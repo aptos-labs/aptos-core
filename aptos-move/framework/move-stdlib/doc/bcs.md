@@ -3,10 +3,7 @@
 
 # Module `0x1::bcs`
 
-Utility for converting a Move value to its binary representation in BCS (Binary Canonical
-Serialization). BCS is the binary encoding for Move resources and other non-module values
-published on-chain. See https://github.com/aptos-labs/bcs#binary-canonical-serialization-bcs for more
-details on BCS.
+Utility for converting a Move value to its binary representation in BCS (Binary Canonical<br/> Serialization). BCS is the binary encoding for Move resources and other non&#45;module values<br/> published on&#45;chain. See https://github.com/aptos&#45;labs/bcs&#35;binary&#45;canonical&#45;serialization&#45;bcs for more<br/> details on BCS.
 
 
 -  [Function `to_bytes`](#0x1_bcs_to_bytes)
@@ -44,7 +41,7 @@ Return the binary representation of <code>v</code> in BCS (Binary Canonical Seri
 
 
 
-Native function which is defined in the prover's prelude.
+Native function which is defined in the prover&apos;s prelude.
 
 
 <a id="0x1_bcs_serialize"></a>

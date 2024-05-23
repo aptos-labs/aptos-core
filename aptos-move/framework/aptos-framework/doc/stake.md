@@ -3,25 +3,7 @@
 
 # Module `0x1::stake`
 
-
-Validator lifecycle:
-1. Prepare a validator node set up and call stake::initialize_validator
-2. Once ready to deposit stake (or have funds assigned by a staking service in exchange for ownership capability),
-call stake::add_stake (or *_with_cap versions if called from the staking service)
-3. Call stake::join_validator_set (or _with_cap version) to join the active validator set. Changes are effective in
-the next epoch.
-4. Validate and gain rewards. The stake will automatically be locked up for a fixed duration (set by governance) and
-automatically renewed at expiration.
-5. At any point, if the validator operator wants to update the consensus key or network/fullnode addresses, they can
-call stake::rotate_consensus_key and stake::update_network_and_fullnode_addresses. Similar to changes to stake, the
-changes to consensus key/network/fullnode addresses are only effective in the next epoch.
-6. Validator can request to unlock their stake at any time. However, their stake will only become withdrawable when
-their current lockup expires. This can be at most as long as the fixed lockup duration.
-7. After exiting, the validator can either explicitly leave the validator set by calling stake::leave_validator_set
-or if their stake drops below the min required, they would get removed at the end of the epoch.
-8. Validator can always rejoin the validator set by going through steps 2-3 again.
-9. An owner can always switch operators by calling stake::set_operator.
-10. An owner can always switch designated voter by calling stake::set_designated_voter.
+<br/> Validator lifecycle:<br/> 1. Prepare a validator node set up and call stake::initialize_validator<br/> 2. Once ready to deposit stake (or have funds assigned by a staking service in exchange for ownership capability),<br/> call stake::add_stake (or &#42;_with_cap versions if called from the staking service)<br/> 3. Call stake::join_validator_set (or _with_cap version) to join the active validator set. Changes are effective in<br/> the next epoch.<br/> 4. Validate and gain rewards. The stake will automatically be locked up for a fixed duration (set by governance) and<br/> automatically renewed at expiration.<br/> 5. At any point, if the validator operator wants to update the consensus key or network/fullnode addresses, they can<br/> call stake::rotate_consensus_key and stake::update_network_and_fullnode_addresses. Similar to changes to stake, the<br/> changes to consensus key/network/fullnode addresses are only effective in the next epoch.<br/> 6. Validator can request to unlock their stake at any time. However, their stake will only become withdrawable when<br/> their current lockup expires. This can be at most as long as the fixed lockup duration.<br/> 7. After exiting, the validator can either explicitly leave the validator set by calling stake::leave_validator_set<br/> or if their stake drops below the min required, they would get removed at the end of the epoch.<br/> 8. Validator can always rejoin the validator set by going through steps 2&#45;3 again.<br/> 9. An owner can always switch operators by calling stake::set_operator.<br/> 10. An owner can always switch designated voter by calling stake::set_designated_voter.
 
 
 -  [Resource `OwnerCapability`](#0x1_stake_OwnerCapability)
@@ -176,9 +158,7 @@ or if their stake drops below the min required, they would get removed at the en
 
 ## Resource `OwnerCapability`
 
-Capability that represents ownership and can be used to control the validator and the associated stake pool.
-Having this be separate from the signer for the account that the validator resources are hosted at allows
-modules to have control over a validator.
+Capability that represents ownership and can be used to control the validator and the associated stake pool.<br/> Having this be separate from the signer for the account that the validator resources are hosted at allows<br/> modules to have control over a validator.
 
 
 <pre><code>struct OwnerCapability has store, key<br/></code></pre>
@@ -205,17 +185,7 @@ modules to have control over a validator.
 
 ## Resource `StakePool`
 
-Each validator has a separate StakePool resource and can provide a stake.
-Changes in stake for an active validator:
-1. If a validator calls add_stake, the newly added stake is moved to pending_active.
-2. If validator calls unlock, their stake is moved to pending_inactive.
-2. When the next epoch starts, any pending_inactive stake is moved to inactive and can be withdrawn.
-Any pending_active stake is moved to active and adds to the validator's voting power.
-
-Changes in stake for an inactive validator:
-1. If a validator calls add_stake, the newly added stake is moved directly to active.
-2. If validator calls unlock, their stake is moved directly to inactive.
-3. When the next epoch starts, the validator can be activated if their active stake is more than the minimum.
+Each validator has a separate StakePool resource and can provide a stake.<br/> Changes in stake for an active validator:<br/> 1. If a validator calls add_stake, the newly added stake is moved to pending_active.<br/> 2. If validator calls unlock, their stake is moved to pending_inactive.<br/> 2. When the next epoch starts, any pending_inactive stake is moved to inactive and can be withdrawn.<br/>    Any pending_active stake is moved to active and adds to the validator&apos;s voting power.<br/><br/> Changes in stake for an inactive validator:<br/> 1. If a validator calls add_stake, the newly added stake is moved directly to active.<br/> 2. If validator calls unlock, their stake is moved directly to inactive.<br/> 3. When the next epoch starts, the validator can be activated if their active stake is more than the minimum.
 
 
 <pre><code>struct StakePool has key<br/></code></pre>
@@ -434,10 +404,7 @@ Consensus information per validator, stored in ValidatorSet.
 
 ## Resource `ValidatorSet`
 
-Full ValidatorSet, stored in @aptos_framework.
-1. join_validator_set adds to pending_active queue.
-2. leave_valdiator_set moves from active to pending_inactive queue.
-3. on_new_epoch processes two pending queues and refresh ValidatorInfo from the owner's address.
+Full ValidatorSet, stored in @aptos_framework.<br/> 1. join_validator_set adds to pending_active queue.<br/> 2. leave_valdiator_set moves from active to pending_inactive queue.<br/> 3. on_new_epoch processes two pending queues and refresh ValidatorInfo from the owner&apos;s address.
 
 
 <pre><code>struct ValidatorSet has copy, drop, store, key<br/></code></pre>
@@ -494,8 +461,7 @@ Full ValidatorSet, stored in @aptos_framework.
 
 ## Resource `AptosCoinCapabilities`
 
-AptosCoin capabilities, set during genesis and stored in @CoreResource account.
-This allows the Stake module to mint rewards to stakers.
+AptosCoin capabilities, set during genesis and stored in @CoreResource account.<br/> This allows the Stake module to mint rewards to stakers.
 
 
 <pre><code>struct AptosCoinCapabilities has key<br/></code></pre>
@@ -1384,8 +1350,7 @@ This allows the Stake module to mint rewards to stakers.
 
 ## Resource `ValidatorFees`
 
-Stores transaction fees assigned to validators. All fees are distributed to validators
-at the end of the epoch.
+Stores transaction fees assigned to validators. All fees are distributed to validators<br/> at the end of the epoch.
 
 
 <pre><code>struct ValidatorFees has key<br/></code></pre>
@@ -1412,9 +1377,7 @@ at the end of the epoch.
 
 ## Resource `AllowedValidators`
 
-This provides an ACL for Testnet purposes. In testnet, everyone is a whale, a whale can be a validator.
-This allows a testnet to bring additional entities into the validator set without compromising the
-security of the testnet. This will NOT be enabled in Mainnet.
+This provides an ACL for Testnet purposes. In testnet, everyone is a whale, a whale can be a validator.<br/> This allows a testnet to bring additional entities into the validator set without compromising the<br/> security of the testnet. This will NOT be enabled in Mainnet.
 
 
 <pre><code>struct AllowedValidators has key<br/></code></pre>
@@ -1601,7 +1564,7 @@ Validator is not defined in the ACL of entities allowed to be validators
 
 <a id="0x1_stake_EINVALID_LOCKUP"></a>
 
-Cannot update stake pool's lockup to earlier than current lockup.
+Cannot update stake pool&apos;s lockup to earlier than current lockup.
 
 
 <pre><code>const EINVALID_LOCKUP: u64 &#61; 18;<br/></code></pre>
@@ -1619,7 +1582,7 @@ Invalid consensus public key
 
 <a id="0x1_stake_ELAST_VALIDATOR"></a>
 
-Can't remove last validator.
+Can&apos;t remove last validator.
 
 
 <pre><code>const ELAST_VALIDATOR: u64 &#61; 6;<br/></code></pre>
@@ -1673,7 +1636,7 @@ Owner capability does not exist at the provided account.
 
 <a id="0x1_stake_ERECONFIGURATION_IN_PROGRESS"></a>
 
-Validator set change temporarily disabled because of in-progress reconfiguration.
+Validator set change temporarily disabled because of in&#45;progress reconfiguration.
 
 
 <pre><code>const ERECONFIGURATION_IN_PROGRESS: u64 &#61; 20;<br/></code></pre>
@@ -1745,8 +1708,7 @@ Voting power increase has exceeded the limit for this current epoch.
 
 <a id="0x1_stake_MAX_VALIDATOR_SET_SIZE"></a>
 
-Limit the maximum size to u16::max, it's the current limit of the bitvec
-https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-bitvec/src/lib.rs#L20
+Limit the maximum size to u16::max, it&apos;s the current limit of the bitvec<br/> https://github.com/aptos&#45;labs/aptos&#45;core/blob/main/crates/aptos&#45;bitvec/src/lib.rs&#35;L20
 
 
 <pre><code>const MAX_VALIDATOR_SET_SIZE: u64 &#61; 65536;<br/></code></pre>
@@ -1790,8 +1752,7 @@ Validator status enum. We can switch to proper enum later once Move supports it.
 
 ## Function `initialize_validator_fees`
 
-Initializes the resource storing information about collected transaction fees per validator.
-Used by <code>transaction_fee.move</code> to initialize fee collection and distribution.
+Initializes the resource storing information about collected transaction fees per validator.<br/> Used by <code>transaction_fee.move</code> to initialize fee collection and distribution.
 
 
 <pre><code>public(friend) fun initialize_validator_fees(aptos_framework: &amp;signer)<br/></code></pre>
@@ -1833,8 +1794,7 @@ Stores the transaction fee collected to the specified validator address.
 
 ## Function `get_lockup_secs`
 
-Return the lockup expiration of the stake pool at <code>pool_address</code>.
-This will throw an error if there's no stake pool at <code>pool_address</code>.
+Return the lockup expiration of the stake pool at <code>pool_address</code>.<br/> This will throw an error if there&apos;s no stake pool at <code>pool_address</code>.
 
 
 <pre><code>&#35;[view]<br/>public fun get_lockup_secs(pool_address: address): u64<br/></code></pre>
@@ -1855,8 +1815,7 @@ This will throw an error if there's no stake pool at <code>pool_address</code>.
 
 ## Function `get_remaining_lockup_secs`
 
-Return the remaining lockup of the stake pool at <code>pool_address</code>.
-This will throw an error if there's no stake pool at <code>pool_address</code>.
+Return the remaining lockup of the stake pool at <code>pool_address</code>.<br/> This will throw an error if there&apos;s no stake pool at <code>pool_address</code>.
 
 
 <pre><code>&#35;[view]<br/>public fun get_remaining_lockup_secs(pool_address: address): u64<br/></code></pre>
@@ -1877,8 +1836,7 @@ This will throw an error if there's no stake pool at <code>pool_address</code>.
 
 ## Function `get_stake`
 
-Return the different stake amounts for <code>pool_address</code> (whether the validator is active or not).
-The returned amounts are for (active, inactive, pending_active, pending_inactive) stake respectively.
+Return the different stake amounts for <code>pool_address</code> (whether the validator is active or not).<br/> The returned amounts are for (active, inactive, pending_active, pending_inactive) stake respectively.
 
 
 <pre><code>&#35;[view]<br/>public fun get_stake(pool_address: address): (u64, u64, u64, u64)<br/></code></pre>
@@ -1899,7 +1857,7 @@ The returned amounts are for (active, inactive, pending_active, pending_inactive
 
 ## Function `get_validator_state`
 
-Returns the validator's state.
+Returns the validator&apos;s state.
 
 
 <pre><code>&#35;[view]<br/>public fun get_validator_state(pool_address: address): u64<br/></code></pre>
@@ -1920,8 +1878,7 @@ Returns the validator's state.
 
 ## Function `get_current_epoch_voting_power`
 
-Return the voting power of the validator in the current epoch.
-This is the same as the validator's total active and pending_inactive stake.
+Return the voting power of the validator in the current epoch.<br/> This is the same as the validator&apos;s total active and pending_inactive stake.
 
 
 <pre><code>&#35;[view]<br/>public fun get_current_epoch_voting_power(pool_address: address): u64<br/></code></pre>
@@ -2047,7 +2004,7 @@ Return the number of successful and failed proposals for the proposal at the giv
 
 ## Function `get_validator_config`
 
-Return the validator's config.
+Return the validator&apos;s config.
 
 
 <pre><code>&#35;[view]<br/>public fun get_validator_config(pool_address: address): (vector&lt;u8&gt;, vector&lt;u8&gt;, vector&lt;u8&gt;)<br/></code></pre>
@@ -2109,8 +2066,7 @@ Initialize validator set to the core resource account.
 
 ## Function `store_aptos_coin_mint_cap`
 
-This is only called during Genesis, which is where MintCapability<AptosCoin> can be created.
-Beyond genesis, no one can create AptosCoin mint/burn capabilities.
+This is only called during Genesis, which is where MintCapability&lt;AptosCoin&gt; can be created.<br/> Beyond genesis, no one can create AptosCoin mint/burn capabilities.
 
 
 <pre><code>public(friend) fun store_aptos_coin_mint_cap(aptos_framework: &amp;signer, mint_cap: coin::MintCapability&lt;aptos_coin::AptosCoin&gt;)<br/></code></pre>
@@ -2152,10 +2108,7 @@ Allow on chain governance to remove validators from the validator set.
 
 ## Function `initialize_stake_owner`
 
-Initialize the validator account and give ownership to the signing account
-except it leaves the ValidatorConfig to be set by another entity.
-Note: this triggers setting the operator and owner, set it to the account's address
-to set later.
+Initialize the validator account and give ownership to the signing account<br/> except it leaves the ValidatorConfig to be set by another entity.<br/> Note: this triggers setting the operator and owner, set it to the account&apos;s address<br/> to set later.
 
 
 <pre><code>public entry fun initialize_stake_owner(owner: &amp;signer, initial_stake_amount: u64, operator: address, voter: address)<br/></code></pre>
@@ -2238,8 +2191,7 @@ Extract and return owner capability from the signing account.
 
 ## Function `deposit_owner_cap`
 
-Deposit <code>owner_cap</code> into <code>account</code>. This requires <code>account</code> to not already have ownership of another
-staking pool.
+Deposit <code>owner_cap</code> into <code>account</code>. This requires <code>account</code> to not already have ownership of another<br/> staking pool.
 
 
 <pre><code>public fun deposit_owner_cap(owner: &amp;signer, owner_cap: stake::OwnerCapability)<br/></code></pre>
@@ -2448,7 +2400,7 @@ Move <code>amount</code> of coins from pending_inactive to active.
 
 ## Function `rotate_consensus_key`
 
-Rotate the consensus key of the validator, it'll take effect in next epoch.
+Rotate the consensus key of the validator, it&apos;ll take effect in next epoch.
 
 
 <pre><code>public entry fun rotate_consensus_key(operator: &amp;signer, pool_address: address, new_consensus_pubkey: vector&lt;u8&gt;, proof_of_possession: vector&lt;u8&gt;)<br/></code></pre>
@@ -2511,8 +2463,7 @@ Similar to increase_lockup_with_cap but will use ownership capability from the s
 
 ## Function `increase_lockup_with_cap`
 
-Unlock from active delegation, it's moved to pending_inactive if locked_until_secs < current_time or
-directly inactive if it's not from an active validator.
+Unlock from active delegation, it&apos;s moved to pending_inactive if locked_until_secs &lt; current_time or<br/> directly inactive if it&apos;s not from an active validator.
 
 
 <pre><code>public fun increase_lockup_with_cap(owner_cap: &amp;stake::OwnerCapability)<br/></code></pre>
@@ -2554,12 +2505,7 @@ This can only called by the operator of the validator/staking pool.
 
 ## Function `join_validator_set_internal`
 
-Request to have <code>pool_address</code> join the validator set. Can only be called after calling <code>initialize_validator</code>.
-If the validator has the required stake (more than minimum and less than maximum allowed), they will be
-added to the pending_active queue. All validators in this queue will be added to the active set when the next
-epoch starts (eligibility will be rechecked).
-
-This internal version can only be called by the Genesis module during Genesis.
+Request to have <code>pool_address</code> join the validator set. Can only be called after calling <code>initialize_validator</code>.<br/> If the validator has the required stake (more than minimum and less than maximum allowed), they will be<br/> added to the pending_active queue. All validators in this queue will be added to the active set when the next<br/> epoch starts (eligibility will be rechecked).<br/><br/> This internal version can only be called by the Genesis module during Genesis.
 
 
 <pre><code>public(friend) fun join_validator_set_internal(operator: &amp;signer, pool_address: address)<br/></code></pre>
@@ -2622,7 +2568,7 @@ Unlock <code>amount</code> from the active stake. Only possible if the lockup ha
 
 ## Function `withdraw`
 
-Withdraw from <code>account</code>'s inactive stake.
+Withdraw from <code>account</code>&apos;s inactive stake.
 
 
 <pre><code>public entry fun withdraw(owner: &amp;signer, withdraw_amount: u64)<br/></code></pre>
@@ -2643,7 +2589,7 @@ Withdraw from <code>account</code>'s inactive stake.
 
 ## Function `withdraw_with_cap`
 
-Withdraw from <code>pool_address</code>'s inactive stake with the corresponding <code>owner_cap</code>.
+Withdraw from <code>pool_address</code>&apos;s inactive stake with the corresponding <code>owner_cap</code>.
 
 
 <pre><code>public fun withdraw_with_cap(owner_cap: &amp;stake::OwnerCapability, withdraw_amount: u64): coin::Coin&lt;aptos_coin::AptosCoin&gt;<br/></code></pre>
@@ -2664,12 +2610,7 @@ Withdraw from <code>pool_address</code>'s inactive stake with the corresponding 
 
 ## Function `leave_validator_set`
 
-Request to have <code>pool_address</code> leave the validator set. The validator is only actually removed from the set when
-the next epoch starts.
-The last validator in the set cannot leave. This is an edge case that should never happen as long as the network
-is still operational.
-
-Can only be called by the operator of the validator/staking pool.
+Request to have <code>pool_address</code> leave the validator set. The validator is only actually removed from the set when<br/> the next epoch starts.<br/> The last validator in the set cannot leave. This is an edge case that should never happen as long as the network<br/> is still operational.<br/><br/> Can only be called by the operator of the validator/staking pool.
 
 
 <pre><code>public entry fun leave_validator_set(operator: &amp;signer, pool_address: address)<br/></code></pre>
@@ -2690,9 +2631,7 @@ Can only be called by the operator of the validator/staking pool.
 
 ## Function `is_current_epoch_validator`
 
-Returns true if the current validator can still vote in the current epoch.
-This includes validators that requested to leave but are still in the pending_inactive queue and will be removed
-when the epoch starts.
+Returns true if the current validator can still vote in the current epoch.<br/> This includes validators that requested to leave but are still in the pending_inactive queue and will be removed<br/> when the epoch starts.
 
 
 <pre><code>public fun is_current_epoch_validator(pool_address: address): bool<br/></code></pre>
@@ -2713,8 +2652,7 @@ when the epoch starts.
 
 ## Function `update_performance_statistics`
 
-Update the validator performance (proposal statistics). This is only called by block::prologue().
-This function cannot abort.
+Update the validator performance (proposal statistics). This is only called by block::prologue().<br/> This function cannot abort.
 
 
 <pre><code>public(friend) fun update_performance_statistics(proposer_index: option::Option&lt;u64&gt;, failed_proposer_indices: vector&lt;u64&gt;)<br/></code></pre>
@@ -2735,16 +2673,7 @@ This function cannot abort.
 
 ## Function `on_new_epoch`
 
-Triggered during a reconfiguration. This function shouldn't abort.
-
-1. Distribute transaction fees and rewards to stake pools of active and pending inactive validators (requested
-to leave but not yet removed).
-2. Officially move pending active stake to active and move pending inactive stake to inactive.
-The staking pool's voting power in this new epoch will be updated to the total active stake.
-3. Add pending active validators to the active set if they satisfy requirements so they can vote and remove
-pending inactive validators so they no longer can vote.
-4. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
-power.
+Triggered during a reconfiguration. This function shouldn&apos;t abort.<br/><br/> 1. Distribute transaction fees and rewards to stake pools of active and pending inactive validators (requested<br/> to leave but not yet removed).<br/> 2. Officially move pending active stake to active and move pending inactive stake to inactive.<br/> The staking pool&apos;s voting power in this new epoch will be updated to the total active stake.<br/> 3. Add pending active validators to the active set if they satisfy requirements so they can vote and remove<br/> pending inactive validators so they no longer can vote.<br/> 4. The validator&apos;s voting power in the validator set is updated to be the corresponding staking pool&apos;s voting<br/> power.
 
 
 <pre><code>public(friend) fun on_new_epoch()<br/></code></pre>
@@ -2846,13 +2775,7 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
 
 ## Function `update_stake_pool`
 
-Calculate the stake amount of a stake pool for the next epoch.
-Update individual validator's stake pool if <code>commit &#61;&#61; true</code>.
-
-1. distribute transaction fees to active/pending_inactive delegations
-2. distribute rewards to active/pending_inactive delegations
-3. process pending_active, pending_inactive correspondingly
-This function shouldn't abort.
+Calculate the stake amount of a stake pool for the next epoch.<br/> Update individual validator&apos;s stake pool if <code>commit &#61;&#61; true</code>.<br/><br/> 1. distribute transaction fees to active/pending_inactive delegations<br/> 2. distribute rewards to active/pending_inactive delegations<br/> 3. process pending_active, pending_inactive correspondingly<br/> This function shouldn&apos;t abort.
 
 
 <pre><code>fun update_stake_pool(validator_perf: &amp;stake::ValidatorPerformance, pool_address: address, staking_config: &amp;staking_config::StakingConfig)<br/></code></pre>
@@ -2915,7 +2838,7 @@ Calculate the rewards amount.
 
 ## Function `distribute_rewards`
 
-Mint rewards corresponding to current epoch's <code>stake</code> and <code>num_successful_votes</code>.
+Mint rewards corresponding to current epoch&apos;s <code>stake</code> and <code>num_successful_votes</code>.
 
 
 <pre><code>fun distribute_rewards(stake: &amp;mut coin::Coin&lt;aptos_coin::AptosCoin&gt;, num_successful_proposals: u64, num_total_proposals: u64, rewards_rate: u64, rewards_rate_denominator: u64): u64<br/></code></pre>
@@ -2996,7 +2919,7 @@ Mint rewards corresponding to current epoch's <code>stake</code> and <code>num_s
 
 ## Function `get_next_epoch_voting_power`
 
-Returns validator's next epoch voting power, including pending_active, active, and pending_inactive stake.
+Returns validator&apos;s next epoch voting power, including pending_active, active, and pending_inactive stake.
 
 
 <pre><code>fun get_next_epoch_voting_power(stake_pool: &amp;stake::StakePool): u64<br/></code></pre>
@@ -3144,46 +3067,19 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>The validator set resource stores consensus information for each validator. The consensus scheme remains consistent across all validators within the set.</td>
-<td>Low</td>
-<td>The consensus_scheme attribute within ValidatorSet initializes with the value zero during the module's initialization and its value remains unchanged afterward.</td>
-<td>Formally verified by the data invariant of <a href="#high-level-req-1">ValidatorSet</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The validator set resource stores consensus information for each validator. The consensus scheme remains consistent across all validators within the set.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The consensus_scheme attribute within ValidatorSet initializes with the value zero during the module&apos;s initialization and its value remains unchanged afterward.&lt;/td&gt;<br/>&lt;td&gt;Formally verified by the data invariant of &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;ValidatorSet&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The owner of a validator is immutable.</td>
-<td>Low</td>
-<td>During the initialization of a validator, the owner attribute becomes the signer's address. This assignment establishes the signer as the owner and controller of the validator entity. Subsequently, the owner attribute remains unchanged throughout the validator's lifespan, maintaining its assigned value without any modifications.</td>
-<td>Formally verified in the schema <a href="#high-level-req-2">ValidatorOwnerNoChange</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The owner of a validator is immutable.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;During the initialization of a validator, the owner attribute becomes the signer&apos;s address. This assignment establishes the signer as the owner and controller of the validator entity. Subsequently, the owner attribute remains unchanged throughout the validator&apos;s lifespan, maintaining its assigned value without any modifications.&lt;/td&gt;<br/>&lt;td&gt;Formally verified in the schema &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;ValidatorOwnerNoChange&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>The total staked value in the stake pool should remain constant, excluding operations related to adding and withdrawing.</td>
-<td>Low</td>
-<td>The total staked value (AptosCoin) of a stake pool is grouped by: active, inactive, pending_active, and pending_inactive. The stake value remains constant except during the execution of the add_stake_with_cap or withdraw_with_cap functions or on_new_epoch (which distributes the reward).</td>
-<td>Formally specified in the schema <a href="#high-level-req-3">StakedValueNoChange</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The total staked value in the stake pool should remain constant, excluding operations related to adding and withdrawing.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The total staked value (AptosCoin) of a stake pool is grouped by: active, inactive, pending_active, and pending_inactive. The stake value remains constant except during the execution of the add_stake_with_cap or withdraw_with_cap functions or on_new_epoch (which distributes the reward).&lt;/td&gt;<br/>&lt;td&gt;Formally specified in the schema &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;StakedValueNoChange&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>During each epoch, the following operations should be consistently performed without aborting: rewards distribution, validator activation/deactivation, updates to validator sets and voting power, and renewal of lockups.</td>
-<td>Low</td>
-<td>The on_new_epoch function is triggered at each epoch boundary to perform distribution of the transaction fee, updates to active/inactive stakes, updates to pending active/inactive validators and adjusts voting power of the validators without aborting.</td>
-<td>Formally verified via <a href="#high-level-req-4">on_new_epoch</a>. This also requires a manual review to verify the state updates of the stake pool.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;During each epoch, the following operations should be consistently performed without aborting: rewards distribution, validator activation/deactivation, updates to validator sets and voting power, and renewal of lockups.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The on_new_epoch function is triggered at each epoch boundary to perform distribution of the transaction fee, updates to active/inactive stakes, updates to pending active/inactive validators and adjusts voting power of the validators without aborting.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;on_new_epoch&lt;/a&gt;. This also requires a manual review to verify the state updates of the stake pool.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -3249,7 +3145,7 @@ global ghost_pending_inactive_num: u64;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 invariant consensus_scheme &#61;&#61; 0;<br/></code></pre>
 
 
@@ -3274,7 +3170,7 @@ invariant consensus_scheme &#61;&#61; 0;<br/></code></pre>
 <a id="0x1_stake_ValidatorOwnerNoChange"></a>
 
 
-<pre><code>schema ValidatorOwnerNoChange &#123;<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>schema ValidatorOwnerNoChange &#123;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
     ensures forall addr: address where old(exists&lt;OwnerCapability&gt;(addr)):<br/>    old(global&lt;OwnerCapability&gt;(addr)).pool_address &#61;&#61; global&lt;OwnerCapability&gt;(addr).pool_address;<br/>&#125;<br/></code></pre>
 
 
@@ -3283,7 +3179,7 @@ invariant consensus_scheme &#61;&#61; 0;<br/></code></pre>
 <a id="0x1_stake_StakedValueNochange"></a>
 
 
-<pre><code>schema StakedValueNochange &#123;<br/>pool_address: address;<br/>let stake_pool &#61; global&lt;StakePool&gt;(pool_address);<br/>let post post_stake_pool &#61; global&lt;StakePool&gt;(pool_address);<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>schema StakedValueNochange &#123;<br/>pool_address: address;<br/>let stake_pool &#61; global&lt;StakePool&gt;(pool_address);<br/>let post post_stake_pool &#61; global&lt;StakePool&gt;(pool_address);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
     ensures stake_pool.active.value &#43; stake_pool.inactive.value &#43; stake_pool.pending_active.value &#43; stake_pool.pending_inactive.value &#61;&#61;<br/>    post_stake_pool.active.value &#43; post_stake_pool.inactive.value &#43; post_stake_pool.pending_active.value &#43; post_stake_pool.pending_inactive.value;<br/>&#125;<br/></code></pre>
 
 
@@ -3636,7 +3532,7 @@ invariant consensus_scheme &#61;&#61; 0;<br/></code></pre>
 
 
 
-<pre><code>pragma verify &#61; false;<br/>pragma disable_invariants_in_body;<br/>include ResourceRequirement;<br/>include GetReconfigStartTimeRequirement;<br/>include staking_config::StakingRewardsConfigRequirement;<br/>include aptos_framework::aptos_coin::ExistsAptosCoin;<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<pre><code>pragma verify &#61; false;<br/>pragma disable_invariants_in_body;<br/>include ResourceRequirement;<br/>include GetReconfigStartTimeRequirement;<br/>include staking_config::StakingRewardsConfigRequirement;<br/>include aptos_framework::aptos_coin::ExistsAptosCoin;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 

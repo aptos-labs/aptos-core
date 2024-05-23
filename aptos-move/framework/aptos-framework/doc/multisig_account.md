@@ -3,43 +3,7 @@
 
 # Module `0x1::multisig_account`
 
-Enhanced multisig account standard on Aptos. This is different from the native multisig scheme support enforced via
-the account's auth key.
-
-This module allows creating a flexible and powerful multisig account with seamless support for updating owners
-without changing the auth key. Users can choose to store transaction payloads waiting for owner signatures on chain
-or off chain (primary consideration is decentralization/transparency vs gas cost).
-
-The multisig account is a resource account underneath. By default, it has no auth key and can only be controlled via
-the special multisig transaction flow. However, owners can create a transaction to change the auth key to match a
-private key off chain if so desired.
-
-Transactions need to be executed in order of creation, similar to transactions for a normal Aptos account (enforced
-with account nonce).
-
-The flow is like below:
-1. Owners can create a new multisig account by calling create (signer is default single owner) or with
-create_with_owners where multiple initial owner addresses can be specified. This is different (and easier) from
-the native multisig scheme where the owners' public keys have to be specified. Here, only addresses are needed.
-2. Owners can be added/removed any time by calling add_owners or remove_owners. The transactions to do still need
-to follow the k-of-n scheme specified for the multisig account.
-3. To create a new transaction, an owner can call create_transaction with the transaction payload. This will store
-the full transaction payload on chain, which adds decentralization (censorship is not possible as the data is
-available on chain) and makes it easier to fetch all transactions waiting for execution. If saving gas is desired,
-an owner can alternatively call create_transaction_with_hash where only the payload hash is stored. Later execution
-will be verified using the hash. Only owners can create transactions and a transaction id (incremeting id) will be
-assigned.
-4. To approve or reject a transaction, other owners can call approve() or reject() with the transaction id.
-5. If there are enough approvals, any owner can execute the transaction using the special MultisigTransaction type
-with the transaction id if the full payload is already stored on chain or with the transaction payload if only a
-hash is stored. Transaction execution will first check with this module that the transaction payload has gotten
-enough signatures. If so, it will be executed as the multisig account. The owner who executes will pay for gas.
-6. If there are enough rejections, any owner can finalize the rejection by calling execute_rejected_transaction().
-
-Note that this multisig account model is not designed to use with a large number of owners. The more owners there
-are, the more expensive voting on transactions will become. If a large number of owners is designed, such as in a
-flat governance structure, clients are encouraged to write their own modules on top of this multisig account module
-and implement the governance voting logic on top.
+Enhanced multisig account standard on Aptos. This is different from the native multisig scheme support enforced via<br/> the account&apos;s auth key.<br/><br/> This module allows creating a flexible and powerful multisig account with seamless support for updating owners<br/> without changing the auth key. Users can choose to store transaction payloads waiting for owner signatures on chain<br/> or off chain (primary consideration is decentralization/transparency vs gas cost).<br/><br/> The multisig account is a resource account underneath. By default, it has no auth key and can only be controlled via<br/> the special multisig transaction flow. However, owners can create a transaction to change the auth key to match a<br/> private key off chain if so desired.<br/><br/> Transactions need to be executed in order of creation, similar to transactions for a normal Aptos account (enforced<br/> with account nonce).<br/><br/> The flow is like below:<br/> 1. Owners can create a new multisig account by calling create (signer is default single owner) or with<br/> create_with_owners where multiple initial owner addresses can be specified. This is different (and easier) from<br/> the native multisig scheme where the owners&apos; public keys have to be specified. Here, only addresses are needed.<br/> 2. Owners can be added/removed any time by calling add_owners or remove_owners. The transactions to do still need<br/> to follow the k&#45;of&#45;n scheme specified for the multisig account.<br/> 3. To create a new transaction, an owner can call create_transaction with the transaction payload. This will store<br/> the full transaction payload on chain, which adds decentralization (censorship is not possible as the data is<br/> available on chain) and makes it easier to fetch all transactions waiting for execution. If saving gas is desired,<br/> an owner can alternatively call create_transaction_with_hash where only the payload hash is stored. Later execution<br/> will be verified using the hash. Only owners can create transactions and a transaction id (incremeting id) will be<br/> assigned.<br/> 4. To approve or reject a transaction, other owners can call approve() or reject() with the transaction id.<br/> 5. If there are enough approvals, any owner can execute the transaction using the special MultisigTransaction type<br/> with the transaction id if the full payload is already stored on chain or with the transaction payload if only a<br/> hash is stored. Transaction execution will first check with this module that the transaction payload has gotten<br/> enough signatures. If so, it will be executed as the multisig account. The owner who executes will pay for gas.<br/> 6. If there are enough rejections, any owner can finalize the rejection by calling execute_rejected_transaction().<br/><br/> Note that this multisig account model is not designed to use with a large number of owners. The more owners there<br/> are, the more expensive voting on transactions will become. If a large number of owners is designed, such as in a<br/> flat governance structure, clients are encouraged to write their own modules on top of this multisig account module<br/> and implement the governance voting logic on top.
 
 
 -  [Resource `MultisigAccount`](#0x1_multisig_account_MultisigAccount)
@@ -149,8 +113,7 @@ and implement the governance voting logic on top.
 
 ## Resource `MultisigAccount`
 
-Represents a multisig account's configurations and transactions.
-This will be stored in the multisig account (created as a resource account separate from any owner accounts).
+Represents a multisig account&apos;s configurations and transactions.<br/> This will be stored in the multisig account (created as a resource account separate from any owner accounts).
 
 
 <pre><code>struct MultisigAccount has key<br/></code></pre>
@@ -267,8 +230,7 @@ This will be stored in the multisig account (created as a resource account separ
 
 ## Struct `MultisigTransaction`
 
-A transaction to be executed in a multisig account.
-This must contain either the full transaction payload or its hash (stored as bytes).
+A transaction to be executed in a multisig account.<br/> This must contain either the full transaction payload or its hash (stored as bytes).
 
 
 <pre><code>struct MultisigTransaction has copy, drop, store<br/></code></pre>
@@ -815,8 +777,7 @@ Event emitted when an owner approves or rejects a transaction.
 
 ## Struct `ExecuteRejectedTransactionEvent`
 
-Event emitted when a transaction is officially rejected because the number of rejections has reached the
-number of signatures required.
+Event emitted when a transaction is officially rejected because the number of rejections has reached the<br/> number of signatures required.
 
 
 <pre><code>struct ExecuteRejectedTransactionEvent has drop, store<br/></code></pre>
@@ -994,7 +955,7 @@ Event emitted when a transaction is executed.
 
 ## Struct `TransactionExecutionFailedEvent`
 
-Event emitted when a transaction's execution failed.
+Event emitted when a transaction&apos;s execution failed.
 
 
 <pre><code>struct TransactionExecutionFailedEvent has drop, store<br/></code></pre>
@@ -1101,7 +1062,7 @@ Event emitted when a transaction's execution failed.
 
 ## Struct `MetadataUpdatedEvent`
 
-Event emitted when a transaction's metadata is updated.
+Event emitted when a transaction&apos;s metadata is updated.
 
 
 <pre><code>struct MetadataUpdatedEvent has drop, store<br/></code></pre>
@@ -1183,9 +1144,7 @@ Event emitted when a transaction's metadata is updated.
 
 <a id="0x1_multisig_account_DOMAIN_SEPARATOR"></a>
 
-The salt used to create a resource account during multisig account creation.
-This is used to avoid conflicts with other modules that also create resource accounts with the same owner
-account.
+The salt used to create a resource account during multisig account creation.<br/> This is used to avoid conflicts with other modules that also create resource accounts with the same owner<br/> account.
 
 
 <pre><code>const DOMAIN_SEPARATOR: vector&lt;u8&gt; &#61; [97, 112, 116, 111, 115, 95, 102, 114, 97, 109, 101, 119, 111, 114, 107, 58, 58, 109, 117, 108, 116, 105, 115, 105, 103, 95, 97, 99, 99, 111, 117, 110, 116];<br/></code></pre>
@@ -1221,7 +1180,7 @@ Owner list cannot contain the same address more than once.
 
 <a id="0x1_multisig_account_EINVALID_PAYLOAD_HASH"></a>
 
-Payload hash must be exactly 32 bytes (sha3-256).
+Payload hash must be exactly 32 bytes (sha3&#45;256).
 
 
 <pre><code>const EINVALID_PAYLOAD_HASH: u64 &#61; 12;<br/></code></pre>
@@ -1230,7 +1189,7 @@ Payload hash must be exactly 32 bytes (sha3-256).
 
 <a id="0x1_multisig_account_EINVALID_SEQUENCE_NUMBER"></a>
 
-The sequence number provided is invalid. It must be between [1, next pending transaction - 1].
+The sequence number provided is invalid. It must be between [1, next pending transaction &#45; 1].
 
 
 <pre><code>const EINVALID_SEQUENCE_NUMBER: u64 &#61; 17;<br/></code></pre>
@@ -1311,7 +1270,7 @@ Account executing this operation is not an owner of the multisig account.
 
 <a id="0x1_multisig_account_ENUMBER_OF_METADATA_KEYS_AND_VALUES_DONT_MATCH"></a>
 
-The number of metadata keys and values don't match.
+The number of metadata keys and values don&apos;t match.
 
 
 <pre><code>const ENUMBER_OF_METADATA_KEYS_AND_VALUES_DONT_MATCH: u64 &#61; 15;<br/></code></pre>
@@ -1347,7 +1306,7 @@ Transaction payload cannot be empty.
 
 <a id="0x1_multisig_account_EPAYLOAD_DOES_NOT_MATCH_HASH"></a>
 
-Provided target function does not match the hash stored in the on-chain transaction.
+Provided target function does not match the hash stored in the on&#45;chain transaction.
 
 
 <pre><code>const EPAYLOAD_DOES_NOT_MATCH_HASH: u64 &#61; 2008;<br/></code></pre>
@@ -1375,7 +1334,7 @@ Transaction with specified id cannot be found.
 
 ## Function `metadata`
 
-Return the multisig account's metadata.
+Return the multisig account&apos;s metadata.
 
 
 <pre><code>&#35;[view]<br/>public fun metadata(multisig_account: address): simple_map::SimpleMap&lt;string::String, vector&lt;u8&gt;&gt;<br/></code></pre>
@@ -1396,8 +1355,7 @@ Return the multisig account's metadata.
 
 ## Function `num_signatures_required`
 
-Return the number of signatures required to execute or execute-reject a transaction in the provided
-multisig account.
+Return the number of signatures required to execute or execute&#45;reject a transaction in the provided<br/> multisig account.
 
 
 <pre><code>&#35;[view]<br/>public fun num_signatures_required(multisig_account: address): u64<br/></code></pre>
@@ -1418,7 +1376,7 @@ multisig account.
 
 ## Function `owners`
 
-Return a vector of all of the provided multisig account's owners.
+Return a vector of all of the provided multisig account&apos;s owners.
 
 
 <pre><code>&#35;[view]<br/>public fun owners(multisig_account: address): vector&lt;address&gt;<br/></code></pre>
@@ -1586,7 +1544,7 @@ Return true if the transaction with given transaction id can be officially rejec
 
 ## Function `can_reject`
 
-Return true if the owner can execute the "rejected" transaction with given transaction id now.
+Return true if the owner can execute the &quot;rejected&quot; transaction with given transaction id now.
 
 
 <pre><code>&#35;[view]<br/>public fun can_reject(owner: address, multisig_account: address, sequence_number: u64): bool<br/></code></pre>
@@ -1711,15 +1669,7 @@ Return a bool tuple indicating whether an owner has voted and if so, whether the
 
 ## Function `create_with_existing_account`
 
-Creates a new multisig account on top of an existing account.
-
-This offers a migration path for an existing account with a multi-ed25519 auth key (native multisig account).
-In order to ensure a malicious module cannot obtain backdoor control over an existing account, a signed message
-with a valid signature from the account's auth key is required.
-
-Note that this does not revoke auth key-based control over the account. Owners should separately rotate the auth
-key after they are fully migrated to the new multisig account. Alternatively, they can call
-create_with_existing_account_and_revoke_auth_key instead.
+Creates a new multisig account on top of an existing account.<br/><br/> This offers a migration path for an existing account with a multi&#45;ed25519 auth key (native multisig account).<br/> In order to ensure a malicious module cannot obtain backdoor control over an existing account, a signed message<br/> with a valid signature from the account&apos;s auth key is required.<br/><br/> Note that this does not revoke auth key&#45;based control over the account. Owners should separately rotate the auth<br/> key after they are fully migrated to the new multisig account. Alternatively, they can call<br/> create_with_existing_account_and_revoke_auth_key instead.
 
 
 <pre><code>public entry fun create_with_existing_account(multisig_address: address, owners: vector&lt;address&gt;, num_signatures_required: u64, account_scheme: u8, account_public_key: vector&lt;u8&gt;, create_multisig_account_signed_message: vector&lt;u8&gt;, metadata_keys: vector&lt;string::String&gt;, metadata_values: vector&lt;vector&lt;u8&gt;&gt;)<br/></code></pre>
@@ -1740,11 +1690,7 @@ create_with_existing_account_and_revoke_auth_key instead.
 
 ## Function `create_with_existing_account_and_revoke_auth_key`
 
-Creates a new multisig account on top of an existing account and immediately rotate the origin auth key to 0x0.
-
-Note: If the original account is a resource account, this does not revoke all control over it as if any
-SignerCapability of the resource account still exists, it can still be used to generate the signer for the
-account.
+Creates a new multisig account on top of an existing account and immediately rotate the origin auth key to 0x0.<br/><br/> Note: If the original account is a resource account, this does not revoke all control over it as if any<br/> SignerCapability of the resource account still exists, it can still be used to generate the signer for the<br/> account.
 
 
 <pre><code>public entry fun create_with_existing_account_and_revoke_auth_key(multisig_address: address, owners: vector&lt;address&gt;, num_signatures_required: u64, account_scheme: u8, account_public_key: vector&lt;u8&gt;, create_multisig_account_signed_message: vector&lt;u8&gt;, metadata_keys: vector&lt;string::String&gt;, metadata_values: vector&lt;vector&lt;u8&gt;&gt;)<br/></code></pre>
@@ -1786,12 +1732,7 @@ Creates a new multisig account and add the signer as a single owner.
 
 ## Function `create_with_owners`
 
-Creates a new multisig account with the specified additional owner list and signatures required.
-
-@param additional_owners The owner account who calls this function cannot be in the additional_owners and there
-cannot be any duplicate owners in the list.
-@param num_signatures_required The number of signatures required to execute a transaction. Must be at least 1 and
-at most the total number of owners.
+Creates a new multisig account with the specified additional owner list and signatures required.<br/><br/> @param additional_owners The owner account who calls this function cannot be in the additional_owners and there<br/> cannot be any duplicate owners in the list.<br/> @param num_signatures_required The number of signatures required to execute a transaction. Must be at least 1 and<br/> at most the total number of owners.
 
 
 <pre><code>public entry fun create_with_owners(owner: &amp;signer, additional_owners: vector&lt;address&gt;, num_signatures_required: u64, metadata_keys: vector&lt;string::String&gt;, metadata_values: vector&lt;vector&lt;u8&gt;&gt;)<br/></code></pre>
@@ -1812,10 +1753,7 @@ at most the total number of owners.
 
 ## Function `create_with_owners_then_remove_bootstrapper`
 
-Like <code>create_with_owners</code>, but removes the calling account after creation.
-
-This is for creating a vanity multisig account from a bootstrapping account that should not
-be an owner after the vanity multisig address has been secured.
+Like <code>create_with_owners</code>, but removes the calling account after creation.<br/><br/> This is for creating a vanity multisig account from a bootstrapping account that should not<br/> be an owner after the vanity multisig address has been secured.
 
 
 <pre><code>public entry fun create_with_owners_then_remove_bootstrapper(bootstrapper: &amp;signer, owners: vector&lt;address&gt;, num_signatures_required: u64, metadata_keys: vector&lt;string::String&gt;, metadata_values: vector&lt;vector&lt;u8&gt;&gt;)<br/></code></pre>
@@ -1877,12 +1815,7 @@ Similar to add_owners, but only allow adding one owner.
 
 ## Function `add_owners`
 
-Add new owners to the multisig account. This can only be invoked by the multisig account itself, through the
-proposal flow.
-
-Note that this function is not public so it can only be invoked directly instead of via a module or script. This
-ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to
-maliciously alter the owners list.
+Add new owners to the multisig account. This can only be invoked by the multisig account itself, through the<br/> proposal flow.<br/><br/> Note that this function is not public so it can only be invoked directly instead of via a module or script. This<br/> ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to<br/> maliciously alter the owners list.
 
 
 <pre><code>entry fun add_owners(multisig_account: &amp;signer, new_owners: vector&lt;address&gt;)<br/></code></pre>
@@ -1945,13 +1878,7 @@ Similar to remove_owners, but only allow removing one owner.
 
 ## Function `remove_owners`
 
-Remove owners from the multisig account. This can only be invoked by the multisig account itself, through the
-proposal flow.
-
-This function skips any owners who are not in the multisig account's list of owners.
-Note that this function is not public so it can only be invoked directly instead of via a module or script. This
-ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to
-maliciously alter the owners list.
+Remove owners from the multisig account. This can only be invoked by the multisig account itself, through the<br/> proposal flow.<br/><br/> This function skips any owners who are not in the multisig account&apos;s list of owners.<br/> Note that this function is not public so it can only be invoked directly instead of via a module or script. This<br/> ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to<br/> maliciously alter the owners list.
 
 
 <pre><code>entry fun remove_owners(multisig_account: &amp;signer, owners_to_remove: vector&lt;address&gt;)<br/></code></pre>
@@ -2035,12 +1962,7 @@ Swap owners in and out, updating number of required signatures.
 
 ## Function `update_signatures_required`
 
-Update the number of signatures required to execute transaction in the specified multisig account.
-
-This can only be invoked by the multisig account itself, through the proposal flow.
-Note that this function is not public so it can only be invoked directly instead of via a module or script. This
-ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to
-maliciously alter the number of signatures required.
+Update the number of signatures required to execute transaction in the specified multisig account.<br/><br/> This can only be invoked by the multisig account itself, through the proposal flow.<br/> Note that this function is not public so it can only be invoked directly instead of via a module or script. This<br/> ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to<br/> maliciously alter the number of signatures required.
 
 
 <pre><code>entry fun update_signatures_required(multisig_account: &amp;signer, new_num_signatures_required: u64)<br/></code></pre>
@@ -2061,13 +1983,7 @@ maliciously alter the number of signatures required.
 
 ## Function `update_metadata`
 
-Allow the multisig account to update its own metadata. Note that this overrides the entire existing metadata.
-If any attributes are not specified in the metadata, they will be removed!
-
-This can only be invoked by the multisig account itself, through the proposal flow.
-Note that this function is not public so it can only be invoked directly instead of via a module or script. This
-ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to
-maliciously alter the number of signatures required.
+Allow the multisig account to update its own metadata. Note that this overrides the entire existing metadata.<br/> If any attributes are not specified in the metadata, they will be removed!<br/><br/> This can only be invoked by the multisig account itself, through the proposal flow.<br/> Note that this function is not public so it can only be invoked directly instead of via a module or script. This<br/> ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to<br/> maliciously alter the number of signatures required.
 
 
 <pre><code>entry fun update_metadata(multisig_account: &amp;signer, keys: vector&lt;string::String&gt;, values: vector&lt;vector&lt;u8&gt;&gt;)<br/></code></pre>
@@ -2129,9 +2045,7 @@ Create a multisig transaction, which will have one approval initially (from the 
 
 ## Function `create_transaction_with_hash`
 
-Create a multisig transaction with a transaction hash instead of the full payload.
-This means the payload will be stored off chain for gas saving. Later, during execution, the executor will need
-to provide the full payload, which will be validated against the hash stored on-chain.
+Create a multisig transaction with a transaction hash instead of the full payload.<br/> This means the payload will be stored off chain for gas saving. Later, during execution, the executor will need<br/> to provide the full payload, which will be validated against the hash stored on&#45;chain.
 
 
 <pre><code>public entry fun create_transaction_with_hash(owner: &amp;signer, multisig_account: address, payload_hash: vector&lt;u8&gt;)<br/></code></pre>
@@ -2194,9 +2108,7 @@ Reject a multisig transaction.
 
 ## Function `vote_transanction`
 
-Generic function that can be used to either approve or reject a multisig transaction
-Retained for backward compatibility: the function with the typographical error in its name
-will continue to be an accessible entry point.
+Generic function that can be used to either approve or reject a multisig transaction<br/> Retained for backward compatibility: the function with the typographical error in its name<br/> will continue to be an accessible entry point.
 
 
 <pre><code>public entry fun vote_transanction(owner: &amp;signer, multisig_account: address, sequence_number: u64, approved: bool)<br/></code></pre>
@@ -2301,10 +2213,7 @@ Remove the next transactions until the final_sequence_number if they have suffic
 
 ## Function `validate_multisig_transaction`
 
-Called by the VM as part of transaction prologue, which is invoked during mempool transaction validation and as
-the first step of transaction execution.
-
-Transaction payload is optional if it's already stored on chain for the transaction.
+Called by the VM as part of transaction prologue, which is invoked during mempool transaction validation and as<br/> the first step of transaction execution.<br/><br/> Transaction payload is optional if it&apos;s already stored on chain for the transaction.
 
 
 <pre><code>fun validate_multisig_transaction(owner: &amp;signer, multisig_account: address, payload: vector&lt;u8&gt;)<br/></code></pre>
@@ -2325,8 +2234,7 @@ Transaction payload is optional if it's already stored on chain for the transact
 
 ## Function `successful_transaction_execution_cleanup`
 
-Post-execution cleanup for a successful multisig transaction execution.
-This function is private so no other code can call this beside the VM itself as part of MultisigTransaction.
+Post&#45;execution cleanup for a successful multisig transaction execution.<br/> This function is private so no other code can call this beside the VM itself as part of MultisigTransaction.
 
 
 <pre><code>fun successful_transaction_execution_cleanup(executor: address, multisig_account: address, transaction_payload: vector&lt;u8&gt;)<br/></code></pre>
@@ -2347,8 +2255,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 ## Function `failed_transaction_execution_cleanup`
 
-Post-execution cleanup for a failed multisig transaction execution.
-This function is private so no other code can call this beside the VM itself as part of MultisigTransaction.
+Post&#45;execution cleanup for a failed multisig transaction execution.<br/> This function is private so no other code can call this beside the VM itself as part of MultisigTransaction.
 
 
 <pre><code>fun failed_transaction_execution_cleanup(executor: address, multisig_account: address, transaction_payload: vector&lt;u8&gt;, execution_error: multisig_account::ExecutionError)<br/></code></pre>
@@ -2697,148 +2604,43 @@ Add new owners, remove owners to remove, update signatures required.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>For every multi-signature account, the range of required signatures should always be in the range of one to the total number of owners.</td>
-<td>Critical</td>
-<td>While creating a MultisigAccount, the function create_with_owners_internal checks that num_signatures_required is in the span from 1 to total count of owners.</td>
-<td>This has been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;For every multi&#45;signature account, the range of required signatures should always be in the range of one to the total number of owners.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;While creating a MultisigAccount, the function create_with_owners_internal checks that num_signatures_required is in the span from 1 to total count of owners.&lt;/td&gt;<br/>&lt;td&gt;This has been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The list of owners for a multi-signature account should not contain any duplicate owners, and the multi-signature account itself cannot be listed as one of its owners.</td>
-<td>Critical</td>
-<td>The function validate_owners validates the owner vector that no duplicate entries exists.</td>
-<td>This has been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The list of owners for a multi&#45;signature account should not contain any duplicate owners, and the multi&#45;signature account itself cannot be listed as one of its owners.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The function validate_owners validates the owner vector that no duplicate entries exists.&lt;/td&gt;<br/>&lt;td&gt;This has been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>The current value of the next sequence number should not be present in the transaction table, until the next sequence number gets increased.</td>
-<td>Medium</td>
-<td>The add_transaction function increases the next sequence number and only then adds the transaction with the old next sequence number to the transaction table.</td>
-<td>This has been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The current value of the next sequence number should not be present in the transaction table, until the next sequence number gets increased.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The add_transaction function increases the next sequence number and only then adds the transaction with the old next sequence number to the transaction table.&lt;/td&gt;<br/>&lt;td&gt;This has been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>When the last executed sequence number is smaller than the next sequence number by only one unit, no transactions should exist in the multi-signature account's transactions list.</td>
-<td>High</td>
-<td>The get_pending_transactions function retrieves pending transactions by iterating through the transactions table, starting from the last_executed_sequence_number + 1 to the next_sequence_number.</td>
-<td>Audited that MultisigAccount.transactions is empty when last_executed_sequence_number == next_sequence_number -1</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;When the last executed sequence number is smaller than the next sequence number by only one unit, no transactions should exist in the multi&#45;signature account&apos;s transactions list.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The get_pending_transactions function retrieves pending transactions by iterating through the transactions table, starting from the last_executed_sequence_number &#43; 1 to the next_sequence_number.&lt;/td&gt;<br/>&lt;td&gt;Audited that MultisigAccount.transactions is empty when last_executed_sequence_number &#61;&#61; next_sequence_number &#45;1&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>The last executed sequence number is always smaller than the next sequence number.</td>
-<td>Medium</td>
-<td>When creating a new MultisigAccount, the last_executed_sequence_number and next_sequence_number are assigned with 0 and 1 respectively, and from there both these values increase monotonically when a transaction is executed and removed from the table and when new transaction are added respectively.</td>
-<td>This has been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;The last executed sequence number is always smaller than the next sequence number.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;When creating a new MultisigAccount, the last_executed_sequence_number and next_sequence_number are assigned with 0 and 1 respectively, and from there both these values increase monotonically when a transaction is executed and removed from the table and when new transaction are added respectively.&lt;/td&gt;<br/>&lt;td&gt;This has been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>6</td>
-<td>The number of pending transactions should be equal to the difference between the next sequence number and the last executed sequence number.</td>
-<td>High</td>
-<td>When a transaction is added, next_sequence_number is incremented. And when a transaction is removed after execution, last_executed_sequence_number is incremented.</td>
-<td>This has been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;6&lt;/td&gt;<br/>&lt;td&gt;The number of pending transactions should be equal to the difference between the next sequence number and the last executed sequence number.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;When a transaction is added, next_sequence_number is incremented. And when a transaction is removed after execution, last_executed_sequence_number is incremented.&lt;/td&gt;<br/>&lt;td&gt;This has been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>7</td>
-<td>Only transactions with valid sequence number should be fetched.</td>
-<td>Medium</td>
-<td>Functions such as: 1. get_transaction 2. can_be_executed 3. can_be_rejected 4. vote always validate the given sequence number and only then fetch the associated transaction.</td>
-<td>Audited that it aborts if the sequence number is not valid.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;7&lt;/td&gt;<br/>&lt;td&gt;Only transactions with valid sequence number should be fetched.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;Functions such as: 1. get_transaction 2. can_be_executed 3. can_be_rejected 4. vote always validate the given sequence number and only then fetch the associated transaction.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the sequence number is not valid.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>8</td>
-<td>The execution or rejection of a transaction should enforce that the minimum number of required signatures is less or equal to the total number of approvals.</td>
-<td>Critical</td>
-<td>The functions can_be_executed and can_be_rejected perform validation on the number of votes required for execution or rejection.</td>
-<td>Audited that these functions return the correct value.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;8&lt;/td&gt;<br/>&lt;td&gt;The execution or rejection of a transaction should enforce that the minimum number of required signatures is less or equal to the total number of approvals.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The functions can_be_executed and can_be_rejected perform validation on the number of votes required for execution or rejection.&lt;/td&gt;<br/>&lt;td&gt;Audited that these functions return the correct value.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>9</td>
-<td>The creation of a multi-signature account properly initializes the resources and then it gets published under the corresponding account.</td>
-<td>Medium</td>
-<td>When creating a MultisigAccount via one of the functions: create_with_existing_account, create_with_existing_account_and_revoke_auth_key, create_with_owners, create, the MultisigAccount data is initialized properly and published to the multisig_account (new or existing).</td>
-<td>Audited that the MultisigAccount is initialized properly.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;9&lt;/td&gt;<br/>&lt;td&gt;The creation of a multi&#45;signature account properly initializes the resources and then it gets published under the corresponding account.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;When creating a MultisigAccount via one of the functions: create_with_existing_account, create_with_existing_account_and_revoke_auth_key, create_with_owners, create, the MultisigAccount data is initialized properly and published to the multisig_account (new or existing).&lt;/td&gt;<br/>&lt;td&gt;Audited that the MultisigAccount is initialized properly.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>10</td>
-<td>Creation of a multi-signature account on top of an existing account should revoke auth key and any previous offered capabilities or control.</td>
-<td>Critical</td>
-<td>The function create_with_existing_account_and_revoke_auth_key, after successfully creating the MultisigAccount, rotates the account to ZeroAuthKey and revokes any offered capabilities of that account.</td>
-<td>Audited that the account's auth key and the offered capabilities are revoked.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;10&lt;/td&gt;<br/>&lt;td&gt;Creation of a multi&#45;signature account on top of an existing account should revoke auth key and any previous offered capabilities or control.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The function create_with_existing_account_and_revoke_auth_key, after successfully creating the MultisigAccount, rotates the account to ZeroAuthKey and revokes any offered capabilities of that account.&lt;/td&gt;<br/>&lt;td&gt;Audited that the account&apos;s auth key and the offered capabilities are revoked.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>11</td>
-<td>Upon the creation of a multi-signature account from a bootstrapping account, the ownership of the resultant account should not pertain to the bootstrapping account.</td>
-<td>High</td>
-<td>In create_with_owners_then_remove_bootstrapper function after successful creation of the account the bootstrapping account is removed from the owner vector of the account.</td>
-<td>Audited that the bootstrapping account is not in the owners list.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;11&lt;/td&gt;<br/>&lt;td&gt;Upon the creation of a multi&#45;signature account from a bootstrapping account, the ownership of the resultant account should not pertain to the bootstrapping account.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;In create_with_owners_then_remove_bootstrapper function after successful creation of the account the bootstrapping account is removed from the owner vector of the account.&lt;/td&gt;<br/>&lt;td&gt;Audited that the bootstrapping account is not in the owners list.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>12</td>
-<td>Performing any changes on the list of owners such as adding new owners, removing owners, swapping owners should ensure that the number of required signature, for the multi-signature account remains valid.</td>
-<td>Critical</td>
-<td>The following function as used to modify the owners list and the required signature of the account: add_owner, add_owners, add_owners_and_update_signatures_required, remove_owner, remove_owners, swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_signatures_required. All of these functions use update_owner_schema function to process these changes, the function validates the owner list while adding and verifies that the account has enough required signatures and updates the owner's schema.</td>
-<td>Audited that the owners are added successfully. (add_owner, add_owners, add_owners_and_update_signatures_required, swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_owner_schema) Audited that the owners are removed successfully. (remove_owner, remove_owners, swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_owner_schema) Audited that the num_signatures_required is updated successfully. (add_owners_and_update_signatures_required, swap_owners_and_update_signatures_required, update_signatures_required, update_owner_schema)</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;12&lt;/td&gt;<br/>&lt;td&gt;Performing any changes on the list of owners such as adding new owners, removing owners, swapping owners should ensure that the number of required signature, for the multi&#45;signature account remains valid.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The following function as used to modify the owners list and the required signature of the account: add_owner, add_owners, add_owners_and_update_signatures_required, remove_owner, remove_owners, swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_signatures_required. All of these functions use update_owner_schema function to process these changes, the function validates the owner list while adding and verifies that the account has enough required signatures and updates the owner&apos;s schema.&lt;/td&gt;<br/>&lt;td&gt;Audited that the owners are added successfully. (add_owner, add_owners, add_owners_and_update_signatures_required, swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_owner_schema) Audited that the owners are removed successfully. (remove_owner, remove_owners, swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_owner_schema) Audited that the num_signatures_required is updated successfully. (add_owners_and_update_signatures_required, swap_owners_and_update_signatures_required, update_signatures_required, update_owner_schema)&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>13</td>
-<td>The creation of a transaction should be limited to an account owner, which should be automatically considered a voter; additionally, the account's sequence should increase monotonically.</td>
-<td>Critical</td>
-<td>The following functions can only be called by the owners of the account and create a transaction and uses add_transaction function to gives approval on behalf of the creator and increments the next_sequence_number and finally adds the transaction to the MultsigAccount: create_transaction_with_hash, create_transaction.</td>
-<td>Audited it aborts if the caller is not in the owner's list of the account. (create_transaction_with_hash, create_transaction) Audited that the transaction is successfully stored in the MultisigAccount.(create_transaction_with_hash, create_transaction, add_transaction) Audited that the creators voted to approve the transaction. (create_transaction_with_hash, create_transaction, add_transaction) Audited that the next_sequence_number increases monotonically. (create_transaction_with_hash, create_transaction, add_transaction)</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;13&lt;/td&gt;<br/>&lt;td&gt;The creation of a transaction should be limited to an account owner, which should be automatically considered a voter; additionally, the account&apos;s sequence should increase monotonically.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The following functions can only be called by the owners of the account and create a transaction and uses add_transaction function to gives approval on behalf of the creator and increments the next_sequence_number and finally adds the transaction to the MultsigAccount: create_transaction_with_hash, create_transaction.&lt;/td&gt;<br/>&lt;td&gt;Audited it aborts if the caller is not in the owner&apos;s list of the account. (create_transaction_with_hash, create_transaction) Audited that the transaction is successfully stored in the MultisigAccount.(create_transaction_with_hash, create_transaction, add_transaction) Audited that the creators voted to approve the transaction. (create_transaction_with_hash, create_transaction, add_transaction) Audited that the next_sequence_number increases monotonically. (create_transaction_with_hash, create_transaction, add_transaction)&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>14</td>
-<td>Only owners are allowed to vote for a valid transaction.</td>
-<td>Critical</td>
-<td>Any owner of the MultisigAccount can either approve (approve_transaction) or reject (reject_transaction) a transaction. Both these functions use a generic function to vote for the transaction which validates the caller and the transaction id and adds/updates the vote.</td>
-<td>Audited that it aborts if the caller is not in the owner's list (approve_transaction, reject_transaction, vote_transaction, assert_is_owner). Audited that it aborts if the transaction with the given sequence number doesn't exist in the account (approve_transaction, reject_transaction, vote_transaction). Audited that the vote is recorded as intended.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;14&lt;/td&gt;<br/>&lt;td&gt;Only owners are allowed to vote for a valid transaction.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;Any owner of the MultisigAccount can either approve (approve_transaction) or reject (reject_transaction) a transaction. Both these functions use a generic function to vote for the transaction which validates the caller and the transaction id and adds/updates the vote.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the caller is not in the owner&apos;s list (approve_transaction, reject_transaction, vote_transaction, assert_is_owner). Audited that it aborts if the transaction with the given sequence number doesn&apos;t exist in the account (approve_transaction, reject_transaction, vote_transaction). Audited that the vote is recorded as intended.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>15</td>
-<td>Only owners are allowed to execute a valid transaction, if the number of approvals meets the k-of-n criteria, finally the executed transaction should be removed.</td>
-<td>Critical</td>
-<td>Functions execute_rejected_transaction and validate_multisig_transaction can only be called by the owner which validates the transaction and based on the number of approvals and rejections it proceeds to execute the transactions. For rejected transaction, the transactions are immediately removed from the MultisigAccount via remove_executed_transaction. VM validates the transaction via validate_multisig_transaction and cleans up the transaction via successful_transaction_execution_cleanup and failed_transaction_execution_cleanup.</td>
-<td>Audited that it aborts if the caller is not in the owner's list (execute_rejected_transaction, validate_multisig_transaction). Audited that it aborts if the transaction with the given sequence number doesn't exist in the account (execute_rejected_transaction, validate_multisig_transaction). Audited that it aborts if the votes (approvals or rejections) are less than num_signatures_required (execute_rejected_transaction, validate_multisig_transaction). Audited that the transaction is removed from the MultisigAccount (execute_rejected_transaction, remove_executed_transaction, successful_transaction_execution_cleanup, failed_transaction_execution_cleanup).</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;15&lt;/td&gt;<br/>&lt;td&gt;Only owners are allowed to execute a valid transaction, if the number of approvals meets the k&#45;of&#45;n criteria, finally the executed transaction should be removed.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;Functions execute_rejected_transaction and validate_multisig_transaction can only be called by the owner which validates the transaction and based on the number of approvals and rejections it proceeds to execute the transactions. For rejected transaction, the transactions are immediately removed from the MultisigAccount via remove_executed_transaction. VM validates the transaction via validate_multisig_transaction and cleans up the transaction via successful_transaction_execution_cleanup and failed_transaction_execution_cleanup.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the caller is not in the owner&apos;s list (execute_rejected_transaction, validate_multisig_transaction). Audited that it aborts if the transaction with the given sequence number doesn&apos;t exist in the account (execute_rejected_transaction, validate_multisig_transaction). Audited that it aborts if the votes (approvals or rejections) are less than num_signatures_required (execute_rejected_transaction, validate_multisig_transaction). Audited that the transaction is removed from the MultisigAccount (execute_rejected_transaction, remove_executed_transaction, successful_transaction_execution_cleanup, failed_transaction_execution_cleanup).&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>16</td>
-<td>Removing an executed transaction from the transactions list should increase the last sequence number monotonically.</td>
-<td>High</td>
-<td>When transactions are removed via remove_executed_transaction (maybe called by VM cleanup or execute_rejected_transaction), the last_executed_sequence_number increases by 1.</td>
-<td>Audited that last_executed_sequence_number is incremented.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;16&lt;/td&gt;<br/>&lt;td&gt;Removing an executed transaction from the transactions list should increase the last sequence number monotonically.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;When transactions are removed via remove_executed_transaction (maybe called by VM cleanup or execute_rejected_transaction), the last_executed_sequence_number increases by 1.&lt;/td&gt;<br/>&lt;td&gt;Audited that last_executed_sequence_number is incremented.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>17</td>
-<td>The voting and transaction creation operations should only be available if a multi-signature account exists.</td>
-<td>Low</td>
-<td>The function assert_multisig_account_exists validates the existence of MultisigAccount under the account.</td>
-<td>Audited that it aborts if the MultisigAccount doesn't exist on the account.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;17&lt;/td&gt;<br/>&lt;td&gt;The voting and transaction creation operations should only be available if a multi&#45;signature account exists.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The function assert_multisig_account_exists validates the existence of MultisigAccount under the account.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the MultisigAccount doesn&apos;t exist on the account.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
 
 

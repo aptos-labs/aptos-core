@@ -107,8 +107,7 @@ Account is not authorized to make this change.
 
 ## Function `initialize`
 
-Only called during genesis.
-Publishes the Version config.
+Only called during genesis.<br/> Publishes the Version config.
 
 
 <pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, initial_version: u64)<br/></code></pre>
@@ -129,11 +128,7 @@ Publishes the Version config.
 
 ## Function `set_version`
 
-Deprecated by <code>set_for_next_epoch()</code>.
-
-WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
-
-TODO: update all the tests that reference this function, then disable this function.
+Deprecated by <code>set_for_next_epoch()</code>.<br/><br/> WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!<br/><br/> TODO: update all the tests that reference this function, then disable this function.
 
 
 <pre><code>public entry fun set_version(account: &amp;signer, major: u64)<br/></code></pre>
@@ -154,10 +149,7 @@ TODO: update all the tests that reference this function, then disable this funct
 
 ## Function `set_for_next_epoch`
 
-Used in on-chain governances to update the major version for the next epoch.
-Example usage:
-- <code>aptos_framework::version::set_for_next_epoch(&amp;framework_signer, new_version);</code>
-- <code>aptos_framework::aptos_governance::reconfigure(&amp;framework_signer);</code>
+Used in on&#45;chain governances to update the major version for the next epoch.<br/> Example usage:<br/> &#45; <code>aptos_framework::version::set_for_next_epoch(&amp;framework_signer, new_version);</code><br/> &#45; <code>aptos_framework::aptos_governance::reconfigure(&amp;framework_signer);</code>
 
 
 <pre><code>public entry fun set_for_next_epoch(account: &amp;signer, major: u64)<br/></code></pre>
@@ -199,8 +191,7 @@ Only used in reconfigurations to apply the pending <code>Version</code>, if ther
 
 ## Function `initialize_for_test`
 
-Only called in tests and testnets. This allows the core resources account, which only exists in tests/testnets,
-to update the version.
+Only called in tests and testnets. This allows the core resources account, which only exists in tests/testnets,<br/> to update the version.
 
 
 <pre><code>fun initialize_for_test(core_resources: &amp;signer)<br/></code></pre>
@@ -228,30 +219,15 @@ to update the version.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>During genesis, the Version resource should be initialized with the initial version and stored along with its capability under the aptos framework account.</td>
-<td>Medium</td>
-<td>The initialize function ensures that the signer is the aptos framework account and stores the Version and SetVersionCapability resources in it.</td>
-<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;During genesis, the Version resource should be initialized with the initial version and stored along with its capability under the aptos framework account.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The initialize function ensures that the signer is the aptos framework account and stores the Version and SetVersionCapability resources in it.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The version should be updateable after initialization, but only by the Aptos framework account and with an increasing version number.</td>
-<td>Medium</td>
-<td>The version number for the blockchain should be updatable whenever necessary. This functionality is provided by the set_version function which ensures that the new version is greater than the previous one.</td>
-<td>Formally verified via <a href="#high-level-req-2">set_version</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The version should be updateable after initialization, but only by the Aptos framework account and with an increasing version number.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The version number for the blockchain should be updatable whenever necessary. This functionality is provided by the set_version function which ensures that the new version is greater than the previous one.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;set_version&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -274,7 +250,7 @@ to update the version.
 Abort if resource already exists in <code>@aptos_framwork</code> when initializing.
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 aborts_if signer::address_of(aptos_framework) !&#61; @aptos_framework;<br/>aborts_if exists&lt;Version&gt;(@aptos_framework);<br/>aborts_if exists&lt;SetVersionCapability&gt;(@aptos_framework);<br/>ensures exists&lt;Version&gt;(@aptos_framework);<br/>ensures exists&lt;SetVersionCapability&gt;(@aptos_framework);<br/>ensures global&lt;Version&gt;(@aptos_framework) &#61;&#61; Version &#123; major: initial_version &#125;;<br/>ensures global&lt;SetVersionCapability&gt;(@aptos_framework) &#61;&#61; SetVersionCapability &#123;&#125;;<br/></code></pre>
 
 
@@ -289,7 +265,7 @@ aborts_if signer::address_of(aptos_framework) !&#61; @aptos_framework;<br/>abort
 
 
 
-<pre><code>pragma verify_duration_estimate &#61; 120;<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>include staking_config::StakingRewardsConfigRequirement;<br/>requires chain_status::is_genesis();<br/>requires timestamp::spec_now_microseconds() &gt;&#61; reconfiguration::last_reconfiguration_time();<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br/>aborts_if !exists&lt;SetVersionCapability&gt;(signer::address_of(account));<br/>aborts_if !exists&lt;Version&gt;(@aptos_framework);<br/>let old_major &#61; global&lt;Version&gt;(@aptos_framework).major;<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>pragma verify_duration_estimate &#61; 120;<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>include staking_config::StakingRewardsConfigRequirement;<br/>requires chain_status::is_genesis();<br/>requires timestamp::spec_now_microseconds() &gt;&#61; reconfiguration::last_reconfiguration_time();<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br/>aborts_if !exists&lt;SetVersionCapability&gt;(signer::address_of(account));<br/>aborts_if !exists&lt;Version&gt;(@aptos_framework);<br/>let old_major &#61; global&lt;Version&gt;(@aptos_framework).major;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if !(old_major &lt; major);<br/>ensures global&lt;Version&gt;(@aptos_framework).major &#61;&#61; major;<br/></code></pre>
 
 

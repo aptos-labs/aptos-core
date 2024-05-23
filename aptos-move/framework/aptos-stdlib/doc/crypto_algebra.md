@@ -3,43 +3,7 @@
 
 # Module `0x1::crypto_algebra`
 
-This module provides generic structs/functions for operations of algebraic structures (e.g. fields and groups),
-which can be used to build generic cryptographic schemes atop.
-E.g., a Groth16 ZK proof verifier can be built to work over any pairing supported in this module.
-
-In general, every structure implements basic operations like (de)serialization, equality check, random sampling.
-
-A group may also implement the following operations. (Additive group notation is assumed.)
-- <code>order()</code> for getting the group order.
-- <code>zero()</code> for getting the group identity.
-- <code>one()</code> for getting the group generator (if exists).
-- <code>neg()</code> for group element inversion.
-- <code>add()</code> for group operation (i.e., a group addition).
-- <code>sub()</code> for group element subtraction.
-- <code>double()</code> for efficient doubling.
-- <code>scalar_mul()</code> for group scalar multiplication.
-- <code>multi_scalar_mul()</code> for efficient group multi-scalar multiplication.
-- <code>hash_to()</code> for hash-to-group.
-
-A field may also implement the following operations.
-- <code>zero()</code> for getting the field additive identity.
-- <code>one()</code> for getting the field multiplicative identity.
-- <code>add()</code> for field addition.
-- <code>sub()</code> for field subtraction.
-- <code>mul()</code> for field multiplication.
-- <code>div()</code> for field division.
-- <code>neg()</code> for field negation.
-- <code>inv()</code> for field inversion.
-- <code>sqr()</code> for efficient field element squaring.
-- <code>from_u64()</code> for quick conversion from u64 to field element.
-
-For 3 groups that admit a bilinear map, <code>pairing()</code> and <code>multi_pairing()</code> may be implemented.
-
-For a subset/superset relationship between 2 structures, <code>upcast()</code> and <code>downcast()</code> may be implemented.
-E.g., in BLS12-381 pairing, since <code>Gt</code> is a subset of <code>Fq12</code>,
-<code>upcast&lt;Gt, Fq12&gt;()</code> and <code>downcast&lt;Fq12, Gt&gt;()</code> will be supported.
-
-See <code>&#42;_algebra.move</code> for currently implemented algebraic structures.
+This module provides generic structs/functions for operations of algebraic structures (e.g. fields and groups),<br/> which can be used to build generic cryptographic schemes atop.<br/> E.g., a Groth16 ZK proof verifier can be built to work over any pairing supported in this module.<br/><br/> In general, every structure implements basic operations like (de)serialization, equality check, random sampling.<br/><br/> A group may also implement the following operations. (Additive group notation is assumed.)<br/> &#45; <code>order()</code> for getting the group order.<br/> &#45; <code>zero()</code> for getting the group identity.<br/> &#45; <code>one()</code> for getting the group generator (if exists).<br/> &#45; <code>neg()</code> for group element inversion.<br/> &#45; <code>add()</code> for group operation (i.e., a group addition).<br/> &#45; <code>sub()</code> for group element subtraction.<br/> &#45; <code>double()</code> for efficient doubling.<br/> &#45; <code>scalar_mul()</code> for group scalar multiplication.<br/> &#45; <code>multi_scalar_mul()</code> for efficient group multi&#45;scalar multiplication.<br/> &#45; <code>hash_to()</code> for hash&#45;to&#45;group.<br/><br/> A field may also implement the following operations.<br/> &#45; <code>zero()</code> for getting the field additive identity.<br/> &#45; <code>one()</code> for getting the field multiplicative identity.<br/> &#45; <code>add()</code> for field addition.<br/> &#45; <code>sub()</code> for field subtraction.<br/> &#45; <code>mul()</code> for field multiplication.<br/> &#45; <code>div()</code> for field division.<br/> &#45; <code>neg()</code> for field negation.<br/> &#45; <code>inv()</code> for field inversion.<br/> &#45; <code>sqr()</code> for efficient field element squaring.<br/> &#45; <code>from_u64()</code> for quick conversion from u64 to field element.<br/><br/> For 3 groups that admit a bilinear map, <code>pairing()</code> and <code>multi_pairing()</code> may be implemented.<br/><br/> For a subset/superset relationship between 2 structures, <code>upcast()</code> and <code>downcast()</code> may be implemented.<br/> E.g., in BLS12&#45;381 pairing, since <code>Gt</code> is a subset of <code>Fq12</code>,<br/> <code>upcast&lt;Gt, Fq12&gt;()</code> and <code>downcast&lt;Fq12, Gt&gt;()</code> will be supported.<br/><br/> See <code>&#42;_algebra.move</code> for currently implemented algebraic structures.
 
 
 -  [Struct `Element`](#0x1_crypto_algebra_Element)
@@ -348,9 +312,7 @@ Compute <code>x &#42; y</code> for elements <code>x</code> and <code>y</code> of
 
 ## Function `div`
 
-Try computing <code>x / y</code> for elements <code>x</code> and <code>y</code> of a structure <code>S</code>.
-Return none if <code>y</code> does not have a multiplicative inverse in the structure <code>S</code>
-(e.g., when <code>S</code> is a field, and <code>y</code> is zero).
+Try computing <code>x / y</code> for elements <code>x</code> and <code>y</code> of a structure <code>S</code>.<br/> Return none if <code>y</code> does not have a multiplicative inverse in the structure <code>S</code><br/> (e.g., when <code>S</code> is a field, and <code>y</code> is zero).
 
 
 <pre><code>public fun div&lt;S&gt;(x: &amp;crypto_algebra::Element&lt;S&gt;, y: &amp;crypto_algebra::Element&lt;S&gt;): option::Option&lt;crypto_algebra::Element&lt;S&gt;&gt;<br/></code></pre>
@@ -392,9 +354,7 @@ Compute <code>x^2</code> for an element <code>x</code> of a structure <code>S</c
 
 ## Function `inv`
 
-Try computing <code>x^(&#45;1)</code> for an element <code>x</code> of a structure <code>S</code>.
-Return none if <code>x</code> does not have a multiplicative inverse in the structure <code>S</code>
-(e.g., when <code>S</code> is a field, and <code>x</code> is zero).
+Try computing <code>x^(&#45;1)</code> for an element <code>x</code> of a structure <code>S</code>.<br/> Return none if <code>x</code> does not have a multiplicative inverse in the structure <code>S</code><br/> (e.g., when <code>S</code> is a field, and <code>x</code> is zero).
 
 
 <pre><code>public fun inv&lt;S&gt;(x: &amp;crypto_algebra::Element&lt;S&gt;): option::Option&lt;crypto_algebra::Element&lt;S&gt;&gt;<br/></code></pre>
@@ -436,11 +396,7 @@ Compute <code>2&#42;P</code> for an element <code>P</code> of a structure <code>
 
 ## Function `multi_scalar_mul`
 
-Compute <code>k[0]&#42;P[0]&#43;...&#43;k[n&#45;1]&#42;P[n&#45;1]</code>, where
-<code>P[]</code> are <code>n</code> elements of group <code>G</code> represented by parameter <code>elements</code>, and
-<code>k[]</code> are <code>n</code> elements of the scalarfield <code>S</code> of group <code>G</code> represented by parameter <code>scalars</code>.
-
-Abort with code <code>std::error::invalid_argument(E_NON_EQUAL_LENGTHS)</code> if the sizes of <code>elements</code> and <code>scalars</code> do not match.
+Compute <code>k[0]&#42;P[0]&#43;...&#43;k[n&#45;1]&#42;P[n&#45;1]</code>, where<br/> <code>P[]</code> are <code>n</code> elements of group <code>G</code> represented by parameter <code>elements</code>, and<br/> <code>k[]</code> are <code>n</code> elements of the scalarfield <code>S</code> of group <code>G</code> represented by parameter <code>scalars</code>.<br/><br/> Abort with code <code>std::error::invalid_argument(E_NON_EQUAL_LENGTHS)</code> if the sizes of <code>elements</code> and <code>scalars</code> do not match.
 
 
 <pre><code>public fun multi_scalar_mul&lt;G, S&gt;(elements: &amp;vector&lt;crypto_algebra::Element&lt;G&gt;&gt;, scalars: &amp;vector&lt;crypto_algebra::Element&lt;S&gt;&gt;): crypto_algebra::Element&lt;G&gt;<br/></code></pre>
@@ -482,15 +438,7 @@ Compute <code>k&#42;P</code>, where <code>P</code> is an element of a group <cod
 
 ## Function `multi_pairing`
 
-Efficiently compute <code>e(P[0],Q[0])&#43;...&#43;e(P[n&#45;1],Q[n&#45;1])</code>,
-where <code>e: (G1,G2) &#45;&gt; (Gt)</code> is the pairing function from groups <code>(G1,G2)</code> to group <code>Gt</code>,
-<code>P[]</code> are <code>n</code> elements of group <code>G1</code> represented by parameter <code>g1_elements</code>, and
-<code>Q[]</code> are <code>n</code> elements of group <code>G2</code> represented by parameter <code>g2_elements</code>.
-
-Abort with code <code>std::error::invalid_argument(E_NON_EQUAL_LENGTHS)</code> if the sizes of <code>g1_elements</code> and <code>g2_elements</code> do not match.
-
-NOTE: we are viewing the target group <code>Gt</code> of the pairing as an additive group,
-rather than a multiplicative one (which is typically the case).
+Efficiently compute <code>e(P[0],Q[0])&#43;...&#43;e(P[n&#45;1],Q[n&#45;1])</code>,<br/> where <code>e: (G1,G2) &#45;&gt; (Gt)</code> is the pairing function from groups <code>(G1,G2)</code> to group <code>Gt</code>,<br/> <code>P[]</code> are <code>n</code> elements of group <code>G1</code> represented by parameter <code>g1_elements</code>, and<br/> <code>Q[]</code> are <code>n</code> elements of group <code>G2</code> represented by parameter <code>g2_elements</code>.<br/><br/> Abort with code <code>std::error::invalid_argument(E_NON_EQUAL_LENGTHS)</code> if the sizes of <code>g1_elements</code> and <code>g2_elements</code> do not match.<br/><br/> NOTE: we are viewing the target group <code>Gt</code> of the pairing as an additive group,<br/> rather than a multiplicative one (which is typically the case).
 
 
 <pre><code>public fun multi_pairing&lt;G1, G2, Gt&gt;(g1_elements: &amp;vector&lt;crypto_algebra::Element&lt;G1&gt;&gt;, g2_elements: &amp;vector&lt;crypto_algebra::Element&lt;G2&gt;&gt;): crypto_algebra::Element&lt;Gt&gt;<br/></code></pre>
@@ -511,8 +459,7 @@ rather than a multiplicative one (which is typically the case).
 
 ## Function `pairing`
 
-Compute the pairing function (a.k.a., bilinear map) on a <code>G1</code> element and a <code>G2</code> element.
-Return an element in the target group <code>Gt</code>.
+Compute the pairing function (a.k.a., bilinear map) on a <code>G1</code> element and a <code>G2</code> element.<br/> Return an element in the target group <code>Gt</code>.
 
 
 <pre><code>public fun pairing&lt;G1, G2, Gt&gt;(element_1: &amp;crypto_algebra::Element&lt;G1&gt;, element_2: &amp;crypto_algebra::Element&lt;G2&gt;): crypto_algebra::Element&lt;Gt&gt;<br/></code></pre>
@@ -533,8 +480,7 @@ Return an element in the target group <code>Gt</code>.
 
 ## Function `deserialize`
 
-Try deserializing a byte array to an element of an algebraic structure <code>S</code> using a given serialization format <code>F</code>.
-Return none if the deserialization failed.
+Try deserializing a byte array to an element of an algebraic structure <code>S</code> using a given serialization format <code>F</code>.<br/> Return none if the deserialization failed.
 
 
 <pre><code>public fun deserialize&lt;S, F&gt;(bytes: &amp;vector&lt;u8&gt;): option::Option&lt;crypto_algebra::Element&lt;S&gt;&gt;<br/></code></pre>
@@ -576,7 +522,7 @@ Serialize an element of an algebraic structure <code>S</code> to a byte array us
 
 ## Function `order`
 
-Get the order of structure <code>S</code>, a big integer little-endian encoded as a byte array.
+Get the order of structure <code>S</code>, a big integer little&#45;endian encoded as a byte array.
 
 
 <pre><code>public fun order&lt;S&gt;(): vector&lt;u8&gt;<br/></code></pre>
@@ -618,10 +564,7 @@ Cast an element of a structure <code>S</code> to a parent structure <code>L</cod
 
 ## Function `downcast`
 
-Try casting an element <code>x</code> of a structure <code>L</code> to a sub-structure <code>S</code>.
-Return none if <code>x</code> is not a member of <code>S</code>.
-
-NOTE: Membership check in <code>S</code> is performed inside, which can be expensive, depending on the structures <code>L</code> and <code>S</code>.
+Try casting an element <code>x</code> of a structure <code>L</code> to a sub&#45;structure <code>S</code>.<br/> Return none if <code>x</code> is not a member of <code>S</code>.<br/><br/> NOTE: Membership check in <code>S</code> is performed inside, which can be expensive, depending on the structures <code>L</code> and <code>S</code>.
 
 
 <pre><code>public fun downcast&lt;L, S&gt;(element_x: &amp;crypto_algebra::Element&lt;L&gt;): option::Option&lt;crypto_algebra::Element&lt;S&gt;&gt;<br/></code></pre>
@@ -642,10 +585,7 @@ NOTE: Membership check in <code>S</code> is performed inside, which can be expen
 
 ## Function `hash_to`
 
-Hash an arbitrary-length byte array <code>msg</code> into structure <code>S</code> with a domain separation tag <code>dst</code>
-using the given hash-to-structure suite <code>H</code>.
-
-NOTE: some hashing methods do not accept a <code>dst</code> and will abort if a non-empty one is provided.
+Hash an arbitrary&#45;length byte array <code>msg</code> into structure <code>S</code> with a domain separation tag <code>dst</code><br/> using the given hash&#45;to&#45;structure suite <code>H</code>.<br/><br/> NOTE: some hashing methods do not accept a <code>dst</code> and will abort if a non&#45;empty one is provided.
 
 
 <pre><code>public fun hash_to&lt;S, H&gt;(dst: &amp;vector&lt;u8&gt;, msg: &amp;vector&lt;u8&gt;): crypto_algebra::Element&lt;S&gt;<br/></code></pre>

@@ -64,8 +64,7 @@
 
 ## Resource `StateStorageUsage`
 
-This is updated at the beginning of each epoch, reflecting the storage
-usage after the last txn of the previous epoch is committed.
+This is updated at the beginning of each epoch, reflecting the storage<br/> usage after the last txn of the previous epoch is committed.
 
 
 <pre><code>struct StateStorageUsage has store, key<br/></code></pre>
@@ -197,10 +196,7 @@ usage after the last txn of the previous epoch is committed.
 
 ## Function `get_state_storage_usage_only_at_epoch_beginning`
 
-Warning: the result returned is based on the base state view held by the
-VM for the entire block or chunk of transactions, it's only deterministic
-if called from the first transaction of the block because the execution layer
-guarantees a fresh state view then.
+Warning: the result returned is based on the base state view held by the<br/> VM for the entire block or chunk of transactions, it&apos;s only deterministic<br/> if called from the first transaction of the block because the execution layer<br/> guarantees a fresh state view then.
 
 
 <pre><code>fun get_state_storage_usage_only_at_epoch_beginning(): state_storage::Usage<br/></code></pre>
@@ -248,54 +244,21 @@ guarantees a fresh state view then.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>Given the blockchain is in an operating state, the resources for tracking state storage usage and gas parameters must exist for the Aptos framework address.</td>
-<td>Critical</td>
-<td>The initialize function ensures only the Aptos framework address can call it.</td>
-<td>Formally verified via <a href="#high-level-req-1">module</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Given the blockchain is in an operating state, the resources for tracking state storage usage and gas parameters must exist for the Aptos framework address.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The initialize function ensures only the Aptos framework address can call it.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;module&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>During the initialization of the module, it is guaranteed that the resource for tracking state storage usage will be moved under the Aptos framework account with default initial values.</td>
-<td>Medium</td>
-<td>The resource for tracking state storage usage may only be initialized with specific values and published under the aptos_framework account.</td>
-<td>Formally verified via <a href="#high-level-req-2">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;During the initialization of the module, it is guaranteed that the resource for tracking state storage usage will be moved under the Aptos framework account with default initial values.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The resource for tracking state storage usage may only be initialized with specific values and published under the aptos_framework account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>The initialization function is only called once, during genesis.</td>
-<td>Medium</td>
-<td>The initialize function ensures StateStorageUsage does not already exist.</td>
-<td>Formally verified via <a href="#high-level-req-3">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The initialization function is only called once, during genesis.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The initialize function ensures StateStorageUsage does not already exist.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>During the initialization of the module, it is guaranteed that the resource for tracking state storage usage will be moved under the Aptos framework account with default initial values.</td>
-<td>Medium</td>
-<td>The resource for tracking state storage usage may only be initialized with specific values and published under the aptos_framework account.</td>
-<td>Formally verified via <a href="#high-level-req-4">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;During the initialization of the module, it is guaranteed that the resource for tracking state storage usage will be moved under the Aptos framework account with default initial values.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The resource for tracking state storage usage may only be initialized with specific values and published under the aptos_framework account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>The structure for tracking state storage usage should exist for it to be updated at the beginning of each new block and for retrieving the values of structure members.</td>
-<td>Medium</td>
-<td>The functions on_new_block and current_items_and_bytes verify that the StateStorageUsage structure exists before performing any further operations.</td>
-<td>Formally Verified via <a href="#high-level-req-5.1">current_items_and_bytes</a>, <a href="#high-level-req-5.2">on_new_block</a>, and the <a href="#high-level-req-5.3">global invariant</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;The structure for tracking state storage usage should exist for it to be updated at the beginning of each new block and for retrieving the values of structure members.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The functions on_new_block and current_items_and_bytes verify that the StateStorageUsage structure exists before performing any further operations.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5.1&quot;&gt;current_items_and_bytes&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5.2&quot;&gt;on_new_block&lt;/a&gt;, and the &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5.3&quot;&gt;global invariant&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -303,7 +266,7 @@ guarantees a fresh state view then.
 ### Module-level Specification
 
 
-<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a> and <a id="high-level-req-5.3" href="#high-level-req">high-level requirement 5</a>:
+<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt; and &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt;:
 invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;StateStorageUsage&gt;(@aptos_framework);<br/>invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;GasParameter&gt;(@aptos_framework);<br/></code></pre>
 
 
@@ -316,13 +279,12 @@ invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;St
 <pre><code>public(friend) fun initialize(aptos_framework: &amp;signer)<br/></code></pre>
 
 
-ensure caller is admin.
-aborts if StateStorageUsage already exists.
+ensure caller is admin.<br/> aborts if StateStorageUsage already exists.
 
 
-<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
-aborts_if !system_addresses::is_aptos_framework_address(addr);<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
-aborts_if exists&lt;StateStorageUsage&gt;(@aptos_framework);<br/>ensures exists&lt;StateStorageUsage&gt;(@aptos_framework);<br/>let post state_usage &#61; global&lt;StateStorageUsage&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
+aborts_if !system_addresses::is_aptos_framework_address(addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
+aborts_if exists&lt;StateStorageUsage&gt;(@aptos_framework);<br/>ensures exists&lt;StateStorageUsage&gt;(@aptos_framework);<br/>let post state_usage &#61; global&lt;StateStorageUsage&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 ensures state_usage.epoch &#61;&#61; 0 &amp;&amp; state_usage.usage.bytes &#61;&#61; 0 &amp;&amp; state_usage.usage.items &#61;&#61; 0;<br/></code></pre>
 
 
@@ -337,7 +299,7 @@ ensures state_usage.epoch &#61;&#61; 0 &amp;&amp; state_usage.usage.bytes &#61;&
 
 
 
-<pre><code>// This enforces <a id="high-level-req-5.2" href="#high-level-req">high-level requirement 5</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt;:
 requires chain_status::is_operating();<br/>aborts_if false;<br/>ensures epoch &#61;&#61; global&lt;StateStorageUsage&gt;(@aptos_framework).epoch;<br/></code></pre>
 
 
@@ -352,7 +314,7 @@ requires chain_status::is_operating();<br/>aborts_if false;<br/>ensures epoch &#
 
 
 
-<pre><code>// This enforces <a id="high-level-req-5.1" href="#high-level-req">high-level requirement 5</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt;:
 aborts_if !exists&lt;StateStorageUsage&gt;(@aptos_framework);<br/></code></pre>
 
 

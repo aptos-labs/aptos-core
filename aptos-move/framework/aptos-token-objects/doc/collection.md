@@ -3,24 +3,7 @@
 
 # Module `0x4::collection`
 
-This defines an object-based Collection. A collection acts as a set organizer for a group of
-tokens. This includes aspects such as a general description, project URI, name, and may contain
-other useful generalizations across this set of tokens.
-
-Being built upon objects enables collections to be relatively flexible. As core primitives it
-supports:
-* Common fields: name, uri, description, creator
-* MutatorRef leaving mutability configuration to a higher level component
-* Addressed by a global identifier of creator's address and collection name, thus collections
-cannot be deleted as a restriction of the object model.
-* Optional support for collection-wide royalties
-* Optional support for tracking of supply with events on mint or burn
-
-TODO:
-* Consider supporting changing the name of the collection with the MutatorRef. This would
-require adding the field original_name.
-* Consider supporting changing the aspects of supply with the MutatorRef.
-* Add aggregator support when added to framework
+This defines an object&#45;based Collection. A collection acts as a set organizer for a group of<br/> tokens. This includes aspects such as a general description, project URI, name, and may contain<br/> other useful generalizations across this set of tokens.<br/><br/> Being built upon objects enables collections to be relatively flexible. As core primitives it<br/> supports:<br/> &#42; Common fields: name, uri, description, creator<br/> &#42; MutatorRef leaving mutability configuration to a higher level component<br/> &#42; Addressed by a global identifier of creator&apos;s address and collection name, thus collections<br/>   cannot be deleted as a restriction of the object model.<br/> &#42; Optional support for collection&#45;wide royalties<br/> &#42; Optional support for tracking of supply with events on mint or burn<br/><br/> TODO:<br/> &#42; Consider supporting changing the name of the collection with the MutatorRef. This would<br/>   require adding the field original_name.<br/> &#42; Consider supporting changing the aspects of supply with the MutatorRef.<br/> &#42; Add aggregator support when added to framework
 
 
 -  [Resource `Collection`](#0x4_collection_Collection)
@@ -105,8 +88,7 @@ Represents the common fields for a collection.
 <code>uri: string::String</code>
 </dt>
 <dd>
- The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
- storage; the URL length will likely need a maximum any suggestions?
+ The Uniform Resource Identifier (uri) pointing to the JSON file stored in off&#45;chain<br/> storage; the URL length will likely need a maximum any suggestions?
 </dd>
 <dt>
 <code>mutation_events: event::EventHandle&lt;collection::MutationEvent&gt;</code>
@@ -150,8 +132,7 @@ This enables mutating description and URI by higher level services.
 
 ## Struct `MutationEvent`
 
-Contains the mutated fields name. This makes the life of indexers easier, so that they can
-directly understand the behavior in a writeset.
+Contains the mutated fields name. This makes the life of indexers easier, so that they can<br/> directly understand the behavior in a writeset.
 
 
 <pre><code>struct MutationEvent has drop, store<br/></code></pre>
@@ -178,8 +159,7 @@ directly understand the behavior in a writeset.
 
 ## Struct `Mutation`
 
-Contains the mutated fields name. This makes the life of indexers easier, so that they can
-directly understand the behavior in a writeset.
+Contains the mutated fields name. This makes the life of indexers easier, so that they can<br/> directly understand the behavior in a writeset.
 
 
 <pre><code>&#35;[event]<br/>struct Mutation has drop, store<br/></code></pre>
@@ -224,8 +204,7 @@ directly understand the behavior in a writeset.
 
 ## Resource `FixedSupply`
 
-Fixed supply tracker, this is useful for ensuring that a limited number of tokens are minted.
-and adding events and supply tracking to a collection.
+Fixed supply tracker, this is useful for ensuring that a limited number of tokens are minted.<br/> and adding events and supply tracking to a collection.
 
 
 <pre><code>&#35;[resource_group_member(&#35;[group &#61; 0x1::object::ObjectGroup])]<br/>struct FixedSupply has key<br/></code></pre>
@@ -241,7 +220,7 @@ and adding events and supply tracking to a collection.
 <code>current_supply: u64</code>
 </dt>
 <dd>
- Total minted - total burned
+ Total minted &#45; total burned
 </dd>
 <dt>
 <code>max_supply: u64</code>
@@ -321,8 +300,7 @@ Unlimited supply tracker, this is useful for adding events and supply tracking t
 
 ## Resource `ConcurrentSupply`
 
-Supply tracker, useful for tracking amount of issued tokens.
-If max_value is not set to U64_MAX, this ensures that a limited number of tokens are minted.
+Supply tracker, useful for tracking amount of issued tokens.<br/> If max_value is not set to U64_MAX, this ensures that a limited number of tokens are minted.
 
 
 <pre><code>&#35;[resource_group_member(&#35;[group &#61; 0x1::object::ObjectGroup])]<br/>struct ConcurrentSupply has key<br/></code></pre>
@@ -338,7 +316,7 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 <code>current_supply: aggregator_v2::Aggregator&lt;u64&gt;</code>
 </dt>
 <dd>
- Total minted - total burned
+ Total minted &#45; total burned
 </dd>
 <dt>
 <code>total_minted: aggregator_v2::Aggregator&lt;u64&gt;</code>
@@ -742,11 +720,7 @@ The collection does not have a max supply
 
 ## Function `create_fixed_collection`
 
-Creates a fixed-sized collection, or a collection that supports a fixed amount of tokens.
-This is useful to create a guaranteed, limited supply on-chain digital asset. For example,
-a collection 1111 vicious vipers. Note, creating restrictions such as upward limits results
-in data structures that prevent Aptos from parallelizing mints of this collection type.
-Beyond that, it adds supply tracking with events.
+Creates a fixed&#45;sized collection, or a collection that supports a fixed amount of tokens.<br/> This is useful to create a guaranteed, limited supply on&#45;chain digital asset. For example,<br/> a collection 1111 vicious vipers. Note, creating restrictions such as upward limits results<br/> in data structures that prevent Aptos from parallelizing mints of this collection type.<br/> Beyond that, it adds supply tracking with events.
 
 
 <pre><code>public fun create_fixed_collection(creator: &amp;signer, description: string::String, max_supply: u64, name: string::String, royalty: option::Option&lt;royalty::Royalty&gt;, uri: string::String): object::ConstructorRef<br/></code></pre>
@@ -767,8 +741,7 @@ Beyond that, it adds supply tracking with events.
 
 ## Function `create_unlimited_collection`
 
-Creates an unlimited collection. This has support for supply tracking but does not limit
-the supply of tokens.
+Creates an unlimited collection. This has support for supply tracking but does not limit<br/> the supply of tokens.
 
 
 <pre><code>public fun create_unlimited_collection(creator: &amp;signer, description: string::String, name: string::String, royalty: option::Option&lt;royalty::Royalty&gt;, uri: string::String): object::ConstructorRef<br/></code></pre>
@@ -789,9 +762,7 @@ the supply of tokens.
 
 ## Function `create_untracked_collection`
 
-Creates an untracked collection, or a collection that supports an arbitrary amount of
-tokens. This is useful for mass airdrops that fully leverage Aptos parallelization.
-TODO: Hide this until we bring back meaningful way to enforce burns
+Creates an untracked collection, or a collection that supports an arbitrary amount of<br/> tokens. This is useful for mass airdrops that fully leverage Aptos parallelization.<br/> TODO: Hide this until we bring back meaningful way to enforce burns
 
 
 <pre><code>fun create_untracked_collection(creator: &amp;signer, description: string::String, name: string::String, royalty: option::Option&lt;royalty::Royalty&gt;, uri: string::String): object::ConstructorRef<br/></code></pre>
@@ -832,7 +803,7 @@ TODO: Hide this until we bring back meaningful way to enforce burns
 
 ## Function `create_collection_address`
 
-Generates the collections address based upon the creators address and the collection's name
+Generates the collections address based upon the creators address and the collection&apos;s name
 
 
 <pre><code>public fun create_collection_address(creator: &amp;address, name: &amp;string::String): address<br/></code></pre>
@@ -853,7 +824,7 @@ Generates the collections address based upon the creators address and the collec
 
 ## Function `create_collection_seed`
 
-Named objects are derived from a seed, the collection's seed is its name.
+Named objects are derived from a seed, the collection&apos;s seed is its name.
 
 
 <pre><code>public fun create_collection_seed(name: &amp;string::String): vector&lt;u8&gt;<br/></code></pre>
@@ -874,9 +845,7 @@ Named objects are derived from a seed, the collection's seed is its name.
 
 ## Function `increment_supply`
 
-Called by token on mint to increment supply if there's an appropriate Supply struct.
-TODO[agg_v2](cleanup): remove in a future release. We need to have both functions, as
-increment_concurrent_supply cannot be used until AGGREGATOR_API_V2 is enabled.
+Called by token on mint to increment supply if there&apos;s an appropriate Supply struct.<br/> TODO[agg_v2](cleanup): remove in a future release. We need to have both functions, as<br/> increment_concurrent_supply cannot be used until AGGREGATOR_API_V2 is enabled.
 
 
 <pre><code>public(friend) fun increment_supply(collection: &amp;object::Object&lt;collection::Collection&gt;, token: address): option::Option&lt;u64&gt;<br/></code></pre>
@@ -897,7 +866,7 @@ increment_concurrent_supply cannot be used until AGGREGATOR_API_V2 is enabled.
 
 ## Function `increment_concurrent_supply`
 
-Called by token on mint to increment supply if there's an appropriate Supply struct.
+Called by token on mint to increment supply if there&apos;s an appropriate Supply struct.
 
 
 <pre><code>public(friend) fun increment_concurrent_supply(collection: &amp;object::Object&lt;collection::Collection&gt;, token: address): option::Option&lt;aggregator_v2::AggregatorSnapshot&lt;u64&gt;&gt;<br/></code></pre>
@@ -918,7 +887,7 @@ Called by token on mint to increment supply if there's an appropriate Supply str
 
 ## Function `decrement_supply`
 
-Called by token on burn to decrement supply if there's an appropriate Supply struct.
+Called by token on burn to decrement supply if there&apos;s an appropriate Supply struct.
 
 
 <pre><code>public(friend) fun decrement_supply(collection: &amp;object::Object&lt;collection::Collection&gt;, token: address, index: option::Option&lt;u64&gt;, previous_owner: address)<br/></code></pre>
@@ -1020,10 +989,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 ## Function `count`
 
-Provides the count of the current selection if supply tracking is used
-
-Note: Calling this method from transaction that also mints/burns, prevents
-it from being parallelized.
+Provides the count of the current selection if supply tracking is used<br/><br/> Note: Calling this method from transaction that also mints/burns, prevents<br/> it from being parallelized.
 
 
 <pre><code>&#35;[view]<br/>public fun count&lt;T: key&gt;(collection: object::Object&lt;T&gt;): option::Option&lt;u64&gt;<br/></code></pre>
@@ -1144,12 +1110,7 @@ it from being parallelized.
 
 ## Function `set_name`
 
-Callers of this function must be aware that changing the name will change the calculated
-collection's address when calling <code>create_collection_address</code>.
-Once the collection has been created, the collection address should be saved for reference and
-<code>create_collection_address</code> should not be used to derive the collection's address.
-
-After changing the collection's name, to create tokens - only call functions that accept the collection object as an argument.
+Callers of this function must be aware that changing the name will change the calculated<br/> collection&apos;s address when calling <code>create_collection_address</code>.<br/> Once the collection has been created, the collection address should be saved for reference and<br/> <code>create_collection_address</code> should not be used to derive the collection&apos;s address.<br/><br/> After changing the collection&apos;s name, to create tokens &#45; only call functions that accept the collection object as an argument.
 
 
 <pre><code>public fun set_name(mutator_ref: &amp;collection::MutatorRef, name: string::String)<br/></code></pre>

@@ -3,10 +3,7 @@
 
 # Module `0x1::hash`
 
-Module which defines SHA hashes for byte vectors.
-
-The functions in this module are natively declared both in the Move runtime
-as in the Move prover's prelude.
+Module which defines SHA hashes for byte vectors.<br/><br/> The functions in this module are natively declared both in the Move runtime<br/> as in the Move prover&apos;s prelude.
 
 
 -  [Function `sha2_256`](#0x1_hash_sha2_256)

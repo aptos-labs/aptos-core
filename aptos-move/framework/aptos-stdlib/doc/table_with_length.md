@@ -146,9 +146,7 @@ Destroy a table. The table must be empty to succeed.
 
 ## Function `add`
 
-Add a new entry to the table. Aborts if an entry for this
-key already exists. The entry itself is not stored in the
-table, and cannot be discovered from it.
+Add a new entry to the table. Aborts if an entry for this<br/> key already exists. The entry itself is not stored in the<br/> table, and cannot be discovered from it.
 
 
 <pre><code>public fun add&lt;K: copy, drop, V&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K, val: V)<br/></code></pre>
@@ -169,8 +167,7 @@ table, and cannot be discovered from it.
 
 ## Function `borrow`
 
-Acquire an immutable reference to the value which <code>key</code> maps to.
-Aborts if there is no entry for <code>key</code>.
+Acquire an immutable reference to the value which <code>key</code> maps to.<br/> Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun borrow&lt;K: copy, drop, V&gt;(table: &amp;table_with_length::TableWithLength&lt;K, V&gt;, key: K): &amp;V<br/></code></pre>
@@ -191,8 +188,7 @@ Aborts if there is no entry for <code>key</code>.
 
 ## Function `borrow_mut`
 
-Acquire a mutable reference to the value which <code>key</code> maps to.
-Aborts if there is no entry for <code>key</code>.
+Acquire a mutable reference to the value which <code>key</code> maps to.<br/> Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun borrow_mut&lt;K: copy, drop, V&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K): &amp;mut V<br/></code></pre>
@@ -255,8 +251,7 @@ Returns true if this table is empty.
 
 ## Function `borrow_mut_with_default`
 
-Acquire a mutable reference to the value which <code>key</code> maps to.
-Insert the pair (<code>key</code>, <code>default</code>) first if there is no entry for <code>key</code>.
+Acquire a mutable reference to the value which <code>key</code> maps to.<br/> Insert the pair (<code>key</code>, <code>default</code>) first if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun borrow_mut_with_default&lt;K: copy, drop, V: drop&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K, default: V): &amp;mut V<br/></code></pre>
@@ -277,8 +272,7 @@ Insert the pair (<code>key</code>, <code>default</code>) first if there is no en
 
 ## Function `upsert`
 
-Insert the pair (<code>key</code>, <code>value</code>) if there is no entry for <code>key</code>.
-update the value of the entry for <code>key</code> to <code>value</code> otherwise
+Insert the pair (<code>key</code>, <code>value</code>) if there is no entry for <code>key</code>.<br/> update the value of the entry for <code>key</code> to <code>value</code> otherwise
 
 
 <pre><code>public fun upsert&lt;K: copy, drop, V: drop&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K, value: V)<br/></code></pre>
@@ -299,8 +293,7 @@ update the value of the entry for <code>key</code> to <code>value</code> otherwi
 
 ## Function `remove`
 
-Remove from <code>table</code> and return the value which <code>key</code> maps to.
-Aborts if there is no entry for <code>key</code>.
+Remove from <code>table</code> and return the value which <code>key</code> maps to.<br/> Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun remove&lt;K: copy, drop, V&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K): V<br/></code></pre>

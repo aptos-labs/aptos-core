@@ -3,8 +3,7 @@
 
 # Module `0x1::fixed_point32`
 
-Defines a fixed-point numeric type with a 32-bit integer part and
-a 32-bit fractional part.
+Defines a fixed&#45;point numeric type with a 32&#45;bit integer part and<br/> a 32&#45;bit fractional part.
 
 
 -  [Struct `FixedPoint32`](#0x1_fixed_point32_FixedPoint32)
@@ -42,15 +41,7 @@ a 32-bit fractional part.
 
 ## Struct `FixedPoint32`
 
-Define a fixed-point numeric type with 32 fractional bits.
-This is just a u64 integer but it is wrapped in a struct to
-make a unique type. This is a binary representation, so decimal
-values may not be exactly representable, but it provides more
-than 9 decimal digits of precision both before and after the
-decimal point (18 digits total). For comparison, double precision
-floating-point has less than 16 decimal digits of precision, so
-be careful about using floating-point to convert these values to
-decimal.
+Define a fixed&#45;point numeric type with 32 fractional bits.<br/> This is just a u64 integer but it is wrapped in a struct to<br/> make a unique type. This is a binary representation, so decimal<br/> values may not be exactly representable, but it provides more<br/> than 9 decimal digits of precision both before and after the<br/> decimal point (18 digits total). For comparison, double precision<br/> floating&#45;point has less than 16 decimal digits of precision, so<br/> be careful about using floating&#45;point to convert these values to<br/> decimal.
 
 
 <pre><code>struct FixedPoint32 has copy, drop, store<br/></code></pre>
@@ -135,9 +126,7 @@ The computed ratio when converting to a <code>FixedPoint32</code> would be unrep
 
 ## Function `multiply_u64`
 
-Multiply a u64 integer by a fixed-point number, truncating any
-fractional part of the product. This will abort if the product
-overflows.
+Multiply a u64 integer by a fixed&#45;point number, truncating any<br/> fractional part of the product. This will abort if the product<br/> overflows.
 
 
 <pre><code>public fun multiply_u64(val: u64, multiplier: fixed_point32::FixedPoint32): u64<br/></code></pre>
@@ -158,9 +147,7 @@ overflows.
 
 ## Function `divide_u64`
 
-Divide a u64 integer by a fixed-point number, truncating any
-fractional part of the quotient. This will abort if the divisor
-is zero or if the quotient overflows.
+Divide a u64 integer by a fixed&#45;point number, truncating any<br/> fractional part of the quotient. This will abort if the divisor<br/> is zero or if the quotient overflows.
 
 
 <pre><code>public fun divide_u64(val: u64, divisor: fixed_point32::FixedPoint32): u64<br/></code></pre>
@@ -181,16 +168,7 @@ is zero or if the quotient overflows.
 
 ## Function `create_from_rational`
 
-Create a fixed-point value from a rational number specified by its
-numerator and denominator. Calling this function should be preferred
-for using <code>Self::create_from_raw_value</code> which is also available.
-This will abort if the denominator is zero. It will also
-abort if the numerator is nonzero and the ratio is not in the range
-2^-32 .. 2^32-1. When specifying decimal fractions, be careful about
-rounding errors: if you round to display N digits after the decimal
-point, you can use a denominator of 10^N to avoid numbers where the
-very small imprecision in the binary representation could change the
-rounding, e.g., 0.0125 will round down to 0.012 instead of up to 0.013.
+Create a fixed&#45;point value from a rational number specified by its<br/> numerator and denominator. Calling this function should be preferred<br/> for using <code>Self::create_from_raw_value</code> which is also available.<br/> This will abort if the denominator is zero. It will also<br/> abort if the numerator is nonzero and the ratio is not in the range<br/> 2^&#45;32 .. 2^32&#45;1. When specifying decimal fractions, be careful about<br/> rounding errors: if you round to display N digits after the decimal<br/> point, you can use a denominator of 10^N to avoid numbers where the<br/> very small imprecision in the binary representation could change the<br/> rounding, e.g., 0.0125 will round down to 0.012 instead of up to 0.013.
 
 
 <pre><code>public fun create_from_rational(numerator: u64, denominator: u64): fixed_point32::FixedPoint32<br/></code></pre>
@@ -232,9 +210,7 @@ Create a fixedpoint value from a raw value.
 
 ## Function `get_raw_value`
 
-Accessor for the raw u64 value. Other less common operations, such as
-adding or subtracting FixedPoint32 values, can be done using the raw
-values directly.
+Accessor for the raw u64 value. Other less common operations, such as<br/> adding or subtracting FixedPoint32 values, can be done using the raw<br/> values directly.
 
 
 <pre><code>public fun get_raw_value(num: fixed_point32::FixedPoint32): u64<br/></code></pre>

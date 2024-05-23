@@ -3,10 +3,7 @@
 
 # Module `0x1::ristretto255_pedersen`
 
-This module implements a Pedersen commitment API, over the Ristretto255 curve, that can be used with the
-Bulletproofs module.
-
-A Pedersen commitment to a value <code>v</code> under _commitment key_ <code>(g, h)</code> is <code>v &#42; g &#43; r &#42; h</code>, for a random scalar <code>r</code>.
+This module implements a Pedersen commitment API, over the Ristretto255 curve, that can be used with the<br/> Bulletproofs module.<br/><br/> A Pedersen commitment to a value <code>v</code> under _commitment key_ <code>(g, h)</code> is <code>v &#42; g &#43; r &#42; h</code>, for a random scalar <code>r</code>.
 
 
 -  [Struct `Commitment`](#0x1_ristretto255_pedersen_Commitment)
@@ -69,8 +66,7 @@ A Pedersen commitment to some value with some randomness.
 
 <a id="0x1_ristretto255_pedersen_BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE"></a>
 
-The default Pedersen randomness base <code>h</code> used in our underlying Bulletproofs library.
-This is obtained by hashing the compressed Ristretto255 basepoint using SHA3-512 (not SHA2-512).
+The default Pedersen randomness base <code>h</code> used in our underlying Bulletproofs library.<br/> This is obtained by hashing the compressed Ristretto255 basepoint using SHA3&#45;512 (not SHA2&#45;512).
 
 
 <pre><code>const BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE: vector&lt;u8&gt; &#61; [140, 146, 64, 180, 86, 169, 230, 220, 101, 195, 119, 161, 4, 141, 116, 95, 148, 160, 140, 219, 127, 68, 203, 205, 123, 70, 243, 64, 72, 135, 17, 52];<br/></code></pre>
@@ -207,8 +203,7 @@ Returns a commitment <code>v &#42; G &#43; r &#42; rand_base</code> where <code>
 
 ## Function `new_commitment_for_bulletproof`
 
-Returns a commitment <code>v &#42; G &#43; r &#42; H</code> where <code>G</code> is the Ristretto255 basepoint and <code>H</code> is the default randomness
-base used in the Bulletproofs library (i.e., <code>BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE</code>).
+Returns a commitment <code>v &#42; G &#43; r &#42; H</code> where <code>G</code> is the Ristretto255 basepoint and <code>H</code> is the default randomness<br/> base used in the Bulletproofs library (i.e., <code>BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE</code>).
 
 
 <pre><code>public fun new_commitment_for_bulletproof(v: &amp;ristretto255::Scalar, r: &amp;ristretto255::Scalar): ristretto255_pedersen::Commitment<br/></code></pre>
@@ -229,8 +224,7 @@ base used in the Bulletproofs library (i.e., <code>BULLETPROOF_DEFAULT_PEDERSEN_
 
 ## Function `commitment_add`
 
-Homomorphically combines two commitments <code>lhs</code> and <code>rhs</code> as <code>lhs &#43; rhs</code>.
-Useful for re-randomizing the commitment or updating the committed value.
+Homomorphically combines two commitments <code>lhs</code> and <code>rhs</code> as <code>lhs &#43; rhs</code>.<br/> Useful for re&#45;randomizing the commitment or updating the committed value.
 
 
 <pre><code>public fun commitment_add(lhs: &amp;ristretto255_pedersen::Commitment, rhs: &amp;ristretto255_pedersen::Commitment): ristretto255_pedersen::Commitment<br/></code></pre>
@@ -272,8 +266,7 @@ Like <code>commitment_add</code> but assigns <code>lhs &#61; lhs &#43; rhs</code
 
 ## Function `commitment_sub`
 
-Homomorphically combines two commitments <code>lhs</code> and <code>rhs</code> as <code>lhs &#45; rhs</code>.
-Useful for re-randomizing the commitment or updating the committed value.
+Homomorphically combines two commitments <code>lhs</code> and <code>rhs</code> as <code>lhs &#45; rhs</code>.<br/> Useful for re&#45;randomizing the commitment or updating the committed value.
 
 
 <pre><code>public fun commitment_sub(lhs: &amp;ristretto255_pedersen::Commitment, rhs: &amp;ristretto255_pedersen::Commitment): ristretto255_pedersen::Commitment<br/></code></pre>
@@ -357,7 +350,7 @@ Returns true if the two commitments are identical: i.e., same value and same ran
 
 ## Function `commitment_as_point`
 
-Returns the underlying elliptic curve point representing the commitment as an in-memory <code>RistrettoPoint</code>.
+Returns the underlying elliptic curve point representing the commitment as an in&#45;memory <code>RistrettoPoint</code>.
 
 
 <pre><code>public fun commitment_as_point(c: &amp;ristretto255_pedersen::Commitment): &amp;ristretto255::RistrettoPoint<br/></code></pre>
@@ -441,14 +434,7 @@ Moves the Commitment into a <code>CompressedRistretto</code> point.
 
 ## Function `randomness_base_for_bulletproof`
 
-Returns the randomness base compatible with the Bulletproofs module.
-
-Recal that a Bulletproof range proof attests, in zero-knowledge, that a value <code>v</code> inside a Pedersen commitment
-<code>v &#42; g &#43; r &#42; h</code> is sufficiently "small" (e.g., is 32-bits wide). Here, <code>h</code> is referred to as the
-"randomness base" of the commitment scheme.
-
-Bulletproof has a default choice for <code>g</code> and <code>h</code> and this function returns the default <code>h</code> as used in the
-Bulletproofs Move module.
+Returns the randomness base compatible with the Bulletproofs module.<br/><br/> Recal that a Bulletproof range proof attests, in zero&#45;knowledge, that a value <code>v</code> inside a Pedersen commitment<br/> <code>v &#42; g &#43; r &#42; h</code> is sufficiently &quot;small&quot; (e.g., is 32&#45;bits wide). Here, <code>h</code> is referred to as the<br/> &quot;randomness base&quot; of the commitment scheme.<br/><br/> Bulletproof has a default choice for <code>g</code> and <code>h</code> and this function returns the default <code>h</code> as used in the<br/> Bulletproofs Move module.
 
 
 <pre><code>public fun randomness_base_for_bulletproof(): ristretto255::RistrettoPoint<br/></code></pre>

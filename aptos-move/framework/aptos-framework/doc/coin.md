@@ -151,8 +151,7 @@ This module provides the foundation for typesafe Coins.
 
 ## Struct `Coin`
 
-Core data structures
-Main structure representing a coin/token in an account's custody.
+Core data structures<br/> Main structure representing a coin/token in an account&apos;s custody.
 
 
 <pre><code>struct Coin&lt;CoinType&gt; has store<br/></code></pre>
@@ -179,9 +178,7 @@ Main structure representing a coin/token in an account's custody.
 
 ## Struct `AggregatableCoin`
 
-Represents a coin with aggregator as its value. This allows to update
-the coin in every transaction avoiding read-modify-write conflicts. Only
-used for gas fees distribution by Aptos Framework (0x1).
+Represents a coin with aggregator as its value. This allows to update<br/> the coin in every transaction avoiding read&#45;modify&#45;write conflicts. Only<br/> used for gas fees distribution by Aptos Framework (0x1).
 
 
 <pre><code>struct AggregatableCoin&lt;CoinType&gt; has store<br/></code></pre>
@@ -208,8 +205,7 @@ used for gas fees distribution by Aptos Framework (0x1).
 
 ## Resource `CoinStore`
 
-A holder of a specific coin types and associated event handles.
-These are kept in a single resource to ensure locality of data.
+A holder of a specific coin types and associated event handles.<br/> These are kept in a single resource to ensure locality of data.
 
 
 <pre><code>struct CoinStore&lt;CoinType&gt; has key<br/></code></pre>
@@ -254,8 +250,7 @@ These are kept in a single resource to ensure locality of data.
 
 ## Resource `SupplyConfig`
 
-Configuration that controls the behavior of total coin supply. If the field
-is set, coin creators are allowed to upgrade to parallelizable implementations.
+Configuration that controls the behavior of total coin supply. If the field<br/> is set, coin creators are allowed to upgrade to parallelizable implementations.
 
 
 <pre><code>struct SupplyConfig has key<br/></code></pre>
@@ -282,7 +277,7 @@ is set, coin creators are allowed to upgrade to parallelizable implementations.
 
 ## Resource `CoinInfo`
 
-Information about a specific coin type. Stored on the creator of the coin's account.
+Information about a specific coin type. Stored on the creator of the coin&apos;s account.
 
 
 <pre><code>struct CoinInfo&lt;CoinType&gt; has key<br/></code></pre>
@@ -304,16 +299,13 @@ Information about a specific coin type. Stored on the creator of the coin's acco
 <code>symbol: string::String</code>
 </dt>
 <dd>
- Symbol of the coin, usually a shorter version of the name.
- For example, Singapore Dollar is SGD.
+ Symbol of the coin, usually a shorter version of the name.<br/> For example, Singapore Dollar is SGD.
 </dd>
 <dt>
 <code>decimals: u8</code>
 </dt>
 <dd>
- Number of decimals used to get its user representation.
- For example, if <code>decimals</code> equals <code>2</code>, a balance of <code>505</code> coins should
- be displayed to a user as <code>5.05</code> (<code>505 / 10 &#42;&#42; 2</code>).
+ Number of decimals used to get its user representation.<br/> For example, if <code>decimals</code> equals <code>2</code>, a balance of <code>505</code> coins should<br/> be displayed to a user as <code>5.05</code> (<code>505 / 10 &#42;&#42; 2</code>).
 </dd>
 <dt>
 <code>supply: option::Option&lt;optional_aggregator::OptionalAggregator&gt;</code>
@@ -931,7 +923,7 @@ The coin converison map is not created yet.
 
 <a id="0x1_coin_ECOIN_INFO_ADDRESS_MISMATCH"></a>
 
-Address of account which is used to initialize a coin <code>CoinType</code> doesn't match the deployer of module
+Address of account which is used to initialize a coin <code>CoinType</code> doesn&apos;t match the deployer of module
 
 
 <pre><code>const ECOIN_INFO_ADDRESS_MISMATCH: u64 &#61; 1;<br/></code></pre>
@@ -949,7 +941,7 @@ Address of account which is used to initialize a coin <code>CoinType</code> does
 
 <a id="0x1_coin_ECOIN_INFO_NOT_PUBLISHED"></a>
 
-<code>CoinType</code> hasn't been initialized as a coin
+<code>CoinType</code> hasn&apos;t been initialized as a coin
 
 
 <pre><code>const ECOIN_INFO_NOT_PUBLISHED: u64 &#61; 3;<br/></code></pre>
@@ -976,7 +968,7 @@ Deprecated. Account already has <code>CoinStore</code> registered for <code>Coin
 
 <a id="0x1_coin_ECOIN_STORE_NOT_PUBLISHED"></a>
 
-Account hasn't registered <code>CoinStore</code> for <code>CoinType</code>
+Account hasn&apos;t registered <code>CoinStore</code> for <code>CoinType</code>
 
 
 <pre><code>const ECOIN_STORE_NOT_PUBLISHED: u64 &#61; 5;<br/></code></pre>
@@ -1021,7 +1013,7 @@ The coin type from the map does not match the calling function type argument.
 
 <a id="0x1_coin_EDESTRUCTION_OF_NONZERO_TOKEN"></a>
 
-Cannot destroy non-zero coins
+Cannot destroy non&#45;zero coins
 
 
 <pre><code>const EDESTRUCTION_OF_NONZERO_TOKEN: u64 &#61; 7;<br/></code></pre>
@@ -1565,8 +1557,7 @@ Publishes supply configuration. Initially, upgrading is not allowed.
 
 ## Function `allow_supply_upgrades`
 
-This should be called by on-chain governance to update the config and allow
-or disallow upgradability of total supply.
+This should be called by on&#45;chain governance to update the config and allow<br/> or disallow upgradability of total supply.
 
 
 <pre><code>public fun allow_supply_upgrades(aptos_framework: &amp;signer, allowed: bool)<br/></code></pre>
@@ -1587,8 +1578,7 @@ or disallow upgradability of total supply.
 
 ## Function `initialize_aggregatable_coin`
 
-Creates a new aggregatable coin with value overflowing on <code>limit</code>. Note that this function can
-only be called by Aptos Framework (0x1) account for now because of <code>create_aggregator</code>.
+Creates a new aggregatable coin with value overflowing on <code>limit</code>. Note that this function can<br/> only be called by Aptos Framework (0x1) account for now because of <code>create_aggregator</code>.
 
 
 <pre><code>public(friend) fun initialize_aggregatable_coin&lt;CoinType&gt;(aptos_framework: &amp;signer): coin::AggregatableCoin&lt;CoinType&gt;<br/></code></pre>
@@ -1796,7 +1786,7 @@ Returns the balance of <code>owner</code> for provided <code>CoinType</code> and
 
 ## Function `is_balance_at_least`
 
-Returns whether the balance of <code>owner</code> for provided <code>CoinType</code> and its paired FA is >= <code>amount</code>.
+Returns whether the balance of <code>owner</code> for provided <code>CoinType</code> and its paired FA is &gt;&#61; <code>amount</code>.
 
 
 <pre><code>&#35;[view]<br/>public fun is_balance_at_least&lt;CoinType&gt;(owner: address, amount: u64): bool<br/></code></pre>
@@ -1858,7 +1848,7 @@ Returns <code>true</code> if the type <code>CoinType</code> is an initialized co
 
 ## Function `is_coin_store_frozen`
 
-Returns <code>true</code> is account_addr has frozen the CoinStore or if it's not registered at all
+Returns <code>true</code> is account_addr has frozen the CoinStore or if it&apos;s not registered at all
 
 
 <pre><code>&#35;[view]<br/>public fun is_coin_store_frozen&lt;CoinType&gt;(account_addr: address): bool<br/></code></pre>
@@ -1942,9 +1932,7 @@ Returns the symbol of the coin, usually a shorter version of the name.
 
 ## Function `decimals`
 
-Returns the number of decimals used to get its user representation.
-For example, if <code>decimals</code> equals <code>2</code>, a balance of <code>505</code> coins should
-be displayed to a user as <code>5.05</code> (<code>505 / 10 &#42;&#42; 2</code>).
+Returns the number of decimals used to get its user representation.<br/> For example, if <code>decimals</code> equals <code>2</code>, a balance of <code>505</code> coins should<br/> be displayed to a user as <code>5.05</code> (<code>505 / 10 &#42;&#42; 2</code>).
 
 
 <pre><code>&#35;[view]<br/>public fun decimals&lt;CoinType&gt;(): u8<br/></code></pre>
@@ -2007,8 +1995,7 @@ Returns the amount of coin in existence.
 
 ## Function `burn`
 
-Burn <code>coin</code> with capability.
-The capability <code>_cap</code> should be passed as a reference to <code>BurnCapability&lt;CoinType&gt;</code>.
+Burn <code>coin</code> with capability.<br/> The capability <code>_cap</code> should be passed as a reference to <code>BurnCapability&lt;CoinType&gt;</code>.
 
 
 <pre><code>public fun burn&lt;CoinType&gt;(coin: coin::Coin&lt;CoinType&gt;, _cap: &amp;coin::BurnCapability&lt;CoinType&gt;)<br/></code></pre>
@@ -2029,11 +2016,7 @@ The capability <code>_cap</code> should be passed as a reference to <code>BurnCa
 
 ## Function `burn_from`
 
-Burn <code>coin</code> from the specified <code>account</code> with capability.
-The capability <code>burn_cap</code> should be passed as a reference to <code>BurnCapability&lt;CoinType&gt;</code>.
-This function shouldn't fail as it's called as part of transaction fee burning.
-
-Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be burned.
+Burn <code>coin</code> from the specified <code>account</code> with capability.<br/> The capability <code>burn_cap</code> should be passed as a reference to <code>BurnCapability&lt;CoinType&gt;</code>.<br/> This function shouldn&apos;t fail as it&apos;s called as part of transaction fee burning.<br/><br/> Note: This bypasses CoinStore::frozen &#45;&#45; coins within a frozen CoinStore can be burned.
 
 
 <pre><code>public fun burn_from&lt;CoinType&gt;(account_addr: address, amount: u64, burn_cap: &amp;coin::BurnCapability&lt;CoinType&gt;)<br/></code></pre>
@@ -2054,7 +2037,7 @@ Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be 
 
 ## Function `deposit`
 
-Deposit the coin balance into the recipient's account and emit an event.
+Deposit the coin balance into the recipient&apos;s account and emit an event.
 
 
 <pre><code>public fun deposit&lt;CoinType&gt;(account_addr: address, coin: coin::Coin&lt;CoinType&gt;)<br/></code></pre>
@@ -2095,8 +2078,7 @@ Deposit the coin balance into the recipient's account and emit an event.
 
 ## Function `force_deposit`
 
-Deposit the coin balance into the recipient's account without checking if the account is frozen.
-This is for internal use only and doesn't emit an DepositEvent.
+Deposit the coin balance into the recipient&apos;s account without checking if the account is frozen.<br/> This is for internal use only and doesn&apos;t emit an DepositEvent.
 
 
 <pre><code>public(friend) fun force_deposit&lt;CoinType&gt;(account_addr: address, coin: coin::Coin&lt;CoinType&gt;)<br/></code></pre>
@@ -2117,9 +2099,7 @@ This is for internal use only and doesn't emit an DepositEvent.
 
 ## Function `destroy_zero`
 
-Destroys a zero-value coin. Calls will fail if the <code>value</code> in the passed-in <code>token</code> is non-zero
-so it is impossible to "burn" any non-zero amount of <code>Coin</code> without having
-a <code>BurnCapability</code> for the specific <code>CoinType</code>.
+Destroys a zero&#45;value coin. Calls will fail if the <code>value</code> in the passed&#45;in <code>token</code> is non&#45;zero<br/> so it is impossible to &quot;burn&quot; any non&#45;zero amount of <code>Coin</code> without having<br/> a <code>BurnCapability</code> for the specific <code>CoinType</code>.
 
 
 <pre><code>public fun destroy_zero&lt;CoinType&gt;(zero_coin: coin::Coin&lt;CoinType&gt;)<br/></code></pre>
@@ -2140,7 +2120,7 @@ a <code>BurnCapability</code> for the specific <code>CoinType</code>.
 
 ## Function `extract`
 
-Extracts <code>amount</code> from the passed-in <code>coin</code>, where the original token is modified in place.
+Extracts <code>amount</code> from the passed&#45;in <code>coin</code>, where the original token is modified in place.
 
 
 <pre><code>public fun extract&lt;CoinType&gt;(coin: &amp;mut coin::Coin&lt;CoinType&gt;, amount: u64): coin::Coin&lt;CoinType&gt;<br/></code></pre>
@@ -2161,7 +2141,7 @@ Extracts <code>amount</code> from the passed-in <code>coin</code>, where the ori
 
 ## Function `extract_all`
 
-Extracts the entire amount from the passed-in <code>coin</code>, where the original token is modified in place.
+Extracts the entire amount from the passed&#45;in <code>coin</code>, where the original token is modified in place.
 
 
 <pre><code>public fun extract_all&lt;CoinType&gt;(coin: &amp;mut coin::Coin&lt;CoinType&gt;): coin::Coin&lt;CoinType&gt;<br/></code></pre>
@@ -2224,8 +2204,7 @@ Unfreeze a CoinStore to allow transfers
 
 ## Function `upgrade_supply`
 
-Upgrade total supply to use a parallelizable implementation if it is
-available.
+Upgrade total supply to use a parallelizable implementation if it is<br/> available.
 
 
 <pre><code>public entry fun upgrade_supply&lt;CoinType&gt;(account: &amp;signer)<br/></code></pre>
@@ -2246,9 +2225,8 @@ available.
 
 ## Function `initialize`
 
-Creates a new Coin with given <code>CoinType</code> and returns minting/freezing/burning capabilities.
-The given signer also becomes the account hosting the information  about the coin
-(name, supply, etc.). Supply is initialized as non-parallelizable integer.
+Creates a new Coin with given <code>CoinType</code> and returns minting/freezing/burning capabilities.<br/> The given signer also becomes the account hosting the information  about the coin
+(name, supply, etc.). Supply is initialized as non&#45;parallelizable integer.
 
 
 <pre><code>public fun initialize&lt;CoinType&gt;(account: &amp;signer, name: string::String, symbol: string::String, decimals: u8, monitor_supply: bool): (coin::BurnCapability&lt;CoinType&gt;, coin::FreezeCapability&lt;CoinType&gt;, coin::MintCapability&lt;CoinType&gt;)<br/></code></pre>
@@ -2310,8 +2288,7 @@ Same as <code>initialize</code> but supply can be initialized to parallelizable 
 
 ## Function `merge`
 
-"Merges" the two given coins.  The coin passed in as <code>dst_coin</code> will have a value equal
-to the sum of the two tokens (<code>dst_coin</code> and <code>source_coin</code>).
+&quot;Merges&quot; the two given coins.  The coin passed in as <code>dst_coin</code> will have a value equal<br/> to the sum of the two tokens (<code>dst_coin</code> and <code>source_coin</code>).
 
 
 <pre><code>public fun merge&lt;CoinType&gt;(dst_coin: &amp;mut coin::Coin&lt;CoinType&gt;, source_coin: coin::Coin&lt;CoinType&gt;)<br/></code></pre>
@@ -2332,9 +2309,7 @@ to the sum of the two tokens (<code>dst_coin</code> and <code>source_coin</code>
 
 ## Function `mint`
 
-Mint new <code>Coin</code> with capability.
-The capability <code>_cap</code> should be passed as reference to <code>MintCapability&lt;CoinType&gt;</code>.
-Returns minted <code>Coin</code>.
+Mint new <code>Coin</code> with capability.<br/> The capability <code>_cap</code> should be passed as reference to <code>MintCapability&lt;CoinType&gt;</code>.<br/> Returns minted <code>Coin</code>.
 
 
 <pre><code>public fun mint&lt;CoinType&gt;(amount: u64, _cap: &amp;coin::MintCapability&lt;CoinType&gt;): coin::Coin&lt;CoinType&gt;<br/></code></pre>
@@ -2569,86 +2544,29 @@ Destroy a burn capability.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>Only the owner of a coin may mint, burn or freeze coins.</td>
-<td>Critical</td>
-<td>Acquiring capabilities for a particular CoinType may only occur if the caller has a signer for the module declaring that type. The initialize function returns these capabilities to the caller.</td>
-<td>Formally Verified via <a href="#high-level-req-1.1">upgrade_supply</a> and <a href="#high-level-req-1.2">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Only the owner of a coin may mint, burn or freeze coins.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;Acquiring capabilities for a particular CoinType may only occur if the caller has a signer for the module declaring that type. The initialize function returns these capabilities to the caller.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1.1&quot;&gt;upgrade_supply&lt;/a&gt; and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1.2&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>Each coin may only be created exactly once.</td>
-<td>Medium</td>
-<td>The initialization function may only be called once.</td>
-<td>Formally Verified via <a href="#high-level-req-2">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;Each coin may only be created exactly once.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The initialization function may only be called once.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>The merging of coins may only be done on coins of the same type.</td>
-<td>Critical</td>
-<td>The merge function is limited to merging coins of the same type only.</td>
-<td>Formally Verified via <a href="#high-level-req-3">merge</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The merging of coins may only be done on coins of the same type.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The merge function is limited to merging coins of the same type only.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;merge&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>The supply of a coin is only affected by burn and mint operations.</td>
-<td>High</td>
-<td>Only mint and burn operations on a coin alter the total supply of coins.</td>
-<td>Formally Verified via <a href="#high-level-req-4">TotalSupplyNoChange</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The supply of a coin is only affected by burn and mint operations.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;Only mint and burn operations on a coin alter the total supply of coins.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;TotalSupplyNoChange&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>Users may register an account for a coin multiple times idempotently.</td>
-<td>Medium</td>
-<td>The register function should work idempotently. Importantly, it should not abort if the coin is already registered.</td>
-<td>Formally verified via aborts_if on <a href="#high-level-req-5">register</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;Users may register an account for a coin multiple times idempotently.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The register function should work idempotently. Importantly, it should not abort if the coin is already registered.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via aborts_if on &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5&quot;&gt;register&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>6</td>
-<td>Coin operations should fail if the user has not registered for the coin.</td>
-<td>Medium</td>
-<td>Coin operations may succeed only on valid user coin registration.</td>
-<td>Formally Verified via <a href="#high-level-req-6.1">balance</a>, <a href="#high-level-req-6.2">burn_from</a>, <a href="#high-level-req-6.3">freeze</a>, <a href="#high-level-req-6.4">unfreeze</a>, <a href="#high-level-req-6.5">transfer</a> and <a href="#high-level-req-6.6">withdraw</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;6&lt;/td&gt;<br/>&lt;td&gt;Coin operations should fail if the user has not registered for the coin.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;Coin operations may succeed only on valid user coin registration.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.1&quot;&gt;balance&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.2&quot;&gt;burn_from&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.3&quot;&gt;freeze&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.4&quot;&gt;unfreeze&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.5&quot;&gt;transfer&lt;/a&gt; and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.6&quot;&gt;withdraw&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>7</td>
-<td>It should always be possible to (1) determine if a coin exists, and (2) determine if a user registered an account with a particular coin. If a coin exists, it should always be possible to request the following information of the coin: (1) Name, (2) Symbol, and (3) Supply.</td>
-<td>Low</td>
-<td>The following functions should never abort: (1) is_coin_initialized, and (2) is_account_registered. The following functions should not abort if the coin exists: (1) name, (2) symbol, and (3) supply.</td>
-<td>Formally Verified in corresponding functions: <a href="#high-level-req-7.1">is_coin_initialized</a>, <a href="#high-level-req-7.2">is_account_registered</a>, <a href="#high-level-req-7.3">name</a>, <a href="#high-level-req-7.4">symbol</a> and <a href="#high-level-req-7.5">supply</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;7&lt;/td&gt;<br/>&lt;td&gt;It should always be possible to (1) determine if a coin exists, and (2) determine if a user registered an account with a particular coin. If a coin exists, it should always be possible to request the following information of the coin: (1) Name, (2) Symbol, and (3) Supply.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The following functions should never abort: (1) is_coin_initialized, and (2) is_account_registered. The following functions should not abort if the coin exists: (1) name, (2) symbol, and (3) supply.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified in corresponding functions: &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;7.1&quot;&gt;is_coin_initialized&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;7.2&quot;&gt;is_account_registered&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;7.3&quot;&gt;name&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;7.4&quot;&gt;symbol&lt;/a&gt; and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;7.5&quot;&gt;supply&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>8</td>
-<td>Coin operations should fail if the user's CoinStore is frozen.</td>
-<td>Medium</td>
-<td>If the CoinStore of an address is frozen, coin operations are disallowed.</td>
-<td>Formally Verified via <a href="#high-level-req-8.1">withdraw</a>, <a href="#high-level-req-8.2">transfer</a> and <a href="#high-level-req-8.3">deposit</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;8&lt;/td&gt;<br/>&lt;td&gt;Coin operations should fail if the user&apos;s CoinStore is frozen.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;If the CoinStore of an address is frozen, coin operations are disallowed.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;8.1&quot;&gt;withdraw&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;8.2&quot;&gt;transfer&lt;/a&gt; and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;8.3&quot;&gt;deposit&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>9</td>
-<td>Utilizing AggregatableCoins does not violate other critical invariants, such as (4).</td>
-<td>High</td>
-<td>Utilizing AggregatableCoin does not change the real-supply of any token.</td>
-<td>Formally Verified via <a href="#high-level-req-9">TotalSupplyNoChange</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;9&lt;/td&gt;<br/>&lt;td&gt;Utilizing AggregatableCoins does not violate other critical invariants, such as (4).&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;Utilizing AggregatableCoin does not change the real&#45;supply of any token.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;9&quot;&gt;TotalSupplyNoChange&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -2757,8 +2675,7 @@ global aggregate_supply&lt;CoinType&gt;: num;<br/>apply TotalSupplyTracked&lt;Co
 <pre><code>public(friend) fun initialize_supply_config(aptos_framework: &amp;signer)<br/></code></pre>
 
 
-Can only be initialized once.
-Can only be published by reserved addresses.
+Can only be initialized once.<br/> Can only be published by reserved addresses.
 
 
 <pre><code>let aptos_addr &#61; signer::address_of(aptos_framework);<br/>aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);<br/>aborts_if exists&lt;SupplyConfig&gt;(aptos_addr);<br/>ensures !global&lt;SupplyConfig&gt;(aptos_addr).allow_upgrades;<br/>ensures exists&lt;SupplyConfig&gt;(aptos_addr);<br/></code></pre>
@@ -2911,7 +2828,7 @@ Get address by reflection.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-7.1" href="#high-level-req">high-level requirement 7</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;7.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 7&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -2988,7 +2905,7 @@ aborts_if false;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-7.3" href="#high-level-req">high-level requirement 7</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;7.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 7&lt;/a&gt;:
 include AbortsIfNotExistCoinInfo&lt;CoinType&gt;;<br/></code></pre>
 
 
@@ -3003,7 +2920,7 @@ include AbortsIfNotExistCoinInfo&lt;CoinType&gt;;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-7.4" href="#high-level-req">high-level requirement 7</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;7.4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 7&lt;/a&gt;:
 include AbortsIfNotExistCoinInfo&lt;CoinType&gt;;<br/></code></pre>
 
 
@@ -3046,7 +2963,7 @@ include AbortsIfNotExistCoinInfo&lt;CoinType&gt;;<br/></code></pre>
 
 
 
-<pre><code>let coin_addr &#61; type_info::type_of&lt;CoinType&gt;().account_address;<br/>// This enforces <a id="high-level-req-7.5" href="#high-level-req">high-level requirement 7</a>:
+<pre><code>let coin_addr &#61; type_info::type_of&lt;CoinType&gt;().account_address;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;7.5&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 7&lt;/a&gt;:
 aborts_if !exists&lt;CoinInfo&lt;CoinType&gt;&gt;(coin_addr);<br/>let maybe_supply &#61; global&lt;CoinInfo&lt;CoinType&gt;&gt;(coin_addr).supply;<br/>let supply &#61; option::spec_borrow(maybe_supply);<br/>let value &#61; optional_aggregator::optional_aggregator_value(supply);<br/>ensures if (option::spec_is_some(maybe_supply)) &#123;<br/>    result &#61;&#61; option::spec_some(value)<br/>&#125; else &#123;<br/>    option::spec_is_none(result)<br/>&#125;;<br/></code></pre>
 
 
@@ -3075,8 +2992,8 @@ aborts_if !exists&lt;CoinInfo&lt;CoinType&gt;&gt;(coin_addr);<br/>let maybe_supp
 
 
 
-<pre><code>pragma verify &#61; false;<br/>let addr &#61; type_info::type_of&lt;CoinType&gt;().account_address;<br/>let coin_store &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>let post post_coin_store &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>modifies global&lt;CoinInfo&lt;CoinType&gt;&gt;(addr);<br/>modifies global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>// This enforces <a id="high-level-req-6.2" href="#high-level-req">high-level requirement 6</a>:
-aborts_if amount !&#61; 0 &amp;&amp; !exists&lt;CoinInfo&lt;CoinType&gt;&gt;(addr);<br/>aborts_if amount !&#61; 0 &amp;&amp; !exists&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>aborts_if coin_store.coin.value &lt; amount;<br/>let maybe_supply &#61; global&lt;CoinInfo&lt;CoinType&gt;&gt;(addr).supply;<br/>let supply_aggr &#61; option::spec_borrow(maybe_supply);<br/>let value &#61; optional_aggregator::optional_aggregator_value(supply_aggr);<br/>let post post_maybe_supply &#61; global&lt;CoinInfo&lt;CoinType&gt;&gt;(addr).supply;<br/>let post post_supply &#61; option::spec_borrow(post_maybe_supply);<br/>let post post_value &#61; optional_aggregator::optional_aggregator_value(post_supply);<br/>aborts_if option::spec_is_some(maybe_supply) &amp;&amp; value &lt; amount;<br/>ensures post_coin_store.coin.value &#61;&#61; coin_store.coin.value &#45; amount;<br/>// This enforces <a id="high-level-req-5" href="managed_coin.md#high-level-req">high-level requirement 5</a> of the <a href="managed_coin.md">managed_coin</a> module:
+<pre><code>pragma verify &#61; false;<br/>let addr &#61; type_info::type_of&lt;CoinType&gt;().account_address;<br/>let coin_store &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>let post post_coin_store &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>modifies global&lt;CoinInfo&lt;CoinType&gt;&gt;(addr);<br/>modifies global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
+aborts_if amount !&#61; 0 &amp;&amp; !exists&lt;CoinInfo&lt;CoinType&gt;&gt;(addr);<br/>aborts_if amount !&#61; 0 &amp;&amp; !exists&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>aborts_if coin_store.coin.value &lt; amount;<br/>let maybe_supply &#61; global&lt;CoinInfo&lt;CoinType&gt;&gt;(addr).supply;<br/>let supply_aggr &#61; option::spec_borrow(maybe_supply);<br/>let value &#61; optional_aggregator::optional_aggregator_value(supply_aggr);<br/>let post post_maybe_supply &#61; global&lt;CoinInfo&lt;CoinType&gt;&gt;(addr).supply;<br/>let post post_supply &#61; option::spec_borrow(post_maybe_supply);<br/>let post post_value &#61; optional_aggregator::optional_aggregator_value(post_supply);<br/>aborts_if option::spec_is_some(maybe_supply) &amp;&amp; value &lt; amount;<br/>ensures post_coin_store.coin.value &#61;&#61; coin_store.coin.value &#45; amount;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5&quot; href&#61;&quot;managed_coin.md&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt; of the &lt;a href&#61;&quot;managed_coin.md&quot;&gt;managed_coin&lt;/a&gt; module:
 ensures if (option::spec_is_some(maybe_supply)) &#123;<br/>    post_value &#61;&#61; value &#45; amount<br/>&#125; else &#123;<br/>    option::spec_is_none(post_maybe_supply)<br/>&#125;;<br/>ensures supply&lt;CoinType&gt; &#61;&#61; old(supply&lt;CoinType&gt;) &#45; amount;<br/></code></pre>
 
 
@@ -3092,7 +3009,7 @@ ensures if (option::spec_is_some(maybe_supply)) &#123;<br/>    post_value &#61;&
 <code>account_addr</code> is not frozen.
 
 
-<pre><code>pragma verify &#61; false;<br/>modifies global&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr);<br/>// This enforces <a id="high-level-req-8.3" href="#high-level-req">high-level requirement 8</a>:
+<pre><code>pragma verify &#61; false;<br/>modifies global&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;8.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 8&lt;/a&gt;:
 include DepositAbortsIf&lt;CoinType&gt;;<br/>ensures global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr).coin.value &#61;&#61; old(<br/>    global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr)<br/>).coin.value &#43; coin.value;<br/></code></pre>
 
 
@@ -3164,7 +3081,7 @@ The value of <code>zero_coin</code> must be 0.
 
 
 
-<pre><code>pragma verify &#61; false;<br/>modifies global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>// This enforces <a id="high-level-req-6.3" href="#high-level-req">high-level requirement 6</a>:
+<pre><code>pragma verify &#61; false;<br/>modifies global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
 aborts_if !exists&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>let post coin_store &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>ensures coin_store.frozen;<br/></code></pre>
 
 
@@ -3179,7 +3096,7 @@ aborts_if !exists&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>let post c
 
 
 
-<pre><code>pragma verify &#61; false;<br/>modifies global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>// This enforces <a id="high-level-req-6.4" href="#high-level-req">high-level requirement 6</a>:
+<pre><code>pragma verify &#61; false;<br/>modifies global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
 aborts_if !exists&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>let post coin_store &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>ensures !coin_store.frozen;<br/></code></pre>
 
 
@@ -3192,11 +3109,10 @@ aborts_if !exists&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>let post c
 <pre><code>public entry fun upgrade_supply&lt;CoinType&gt;(account: &amp;signer)<br/></code></pre>
 
 
-The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
-<code>SupplyConfig</code> allow upgrade.
+The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.<br/> <code>SupplyConfig</code> allow upgrade.
 
 
-<pre><code>let account_addr &#61; signer::address_of(account);<br/>let coin_address &#61; type_info::type_of&lt;CoinType&gt;().account_address;<br/>aborts_if coin_address !&#61; account_addr;<br/>aborts_if !exists&lt;SupplyConfig&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-1.1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>let account_addr &#61; signer::address_of(account);<br/>let coin_address &#61; type_info::type_of&lt;CoinType&gt;().account_address;<br/>aborts_if coin_address !&#61; account_addr;<br/>aborts_if !exists&lt;SupplyConfig&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 aborts_if !exists&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr);<br/>let supply_config &#61; global&lt;SupplyConfig&gt;(@aptos_framework);<br/>aborts_if !supply_config.allow_upgrades;<br/>modifies global&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr);<br/>let maybe_supply &#61; global&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr).supply;<br/>let supply &#61; option::spec_borrow(maybe_supply);<br/>let value &#61; optional_aggregator::optional_aggregator_value(supply);<br/>let post post_maybe_supply &#61; global&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr).supply;<br/>let post post_supply &#61; option::spec_borrow(post_maybe_supply);<br/>let post post_value &#61; optional_aggregator::optional_aggregator_value(post_supply);<br/>let supply_no_parallel &#61; option::spec_is_some(maybe_supply) &amp;&amp;<br/>    !optional_aggregator::is_parallelizable(supply);<br/>aborts_if supply_no_parallel &amp;&amp; !exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>ensures supply_no_parallel &#61;&#61;&gt;<br/>    optional_aggregator::is_parallelizable(post_supply) &amp;&amp; post_value &#61;&#61; value;<br/></code></pre>
 
 
@@ -3211,8 +3127,8 @@ aborts_if !exists&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr);<br/>let supply_
 
 
 
-<pre><code>let account_addr &#61; signer::address_of(account);<br/>// This enforces <a id="high-level-req-1.2" href="#high-level-req">high-level requirement 1</a>:
-aborts_if type_info::type_of&lt;CoinType&gt;().account_address !&#61; account_addr;<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>let account_addr &#61; signer::address_of(account);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
+aborts_if type_info::type_of&lt;CoinType&gt;().account_address !&#61; account_addr;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if exists&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr);<br/>aborts_if string::length(name) &gt; MAX_COIN_NAME_LENGTH;<br/>aborts_if string::length(symbol) &gt; MAX_COIN_SYMBOL_LENGTH;<br/></code></pre>
 
 
@@ -3230,8 +3146,7 @@ aborts_if exists&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr);<br/>aborts_if st
 <pre><code>let addr &#61; signer::address_of(account);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if monitor_supply &amp;&amp; !exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>include InitializeInternalSchema&lt;CoinType&gt; &#123;<br/>    name: name.bytes,<br/>    symbol: symbol.bytes<br/>&#125;;<br/>ensures exists&lt;CoinInfo&lt;CoinType&gt;&gt;(addr);<br/></code></pre>
 
 
-Make sure <code>name</code> and <code>symbol</code> are legal length.
-Only the creator of <code>CoinType</code> can initialize.
+Make sure <code>name</code> and <code>symbol</code> are legal length.<br/> Only the creator of <code>CoinType</code> can initialize.
 
 
 <a id="0x1_coin_InitializeInternalSchema"></a>
@@ -3251,7 +3166,7 @@ Only the creator of <code>CoinType</code> can initialize.
 
 
 
-<pre><code>include InitializeInternalSchema&lt;CoinType&gt; &#123;<br/>    name: name.bytes,<br/>    symbol: symbol.bytes<br/>&#125;;<br/>let account_addr &#61; signer::address_of(account);<br/>let post coin_info &#61; global&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr);<br/>let post supply &#61; option::spec_borrow(coin_info.supply);<br/>let post value &#61; optional_aggregator::optional_aggregator_value(supply);<br/>let post limit &#61; optional_aggregator::optional_aggregator_limit(supply);<br/>modifies global&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr);<br/>aborts_if monitor_supply &amp;&amp; parallelizable<br/>    &amp;&amp; !exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-2" href="managed_coin.md#high-level-req">high-level requirement 2</a> of the <a href="managed_coin.md">managed_coin</a> module:
+<pre><code>include InitializeInternalSchema&lt;CoinType&gt; &#123;<br/>    name: name.bytes,<br/>    symbol: symbol.bytes<br/>&#125;;<br/>let account_addr &#61; signer::address_of(account);<br/>let post coin_info &#61; global&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr);<br/>let post supply &#61; option::spec_borrow(coin_info.supply);<br/>let post value &#61; optional_aggregator::optional_aggregator_value(supply);<br/>let post limit &#61; optional_aggregator::optional_aggregator_limit(supply);<br/>modifies global&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr);<br/>aborts_if monitor_supply &amp;&amp; parallelizable<br/>    &amp;&amp; !exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;managed_coin.md&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt; of the &lt;a href&#61;&quot;managed_coin.md&quot;&gt;managed_coin&lt;/a&gt; module:
 ensures exists&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr)<br/>    &amp;&amp; coin_info.name &#61;&#61; name<br/>    &amp;&amp; coin_info.symbol &#61;&#61; symbol<br/>    &amp;&amp; coin_info.decimals &#61;&#61; decimals;<br/>ensures if (monitor_supply) &#123;<br/>    value &#61;&#61; 0 &amp;&amp; limit &#61;&#61; MAX_U128<br/>        &amp;&amp; (parallelizable &#61;&#61; optional_aggregator::is_parallelizable(supply))<br/>&#125; else &#123;<br/>    option::spec_is_none(coin_info.supply)<br/>&#125;;<br/>ensures result_1 &#61;&#61; BurnCapability&lt;CoinType&gt; &#123;&#125;;<br/>ensures result_2 &#61;&#61; FreezeCapability&lt;CoinType&gt; &#123;&#125;;<br/>ensures result_3 &#61;&#61; MintCapability&lt;CoinType&gt; &#123;&#125;;<br/></code></pre>
 
 
@@ -3266,7 +3181,7 @@ ensures exists&lt;CoinInfo&lt;CoinType&gt;&gt;(account_addr)<br/>    &amp;&amp; 
 
 
 
-<pre><code>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 ensures dst_coin.value &#61;&#61; old(dst_coin.value) &#43; source_coin.value;<br/></code></pre>
 
 
@@ -3293,8 +3208,7 @@ ensures dst_coin.value &#61;&#61; old(dst_coin.value) &#43; source_coin.value;<b
 <pre><code>public fun register&lt;CoinType&gt;(account: &amp;signer)<br/></code></pre>
 
 
-An account can only be registered once.
-Updating <code>Account.guid_creation_num</code> will not overflow.
+An account can only be registered once.<br/> Updating <code>Account.guid_creation_num</code> will not overflow.
 
 
 <pre><code>pragma verify &#61; false;<br/></code></pre>
@@ -3309,13 +3223,11 @@ Updating <code>Account.guid_creation_num</code> will not overflow.
 <pre><code>public entry fun transfer&lt;CoinType&gt;(from: &amp;signer, to: address, amount: u64)<br/></code></pre>
 
 
-<code>from</code> and <code>to</code> account not frozen.
-<code>from</code> and <code>to</code> not the same address.
-<code>from</code> account sufficient balance.
+<code>from</code> and <code>to</code> account not frozen.<br/> <code>from</code> and <code>to</code> not the same address.<br/> <code>from</code> account sufficient balance.
 
 
-<pre><code>pragma verify &#61; false;<br/>let account_addr_from &#61; signer::address_of(from);<br/>let coin_store_from &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr_from);<br/>let post coin_store_post_from &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr_from);<br/>let coin_store_to &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(to);<br/>let post coin_store_post_to &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(to);<br/>// This enforces <a id="high-level-req-6.5" href="#high-level-req">high-level requirement 6</a>:
-aborts_if !exists&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr_from);<br/>aborts_if !exists&lt;CoinStore&lt;CoinType&gt;&gt;(to);<br/>// This enforces <a id="high-level-req-8.2" href="#high-level-req">high-level requirement 8</a>:
+<pre><code>pragma verify &#61; false;<br/>let account_addr_from &#61; signer::address_of(from);<br/>let coin_store_from &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr_from);<br/>let post coin_store_post_from &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr_from);<br/>let coin_store_to &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(to);<br/>let post coin_store_post_to &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(to);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.5&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
+aborts_if !exists&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr_from);<br/>aborts_if !exists&lt;CoinStore&lt;CoinType&gt;&gt;(to);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;8.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 8&lt;/a&gt;:
 aborts_if coin_store_from.frozen;<br/>aborts_if coin_store_to.frozen;<br/>aborts_if coin_store_from.coin.value &lt; amount;<br/>ensures account_addr_from !&#61; to &#61;&#61;&gt; coin_store_post_from.coin.value &#61;&#61;<br/>    coin_store_from.coin.value &#45; amount;<br/>ensures account_addr_from !&#61; to &#61;&#61;&gt; coin_store_post_to.coin.value &#61;&#61; coin_store_to.coin.value &#43; amount;<br/>ensures account_addr_from &#61;&#61; to &#61;&#61;&gt; coin_store_post_from.coin.value &#61;&#61; coin_store_from.coin.value;<br/></code></pre>
 
 
@@ -3339,8 +3251,8 @@ Account is not frozen and sufficient balance.
 <a id="0x1_coin_WithdrawAbortsIf"></a>
 
 
-<pre><code>schema WithdrawAbortsIf&lt;CoinType&gt; &#123;<br/>account: &amp;signer;<br/>amount: u64;<br/>let account_addr &#61; signer::address_of(account);<br/>let coin_store &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>let balance &#61; coin_store.coin.value;<br/>// This enforces <a id="high-level-req-6.6" href="#high-level-req">high-level requirement 6</a>:
-    aborts_if !exists&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>// This enforces <a id="high-level-req-8.1" href="#high-level-req">high-level requirement 8</a>:
+<pre><code>schema WithdrawAbortsIf&lt;CoinType&gt; &#123;<br/>account: &amp;signer;<br/>amount: u64;<br/>let account_addr &#61; signer::address_of(account);<br/>let coin_store &#61; global&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>let balance &#61; coin_store.coin.value;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.6&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
+    aborts_if !exists&lt;CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;8.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 8&lt;/a&gt;:
     aborts_if coin_store.frozen;<br/>aborts_if balance &lt; amount;<br/>&#125;<br/></code></pre>
 
 

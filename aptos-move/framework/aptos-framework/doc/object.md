@@ -3,22 +3,7 @@
 
 # Module `0x1::object`
 
-This defines the Move object model with the following properties:
-- Simplified storage interface that supports a heterogeneous collection of resources to be
-stored together. This enables data types to share a common core data layer (e.g., tokens),
-while having richer extensions (e.g., concert ticket, sword).
-- Globally accessible data and ownership model that enables creators and developers to dictate
-the application and lifetime of data.
-- Extensible programming model that supports individualization of user applications that
-leverage the core framework including tokens.
-- Support emitting events directly, thus improving discoverability of events associated with
-objects.
-- Considerate of the underlying system by leveraging resource groups for gas efficiency,
-avoiding costly deserialization and serialization costs, and supporting deletability.
-
-TODO:
-* There is no means to borrow an object or a reference to an object. We are exploring how to
-make it so that a reference to a global object can be returned from a function.
+This defines the Move object model with the following properties:<br/> &#45; Simplified storage interface that supports a heterogeneous collection of resources to be<br/>   stored together. This enables data types to share a common core data layer (e.g., tokens),<br/>   while having richer extensions (e.g., concert ticket, sword).<br/> &#45; Globally accessible data and ownership model that enables creators and developers to dictate<br/>   the application and lifetime of data.<br/> &#45; Extensible programming model that supports individualization of user applications that<br/>   leverage the core framework including tokens.<br/> &#45; Support emitting events directly, thus improving discoverability of events associated with<br/>   objects.<br/> &#45; Considerate of the underlying system by leveraging resource groups for gas efficiency,<br/>   avoiding costly deserialization and serialization costs, and supporting deletability.<br/><br/> TODO:<br/> &#42; There is no means to borrow an object or a reference to an object. We are exploring how to<br/>   make it so that a reference to a global object can be returned from a function.
 
 
 -  [Resource `ObjectCore`](#0x1_object_ObjectCore)
@@ -171,8 +156,7 @@ The core of the object model that defines ownership, transferability, and events
 <code>allow_ungated_transfer: bool</code>
 </dt>
 <dd>
- Object transferring is a common operation, this allows for disabling and enabling
- transfers bypassing the use of a TransferRef.
+ Object transferring is a common operation, this allows for disabling and enabling<br/> transfers bypassing the use of a TransferRef.
 </dd>
 <dt>
 <code>transfer_events: event::EventHandle&lt;object::TransferEvent&gt;</code>
@@ -270,10 +254,7 @@ A shared resource group for storing object resources together in storage.
 
 ## Struct `Object`
 
-A pointer to an object -- these can only provide guarantees based upon the underlying data
-type, that is the validity of T existing at an address is something that cannot be verified
-by any other module than the module that defined T. Similarly, the module that defines T
-can remove it from storage at any point in time.
+A pointer to an object &#45;&#45; these can only provide guarantees based upon the underlying data<br/> type, that is the validity of T existing at an address is something that cannot be verified<br/> by any other module than the module that defined T. Similarly, the module that defines T<br/> can remove it from storage at any point in time.
 
 
 <pre><code>struct Object&lt;T&gt; has copy, drop, store<br/></code></pre>
@@ -414,8 +395,7 @@ Used to create LinearTransferRef, hence ownership transfer.
 
 ## Struct `LinearTransferRef`
 
-Used to perform transfers. This locks transferring ability to a single time use bound to
-the current owner.
+Used to perform transfers. This locks transferring ability to a single time use bound to<br/> the current owner.
 
 
 <pre><code>struct LinearTransferRef has drop<br/></code></pre>
@@ -475,7 +455,7 @@ Used to create derived objects from a given objects.
 
 ## Struct `TransferEvent`
 
-Emitted whenever the object's owner field is changed.
+Emitted whenever the object&apos;s owner field is changed.
 
 
 <pre><code>struct TransferEvent has drop, store<br/></code></pre>
@@ -514,7 +494,7 @@ Emitted whenever the object's owner field is changed.
 
 ## Struct `Transfer`
 
-Emitted whenever the object's owner field is changed.
+Emitted whenever the object&apos;s owner field is changed.
 
 
 <pre><code>&#35;[event]<br/>struct Transfer has drop, store<br/></code></pre>
@@ -637,7 +617,7 @@ An object already exists at this address
 
 <a id="0x1_object_EOBJECT_NOT_BURNT"></a>
 
-Cannot reclaim objects that weren't burnt.
+Cannot reclaim objects that weren&apos;t burnt.
 
 
 <pre><code>const EOBJECT_NOT_BURNT: u64 &#61; 8;<br/></code></pre>
@@ -664,8 +644,7 @@ Explicitly separate the GUID space between Object and Account to prevent acciden
 
 <a id="0x1_object_MAXIMUM_OBJECT_NESTING"></a>
 
-Maximum nesting from one object to another. That is objects can technically have infinte
-nesting, but any checks such as transfer will only be evaluated this deep.
+Maximum nesting from one object to another. That is objects can technically have infinte<br/> nesting, but any checks such as transfer will only be evaluated this deep.
 
 
 <pre><code>const MAXIMUM_OBJECT_NESTING: u8 &#61; 8;<br/></code></pre>
@@ -674,14 +653,7 @@ nesting, but any checks such as transfer will only be evaluated this deep.
 
 <a id="0x1_object_OBJECT_DERIVED_SCHEME"></a>
 
-Scheme identifier used to generate an object's address <code>obj_addr</code> as derived from another object.
-The object's address is generated as:
-```
-obj_addr = sha3_256(account addr | derived from object's address | 0xFC)
-```
-
-This 0xFC constant serves as a domain separation tag to prevent existing authentication key and resource account
-derivation to produce an object address.
+Scheme identifier used to generate an object&apos;s address <code>obj_addr</code> as derived from another object.<br/> The object&apos;s address is generated as:<br/> ```<br/>     obj_addr &#61; sha3_256(account addr &#124; derived from object&apos;s address &#124; 0xFC)<br/> ```<br/><br/> This 0xFC constant serves as a domain separation tag to prevent existing authentication key and resource account<br/> derivation to produce an object address.
 
 
 <pre><code>const OBJECT_DERIVED_SCHEME: u8 &#61; 252;<br/></code></pre>
@@ -690,15 +662,7 @@ derivation to produce an object address.
 
 <a id="0x1_object_OBJECT_FROM_GUID_ADDRESS_SCHEME"></a>
 
-Scheme identifier used to generate an object's address <code>obj_addr</code> via a fresh GUID generated by the creator at
-<code>source_addr</code>. The object's address is generated as:
-```
-obj_addr = sha3_256(guid | 0xFD)
-```
-where <code>guid &#61; account::create_guid(create_signer(source_addr))</code>
-
-This 0xFD constant serves as a domain separation tag to prevent existing authentication key and resource account
-derivation to produce an object address.
+Scheme identifier used to generate an object&apos;s address <code>obj_addr</code> via a fresh GUID generated by the creator at<br/> <code>source_addr</code>. The object&apos;s address is generated as:<br/> ```<br/>     obj_addr &#61; sha3_256(guid &#124; 0xFD)<br/> ```<br/> where <code>guid &#61; account::create_guid(create_signer(source_addr))</code><br/><br/> This 0xFD constant serves as a domain separation tag to prevent existing authentication key and resource account<br/> derivation to produce an object address.
 
 
 <pre><code>const OBJECT_FROM_GUID_ADDRESS_SCHEME: u8 &#61; 253;<br/></code></pre>
@@ -707,11 +671,7 @@ derivation to produce an object address.
 
 <a id="0x1_object_OBJECT_FROM_SEED_ADDRESS_SCHEME"></a>
 
-Scheme identifier used to generate an object's address <code>obj_addr</code> from the creator's <code>source_addr</code> and a <code>seed</code> as:
-obj_addr = sha3_256(source_addr | seed | 0xFE).
-
-This 0xFE constant serves as a domain separation tag to prevent existing authentication key and resource account
-derivation to produce an object address.
+Scheme identifier used to generate an object&apos;s address <code>obj_addr</code> from the creator&apos;s <code>source_addr</code> and a <code>seed</code> as:<br/>     obj_addr &#61; sha3_256(source_addr &#124; seed &#124; 0xFE).<br/><br/> This 0xFE constant serves as a domain separation tag to prevent existing authentication key and resource account<br/> derivation to produce an object address.
 
 
 <pre><code>const OBJECT_FROM_SEED_ADDRESS_SCHEME: u8 &#61; 254;<br/></code></pre>
@@ -825,7 +785,7 @@ Returns true if there exists an object with resource T.
 
 ## Function `create_object_address`
 
-Derives an object address from source material: sha3_256([creator address | seed | 0xFE]).
+Derives an object address from source material: sha3_256([creator address &#124; seed &#124; 0xFE]).
 
 
 <pre><code>public fun create_object_address(source: &amp;address, seed: vector&lt;u8&gt;): address<br/></code></pre>
@@ -866,7 +826,7 @@ Derives an object address from source material: sha3_256([creator address | seed
 
 ## Function `create_user_derived_object_address`
 
-Derives an object address from the source address and an object: sha3_256([source | object addr | 0xFC]).
+Derives an object address from the source address and an object: sha3_256([source &#124; object addr &#124; 0xFC]).
 
 
 <pre><code>public fun create_user_derived_object_address(source: address, derive_from: address): address<br/></code></pre>
@@ -949,7 +909,7 @@ Returns the address of within an ObjectId.
 
 ## Function `convert`
 
-Convert Object<X> to Object<Y>.
+Convert Object&lt;X&gt; to Object&lt;Y&gt;.
 
 
 <pre><code>public fun convert&lt;X: key, Y: key&gt;(object: object::Object&lt;X&gt;): object::Object&lt;Y&gt;<br/></code></pre>
@@ -970,8 +930,7 @@ Convert Object<X> to Object<Y>.
 
 ## Function `create_named_object`
 
-Create a new named object and return the ConstructorRef. Named objects can be queried globally
-by knowing the user generated seed used to create them. Named objects cannot be deleted.
+Create a new named object and return the ConstructorRef. Named objects can be queried globally<br/> by knowing the user generated seed used to create them. Named objects cannot be deleted.
 
 
 <pre><code>public fun create_named_object(creator: &amp;signer, seed: vector&lt;u8&gt;): object::ConstructorRef<br/></code></pre>
@@ -992,8 +951,7 @@ by knowing the user generated seed used to create them. Named objects cannot be 
 
 ## Function `create_user_derived_object`
 
-Create a new object whose address is derived based on the creator account address and another object.
-Derivde objects, similar to named objects, cannot be deleted.
+Create a new object whose address is derived based on the creator account address and another object.<br/> Derivde objects, similar to named objects, cannot be deleted.
 
 
 <pre><code>public(friend) fun create_user_derived_object(creator_address: address, derive_ref: &amp;object::DeriveRef): object::ConstructorRef<br/></code></pre>
@@ -1014,10 +972,7 @@ Derivde objects, similar to named objects, cannot be deleted.
 
 ## Function `create_object`
 
-Create a new object by generating a random unique address based on transaction hash.
-The unique address is computed sha3_256([transaction hash | auid counter | 0xFB]).
-The created object is deletable as we can guarantee the same unique address can
-never be regenerated with future txs.
+Create a new object by generating a random unique address based on transaction hash.<br/> The unique address is computed sha3_256([transaction hash &#124; auid counter &#124; 0xFB]).<br/> The created object is deletable as we can guarantee the same unique address can<br/> never be regenerated with future txs.
 
 
 <pre><code>public fun create_object(owner_address: address): object::ConstructorRef<br/></code></pre>
@@ -1080,12 +1035,7 @@ Create a sticky object at a specific address. Only used by aptos_framework::coin
 
 ## Function `create_object_from_account`
 
-Use <code>create_object</code> instead.
-Create a new object from a GUID generated by an account.
-As the GUID creation internally increments a counter, two transactions that executes
-<code>create_object_from_account</code> function for the same creator run sequentially.
-Therefore, using <code>create_object</code> method for creating objects is preferrable as it
-doesn't have the same bottlenecks.
+Use <code>create_object</code> instead.<br/> Create a new object from a GUID generated by an account.<br/> As the GUID creation internally increments a counter, two transactions that executes<br/> <code>create_object_from_account</code> function for the same creator run sequentially.<br/> Therefore, using <code>create_object</code> method for creating objects is preferrable as it<br/> doesn&apos;t have the same bottlenecks.
 
 
 <pre><code>&#35;[deprecated]<br/>public fun create_object_from_account(creator: &amp;signer): object::ConstructorRef<br/></code></pre>
@@ -1106,12 +1056,7 @@ doesn't have the same bottlenecks.
 
 ## Function `create_object_from_object`
 
-Use <code>create_object</code> instead.
-Create a new object from a GUID generated by an object.
-As the GUID creation internally increments a counter, two transactions that executes
-<code>create_object_from_object</code> function for the same creator run sequentially.
-Therefore, using <code>create_object</code> method for creating objects is preferrable as it
-doesn't have the same bottlenecks.
+Use <code>create_object</code> instead.<br/> Create a new object from a GUID generated by an object.<br/> As the GUID creation internally increments a counter, two transactions that executes<br/> <code>create_object_from_object</code> function for the same creator run sequentially.<br/> Therefore, using <code>create_object</code> method for creating objects is preferrable as it<br/> doesn&apos;t have the same bottlenecks.
 
 
 <pre><code>&#35;[deprecated]<br/>public fun create_object_from_object(creator: &amp;signer): object::ConstructorRef<br/></code></pre>
@@ -1298,7 +1243,7 @@ Returns the address associated with the constructor
 
 ## Function `object_from_constructor_ref`
 
-Returns an Object<T> from within a ConstructorRef
+Returns an Object&lt;T&gt; from within a ConstructorRef
 
 
 <pre><code>public fun object_from_constructor_ref&lt;T: key&gt;(ref: &amp;object::ConstructorRef): object::Object&lt;T&gt;<br/></code></pre>
@@ -1403,7 +1348,7 @@ Returns the address associated with the constructor
 
 ## Function `object_from_delete_ref`
 
-Returns an Object<T> from within a DeleteRef.
+Returns an Object&lt;T&gt; from within a DeleteRef.
 
 
 <pre><code>public fun object_from_delete_ref&lt;T: key&gt;(ref: &amp;object::DeleteRef): object::Object&lt;T&gt;<br/></code></pre>
@@ -1550,8 +1495,7 @@ Enable direct transfer.
 
 ## Function `generate_linear_transfer_ref`
 
-Create a LinearTransferRef for a one-time transfer. This requires that the owner at the
-time of generation is the owner at the time of transferring.
+Create a LinearTransferRef for a one&#45;time transfer. This requires that the owner at the<br/> time of generation is the owner at the time of transferring.
 
 
 <pre><code>public fun generate_linear_transfer_ref(ref: &amp;object::TransferRef): object::LinearTransferRef<br/></code></pre>
@@ -1614,8 +1558,7 @@ Entry function that can be used to transfer, if allow_ungated_transfer is set tr
 
 ## Function `transfer`
 
-Transfers ownership of the object (and all associated resources) at the specified address
-for Object<T> to the "to" address.
+Transfers ownership of the object (and all associated resources) at the specified address<br/> for Object&lt;T&gt; to the &quot;to&quot; address.
 
 
 <pre><code>public entry fun transfer&lt;T: key&gt;(owner: &amp;signer, object: object::Object&lt;T&gt;, to: address)<br/></code></pre>
@@ -1636,10 +1579,7 @@ for Object<T> to the "to" address.
 
 ## Function `transfer_raw`
 
-Attempts to transfer using addresses only. Transfers the given object if
-allow_ungated_transfer is set true. Note, that this allows the owner of a nested object to
-transfer that object, so long as allow_ungated_transfer is enabled at each stage in the
-hierarchy.
+Attempts to transfer using addresses only. Transfers the given object if<br/> allow_ungated_transfer is set true. Note, that this allows the owner of a nested object to<br/> transfer that object, so long as allow_ungated_transfer is enabled at each stage in the<br/> hierarchy.
 
 
 <pre><code>public fun transfer_raw(owner: &amp;signer, object: address, to: address)<br/></code></pre>
@@ -1701,9 +1641,7 @@ Transfer the given object to another object. See <code>transfer</code> for more 
 
 ## Function `verify_ungated_and_descendant`
 
-This checks that the destination address is eventually owned by the owner and that each
-object between the two allows for ungated transfers. Note, this is limited to a depth of 8
-objects may have cyclic dependencies.
+This checks that the destination address is eventually owned by the owner and that each<br/> object between the two allows for ungated transfers. Note, this is limited to a depth of 8<br/> objects may have cyclic dependencies.
 
 
 <pre><code>fun verify_ungated_and_descendant(owner: address, destination: address)<br/></code></pre>
@@ -1724,9 +1662,7 @@ objects may have cyclic dependencies.
 
 ## Function `burn`
 
-Forcefully transfer an unwanted object to BURN_ADDRESS, ignoring whether ungated_transfer is allowed.
-This only works for objects directly owned and for simplicity does not apply to indirectly owned objects.
-Original owners can reclaim burnt objects any time in the future by calling unburn.
+Forcefully transfer an unwanted object to BURN_ADDRESS, ignoring whether ungated_transfer is allowed.<br/> This only works for objects directly owned and for simplicity does not apply to indirectly owned objects.<br/> Original owners can reclaim burnt objects any time in the future by calling unburn.
 
 
 <pre><code>public entry fun burn&lt;T: key&gt;(owner: &amp;signer, object: object::Object&lt;T&gt;)<br/></code></pre>
@@ -1768,8 +1704,7 @@ Allow origin owners to reclaim any objects they previous burnt.
 
 ## Function `ungated_transfer_allowed`
 
-Accessors
-Return true if ungated transfer is allowed.
+Accessors<br/> Return true if ungated transfer is allowed.
 
 
 <pre><code>public fun ungated_transfer_allowed&lt;T: key&gt;(object: object::Object&lt;T&gt;): bool<br/></code></pre>
@@ -1853,8 +1788,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 ## Function `root_owner`
 
-Returns the root owner of an object. As objects support nested ownership, it can be useful
-to determine the identity of the starting point of ownership.
+Returns the root owner of an object. As objects support nested ownership, it can be useful<br/> to determine the identity of the starting point of ownership.
 
 
 <pre><code>public fun root_owner&lt;T: key&gt;(object: object::Object&lt;T&gt;): address<br/></code></pre>
@@ -1882,62 +1816,23 @@ to determine the identity of the starting point of ownership.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>It's not possible to create an object twice on the same address.</td>
-<td>Critical</td>
-<td>The create_object_internal function includes an assertion to ensure that the object being created does not already exist at the specified address.</td>
-<td>Formally verified via <a href="#high-level-req-1">create_object_internal</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;It&apos;s not possible to create an object twice on the same address.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The create_object_internal function includes an assertion to ensure that the object being created does not already exist at the specified address.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;create_object_internal&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>Only its owner may transfer an object.</td>
-<td>Critical</td>
-<td>The transfer function mandates that the transaction be signed by the owner's address, ensuring that only the rightful owner may initiate the object transfer.</td>
-<td>Audited that it aborts if anyone other than the owner attempts to transfer.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;Only its owner may transfer an object.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The transfer function mandates that the transaction be signed by the owner&apos;s address, ensuring that only the rightful owner may initiate the object transfer.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if anyone other than the owner attempts to transfer.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>The indirect owner of an object may transfer the object.</td>
-<td>Medium</td>
-<td>The owns function evaluates to true when the given address possesses either direct or indirect ownership of the specified object.</td>
-<td>Audited that it aborts if address transferring is not indirect owner.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The indirect owner of an object may transfer the object.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The owns function evaluates to true when the given address possesses either direct or indirect ownership of the specified object.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if address transferring is not indirect owner.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>Objects may never change the address which houses them.</td>
-<td>Low</td>
-<td>After creating an object, transfers to another owner may occur. However, the address which stores the object may not be changed.</td>
-<td>This is implied by <a href="#high-level-req">high-level requirement 1</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;Objects may never change the address which houses them.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;After creating an object, transfers to another owner may occur. However, the address which stores the object may not be changed.&lt;/td&gt;<br/>&lt;td&gt;This is implied by &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>If an ungated transfer is disabled on an object in an indirect ownership chain, a transfer should not occur.</td>
-<td>Medium</td>
-<td>Calling disable_ungated_transfer disables direct transfer, and only TransferRef may trigger transfers. The transfer_with_ref function is called.</td>
-<td>Formally verified via <a href="#high-level-req-5">transfer_with_ref</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;If an ungated transfer is disabled on an object in an indirect ownership chain, a transfer should not occur.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;Calling disable_ungated_transfer disables direct transfer, and only TransferRef may trigger transfers. The transfer_with_ref function is called.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5&quot;&gt;transfer_with_ref&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>6</td>
-<td>Object addresses must not overlap with other addresses in different domains.</td>
-<td>Critical</td>
-<td>The current addressing scheme with suffixes does not conflict with any existing addresses, such as resource accounts. The GUID space is explicitly separated to ensure this doesn't happen.</td>
-<td>This is true by construction if one correctly ensures the usage of INIT_GUID_CREATION_NUM during the creation of GUID.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;6&lt;/td&gt;<br/>&lt;td&gt;Object addresses must not overlap with other addresses in different domains.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The current addressing scheme with suffixes does not conflict with any existing addresses, such as resource accounts. The GUID space is explicitly separated to ensure this doesn&apos;t happen.&lt;/td&gt;<br/>&lt;td&gt;This is true by construction if one correctly ensures the usage of INIT_GUID_CREATION_NUM during the creation of GUID.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -2199,7 +2094,7 @@ to determine the identity of the starting point of ownership.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 aborts_if exists&lt;ObjectCore&gt;(object);<br/>ensures exists&lt;ObjectCore&gt;(object);<br/>ensures global&lt;ObjectCore&gt;(object).guid_creation_num &#61;&#61; INIT_GUID_CREATION_NUM &#43; 1;<br/>ensures result &#61;&#61; ConstructorRef &#123; self: object, can_delete &#125;;<br/></code></pre>
 
 
@@ -2368,7 +2263,7 @@ aborts_if exists&lt;ObjectCore&gt;(object);<br/>ensures exists&lt;ObjectCore&gt;
 
 
 
-<pre><code>aborts_if exists&lt;Untransferable&gt;(ref.self);<br/>let object &#61; global&lt;ObjectCore&gt;(ref.self);<br/>aborts_if !exists&lt;ObjectCore&gt;(ref.self);<br/>// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
+<pre><code>aborts_if exists&lt;Untransferable&gt;(ref.self);<br/>let object &#61; global&lt;ObjectCore&gt;(ref.self);<br/>aborts_if !exists&lt;ObjectCore&gt;(ref.self);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt;:
 aborts_if object.owner !&#61; ref.owner;<br/>ensures global&lt;ObjectCore&gt;(ref.self).owner &#61;&#61; to;<br/></code></pre>
 
 

@@ -3,11 +3,7 @@
 
 # Module `0x1::aggregator_factory`
 
-This module provides foundations to create aggregators. Currently only
-Aptos Framework (0x1) can create them, so this module helps to wrap
-the constructor of <code>Aggregator</code> struct so that only a system account
-can initialize one. In the future, this might change and aggregators
-can be enabled for the public.
+This module provides foundations to create aggregators. Currently only<br/> Aptos Framework (0x1) can create them, so this module helps to wrap<br/> the constructor of <code>Aggregator</code> struct so that only a system account<br/> can initialize one. In the future, this might change and aggregators<br/> can be enabled for the public.
 
 
 -  [Resource `AggregatorFactory`](#0x1_aggregator_factory_AggregatorFactory)
@@ -33,9 +29,7 @@ can be enabled for the public.
 
 ## Resource `AggregatorFactory`
 
-Creates new aggregators. Used to control the numbers of aggregators in the
-system and who can create them. At the moment, only Aptos Framework (0x1)
-account can.
+Creates new aggregators. Used to control the numbers of aggregators in the<br/> system and who can create them. At the moment, only Aptos Framework (0x1)<br/> account can.
 
 
 <pre><code>struct AggregatorFactory has key<br/></code></pre>
@@ -118,8 +112,7 @@ Creates a new aggregator instance which overflows on exceeding a <code>limit</co
 
 ## Function `create_aggregator`
 
-This is currently a function closed for public. This can be updated in the future by on-chain governance
-to allow any signer to call.
+This is currently a function closed for public. This can be updated in the future by on&#45;chain governance<br/> to allow any signer to call.
 
 
 <pre><code>public fun create_aggregator(account: &amp;signer, limit: u128): aggregator::Aggregator<br/></code></pre>
@@ -168,46 +161,19 @@ Returns a new aggregator.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>During the module's initialization, it guarantees that the Aptos framework is the caller and that the AggregatorFactory resource will move under the Aptos framework account.</td>
-<td>High</td>
-<td>The initialize function is responsible for establishing the initial state of the module by creating the AggregatorFactory resource, indicating its presence within the module's context. Subsequently, the resource transfers to the Aptos framework account.</td>
-<td>Formally verified via <a href="#high-level-req-1">initialize_aggregator_factory</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;During the module&apos;s initialization, it guarantees that the Aptos framework is the caller and that the AggregatorFactory resource will move under the Aptos framework account.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The initialize function is responsible for establishing the initial state of the module by creating the AggregatorFactory resource, indicating its presence within the module&apos;s context. Subsequently, the resource transfers to the Aptos framework account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;initialize_aggregator_factory&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>To create a new aggregator instance, the aggregator factory must already be initialized and exist under the Aptos account.</td>
-<td>High</td>
-<td>The create_aggregator_internal function asserts that AggregatorFactory exists for the Aptos account.</td>
-<td>Formally verified via <a href="#high-level-req-2">CreateAggregatorInternalAbortsIf</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;To create a new aggregator instance, the aggregator factory must already be initialized and exist under the Aptos account.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The create_aggregator_internal function asserts that AggregatorFactory exists for the Aptos account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;CreateAggregatorInternalAbortsIf&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>Only the Aptos framework address may create an aggregator instance currently.</td>
-<td>Low</td>
-<td>The create_aggregator function ensures that the address calling it is the Aptos framework address.</td>
-<td>Formally verified via <a href="#high-level-req-3">create_aggregator</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Only the Aptos framework address may create an aggregator instance currently.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The create_aggregator function ensures that the address calling it is the Aptos framework address.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;create_aggregator&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>The creation of new aggregators should be done correctly.</td>
-<td>High</td>
-<td>The native new_aggregator function correctly creates a new aggregator.</td>
-<td>The new_aggregator native function has been manually audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The creation of new aggregators should be done correctly.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The native new_aggregator function correctly creates a new aggregator.&lt;/td&gt;<br/>&lt;td&gt;The new_aggregator native function has been manually audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -227,11 +193,10 @@ Returns a new aggregator.
 <pre><code>public(friend) fun initialize_aggregator_factory(aptos_framework: &amp;signer)<br/></code></pre>
 
 
-Make sure the caller is @aptos_framework.
-AggregatorFactory is not under the caller before creating the resource.
+Make sure the caller is @aptos_framework.<br/> AggregatorFactory is not under the caller before creating the resource.
 
 
-<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if exists&lt;AggregatorFactory&gt;(addr);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if exists&lt;AggregatorFactory&gt;(addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 ensures exists&lt;AggregatorFactory&gt;(addr);<br/></code></pre>
 
 
@@ -246,7 +211,7 @@ ensures exists&lt;AggregatorFactory&gt;(addr);<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 include CreateAggregatorInternalAbortsIf;<br/>ensures aggregator::spec_get_limit(result) &#61;&#61; limit;<br/>ensures aggregator::spec_aggregator_get_val(result) &#61;&#61; 0;<br/></code></pre>
 
 
@@ -267,11 +232,10 @@ include CreateAggregatorInternalAbortsIf;<br/>ensures aggregator::spec_get_limit
 <pre><code>public fun create_aggregator(account: &amp;signer, limit: u128): aggregator::Aggregator<br/></code></pre>
 
 
-Make sure the caller is @aptos_framework.
-AggregatorFactory existed under the @aptos_framework when Creating a new aggregator.
+Make sure the caller is @aptos_framework.<br/> AggregatorFactory existed under the @aptos_framework when Creating a new aggregator.
 
 
-<pre><code>let addr &#61; signer::address_of(account);<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>let addr &#61; signer::address_of(account);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 aborts_if addr !&#61; @aptos_framework;<br/>aborts_if !exists&lt;AggregatorFactory&gt;(@aptos_framework);<br/></code></pre>
 
 

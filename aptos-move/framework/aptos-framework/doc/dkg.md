@@ -3,7 +3,7 @@
 
 # Module `0x1::dkg`
 
-DKG on-chain states and helper functions.
+DKG on&#45;chain states and helper functions.
 
 
 -  [Struct `DKGSessionMetadata`](#0x1_dkg_DKGSessionMetadata)
@@ -110,8 +110,7 @@ This can be considered as the public input of DKG.
 
 ## Struct `DKGSessionState`
 
-The input and output of a DKG session.
-The validator set of epoch <code>x</code> works together for an DKG output for the target validator set of epoch <code>x&#43;1</code>.
+The input and output of a DKG session.<br/> The validator set of epoch <code>x</code> works together for an DKG output for the target validator set of epoch <code>x&#43;1</code>.
 
 
 <pre><code>struct DKGSessionState has copy, drop, store<br/></code></pre>
@@ -150,7 +149,7 @@ The validator set of epoch <code>x</code> works together for an DKG output for t
 
 ## Resource `DKGState`
 
-The completed and in-progress DKG sessions.
+The completed and in&#45;progress DKG sessions.
 
 
 <pre><code>struct DKGState has key<br/></code></pre>
@@ -204,7 +203,7 @@ The completed and in-progress DKG sessions.
 
 ## Function `initialize`
 
-Called in genesis to initialize on-chain states.
+Called in genesis to initialize on&#45;chain states.
 
 
 <pre><code>public fun initialize(aptos_framework: &amp;signer)<br/></code></pre>
@@ -225,8 +224,7 @@ Called in genesis to initialize on-chain states.
 
 ## Function `start`
 
-Mark on-chain DKG state as in-progress. Notify validators to start DKG.
-Abort if a DKG is already in progress.
+Mark on&#45;chain DKG state as in&#45;progress. Notify validators to start DKG.<br/> Abort if a DKG is already in progress.
 
 
 <pre><code>public(friend) fun start(dealer_epoch: u64, randomness_config: randomness_config::RandomnessConfig, dealer_validator_set: vector&lt;validator_consensus_info::ValidatorConsensusInfo&gt;, target_validator_set: vector&lt;validator_consensus_info::ValidatorConsensusInfo&gt;)<br/></code></pre>
@@ -247,9 +245,7 @@ Abort if a DKG is already in progress.
 
 ## Function `finish`
 
-Put a transcript into the currently incomplete DKG session, then mark it completed.
-
-Abort if DKG is not in progress.
+Put a transcript into the currently incomplete DKG session, then mark it completed.<br/><br/> Abort if DKG is not in progress.
 
 
 <pre><code>public(friend) fun finish(transcript: vector&lt;u8&gt;)<br/></code></pre>

@@ -3,14 +3,7 @@
 
 # Module `0x4::aptos_token`
 
-This defines a minimally viable token for no-code solutions akin to the original token at
-0x3::token module.
-The key features are:
-* Base token and collection features
-* Creator definable mutability for tokens
-* Creator-based freezing of tokens
-* Standard object-based transfer and events
-* Metadata property type
+This defines a minimally viable token for no&#45;code solutions akin to the original token at<br/> 0x3::token module.<br/> The key features are:<br/> &#42; Base token and collection features<br/> &#42; Creator definable mutability for tokens<br/> &#42; Creator&#45;based freezing of tokens<br/> &#42; Standard object&#45;based transfer and events<br/> &#42; Metadata property type
 
 
 -  [Resource `AptosCollection`](#0x4_aptos_token_AptosCollection)
@@ -68,7 +61,7 @@ The key features are:
 
 ## Resource `AptosCollection`
 
-Storage state for managing the no-code Collection.
+Storage state for managing the no&#45;code Collection.
 
 
 <pre><code>&#35;[resource_group_member(&#35;[group &#61; 0x1::object::ObjectGroup])]<br/>struct AptosCollection has key<br/></code></pre>
@@ -96,13 +89,13 @@ Storage state for managing the no-code Collection.
 <code>mutable_description: bool</code>
 </dt>
 <dd>
- Determines if the creator can mutate the collection's description
+ Determines if the creator can mutate the collection&apos;s description
 </dd>
 <dt>
 <code>mutable_uri: bool</code>
 </dt>
 <dd>
- Determines if the creator can mutate the collection's uri
+ Determines if the creator can mutate the collection&apos;s uri
 </dd>
 <dt>
 <code>mutable_token_description: bool</code>
@@ -149,7 +142,7 @@ Storage state for managing the no-code Collection.
 
 ## Resource `AptosToken`
 
-Storage state for managing the no-code Token.
+Storage state for managing the no&#45;code Token.
 
 
 <pre><code>&#35;[resource_group_member(&#35;[group &#61; 0x1::object::ObjectGroup])]<br/>struct AptosToken has key<br/></code></pre>
@@ -336,7 +329,7 @@ Mint a token into an existing collection, and retrieve the object / address of t
 
 ## Function `mint_soul_bound`
 
-With an existing collection, directly mint a soul bound token into the recipient's account.
+With an existing collection, directly mint a soul bound token into the recipient&apos;s account.
 
 
 <pre><code>public entry fun mint_soul_bound(creator: &amp;signer, collection: string::String, description: string::String, name: string::String, uri: string::String, property_keys: vector&lt;string::String&gt;, property_types: vector&lt;string::String&gt;, property_values: vector&lt;vector&lt;u8&gt;&gt;, soul_bound_to: address)<br/></code></pre>
@@ -357,7 +350,7 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 ## Function `mint_soul_bound_token_object`
 
-With an existing collection, directly mint a soul bound token into the recipient's account.
+With an existing collection, directly mint a soul bound token into the recipient&apos;s account.
 
 
 <pre><code>public fun mint_soul_bound_token_object(creator: &amp;signer, collection: string::String, description: string::String, name: string::String, uri: string::String, property_keys: vector&lt;string::String&gt;, property_types: vector&lt;string::String&gt;, property_values: vector&lt;vector&lt;u8&gt;&gt;, soul_bound_to: address): object::Object&lt;aptos_token::AptosToken&gt;<br/></code></pre>

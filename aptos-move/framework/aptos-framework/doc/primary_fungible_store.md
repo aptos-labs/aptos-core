@@ -3,19 +3,7 @@
 
 # Module `0x1::primary_fungible_store`
 
-This module provides a way for creators of fungible assets to enable support for creating primary (deterministic)
-stores for their users. This is useful for assets that are meant to be used as a currency, as it allows users to
-easily create a store for their account and deposit/withdraw/transfer fungible assets to/from it.
-
-The transfer flow works as below:
-1. The sender calls <code>transfer</code> on the fungible asset metadata object to transfer <code>amount</code> of fungible asset to
-<code>recipient</code>.
-2. The fungible asset metadata object calls <code>ensure_primary_store_exists</code> to ensure that both the sender's and the
-recipient's primary stores exist. If either doesn't, it will be created.
-3. The fungible asset metadata object calls <code>withdraw</code> on the sender's primary store to withdraw <code>amount</code> of
-fungible asset from it. This emits a withdraw event.
-4. The fungible asset metadata object calls <code>deposit</code> on the recipient's primary store to deposit <code>amount</code> of
-fungible asset to it. This emits an deposit event.
+This module provides a way for creators of fungible assets to enable support for creating primary (deterministic)<br/> stores for their users. This is useful for assets that are meant to be used as a currency, as it allows users to<br/> easily create a store for their account and deposit/withdraw/transfer fungible assets to/from it.<br/><br/> The transfer flow works as below:<br/> 1. The sender calls <code>transfer</code> on the fungible asset metadata object to transfer <code>amount</code> of fungible asset to<br/>   <code>recipient</code>.<br/> 2. The fungible asset metadata object calls <code>ensure_primary_store_exists</code> to ensure that both the sender&apos;s and the<br/> recipient&apos;s primary stores exist. If either doesn&apos;t, it will be created.<br/> 3. The fungible asset metadata object calls <code>withdraw</code> on the sender&apos;s primary store to withdraw <code>amount</code> of<br/> fungible asset from it. This emits a withdraw event.<br/> 4. The fungible asset metadata object calls <code>deposit</code> on the recipient&apos;s primary store to deposit <code>amount</code> of<br/> fungible asset to it. This emits an deposit event.
 
 
 -  [Resource `DeriveRefPod`](#0x1_primary_fungible_store_DeriveRefPod)
@@ -53,9 +41,7 @@ fungible asset to it. This emits an deposit event.
 
 ## Resource `DeriveRefPod`
 
-A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
-stores for users with deterministic addresses so that users can easily deposit/withdraw/transfer fungible
-assets.
+A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary<br/> stores for users with deterministic addresses so that users can easily deposit/withdraw/transfer fungible<br/> assets.
 
 
 <pre><code>&#35;[resource_group_member(&#35;[group &#61; 0x1::object::ObjectGroup])]<br/>struct DeriveRefPod has key<br/></code></pre>
@@ -82,9 +68,7 @@ assets.
 
 ## Function `create_primary_store_enabled_fungible_asset`
 
-Create a fungible asset with primary store support. When users transfer fungible assets to each other, their
-primary stores will be created automatically if they don't exist. Primary stores have deterministic addresses
-so that users can easily deposit/withdraw/transfer fungible assets.
+Create a fungible asset with primary store support. When users transfer fungible assets to each other, their<br/> primary stores will be created automatically if they don&apos;t exist. Primary stores have deterministic addresses<br/> so that users can easily deposit/withdraw/transfer fungible assets.
 
 
 <pre><code>public fun create_primary_store_enabled_fungible_asset(constructor_ref: &amp;object::ConstructorRef, maximum_supply: option::Option&lt;u128&gt;, name: string::String, symbol: string::String, decimals: u8, icon_uri: string::String, project_uri: string::String)<br/></code></pre>
@@ -105,7 +89,7 @@ so that users can easily deposit/withdraw/transfer fungible assets.
 
 ## Function `ensure_primary_store_exists`
 
-Ensure that the primary store object for the given address exists. If it doesn't, create it.
+Ensure that the primary store object for the given address exists. If it doesn&apos;t, create it.
 
 
 <pre><code>public fun ensure_primary_store_exists&lt;T: key&gt;(owner: address, metadata: object::Object&lt;T&gt;): object::Object&lt;fungible_asset::FungibleStore&gt;<br/></code></pre>
@@ -189,7 +173,7 @@ Get the primary store object for the given account.
 
 ## Function `primary_store_exists`
 
-Return whether the given account's primary store exists.
+Return whether the given account&apos;s primary store exists.
 
 
 <pre><code>&#35;[view]<br/>public fun primary_store_exists&lt;T: key&gt;(account: address, metadata: object::Object&lt;T&gt;): bool<br/></code></pre>
@@ -210,7 +194,7 @@ Return whether the given account's primary store exists.
 
 ## Function `balance`
 
-Get the balance of <code>account</code>'s primary store.
+Get the balance of <code>account</code>&apos;s primary store.
 
 
 <pre><code>&#35;[view]<br/>public fun balance&lt;T: key&gt;(account: address, metadata: object::Object&lt;T&gt;): u64<br/></code></pre>
@@ -251,7 +235,7 @@ Get the balance of <code>account</code>'s primary store.
 
 ## Function `is_frozen`
 
-Return whether the given account's primary store is frozen.
+Return whether the given account&apos;s primary store is frozen.
 
 
 <pre><code>&#35;[view]<br/>public fun is_frozen&lt;T: key&gt;(account: address, metadata: object::Object&lt;T&gt;): bool<br/></code></pre>
@@ -272,7 +256,7 @@ Return whether the given account's primary store is frozen.
 
 ## Function `withdraw`
 
-Withdraw <code>amount</code> of fungible asset from the given account's primary store.
+Withdraw <code>amount</code> of fungible asset from the given account&apos;s primary store.
 
 
 <pre><code>public fun withdraw&lt;T: key&gt;(owner: &amp;signer, metadata: object::Object&lt;T&gt;, amount: u64): fungible_asset::FungibleAsset<br/></code></pre>
@@ -293,7 +277,7 @@ Withdraw <code>amount</code> of fungible asset from the given account's primary 
 
 ## Function `deposit`
 
-Deposit fungible asset <code>fa</code> to the given account's primary store.
+Deposit fungible asset <code>fa</code> to the given account&apos;s primary store.
 
 
 <pre><code>public fun deposit(owner: address, fa: fungible_asset::FungibleAsset)<br/></code></pre>
@@ -314,7 +298,7 @@ Deposit fungible asset <code>fa</code> to the given account's primary store.
 
 ## Function `force_deposit`
 
-Deposit fungible asset <code>fa</code> to the given account's primary store.
+Deposit fungible asset <code>fa</code> to the given account&apos;s primary store.
 
 
 <pre><code>public(friend) fun force_deposit(owner: address, fa: fungible_asset::FungibleAsset)<br/></code></pre>
@@ -335,7 +319,7 @@ Deposit fungible asset <code>fa</code> to the given account's primary store.
 
 ## Function `transfer`
 
-Transfer <code>amount</code> of fungible asset from sender's primary store to receiver's primary store.
+Transfer <code>amount</code> of fungible asset from sender&apos;s primary store to receiver&apos;s primary store.
 
 
 <pre><code>public entry fun transfer&lt;T: key&gt;(sender: &amp;signer, metadata: object::Object&lt;T&gt;, recipient: address, amount: u64)<br/></code></pre>
@@ -356,8 +340,7 @@ Transfer <code>amount</code> of fungible asset from sender's primary store to re
 
 ## Function `transfer_assert_minimum_deposit`
 
-Transfer <code>amount</code> of fungible asset from sender's primary store to receiver's primary store.
-Use the minimum deposit assertion api to make sure receipient will receive a minimum amount of fund.
+Transfer <code>amount</code> of fungible asset from sender&apos;s primary store to receiver&apos;s primary store.<br/> Use the minimum deposit assertion api to make sure receipient will receive a minimum amount of fund.
 
 
 <pre><code>public entry fun transfer_assert_minimum_deposit&lt;T: key&gt;(sender: &amp;signer, metadata: object::Object&lt;T&gt;, recipient: address, amount: u64, expected: u64)<br/></code></pre>
@@ -531,110 +514,35 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>Creating a fungible asset with primary store support should initiate a derived reference and store it under the metadata object.</td>
-<td>Medium</td>
-<td>The function create_primary_store_enabled_fungible_asset makes an existing object, fungible, via the fungible_asset::add_fungibility function and initializes the DeriveRefPod resource by generating a DeriveRef for the object and then stores it under the object address.</td>
-<td>Audited that the DeriveRefPod has been properly initialized and stored under the metadata object.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Creating a fungible asset with primary store support should initiate a derived reference and store it under the metadata object.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The function create_primary_store_enabled_fungible_asset makes an existing object, fungible, via the fungible_asset::add_fungibility function and initializes the DeriveRefPod resource by generating a DeriveRef for the object and then stores it under the object address.&lt;/td&gt;<br/>&lt;td&gt;Audited that the DeriveRefPod has been properly initialized and stored under the metadata object.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>Fetching and creating a primary fungible store of an asset should only succeed if the object supports primary store.</td>
-<td>Low</td>
-<td>The function create_primary_store is used to create a primary store by borrowing the DeriveRef resource from the object. In case the resource does not exist, creation will fail. The function ensure_primary_store_exists is used to fetch the primary store if it exists, otherwise it will create one via the create_primary function.</td>
-<td>Audited that it aborts if the DeriveRefPod doesn't exist. Audited that it aborts if the FungibleStore resource exists already under the object address.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;Fetching and creating a primary fungible store of an asset should only succeed if the object supports primary store.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The function create_primary_store is used to create a primary store by borrowing the DeriveRef resource from the object. In case the resource does not exist, creation will fail. The function ensure_primary_store_exists is used to fetch the primary store if it exists, otherwise it will create one via the create_primary function.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the DeriveRefPod doesn&apos;t exist. Audited that it aborts if the FungibleStore resource exists already under the object address.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>It should be possible to create a primary store to hold a fungible asset.</td>
-<td>Medium</td>
-<td>The function create_primary_store borrows the DeriveRef resource from DeriveRefPod and then creates the store which is returned.</td>
-<td>Audited that it returns the newly created FungibleStore.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;It should be possible to create a primary store to hold a fungible asset.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The function create_primary_store borrows the DeriveRef resource from DeriveRefPod and then creates the store which is returned.&lt;/td&gt;<br/>&lt;td&gt;Audited that it returns the newly created FungibleStore.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>Fetching the balance or the frozen status of a primary store should never abort.</td>
-<td>Low</td>
-<td>The function balance returns the balance of the store, if the store exists, otherwise it returns 0. The function is_frozen returns the frozen flag of the fungible store, if the store exists, otherwise it returns false.</td>
-<td>Audited that the balance function returns the balance of the FungibleStore. Audited that the is_frozen function returns the frozen status of the FungibleStore resource. Audited that it never aborts.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;Fetching the balance or the frozen status of a primary store should never abort.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The function balance returns the balance of the store, if the store exists, otherwise it returns 0. The function is_frozen returns the frozen flag of the fungible store, if the store exists, otherwise it returns false.&lt;/td&gt;<br/>&lt;td&gt;Audited that the balance function returns the balance of the FungibleStore. Audited that the is_frozen function returns the frozen status of the FungibleStore resource. Audited that it never aborts.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>The ability to withdraw, deposit, transfer, mint and burn should only be available for assets with primary store support.</td>
-<td>Medium</td>
-<td>The primary store is fetched before performing either of withdraw, deposit, transfer, mint, burn operation. If the FungibleStore resource doesn't exist the operation will fail.</td>
-<td>Audited that it aborts if the primary store FungibleStore doesn't exist.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;The ability to withdraw, deposit, transfer, mint and burn should only be available for assets with primary store support.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The primary store is fetched before performing either of withdraw, deposit, transfer, mint, burn operation. If the FungibleStore resource doesn&apos;t exist the operation will fail.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the primary store FungibleStore doesn&apos;t exist.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>6</td>
-<td>The action of depositing a fungible asset of the same type as the store should never fail if the store is not frozen.</td>
-<td>Medium</td>
-<td>The function deposit fetches the owner's store, if it doesn't exist it will be created, and then deposits the fungible asset to it. The function deposit_with_ref fetches the owner's store, if it doesn't exist it will be created, and then deposit the fungible asset via the fungible_asset::deposit_with_ref function. Depositing fails if the metadata of the FungibleStore and FungibleAsset differs.</td>
-<td>Audited that it aborts if the store is frozen (deposit). Audited that the balance of the store is increased by the deposit amount (deposit, deposit_with_ref). Audited that it aborts if the metadata of the store and the asset differs (deposit, deposit_with_ref).</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;6&lt;/td&gt;<br/>&lt;td&gt;The action of depositing a fungible asset of the same type as the store should never fail if the store is not frozen.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The function deposit fetches the owner&apos;s store, if it doesn&apos;t exist it will be created, and then deposits the fungible asset to it. The function deposit_with_ref fetches the owner&apos;s store, if it doesn&apos;t exist it will be created, and then deposit the fungible asset via the fungible_asset::deposit_with_ref function. Depositing fails if the metadata of the FungibleStore and FungibleAsset differs.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the store is frozen (deposit). Audited that the balance of the store is increased by the deposit amount (deposit, deposit_with_ref). Audited that it aborts if the metadata of the store and the asset differs (deposit, deposit_with_ref).&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>7</td>
-<td>Withdrawing should only be allowed to the owner of an existing store with sufficient balance.</td>
-<td>Critical</td>
-<td>The withdraw function fetches the owner's store via the primary_store function and then calls fungible_asset::withdraw which validates the owner of the store, checks the frozen status and the balance of the store. The withdraw_with_ref function fetches the store of the owner via primary_store function and calls the fungible_asset::withdraw_with_ref which validates transfer_ref's metadata with the withdrawing stores metadata, and the balance of the store.</td>
-<td>Audited that it aborts if the owner doesn't own the store (withdraw). Audited that it aborts if the store is frozen (withdraw). Audited that it aborts if the transfer ref's metadata doesn't match the withdrawing store's metadata (withdraw_with_ref). Audited that it aborts if the store doesn't have sufficient balance. Audited that the store is not burned. Audited that the balance of the store is decreased by the amount withdrawn.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;7&lt;/td&gt;<br/>&lt;td&gt;Withdrawing should only be allowed to the owner of an existing store with sufficient balance.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The withdraw function fetches the owner&apos;s store via the primary_store function and then calls fungible_asset::withdraw which validates the owner of the store, checks the frozen status and the balance of the store. The withdraw_with_ref function fetches the store of the owner via primary_store function and calls the fungible_asset::withdraw_with_ref which validates transfer_ref&apos;s metadata with the withdrawing stores metadata, and the balance of the store.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the owner doesn&apos;t own the store (withdraw). Audited that it aborts if the store is frozen (withdraw). Audited that it aborts if the transfer ref&apos;s metadata doesn&apos;t match the withdrawing store&apos;s metadata (withdraw_with_ref). Audited that it aborts if the store doesn&apos;t have sufficient balance. Audited that the store is not burned. Audited that the balance of the store is decreased by the amount withdrawn.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>8</td>
-<td>Only the fungible store owner is allowed to unburn a burned store.</td>
-<td>High</td>
-<td>The function may_be_unburn checks if the store is burned and then proceeds to call object::unburn which ensures that the owner of the object matches the address of the signer.</td>
-<td>Audited that the store is unburned successfully.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;8&lt;/td&gt;<br/>&lt;td&gt;Only the fungible store owner is allowed to unburn a burned store.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The function may_be_unburn checks if the store is burned and then proceeds to call object::unburn which ensures that the owner of the object matches the address of the signer.&lt;/td&gt;<br/>&lt;td&gt;Audited that the store is unburned successfully.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>9</td>
-<td>Only the owner of a primary store can transfer its balance to any recipient's primary store.</td>
-<td>High</td>
-<td>The function transfer fetches sender and recipient's primary stores, if the sender's store is burned it unburns the store and calls the fungile_asset::transfer to proceed with the transfer, which first withdraws the assets from the sender's store and then deposits to the recipient's store. The function transfer_with_ref fetches the sender's and recipient's stores and calls the fungible_asset::transfer_with_ref function which withdraws the asset with the ref from the sender and deposits the asset to the recipient with the ref.</td>
-<td>Audited the deposit and withdraw (transfer). Audited the deposit_with_ref and withdraw_with_ref (transfer_with_ref). Audited that the store balance of the sender is decreased by the specified amount and its added to the recipients store. (transfer, transfer_with_ref) Audited that the sender's store is not burned (transfer).</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;9&lt;/td&gt;<br/>&lt;td&gt;Only the owner of a primary store can transfer its balance to any recipient&apos;s primary store.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The function transfer fetches sender and recipient&apos;s primary stores, if the sender&apos;s store is burned it unburns the store and calls the fungile_asset::transfer to proceed with the transfer, which first withdraws the assets from the sender&apos;s store and then deposits to the recipient&apos;s store. The function transfer_with_ref fetches the sender&apos;s and recipient&apos;s stores and calls the fungible_asset::transfer_with_ref function which withdraws the asset with the ref from the sender and deposits the asset to the recipient with the ref.&lt;/td&gt;<br/>&lt;td&gt;Audited the deposit and withdraw (transfer). Audited the deposit_with_ref and withdraw_with_ref (transfer_with_ref). Audited that the store balance of the sender is decreased by the specified amount and its added to the recipients store. (transfer, transfer_with_ref) Audited that the sender&apos;s store is not burned (transfer).&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>10</td>
-<td>Minting an amount of assets to an unfrozen store is only allowed with a valid mint reference.</td>
-<td>High</td>
-<td>The mint function fetches the primary store and calls the fungible_asset::mint_to, which mints with MintRef's metadata which internally validates the amount and the increases the total supply of the asset. And the minted asset is deposited to the provided store by validating that the store is unfrozen and the store's metadata is the same as the depositing asset's metadata.</td>
-<td>Audited that it aborts if the amount is equal to 0. Audited that it aborts if the store is frozen. Audited that it aborts if the mint_ref's metadata is not the same as the store's metadata. Audited that the asset's total supply is increased by the amount minted. Audited that the balance of the store is increased by the minted amount.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;10&lt;/td&gt;<br/>&lt;td&gt;Minting an amount of assets to an unfrozen store is only allowed with a valid mint reference.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The mint function fetches the primary store and calls the fungible_asset::mint_to, which mints with MintRef&apos;s metadata which internally validates the amount and the increases the total supply of the asset. And the minted asset is deposited to the provided store by validating that the store is unfrozen and the store&apos;s metadata is the same as the depositing asset&apos;s metadata.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the amount is equal to 0. Audited that it aborts if the store is frozen. Audited that it aborts if the mint_ref&apos;s metadata is not the same as the store&apos;s metadata. Audited that the asset&apos;s total supply is increased by the amount minted. Audited that the balance of the store is increased by the minted amount.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>11</td>
-<td>Burning an amount of assets from an existing unfrozen store is only allowed with a valid burn reference.</td>
-<td>High</td>
-<td>The burn function fetches the primary store and calls the fungible_asset::burn_from function which withdraws the amount from the store while enforcing that the store has enough balance and burns the withdrawn asset after validating the asset's metadata and the BurnRef's metadata followed by decreasing the supply of the asset.</td>
-<td>Audited that it aborts if the metadata of the store is not same as the BurnRef's metadata. Audited that it aborts if the burning amount is 0. Audited that it aborts if the store doesn't have enough balance. Audited that it aborts if the asset's metadata is not same as the BurnRef's metadata. Audited that the total supply of the asset is decreased. Audited that the store's balance is reduced by the amount burned.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;11&lt;/td&gt;<br/>&lt;td&gt;Burning an amount of assets from an existing unfrozen store is only allowed with a valid burn reference.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The burn function fetches the primary store and calls the fungible_asset::burn_from function which withdraws the amount from the store while enforcing that the store has enough balance and burns the withdrawn asset after validating the asset&apos;s metadata and the BurnRef&apos;s metadata followed by decreasing the supply of the asset.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the metadata of the store is not same as the BurnRef&apos;s metadata. Audited that it aborts if the burning amount is 0. Audited that it aborts if the store doesn&apos;t have enough balance. Audited that it aborts if the asset&apos;s metadata is not same as the BurnRef&apos;s metadata. Audited that the total supply of the asset is decreased. Audited that the store&apos;s balance is reduced by the amount burned.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>12</td>
-<td>Setting the frozen flag of a store is only allowed with a valid reference.</td>
-<td>High</td>
-<td>The function set_frozen_flag fetches the primary store and calls fungible_asset::set_frozen_flag which validates the TransferRef's metadata with the store's metadata and then updates the frozen flag.</td>
-<td>Audited that it aborts if the store's metadata is not same as the TransferRef's metadata. Audited that the status of the frozen flag is updated correctly.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;12&lt;/td&gt;<br/>&lt;td&gt;Setting the frozen flag of a store is only allowed with a valid reference.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The function set_frozen_flag fetches the primary store and calls fungible_asset::set_frozen_flag which validates the TransferRef&apos;s metadata with the store&apos;s metadata and then updates the frozen flag.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the store&apos;s metadata is not same as the TransferRef&apos;s metadata. Audited that the status of the frozen flag is updated correctly.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>

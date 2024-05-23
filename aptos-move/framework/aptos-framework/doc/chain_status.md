@@ -3,10 +3,7 @@
 
 # Module `0x1::chain_status`
 
-This module code to assert that it is running in genesis (<code>Self::assert_genesis</code>) or after
-genesis (<code>Self::assert_operating</code>). These are essentially distinct states of the system. Specifically,
-if <code>Self::assert_operating</code> succeeds, assumptions about invariants over the global state can be made
-which reflect that the system has been successfully initialized.
+This module code to assert that it is running in genesis (<code>Self::assert_genesis</code>) or after<br/> genesis (<code>Self::assert_operating</code>). These are essentially distinct states of the system. Specifically,<br/> if <code>Self::assert_operating</code> succeeds, assumptions about invariants over the global state can be made<br/> which reflect that the system has been successfully initialized.
 
 
 -  [Resource `GenesisEndMarker`](#0x1_chain_status_GenesisEndMarker)
@@ -124,9 +121,7 @@ Helper function to determine if Aptos is in genesis state.
 
 ## Function `is_operating`
 
-Helper function to determine if Aptos is operating. This is
-the same as <code>!is_genesis()</code> and is provided for convenience.
-Testing <code>is_operating()</code> is more frequent than <code>is_genesis()</code>.
+Helper function to determine if Aptos is operating. This is<br/> the same as <code>!is_genesis()</code> and is provided for convenience.<br/> Testing <code>is_operating()</code> is more frequent than <code>is_genesis()</code>.
 
 
 <pre><code>&#35;[view]<br/>public fun is_operating(): bool<br/></code></pre>
@@ -196,38 +191,17 @@ Helper function to assert genesis state.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>The end of genesis mark should persist throughout the entire life of the chain.</td>
-<td>Medium</td>
-<td>The Aptos framework account should never drop the GenesisEndMarker resource.</td>
-<td>Audited that GenesisEndMarker is published at the end of genesis and never removed. Formally verified via <a href="#high-level-req-1">set_genesis_end</a> that GenesisEndMarker is published.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The end of genesis mark should persist throughout the entire life of the chain.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The Aptos framework account should never drop the GenesisEndMarker resource.&lt;/td&gt;<br/>&lt;td&gt;Audited that GenesisEndMarker is published at the end of genesis and never removed. Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;set_genesis_end&lt;/a&gt; that GenesisEndMarker is published.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The status of the chain should never be genesis and operating at the same time.</td>
-<td>Low</td>
-<td>The status of the chain is determined by the GenesisEndMarker resource.</td>
-<td>Formally verified via <a href="#high-level-req-2">global invariant</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The status of the chain should never be genesis and operating at the same time.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The status of the chain is determined by the GenesisEndMarker resource.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;global invariant&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>The status of the chain should only be changed once, from genesis to operating.</td>
-<td>Low</td>
-<td>Attempting to assign a resource type more than once will abort.</td>
-<td>Formally verified via <a href="#high-level-req-3">set_genesis_end</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The status of the chain should only be changed once, from genesis to operating.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;Attempting to assign a resource type more than once will abort.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;set_genesis_end&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -235,7 +209,7 @@ Helper function to assert genesis state.
 ### Module-level Specification
 
 
-<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 invariant is_genesis() &#61;&#61; !is_operating();<br/></code></pre>
 
 
@@ -250,8 +224,8 @@ invariant is_genesis() &#61;&#61; !is_operating();<br/></code></pre>
 
 
 
-<pre><code>pragma verify &#61; true;<br/>pragma delegate_invariants_to_caller;<br/>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
-aborts_if exists&lt;GenesisEndMarker&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>pragma verify &#61; true;<br/>pragma delegate_invariants_to_caller;<br/>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
+aborts_if exists&lt;GenesisEndMarker&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 ensures global&lt;GenesisEndMarker&gt;(@aptos_framework) &#61;&#61; GenesisEndMarker &#123;&#125;;<br/></code></pre>
 
 

@@ -23,8 +23,7 @@ Reconfiguration with DKG helper functions.
 
 ## Function `try_start`
 
-Trigger a reconfiguration with DKG.
-Do nothing if one is already in progress.
+Trigger a reconfiguration with DKG.<br/> Do nothing if one is already in progress.
 
 
 <pre><code>public(friend) fun try_start()<br/></code></pre>
@@ -45,10 +44,7 @@ Do nothing if one is already in progress.
 
 ## Function `finish`
 
-Clear incomplete DKG session, if it exists.
-Apply buffered on-chain configs (except for ValidatorSet, which is done inside <code>reconfiguration::reconfigure()</code>).
-Re-enable validator set changes.
-Run the default reconfiguration to enter the new epoch.
+Clear incomplete DKG session, if it exists.<br/> Apply buffered on&#45;chain configs (except for ValidatorSet, which is done inside <code>reconfiguration::reconfigure()</code>).<br/> Re&#45;enable validator set changes.<br/> Run the default reconfiguration to enter the new epoch.
 
 
 <pre><code>public(friend) fun finish(framework: &amp;signer)<br/></code></pre>
@@ -69,8 +65,7 @@ Run the default reconfiguration to enter the new epoch.
 
 ## Function `finish_with_dkg_result`
 
-Complete the current reconfiguration with DKG.
-Abort if no DKG is in progress.
+Complete the current reconfiguration with DKG.<br/> Abort if no DKG is in progress.
 
 
 <pre><code>fun finish_with_dkg_result(account: &amp;signer, dkg_result: vector&lt;u8&gt;)<br/></code></pre>

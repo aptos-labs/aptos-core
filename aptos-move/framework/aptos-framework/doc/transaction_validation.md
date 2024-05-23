@@ -48,8 +48,7 @@
 
 ## Resource `TransactionValidation`
 
-This holds information that will be picked up by the VM to call the
-correct chain-specific prologue and epilogue functions
+This holds information that will be picked up by the VM to call the<br/> correct chain&#45;specific prologue and epilogue functions
 
 
 <pre><code>struct TransactionValidation has key<br/></code></pre>
@@ -167,9 +166,7 @@ Transaction exceeded its allocated max gas
 
 <a id="0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY"></a>
 
-Prologue errors. These are separated out from the other errors in this
-module since they are mapped separately to major VM statuses, and are
-important to the semantics of the system.
+Prologue errors. These are separated out from the other errors in this<br/> module since they are mapped separately to major VM statuses, and are<br/> important to the semantics of the system.
 
 
 <pre><code>const PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY: u64 &#61; 1001;<br/></code></pre>
@@ -241,8 +238,7 @@ Only called during genesis to initialize system resources for this module.
 
 ## Function `collect_deposit`
 
-Called in prologue to optionally hold some amount for special txns (e.g. randomness txns).
-<code>return_deposit()</code> should be invoked in the corresponding epilogue with the same arguments.
+Called in prologue to optionally hold some amount for special txns (e.g. randomness txns).<br/> <code>return_deposit()</code> should be invoked in the corresponding epilogue with the same arguments.
 
 
 <pre><code>fun collect_deposit(gas_payer: address, amount: option::Option&lt;u64&gt;)<br/></code></pre>
@@ -324,9 +320,7 @@ Called in epilogue to optionally released the amount held in prologue for specia
 
 ## Function `script_prologue_collect_deposit`
 
-<code>script_prologue()</code> then collect an optional deposit depending on the txn.
-
-Deposit collection goes last so <code>script_prologue()</code> doesn't have to be aware of the deposit logic.
+<code>script_prologue()</code> then collect an optional deposit depending on the txn.<br/><br/> Deposit collection goes last so <code>script_prologue()</code> doesn&apos;t have to be aware of the deposit logic.
 
 
 <pre><code>fun script_prologue_collect_deposit(sender: signer, txn_sequence_number: u64, txn_public_key: vector&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, chain_id: u8, script_hash: vector&lt;u8&gt;, required_deposit: option::Option&lt;u64&gt;)<br/></code></pre>
@@ -407,9 +401,7 @@ Deposit collection goes last so <code>script_prologue()</code> doesn't have to b
 
 ## Function `fee_payer_script_prologue_collect_deposit`
 
-<code>fee_payer_script_prologue()</code> then collect an optional deposit depending on the txn.
-
-Deposit collection goes last so <code>fee_payer_script_prologue()</code> doesn't have to be aware of the deposit logic.
+<code>fee_payer_script_prologue()</code> then collect an optional deposit depending on the txn.<br/><br/> Deposit collection goes last so <code>fee_payer_script_prologue()</code> doesn&apos;t have to be aware of the deposit logic.
 
 
 <pre><code>fun fee_payer_script_prologue_collect_deposit(sender: signer, txn_sequence_number: u64, txn_sender_public_key: vector&lt;u8&gt;, secondary_signer_addresses: vector&lt;address&gt;, secondary_signer_public_key_hashes: vector&lt;vector&lt;u8&gt;&gt;, fee_payer_address: address, fee_payer_public_key_hash: vector&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, chain_id: u8, required_deposit: option::Option&lt;u64&gt;)<br/></code></pre>
@@ -430,8 +422,7 @@ Deposit collection goes last so <code>fee_payer_script_prologue()</code> doesn't
 
 ## Function `epilogue`
 
-Epilogue function is run after a transaction is successfully executed.
-Called by the Adapter
+Epilogue function is run after a transaction is successfully executed.<br/> Called by the Adapter
 
 
 <pre><code>fun epilogue(account: signer, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)<br/></code></pre>
@@ -452,9 +443,7 @@ Called by the Adapter
 
 ## Function `epilogue_return_deposit`
 
-Return the deposit held in prologue, then <code>epilogue()</code>.
-
-Deposit return goes first so <code>epilogue()</code> doesn't have to be aware of this change.
+Return the deposit held in prologue, then <code>epilogue()</code>.<br/><br/> Deposit return goes first so <code>epilogue()</code> doesn&apos;t have to be aware of this change.
 
 
 <pre><code>fun epilogue_return_deposit(account: signer, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64, required_deposit: option::Option&lt;u64&gt;)<br/></code></pre>
@@ -475,8 +464,7 @@ Deposit return goes first so <code>epilogue()</code> doesn't have to be aware of
 
 ## Function `epilogue_gas_payer`
 
-Epilogue function with explicit gas payer specified, is run after a transaction is successfully executed.
-Called by the Adapter
+Epilogue function with explicit gas payer specified, is run after a transaction is successfully executed.<br/> Called by the Adapter
 
 
 <pre><code>fun epilogue_gas_payer(account: signer, gas_payer: address, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)<br/></code></pre>
@@ -497,9 +485,7 @@ Called by the Adapter
 
 ## Function `epilogue_gas_payer_return_deposit`
 
-Return the deposit held in prologue to the gas payer, then <code>epilogue_gas_payer()</code>.
-
-Deposit return should go first so <code>epilogue_gas_payer()</code> doesn't have to be aware of this change.
+Return the deposit held in prologue to the gas payer, then <code>epilogue_gas_payer()</code>.<br/><br/> Deposit return should go first so <code>epilogue_gas_payer()</code> doesn&apos;t have to be aware of this change.
 
 
 <pre><code>fun epilogue_gas_payer_return_deposit(account: signer, gas_payer: address, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64, required_deposit: option::Option&lt;u64&gt;)<br/></code></pre>
@@ -527,38 +513,17 @@ Deposit return should go first so <code>epilogue_gas_payer()</code> doesn't have
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>The sender of a transaction should have sufficient coin balance to pay the transaction fee.</td>
-<td>High</td>
-<td>The prologue_common function asserts that the transaction sender has enough coin balance to be paid as the max_transaction_fee.</td>
-<td>Formally verified via <a href="#high-level-req-1">PrologueCommonAbortsIf</a>. Moreover, the native transaction validation patterns have been manually audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The sender of a transaction should have sufficient coin balance to pay the transaction fee.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The prologue_common function asserts that the transaction sender has enough coin balance to be paid as the max_transaction_fee.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;PrologueCommonAbortsIf&lt;/a&gt;. Moreover, the native transaction validation patterns have been manually audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>All secondary signer addresses are verified to be authentic through a validation process.</td>
-<td>Critical</td>
-<td>The function multi_agent_script_prologue ensures that each secondary signer address undergoes authentication validation, including verification of account existence and authentication key matching, confirming their authenticity.</td>
-<td>Formally verified via <a href="#high-level-req-2">multi_agent_script_prologue</a>. Moreover, the native transaction validation patterns have been manually audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;All secondary signer addresses are verified to be authentic through a validation process.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The function multi_agent_script_prologue ensures that each secondary signer address undergoes authentication validation, including verification of account existence and authentication key matching, confirming their authenticity.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;multi_agent_script_prologue&lt;/a&gt;. Moreover, the native transaction validation patterns have been manually audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>After successful execution, base the transaction fee on the configuration set by the features library.</td>
-<td>High</td>
-<td>The epilogue function collects the transaction fee for either redistribution or burning based on the feature::collect_and_distribute_gas_fees result.</td>
-<td>Formally Verified via <a href="#high-level-req-3">epilogue</a>. Moreover, the native transaction validation patterns have been manually audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;After successful execution, base the transaction fee on the configuration set by the features library.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The epilogue function collects the transaction fee for either redistribution or burning based on the feature::collect_and_distribute_gas_fees result.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;epilogue&lt;/a&gt;. Moreover, the native transaction validation patterns have been manually audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -578,21 +543,19 @@ Deposit return should go first so <code>epilogue_gas_payer()</code> doesn't have
 <pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, script_prologue_name: vector&lt;u8&gt;, module_prologue_name: vector&lt;u8&gt;, multi_agent_prologue_name: vector&lt;u8&gt;, user_epilogue_name: vector&lt;u8&gt;)<br/></code></pre>
 
 
-Ensure caller is <code>aptos_framework</code>.
-Aborts if TransactionValidation already exists.
+Ensure caller is <code>aptos_framework</code>.<br/> Aborts if TransactionValidation already exists.
 
 
 <pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if !system_addresses::is_aptos_framework_address(addr);<br/>aborts_if exists&lt;TransactionValidation&gt;(addr);<br/>ensures exists&lt;TransactionValidation&gt;(addr);<br/></code></pre>
 
 
-Create a schema to reuse some code.
-Give some constraints that may abort according to the conditions.
+Create a schema to reuse some code.<br/> Give some constraints that may abort according to the conditions.
 
 
 <a id="0x1_transaction_validation_PrologueCommonAbortsIf"></a>
 
 
-<pre><code>schema PrologueCommonAbortsIf &#123;<br/>sender: signer;<br/>gas_payer: address;<br/>txn_sequence_number: u64;<br/>txn_authentication_key: vector&lt;u8&gt;;<br/>txn_gas_price: u64;<br/>txn_max_gas_units: u64;<br/>txn_expiration_time: u64;<br/>chain_id: u8;<br/>aborts_if !exists&lt;CurrentTimeMicroseconds&gt;(@aptos_framework);<br/>aborts_if !(timestamp::now_seconds() &lt; txn_expiration_time);<br/>aborts_if !exists&lt;ChainId&gt;(@aptos_framework);<br/>aborts_if !(chain_id::get() &#61;&#61; chain_id);<br/>let transaction_sender &#61; signer::address_of(sender);<br/>aborts_if (<br/>    !features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)<br/>    &#124;&#124; account::exists_at(transaction_sender)<br/>    &#124;&#124; transaction_sender &#61;&#61; gas_payer<br/>    &#124;&#124; txn_sequence_number &gt; 0<br/>) &amp;&amp; (<br/>    !(txn_sequence_number &gt;&#61; global&lt;Account&gt;(transaction_sender).sequence_number)<br/>    &#124;&#124; !(txn_authentication_key &#61;&#61; global&lt;Account&gt;(transaction_sender).authentication_key)<br/>    &#124;&#124; !account::exists_at(transaction_sender)<br/>    &#124;&#124; !(txn_sequence_number &#61;&#61; global&lt;Account&gt;(transaction_sender).sequence_number)<br/>);<br/>aborts_if features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)<br/>    &amp;&amp; transaction_sender !&#61; gas_payer<br/>    &amp;&amp; txn_sequence_number &#61;&#61; 0<br/>    &amp;&amp; !account::exists_at(transaction_sender)<br/>    &amp;&amp; txn_authentication_key !&#61; bcs::to_bytes(transaction_sender);<br/>aborts_if !(txn_sequence_number &lt; (1u64 &lt;&lt; 63));<br/>let max_transaction_fee &#61; txn_gas_price &#42; txn_max_gas_units;<br/>aborts_if max_transaction_fee &gt; MAX_U64;<br/>aborts_if !exists&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>schema PrologueCommonAbortsIf &#123;<br/>sender: signer;<br/>gas_payer: address;<br/>txn_sequence_number: u64;<br/>txn_authentication_key: vector&lt;u8&gt;;<br/>txn_gas_price: u64;<br/>txn_max_gas_units: u64;<br/>txn_expiration_time: u64;<br/>chain_id: u8;<br/>aborts_if !exists&lt;CurrentTimeMicroseconds&gt;(@aptos_framework);<br/>aborts_if !(timestamp::now_seconds() &lt; txn_expiration_time);<br/>aborts_if !exists&lt;ChainId&gt;(@aptos_framework);<br/>aborts_if !(chain_id::get() &#61;&#61; chain_id);<br/>let transaction_sender &#61; signer::address_of(sender);<br/>aborts_if (<br/>    !features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)<br/>    &#124;&#124; account::exists_at(transaction_sender)<br/>    &#124;&#124; transaction_sender &#61;&#61; gas_payer<br/>    &#124;&#124; txn_sequence_number &gt; 0<br/>) &amp;&amp; (<br/>    !(txn_sequence_number &gt;&#61; global&lt;Account&gt;(transaction_sender).sequence_number)<br/>    &#124;&#124; !(txn_authentication_key &#61;&#61; global&lt;Account&gt;(transaction_sender).authentication_key)<br/>    &#124;&#124; !account::exists_at(transaction_sender)<br/>    &#124;&#124; !(txn_sequence_number &#61;&#61; global&lt;Account&gt;(transaction_sender).sequence_number)<br/>);<br/>aborts_if features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)<br/>    &amp;&amp; transaction_sender !&#61; gas_payer<br/>    &amp;&amp; txn_sequence_number &#61;&#61; 0<br/>    &amp;&amp; !account::exists_at(transaction_sender)<br/>    &amp;&amp; txn_authentication_key !&#61; bcs::to_bytes(transaction_sender);<br/>aborts_if !(txn_sequence_number &lt; (1u64 &lt;&lt; 63));<br/>let max_transaction_fee &#61; txn_gas_price &#42; txn_max_gas_units;<br/>aborts_if max_transaction_fee &gt; MAX_U64;<br/>aborts_if !exists&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
     aborts_if !(global&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer).coin.value &gt;&#61; max_transaction_fee);<br/>&#125;<br/></code></pre>
 
 
@@ -657,7 +620,7 @@ Give some constraints that may abort according to the conditions.
 <a id="0x1_transaction_validation_MultiAgentPrologueCommonAbortsIf"></a>
 
 
-<pre><code>schema MultiAgentPrologueCommonAbortsIf &#123;<br/>secondary_signer_addresses: vector&lt;address&gt;;<br/>secondary_signer_public_key_hashes: vector&lt;vector&lt;u8&gt;&gt;;<br/>let num_secondary_signers &#61; len(secondary_signer_addresses);<br/>aborts_if len(secondary_signer_public_key_hashes) !&#61; num_secondary_signers;<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>schema MultiAgentPrologueCommonAbortsIf &#123;<br/>secondary_signer_addresses: vector&lt;address&gt;;<br/>secondary_signer_public_key_hashes: vector&lt;vector&lt;u8&gt;&gt;;<br/>let num_secondary_signers &#61; len(secondary_signer_addresses);<br/>aborts_if len(secondary_signer_public_key_hashes) !&#61; num_secondary_signers;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
     aborts_if exists i in 0..num_secondary_signers:<br/>    !account::exists_at(secondary_signer_addresses[i])<br/>        &#124;&#124; secondary_signer_public_key_hashes[i] !&#61;<br/>        account::get_authentication_key(secondary_signer_addresses[i]);<br/>ensures forall i in 0..num_secondary_signers:<br/>    account::exists_at(secondary_signer_addresses[i])<br/>        &amp;&amp; secondary_signer_public_key_hashes[i] &#61;&#61;<br/>            account::get_authentication_key(secondary_signer_addresses[i]);<br/>&#125;<br/></code></pre>
 
 
@@ -684,8 +647,7 @@ Give some constraints that may abort according to the conditions.
 <pre><code>fun multi_agent_script_prologue(sender: signer, txn_sequence_number: u64, txn_sender_public_key: vector&lt;u8&gt;, secondary_signer_addresses: vector&lt;address&gt;, secondary_signer_public_key_hashes: vector&lt;vector&lt;u8&gt;&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, chain_id: u8)<br/></code></pre>
 
 
-Aborts if length of public key hashed vector
-not equal the number of singers.
+Aborts if length of public key hashed vector<br/> not equal the number of singers.
 
 
 <pre><code>pragma verify_duration_estimate &#61; 120;<br/>let gas_payer &#61; signer::address_of(sender);<br/>pragma verify &#61; false;<br/>include PrologueCommonAbortsIf &#123;<br/>    gas_payer,<br/>    txn_sequence_number,<br/>    txn_authentication_key: txn_sender_public_key,<br/>&#125;;<br/>include MultiAgentPrologueCommonAbortsIf &#123;<br/>    secondary_signer_addresses,<br/>    secondary_signer_public_key_hashes,<br/>&#125;;<br/></code></pre>
@@ -742,9 +704,7 @@ not equal the number of singers.
 <pre><code>fun epilogue(account: signer, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)<br/></code></pre>
 
 
-Abort according to the conditions.
-<code>AptosCoinCapabilities</code> and <code>CoinInfo</code> should exists.
-Skip transaction_fee::burn_fee verification.
+Abort according to the conditions.<br/> <code>AptosCoinCapabilities</code> and <code>CoinInfo</code> should exists.<br/> Skip transaction_fee::burn_fee verification.
 
 
 <pre><code>pragma verify &#61; false;<br/>include EpilogueGasPayerAbortsIf &#123; gas_payer: signer::address_of(account) &#125;;<br/></code></pre>
@@ -773,9 +733,7 @@ Skip transaction_fee::burn_fee verification.
 <pre><code>fun epilogue_gas_payer(account: signer, gas_payer: address, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)<br/></code></pre>
 
 
-Abort according to the conditions.
-<code>AptosCoinCapabilities</code> and <code>CoinInfo</code> should exist.
-Skip transaction_fee::burn_fee verification.
+Abort according to the conditions.<br/> <code>AptosCoinCapabilities</code> and <code>CoinInfo</code> should exist.<br/> Skip transaction_fee::burn_fee verification.
 
 
 <pre><code>pragma verify &#61; false;<br/>include EpilogueGasPayerAbortsIf;<br/></code></pre>
@@ -786,7 +744,7 @@ Skip transaction_fee::burn_fee verification.
 <a id="0x1_transaction_validation_EpilogueGasPayerAbortsIf"></a>
 
 
-<pre><code>schema EpilogueGasPayerAbortsIf &#123;<br/>account: signer;<br/>gas_payer: address;<br/>storage_fee_refunded: u64;<br/>txn_gas_price: u64;<br/>txn_max_gas_units: u64;<br/>gas_units_remaining: u64;<br/>aborts_if !(txn_max_gas_units &gt;&#61; gas_units_remaining);<br/>let gas_used &#61; txn_max_gas_units &#45; gas_units_remaining;<br/>aborts_if !(txn_gas_price &#42; gas_used &lt;&#61; MAX_U64);<br/>let transaction_fee_amount &#61; txn_gas_price &#42; gas_used;<br/>let addr &#61; signer::address_of(account);<br/>let pre_account &#61; global&lt;account::Account&gt;(addr);<br/>let post account &#61; global&lt;account::Account&gt;(addr);<br/>aborts_if !exists&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer);<br/>aborts_if !exists&lt;Account&gt;(addr);<br/>aborts_if !(global&lt;Account&gt;(addr).sequence_number &lt; MAX_U64);<br/>ensures account.sequence_number &#61;&#61; pre_account.sequence_number &#43; 1;<br/>let collect_fee_enabled &#61; features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES);<br/>let collected_fees &#61; global&lt;CollectedFeesPerBlock&gt;(@aptos_framework).amount;<br/>let aggr &#61; collected_fees.value;<br/>let aggr_val &#61; aggregator::spec_aggregator_get_val(aggr);<br/>let aggr_lim &#61; aggregator::spec_get_limit(aggr);<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>schema EpilogueGasPayerAbortsIf &#123;<br/>account: signer;<br/>gas_payer: address;<br/>storage_fee_refunded: u64;<br/>txn_gas_price: u64;<br/>txn_max_gas_units: u64;<br/>gas_units_remaining: u64;<br/>aborts_if !(txn_max_gas_units &gt;&#61; gas_units_remaining);<br/>let gas_used &#61; txn_max_gas_units &#45; gas_units_remaining;<br/>aborts_if !(txn_gas_price &#42; gas_used &lt;&#61; MAX_U64);<br/>let transaction_fee_amount &#61; txn_gas_price &#42; gas_used;<br/>let addr &#61; signer::address_of(account);<br/>let pre_account &#61; global&lt;account::Account&gt;(addr);<br/>let post account &#61; global&lt;account::Account&gt;(addr);<br/>aborts_if !exists&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer);<br/>aborts_if !exists&lt;Account&gt;(addr);<br/>aborts_if !(global&lt;Account&gt;(addr).sequence_number &lt; MAX_U64);<br/>ensures account.sequence_number &#61;&#61; pre_account.sequence_number &#43; 1;<br/>let collect_fee_enabled &#61; features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES);<br/>let collected_fees &#61; global&lt;CollectedFeesPerBlock&gt;(@aptos_framework).amount;<br/>let aggr &#61; collected_fees.value;<br/>let aggr_val &#61; aggregator::spec_aggregator_get_val(aggr);<br/>let aggr_lim &#61; aggregator::spec_get_limit(aggr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
     aborts_if collect_fee_enabled &amp;&amp; !exists&lt;CollectedFeesPerBlock&gt;(@aptos_framework);<br/>aborts_if collect_fee_enabled &amp;&amp; transaction_fee_amount &gt; 0 &amp;&amp; aggr_val &#43; transaction_fee_amount &gt; aggr_lim;<br/>let amount_to_burn&#61; if (collect_fee_enabled) &#123;<br/>    0<br/>&#125; else &#123;<br/>    transaction_fee_amount &#45; storage_fee_refunded<br/>&#125;;<br/>let apt_addr &#61; type_info::type_of&lt;AptosCoin&gt;().account_address;<br/>let maybe_apt_supply &#61; global&lt;CoinInfo&lt;AptosCoin&gt;&gt;(apt_addr).supply;<br/>let total_supply_enabled &#61; option::spec_is_some(maybe_apt_supply);<br/>let apt_supply &#61; option::spec_borrow(maybe_apt_supply);<br/>let apt_supply_value &#61; optional_aggregator::optional_aggregator_value(apt_supply);<br/>let post post_maybe_apt_supply &#61; global&lt;CoinInfo&lt;AptosCoin&gt;&gt;(apt_addr).supply;<br/>let post post_apt_supply &#61; option::spec_borrow(post_maybe_apt_supply);<br/>let post post_apt_supply_value &#61; optional_aggregator::optional_aggregator_value(post_apt_supply);<br/>aborts_if amount_to_burn &gt; 0 &amp;&amp; !exists&lt;AptosCoinCapabilities&gt;(@aptos_framework);<br/>aborts_if amount_to_burn &gt; 0 &amp;&amp; !exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(apt_addr);<br/>aborts_if amount_to_burn &gt; 0 &amp;&amp; total_supply_enabled &amp;&amp; apt_supply_value &lt; amount_to_burn;<br/>ensures total_supply_enabled &#61;&#61;&gt; apt_supply_value &#45; amount_to_burn &#61;&#61; post_apt_supply_value;<br/>let amount_to_mint &#61; if (collect_fee_enabled) &#123;<br/>    storage_fee_refunded<br/>&#125; else &#123;<br/>    storage_fee_refunded &#45; transaction_fee_amount<br/>&#125;;<br/>let total_supply &#61; coin::supply&lt;AptosCoin&gt;;<br/>let post post_total_supply &#61; coin::supply&lt;AptosCoin&gt;;<br/>aborts_if amount_to_mint &gt; 0 &amp;&amp; !exists&lt;CoinStore&lt;AptosCoin&gt;&gt;(addr);<br/>aborts_if amount_to_mint &gt; 0 &amp;&amp; !exists&lt;AptosCoinMintCapability&gt;(@aptos_framework);<br/>aborts_if amount_to_mint &gt; 0 &amp;&amp; total_supply &#43; amount_to_mint &gt; MAX_U128;<br/>ensures amount_to_mint &gt; 0 &#61;&#61;&gt; post_total_supply &#61;&#61; total_supply &#43; amount_to_mint;<br/>let aptos_addr &#61; type_info::type_of&lt;AptosCoin&gt;().account_address;<br/>aborts_if (amount_to_mint !&#61; 0) &amp;&amp; !exists&lt;coin::CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr);<br/>include coin::CoinAddAbortsIf&lt;AptosCoin&gt; &#123; amount: amount_to_mint &#125;;<br/>&#125;<br/></code></pre>
 
 

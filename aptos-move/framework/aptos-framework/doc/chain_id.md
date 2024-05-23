@@ -3,9 +3,7 @@
 
 # Module `0x1::chain_id`
 
-The chain id distinguishes between different chains (e.g., testnet and the main network).
-One important role is to prevent transactions intended for one chain from being executed on another.
-This code provides a container for storing a chain id and functions to initialize and get it.
+The chain id distinguishes between different chains (e.g., testnet and the main network).<br/> One important role is to prevent transactions intended for one chain from being executed on another.<br/> This code provides a container for storing a chain id and functions to initialize and get it.
 
 
 -  [Resource `ChainId`](#0x1_chain_id_ChainId)
@@ -52,8 +50,7 @@ This code provides a container for storing a chain id and functions to initializ
 
 ## Function `initialize`
 
-Only called during genesis.
-Publish the chain ID <code>id</code> of this instance under the SystemAddresses address
+Only called during genesis.<br/> Publish the chain ID <code>id</code> of this instance under the SystemAddresses address
 
 
 <pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, id: u8)<br/></code></pre>
@@ -102,30 +99,15 @@ Return the chain ID of this instance.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>During genesis, the ChainId resource should be created and moved under the Aptos framework account with the specified chain id.</td>
-<td>Medium</td>
-<td>The chain_id::initialize function is responsible for generating the ChainId resource and then storing it under the aptos_framework account.</td>
-<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;During genesis, the ChainId resource should be created and moved under the Aptos framework account with the specified chain id.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The chain_id::initialize function is responsible for generating the ChainId resource and then storing it under the aptos_framework account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The chain id can only be fetched if the chain id resource exists under the Aptos framework account.</td>
-<td>Low</td>
-<td>The chain_id::get function fetches the chain id by borrowing the ChainId resource from the aptos_framework account.</td>
-<td>Formally verified via <a href="#high-level-req-2">get</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The chain id can only be fetched if the chain id resource exists under the Aptos framework account.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The chain_id::get function fetches the chain id by borrowing the ChainId resource from the aptos_framework account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;get&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -147,7 +129,7 @@ Return the chain ID of this instance.
 
 
 
-<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if exists&lt;ChainId&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if exists&lt;ChainId&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 ensures exists&lt;ChainId&gt;(addr);<br/>ensures global&lt;ChainId&gt;(addr).id &#61;&#61; id;<br/></code></pre>
 
 
@@ -162,7 +144,7 @@ ensures exists&lt;ChainId&gt;(addr);<br/>ensures global&lt;ChainId&gt;(addr).id 
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if !exists&lt;ChainId&gt;(@aptos_framework);<br/></code></pre>
 
 

@@ -79,7 +79,7 @@ The package registry at the given address.
 
 ## Struct `PackageMetadata`
 
-Metadata for a package. All byte blobs are represented as base64-of-gzipped-bytes
+Metadata for a package. All byte blobs are represented as base64&#45;of&#45;gzipped&#45;bytes
 
 
 <pre><code>struct PackageMetadata has drop, store<br/></code></pre>
@@ -107,15 +107,13 @@ Metadata for a package. All byte blobs are represented as base64-of-gzipped-byte
 <code>upgrade_number: u64</code>
 </dt>
 <dd>
- The numbers of times this module has been upgraded. Also serves as the on-chain version.
- This field will be automatically assigned on successful upgrade.
+ The numbers of times this module has been upgraded. Also serves as the on&#45;chain version.<br/> This field will be automatically assigned on successful upgrade.
 </dd>
 <dt>
 <code>source_digest: string::String</code>
 </dt>
 <dd>
- The source digest of the sources in the package. This is constructed by first building the
- sha256 of each individual source, than sorting them alphabetically, and sha256 them again.
+ The source digest of the sources in the package. This is constructed by first building the<br/> sha256 of each individual source, than sorting them alphabetically, and sha256 them again.
 </dd>
 <dt>
 <code>manifest: vector&lt;u8&gt;</code>
@@ -310,9 +308,7 @@ A helper type for request_publish_with_allowed_deps
 <code>module_name: string::String</code>
 </dt>
 <dd>
- Name of the module. If this is the empty string, then this serves as a wildcard for
- all modules from this address. This is used for speeding up dependency checking for packages from
- well-known framework addresses, where we can assume that there are no malicious packages.
+ Name of the module. If this is the empty string, then this serves as a wildcard for<br/> all modules from this address. This is used for speeding up dependency checking for packages from<br/> well&#45;known framework addresses, where we can assume that there are no malicious packages.
 </dd>
 </dl>
 
@@ -407,7 +403,7 @@ Cannot upgrade an immutable package
 
 <a id="0x1_code_EUPGRADE_WEAKER_POLICY"></a>
 
-Cannot downgrade a package's upgradability policy
+Cannot downgrade a package&apos;s upgradability policy
 
 
 <pre><code>const EUPGRADE_WEAKER_POLICY: u64 &#61; 3;<br/></code></pre>
@@ -418,10 +414,7 @@ Cannot downgrade a package's upgradability policy
 
 ## Function `upgrade_policy_arbitrary`
 
-Whether unconditional code upgrade with no compatibility check is allowed. This
-publication mode should only be used for modules which aren't shared with user others.
-The developer is responsible for not breaking memory layout of any resources he already
-stored on chain.
+Whether unconditional code upgrade with no compatibility check is allowed. This<br/> publication mode should only be used for modules which aren&apos;t shared with user others.<br/> The developer is responsible for not breaking memory layout of any resources he already<br/> stored on chain.
 
 
 <pre><code>public fun upgrade_policy_arbitrary(): code::UpgradePolicy<br/></code></pre>
@@ -442,8 +435,7 @@ stored on chain.
 
 ## Function `upgrade_policy_compat`
 
-Whether a compatibility check should be performed for upgrades. The check only passes if
-a new module has (a) the same public functions (b) for existing resources, no layout change.
+Whether a compatibility check should be performed for upgrades. The check only passes if<br/> a new module has (a) the same public functions (b) for existing resources, no layout change.
 
 
 <pre><code>public fun upgrade_policy_compat(): code::UpgradePolicy<br/></code></pre>
@@ -485,8 +477,7 @@ Whether the modules in the package are immutable and cannot be upgraded.
 
 ## Function `can_change_upgrade_policy_to`
 
-Whether the upgrade policy can be changed. In general, the policy can be only
-strengthened but not weakened.
+Whether the upgrade policy can be changed. In general, the policy can be only<br/> strengthened but not weakened.
 
 
 <pre><code>public fun can_change_upgrade_policy_to(from: code::UpgradePolicy, to: code::UpgradePolicy): bool<br/></code></pre>
@@ -528,8 +519,7 @@ Initialize package metadata for Genesis.
 
 ## Function `publish_package`
 
-Publishes a package at the given signer's address. The caller must provide package metadata describing the
-package.
+Publishes a package at the given signer&apos;s address. The caller must provide package metadata describing the<br/> package.
 
 
 <pre><code>public fun publish_package(owner: &amp;signer, pack: code::PackageMetadata, code: vector&lt;vector&lt;u8&gt;&gt;)<br/></code></pre>
@@ -570,8 +560,7 @@ package.
 
 ## Function `publish_package_txn`
 
-Same as <code>publish_package</code> but as an entry function which can be called as a transaction. Because
-of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
+Same as <code>publish_package</code> but as an entry function which can be called as a transaction. Because<br/> of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
 
 
 <pre><code>public entry fun publish_package_txn(owner: &amp;signer, metadata_serialized: vector&lt;u8&gt;, code: vector&lt;vector&lt;u8&gt;&gt;)<br/></code></pre>
@@ -613,7 +602,7 @@ Checks whether the given package is upgradable, and returns true if a compatibil
 
 ## Function `check_coexistence`
 
-Checks whether a new package with given names can co-exist with old package.
+Checks whether a new package with given names can co&#45;exist with old package.
 
 
 <pre><code>fun check_coexistence(old_pack: &amp;code::PackageMetadata, new_modules: &amp;vector&lt;string::String&gt;)<br/></code></pre>
@@ -634,9 +623,7 @@ Checks whether a new package with given names can co-exist with old package.
 
 ## Function `check_dependencies`
 
-Check that the upgrade policies of all packages are equal or higher quality than this package. Also
-compute the list of module dependencies which are allowed by the package metadata. The later
-is passed on to the native layer to verify that bytecode dependencies are actually what is pretended here.
+Check that the upgrade policies of all packages are equal or higher quality than this package. Also<br/> compute the list of module dependencies which are allowed by the package metadata. The later<br/> is passed on to the native layer to verify that bytecode dependencies are actually what is pretended here.
 
 
 <pre><code>fun check_dependencies(publish_address: address, pack: &amp;code::PackageMetadata): vector&lt;code::AllowedDep&gt;<br/></code></pre>
@@ -657,9 +644,7 @@ is passed on to the native layer to verify that bytecode dependencies are actual
 
 ## Function `is_policy_exempted_address`
 
-Core addresses which are exempted from the check that their policy matches the referring package. Without
-this exemption, it would not be possible to define an immutable package based on the core system, which
-requires to be upgradable for maintenance and evolution, and is configured to be <code>compatible</code>.
+Core addresses which are exempted from the check that their policy matches the referring package. Without<br/> this exemption, it would not be possible to define an immutable package based on the core system, which<br/> requires to be upgradable for maintenance and evolution, and is configured to be <code>compatible</code>.
 
 
 <pre><code>fun is_policy_exempted_address(addr: address): bool<br/></code></pre>
@@ -750,70 +735,25 @@ Native function to initiate module loading, including a list of allowed dependen
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>Updating a package should fail if the user is not the owner of it.</td>
-<td>Critical</td>
-<td>The publish_package function may only be able to update the package if the signer is the actual owner of the package.</td>
-<td>The Aptos upgrade native functions have been manually audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Updating a package should fail if the user is not the owner of it.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The publish_package function may only be able to update the package if the signer is the actual owner of the package.&lt;/td&gt;<br/>&lt;td&gt;The Aptos upgrade native functions have been manually audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The arbitrary upgrade policy should never be used.</td>
-<td>Critical</td>
-<td>There should never be a pass of an arbitrary upgrade policy to the request_publish native function.</td>
-<td>Manually audited that it aborts if package.upgrade_policy.policy == 0.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The arbitrary upgrade policy should never be used.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;There should never be a pass of an arbitrary upgrade policy to the request_publish native function.&lt;/td&gt;<br/>&lt;td&gt;Manually audited that it aborts if package.upgrade_policy.policy &#61;&#61; 0.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>Should perform accurate compatibility checks when the policy indicates compatibility, ensuring it meets the required conditions.</td>
-<td>Critical</td>
-<td>Specifies if it should perform compatibility checks for upgrades. The check only passes if a new module has (a) the same public functions, and (b) for existing resources, no layout change.</td>
-<td>The Move upgradability patterns have been manually audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Should perform accurate compatibility checks when the policy indicates compatibility, ensuring it meets the required conditions.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;Specifies if it should perform compatibility checks for upgrades. The check only passes if a new module has (a) the same public functions, and (b) for existing resources, no layout change.&lt;/td&gt;<br/>&lt;td&gt;The Move upgradability patterns have been manually audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>Package upgrades should abide by policy change rules. In particular, The new upgrade policy must be equal to or stricter when compared to the old one. The original upgrade policy must not be immutable. The new package must contain all modules contained in the old package.</td>
-<td>Medium</td>
-<td>A package may only be updated using the publish_package function when the check_upgradability function returns true.</td>
-<td>This is audited by a manual review of the check_upgradability patterns.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;Package upgrades should abide by policy change rules. In particular, The new upgrade policy must be equal to or stricter when compared to the old one. The original upgrade policy must not be immutable. The new package must contain all modules contained in the old package.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;A package may only be updated using the publish_package function when the check_upgradability function returns true.&lt;/td&gt;<br/>&lt;td&gt;This is audited by a manual review of the check_upgradability patterns.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>The upgrade policy of a package must not exceed the strictness level imposed by its dependencies.</td>
-<td>Medium</td>
-<td>The upgrade_policy of a package may only be less than its dependencies throughout the upgrades. In addition, the native code properly restricts the use of dependencies outside the passed-in metadata.</td>
-<td>This has been manually audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;The upgrade policy of a package must not exceed the strictness level imposed by its dependencies.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The upgrade_policy of a package may only be less than its dependencies throughout the upgrades. In addition, the native code properly restricts the use of dependencies outside the passed&#45;in metadata.&lt;/td&gt;<br/>&lt;td&gt;This has been manually audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>6</td>
-<td>The extension for package metadata is currently unused.</td>
-<td>Medium</td>
-<td>The extension field in PackageMetadata should be unused.</td>
-<td>Data invariant on the extension field has been manually audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;6&lt;/td&gt;<br/>&lt;td&gt;The extension for package metadata is currently unused.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The extension field in PackageMetadata should be unused.&lt;/td&gt;<br/>&lt;td&gt;Data invariant on the extension field has been manually audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>7</td>
-<td>The upgrade number of a package increases incrementally in a monotonic manner with each subsequent upgrade.</td>
-<td>Low</td>
-<td>On each upgrade of a particular package, the publish_package function updates the upgrade_number for that package.</td>
-<td>Post condition on upgrade_number has been manually audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;7&lt;/td&gt;<br/>&lt;td&gt;The upgrade number of a package increases incrementally in a monotonic manner with each subsequent upgrade.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;On each upgrade of a particular package, the publish_package function updates the upgrade_number for that package.&lt;/td&gt;<br/>&lt;td&gt;Post condition on upgrade_number has been manually audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>

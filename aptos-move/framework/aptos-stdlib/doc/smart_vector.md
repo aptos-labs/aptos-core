@@ -69,9 +69,7 @@
 
 ## Struct `SmartVector`
 
-A Scalable vector implementation based on tables, Ts are grouped into buckets with <code>bucket_size</code>.
-The option wrapping BigVector saves space in the metadata associated with BigVector when smart_vector is
-so small that inline_vec vector can hold all the data.
+A Scalable vector implementation based on tables, Ts are grouped into buckets with <code>bucket_size</code>.<br/> The option wrapping BigVector saves space in the metadata associated with BigVector when smart_vector is<br/> so small that inline_vec vector can hold all the data.
 
 
 <pre><code>struct SmartVector&lt;T&gt; has store<br/></code></pre>
@@ -137,7 +135,7 @@ Cannot pop back from an empty vector
 
 <a id="0x1_smart_vector_EVECTOR_NOT_EMPTY"></a>
 
-Cannot destroy a non-empty vector
+Cannot destroy a non&#45;empty vector
 
 
 <pre><code>const EVECTOR_NOT_EMPTY: u64 &#61; 2;<br/></code></pre>
@@ -166,10 +164,7 @@ The length of the smart vectors are not equal.
 
 ## Function `new`
 
-Regular Vector API
-Create an empty vector using default logic to estimate <code>inline_capacity</code> and <code>bucket_size</code>, which may be
-inaccurate.
-This is exactly the same as empty() but is more standardized as all other data structures have new().
+Regular Vector API<br/> Create an empty vector using default logic to estimate <code>inline_capacity</code> and <code>bucket_size</code>, which may be<br/> inaccurate.<br/> This is exactly the same as empty() but is more standardized as all other data structures have new().
 
 
 <pre><code>public fun new&lt;T: store&gt;(): smart_vector::SmartVector&lt;T&gt;<br/></code></pre>
@@ -190,8 +185,7 @@ This is exactly the same as empty() but is more standardized as all other data s
 
 ## Function `empty`
 
-Create an empty vector using default logic to estimate <code>inline_capacity</code> and <code>bucket_size</code>, which may be
-inaccurate.
+Create an empty vector using default logic to estimate <code>inline_capacity</code> and <code>bucket_size</code>, which may be<br/> inaccurate.
 
 
 <pre><code>&#35;[deprecated]<br/>public fun empty&lt;T: store&gt;(): smart_vector::SmartVector&lt;T&gt;<br/></code></pre>
@@ -212,8 +206,7 @@ inaccurate.
 
 ## Function `empty_with_config`
 
-Create an empty vector with customized config.
-When inline_capacity = 0, SmartVector degrades to a wrapper of BigVector.
+Create an empty vector with customized config.<br/> When inline_capacity &#61; 0, SmartVector degrades to a wrapper of BigVector.
 
 
 <pre><code>public fun empty_with_config&lt;T: store&gt;(inline_capacity: u64, bucket_size: u64): smart_vector::SmartVector&lt;T&gt;<br/></code></pre>
@@ -255,8 +248,7 @@ Create a vector of length 1 containing the passed in T.
 
 ## Function `destroy_empty`
 
-Destroy the vector <code>v</code>.
-Aborts if <code>v</code> is not empty.
+Destroy the vector <code>v</code>.<br/> Aborts if <code>v</code> is not empty.
 
 
 <pre><code>public fun destroy_empty&lt;T&gt;(v: smart_vector::SmartVector&lt;T&gt;)<br/></code></pre>
@@ -319,8 +311,7 @@ Clear a vector completely when T has <code>drop</code>.
 
 ## Function `borrow`
 
-Acquire an immutable reference to the <code>i</code>th T of the vector <code>v</code>.
-Aborts if <code>i</code> is out of bounds.
+Acquire an immutable reference to the <code>i</code>th T of the vector <code>v</code>.<br/> Aborts if <code>i</code> is out of bounds.
 
 
 <pre><code>public fun borrow&lt;T&gt;(v: &amp;smart_vector::SmartVector&lt;T&gt;, i: u64): &amp;T<br/></code></pre>
@@ -341,8 +332,7 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `borrow_mut`
 
-Return a mutable reference to the <code>i</code>th T in the vector <code>v</code>.
-Aborts if <code>i</code> is out of bounds.
+Return a mutable reference to the <code>i</code>th T in the vector <code>v</code>.<br/> Aborts if <code>i</code> is out of bounds.
 
 
 <pre><code>public fun borrow_mut&lt;T&gt;(v: &amp;mut smart_vector::SmartVector&lt;T&gt;, i: u64): &amp;mut T<br/></code></pre>
@@ -363,9 +353,7 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `append`
 
-Empty and destroy the other vector, and push each of the Ts in the other vector onto the lhs vector in the
-same order as they occurred in other.
-Disclaimer: This function may be costly. Use it at your own discretion.
+Empty and destroy the other vector, and push each of the Ts in the other vector onto the lhs vector in the<br/> same order as they occurred in other.<br/> Disclaimer: This function may be costly. Use it at your own discretion.
 
 
 <pre><code>public fun append&lt;T: store&gt;(lhs: &amp;mut smart_vector::SmartVector&lt;T&gt;, other: smart_vector::SmartVector&lt;T&gt;)<br/></code></pre>
@@ -407,9 +395,7 @@ Add multiple values to the vector at once.
 
 ## Function `to_vector`
 
-Convert a smart vector to a native vector, which is supposed to be called mostly by view functions to get an
-atomic view of the whole vector.
-Disclaimer: This function may be costly as the smart vector may be huge in size. Use it at your own discretion.
+Convert a smart vector to a native vector, which is supposed to be called mostly by view functions to get an<br/> atomic view of the whole vector.<br/> Disclaimer: This function may be costly as the smart vector may be huge in size. Use it at your own discretion.
 
 
 <pre><code>public fun to_vector&lt;T: copy, store&gt;(v: &amp;smart_vector::SmartVector&lt;T&gt;): vector&lt;T&gt;<br/></code></pre>
@@ -430,8 +416,7 @@ Disclaimer: This function may be costly as the smart vector may be huge in size.
 
 ## Function `push_back`
 
-Add T <code>val</code> to the end of the vector <code>v</code>. It grows the buckets when the current buckets are full.
-This operation will cost more gas when it adds new bucket.
+Add T <code>val</code> to the end of the vector <code>v</code>. It grows the buckets when the current buckets are full.<br/> This operation will cost more gas when it adds new bucket.
 
 
 <pre><code>public fun push_back&lt;T: store&gt;(v: &amp;mut smart_vector::SmartVector&lt;T&gt;, val: T)<br/></code></pre>
@@ -452,8 +437,7 @@ This operation will cost more gas when it adds new bucket.
 
 ## Function `pop_back`
 
-Pop an T from the end of vector <code>v</code>. It does shrink the buckets if they're empty.
-Aborts if <code>v</code> is empty.
+Pop an T from the end of vector <code>v</code>. It does shrink the buckets if they&apos;re empty.<br/> Aborts if <code>v</code> is empty.
 
 
 <pre><code>public fun pop_back&lt;T&gt;(v: &amp;mut smart_vector::SmartVector&lt;T&gt;): T<br/></code></pre>
@@ -474,9 +458,7 @@ Aborts if <code>v</code> is empty.
 
 ## Function `remove`
 
-Remove the T at index i in the vector v and return the owned value that was previously stored at i in v.
-All Ts occurring at indices greater than i will be shifted down by 1. Will abort if i is out of bounds.
-Disclaimer: This function may be costly. Use it at your own discretion.
+Remove the T at index i in the vector v and return the owned value that was previously stored at i in v.<br/> All Ts occurring at indices greater than i will be shifted down by 1. Will abort if i is out of bounds.<br/> Disclaimer: This function may be costly. Use it at your own discretion.
 
 
 <pre><code>public fun remove&lt;T&gt;(v: &amp;mut smart_vector::SmartVector&lt;T&gt;, i: u64): T<br/></code></pre>
@@ -497,9 +479,7 @@ Disclaimer: This function may be costly. Use it at your own discretion.
 
 ## Function `swap_remove`
 
-Swap the <code>i</code>th T of the vector <code>v</code> with the last T and then pop the vector.
-This is O(1), but does not preserve ordering of Ts in the vector.
-Aborts if <code>i</code> is out of bounds.
+Swap the <code>i</code>th T of the vector <code>v</code> with the last T and then pop the vector.<br/> This is O(1), but does not preserve ordering of Ts in the vector.<br/> Aborts if <code>i</code> is out of bounds.
 
 
 <pre><code>public fun swap_remove&lt;T&gt;(v: &amp;mut smart_vector::SmartVector&lt;T&gt;, i: u64): T<br/></code></pre>
@@ -520,8 +500,7 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `swap`
 
-Swap the Ts at the i'th and j'th indices in the vector v. Will abort if either of i or j are out of bounds
-for v.
+Swap the Ts at the i&apos;th and j&apos;th indices in the vector v. Will abort if either of i or j are out of bounds<br/> for v.
 
 
 <pre><code>public fun swap&lt;T: store&gt;(v: &amp;mut smart_vector::SmartVector&lt;T&gt;, i: u64, j: u64)<br/></code></pre>
@@ -542,8 +521,7 @@ for v.
 
 ## Function `reverse`
 
-Reverse the order of the Ts in the vector v in-place.
-Disclaimer: This function may be costly. Use it at your own discretion.
+Reverse the order of the Ts in the vector v in&#45;place.<br/> Disclaimer: This function may be costly. Use it at your own discretion.
 
 
 <pre><code>public fun reverse&lt;T: store&gt;(v: &amp;mut smart_vector::SmartVector&lt;T&gt;)<br/></code></pre>
@@ -564,9 +542,7 @@ Disclaimer: This function may be costly. Use it at your own discretion.
 
 ## Function `index_of`
 
-Return <code>(true, i)</code> if <code>val</code> is in the vector <code>v</code> at index <code>i</code>.
-Otherwise, returns <code>(false, 0)</code>.
-Disclaimer: This function may be costly. Use it at your own discretion.
+Return <code>(true, i)</code> if <code>val</code> is in the vector <code>v</code> at index <code>i</code>.<br/> Otherwise, returns <code>(false, 0)</code>.<br/> Disclaimer: This function may be costly. Use it at your own discretion.
 
 
 <pre><code>public fun index_of&lt;T&gt;(v: &amp;smart_vector::SmartVector&lt;T&gt;, val: &amp;T): (bool, u64)<br/></code></pre>
@@ -587,8 +563,7 @@ Disclaimer: This function may be costly. Use it at your own discretion.
 
 ## Function `contains`
 
-Return true if <code>val</code> is in the vector <code>v</code>.
-Disclaimer: This function may be costly. Use it at your own discretion.
+Return true if <code>val</code> is in the vector <code>v</code>.<br/> Disclaimer: This function may be costly. Use it at your own discretion.
 
 
 <pre><code>public fun contains&lt;T&gt;(v: &amp;smart_vector::SmartVector&lt;T&gt;, val: &amp;T): bool<br/></code></pre>
@@ -777,8 +752,7 @@ Apply the function to a mutable reference of each T in the vector with its index
 
 ## Function `fold`
 
-Fold the function over the Ts. For example, <code>fold(vector[1,2,3], 0, f)</code> will execute
-<code>f(f(f(0, 1), 2), 3)</code>
+Fold the function over the Ts. For example, <code>fold(vector[1,2,3], 0, f)</code> will execute<br/> <code>f(f(f(0, 1), 2), 3)</code>
 
 
 <pre><code>public fun fold&lt;Accumulator, T: store&gt;(v: smart_vector::SmartVector&lt;T&gt;, init: Accumulator, f: &#124;(Accumulator, T)&#124;Accumulator): Accumulator<br/></code></pre>
@@ -799,8 +773,7 @@ Fold the function over the Ts. For example, <code>fold(vector[1,2,3], 0, f)</cod
 
 ## Function `foldr`
 
-Fold right like fold above but working right to left. For example, <code>fold(vector[1,2,3], 0, f)</code> will execute
-<code>f(1, f(2, f(3, 0)))</code>
+Fold right like fold above but working right to left. For example, <code>fold(vector[1,2,3], 0, f)</code> will execute<br/> <code>f(1, f(2, f(3, 0)))</code>
 
 
 <pre><code>public fun foldr&lt;Accumulator, T&gt;(v: smart_vector::SmartVector&lt;T&gt;, init: Accumulator, f: &#124;(T, Accumulator)&#124;Accumulator): Accumulator<br/></code></pre>
@@ -821,8 +794,7 @@ Fold right like fold above but working right to left. For example, <code>fold(ve
 
 ## Function `map_ref`
 
-Map the function over the references of the Ts of the vector, producing a new vector without modifying the
-original vector.
+Map the function over the references of the Ts of the vector, producing a new vector without modifying the<br/> original vector.
 
 
 <pre><code>public fun map_ref&lt;T1, T2: store&gt;(v: &amp;smart_vector::SmartVector&lt;T1&gt;, f: &#124;&amp;T1&#124;T2): smart_vector::SmartVector&lt;T2&gt;<br/></code></pre>
@@ -905,8 +877,7 @@ Filter the vector using the boolean function, removing all Ts for which <code>p(
 
 ## Function `zip_reverse`
 
-Apply the function to each pair of elements in the two given vectors in the reverse order, consuming them.
-This errors out if the vectors are not of the same length.
+Apply the function to each pair of elements in the two given vectors in the reverse order, consuming them.<br/> This errors out if the vectors are not of the same length.
 
 
 <pre><code>public fun zip_reverse&lt;T1, T2&gt;(v1: smart_vector::SmartVector&lt;T1&gt;, v2: smart_vector::SmartVector&lt;T2&gt;, f: &#124;(T1, T2)&#124;)<br/></code></pre>
@@ -927,8 +898,7 @@ This errors out if the vectors are not of the same length.
 
 ## Function `zip_ref`
 
-Apply the function to the references of each pair of elements in the two given vectors.
-This errors out if the vectors are not of the same length.
+Apply the function to the references of each pair of elements in the two given vectors.<br/> This errors out if the vectors are not of the same length.
 
 
 <pre><code>public fun zip_ref&lt;T1, T2&gt;(v1: &amp;smart_vector::SmartVector&lt;T1&gt;, v2: &amp;smart_vector::SmartVector&lt;T2&gt;, f: &#124;(&amp;T1, &amp;T2)&#124;)<br/></code></pre>
@@ -949,8 +919,7 @@ This errors out if the vectors are not of the same length.
 
 ## Function `zip_mut`
 
-Apply the function to mutable references to each pair of elements in the two given vectors.
-This errors out if the vectors are not of the same length.
+Apply the function to mutable references to each pair of elements in the two given vectors.<br/> This errors out if the vectors are not of the same length.
 
 
 <pre><code>public fun zip_mut&lt;T1, T2&gt;(v1: &amp;mut smart_vector::SmartVector&lt;T1&gt;, v2: &amp;mut smart_vector::SmartVector&lt;T2&gt;, f: &#124;(&amp;mut T1, &amp;mut T2)&#124;)<br/></code></pre>
@@ -992,8 +961,7 @@ Map the function over the element pairs of the two vectors, producing a new vect
 
 ## Function `zip_map_ref`
 
-Map the function over the references of the element pairs of two vectors, producing a new vector from the return
-values without modifying the original vectors.
+Map the function over the references of the element pairs of two vectors, producing a new vector from the return<br/> values without modifying the original vectors.
 
 
 <pre><code>public fun zip_map_ref&lt;T1, T2, NewT: store&gt;(v1: &amp;smart_vector::SmartVector&lt;T1&gt;, v2: &amp;smart_vector::SmartVector&lt;T2&gt;, f: &#124;(&amp;T1, &amp;T2)&#124;NewT): smart_vector::SmartVector&lt;NewT&gt;<br/></code></pre>

@@ -3,14 +3,7 @@
 
 # Module `0x1::aptos_hash`
 
-Cryptographic hashes:
-- Keccak-256: see https://keccak.team/keccak.html
-
-In addition, SHA2-256 and SHA3-256 are available in <code>std::hash</code>. Note that SHA3-256 is a variant of Keccak: it is
-NOT the same as Keccak-256.
-
-Non-cryptograhic hashes:
-- SipHash: an add-rotate-xor (ARX) based family of pseudorandom functions created by Jean-Philippe Aumasson and Daniel J. Bernstein in 2012
+Cryptographic hashes:<br/> &#45; Keccak&#45;256: see https://keccak.team/keccak.html<br/><br/> In addition, SHA2&#45;256 and SHA3&#45;256 are available in <code>std::hash</code>. Note that SHA3&#45;256 is a variant of Keccak: it is<br/> NOT the same as Keccak&#45;256.<br/><br/> Non&#45;cryptograhic hashes:<br/> &#45; SipHash: an add&#45;rotate&#45;xor (ARX) based family of pseudorandom functions created by Jean&#45;Philippe Aumasson and Daniel J. Bernstein in 2012
 
 
 -  [Constants](#@Constants_0)
@@ -50,7 +43,7 @@ Non-cryptograhic hashes:
 
 <a id="0x1_aptos_hash_E_NATIVE_FUN_NOT_AVAILABLE"></a>
 
-A newly-added native function is not yet enabled.
+A newly&#45;added native function is not yet enabled.
 
 
 <pre><code>const E_NATIVE_FUN_NOT_AVAILABLE: u64 &#61; 1;<br/></code></pre>
@@ -61,7 +54,7 @@ A newly-added native function is not yet enabled.
 
 ## Function `sip_hash`
 
-Returns the (non-cryptographic) SipHash of <code>bytes</code>. See https://en.wikipedia.org/wiki/SipHash
+Returns the (non&#45;cryptographic) SipHash of <code>bytes</code>. See https://en.wikipedia.org/wiki/SipHash
 
 
 <pre><code>public fun sip_hash(bytes: vector&lt;u8&gt;): u64<br/></code></pre>
@@ -82,7 +75,7 @@ Returns the (non-cryptographic) SipHash of <code>bytes</code>. See https://en.wi
 
 ## Function `sip_hash_from_value`
 
-Returns the (non-cryptographic) SipHash of the BCS serialization of <code>v</code>. See https://en.wikipedia.org/wiki/SipHash
+Returns the (non&#45;cryptographic) SipHash of the BCS serialization of <code>v</code>. See https://en.wikipedia.org/wiki/SipHash
 
 
 <pre><code>public fun sip_hash_from_value&lt;MoveValue&gt;(v: &amp;MoveValue): u64<br/></code></pre>
@@ -103,7 +96,7 @@ Returns the (non-cryptographic) SipHash of the BCS serialization of <code>v</cod
 
 ## Function `keccak256`
 
-Returns the Keccak-256 hash of <code>bytes</code>.
+Returns the Keccak&#45;256 hash of <code>bytes</code>.
 
 
 <pre><code>public fun keccak256(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;<br/></code></pre>
@@ -124,7 +117,7 @@ Returns the Keccak-256 hash of <code>bytes</code>.
 
 ## Function `sha2_512`
 
-Returns the SHA2-512 hash of <code>bytes</code>.
+Returns the SHA2&#45;512 hash of <code>bytes</code>.
 
 
 <pre><code>public fun sha2_512(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;<br/></code></pre>
@@ -145,7 +138,7 @@ Returns the SHA2-512 hash of <code>bytes</code>.
 
 ## Function `sha3_512`
 
-Returns the SHA3-512 hash of <code>bytes</code>.
+Returns the SHA3&#45;512 hash of <code>bytes</code>.
 
 
 <pre><code>public fun sha3_512(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;<br/></code></pre>
@@ -166,10 +159,7 @@ Returns the SHA3-512 hash of <code>bytes</code>.
 
 ## Function `ripemd160`
 
-Returns the RIPEMD-160 hash of <code>bytes</code>.
-
-WARNING: Only 80-bit security is provided by this function. This means an adversary who can compute roughly 2^80
-hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD-160(x_1) = RIPEMD-160(x_2).
+Returns the RIPEMD&#45;160 hash of <code>bytes</code>.<br/><br/> WARNING: Only 80&#45;bit security is provided by this function. This means an adversary who can compute roughly 2^80<br/> hashes will, with high probability, find a collision x_1 !&#61; x_2 such that RIPEMD&#45;160(x_1) &#61; RIPEMD&#45;160(x_2).
 
 
 <pre><code>public fun ripemd160(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;<br/></code></pre>
@@ -190,7 +180,7 @@ hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD
 
 ## Function `blake2b_256`
 
-Returns the BLAKE2B-256 hash of <code>bytes</code>.
+Returns the BLAKE2B&#45;256 hash of <code>bytes</code>.
 
 
 <pre><code>public fun blake2b_256(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;<br/></code></pre>
@@ -211,7 +201,7 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 
 ## Function `sha2_512_internal`
 
-Returns the SHA2-512 hash of <code>bytes</code>.
+Returns the SHA2&#45;512 hash of <code>bytes</code>.
 
 
 <pre><code>fun sha2_512_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;<br/></code></pre>
@@ -232,7 +222,7 @@ Returns the SHA2-512 hash of <code>bytes</code>.
 
 ## Function `sha3_512_internal`
 
-Returns the SHA3-512 hash of <code>bytes</code>.
+Returns the SHA3&#45;512 hash of <code>bytes</code>.
 
 
 <pre><code>fun sha3_512_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;<br/></code></pre>
@@ -253,10 +243,7 @@ Returns the SHA3-512 hash of <code>bytes</code>.
 
 ## Function `ripemd160_internal`
 
-Returns the RIPEMD-160 hash of <code>bytes</code>.
-
-WARNING: Only 80-bit security is provided by this function. This means an adversary who can compute roughly 2^80
-hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD-160(x_1) = RIPEMD-160(x_2).
+Returns the RIPEMD&#45;160 hash of <code>bytes</code>.<br/><br/> WARNING: Only 80&#45;bit security is provided by this function. This means an adversary who can compute roughly 2^80<br/> hashes will, with high probability, find a collision x_1 !&#61; x_2 such that RIPEMD&#45;160(x_1) &#61; RIPEMD&#45;160(x_2).
 
 
 <pre><code>fun ripemd160_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;<br/></code></pre>
@@ -277,7 +264,7 @@ hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD
 
 ## Function `blake2b_256_internal`
 
-Returns the BLAKE2B-256 hash of <code>bytes</code>.
+Returns the BLAKE2B&#45;256 hash of <code>bytes</code>.
 
 
 <pre><code>fun blake2b_256_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;<br/></code></pre>

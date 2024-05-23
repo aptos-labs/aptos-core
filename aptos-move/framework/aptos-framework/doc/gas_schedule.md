@@ -3,8 +3,7 @@
 
 # Module `0x1::gas_schedule`
 
-This module defines structs and methods to initialize the gas schedule, which dictates how much
-it costs to execute Move on the network.
+This module defines structs and methods to initialize the gas schedule, which dictates how much<br/> it costs to execute Move on the network.
 
 
 -  [Struct `GasEntry`](#0x1_gas_schedule_GasEntry)
@@ -169,11 +168,7 @@ Only called during genesis.
 
 ## Function `set_gas_schedule`
 
-Deprecated by <code>set_for_next_epoch()</code>.
-
-WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
-
-TODO: update all the tests that reference this function, then disable this function.
+Deprecated by <code>set_for_next_epoch()</code>.<br/><br/> WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!<br/><br/> TODO: update all the tests that reference this function, then disable this function.
 
 
 <pre><code>public fun set_gas_schedule(aptos_framework: &amp;signer, gas_schedule_blob: vector&lt;u8&gt;)<br/></code></pre>
@@ -194,14 +189,7 @@ TODO: update all the tests that reference this function, then disable this funct
 
 ## Function `set_for_next_epoch`
 
-Set the gas schedule for the next epoch, typically called by on-chain governance.
-Abort if the version of the given schedule is lower than the current version.
-
-Example usage:
-```
-aptos_framework::gas_schedule::set_for_next_epoch(&framework_signer, some_gas_schedule_blob);
-aptos_framework::aptos_governance::reconfigure(&framework_signer);
-```
+Set the gas schedule for the next epoch, typically called by on&#45;chain governance.<br/> Abort if the version of the given schedule is lower than the current version.<br/><br/> Example usage:<br/> ```<br/> aptos_framework::gas_schedule::set_for_next_epoch(&amp;framework_signer, some_gas_schedule_blob);<br/> aptos_framework::aptos_governance::reconfigure(&amp;framework_signer);<br/> ```
 
 
 <pre><code>public fun set_for_next_epoch(aptos_framework: &amp;signer, gas_schedule_blob: vector&lt;u8&gt;)<br/></code></pre>
@@ -290,46 +278,19 @@ Only used in reconfigurations to apply the pending <code>GasScheduleV2</code>, i
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>During genesis, the Aptos framework account should be assigned the gas schedule resource.</td>
-<td>Medium</td>
-<td>The gas_schedule::initialize function calls the assert_aptos_framework function to ensure that the signer is the aptos_framework and then assigns the GasScheduleV2 resource to it.</td>
-<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;During genesis, the Aptos framework account should be assigned the gas schedule resource.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The gas_schedule::initialize function calls the assert_aptos_framework function to ensure that the signer is the aptos_framework and then assigns the GasScheduleV2 resource to it.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>Only the Aptos framework account should be allowed to update the gas schedule resource.</td>
-<td>Critical</td>
-<td>The gas_schedule::set_gas_schedule function calls the assert_aptos_framework function to ensure that the signer is the aptos framework account.</td>
-<td>Formally verified via <a href="#high-level-req-2">set_gas_schedule</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;Only the Aptos framework account should be allowed to update the gas schedule resource.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The gas_schedule::set_gas_schedule function calls the assert_aptos_framework function to ensure that the signer is the aptos framework account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;set_gas_schedule&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>Only valid gas schedule should be allowed for initialization and update.</td>
-<td>Medium</td>
-<td>The initialize and set_gas_schedule functions ensures that the gas_schedule_blob is not empty.</td>
-<td>Formally verified via <a href="#high-level-req-3.3">initialize</a> and <a href="#high-level-req-3.2">set_gas_schedule</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Only valid gas schedule should be allowed for initialization and update.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The initialize and set_gas_schedule functions ensures that the gas_schedule_blob is not empty.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3.3&quot;&gt;initialize&lt;/a&gt; and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3.2&quot;&gt;set_gas_schedule&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>Only a gas schedule with the feature version greater or equal than the current feature version is allowed to be provided when performing an update operation.</td>
-<td>Medium</td>
-<td>The set_gas_schedule function validates the feature_version of the new_gas_schedule by ensuring that it is greater or equal than the current gas_schedule.feature_version.</td>
-<td>Formally verified via <a href="#high-level-req-4">set_gas_schedule</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;Only a gas schedule with the feature version greater or equal than the current feature version is allowed to be provided when performing an update operation.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The set_gas_schedule function validates the feature_version of the new_gas_schedule by ensuring that it is greater or equal than the current gas_schedule.feature_version.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;set_gas_schedule&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -351,8 +312,8 @@ Only used in reconfigurations to apply the pending <code>GasScheduleV2</code>, i
 
 
 
-<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-include system_addresses::AbortsIfNotAptosFramework&#123; account: aptos_framework &#125;;<br/>// This enforces <a id="high-level-req-3.3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
+include system_addresses::AbortsIfNotAptosFramework&#123; account: aptos_framework &#125;;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 aborts_if len(gas_schedule_blob) &#61;&#61; 0;<br/>aborts_if exists&lt;GasScheduleV2&gt;(addr);<br/>ensures exists&lt;GasScheduleV2&gt;(addr);<br/></code></pre>
 
 
@@ -367,9 +328,9 @@ aborts_if len(gas_schedule_blob) &#61;&#61; 0;<br/>aborts_if exists&lt;GasSchedu
 
 
 
-<pre><code>pragma verify_duration_estimate &#61; 600;<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br/>requires chain_status::is_genesis();<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>include staking_config::StakingRewardsConfigRequirement;<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-include system_addresses::AbortsIfNotAptosFramework&#123; account: aptos_framework &#125;;<br/>// This enforces <a id="high-level-req-3.2" href="#high-level-req">high-level requirement 3</a>:
-aborts_if len(gas_schedule_blob) &#61;&#61; 0;<br/>let new_gas_schedule &#61; util::spec_from_bytes&lt;GasScheduleV2&gt;(gas_schedule_blob);<br/>let gas_schedule &#61; global&lt;GasScheduleV2&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<pre><code>pragma verify_duration_estimate &#61; 600;<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br/>requires chain_status::is_genesis();<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>include staking_config::StakingRewardsConfigRequirement;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
+include system_addresses::AbortsIfNotAptosFramework&#123; account: aptos_framework &#125;;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
+aborts_if len(gas_schedule_blob) &#61;&#61; 0;<br/>let new_gas_schedule &#61; util::spec_from_bytes&lt;GasScheduleV2&gt;(gas_schedule_blob);<br/>let gas_schedule &#61; global&lt;GasScheduleV2&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
 aborts_if exists&lt;GasScheduleV2&gt;(@aptos_framework) &amp;&amp; new_gas_schedule.feature_version &lt; gas_schedule.feature_version;<br/>ensures exists&lt;GasScheduleV2&gt;(signer::address_of(aptos_framework));<br/>ensures global&lt;GasScheduleV2&gt;(@aptos_framework) &#61;&#61; new_gas_schedule;<br/></code></pre>
 
 

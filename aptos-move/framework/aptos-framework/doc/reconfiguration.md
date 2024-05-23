@@ -3,8 +3,7 @@
 
 # Module `0x1::reconfiguration`
 
-Publishes configuration information for validators, and issues reconfiguration events
-to synchronize configuration changes for the validators.
+Publishes configuration information for validators, and issues reconfiguration events<br/> to synchronize configuration changes for the validators.
 
 
 -  [Struct `NewEpochEvent`](#0x1_reconfiguration_NewEpochEvent)
@@ -41,9 +40,7 @@ to synchronize configuration changes for the validators.
 
 ## Struct `NewEpochEvent`
 
-Event that signals consensus to start a new epoch,
-with new configuration information. This is also called a
-"reconfiguration event"
+Event that signals consensus to start a new epoch,<br/> with new configuration information. This is also called a<br/> &quot;reconfiguration event&quot;
 
 
 <pre><code>&#35;[event]<br/>struct NewEpochEvent has drop, store<br/></code></pre>
@@ -70,9 +67,7 @@ with new configuration information. This is also called a
 
 ## Struct `NewEpoch`
 
-Event that signals consensus to start a new epoch,
-with new configuration information. This is also called a
-"reconfiguration event"
+Event that signals consensus to start a new epoch,<br/> with new configuration information. This is also called a<br/> &quot;reconfiguration event&quot;
 
 
 <pre><code>&#35;[event]<br/>struct NewEpoch has drop, store<br/></code></pre>
@@ -138,8 +133,7 @@ Holds information about state of reconfiguration
 
 ## Resource `DisableReconfiguration`
 
-Reconfiguration will be disabled if this resource is published under the
-aptos_framework system address
+Reconfiguration will be disabled if this resource is published under the<br/> aptos_framework system address
 
 
 <pre><code>struct DisableReconfiguration has key<br/></code></pre>
@@ -216,8 +210,7 @@ A <code>ModifyConfigCapability</code> is in a different state than was expected
 
 ## Function `initialize`
 
-Only called during genesis.
-Publishes <code>Configuration</code> resource. Can only be invoked by aptos framework account, and only a single time in Genesis.
+Only called during genesis.<br/> Publishes <code>Configuration</code> resource. Can only be invoked by aptos framework account, and only a single time in Genesis.
 
 
 <pre><code>public(friend) fun initialize(aptos_framework: &amp;signer)<br/></code></pre>
@@ -238,8 +231,7 @@ Publishes <code>Configuration</code> resource. Can only be invoked by aptos fram
 
 ## Function `disable_reconfiguration`
 
-Private function to temporarily halt reconfiguration.
-This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
+Private function to temporarily halt reconfiguration.<br/> This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
 
 
 <pre><code>fun disable_reconfiguration(aptos_framework: &amp;signer)<br/></code></pre>
@@ -260,8 +252,7 @@ This function should only be used for offline WriteSet generation purpose and sh
 
 ## Function `enable_reconfiguration`
 
-Private function to resume reconfiguration.
-This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
+Private function to resume reconfiguration.<br/> This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
 
 
 <pre><code>fun enable_reconfiguration(aptos_framework: &amp;signer)<br/></code></pre>
@@ -363,8 +354,7 @@ Signal validators to start using new configuration. Must be called from friend c
 
 ## Function `emit_genesis_reconfiguration_event`
 
-Emit a <code>NewEpochEvent</code> event. This function will be invoked by genesis directly to generate the very first
-reconfiguration event.
+Emit a <code>NewEpochEvent</code> event. This function will be invoked by genesis directly to generate the very first<br/> reconfiguration event.
 
 
 <pre><code>fun emit_genesis_reconfiguration_event()<br/></code></pre>
@@ -392,54 +382,21 @@ reconfiguration event.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>The Configuration resource is stored under the Aptos framework account with initial values upon module's initialization.</td>
-<td>Medium</td>
-<td>The Configuration resource may only be initialized with specific values and published under the aptos_framework account.</td>
-<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The Configuration resource is stored under the Aptos framework account with initial values upon module&apos;s initialization.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The Configuration resource may only be initialized with specific values and published under the aptos_framework account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The reconfiguration status may be determined at any time without causing an abort, indicating whether or not the system allows reconfiguration.</td>
-<td>Low</td>
-<td>The reconfiguration_enabled function will never abort and always returns a boolean value that accurately represents whether the system allows reconfiguration.</td>
-<td>Formally verified via <a href="#high-level-req-2">reconfiguration_enabled</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The reconfiguration status may be determined at any time without causing an abort, indicating whether or not the system allows reconfiguration.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The reconfiguration_enabled function will never abort and always returns a boolean value that accurately represents whether the system allows reconfiguration.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;reconfiguration_enabled&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>For each reconfiguration, the epoch value (config_ref.epoch) increases by 1, and one 'NewEpochEvent' is emitted.</td>
-<td>Critical</td>
-<td>After reconfiguration, the reconfigure() function increases the epoch value of the configuration by one and increments the counter of the NewEpochEvent's EventHandle by one.</td>
-<td>Audited that these two values remain in sync.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;For each reconfiguration, the epoch value (config_ref.epoch) increases by 1, and one &apos;NewEpochEvent&apos; is emitted.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;After reconfiguration, the reconfigure() function increases the epoch value of the configuration by one and increments the counter of the NewEpochEvent&apos;s EventHandle by one.&lt;/td&gt;<br/>&lt;td&gt;Audited that these two values remain in sync.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>Reconfiguration is possible only if genesis has started and reconfiguration is enabled. Also, the last reconfiguration must not be the current time, returning early without further actions otherwise.</td>
-<td>High</td>
-<td>The reconfigure() function may only execute to perform successful reconfiguration when genesis has started and when reconfiguration is enabled. Without satisfying both conditions, the function returns early without executing any further actions.</td>
-<td>Formally verified via <a href="#high-level-req-4">reconfigure</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;Reconfiguration is possible only if genesis has started and reconfiguration is enabled. Also, the last reconfiguration must not be the current time, returning early without further actions otherwise.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The reconfigure() function may only execute to perform successful reconfiguration when genesis has started and when reconfiguration is enabled. Without satisfying both conditions, the function returns early without executing any further actions.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;reconfigure&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>Consecutive reconfigurations without the passage of time are not permitted.</td>
-<td>High</td>
-<td>The reconfigure() function enforces the restriction that reconfiguration may only be performed when the current time is not equal to the last_reconfiguration_time.</td>
-<td>Formally verified via <a href="#high-level-req-5">reconfigure</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;Consecutive reconfigurations without the passage of time are not permitted.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The reconfigure() function enforces the restriction that reconfiguration may only be performed when the current time is not equal to the last_reconfiguration_time.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5&quot;&gt;reconfigure&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -468,12 +425,10 @@ Make sure the signer address is @aptos_framework.
 <pre><code>public(friend) fun initialize(aptos_framework: &amp;signer)<br/></code></pre>
 
 
-Address @aptos_framework must exist resource Account and Configuration.
-Already exists in framework account.
-Guid_creation_num should be 2 according to logic.
+Address @aptos_framework must exist resource Account and Configuration.<br/> Already exists in framework account.<br/> Guid_creation_num should be 2 according to logic.
 
 
-<pre><code>include AbortsIfNotAptosFramework;<br/>let addr &#61; signer::address_of(aptos_framework);<br/>let post config &#61; global&lt;Configuration&gt;(@aptos_framework);<br/>requires exists&lt;Account&gt;(addr);<br/>aborts_if !(global&lt;Account&gt;(addr).guid_creation_num &#61;&#61; 2);<br/>aborts_if exists&lt;Configuration&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>include AbortsIfNotAptosFramework;<br/>let addr &#61; signer::address_of(aptos_framework);<br/>let post config &#61; global&lt;Configuration&gt;(@aptos_framework);<br/>requires exists&lt;Account&gt;(addr);<br/>aborts_if !(global&lt;Account&gt;(addr).guid_creation_num &#61;&#61; 2);<br/>aborts_if exists&lt;Configuration&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 ensures exists&lt;Configuration&gt;(@aptos_framework);<br/>ensures config.epoch &#61;&#61; 0 &amp;&amp; config.last_reconfiguration_time &#61;&#61; 0;<br/>ensures config.events &#61;&#61; event::EventHandle&lt;NewEpochEvent&gt; &#123;<br/>    counter: 0,<br/>    guid: guid::GUID &#123;<br/>        id: guid::ID &#123;<br/>            creation_num: 2,<br/>            addr: @aptos_framework<br/>        &#125;<br/>    &#125;<br/>&#125;;<br/></code></pre>
 
 
@@ -517,7 +472,7 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if false;<br/>ensures result &#61;&#61; !exists&lt;DisableReconfiguration&gt;(@aptos_framework);<br/></code></pre>
 
 
@@ -532,7 +487,7 @@ aborts_if false;<br/>ensures result &#61;&#61; !exists&lt;DisableReconfiguration
 
 
 
-<pre><code>pragma verify &#61; true;<br/>pragma verify_duration_estimate &#61; 600;<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>let success &#61; !(chain_status::is_genesis() &#124;&#124; timestamp::spec_now_microseconds() &#61;&#61; 0 &#124;&#124; !reconfiguration_enabled())<br/>    &amp;&amp; timestamp::spec_now_microseconds() !&#61; global&lt;Configuration&gt;(@aptos_framework).last_reconfiguration_time;<br/>include features::spec_periodical_reward_rate_decrease_enabled() &#61;&#61;&gt; staking_config::StakingRewardsConfigEnabledRequirement;<br/>include success &#61;&#61;&gt; aptos_coin::ExistsAptosCoin;<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>aborts_if false;<br/>ensures success &#61;&#61;&gt; global&lt;Configuration&gt;(@aptos_framework).epoch &#61;&#61; old(global&lt;Configuration&gt;(@aptos_framework).epoch) &#43; 1;<br/>ensures success &#61;&#61;&gt; global&lt;Configuration&gt;(@aptos_framework).last_reconfiguration_time &#61;&#61; timestamp::spec_now_microseconds();<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a> and <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
+<pre><code>pragma verify &#61; true;<br/>pragma verify_duration_estimate &#61; 600;<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>let success &#61; !(chain_status::is_genesis() &#124;&#124; timestamp::spec_now_microseconds() &#61;&#61; 0 &#124;&#124; !reconfiguration_enabled())<br/>    &amp;&amp; timestamp::spec_now_microseconds() !&#61; global&lt;Configuration&gt;(@aptos_framework).last_reconfiguration_time;<br/>include features::spec_periodical_reward_rate_decrease_enabled() &#61;&#61;&gt; staking_config::StakingRewardsConfigEnabledRequirement;<br/>include success &#61;&#61;&gt; aptos_coin::ExistsAptosCoin;<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>aborts_if false;<br/>ensures success &#61;&#61;&gt; global&lt;Configuration&gt;(@aptos_framework).epoch &#61;&#61; old(global&lt;Configuration&gt;(@aptos_framework).epoch) &#43; 1;<br/>ensures success &#61;&#61;&gt; global&lt;Configuration&gt;(@aptos_framework).last_reconfiguration_time &#61;&#61; timestamp::spec_now_microseconds();<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt; and &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt;:
 ensures !success &#61;&#61;&gt; global&lt;Configuration&gt;(@aptos_framework).epoch &#61;&#61; old(global&lt;Configuration&gt;(@aptos_framework).epoch);<br/></code></pre>
 
 
@@ -573,8 +528,7 @@ ensures !success &#61;&#61;&gt; global&lt;Configuration&gt;(@aptos_framework).ep
 <pre><code>fun emit_genesis_reconfiguration_event()<br/></code></pre>
 
 
-When genesis_event emit the epoch and the <code>last_reconfiguration_time</code> .
-Should equal to 0
+When genesis_event emit the epoch and the <code>last_reconfiguration_time</code> .<br/> Should equal to 0
 
 
 <pre><code>aborts_if !exists&lt;Configuration&gt;(@aptos_framework);<br/>let config_ref &#61; global&lt;Configuration&gt;(@aptos_framework);<br/>aborts_if !(config_ref.epoch &#61;&#61; 0 &amp;&amp; config_ref.last_reconfiguration_time &#61;&#61; 0);<br/>ensures global&lt;Configuration&gt;(@aptos_framework).epoch &#61;&#61; 1;<br/></code></pre>

@@ -45,10 +45,7 @@ The configuration of the JWK consensus feature.
 <code>variant: copyable_any::Any</code>
 </dt>
 <dd>
- A config variant packed as an <code>Any</code>.
- Currently the variant type is one of the following.
- - <code>ConfigOff</code>
- - <code>ConfigV1</code>
+ A config variant packed as an <code>Any</code>.<br/> Currently the variant type is one of the following.<br/> &#45; <code>ConfigOff</code><br/> &#45; <code>ConfigV1</code>
 </dd>
 </dl>
 
@@ -180,16 +177,7 @@ Initialize the configuration. Used in genesis or governance.
 
 ## Function `set_for_next_epoch`
 
-This can be called by on-chain governance to update JWK consensus configs for the next epoch.
-Example usage:
-```
-use aptos_framework::jwk_consensus_config;
-use aptos_framework::aptos_governance;
-// ...
-let config = jwk_consensus_config::new_v1(vector[]);
-jwk_consensus_config::set_for_next_epoch(&framework_signer, config);
-aptos_governance::reconfigure(&framework_signer);
-```
+This can be called by on&#45;chain governance to update JWK consensus configs for the next epoch.<br/> Example usage:<br/> ```<br/> use aptos_framework::jwk_consensus_config;<br/> use aptos_framework::aptos_governance;<br/> // ...<br/> let config &#61; jwk_consensus_config::new_v1(vector[]);<br/> jwk_consensus_config::set_for_next_epoch(&amp;framework_signer, config);<br/> aptos_governance::reconfigure(&amp;framework_signer);<br/> ```
 
 
 <pre><code>public fun set_for_next_epoch(framework: &amp;signer, config: jwk_consensus_config::JWKConsensusConfig)<br/></code></pre>
@@ -252,9 +240,7 @@ Construct a <code>JWKConsensusConfig</code> of variant <code>ConfigOff</code>.
 
 ## Function `new_v1`
 
-Construct a <code>JWKConsensusConfig</code> of variant <code>ConfigV1</code>.
-
-Abort if the given provider list contains duplicated provider names.
+Construct a <code>JWKConsensusConfig</code> of variant <code>ConfigV1</code>.<br/><br/> Abort if the given provider list contains duplicated provider names.
 
 
 <pre><code>public fun new_v1(oidc_providers: vector&lt;jwk_consensus_config::OIDCProvider&gt;): jwk_consensus_config::JWKConsensusConfig<br/></code></pre>

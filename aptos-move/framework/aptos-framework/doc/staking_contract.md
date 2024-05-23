@@ -3,32 +3,7 @@
 
 # Module `0x1::staking_contract`
 
-Allow stakers and operators to enter a staking contract with reward sharing.
-The main accounting logic in a staking contract consists of 2 parts:
-1. Tracks how much commission needs to be paid out to the operator. This is tracked with an increasing principal
-amount that's updated every time the operator requests commission, the staker withdraws funds, or the staker
-switches operators.
-2. Distributions of funds to operators (commissions) and stakers (stake withdrawals) use the shares model provided
-by the pool_u64 to track shares that increase in price as the stake pool accumulates rewards.
-
-Example flow:
-1. A staker creates a staking contract with an operator by calling create_staking_contract() with 100 coins of
-initial stake and commission = 10%. This means the operator will receive 10% of any accumulated rewards. A new stake
-pool will be created and hosted in a separate account that's controlled by the staking contract.
-2. The operator sets up a validator node and, once ready, joins the validator set by calling stake::join_validator_set
-3. After some time, the stake pool gains rewards and now has 150 coins.
-4. Operator can now call request_commission. 10% of (150 - 100) = 5 coins will be unlocked from the stake pool. The
-staker's principal is now updated from 100 to 145 (150 coins - 5 coins of commission). The pending distribution pool
-has 5 coins total and the operator owns all 5 shares of it.
-5. Some more time has passed. The pool now has 50 more coins in rewards and a total balance of 195. The operator
-calls request_commission again. Since the previous 5 coins have now become withdrawable, it'll be deposited into the
-operator's account first. Their new commission will be 10% of (195 coins - 145 principal) = 5 coins. Principal is
-updated to be 190 (195 - 5). Pending distribution pool has 5 coins and operator owns all 5 shares.
-6. Staker calls unlock_stake to unlock 50 coins of stake, which gets added to the pending distribution pool. Based
-on shares math, staker will be owning 50 shares and operator still owns 5 shares of the 55-coin pending distribution
-pool.
-7. Some time passes and the 55 coins become fully withdrawable from the stake pool. Due to accumulated rewards, the
-55 coins become 70 coins. Calling distribute() distributes 6 coins to the operator and 64 coins to the validator.
+Allow stakers and operators to enter a staking contract with reward sharing.<br/> The main accounting logic in a staking contract consists of 2 parts:<br/> 1. Tracks how much commission needs to be paid out to the operator. This is tracked with an increasing principal<br/> amount that&apos;s updated every time the operator requests commission, the staker withdraws funds, or the staker<br/> switches operators.<br/> 2. Distributions of funds to operators (commissions) and stakers (stake withdrawals) use the shares model provided<br/> by the pool_u64 to track shares that increase in price as the stake pool accumulates rewards.<br/><br/> Example flow:<br/> 1. A staker creates a staking contract with an operator by calling create_staking_contract() with 100 coins of<br/> initial stake and commission &#61; 10%. This means the operator will receive 10% of any accumulated rewards. A new stake<br/> pool will be created and hosted in a separate account that&apos;s controlled by the staking contract.<br/> 2. The operator sets up a validator node and, once ready, joins the validator set by calling stake::join_validator_set<br/> 3. After some time, the stake pool gains rewards and now has 150 coins.<br/> 4. Operator can now call request_commission. 10% of (150 &#45; 100) &#61; 5 coins will be unlocked from the stake pool. The<br/> staker&apos;s principal is now updated from 100 to 145 (150 coins &#45; 5 coins of commission). The pending distribution pool<br/> has 5 coins total and the operator owns all 5 shares of it.<br/> 5. Some more time has passed. The pool now has 50 more coins in rewards and a total balance of 195. The operator<br/> calls request_commission again. Since the previous 5 coins have now become withdrawable, it&apos;ll be deposited into the<br/> operator&apos;s account first. Their new commission will be 10% of (195 coins &#45; 145 principal) &#61; 5 coins. Principal is<br/> updated to be 190 (195 &#45; 5). Pending distribution pool has 5 coins and operator owns all 5 shares.<br/> 6. Staker calls unlock_stake to unlock 50 coins of stake, which gets added to the pending distribution pool. Based<br/> on shares math, staker will be owning 50 shares and operator still owns 5 shares of the 55&#45;coin pending distribution<br/> pool.<br/> 7. Some time passes and the 55 coins become fully withdrawable from the stake pool. Due to accumulated rewards, the<br/> 55 coins become 70 coins. Calling distribute() distributes 6 coins to the operator and 64 coins to the validator.
 
 
 -  [Struct `StakingGroupContainer`](#0x1_staking_contract_StakingGroupContainer)
@@ -1234,7 +1209,7 @@ Chaning beneficiaries for operators is not supported.
 
 <a id="0x1_staking_contract_ECANT_MERGE_STAKING_CONTRACTS"></a>
 
-Staking contracts can't be merged.
+Staking contracts can&apos;t be merged.
 
 
 <pre><code>const ECANT_MERGE_STAKING_CONTRACTS: u64 &#61; 5;<br/></code></pre>
@@ -1288,7 +1263,7 @@ Staker has no staking contracts.
 
 <a id="0x1_staking_contract_ESTAKING_CONTRACT_ALREADY_EXISTS"></a>
 
-The staking contract already exists and cannot be re-created.
+The staking contract already exists and cannot be re&#45;created.
 
 
 <pre><code>const ESTAKING_CONTRACT_ALREADY_EXISTS: u64 &#61; 6;<br/></code></pre>
@@ -1316,10 +1291,7 @@ Maximum number of distributions a stake pool can support.
 
 ## Function `stake_pool_address`
 
-Return the address of the underlying stake pool for the staking contract between the provided staker and
-operator.
-
-This errors out the staking contract with the provided staker and operator doesn't exist.
+Return the address of the underlying stake pool for the staking contract between the provided staker and<br/> operator.<br/><br/> This errors out the staking contract with the provided staker and operator doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun stake_pool_address(staker: address, operator: address): address<br/></code></pre>
@@ -1340,10 +1312,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 ## Function `last_recorded_principal`
 
-Return the last recorded principal (the amount that 100% belongs to the staker with commission already paid for)
-for staking contract between the provided staker and operator.
-
-This errors out the staking contract with the provided staker and operator doesn't exist.
+Return the last recorded principal (the amount that 100% belongs to the staker with commission already paid for)<br/> for staking contract between the provided staker and operator.<br/><br/> This errors out the staking contract with the provided staker and operator doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun last_recorded_principal(staker: address, operator: address): u64<br/></code></pre>
@@ -1364,10 +1333,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 ## Function `commission_percentage`
 
-Return percentage of accumulated rewards that will be paid to the operator as commission for staking contract
-between the provided staker and operator.
-
-This errors out the staking contract with the provided staker and operator doesn't exist.
+Return percentage of accumulated rewards that will be paid to the operator as commission for staking contract<br/> between the provided staker and operator.<br/><br/> This errors out the staking contract with the provided staker and operator doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun commission_percentage(staker: address, operator: address): u64<br/></code></pre>
@@ -1388,12 +1354,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 ## Function `staking_contract_amounts`
 
-Return a tuple of three numbers:
-1. The total active stake in the underlying stake pool
-2. The total accumulated rewards that haven't had commission paid out
-3. The commission amount owned from those accumulated rewards.
-
-This errors out the staking contract with the provided staker and operator doesn't exist.
+Return a tuple of three numbers:<br/> 1. The total active stake in the underlying stake pool<br/> 2. The total accumulated rewards that haven&apos;t had commission paid out<br/> 3. The commission amount owned from those accumulated rewards.<br/><br/> This errors out the staking contract with the provided staker and operator doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun staking_contract_amounts(staker: address, operator: address): (u64, u64, u64)<br/></code></pre>
@@ -1414,9 +1375,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 ## Function `pending_distribution_counts`
 
-Return the number of pending distributions (e.g. commission, withdrawals from stakers).
-
-This errors out the staking contract with the provided staker and operator doesn't exist.
+Return the number of pending distributions (e.g. commission, withdrawals from stakers).<br/><br/> This errors out the staking contract with the provided staker and operator doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun pending_distribution_counts(staker: address, operator: address): u64<br/></code></pre>
@@ -1584,7 +1543,7 @@ Convenient function to allow the staker to update the voter address in a staking
 
 ## Function `reset_lockup`
 
-Convenient function to allow the staker to reset their stake pool's lockup period to start now.
+Convenient function to allow the staker to reset their stake pool&apos;s lockup period to start now.
 
 
 <pre><code>public entry fun reset_lockup(staker: &amp;signer, operator: address)<br/></code></pre>
@@ -1605,8 +1564,7 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
 
 ## Function `update_commision`
 
-Convenience function to allow a staker to update the commission percentage paid to the operator.
-TODO: fix the typo in function name. commision -> commission
+Convenience function to allow a staker to update the commission percentage paid to the operator.<br/> TODO: fix the typo in function name. commision &#45;&gt; commission
 
 
 <pre><code>public entry fun update_commision(staker: &amp;signer, operator: address, new_commission_percentage: u64)<br/></code></pre>
@@ -1627,10 +1585,7 @@ TODO: fix the typo in function name. commision -> commission
 
 ## Function `request_commission`
 
-Unlock commission amount from the stake pool. Operator needs to wait for the amount to become withdrawable
-at the end of the stake pool's lockup period before they can actually can withdraw_commission.
-
-Only staker, operator or beneficiary can call this.
+Unlock commission amount from the stake pool. Operator needs to wait for the amount to become withdrawable<br/> at the end of the stake pool&apos;s lockup period before they can actually can withdraw_commission.<br/><br/> Only staker, operator or beneficiary can call this.
 
 
 <pre><code>public entry fun request_commission(account: &amp;signer, staker: address, operator: address)<br/></code></pre>
@@ -1671,8 +1626,7 @@ Only staker, operator or beneficiary can call this.
 
 ## Function `unlock_stake`
 
-Staker can call this to request withdrawal of part or all of their staking_contract.
-This also triggers paying commission to the operator for accounting simplicity.
+Staker can call this to request withdrawal of part or all of their staking_contract.<br/> This also triggers paying commission to the operator for accounting simplicity.
 
 
 <pre><code>public entry fun unlock_stake(staker: &amp;signer, operator: address, amount: u64)<br/></code></pre>
@@ -1756,9 +1710,7 @@ Allows staker to switch operator without going through the lenghthy process to u
 
 ## Function `set_beneficiary_for_operator`
 
-Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
-beneficiary. To ensures payment to the current beneficiary, one should first call <code>distribute</code> before switching
-the beneficiary. An operator can set one beneficiary for staking contract pools, not a separate one for each pool.
+Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new<br/> beneficiary. To ensures payment to the current beneficiary, one should first call <code>distribute</code> before switching<br/> the beneficiary. An operator can set one beneficiary for staking contract pools, not a separate one for each pool.
 
 
 <pre><code>public entry fun set_beneficiary_for_operator(operator: &amp;signer, new_beneficiary: address)<br/></code></pre>
@@ -1779,8 +1731,7 @@ the beneficiary. An operator can set one beneficiary for staking contract pools,
 
 ## Function `distribute`
 
-Allow anyone to distribute already unlocked funds. This does not affect reward compounding and therefore does
-not need to be restricted to just the staker or operator.
+Allow anyone to distribute already unlocked funds. This does not affect reward compounding and therefore does<br/> not need to be restricted to just the staker or operator.
 
 
 <pre><code>public entry fun distribute(staker: address, operator: address)<br/></code></pre>
@@ -1843,7 +1794,7 @@ Assert that a staking_contract exists for the staker/operator pair.
 
 ## Function `add_distribution`
 
-Add a new distribution for <code>recipient</code> and <code>amount</code> to the staking contract's distributions list.
+Add a new distribution for <code>recipient</code> and <code>amount</code> to the staking contract&apos;s distributions list.
 
 
 <pre><code>fun add_distribution(operator: address, staking_contract: &amp;mut staking_contract::StakingContract, recipient: address, coins_amount: u64, add_distribution_events: &amp;mut event::EventHandle&lt;staking_contract::AddDistributionEvent&gt;)<br/></code></pre>
@@ -1974,78 +1925,27 @@ Create a new staking_contracts resource.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>The Store structure for the staker exists after the staking contract is created.</td>
-<td>Medium</td>
-<td>The create_staking_contract_with_coins function ensures that the staker account has a Store structure assigned.</td>
-<td>Formally verified via <a href="#high-level-req-1">CreateStakingContractWithCoinsAbortsifAndEnsures</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The Store structure for the staker exists after the staking contract is created.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The create_staking_contract_with_coins function ensures that the staker account has a Store structure assigned.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;CreateStakingContractWithCoinsAbortsifAndEnsures&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>A staking contract is created and stored in a mapping within the Store resource.</td>
-<td>High</td>
-<td>The create_staking_contract_with_coins function adds the newly created StakingContract to the staking_contracts map with the operator as a key of the Store resource, effectively storing the staking contract.</td>
-<td>Formally verified via <a href="#high-level-req-2">CreateStakingContractWithCoinsAbortsifAndEnsures</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;A staking contract is created and stored in a mapping within the Store resource.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The create_staking_contract_with_coins function adds the newly created StakingContract to the staking_contracts map with the operator as a key of the Store resource, effectively storing the staking contract.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;CreateStakingContractWithCoinsAbortsifAndEnsures&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>Adding stake to the stake pool increases the principal value of the pool, reflecting the additional stake amount.</td>
-<td>High</td>
-<td>The add_stake function transfers the specified amount of staked coins from the staker's account to the stake pool associated with the staking contract. It increases the principal value of the staking contract by the added stake amount.</td>
-<td>Formally verified via <a href="#high-level-req-3">add_stake</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Adding stake to the stake pool increases the principal value of the pool, reflecting the additional stake amount.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The add_stake function transfers the specified amount of staked coins from the staker&apos;s account to the stake pool associated with the staking contract. It increases the principal value of the staking contract by the added stake amount.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;add_stake&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>The staker may update the voter of a staking contract, enabling them to modify the assigned voter address and ensure it accurately reflects their desired choice.</td>
-<td>High</td>
-<td>The update_voter function ensures that the voter address in a staking contract may be updated by the staker, resulting in the modification of the delegated voter address in the associated stake pool to reflect the new address provided.</td>
-<td>Formally verified via <a href="#high-level-req-4">update_voter</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The staker may update the voter of a staking contract, enabling them to modify the assigned voter address and ensure it accurately reflects their desired choice.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The update_voter function ensures that the voter address in a staking contract may be updated by the staker, resulting in the modification of the delegated voter address in the associated stake pool to reflect the new address provided.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;update_voter&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>Only the owner of the stake pool has the permission to reset the lockup period of the pool.</td>
-<td>Critical</td>
-<td>The reset_lockup function ensures that only the staker who owns the stake pool has the authority to reset the lockup period of the pool.</td>
-<td>Formally verified via <a href="#high-level-req-5">reset_lockup</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;Only the owner of the stake pool has the permission to reset the lockup period of the pool.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The reset_lockup function ensures that only the staker who owns the stake pool has the authority to reset the lockup period of the pool.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5&quot;&gt;reset_lockup&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>6</td>
-<td>Unlocked funds are correctly distributed to recipients based on their distribution shares, taking into account the associated commission percentage.</td>
-<td>High</td>
-<td>The distribution process, implemented in the distribute_internal function, accurately allocates unlocked funds to their intended recipients based on their distribution shares. It guarantees that each recipient receives the correct amount of funds, considering the commission percentage associated with the staking contract.</td>
-<td>Audited that the correct amount of unlocked funds is distributed according to distribution shares.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;6&lt;/td&gt;<br/>&lt;td&gt;Unlocked funds are correctly distributed to recipients based on their distribution shares, taking into account the associated commission percentage.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The distribution process, implemented in the distribute_internal function, accurately allocates unlocked funds to their intended recipients based on their distribution shares. It guarantees that each recipient receives the correct amount of funds, considering the commission percentage associated with the staking contract.&lt;/td&gt;<br/>&lt;td&gt;Audited that the correct amount of unlocked funds is distributed according to distribution shares.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>7</td>
-<td>The stake pool ensures that the commission is correctly requested and paid out from the old operator's stake pool before allowing the switch to the new operator.</td>
-<td>High</td>
-<td>The switch_operator function initiates the commission payout from the stake pool associated with the old operator, ensuring a smooth transition. Paying out the commission before the switch guarantees that the staker receives the appropriate commission amount and maintains the integrity of the staking process.</td>
-<td>Audited that the commission is paid to the old operator.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;7&lt;/td&gt;<br/>&lt;td&gt;The stake pool ensures that the commission is correctly requested and paid out from the old operator&apos;s stake pool before allowing the switch to the new operator.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The switch_operator function initiates the commission payout from the stake pool associated with the old operator, ensuring a smooth transition. Paying out the commission before the switch guarantees that the staker receives the appropriate commission amount and maintains the integrity of the staking process.&lt;/td&gt;<br/>&lt;td&gt;Audited that the commission is paid to the old operator.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>8</td>
-<td>Stakers can withdraw their funds from the staking contract, ensuring the unlocked amount becomes available for withdrawal after the lockup period.</td>
-<td>High</td>
-<td>The unlock_stake function ensures that the requested amount is properly unlocked from the stake pool, considering the lockup period and that the funds become available for withdrawal when the lockup expires.</td>
-<td>Audited that funds are unlocked properly.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;8&lt;/td&gt;<br/>&lt;td&gt;Stakers can withdraw their funds from the staking contract, ensuring the unlocked amount becomes available for withdrawal after the lockup period.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The unlock_stake function ensures that the requested amount is properly unlocked from the stake pool, considering the lockup period and that the funds become available for withdrawal when the lockup expires.&lt;/td&gt;<br/>&lt;td&gt;Audited that funds are unlocked properly.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -2190,9 +2090,7 @@ Account is not frozen and sufficient to withdraw.
 <pre><code>public fun create_staking_contract_with_coins(staker: &amp;signer, operator: address, voter: address, coins: coin::Coin&lt;aptos_coin::AptosCoin&gt;, commission_percentage: u64, contract_creation_seed: vector&lt;u8&gt;): address<br/></code></pre>
 
 
-The amount should be at least the min_stake_required, so the stake pool will be eligible to join the validator set.
-Initialize Store resource if this is the first time the staker has delegated to anyone.
-Cannot create the staking contract if it already exists.
+The amount should be at least the min_stake_required, so the stake pool will be eligible to join the validator set.<br/> Initialize Store resource if this is the first time the staker has delegated to anyone.<br/> Cannot create the staking contract if it already exists.
 
 
 <pre><code>pragma verify_duration_estimate &#61; 120;<br/>pragma aborts_if_is_partial;<br/>include PreconditionsInCreateContract;<br/>let amount &#61; coins.value;<br/>include CreateStakingContractWithCoinsAbortsIfAndEnsures &#123; amount &#125;;<br/></code></pre>
@@ -2207,11 +2105,10 @@ Cannot create the staking contract if it already exists.
 <pre><code>public entry fun add_stake(staker: &amp;signer, operator: address, amount: u64)<br/></code></pre>
 
 
-Account is not frozen and sufficient to withdraw.
-Staking_contract exists the stacker/operator pair.
+Account is not frozen and sufficient to withdraw.<br/> Staking_contract exists the stacker/operator pair.
 
 
-<pre><code>pragma verify_duration_estimate &#61; 600;<br/>include stake::ResourceRequirement;<br/>aborts_if reconfiguration_state::spec_is_in_progress();<br/>let staker_address &#61; signer::address_of(staker);<br/>include ContractExistsAbortsIf &#123; staker: staker_address &#125;;<br/>let store &#61; global&lt;Store&gt;(staker_address);<br/>let staking_contract &#61; simple_map::spec_get(store.staking_contracts, operator);<br/>include WithdrawAbortsIf&lt;AptosCoin&gt; &#123; account: staker &#125;;<br/>let balance &#61; global&lt;coin::CoinStore&lt;AptosCoin&gt;&gt;(staker_address).coin.value;<br/>let post post_coin &#61; global&lt;coin::CoinStore&lt;AptosCoin&gt;&gt;(staker_address).coin.value;<br/>ensures post_coin &#61;&#61; balance &#45; amount;<br/>let owner_cap &#61; staking_contract.owner_cap;<br/>include stake::AddStakeWithCapAbortsIfAndEnsures &#123; owner_cap &#125;;<br/>let post post_store &#61; global&lt;Store&gt;(staker_address);<br/>let post post_staking_contract &#61; simple_map::spec_get(post_store.staking_contracts, operator);<br/>aborts_if staking_contract.principal &#43; amount &gt; MAX_U64;<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>pragma verify_duration_estimate &#61; 600;<br/>include stake::ResourceRequirement;<br/>aborts_if reconfiguration_state::spec_is_in_progress();<br/>let staker_address &#61; signer::address_of(staker);<br/>include ContractExistsAbortsIf &#123; staker: staker_address &#125;;<br/>let store &#61; global&lt;Store&gt;(staker_address);<br/>let staking_contract &#61; simple_map::spec_get(store.staking_contracts, operator);<br/>include WithdrawAbortsIf&lt;AptosCoin&gt; &#123; account: staker &#125;;<br/>let balance &#61; global&lt;coin::CoinStore&lt;AptosCoin&gt;&gt;(staker_address).coin.value;<br/>let post post_coin &#61; global&lt;coin::CoinStore&lt;AptosCoin&gt;&gt;(staker_address).coin.value;<br/>ensures post_coin &#61;&#61; balance &#45; amount;<br/>let owner_cap &#61; staking_contract.owner_cap;<br/>include stake::AddStakeWithCapAbortsIfAndEnsures &#123; owner_cap &#125;;<br/>let post post_store &#61; global&lt;Store&gt;(staker_address);<br/>let post post_staking_contract &#61; simple_map::spec_get(post_store.staking_contracts, operator);<br/>aborts_if staking_contract.principal &#43; amount &gt; MAX_U64;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 ensures post_staking_contract.principal &#61;&#61; staking_contract.principal &#43; amount;<br/></code></pre>
 
 
@@ -2239,11 +2136,10 @@ Staking_contract exists the stacker/operator pair.
 <pre><code>public entry fun reset_lockup(staker: &amp;signer, operator: address)<br/></code></pre>
 
 
-Staking_contract exists the stacker/operator pair.
-Only active validator can update locked_until_secs.
+Staking_contract exists the stacker/operator pair.<br/> Only active validator can update locked_until_secs.
 
 
-<pre><code>let staker_address &#61; signer::address_of(staker);<br/>// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
+<pre><code>let staker_address &#61; signer::address_of(staker);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt;:
 include ContractExistsAbortsIf &#123; staker: staker_address &#125;;<br/>include IncreaseLockupWithCapAbortsIf &#123; staker: staker_address &#125;;<br/></code></pre>
 
 
@@ -2316,7 +2212,7 @@ Only staker or operator can call this.
 Staking_contract exists the stacker/operator pair.
 
 
-<pre><code>pragma verify &#61; false;<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<pre><code>pragma verify &#61; false;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
 requires staking_contract.commission_percentage &gt;&#61; 0 &amp;&amp; staking_contract.commission_percentage &lt;&#61; 100;<br/>let staker_address &#61; signer::address_of(staker);<br/>let staking_contracts &#61; global&lt;Store&gt;(staker_address).staking_contracts;<br/>let staking_contract &#61; simple_map::spec_get(staking_contracts, operator);<br/>include ContractExistsAbortsIf &#123; staker: staker_address &#125;;<br/></code></pre>
 
 
@@ -2388,8 +2284,7 @@ Staking_contract exists the stacker/operator pair.
 <pre><code>fun distribute_internal(staker: address, operator: address, staking_contract: &amp;mut staking_contract::StakingContract, distribute_events: &amp;mut event::EventHandle&lt;staking_contract::DistributeEvent&gt;)<br/></code></pre>
 
 
-The StakePool exists under the pool_address of StakingContract.
-The value of inactive and pending_inactive in the stake_pool is up to MAX_U64.
+The StakePool exists under the pool_address of StakingContract.<br/> The value of inactive and pending_inactive in the stake_pool is up to MAX_U64.
 
 
 <pre><code>pragma verify_duration_estimate &#61; 120;<br/>pragma aborts_if_is_partial;<br/>let pool_address &#61; staking_contract.pool_address;<br/>let stake_pool &#61; borrow_global&lt;stake::StakePool&gt;(pool_address);<br/>aborts_if !exists&lt;stake::StakePool&gt;(pool_address);<br/>aborts_if stake_pool.inactive.value &#43; stake_pool.pending_inactive.value &gt; MAX_U64;<br/>aborts_if !exists&lt;stake::StakePool&gt;(staking_contract.owner_cap.pool_address);<br/></code></pre>
@@ -2476,8 +2371,7 @@ The StakePool exists under the pool_address of StakingContract.
 <pre><code>fun new_staking_contracts_holder(staker: &amp;signer): staking_contract::Store<br/></code></pre>
 
 
-The Account exists under the staker.
-The guid_creation_num of the ccount resource is up to MAX_U64.
+The Account exists under the staker.<br/> The guid_creation_num of the ccount resource is up to MAX_U64.
 
 
 <pre><code>include NewStakingContractsHolderAbortsIf;<br/></code></pre>
@@ -2491,8 +2385,7 @@ The guid_creation_num of the ccount resource is up to MAX_U64.
 <pre><code>schema NewStakingContractsHolderAbortsIf &#123;<br/>staker: signer;<br/>let addr &#61; signer::address_of(staker);<br/>let account &#61; global&lt;account::Account&gt;(addr);<br/>aborts_if !exists&lt;account::Account&gt;(addr);<br/>aborts_if account.guid_creation_num &#43; 9 &gt;&#61; account::MAX_GUID_CREATION_NUM;<br/>aborts_if account.guid_creation_num &#43; 9 &gt; MAX_U64;<br/>&#125;<br/></code></pre>
 
 
-The Store exists under the staker.
-a staking_contract exists for the staker/operator pair.
+The Store exists under the staker.<br/> a staking_contract exists for the staker/operator pair.
 
 
 <a id="0x1_staking_contract_ContractExistsAbortsIf"></a>
@@ -2538,7 +2431,7 @@ a staking_contract exists for the staker/operator pair.
 <a id="0x1_staking_contract_CreateStakingContractWithCoinsAbortsIfAndEnsures"></a>
 
 
-<pre><code>schema CreateStakingContractWithCoinsAbortsIfAndEnsures &#123;<br/>staker: signer;<br/>operator: address;<br/>voter: address;<br/>amount: u64;<br/>commission_percentage: u64;<br/>contract_creation_seed: vector&lt;u8&gt;;<br/>aborts_if commission_percentage &gt; 100;<br/>aborts_if !exists&lt;staking_config::StakingConfig&gt;(@aptos_framework);<br/>let config &#61; global&lt;staking_config::StakingConfig&gt;(@aptos_framework);<br/>let min_stake_required &#61; config.minimum_stake;<br/>aborts_if amount &lt; min_stake_required;<br/>let staker_address &#61; signer::address_of(staker);<br/>let account &#61; global&lt;account::Account&gt;(staker_address);<br/>aborts_if !exists&lt;Store&gt;(staker_address) &amp;&amp; !exists&lt;account::Account&gt;(staker_address);<br/>aborts_if !exists&lt;Store&gt;(staker_address) &amp;&amp; account.guid_creation_num &#43; 9 &gt;&#61; account::MAX_GUID_CREATION_NUM;<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>schema CreateStakingContractWithCoinsAbortsIfAndEnsures &#123;<br/>staker: signer;<br/>operator: address;<br/>voter: address;<br/>amount: u64;<br/>commission_percentage: u64;<br/>contract_creation_seed: vector&lt;u8&gt;;<br/>aborts_if commission_percentage &gt; 100;<br/>aborts_if !exists&lt;staking_config::StakingConfig&gt;(@aptos_framework);<br/>let config &#61; global&lt;staking_config::StakingConfig&gt;(@aptos_framework);<br/>let min_stake_required &#61; config.minimum_stake;<br/>aborts_if amount &lt; min_stake_required;<br/>let staker_address &#61; signer::address_of(staker);<br/>let account &#61; global&lt;account::Account&gt;(staker_address);<br/>aborts_if !exists&lt;Store&gt;(staker_address) &amp;&amp; !exists&lt;account::Account&gt;(staker_address);<br/>aborts_if !exists&lt;Store&gt;(staker_address) &amp;&amp; account.guid_creation_num &#43; 9 &gt;&#61; account::MAX_GUID_CREATION_NUM;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
     ensures exists&lt;Store&gt;(staker_address);<br/>let store &#61; global&lt;Store&gt;(staker_address);<br/>let staking_contracts &#61; store.staking_contracts;<br/>let owner_cap &#61; simple_map::spec_get(store.staking_contracts, operator).owner_cap;<br/>let post post_store &#61; global&lt;Store&gt;(staker_address);<br/>let post post_staking_contracts &#61; post_store.staking_contracts;<br/>&#125;<br/></code></pre>
 
 

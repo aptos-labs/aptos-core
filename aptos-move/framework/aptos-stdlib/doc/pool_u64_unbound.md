@@ -3,20 +3,7 @@
 
 # Module `0x1::pool_u64_unbound`
 
-
-Simple module for tracking and calculating shares of a pool of coins. The shares are worth more as the total coins in
-the pool increases. New shareholder can buy more shares or redeem their existing shares.
-
-Example flow:
-1. Pool start outs empty.
-2. Shareholder A buys in with 1000 coins. A will receive 1000 shares in the pool. Pool now has 1000 total coins and
-1000 total shares.
-3. Pool appreciates in value from rewards and now has 2000 coins. A's 1000 shares are now worth 2000 coins.
-4. Shareholder B now buys in with 1000 coins. Since before the buy in, each existing share is worth 2 coins, B will
-receive 500 shares in exchange for 1000 coins. Pool now has 1500 shares and 3000 coins.
-5. Pool appreciates in value from rewards and now has 6000 coins.
-6. A redeems 500 shares. Each share is worth 6000 / 1500 = 4. A receives 2000 coins. Pool has 4000 coins and 1000
-shares left.
+<br/> Simple module for tracking and calculating shares of a pool of coins. The shares are worth more as the total coins in<br/> the pool increases. New shareholder can buy more shares or redeem their existing shares.<br/><br/> Example flow:<br/> 1. Pool start outs empty.<br/> 2. Shareholder A buys in with 1000 coins. A will receive 1000 shares in the pool. Pool now has 1000 total coins and<br/> 1000 total shares.<br/> 3. Pool appreciates in value from rewards and now has 2000 coins. A&apos;s 1000 shares are now worth 2000 coins.<br/> 4. Shareholder B now buys in with 1000 coins. Since before the buy in, each existing share is worth 2 coins, B will<br/> receive 500 shares in exchange for 1000 coins. Pool now has 1500 shares and 3000 coins.<br/> 5. Pool appreciates in value from rewards and now has 6000 coins.<br/> 6. A redeems 500 shares. Each share is worth 6000 / 1500 &#61; 4. A receives 2000 coins. Pool has 4000 coins and 1000<br/> shares left.<br/>
 
 
 -  [Struct `Pool`](#0x1_pool_u64_unbound_Pool)
@@ -142,7 +129,7 @@ Cannot redeem more shares than the shareholder has in the pool.
 
 <a id="0x1_pool_u64_unbound_EPOOL_IS_NOT_EMPTY"></a>
 
-Cannot destroy non-empty pool.
+Cannot destroy non&#45;empty pool.
 
 
 <pre><code>const EPOOL_IS_NOT_EMPTY: u64 &#61; 3;<br/></code></pre>
@@ -151,7 +138,7 @@ Cannot destroy non-empty pool.
 
 <a id="0x1_pool_u64_unbound_EPOOL_TOTAL_COINS_OVERFLOW"></a>
 
-Pool's total coins cannot exceed u64.max.
+Pool&apos;s total coins cannot exceed u64.max.
 
 
 <pre><code>const EPOOL_TOTAL_COINS_OVERFLOW: u64 &#61; 6;<br/></code></pre>
@@ -160,7 +147,7 @@ Pool's total coins cannot exceed u64.max.
 
 <a id="0x1_pool_u64_unbound_EPOOL_TOTAL_SHARES_OVERFLOW"></a>
 
-Pool's total shares cannot exceed u64.max.
+Pool&apos;s total shares cannot exceed u64.max.
 
 
 <pre><code>const EPOOL_TOTAL_SHARES_OVERFLOW: u64 &#61; 7;<br/></code></pre>
@@ -219,8 +206,7 @@ Create a new pool.
 
 ## Function `create`
 
-Deprecated. Use <code>new</code> instead.
-Create a new pool.
+Deprecated. Use <code>new</code> instead.<br/> Create a new pool.
 
 
 <pre><code>&#35;[deprecated]<br/>public fun create(): pool_u64_unbound::Pool<br/></code></pre>
@@ -283,7 +269,7 @@ Destroy an empty pool. This will fail if the pool has any balance of coins.
 
 ## Function `total_coins`
 
-Return <code>pool</code>'s total balance of coins.
+Return <code>pool</code>&apos;s total balance of coins.
 
 
 <pre><code>public fun total_coins(pool: &amp;pool_u64_unbound::Pool): u64<br/></code></pre>
@@ -409,7 +395,7 @@ Return the number of shareholders in <code>pool</code>.
 
 ## Function `update_total_coins`
 
-Update <code>pool</code>'s total balance of coins.
+Update <code>pool</code>&apos;s total balance of coins.
 
 
 <pre><code>public fun update_total_coins(pool: &amp;mut pool_u64_unbound::Pool, new_total_coins: u64)<br/></code></pre>
@@ -451,8 +437,7 @@ Allow an existing or new shareholder to add their coins to the pool in exchange 
 
 ## Function `add_shares`
 
-Add the number of shares directly for <code>shareholder</code> in <code>pool</code>.
-This would dilute other shareholders if the pool's balance of coins didn't change.
+Add the number of shares directly for <code>shareholder</code> in <code>pool</code>.<br/> This would dilute other shareholders if the pool&apos;s balance of coins didn&apos;t change.
 
 
 <pre><code>fun add_shares(pool: &amp;mut pool_u64_unbound::Pool, shareholder: address, new_shares: u128): u128<br/></code></pre>
@@ -515,7 +500,7 @@ Transfer shares from <code>shareholder_1</code> to <code>shareholder_2</code>.
 
 ## Function `deduct_shares`
 
-Directly deduct <code>shareholder</code>'s number of shares in <code>pool</code> and return the number of remaining shares.
+Directly deduct <code>shareholder</code>&apos;s number of shares in <code>pool</code> and return the number of remaining shares.
 
 
 <pre><code>fun deduct_shares(pool: &amp;mut pool_u64_unbound::Pool, shareholder: address, num_shares: u128): u128<br/></code></pre>
@@ -536,8 +521,7 @@ Directly deduct <code>shareholder</code>'s number of shares in <code>pool</code>
 
 ## Function `amount_to_shares`
 
-Return the number of new shares <code>coins_amount</code> can buy in <code>pool</code>.
-<code>amount</code> needs to big enough to avoid rounding number.
+Return the number of new shares <code>coins_amount</code> can buy in <code>pool</code>.<br/> <code>amount</code> needs to big enough to avoid rounding number.
 
 
 <pre><code>public fun amount_to_shares(pool: &amp;pool_u64_unbound::Pool, coins_amount: u64): u128<br/></code></pre>
@@ -558,8 +542,7 @@ Return the number of new shares <code>coins_amount</code> can buy in <code>pool<
 
 ## Function `amount_to_shares_with_total_coins`
 
-Return the number of new shares <code>coins_amount</code> can buy in <code>pool</code> with a custom total coins number.
-<code>amount</code> needs to big enough to avoid rounding number.
+Return the number of new shares <code>coins_amount</code> can buy in <code>pool</code> with a custom total coins number.<br/> <code>amount</code> needs to big enough to avoid rounding number.
 
 
 <pre><code>public fun amount_to_shares_with_total_coins(pool: &amp;pool_u64_unbound::Pool, coins_amount: u64, total_coins: u64): u128<br/></code></pre>
@@ -580,8 +563,7 @@ Return the number of new shares <code>coins_amount</code> can buy in <code>pool<
 
 ## Function `shares_to_amount`
 
-Return the number of coins <code>shares</code> are worth in <code>pool</code>.
-<code>shares</code> needs to big enough to avoid rounding number.
+Return the number of coins <code>shares</code> are worth in <code>pool</code>.<br/> <code>shares</code> needs to big enough to avoid rounding number.
 
 
 <pre><code>public fun shares_to_amount(pool: &amp;pool_u64_unbound::Pool, shares: u128): u64<br/></code></pre>
@@ -602,8 +584,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code>.
 
 ## Function `shares_to_amount_with_total_coins`
 
-Return the number of coins <code>shares</code> are worth in <code>pool</code> with a custom total coins number.
-<code>shares</code> needs to big enough to avoid rounding number.
+Return the number of coins <code>shares</code> are worth in <code>pool</code> with a custom total coins number.<br/> <code>shares</code> needs to big enough to avoid rounding number.
 
 
 <pre><code>public fun shares_to_amount_with_total_coins(pool: &amp;pool_u64_unbound::Pool, shares: u128, total_coins: u64): u64<br/></code></pre>

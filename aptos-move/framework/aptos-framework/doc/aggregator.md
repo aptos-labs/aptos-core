@@ -3,18 +3,7 @@
 
 # Module `0x1::aggregator`
 
-This module provides an interface for aggregators. Aggregators are similar to
-unsigned integers and support addition and subtraction (aborting on underflow
-or on overflowing a custom upper limit). The difference from integers is that
-aggregators allow to perform both additions and subtractions in parallel across
-multiple transactions, enabling parallel execution. For example, if the first
-transaction is doing <code>add(X, 1)</code> for aggregator resource <code>X</code>, and the second
-is doing <code>sub(X,3)</code>, they can be executed in parallel avoiding a read-modify-write
-dependency.
-However, reading the aggregator value (i.e. calling <code>read(X)</code>) is an expensive
-operation and should be avoided as much as possible because it reduces the
-parallelism. Moreover, **aggregators can only be created by Aptos Framework (0x1)
-at the moment.**
+This module provides an interface for aggregators. Aggregators are similar to<br/> unsigned integers and support addition and subtraction (aborting on underflow<br/> or on overflowing a custom upper limit). The difference from integers is that<br/> aggregators allow to perform both additions and subtractions in parallel across<br/> multiple transactions, enabling parallel execution. For example, if the first<br/> transaction is doing <code>add(X, 1)</code> for aggregator resource <code>X</code>, and the second<br/> is doing <code>sub(X,3)</code>, they can be executed in parallel avoiding a read&#45;modify&#45;write<br/> dependency.<br/> However, reading the aggregator value (i.e. calling <code>read(X)</code>) is an expensive<br/> operation and should be avoided as much as possible because it reduces the<br/> parallelism. Moreover, &#42;&#42;aggregators can only be created by Aptos Framework (0x1)<br/> at the moment.&#42;&#42;
 
 
 -  [Struct `Aggregator`](#0x1_aggregator_Aggregator)
@@ -43,8 +32,7 @@ at the moment.**
 
 ## Struct `Aggregator`
 
-Represents an integer which supports parallel additions and subtractions
-across multiple transactions. See the module description for more details.
+Represents an integer which supports parallel additions and subtractions<br/> across multiple transactions. See the module description for more details.
 
 
 <pre><code>struct Aggregator has store<br/></code></pre>
@@ -258,38 +246,17 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>For a given aggregator, it should always be possible to: Return the limit value of the aggregator. Return the current value stored in the aggregator. Destroy an aggregator, removing it from its AggregatorFactory.</td>
-<td>Low</td>
-<td>The following functions should not abort if EventHandle exists: limit(), read(), destroy().</td>
-<td>Formally verified via <a href="#high-level-req-1.1">read</a>, <a href="#high-level-req-1.2">destroy</a>, and <a href="#high-level-req-1.3">limit</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;For a given aggregator, it should always be possible to: Return the limit value of the aggregator. Return the current value stored in the aggregator. Destroy an aggregator, removing it from its AggregatorFactory.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The following functions should not abort if EventHandle exists: limit(), read(), destroy().&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1.1&quot;&gt;read&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1.2&quot;&gt;destroy&lt;/a&gt;, and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1.3&quot;&gt;limit&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>If the value during addition exceeds the limit, an overflow occurs.</td>
-<td>High</td>
-<td>The native add() function checks the value of the addition to ensure it does not pass the defined limit and results in aggregator overflow.</td>
-<td>Formally verified via <a href="#high-level-req-2">add</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;If the value during addition exceeds the limit, an overflow occurs.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The native add() function checks the value of the addition to ensure it does not pass the defined limit and results in aggregator overflow.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;add&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>Operations over aggregators should be correct.</td>
-<td>High</td>
-<td>The implementation of the add, sub, read and destroy functions is correct.</td>
-<td>The native implementation of the add, sub, read and destroy functions have been manually audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Operations over aggregators should be correct.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The implementation of the add, sub, read and destroy functions is correct.&lt;/td&gt;<br/>&lt;td&gt;The native implementation of the add, sub, read and destroy functions have been manually audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -311,7 +278,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<pre><code>pragma opaque;<br/>// This enforces <a id="high-level-req-1.2" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>pragma opaque;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 aborts_if false;<br/>ensures [abstract] result &#61;&#61; spec_get_limit(aggregator);<br/></code></pre>
 
 
@@ -374,7 +341,7 @@ aborts_if false;<br/>ensures [abstract] result &#61;&#61; spec_get_limit(aggrega
 
 
 
-<pre><code>pragma opaque;<br/>aborts_if spec_aggregator_get_val(aggregator) &#43; value &gt; spec_get_limit(aggregator);<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>pragma opaque;<br/>aborts_if spec_aggregator_get_val(aggregator) &#43; value &gt; spec_get_limit(aggregator);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if spec_aggregator_get_val(aggregator) &#43; value &gt; MAX_U128;<br/>ensures spec_get_limit(aggregator) &#61;&#61; spec_get_limit(old(aggregator));<br/>ensures aggregator &#61;&#61; spec_aggregator_set_val(old(aggregator),<br/>    spec_aggregator_get_val(old(aggregator)) &#43; value);<br/></code></pre>
 
 
@@ -403,7 +370,7 @@ aborts_if spec_aggregator_get_val(aggregator) &#43; value &gt; MAX_U128;<br/>ens
 
 
 
-<pre><code>pragma opaque;<br/>// This enforces <a id="high-level-req-1.1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>pragma opaque;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 aborts_if false;<br/>ensures result &#61;&#61; spec_read(aggregator);<br/>ensures result &lt;&#61; spec_get_limit(aggregator);<br/></code></pre>
 
 
@@ -418,7 +385,7 @@ aborts_if false;<br/>ensures result &#61;&#61; spec_read(aggregator);<br/>ensure
 
 
 
-<pre><code>pragma opaque;<br/>// This enforces <a id="high-level-req-1.2" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>pragma opaque;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 

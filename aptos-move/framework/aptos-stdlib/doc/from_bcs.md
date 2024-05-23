@@ -3,18 +3,7 @@
 
 # Module `0x1::from_bcs`
 
-This module provides a number of functions to convert _primitive_ types from their representation in <code>std::bcs</code>
-to values. This is the opposite of <code>bcs::to_bytes</code>. Note that it is not safe to define a generic public <code>from_bytes</code>
-function because this can violate implicit struct invariants, therefore only primitive types are offerred. If
-a general conversion back-and-force is needed, consider the <code>aptos_std::Any</code> type which preserves invariants.
-
-Example:
-```
-use std::bcs;
-use aptos_std::from_bcs;
-
-assert!(from_bcs::to_address(bcs::to_bytes(&@0xabcdef)) == @0xabcdef, 0);
-```
+This module provides a number of functions to convert _primitive_ types from their representation in <code>std::bcs</code><br/> to values. This is the opposite of <code>bcs::to_bytes</code>. Note that it is not safe to define a generic public <code>from_bytes</code><br/> function because this can violate implicit struct invariants, therefore only primitive types are offerred. If<br/> a general conversion back&#45;and&#45;force is needed, consider the <code>aptos_std::Any</code> type which preserves invariants.<br/><br/> Example:<br/> ```<br/> use std::bcs;<br/> use aptos_std::from_bcs;<br/><br/> assert!(from_bcs::to_address(bcs::to_bytes(&amp;@0xabcdef)) &#61;&#61; @0xabcdef, 0);<br/> ```
 
 
 -  [Constants](#@Constants_0)
@@ -255,11 +244,7 @@ UTF8 check failed in conversion from bytes to string
 
 ## Function `from_bytes`
 
-Package private native function to deserialize a type T.
-
-Note that this function does not put any constraint on <code>T</code>. If code uses this function to
-deserialize a linear value, its their responsibility that the data they deserialize is
-owned.
+Package private native function to deserialize a type T.<br/><br/> Note that this function does not put any constraint on <code>T</code>. If code uses this function to<br/> deserialize a linear value, its their responsibility that the data they deserialize is<br/> owned.
 
 
 <pre><code>public(friend) fun from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T<br/></code></pre>

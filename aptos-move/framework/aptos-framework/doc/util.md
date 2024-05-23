@@ -23,11 +23,7 @@ Utility functions used by the framework modules.
 
 ## Function `from_bytes`
 
-Native function to deserialize a type T.
-
-Note that this function does not put any constraint on <code>T</code>. If code uses this function to
-deserialized a linear value, its their responsibility that the data they deserialize is
-owned.
+Native function to deserialize a type T.<br/><br/> Note that this function does not put any constraint on <code>T</code>. If code uses this function to<br/> deserialized a linear value, its their responsibility that the data they deserialize is<br/> owned.
 
 
 <pre><code>public(friend) fun from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T<br/></code></pre>
@@ -84,22 +80,13 @@ owned.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>The address input bytes should be exactly 32 bytes long.</td>
-<td>Low</td>
-<td>The address_from_bytes function should assert if the length of the input bytes is 32.</td>
-<td>Verified via <a href="#high-level-req-1">address_from_bytes</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The address input bytes should be exactly 32 bytes long.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The address_from_bytes function should assert if the length of the input bytes is 32.&lt;/td&gt;<br/>&lt;td&gt;Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;address_from_bytes&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -129,7 +116,7 @@ owned.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 aborts_if [abstract] len(bytes) !&#61; 32;<br/></code></pre>
 
 

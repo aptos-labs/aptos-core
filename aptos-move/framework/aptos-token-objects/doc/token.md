@@ -3,11 +3,7 @@
 
 # Module `0x4::token`
 
-This defines an object-based Token. The key differentiating features from the Aptos standard
-token are:
-* Decoupled token ownership from token data.
-* Explicit data model for token metadata via adjacent resources
-* Extensible framework for tokens
+This defines an object&#45;based Token. The key differentiating features from the Aptos standard<br/> token are:<br/> &#42; Decoupled token ownership from token data.<br/> &#42; Explicit data model for token metadata via adjacent resources<br/> &#42; Extensible framework for tokens<br/>
 
 
 -  [Resource `Token`](#0x4_token_Token)
@@ -81,10 +77,7 @@ Represents the common fields to all tokens.
 <code>index: u64</code>
 </dt>
 <dd>
- Deprecated in favor of <code>index</code> inside TokenIdentifiers.
- Will be populated until concurrent_token_v2_enabled feature flag is enabled.
-
- Unique identifier within the collection, optional, 0 means unassigned
+ Deprecated in favor of <code>index</code> inside TokenIdentifiers.<br/> Will be populated until concurrent_token_v2_enabled feature flag is enabled.<br/><br/> Unique identifier within the collection, optional, 0 means unassigned
 </dd>
 <dt>
 <code>description: string::String</code>
@@ -96,18 +89,13 @@ Represents the common fields to all tokens.
 <code>name: string::String</code>
 </dt>
 <dd>
- Deprecated in favor of <code>name</code> inside TokenIdentifiers.
- Will be populated until concurrent_token_v2_enabled feature flag is enabled.
-
- The name of the token, which should be unique within the collection; the length of name
- should be smaller than 128, characters, eg: "Aptos Animal #1234"
+ Deprecated in favor of <code>name</code> inside TokenIdentifiers.<br/> Will be populated until concurrent_token_v2_enabled feature flag is enabled.<br/><br/> The name of the token, which should be unique within the collection; the length of name<br/> should be smaller than 128, characters, eg: &quot;Aptos Animal &#35;1234&quot;
 </dd>
 <dt>
 <code>uri: string::String</code>
 </dt>
 <dd>
- The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
- storage; the URL length will likely need a maximum any suggestions?
+ The Uniform Resource Identifier (uri) pointing to the JSON file stored in off&#45;chain<br/> storage; the URL length will likely need a maximum any suggestions?
 </dd>
 <dt>
 <code>mutation_events: event::EventHandle&lt;token::MutationEvent&gt;</code>
@@ -124,8 +112,7 @@ Represents the common fields to all tokens.
 
 ## Resource `TokenIdentifiers`
 
-Represents first addition to the common fields for all tokens
-Starts being populated once aggregator_v2_api_enabled is enabled.
+Represents first addition to the common fields for all tokens<br/> Starts being populated once aggregator_v2_api_enabled is enabled.
 
 
 <pre><code>&#35;[resource_group_member(&#35;[group &#61; 0x1::object::ObjectGroup])]<br/>struct TokenIdentifiers has key<br/></code></pre>
@@ -147,8 +134,7 @@ Starts being populated once aggregator_v2_api_enabled is enabled.
 <code>name: aggregator_v2::DerivedStringSnapshot</code>
 </dt>
 <dd>
- The name of the token, which should be unique within the collection; the length of name
- should be smaller than 128, characters, eg: "Aptos Animal #1234"
+ The name of the token, which should be unique within the collection; the length of name<br/> should be smaller than 128, characters, eg: &quot;Aptos Animal &#35;1234&quot;
 </dd>
 </dl>
 
@@ -191,9 +177,7 @@ Starts being populated once aggregator_v2_api_enabled is enabled.
 
 ## Struct `BurnRef`
 
-This enables burning an NFT, if possible, it will also delete the object. Note, the data
-in inner and self occupies 32-bytes each, rather than have both, this data structure makes
-a small optimization to support either and take a fixed amount of 34-bytes.
+This enables burning an NFT, if possible, it will also delete the object. Note, the data<br/> in inner and self occupies 32&#45;bytes each, rather than have both, this data structure makes<br/> a small optimization to support either and take a fixed amount of 34&#45;bytes.
 
 
 <pre><code>struct BurnRef has drop, store<br/></code></pre>
@@ -253,8 +237,7 @@ This enables mutating description and URI by higher level services.
 
 ## Struct `MutationEvent`
 
-Contains the mutated fields name. This makes the life of indexers easier, so that they can
-directly understand the behavior in a writeset.
+Contains the mutated fields name. This makes the life of indexers easier, so that they can<br/> directly understand the behavior in a writeset.
 
 
 <pre><code>struct MutationEvent has drop, store<br/></code></pre>
@@ -477,10 +460,7 @@ The token name is over the maximum length
 
 ## Function `create_token`
 
-Creates a new token object with a unique address and returns the ConstructorRef
-for additional specialization.
-This takes in the collection object instead of the collection name.
-This function must be called if the collection name has been previously changed.
+Creates a new token object with a unique address and returns the ConstructorRef<br/> for additional specialization.<br/> This takes in the collection object instead of the collection name.<br/> This function must be called if the collection name has been previously changed.
 
 
 <pre><code>public fun create_token(creator: &amp;signer, collection: object::Object&lt;collection::Collection&gt;, description: string::String, name: string::String, royalty: option::Option&lt;royalty::Royalty&gt;, uri: string::String): object::ConstructorRef<br/></code></pre>
@@ -501,8 +481,7 @@ This function must be called if the collection name has been previously changed.
 
 ## Function `create`
 
-Creates a new token object with a unique address and returns the ConstructorRef
-for additional specialization.
+Creates a new token object with a unique address and returns the ConstructorRef<br/> for additional specialization.
 
 
 <pre><code>public fun create(creator: &amp;signer, collection_name: string::String, description: string::String, name: string::String, royalty: option::Option&lt;royalty::Royalty&gt;, uri: string::String): object::ConstructorRef<br/></code></pre>
@@ -523,14 +502,7 @@ for additional specialization.
 
 ## Function `create_numbered_token_object`
 
-Creates a new token object with a unique address and returns the ConstructorRef
-for additional specialization.
-The name is created by concatenating the (name_prefix, index, name_suffix).
-After flag concurrent_token_v2_enabled is enabled, this function will allow
-creating tokens in parallel, from the same collection, while providing sequential names.
-
-This takes in the collection object instead of the collection name.
-This function must be called if the collection name has been previously changed.
+Creates a new token object with a unique address and returns the ConstructorRef<br/> for additional specialization.<br/> The name is created by concatenating the (name_prefix, index, name_suffix).<br/> After flag concurrent_token_v2_enabled is enabled, this function will allow<br/> creating tokens in parallel, from the same collection, while providing sequential names.<br/><br/> This takes in the collection object instead of the collection name.<br/> This function must be called if the collection name has been previously changed.
 
 
 <pre><code>public fun create_numbered_token_object(creator: &amp;signer, collection: object::Object&lt;collection::Collection&gt;, description: string::String, name_with_index_prefix: string::String, name_with_index_suffix: string::String, royalty: option::Option&lt;royalty::Royalty&gt;, uri: string::String): object::ConstructorRef<br/></code></pre>
@@ -551,11 +523,7 @@ This function must be called if the collection name has been previously changed.
 
 ## Function `create_numbered_token`
 
-Creates a new token object with a unique address and returns the ConstructorRef
-for additional specialization.
-The name is created by concatenating the (name_prefix, index, name_suffix).
-After flag concurrent_token_v2_enabled is enabled, this function will allow
-creating tokens in parallel, from the same collection, while providing sequential names.
+Creates a new token object with a unique address and returns the ConstructorRef<br/> for additional specialization.<br/> The name is created by concatenating the (name_prefix, index, name_suffix).<br/> After flag concurrent_token_v2_enabled is enabled, this function will allow<br/> creating tokens in parallel, from the same collection, while providing sequential names.
 
 
 <pre><code>public fun create_numbered_token(creator: &amp;signer, collection_name: string::String, description: string::String, name_with_index_prefix: string::String, name_with_index_suffix: string::String, royalty: option::Option&lt;royalty::Royalty&gt;, uri: string::String): object::ConstructorRef<br/></code></pre>
@@ -576,9 +544,7 @@ creating tokens in parallel, from the same collection, while providing sequentia
 
 ## Function `create_named_token_object`
 
-Creates a new token object from a token name and returns the ConstructorRef for
-additional specialization.
-This function must be called if the collection name has been previously changed.
+Creates a new token object from a token name and returns the ConstructorRef for<br/> additional specialization.<br/> This function must be called if the collection name has been previously changed.
 
 
 <pre><code>public fun create_named_token_object(creator: &amp;signer, collection: object::Object&lt;collection::Collection&gt;, description: string::String, name: string::String, royalty: option::Option&lt;royalty::Royalty&gt;, uri: string::String): object::ConstructorRef<br/></code></pre>
@@ -599,8 +565,7 @@ This function must be called if the collection name has been previously changed.
 
 ## Function `create_named_token`
 
-Creates a new token object from a token name and returns the ConstructorRef for
-additional specialization.
+Creates a new token object from a token name and returns the ConstructorRef for<br/> additional specialization.
 
 
 <pre><code>public fun create_named_token(creator: &amp;signer, collection_name: string::String, description: string::String, name: string::String, royalty: option::Option&lt;royalty::Royalty&gt;, uri: string::String): object::ConstructorRef<br/></code></pre>
@@ -621,9 +586,7 @@ additional specialization.
 
 ## Function `create_named_token_from_seed`
 
-Creates a new token object from a token name and seed.
-Returns the ConstructorRef for additional specialization.
-This function must be called if the collection name has been previously changed.
+Creates a new token object from a token name and seed.<br/> Returns the ConstructorRef for additional specialization.<br/> This function must be called if the collection name has been previously changed.
 
 
 <pre><code>public fun create_named_token_from_seed(creator: &amp;signer, collection: object::Object&lt;collection::Collection&gt;, description: string::String, name: string::String, seed: string::String, royalty: option::Option&lt;royalty::Royalty&gt;, uri: string::String): object::ConstructorRef<br/></code></pre>
@@ -644,10 +607,7 @@ This function must be called if the collection name has been previously changed.
 
 ## Function `create_from_account`
 
-DEPRECATED: Use <code>create</code> instead for identical behavior.
-
-Creates a new token object from an account GUID and returns the ConstructorRef for
-additional specialization.
+DEPRECATED: Use <code>create</code> instead for identical behavior.<br/><br/> Creates a new token object from an account GUID and returns the ConstructorRef for<br/> additional specialization.
 
 
 <pre><code>&#35;[deprecated]<br/>public fun create_from_account(creator: &amp;signer, collection_name: string::String, description: string::String, name: string::String, royalty: option::Option&lt;royalty::Royalty&gt;, uri: string::String): object::ConstructorRef<br/></code></pre>
@@ -668,7 +628,7 @@ additional specialization.
 
 ## Function `create_token_address`
 
-Generates the token's address based upon the creator's address, the collection's name and the token's name.
+Generates the token&apos;s address based upon the creator&apos;s address, the collection&apos;s name and the token&apos;s name.
 
 
 <pre><code>public fun create_token_address(creator: &amp;address, collection: &amp;string::String, name: &amp;string::String): address<br/></code></pre>
@@ -689,7 +649,7 @@ Generates the token's address based upon the creator's address, the collection's
 
 ## Function `create_token_address_with_seed`
 
-Generates the token's address based upon the creator's address, the collection object and the token's name and seed.
+Generates the token&apos;s address based upon the creator&apos;s address, the collection object and the token&apos;s name and seed.
 
 
 <pre><code>&#35;[view]<br/>public fun create_token_address_with_seed(creator: address, collection: string::String, name: string::String, seed: string::String): address<br/></code></pre>
@@ -710,7 +670,7 @@ Generates the token's address based upon the creator's address, the collection o
 
 ## Function `create_token_seed`
 
-Named objects are derived from a seed, the token's seed is its name appended to the collection's name.
+Named objects are derived from a seed, the token&apos;s seed is its name appended to the collection&apos;s name.
 
 
 <pre><code>public fun create_token_seed(collection: &amp;string::String, name: &amp;string::String): vector&lt;u8&gt;<br/></code></pre>
@@ -914,8 +874,7 @@ Extracts the tokens address from a BurnRef.
 
 ## Function `name`
 
-Avoid this method in the same transaction as the token is minted
-as that would prohibit transactions to be executed in parallel.
+Avoid this method in the same transaction as the token is minted<br/> as that would prohibit transactions to be executed in parallel.
 
 
 <pre><code>&#35;[view]<br/>public fun name&lt;T: key&gt;(token: object::Object&lt;T&gt;): string::String<br/></code></pre>
@@ -976,8 +935,7 @@ as that would prohibit transactions to be executed in parallel.
 
 ## Function `index`
 
-Avoid this method in the same transaction as the token is minted
-as that would prohibit transactions to be executed in parallel.
+Avoid this method in the same transaction as the token is minted<br/> as that would prohibit transactions to be executed in parallel.
 
 
 <pre><code>&#35;[view]<br/>public fun index&lt;T: key&gt;(token: object::Object&lt;T&gt;): u64<br/></code></pre>

@@ -3,10 +3,7 @@
 
 # Module `0x1::timestamp`
 
-This module keeps a global wall clock that stores the current Unix time in microseconds.
-It interacts with the other modules in the following ways:
-* genesis: to initialize the timestamp
-* block: to reach consensus on the global wall clock time
+This module keeps a global wall clock that stores the current Unix time in microseconds.<br/> It interacts with the other modules in the following ways:<br/> &#42; genesis: to initialize the timestamp<br/> &#42; block: to reach consensus on the global wall clock time
 
 
 -  [Resource `CurrentTimeMicroseconds`](#0x1_timestamp_CurrentTimeMicroseconds)
@@ -179,46 +176,19 @@ Gets the current time in seconds.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>There should only exist one global wall clock and it should be created during genesis.</td>
-<td>High</td>
-<td>The function set_time_has_started is only called by genesis::initialize and ensures that no other resources of this type exist by only assigning it to a predefined account.</td>
-<td>Formally verified via <a href="#high-level-req-1">module</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;There should only exist one global wall clock and it should be created during genesis.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The function set_time_has_started is only called by genesis::initialize and ensures that no other resources of this type exist by only assigning it to a predefined account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;module&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The global wall clock resource should only be owned by the Aptos framework.</td>
-<td>High</td>
-<td>The function set_time_has_started ensures that only the aptos_framework account can possess the CurrentTimeMicroseconds resource using the assert_aptos_framework function.</td>
-<td>Formally verified via <a href="#high-level-req-2">module</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The global wall clock resource should only be owned by the Aptos framework.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The function set_time_has_started ensures that only the aptos_framework account can possess the CurrentTimeMicroseconds resource using the assert_aptos_framework function.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;module&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>The clock time should only be updated by the VM account.</td>
-<td>High</td>
-<td>The update_global_time function asserts that the transaction signer is the vm_reserved account.</td>
-<td>Formally verified via <a href="#high-level-req-3">UpdateGlobalTimeAbortsIf</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The clock time should only be updated by the VM account.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The update_global_time function asserts that the transaction signer is the vm_reserved account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;UpdateGlobalTimeAbortsIf&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>The clock time should increase with every update as agreed through consensus and proposed by the current epoch's validator.</td>
-<td>High</td>
-<td>The update_global_time function asserts that the new timestamp is greater than the current timestamp.</td>
-<td>Formally verified via <a href="#high-level-req-4">UpdateGlobalTimeAbortsIf</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The clock time should increase with every update as agreed through consensus and proposed by the current epoch&apos;s validator.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The update_global_time function asserts that the new timestamp is greater than the current timestamp.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;UpdateGlobalTimeAbortsIf&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -226,7 +196,7 @@ Gets the current time in seconds.
 ### Module-level Specification
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a> and <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt; and &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;CurrentTimeMicroseconds&gt;(@aptos_framework);<br/></code></pre>
 
 
@@ -249,8 +219,8 @@ invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;Cu
 <a id="0x1_timestamp_UpdateGlobalTimeAbortsIf"></a>
 
 
-<pre><code>schema UpdateGlobalTimeAbortsIf &#123;<br/>account: signer;<br/>proposer: address;<br/>timestamp: u64;<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
-    aborts_if !system_addresses::is_vm(account);<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<pre><code>schema UpdateGlobalTimeAbortsIf &#123;<br/>account: signer;<br/>proposer: address;<br/>timestamp: u64;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
+    aborts_if !system_addresses::is_vm(account);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
     aborts_if (proposer &#61;&#61; @vm_reserved) &amp;&amp; (spec_now_microseconds() !&#61; timestamp);<br/>aborts_if (proposer !&#61; @vm_reserved) &amp;&amp; (spec_now_microseconds() &gt;&#61; timestamp);<br/>&#125;<br/></code></pre>
 
 

@@ -3,15 +3,7 @@
 
 # Module `0x1::randomness_config_seqnum`
 
-Randomness stall recovery utils.
-
-When randomness generation is stuck due to a bug, the chain is also stuck. Below is the recovery procedure.
-1. Ensure more than 2/3 stakes are stuck at the same version.
-1. Every validator restarts with <code>randomness_override_seq_num</code> set to <code>X&#43;1</code> in the node config file,
-where <code>X</code> is the current <code>RandomnessConfigSeqNum</code> on chain.
-1. The chain should then be unblocked.
-1. Once the bug is fixed and the binary + framework have been patched,
-a governance proposal is needed to set <code>RandomnessConfigSeqNum</code> to be <code>X&#43;2</code>.
+Randomness stall recovery utils.<br/><br/> When randomness generation is stuck due to a bug, the chain is also stuck. Below is the recovery procedure.<br/> 1. Ensure more than 2/3 stakes are stuck at the same version.<br/> 1. Every validator restarts with <code>randomness_override_seq_num</code> set to <code>X&#43;1</code> in the node config file,<br/>    where <code>X</code> is the current <code>RandomnessConfigSeqNum</code> on chain.<br/> 1. The chain should then be unblocked.<br/> 1. Once the bug is fixed and the binary &#43; framework have been patched,<br/>    a governance proposal is needed to set <code>RandomnessConfigSeqNum</code> to be <code>X&#43;2</code>.
 
 
 -  [Resource `RandomnessConfigSeqNum`](#0x1_randomness_config_seqnum_RandomnessConfigSeqNum)
@@ -30,8 +22,7 @@ a governance proposal is needed to set <code>RandomnessConfigSeqNum</code> to be
 
 ## Resource `RandomnessConfigSeqNum`
 
-If this seqnum is smaller than a validator local override, the on-chain <code>RandomnessConfig</code> will be ignored.
-Useful in a chain recovery from randomness stall.
+If this seqnum is smaller than a validator local override, the on&#45;chain <code>RandomnessConfig</code> will be ignored.<br/> Useful in a chain recovery from randomness stall.
 
 
 <pre><code>struct RandomnessConfigSeqNum has drop, store, key<br/></code></pre>
@@ -58,8 +49,7 @@ Useful in a chain recovery from randomness stall.
 
 ## Function `set_for_next_epoch`
 
-Update <code>RandomnessConfigSeqNum</code>.
-Used when re-enable randomness after an emergency randomness disable via local override.
+Update <code>RandomnessConfigSeqNum</code>.<br/> Used when re&#45;enable randomness after an emergency randomness disable via local override.
 
 
 <pre><code>public fun set_for_next_epoch(framework: &amp;signer, seq_num: u64)<br/></code></pre>

@@ -3,8 +3,7 @@
 
 # Module `0x3::token`
 
-This module provides the foundation for Tokens.
-Checkout our developer doc on our token standard https://aptos.dev/standards
+This module provides the foundation for Tokens.<br/> Checkout our developer doc on our token standard https://aptos.dev/standards
 
 
 -  [Struct `Token`](#0x3_token_Token)
@@ -211,15 +210,13 @@ Checkout our developer doc on our token standard https://aptos.dev/standards
 <code>amount: u64</code>
 </dt>
 <dd>
- the amount of tokens. Only property_version = 0 can have a value bigger than 1.
+ the amount of tokens. Only property_version &#61; 0 can have a value bigger than 1.
 </dd>
 <dt>
 <code>token_properties: property_map::PropertyMap</code>
 </dt>
 <dd>
- The properties with this token.
- when property_version = 0, the token_properties are the same as default_properties in TokenData, we don't store it.
- when the property_map mutates, a new property_version is assigned to the token.
+ The properties with this token.<br/> when property_version &#61; 0, the token_properties are the same as default_properties in TokenData, we don&apos;t store it.<br/> when the property_map mutates, a new property_version is assigned to the token.
 </dd>
 </dl>
 
@@ -285,7 +282,7 @@ globally unique identifier of tokendata
 <code>collection: string::String</code>
 </dt>
 <dd>
- The name of collection; this is unique under the same account, eg: "Aptos Animal Collection"
+ The name of collection; this is unique under the same account, eg: &quot;Aptos Animal Collection&quot;
 </dd>
 <dt>
 <code>name: string::String</code>
@@ -336,7 +333,7 @@ The shared TokenData by tokens with different property_version
 <code>uri: string::String</code>
 </dt>
 <dd>
- The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain storage; the URL length should be less than 512 characters, eg: https://arweave.net/Fmmn4ul-7Mv6vzm7JwE69O-I-vd6Bz2QriJO1niwCh4
+ The Uniform Resource Identifier (uri) pointing to the JSON file stored in off&#45;chain storage; the URL length should be less than 512 characters, eg: https://arweave.net/Fmmn4ul&#45;7Mv6vzm7JwE69O&#45;I&#45;vd6Bz2QriJO1niwCh4
 </dd>
 <dt>
 <code>royalty: token::Royalty</code>
@@ -348,7 +345,7 @@ The shared TokenData by tokens with different property_version
 <code>name: string::String</code>
 </dt>
 <dd>
- The name of the token, which should be unique within the collection; the length of name should be smaller than 128, characters, eg: "Aptos Animal #1234"
+ The name of the token, which should be unique within the collection; the length of name should be smaller than 128, characters, eg: &quot;Aptos Animal &#35;1234&quot;
 </dd>
 <dt>
 <code>description: string::String</code>
@@ -405,8 +402,7 @@ The royalty of a token
 <code>payee_address: address</code>
 </dt>
 <dd>
- if the token is jointly owned by multiple creators, the group of creators should create a shared account.
- the payee_address will be the shared account address.
+ if the token is jointly owned by multiple creators, the group of creators should create a shared account.<br/> the payee_address will be the shared account address.
 </dd>
 </dl>
 
@@ -631,13 +627,13 @@ Represent the collection metadata
 <code>description: string::String</code>
 </dt>
 <dd>
- A description for the token collection Eg: "Aptos Toad Overload"
+ A description for the token collection Eg: &quot;Aptos Toad Overload&quot;
 </dd>
 <dt>
 <code>name: string::String</code>
 </dt>
 <dd>
- The collection name, which should be unique among all collections by the creator; the name should also be smaller than 128 characters, eg: "Animal Collection"
+ The collection name, which should be unique among all collections by the creator; the name should also be smaller than 128 characters, eg: &quot;Animal Collection&quot;
 </dd>
 <dt>
 <code>uri: string::String</code>
@@ -655,8 +651,7 @@ Represent the collection metadata
 <code>maximum: u64</code>
 </dt>
 <dd>
- If maximal is a non-zero value, the number of created TokenData entries should be smaller or equal to this maximum
- If maximal is 0, Aptos doesn't track the supply of this collection, and there is no limit
+ If maximal is a non&#45;zero value, the number of created TokenData entries should be smaller or equal to this maximum<br/> If maximal is 0, Aptos doesn&apos;t track the supply of this collection, and there is no limit
 </dd>
 <dt>
 <code>mutability_config: token::CollectionMutabilityConfig</code>
@@ -673,7 +668,7 @@ Represent the collection metadata
 
 ## Struct `WithdrawCapability`
 
-capability to withdraw without signer, this struct should be non-copyable
+capability to withdraw without signer, this struct should be non&#45;copyable
 
 
 <pre><code>struct WithdrawCapability has drop, store<br/></code></pre>
@@ -1443,8 +1438,7 @@ The token has balance and cannot be initialized
 
 <a id="0x3_token_ECANNOT_UPDATE_RESERVED_PROPERTY"></a>
 
-Reserved fields for token contract
-Cannot be updated by user
+Reserved fields for token contract<br/> Cannot be updated by user
 
 
 <pre><code>const ECANNOT_UPDATE_RESERVED_PROPERTY: u64 &#61; 32;<br/></code></pre>
@@ -1453,7 +1447,7 @@ Cannot be updated by user
 
 <a id="0x3_token_ECOLLECTIONS_NOT_PUBLISHED"></a>
 
-There isn't any collection under this account
+There isn&apos;t any collection under this account
 
 
 <pre><code>const ECOLLECTIONS_NOT_PUBLISHED: u64 &#61; 1;<br/></code></pre>
@@ -1480,7 +1474,7 @@ The collection name is too long
 
 <a id="0x3_token_ECOLLECTION_NOT_PUBLISHED"></a>
 
-Cannot find collection in creator's account
+Cannot find collection in creator&apos;s account
 
 
 <pre><code>const ECOLLECTION_NOT_PUBLISHED: u64 &#61; 2;<br/></code></pre>
@@ -1489,7 +1483,7 @@ Cannot find collection in creator's account
 
 <a id="0x3_token_ECREATE_WOULD_EXCEED_COLLECTION_MAXIMUM"></a>
 
-Exceeds the collection's maximal number of token_data
+Exceeds the collection&apos;s maximal number of token_data
 
 
 <pre><code>const ECREATE_WOULD_EXCEED_COLLECTION_MAXIMUM: u64 &#61; 4;<br/></code></pre>
@@ -1516,7 +1510,7 @@ The field is not mutable
 
 <a id="0x3_token_EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT"></a>
 
-Withdraw capability doesn't have sufficient amount
+Withdraw capability doesn&apos;t have sufficient amount
 
 
 <pre><code>const EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT: u64 &#61; 38;<br/></code></pre>
@@ -1687,7 +1681,7 @@ TokenData not published
 
 <a id="0x3_token_ETOKEN_PROPERTIES_COUNT_NOT_MATCH"></a>
 
-Token Properties count doesn't match
+Token Properties count doesn&apos;t match
 
 
 <pre><code>const ETOKEN_PROPERTIES_COUNT_NOT_MATCH: u64 &#61; 37;<br/></code></pre>
@@ -1705,7 +1699,7 @@ Cannot split token to an amount larger than its amount
 
 <a id="0x3_token_ETOKEN_STORE_NOT_PUBLISHED"></a>
 
-TokenStore doesn't exist
+TokenStore doesn&apos;t exist
 
 
 <pre><code>const ETOKEN_STORE_NOT_PUBLISHED: u64 &#61; 11;<br/></code></pre>
@@ -1714,7 +1708,7 @@ TokenStore doesn't exist
 
 <a id="0x3_token_EUSER_NOT_OPT_IN_DIRECT_TRANSFER"></a>
 
-User didn't opt-in direct transfer
+User didn&apos;t opt&#45;in direct transfer
 
 
 <pre><code>const EUSER_NOT_OPT_IN_DIRECT_TRANSFER: u64 &#61; 16;<br/></code></pre>
@@ -1878,9 +1872,7 @@ Mint more token from an existing token_data. Mint only adds more token to proper
 
 ## Function `mutate_token_properties`
 
-mutate the token property and save the new property in TokenStore
-if the token property_version is 0, we will create a new property_version per token to generate a new token_id per token
-if the token property_version is not 0, we will just update the propertyMap and use the existing token_id (property_version)
+mutate the token property and save the new property in TokenStore<br/> if the token property_version is 0, we will create a new property_version per token to generate a new token_id per token<br/> if the token property_version is not 0, we will just update the propertyMap and use the existing token_id (property_version)
 
 
 <pre><code>public entry fun mutate_token_properties(account: &amp;signer, token_owner: address, creator: address, collection_name: string::String, token_name: string::String, token_property_version: u64, amount: u64, keys: vector&lt;string::String&gt;, values: vector&lt;vector&lt;u8&gt;&gt;, types: vector&lt;string::String&gt;)<br/></code></pre>
@@ -1941,8 +1933,7 @@ if the token property_version is not 0, we will just update the propertyMap and 
 
 ## Function `transfer_with_opt_in`
 
-Transfers <code>amount</code> of tokens from <code>from</code> to <code>to</code>.
-The receiver <code>to</code> has to opt-in direct transfer first
+Transfers <code>amount</code> of tokens from <code>from</code> to <code>to</code>.<br/> The receiver <code>to</code> has to opt&#45;in direct transfer first
 
 
 <pre><code>public entry fun transfer_with_opt_in(from: &amp;signer, creator: address, collection_name: string::String, token_name: string::String, token_property_version: u64, to: address, amount: u64)<br/></code></pre>
@@ -1963,8 +1954,7 @@ The receiver <code>to</code> has to opt-in direct transfer first
 
 ## Function `burn_by_creator`
 
-Burn a token by creator when the token's BURNABLE_BY_CREATOR is true
-The token is owned at address owner
+Burn a token by creator when the token&apos;s BURNABLE_BY_CREATOR is true<br/> The token is owned at address owner
 
 
 <pre><code>public entry fun burn_by_creator(creator: &amp;signer, owner: address, collection: string::String, name: string::String, property_version: u64, amount: u64)<br/></code></pre>
@@ -2208,7 +2198,7 @@ Mutate the token_properties of one token.
 
 ## Function `deposit_token`
 
-Deposit the token balance into the owner's account and emit an event.
+Deposit the token balance into the owner&apos;s account and emit an event.
 
 
 <pre><code>public fun deposit_token(account: &amp;signer, token: token::Token)<br/></code></pre>
@@ -2371,7 +2361,7 @@ Transfers <code>amount</code> of tokens from <code>from</code> to <code>to</code
 
 ## Function `create_withdraw_capability`
 
-Token owner can create this one-time withdraw capability with an expiration time
+Token owner can create this one&#45;time withdraw capability with an expiration time
 
 
 <pre><code>public fun create_withdraw_capability(owner: &amp;signer, token_id: token::TokenId, amount: u64, expiration_sec: u64): token::WithdrawCapability<br/></code></pre>
@@ -2759,7 +2749,7 @@ return the TokenId for a given Token
 
 ## Function `mint_token_to`
 
-create tokens and directly deposite to receiver's address. The receiver should opt-in direct transfer
+create tokens and directly deposite to receiver&apos;s address. The receiver should opt&#45;in direct transfer
 
 
 <pre><code>public fun mint_token_to(account: &amp;signer, receiver: address, token_data_id: token::TokenDataId, amount: u64)<br/></code></pre>
@@ -3021,9 +3011,7 @@ return the creator address, collection name, token name and property_version
 
 ## Function `get_property_map`
 
-return a copy of the token property map.
-if property_version = 0, return the default property map
-if property_version > 0, return the property value stored at owner's token store
+return a copy of the token property map.<br/> if property_version &#61; 0, return the default property map<br/> if property_version &gt; 0, return the property value stored at owner&apos;s token store
 
 
 <pre><code>public fun get_property_map(owner: address, token_id: token::TokenId): property_map::PropertyMap<br/></code></pre>
@@ -3166,7 +3154,7 @@ return the mutation setting of the token
 
 ## Function `get_token_mutability_maximum`
 
-return if the token's maximum is mutable
+return if the token&apos;s maximum is mutable
 
 
 <pre><code>public fun get_token_mutability_maximum(config: &amp;token::TokenMutabilityConfig): bool<br/></code></pre>
@@ -3250,7 +3238,7 @@ return if the token description is mutable with a token mutability config
 
 ## Function `get_token_mutability_default_properties`
 
-return if the tokendata's default properties is mutable with a token mutability config
+return if the tokendata&apos;s default properties is mutable with a token mutability config
 
 
 <pre><code>public fun get_token_mutability_default_properties(config: &amp;token::TokenMutabilityConfig): bool<br/></code></pre>
@@ -3570,8 +3558,7 @@ Deposit the token balance into the recipients account and emit an event.
 <pre><code>public entry fun create_collection_script(creator: &amp;signer, name: string::String, description: string::String, uri: string::String, maximum: u64, mutate_setting: vector&lt;bool&gt;)<br/></code></pre>
 
 
-The length of the name is up to MAX_COLLECTION_NAME_LENGTH;
-The length of the uri is up to MAX_URI_LENGTH;
+The length of the name is up to MAX_COLLECTION_NAME_LENGTH;<br/> The length of the uri is up to MAX_URI_LENGTH;
 
 
 <pre><code>pragma aborts_if_is_partial;<br/>include CreateCollectionAbortsIf;<br/></code></pre>
@@ -3586,10 +3573,7 @@ The length of the uri is up to MAX_URI_LENGTH;
 <pre><code>public entry fun create_token_script(account: &amp;signer, collection: string::String, name: string::String, description: string::String, balance: u64, maximum: u64, uri: string::String, royalty_payee_address: address, royalty_points_denominator: u64, royalty_points_numerator: u64, mutate_setting: vector&lt;bool&gt;, property_keys: vector&lt;string::String&gt;, property_values: vector&lt;vector&lt;u8&gt;&gt;, property_types: vector&lt;string::String&gt;)<br/></code></pre>
 
 
-the length of 'mutate_setting' should maore than five.
-The creator of the TokenDataId is signer.
-The token_data_id should exist in the creator's collections..
-The sum of supply and mint Token is less than maximum.
+the length of &apos;mutate_setting&apos; should maore than five.<br/> The creator of the TokenDataId is signer.<br/> The token_data_id should exist in the creator&apos;s collections..<br/> The sum of supply and mint Token is less than maximum.
 
 
 <pre><code>pragma aborts_if_is_partial;<br/>let addr &#61; signer::address_of(account);<br/>let token_data_id &#61; spec_create_tokendata(addr, collection, name);<br/>let creator_addr &#61; token_data_id.creator;<br/>let all_token_data &#61; global&lt;Collections&gt;(creator_addr).token_data;<br/>let token_data &#61; table::spec_get(all_token_data, token_data_id);<br/>aborts_if token_data_id.creator !&#61; addr;<br/>aborts_if !exists&lt;Collections&gt;(creator_addr);<br/>aborts_if balance &lt;&#61; 0;<br/>include CreateTokenMutabilityConfigAbortsIf;<br/>include CreateTokenMutabilityConfigAbortsIf;<br/></code></pre>
@@ -3751,9 +3735,7 @@ The uri of Collection is mutable.
 <pre><code>public fun mutate_collection_maximum(creator: &amp;signer, collection_name: string::String, maximum: u64)<br/></code></pre>
 
 
-Cannot change maximum from 0 and cannot change maximum to 0.
-The maximum should more than suply.
-The maxium of Collection is mutable.
+Cannot change maximum from 0 and cannot change maximum to 0.<br/> The maximum should more than suply.<br/> The maxium of Collection is mutable.
 
 
 <pre><code>let addr &#61; signer::address_of(creator);<br/>let account &#61; global&lt;account::Account&gt;(addr);<br/>let collection_data &#61; table::spec_get(global&lt;Collections&gt;(addr).collection_data, collection_name);<br/>include AssertCollectionExistsAbortsIf &#123;<br/>    creator_address: addr,<br/>    collection_name: collection_name<br/>&#125;;<br/>aborts_if collection_data.maximum &#61;&#61; 0 &#124;&#124; maximum &#61;&#61; 0;<br/>aborts_if maximum &lt; collection_data.supply;<br/>aborts_if !collection_data.mutability_config.maximum;<br/>aborts_if !exists&lt;token_event_store::TokenEventStoreV1&gt;(addr) &amp;&amp; !exists&lt;account::Account&gt;(addr);<br/>aborts_if !exists&lt;token_event_store::TokenEventStoreV1&gt;(addr) &amp;&amp; account.guid_creation_num &#43; 9 &gt;&#61; account::MAX_GUID_CREATION_NUM;<br/>aborts_if !exists&lt;token_event_store::TokenEventStoreV1&gt;(addr) &amp;&amp; account.guid_creation_num &#43; 9 &gt; MAX_U64;<br/></code></pre>
@@ -3768,9 +3750,7 @@ The maxium of Collection is mutable.
 <pre><code>public fun mutate_tokendata_maximum(creator: &amp;signer, token_data_id: token::TokenDataId, maximum: u64)<br/></code></pre>
 
 
-Cannot change maximum from 0 and cannot change maximum to 0.
-The maximum should more than suply.
-The token maximum is mutable
+Cannot change maximum from 0 and cannot change maximum to 0.<br/> The maximum should more than suply.<br/> The token maximum is mutable
 
 
 <pre><code>let addr &#61; signer::address_of(creator);<br/>let account &#61; global&lt;account::Account&gt;(addr);<br/>let all_token_data &#61; global&lt;Collections&gt;(token_data_id.creator).token_data;<br/>let token_data &#61; table::spec_get(all_token_data, token_data_id);<br/>include AssertTokendataExistsAbortsIf;<br/>aborts_if token_data.maximum &#61;&#61; 0 &#124;&#124; maximum &#61;&#61; 0;<br/>aborts_if maximum &lt; token_data.supply;<br/>aborts_if !token_data.mutability_config.maximum;<br/>aborts_if !exists&lt;token_event_store::TokenEventStoreV1&gt;(addr) &amp;&amp; !exists&lt;account::Account&gt;(addr);<br/>aborts_if !exists&lt;token_event_store::TokenEventStoreV1&gt;(addr) &amp;&amp; account.guid_creation_num &#43; 9 &gt;&#61; account::MAX_GUID_CREATION_NUM;<br/>aborts_if !exists&lt;token_event_store::TokenEventStoreV1&gt;(addr) &amp;&amp; account.guid_creation_num &#43; 9 &gt; MAX_U64;<br/></code></pre>
@@ -3785,9 +3765,7 @@ The token maximum is mutable
 <pre><code>public fun mutate_tokendata_uri(creator: &amp;signer, token_data_id: token::TokenDataId, uri: string::String)<br/></code></pre>
 
 
-The length of uri should less than MAX_URI_LENGTH.
-The  creator of token_data_id should exist in Collections.
-The token uri is mutable
+The length of uri should less than MAX_URI_LENGTH.<br/> The  creator of token_data_id should exist in Collections.<br/> The token uri is mutable
 
 
 <pre><code>let addr &#61; signer::address_of(creator);<br/>let account &#61; global&lt;account::Account&gt;(addr);<br/>let all_token_data &#61; global&lt;Collections&gt;(token_data_id.creator).token_data;<br/>let token_data &#61; table::spec_get(all_token_data, token_data_id);<br/>include AssertTokendataExistsAbortsIf;<br/>aborts_if len(uri.bytes) &gt; MAX_URI_LENGTH;<br/>aborts_if !token_data.mutability_config.uri;<br/>aborts_if !exists&lt;token_event_store::TokenEventStoreV1&gt;(addr) &amp;&amp; !exists&lt;account::Account&gt;(addr);<br/>aborts_if !exists&lt;token_event_store::TokenEventStoreV1&gt;(addr) &amp;&amp; account.guid_creation_num &#43; 9 &gt;&#61; account::MAX_GUID_CREATION_NUM;<br/>aborts_if !exists&lt;token_event_store::TokenEventStoreV1&gt;(addr) &amp;&amp; account.guid_creation_num &#43; 9 &gt; MAX_U64;<br/></code></pre>
@@ -3847,9 +3825,7 @@ The property map is mutable
 <pre><code>public fun mutate_one_token(account: &amp;signer, token_owner: address, token_id: token::TokenId, keys: vector&lt;string::String&gt;, values: vector&lt;vector&lt;u8&gt;&gt;, types: vector&lt;string::String&gt;): token::TokenId<br/></code></pre>
 
 
-The signer is creator.
-The token_data_id should exist in token_data.
-The property map is mutable.
+The signer is creator.<br/> The token_data_id should exist in token_data.<br/> The property map is mutable.
 
 
 <pre><code>pragma aborts_if_is_partial;<br/>let creator &#61; token_id.token_data_id.creator;<br/>let addr &#61; signer::address_of(account);<br/>let all_token_data &#61; global&lt;Collections&gt;(creator).token_data;<br/>let token_data &#61; table::spec_get(all_token_data, token_id.token_data_id);<br/>aborts_if addr !&#61; creator;<br/>aborts_if !exists&lt;Collections&gt;(creator);<br/>aborts_if !table::spec_contains(all_token_data, token_id.token_data_id);<br/>aborts_if !token_data.mutability_config.properties &amp;&amp; !simple_map::spec_contains_key(token_data.default_properties.map, std::string::spec_utf8(TOKEN_PROPERTY_MUTABLE));<br/></code></pre>
@@ -3916,8 +3892,7 @@ The token can direct_transfer.
 <pre><code>public fun direct_transfer(sender: &amp;signer, receiver: &amp;signer, token_id: token::TokenId, amount: u64)<br/></code></pre>
 
 
-Cannot withdraw 0 tokens.
-Make sure the account has sufficient tokens to withdraw.
+Cannot withdraw 0 tokens.<br/> Make sure the account has sufficient tokens to withdraw.
 
 
 <pre><code>pragma verify &#61; false;<br/></code></pre>
@@ -4024,8 +3999,7 @@ Make sure the account has sufficient tokens to withdraw.
 <pre><code>public fun withdraw_token(account: &amp;signer, id: token::TokenId, amount: u64): token::Token<br/></code></pre>
 
 
-Cannot withdraw 0 tokens.
-Make sure the account has sufficient tokens to withdraw.
+Cannot withdraw 0 tokens.<br/> Make sure the account has sufficient tokens to withdraw.
 
 
 <pre><code>let account_addr &#61; signer::address_of(account);<br/>include WithdrawWithEventInternalAbortsIf;<br/></code></pre>
@@ -4040,9 +4014,7 @@ Make sure the account has sufficient tokens to withdraw.
 <pre><code>public fun create_collection(creator: &amp;signer, name: string::String, description: string::String, uri: string::String, maximum: u64, mutate_setting: vector&lt;bool&gt;)<br/></code></pre>
 
 
-The length of the name is up to MAX_COLLECTION_NAME_LENGTH;
-The length of the uri is up to MAX_URI_LENGTH;
-The collection_data should not exist before you create it.
+The length of the name is up to MAX_COLLECTION_NAME_LENGTH;<br/> The length of the uri is up to MAX_URI_LENGTH;<br/> The collection_data should not exist before you create it.
 
 
 <pre><code>pragma aborts_if_is_partial;<br/>let account_addr &#61; signer::address_of(creator);<br/>aborts_if len(name.bytes) &gt; 128;<br/>aborts_if len(uri.bytes) &gt; 512;<br/>include CreateCollectionAbortsIf;<br/></code></pre>
@@ -4079,8 +4051,7 @@ The collection_data should not exist before you create it.
 <pre><code>public fun check_tokendata_exists(creator: address, collection_name: string::String, token_name: string::String): bool<br/></code></pre>
 
 
-The length of collection should less than MAX_COLLECTION_NAME_LENGTH
-The length of name should less than MAX_NFT_NAME_LENGTH
+The length of collection should less than MAX_COLLECTION_NAME_LENGTH<br/> The length of name should less than MAX_NFT_NAME_LENGTH
 
 
 <pre><code>aborts_if !exists&lt;Collections&gt;(creator);<br/>include CreateTokenDataIdAbortsIf &#123;<br/>    creator: creator,<br/>    collection: collection_name,<br/>    name: token_name<br/>&#125;;<br/></code></pre>
@@ -4095,8 +4066,7 @@ The length of name should less than MAX_NFT_NAME_LENGTH
 <pre><code>public fun create_tokendata(account: &amp;signer, collection: string::String, name: string::String, description: string::String, maximum: u64, uri: string::String, royalty_payee_address: address, royalty_points_denominator: u64, royalty_points_numerator: u64, token_mutate_config: token::TokenMutabilityConfig, property_keys: vector&lt;string::String&gt;, property_values: vector&lt;vector&lt;u8&gt;&gt;, property_types: vector&lt;string::String&gt;): token::TokenDataId<br/></code></pre>
 
 
-The length of collection should less than MAX_COLLECTION_NAME_LENGTH
-The length of name should less than MAX_NFT_NAME_LENGTH
+The length of collection should less than MAX_COLLECTION_NAME_LENGTH<br/> The length of name should less than MAX_NFT_NAME_LENGTH
 
 
 <pre><code>pragma verify &#61; false;<br/>pragma aborts_if_is_partial;<br/>let account_addr &#61; signer::address_of(account);<br/>let collections &#61; global&lt;Collections&gt;(account_addr);<br/>let token_data_id &#61; spec_create_token_data_id(account_addr, collection, name);<br/>let Collection &#61; table::spec_get(collections.collection_data, token_data_id.collection);<br/>let length &#61; len(property_keys);<br/>aborts_if len(name.bytes) &gt; MAX_NFT_NAME_LENGTH;<br/>aborts_if len(collection.bytes) &gt; MAX_COLLECTION_NAME_LENGTH;<br/>aborts_if len(uri.bytes) &gt; MAX_URI_LENGTH;<br/>aborts_if royalty_points_numerator &gt; royalty_points_denominator;<br/>aborts_if !exists&lt;Collections&gt;(account_addr);<br/>include CreateTokenDataIdAbortsIf &#123;<br/>    creator: account_addr,<br/>    collection: collection,<br/>    name: name<br/>&#125;;<br/>aborts_if !table::spec_contains(collections.collection_data, collection);<br/>aborts_if table::spec_contains(collections.token_data, token_data_id);<br/>aborts_if Collection.maximum &gt; 0 &amp;&amp; Collection.supply &#43; 1 &gt; MAX_U64;<br/>aborts_if Collection.maximum &gt; 0 &amp;&amp; Collection.maximum &lt; Collection.supply &#43; 1;<br/>include CreateRoyaltyAbortsIf &#123;<br/>    payee_address: royalty_payee_address<br/>&#125;;<br/>aborts_if length &gt; property_map::MAX_PROPERTY_MAP_SIZE;<br/>aborts_if length !&#61; len(property_values);<br/>aborts_if length !&#61; len(property_types);<br/></code></pre>
@@ -4203,8 +4173,7 @@ The length of name should less than MAX_NFT_NAME_LENGTH
 <pre><code>public fun create_token_mutability_config(mutate_setting: &amp;vector&lt;bool&gt;): token::TokenMutabilityConfig<br/></code></pre>
 
 
-The length of 'mutate_setting' should more than five.
-The mutate_setting shuold have a value.
+The length of &apos;mutate_setting&apos; should more than five.<br/> The mutate_setting shuold have a value.
 
 
 <pre><code>include CreateTokenMutabilityConfigAbortsIf;<br/></code></pre>
@@ -4249,9 +4218,7 @@ The mutate_setting shuold have a value.
 <pre><code>public fun mint_token(account: &amp;signer, token_data_id: token::TokenDataId, amount: u64): token::TokenId<br/></code></pre>
 
 
-The creator of the TokenDataId is signer.
-The token_data_id should exist in the creator's collections..
-The sum of supply and the amount of mint Token is less than maximum.
+The creator of the TokenDataId is signer.<br/> The token_data_id should exist in the creator&apos;s collections..<br/> The sum of supply and the amount of mint Token is less than maximum.
 
 
 <pre><code>pragma verify &#61; false;<br/></code></pre>
@@ -4288,8 +4255,7 @@ The sum of supply and the amount of mint Token is less than maximum.
 <pre><code>public fun create_token_data_id(creator: address, collection: string::String, name: string::String): token::TokenDataId<br/></code></pre>
 
 
-The length of collection should less than MAX_COLLECTION_NAME_LENGTH
-The length of name should less than MAX_NFT_NAME_LENGTH
+The length of collection should less than MAX_COLLECTION_NAME_LENGTH<br/> The length of name should less than MAX_NFT_NAME_LENGTH
 
 
 <pre><code>include CreateTokenDataIdAbortsIf;<br/></code></pre>
@@ -4312,8 +4278,7 @@ The length of name should less than MAX_NFT_NAME_LENGTH
 <pre><code>public fun create_token_id_raw(creator: address, collection: string::String, name: string::String, property_version: u64): token::TokenId<br/></code></pre>
 
 
-The length of collection should less than MAX_COLLECTION_NAME_LENGTH
-The length of name should less than MAX_NFT_NAME_LENGTH
+The length of collection should less than MAX_COLLECTION_NAME_LENGTH<br/> The length of name should less than MAX_NFT_NAME_LENGTH
 
 
 <pre><code>include CreateTokenDataIdAbortsIf;<br/></code></pre>
@@ -4514,7 +4479,7 @@ The length of name should less than MAX_NFT_NAME_LENGTH
 <pre><code>fun assert_collection_exists(creator_address: address, collection_name: string::String)<br/></code></pre>
 
 
-The collection_name should exist in collection_data of the creator_address's Collections.
+The collection_name should exist in collection_data of the creator_address&apos;s Collections.
 
 
 <pre><code>include AssertCollectionExistsAbortsIf;<br/></code></pre>
@@ -4537,9 +4502,7 @@ The collection_name should exist in collection_data of the creator_address's Col
 <pre><code>fun assert_tokendata_exists(creator: &amp;signer, token_data_id: token::TokenDataId)<br/></code></pre>
 
 
-The creator of token_data_id should be signer.
-The  creator of token_data_id exists in Collections.
-The token_data_id is in the all_token_data.
+The creator of token_data_id should be signer.<br/> The  creator of token_data_id exists in Collections.<br/> The token_data_id is in the all_token_data.
 
 
 <pre><code>include AssertTokendataExistsAbortsIf;<br/></code></pre>

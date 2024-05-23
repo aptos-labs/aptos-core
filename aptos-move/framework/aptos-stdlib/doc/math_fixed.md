@@ -98,8 +98,7 @@ Exponent function with a precission of 9 digits.
 
 ## Function `log2_plus_32`
 
-Because log2 is negative for values < 1 we instead return log2(x) + 32 which
-is positive for all values of x.
+Because log2 is negative for values &lt; 1 we instead return log2(x) &#43; 32 which<br/> is positive for all values of x.
 
 
 <pre><code>public fun log2_plus_32(x: fixed_point32::FixedPoint32): fixed_point32::FixedPoint32<br/></code></pre>
@@ -161,7 +160,7 @@ Integer power of a fixed point number
 
 ## Function `mul_div`
 
-Specialized function for x * y / z that omits intermediate shifting
+Specialized function for x &#42; y / z that omits intermediate shifting
 
 
 <pre><code>public fun mul_div(x: fixed_point32::FixedPoint32, y: fixed_point32::FixedPoint32, z: fixed_point32::FixedPoint32): fixed_point32::FixedPoint32<br/></code></pre>

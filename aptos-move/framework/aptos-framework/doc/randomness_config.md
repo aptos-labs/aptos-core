@@ -3,7 +3,7 @@
 
 # Module `0x1::randomness_config`
 
-Structs and functions for on-chain randomness configurations.
+Structs and functions for on&#45;chain randomness configurations.
 
 
 -  [Resource `RandomnessConfig`](#0x1_randomness_config_RandomnessConfig)
@@ -32,7 +32,7 @@ Structs and functions for on-chain randomness configurations.
 
 ## Resource `RandomnessConfig`
 
-The configuration of the on-chain randomness feature.
+The configuration of the on&#45;chain randomness feature.
 
 
 <pre><code>struct RandomnessConfig has copy, drop, store, key<br/></code></pre>
@@ -48,10 +48,7 @@ The configuration of the on-chain randomness feature.
 <code>variant: copyable_any::Any</code>
 </dt>
 <dd>
- A config variant packed as an <code>Any</code>.
- Currently the variant type is one of the following.
- - <code>ConfigOff</code>
- - <code>ConfigV1</code>
+ A config variant packed as an <code>Any</code>.<br/> Currently the variant type is one of the following.<br/> &#45; <code>ConfigOff</code><br/> &#45; <code>ConfigV1</code>
 </dd>
 </dl>
 
@@ -195,7 +192,7 @@ Initialize the configuration. Used in genesis or governance.
 
 ## Function `set_for_next_epoch`
 
-This can be called by on-chain governance to update on-chain consensus configs for the next epoch.
+This can be called by on&#45;chain governance to update on&#45;chain consensus configs for the next epoch.
 
 
 <pre><code>public fun set_for_next_epoch(framework: &amp;signer, new_config: randomness_config::RandomnessConfig)<br/></code></pre>
@@ -237,10 +234,7 @@ Only used in reconfigurations to apply the pending <code>RandomnessConfig</code>
 
 ## Function `enabled`
 
-Check whether on-chain randomness main logic (e.g., <code>DKGManager</code>, <code>RandManager</code>, <code>BlockMetadataExt</code>) is enabled.
-
-NOTE: this returning true does not mean randomness will run.
-The feature works if and only if <code>consensus_config::validator_txn_enabled() &amp;&amp; randomness_config::enabled()</code>.
+Check whether on&#45;chain randomness main logic (e.g., <code>DKGManager</code>, <code>RandManager</code>, <code>BlockMetadataExt</code>) is enabled.<br/><br/> NOTE: this returning true does not mean randomness will run.<br/> The feature works if and only if <code>consensus_config::validator_txn_enabled() &amp;&amp; randomness_config::enabled()</code>.
 
 
 <pre><code>public fun enabled(): bool<br/></code></pre>

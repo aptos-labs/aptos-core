@@ -1,16 +1,4 @@
-
-<a id="@Aptos_Framework_0"></a>
-
-# Aptos Framework
-
-
-This is the reference documentation of the Aptos framework.
-
-
-<a id="@Index_1"></a>
-
-## Index
-
+&#35; Aptos Framework<br/><br/>This is the reference documentation of the Aptos framework.<br/><br/>&#35;&#35; Index<br/>
 
 -  [`0x1::account`](account.md#0x1_account)
 -  [`0x1::aggregator`](aggregator.md#0x1_aggregator)
@@ -71,6 +59,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::version`](version.md#0x1_version)
 -  [`0x1::vesting`](vesting.md#0x1_vesting)
 -  [`0x1::voting`](voting.md#0x1_voting)
+<br/>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

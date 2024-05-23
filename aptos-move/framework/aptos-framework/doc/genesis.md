@@ -334,8 +334,7 @@ Only called for testnets and e2e tests.
 
 ## Function `create_account`
 
-This creates an funds an account if it doesn't exist.
-If it exists, it just returns the signer.
+This creates an funds an account if it doesn&apos;t exist.<br/> If it exists, it just returns the signer.
 
 
 <pre><code>fun create_account(aptos_framework: &amp;signer, account_address: address, balance: u64): signer<br/></code></pre>
@@ -396,16 +395,8 @@ If it exists, it just returns the signer.
 
 ## Function `create_initialize_validators`
 
-Sets up the initial validator set for the network.
-The validator "owner" accounts, and their authentication
-Addresses (and keys) are encoded in the <code>owners</code>
-Each validator signs consensus messages with the private key corresponding to the Ed25519
-public key in <code>consensus_pubkeys</code>.
-Finally, each validator must specify the network address
-(see types/src/network_address/mod.rs) for itself and its full nodes.
-
-Network address fields are a vector per account, where each entry is a vector of addresses
-encoded in a single BCS byte array.
+Sets up the initial validator set for the network.<br/> The validator &quot;owner&quot; accounts, and their authentication<br/> Addresses (and keys) are encoded in the <code>owners</code><br/> Each validator signs consensus messages with the private key corresponding to the Ed25519<br/> public key in <code>consensus_pubkeys</code>.<br/> Finally, each validator must specify the network address
+(see types/src/network_address/mod.rs) for itself and its full nodes.<br/><br/> Network address fields are a vector per account, where each entry is a vector of addresses<br/> encoded in a single BCS byte array.
 
 
 <pre><code>fun create_initialize_validators(aptos_framework: &amp;signer, validators: vector&lt;genesis::ValidatorConfiguration&gt;)<br/></code></pre>
@@ -514,52 +505,19 @@ The last step of genesis.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>All the core resources and modules should be created during genesis and owned by the Aptos framework account.</td>
-<td>Critical</td>
-<td>Resources created during genesis initialization: GovernanceResponsbility, ConsensusConfig, ExecutionConfig, Version, SetVersionCapability, ValidatorSet, ValidatorPerformance, StakingConfig, StorageGasConfig, StorageGas, GasScheduleV2, AggregatorFactory, SupplyConfig, ChainId, Configuration, BlockResource, StateStorageUsage, CurrentTimeMicroseconds. If some of the resources were to be owned by a malicious account, it could lead to the compromise of the chain, as these are core resources. It should be formally verified by a post condition to ensure that all the critical resources are owned by the Aptos framework.</td>
-<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;All the core resources and modules should be created during genesis and owned by the Aptos framework account.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;Resources created during genesis initialization: GovernanceResponsbility, ConsensusConfig, ExecutionConfig, Version, SetVersionCapability, ValidatorSet, ValidatorPerformance, StakingConfig, StorageGasConfig, StorageGas, GasScheduleV2, AggregatorFactory, SupplyConfig, ChainId, Configuration, BlockResource, StateStorageUsage, CurrentTimeMicroseconds. If some of the resources were to be owned by a malicious account, it could lead to the compromise of the chain, as these are core resources. It should be formally verified by a post condition to ensure that all the critical resources are owned by the Aptos framework.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>Addresses ranging from 0x0 - 0xa should be reserved for the framework and part of aptos governance.</td>
-<td>Critical</td>
-<td>The function genesis::initialize calls account::create_framework_reserved_account for addresses 0x0, 0x2, 0x3, 0x4, ..., 0xa which creates an account and authentication_key for them. This should be formally verified by ensuring that at the beginning of the genesis::initialize function no Account resource exists for the reserved addresses, and at the end of the function, an Account resource exists.</td>
-<td>Formally verified via <a href="#high-level-req-2">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;Addresses ranging from 0x0 &#45; 0xa should be reserved for the framework and part of aptos governance.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The function genesis::initialize calls account::create_framework_reserved_account for addresses 0x0, 0x2, 0x3, 0x4, ..., 0xa which creates an account and authentication_key for them. This should be formally verified by ensuring that at the beginning of the genesis::initialize function no Account resource exists for the reserved addresses, and at the end of the function, an Account resource exists.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>The Aptos coin should be initialized during genesis and only the Aptos framework account should own the mint and burn capabilities for the APT token.</td>
-<td>Critical</td>
-<td>Both mint and burn capabilities are wrapped inside the stake::AptosCoinCapabilities and transaction_fee::AptosCoinCapabilities resources which are stored under the aptos framework account.</td>
-<td>Formally verified via <a href="#high-level-req-3">initialize_aptos_coin</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The Aptos coin should be initialized during genesis and only the Aptos framework account should own the mint and burn capabilities for the APT token.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;Both mint and burn capabilities are wrapped inside the stake::AptosCoinCapabilities and transaction_fee::AptosCoinCapabilities resources which are stored under the aptos framework account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;initialize_aptos_coin&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>An initial set of validators should exist before the end of genesis.</td>
-<td>Low</td>
-<td>To ensure that there will be a set of validators available to validate the genesis block, the length of the ValidatorSet.active_validators vector should be > 0.</td>
-<td>Formally verified via <a href="#high-level-req-4">set_genesis_end</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;An initial set of validators should exist before the end of genesis.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;To ensure that there will be a set of validators available to validate the genesis block, the length of the ValidatorSet.active_validators vector should be &gt; 0.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;set_genesis_end&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>The end of genesis should be marked on chain.</td>
-<td>Low</td>
-<td>The end of genesis is marked, on chain, via the chain_status::GenesisEndMarker resource. The ownership of this resource marks the operating state of the chain.</td>
-<td>Formally verified via <a href="#high-level-req-5">set_genesis_end</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;The end of genesis should be marked on chain.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The end of genesis is marked, on chain, via the chain_status::GenesisEndMarker resource. The ownership of this resource marks the operating state of the chain.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5&quot;&gt;set_genesis_end&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
 
 
@@ -582,8 +540,8 @@ The last step of genesis.
 
 
 
-<pre><code>pragma aborts_if_is_partial;<br/>include InitalizeRequires;<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-aborts_if exists&lt;account::Account&gt;(@0x0);<br/>aborts_if exists&lt;account::Account&gt;(@0x2);<br/>aborts_if exists&lt;account::Account&gt;(@0x3);<br/>aborts_if exists&lt;account::Account&gt;(@0x4);<br/>aborts_if exists&lt;account::Account&gt;(@0x5);<br/>aborts_if exists&lt;account::Account&gt;(@0x6);<br/>aborts_if exists&lt;account::Account&gt;(@0x7);<br/>aborts_if exists&lt;account::Account&gt;(@0x8);<br/>aborts_if exists&lt;account::Account&gt;(@0x9);<br/>aborts_if exists&lt;account::Account&gt;(@0xa);<br/>ensures exists&lt;account::Account&gt;(@0x0);<br/>ensures exists&lt;account::Account&gt;(@0x2);<br/>ensures exists&lt;account::Account&gt;(@0x3);<br/>ensures exists&lt;account::Account&gt;(@0x4);<br/>ensures exists&lt;account::Account&gt;(@0x5);<br/>ensures exists&lt;account::Account&gt;(@0x6);<br/>ensures exists&lt;account::Account&gt;(@0x7);<br/>ensures exists&lt;account::Account&gt;(@0x8);<br/>ensures exists&lt;account::Account&gt;(@0x9);<br/>ensures exists&lt;account::Account&gt;(@0xa);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>pragma aborts_if_is_partial;<br/>include InitalizeRequires;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
+aborts_if exists&lt;account::Account&gt;(@0x0);<br/>aborts_if exists&lt;account::Account&gt;(@0x2);<br/>aborts_if exists&lt;account::Account&gt;(@0x3);<br/>aborts_if exists&lt;account::Account&gt;(@0x4);<br/>aborts_if exists&lt;account::Account&gt;(@0x5);<br/>aborts_if exists&lt;account::Account&gt;(@0x6);<br/>aborts_if exists&lt;account::Account&gt;(@0x7);<br/>aborts_if exists&lt;account::Account&gt;(@0x8);<br/>aborts_if exists&lt;account::Account&gt;(@0x9);<br/>aborts_if exists&lt;account::Account&gt;(@0xa);<br/>ensures exists&lt;account::Account&gt;(@0x0);<br/>ensures exists&lt;account::Account&gt;(@0x2);<br/>ensures exists&lt;account::Account&gt;(@0x3);<br/>ensures exists&lt;account::Account&gt;(@0x4);<br/>ensures exists&lt;account::Account&gt;(@0x5);<br/>ensures exists&lt;account::Account&gt;(@0x6);<br/>ensures exists&lt;account::Account&gt;(@0x7);<br/>ensures exists&lt;account::Account&gt;(@0x8);<br/>ensures exists&lt;account::Account&gt;(@0x9);<br/>ensures exists&lt;account::Account&gt;(@0xa);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 ensures exists&lt;aptos_governance::GovernanceResponsbility&gt;(@aptos_framework);<br/>ensures exists&lt;consensus_config::ConsensusConfig&gt;(@aptos_framework);<br/>ensures exists&lt;execution_config::ExecutionConfig&gt;(@aptos_framework);<br/>ensures exists&lt;version::Version&gt;(@aptos_framework);<br/>ensures exists&lt;stake::ValidatorSet&gt;(@aptos_framework);<br/>ensures exists&lt;stake::ValidatorPerformance&gt;(@aptos_framework);<br/>ensures exists&lt;storage_gas::StorageGasConfig&gt;(@aptos_framework);<br/>ensures exists&lt;storage_gas::StorageGas&gt;(@aptos_framework);<br/>ensures exists&lt;gas_schedule::GasScheduleV2&gt;(@aptos_framework);<br/>ensures exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>ensures exists&lt;coin::SupplyConfig&gt;(@aptos_framework);<br/>ensures exists&lt;chain_id::ChainId&gt;(@aptos_framework);<br/>ensures exists&lt;reconfiguration::Configuration&gt;(@aptos_framework);<br/>ensures exists&lt;block::BlockResource&gt;(@aptos_framework);<br/>ensures exists&lt;state_storage::StateStorageUsage&gt;(@aptos_framework);<br/>ensures exists&lt;timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);<br/>ensures exists&lt;account::Account&gt;(@aptos_framework);<br/>ensures exists&lt;version::SetVersionCapability&gt;(@aptos_framework);<br/>ensures exists&lt;staking_config::StakingConfig&gt;(@aptos_framework);<br/></code></pre>
 
 
@@ -598,7 +556,7 @@ ensures exists&lt;aptos_governance::GovernanceResponsbility&gt;(@aptos_framework
 
 
 
-<pre><code>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 requires !exists&lt;stake::AptosCoinCapabilities&gt;(@aptos_framework);<br/>ensures exists&lt;stake::AptosCoinCapabilities&gt;(@aptos_framework);<br/>requires exists&lt;transaction_fee::AptosCoinCapabilities&gt;(@aptos_framework);<br/>ensures exists&lt;transaction_fee::AptosCoinCapabilities&gt;(@aptos_framework);<br/></code></pre>
 
 
@@ -655,8 +613,8 @@ requires !exists&lt;stake::AptosCoinCapabilities&gt;(@aptos_framework);<br/>ensu
 
 
 
-<pre><code>pragma delegate_invariants_to_caller;<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
-requires len(global&lt;stake::ValidatorSet&gt;(@aptos_framework).active_validators) &gt;&#61; 1;<br/>// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
+<pre><code>pragma delegate_invariants_to_caller;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
+requires len(global&lt;stake::ValidatorSet&gt;(@aptos_framework).active_validators) &gt;&#61; 1;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt;:
 let addr &#61; std::signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if exists&lt;chain_status::GenesisEndMarker&gt;(@aptos_framework);<br/>ensures global&lt;chain_status::GenesisEndMarker&gt;(@aptos_framework) &#61;&#61; chain_status::GenesisEndMarker &#123;&#125;;<br/></code></pre>
 
 

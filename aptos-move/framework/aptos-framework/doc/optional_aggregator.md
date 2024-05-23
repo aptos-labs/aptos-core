@@ -3,8 +3,7 @@
 
 # Module `0x1::optional_aggregator`
 
-This module provides an interface to aggregate integers either via
-aggregator (parallelizable) or via normal integers.
+This module provides an interface to aggregate integers either via<br/> aggregator (parallelizable) or via normal integers.
 
 
 -  [Struct `Integer`](#0x1_optional_aggregator_Integer)
@@ -295,7 +294,7 @@ Creates a new optional aggregator.
 
 ## Function `switch`
 
-Switches between parallelizable and non-parallelizable implementations.
+Switches between parallelizable and non&#45;parallelizable implementations.
 
 
 <pre><code>public fun switch(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator)<br/></code></pre>
@@ -316,8 +315,7 @@ Switches between parallelizable and non-parallelizable implementations.
 
 ## Function `switch_and_zero_out`
 
-Switches between parallelizable and non-parallelizable implementations, setting
-the value of the new optional aggregator to zero.
+Switches between parallelizable and non&#45;parallelizable implementations, setting<br/> the value of the new optional aggregator to zero.
 
 
 <pre><code>fun switch_and_zero_out(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator)<br/></code></pre>
@@ -338,8 +336,7 @@ the value of the new optional aggregator to zero.
 
 ## Function `switch_to_integer_and_zero_out`
 
-Switches from parallelizable to non-parallelizable implementation, zero-initializing
-the value.
+Switches from parallelizable to non&#45;parallelizable implementation, zero&#45;initializing<br/> the value.
 
 
 <pre><code>fun switch_to_integer_and_zero_out(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator): u128<br/></code></pre>
@@ -360,8 +357,7 @@ the value.
 
 ## Function `switch_to_aggregator_and_zero_out`
 
-Switches from non-parallelizable to parallelizable implementation, zero-initializing
-the value.
+Switches from non&#45;parallelizable to parallelizable implementation, zero&#45;initializing<br/> the value.
 
 
 <pre><code>fun switch_to_aggregator_and_zero_out(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator): u128<br/></code></pre>
@@ -424,7 +420,7 @@ Destroys parallelizable optional aggregator and returns its limit.
 
 ## Function `destroy_optional_integer`
 
-Destroys non-parallelizable optional aggregator and returns its limit.
+Destroys non&#45;parallelizable optional aggregator and returns its limit.
 
 
 <pre><code>fun destroy_optional_integer(optional_aggregator: optional_aggregator::OptionalAggregator): u128<br/></code></pre>
@@ -536,36 +532,15 @@ Returns true if optional aggregator uses parallelizable implementation.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>When creating a new integer instance, it guarantees that the limit assigned is a value passed into the function as an argument, and the value field becomes zero.</td>
-<td>High</td>
-<td>The new_integer function sets the limit field to the argument passed in, and the value field is set to zero.</td>
-<td>Formally verified via <a href="#high-level-req-1">new_integer</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;When creating a new integer instance, it guarantees that the limit assigned is a value passed into the function as an argument, and the value field becomes zero.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The new_integer function sets the limit field to the argument passed in, and the value field is set to zero.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;new_integer&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>For a given integer instance it should always be possible to: (1) return the limit value of the integer resource, (2) return the current value stored in that particular instance, and (3) destroy the integer instance.</td>
-<td>Low</td>
-<td>The following functions should not abort if the Integer instance exists: limit(), read_integer(), destroy_integer().</td>
-<td>Formally verified via: <a href="#high-level-req-2.1">read_integer</a>, <a href="#high-level-req-2.2">limit</a>, and <a href="#high-level-req-2.3">destroy_integer</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;For a given integer instance it should always be possible to: (1) return the limit value of the integer resource, (2) return the current value stored in that particular instance, and (3) destroy the integer instance.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The following functions should not abort if the Integer instance exists: limit(), read_integer(), destroy_integer().&lt;/td&gt;<br/>&lt;td&gt;Formally verified via: &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.1&quot;&gt;read_integer&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.2&quot;&gt;limit&lt;/a&gt;, and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.3&quot;&gt;destroy_integer&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>Every successful switch must end with the aggregator type changed from non-parallelizable to parallelizable or vice versa.</td>
-<td>High</td>
-<td>The switch function run, if successful, should always change the aggregator type.</td>
-<td>Formally verified via <a href="#high-level-req-3">switch_and_zero_out</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Every successful switch must end with the aggregator type changed from non&#45;parallelizable to parallelizable or vice versa.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The switch function run, if successful, should always change the aggregator type.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;switch_and_zero_out&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
 
 
@@ -618,7 +593,7 @@ Returns true if optional aggregator uses parallelizable implementation.
 
 
 
-<pre><code>aborts_if false;<br/>ensures result.limit &#61;&#61; limit;<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>aborts_if false;<br/>ensures result.limit &#61;&#61; limit;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 ensures result.value &#61;&#61; 0;<br/></code></pre>
 
 
@@ -662,7 +637,7 @@ Check for overflow.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -677,7 +652,7 @@ aborts_if false;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.1" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -692,7 +667,7 @@ aborts_if false;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.3" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -733,12 +708,10 @@ aborts_if false;<br/></code></pre>
 <pre><code>fun switch_and_zero_out(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator)<br/></code></pre>
 
 
-Option<Integer> does not exist When Option<Aggregator> exists.
-Option<Integer> exists when Option<Aggregator> does not exist.
-The AggregatorFactory is under the @aptos_framework when Option<Aggregator> does not exist.
+Option&lt;Integer&gt; does not exist When Option&lt;Aggregator&gt; exists.<br/> Option&lt;Integer&gt; exists when Option&lt;Aggregator&gt; does not exist.<br/> The AggregatorFactory is under the @aptos_framework when Option&lt;Aggregator&gt; does not exist.
 
 
-<pre><code>let vec_ref &#61; optional_aggregator.integer.vec;<br/>aborts_if is_parallelizable(optional_aggregator) &amp;&amp; len(vec_ref) !&#61; 0;<br/>aborts_if !is_parallelizable(optional_aggregator) &amp;&amp; len(vec_ref) &#61;&#61; 0;<br/>aborts_if !is_parallelizable(optional_aggregator) &amp;&amp; !exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>let vec_ref &#61; optional_aggregator.integer.vec;<br/>aborts_if is_parallelizable(optional_aggregator) &amp;&amp; len(vec_ref) !&#61; 0;<br/>aborts_if !is_parallelizable(optional_aggregator) &amp;&amp; len(vec_ref) &#61;&#61; 0;<br/>aborts_if !is_parallelizable(optional_aggregator) &amp;&amp; !exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 ensures is_parallelizable(old(optional_aggregator)) &#61;&#61;&gt; !is_parallelizable(optional_aggregator);<br/>ensures !is_parallelizable(old(optional_aggregator)) &#61;&#61;&gt; is_parallelizable(optional_aggregator);<br/>ensures optional_aggregator_value(optional_aggregator) &#61;&#61; 0;<br/></code></pre>
 
 
@@ -751,7 +724,7 @@ ensures is_parallelizable(old(optional_aggregator)) &#61;&#61;&gt; !is_paralleli
 <pre><code>fun switch_to_integer_and_zero_out(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator): u128<br/></code></pre>
 
 
-The aggregator exists and the integer dosex not exist when Switches from parallelizable to non-parallelizable implementation.
+The aggregator exists and the integer dosex not exist when Switches from parallelizable to non&#45;parallelizable implementation.
 
 
 <pre><code>let limit &#61; aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator));<br/>aborts_if len(optional_aggregator.aggregator.vec) &#61;&#61; 0;<br/>aborts_if len(optional_aggregator.integer.vec) !&#61; 0;<br/>ensures !is_parallelizable(optional_aggregator);<br/>ensures option::borrow(optional_aggregator.integer).limit &#61;&#61; limit;<br/>ensures option::borrow(optional_aggregator.integer).value &#61;&#61; 0;<br/></code></pre>
@@ -766,8 +739,7 @@ The aggregator exists and the integer dosex not exist when Switches from paralle
 <pre><code>fun switch_to_aggregator_and_zero_out(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator): u128<br/></code></pre>
 
 
-The integer exists and the aggregator does not exist when Switches from non-parallelizable to parallelizable implementation.
-The AggregatorFactory is under the @aptos_framework.
+The integer exists and the aggregator does not exist when Switches from non&#45;parallelizable to parallelizable implementation.<br/> The AggregatorFactory is under the @aptos_framework.
 
 
 <pre><code>let limit &#61; option::borrow(optional_aggregator.integer).limit;<br/>aborts_if len(optional_aggregator.integer.vec) &#61;&#61; 0;<br/>aborts_if !exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>aborts_if len(optional_aggregator.aggregator.vec) !&#61; 0;<br/>ensures is_parallelizable(optional_aggregator);<br/>ensures aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator)) &#61;&#61; limit;<br/>ensures aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator)) &#61;&#61; 0;<br/></code></pre>

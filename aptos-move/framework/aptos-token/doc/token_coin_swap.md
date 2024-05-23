@@ -66,7 +66,7 @@ TokenCoinSwap records a swap ask for swapping token_amount with CoinType with a 
 
 ## Resource `TokenListings`
 
-The listing of all tokens for swapping stored at token owner's account
+The listing of all tokens for swapping stored at token owner&apos;s account
 
 
 <pre><code>struct TokenListings&lt;CoinType&gt; has key<br/></code></pre>
@@ -295,7 +295,7 @@ Token already listed
 
 <a id="0x3_token_coin_swap_ETOKEN_AMOUNT_NOT_MATCH"></a>
 
-Token buy amount doesn't match listing amount
+Token buy amount doesn&apos;t match listing amount
 
 
 <pre><code>const ETOKEN_AMOUNT_NOT_MATCH: u64 &#61; 6;<br/></code></pre>
@@ -322,7 +322,7 @@ Token listing no longer exists
 
 <a id="0x3_token_coin_swap_ETOKEN_MIN_PRICE_NOT_MATCH"></a>
 
-Token buy price doesn't match listing price
+Token buy price doesn&apos;t match listing price
 
 
 <pre><code>const ETOKEN_MIN_PRICE_NOT_MATCH: u64 &#61; 5;<br/></code></pre>
@@ -362,7 +362,7 @@ Token is not in escrow
 
 ## Function `exchange_coin_for_token`
 
-Coin owner withdraw coin to swap with tokens listed for swapping at the token owner's address.
+Coin owner withdraw coin to swap with tokens listed for swapping at the token owner&apos;s address.
 
 
 <pre><code>public fun exchange_coin_for_token&lt;CoinType&gt;(_coin_owner: &amp;signer, _coin_amount: u64, _token_owner: address, _creators_address: address, _collection: string::String, _name: string::String, _property_version: u64, _token_amount: u64)<br/></code></pre>

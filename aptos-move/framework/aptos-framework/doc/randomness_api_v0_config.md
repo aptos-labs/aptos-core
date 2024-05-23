@@ -96,7 +96,7 @@ Only used in genesis.
 
 ## Function `set_for_next_epoch`
 
-This can be called by on-chain governance to update <code>RequiredGasDeposit</code> for the next epoch.
+This can be called by on&#45;chain governance to update <code>RequiredGasDeposit</code> for the next epoch.
 
 
 <pre><code>public fun set_for_next_epoch(framework: &amp;signer, gas_amount: option::Option&lt;u64&gt;)<br/></code></pre>
@@ -117,7 +117,7 @@ This can be called by on-chain governance to update <code>RequiredGasDeposit</co
 
 ## Function `set_allow_max_gas_flag_for_next_epoch`
 
-This can be called by on-chain governance to update <code>AllowCustomMaxGasFlag</code> for the next epoch.
+This can be called by on&#45;chain governance to update <code>AllowCustomMaxGasFlag</code> for the next epoch.
 
 
 <pre><code>public fun set_allow_max_gas_flag_for_next_epoch(framework: &amp;signer, value: bool)<br/></code></pre>

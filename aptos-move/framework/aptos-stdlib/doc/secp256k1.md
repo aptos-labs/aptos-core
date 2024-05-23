@@ -3,7 +3,7 @@
 
 # Module `0x1::secp256k1`
 
-This module implements ECDSA signatures based on the prime-order secp256k1 ellptic curve (i.e., cofactor is 1).
+This module implements ECDSA signatures based on the prime&#45;order secp256k1 ellptic curve (i.e., cofactor is 1).
 
 
 -  [Struct `ECDSARawPublicKey`](#0x1_secp256k1_ECDSARawPublicKey)
@@ -32,7 +32,7 @@ This module implements ECDSA signatures based on the prime-order secp256k1 ellpt
 
 ## Struct `ECDSARawPublicKey`
 
-A 64-byte ECDSA public key.
+A 64&#45;byte ECDSA public key.
 
 
 <pre><code>struct ECDSARawPublicKey has copy, drop, store<br/></code></pre>
@@ -59,7 +59,7 @@ A 64-byte ECDSA public key.
 
 ## Struct `ECDSASignature`
 
-A 64-byte ECDSA signature.
+A 64&#45;byte ECDSA signature.
 
 
 <pre><code>struct ECDSASignature has copy, drop, store<br/></code></pre>
@@ -89,7 +89,7 @@ A 64-byte ECDSA signature.
 
 <a id="0x1_secp256k1_SIGNATURE_NUM_BYTES"></a>
 
-The size of a secp256k1-based ECDSA signature, in bytes.
+The size of a secp256k1&#45;based ECDSA signature, in bytes.
 
 
 <pre><code>const SIGNATURE_NUM_BYTES: u64 &#61; 64;<br/></code></pre>
@@ -107,7 +107,7 @@ An error occurred while deserializing, for example due to wrong input size.
 
 <a id="0x1_secp256k1_RAW_PUBLIC_KEY_NUM_BYTES"></a>
 
-The size of a secp256k1-based ECDSA public key, in bytes.
+The size of a secp256k1&#45;based ECDSA public key, in bytes.
 
 
 <pre><code>const RAW_PUBLIC_KEY_NUM_BYTES: u64 &#61; 64;<br/></code></pre>
@@ -139,7 +139,7 @@ Constructs an ECDSASignature struct from the given 64 bytes.
 
 ## Function `ecdsa_raw_public_key_from_64_bytes`
 
-Constructs an ECDSARawPublicKey struct, given a 64-byte raw representation.
+Constructs an ECDSARawPublicKey struct, given a 64&#45;byte raw representation.
 
 
 <pre><code>public fun ecdsa_raw_public_key_from_64_bytes(bytes: vector&lt;u8&gt;): secp256k1::ECDSARawPublicKey<br/></code></pre>
@@ -160,7 +160,7 @@ Constructs an ECDSARawPublicKey struct, given a 64-byte raw representation.
 
 ## Function `ecdsa_raw_public_key_to_bytes`
 
-Serializes an ECDSARawPublicKey struct to 64-bytes.
+Serializes an ECDSARawPublicKey struct to 64&#45;bytes.
 
 
 <pre><code>public fun ecdsa_raw_public_key_to_bytes(pk: &amp;secp256k1::ECDSARawPublicKey): vector&lt;u8&gt;<br/></code></pre>
@@ -181,7 +181,7 @@ Serializes an ECDSARawPublicKey struct to 64-bytes.
 
 ## Function `ecdsa_signature_to_bytes`
 
-Serializes an ECDSASignature struct to 64-bytes.
+Serializes an ECDSASignature struct to 64&#45;bytes.
 
 
 <pre><code>public fun ecdsa_signature_to_bytes(sig: &amp;secp256k1::ECDSASignature): vector&lt;u8&gt;<br/></code></pre>
@@ -202,12 +202,7 @@ Serializes an ECDSASignature struct to 64-bytes.
 
 ## Function `ecdsa_recover`
 
-Recovers the signer's raw (64-byte) public key from a secp256k1 ECDSA <code>signature</code> given the <code>recovery_id</code> and the signed
-<code>message</code> (32 byte digest).
-
-Note that an invalid signature, or a signature from a different message, will result in the recovery of an
-incorrect public key. This recovery algorithm can only be used to check validity of a signature if the signer's
-public key (or its hash) is known beforehand.
+Recovers the signer&apos;s raw (64&#45;byte) public key from a secp256k1 ECDSA <code>signature</code> given the <code>recovery_id</code> and the signed<br/> <code>message</code> (32 byte digest).<br/><br/> Note that an invalid signature, or a signature from a different message, will result in the recovery of an<br/> incorrect public key. This recovery algorithm can only be used to check validity of a signature if the signer&apos;s<br/> public key (or its hash) is known beforehand.
 
 
 <pre><code>public fun ecdsa_recover(message: vector&lt;u8&gt;, recovery_id: u8, signature: &amp;secp256k1::ECDSASignature): option::Option&lt;secp256k1::ECDSARawPublicKey&gt;<br/></code></pre>
@@ -228,8 +223,7 @@ public key (or its hash) is known beforehand.
 
 ## Function `ecdsa_recover_internal`
 
-Returns <code>(public_key, true)</code> if <code>signature</code> verifies on <code>message</code> under the recovered <code>public_key</code>
-and returns <code>([], false)</code> otherwise.
+Returns <code>(public_key, true)</code> if <code>signature</code> verifies on <code>message</code> under the recovered <code>public_key</code><br/> and returns <code>([], false)</code> otherwise.
 
 
 <pre><code>fun ecdsa_recover_internal(message: vector&lt;u8&gt;, recovery_id: u8, signature: vector&lt;u8&gt;): (vector&lt;u8&gt;, bool)<br/></code></pre>

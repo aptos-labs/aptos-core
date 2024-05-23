@@ -66,8 +66,7 @@
 
 ## Struct `AUID`
 
-A wrapper denoting aptos unique identifer (AUID)
-for storing an address
+A wrapper denoting aptos unique identifer (AUID)<br/> for storing an address
 
 
 <pre><code>struct AUID has drop, store<br/></code></pre>
@@ -222,9 +221,7 @@ Returns the transaction hash of the current transaction.
 
 ## Function `get_transaction_hash`
 
-Returns the transaction hash of the current transaction.
-Internally calls the private function <code>get_txn_hash</code>.
-This function is created for to feature gate the <code>get_txn_hash</code> function.
+Returns the transaction hash of the current transaction.<br/> Internally calls the private function <code>get_txn_hash</code>.<br/> This function is created for to feature gate the <code>get_txn_hash</code> function.
 
 
 <pre><code>public fun get_transaction_hash(): vector&lt;u8&gt;<br/></code></pre>
@@ -245,13 +242,7 @@ This function is created for to feature gate the <code>get_txn_hash</code> funct
 
 ## Function `generate_unique_address`
 
-Returns a universally unique identifier (of type address) generated
-by hashing the transaction hash of this transaction and a sequence number
-specific to this transaction. This function can be called any
-number of times inside a single transaction. Each such call increments
-the sequence number and generates a new unique address.
-Uses Scheme in types/src/transaction/authenticator.rs for domain separation
-from other ways of generating unique addresses.
+Returns a universally unique identifier (of type address) generated<br/> by hashing the transaction hash of this transaction and a sequence number<br/> specific to this transaction. This function can be called any<br/> number of times inside a single transaction. Each such call increments<br/> the sequence number and generates a new unique address.<br/> Uses Scheme in types/src/transaction/authenticator.rs for domain separation<br/> from other ways of generating unique addresses.
 
 
 <pre><code>fun generate_unique_address(): address<br/></code></pre>
@@ -272,9 +263,7 @@ from other ways of generating unique addresses.
 
 ## Function `generate_auid_address`
 
-Returns a aptos unique identifier. Internally calls
-the private function <code>generate_unique_address</code>. This function is
-created for to feature gate the <code>generate_unique_address</code> function.
+Returns a aptos unique identifier. Internally calls<br/> the private function <code>generate_unique_address</code>. This function is<br/> created for to feature gate the <code>generate_unique_address</code> function.
 
 
 <pre><code>public fun generate_auid_address(): address<br/></code></pre>
@@ -316,8 +305,7 @@ Returns the script hash of the current entry function.
 
 ## Function `generate_auid`
 
-This method runs <code>generate_unique_address</code> native function and returns
-the generated unique address wrapped in the AUID class.
+This method runs <code>generate_unique_address</code> native function and returns<br/> the generated unique address wrapped in the AUID class.
 
 
 <pre><code>public fun generate_auid(): transaction_context::AUID<br/></code></pre>
@@ -359,8 +347,7 @@ Returns the unique address wrapped in the given AUID struct.
 
 ## Function `sender`
 
-Returns the sender's address for the current transaction.
-This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the sender&apos;s address for the current transaction.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
 <pre><code>public fun sender(): address<br/></code></pre>
@@ -401,9 +388,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 ## Function `secondary_signers`
 
-Returns the list of the secondary signers for the current transaction.
-If the current transaction has no secondary signers, this function returns an empty vector.
-This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the list of the secondary signers for the current transaction.<br/> If the current transaction has no secondary signers, this function returns an empty vector.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
 <pre><code>public fun secondary_signers(): vector&lt;address&gt;<br/></code></pre>
@@ -444,10 +429,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 ## Function `gas_payer`
 
-Returns the gas payer address for the current transaction.
-It is either the sender's address if no separate gas fee payer is specified for the current transaction,
-or the address of the separate gas fee payer if one is specified.
-This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the gas payer address for the current transaction.<br/> It is either the sender&apos;s address if no separate gas fee payer is specified for the current transaction,<br/> or the address of the separate gas fee payer if one is specified.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
 <pre><code>public fun gas_payer(): address<br/></code></pre>
@@ -488,8 +470,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 ## Function `max_gas_amount`
 
-Returns the max gas amount in units which is specified for the current transaction.
-This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the max gas amount in units which is specified for the current transaction.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
 <pre><code>public fun max_gas_amount(): u64<br/></code></pre>
@@ -530,8 +511,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 ## Function `gas_unit_price`
 
-Returns the gas unit price in Octas which is specified for the current transaction.
-This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the gas unit price in Octas which is specified for the current transaction.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
 <pre><code>public fun gas_unit_price(): u64<br/></code></pre>
@@ -572,8 +552,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 ## Function `chain_id`
 
-Returns the chain ID specified for the current transaction.
-This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the chain ID specified for the current transaction.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
 <pre><code>public fun chain_id(): u8<br/></code></pre>
@@ -614,8 +593,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 ## Function `entry_function_payload`
 
-Returns the entry function payload if the current transaction has such a payload. Otherwise, return <code>None</code>.
-This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the entry function payload if the current transaction has such a payload. Otherwise, return <code>None</code>.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
 <pre><code>public fun entry_function_payload(): option::Option&lt;transaction_context::EntryFunctionPayload&gt;<br/></code></pre>
@@ -761,8 +739,7 @@ Returns the arguments of the entry function payload.
 
 ## Function `multisig_payload`
 
-Returns the multisig payload if the current transaction has such a payload. Otherwise, return <code>None</code>.
-This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the multisig payload if the current transaction has such a payload. Otherwise, return <code>None</code>.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
 <pre><code>public fun multisig_payload(): option::Option&lt;transaction_context::MultisigPayload&gt;<br/></code></pre>
@@ -878,7 +855,7 @@ Returns the inner entry function payload of the multisig payload.
 
 
 
-<pre><code>pragma opaque;<br/>aborts_if [abstract] false;<br/>ensures result &#61;&#61; spec_get_txn_hash();<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>pragma opaque;<br/>aborts_if [abstract] false;<br/>ensures result &#61;&#61; spec_get_txn_hash();<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 ensures [abstract] len(result) &#61;&#61; 32;<br/></code></pre>
 
 
@@ -915,7 +892,7 @@ ensures [abstract] len(result) &#61;&#61; 32;<br/></code></pre>
 
 
 
-<pre><code>pragma opaque;<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>pragma opaque;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 ensures [abstract] result &#61;&#61; spec_generate_unique_address();<br/></code></pre>
 
 
@@ -935,44 +912,17 @@ ensures [abstract] result &#61;&#61; spec_generate_unique_address();<br/></code>
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>Fetching the transaction hash should return a vector with 32 bytes.</td>
-<td>Medium</td>
-<td>The get_transaction_hash function calls the native function get_txn_hash, which fetches the NativeTransactionContext struct and returns the txn_hash field.</td>
-<td>Audited that the native function returns the txn hash, whose size is 32 bytes. This has been modeled as the abstract postcondition that the returned vector is of length 32. Formally verified via <a href="#high-level-req-1">get_txn_hash</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Fetching the transaction hash should return a vector with 32 bytes.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The get_transaction_hash function calls the native function get_txn_hash, which fetches the NativeTransactionContext struct and returns the txn_hash field.&lt;/td&gt;<br/>&lt;td&gt;Audited that the native function returns the txn hash, whose size is 32 bytes. This has been modeled as the abstract postcondition that the returned vector is of length 32. Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;get_txn_hash&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>Fetching the unique address should never abort.</td>
-<td>Low</td>
-<td>The function auid_address returns the unique address from a supplied AUID resource.</td>
-<td>Formally verified via <a href="#high-level-req-2">auid_address</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;Fetching the unique address should never abort.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The function auid_address returns the unique address from a supplied AUID resource.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;auid_address&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>Generating the unique address should return a vector with 32 bytes.</td>
-<td>Medium</td>
-<td>The generate_auid_address function checks calls the native function generate_unique_address which fetches the NativeTransactionContext struct, increments the auid_counter by one, and then creates a new authentication key from a preimage, which is then returned.</td>
-<td>Audited that the native function returns an address, and the length of an address is 32 bytes. This has been modeled as the abstract postcondition that the returned vector is of length 32. Formally verified via <a href="#high-level-req-3">generate_auid_address</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Generating the unique address should return a vector with 32 bytes.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The generate_auid_address function checks calls the native function generate_unique_address which fetches the NativeTransactionContext struct, increments the auid_counter by one, and then creates a new authentication key from a preimage, which is then returned.&lt;/td&gt;<br/>&lt;td&gt;Audited that the native function returns an address, and the length of an address is 32 bytes. This has been modeled as the abstract postcondition that the returned vector is of length 32. Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;generate_auid_address&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>Fetching the script hash of the current entry function should never fail and should return a vector with 32 bytes if the transaction payload is a script, otherwise an empty vector.</td>
-<td>Low</td>
-<td>The native function get_script_hash returns the NativeTransactionContext.script_hash field.</td>
-<td>Audited that the native function holds the required property. This has been modeled as the abstract spec. Formally verified via <a href="#high-level-req-4">get_script_hash</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;Fetching the script hash of the current entry function should never fail and should return a vector with 32 bytes if the transaction payload is a script, otherwise an empty vector.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The native function get_script_hash returns the NativeTransactionContext.script_hash field.&lt;/td&gt;<br/>&lt;td&gt;Audited that the native function holds the required property. This has been modeled as the abstract spec. Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;get_script_hash&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
 
 
@@ -981,7 +931,7 @@ ensures [abstract] result &#61;&#61; spec_generate_unique_address();<br/></code>
 ### Module-level Specification
 
 
-<pre><code>pragma opaque;<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<pre><code>pragma opaque;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
 aborts_if [abstract] false;<br/>ensures [abstract] result &#61;&#61; spec_get_script_hash();<br/>ensures [abstract] len(result) &#61;&#61; 32;<br/></code></pre>
 
 
@@ -1004,7 +954,7 @@ aborts_if [abstract] false;<br/>ensures [abstract] result &#61;&#61; spec_get_sc
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 

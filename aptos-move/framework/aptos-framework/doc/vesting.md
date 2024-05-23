@@ -3,41 +3,7 @@
 
 # Module `0x1::vesting`
 
-
-Simple vesting contract that allows specifying how much APT coins should be vesting in each fixed-size period. The
-vesting contract also comes with staking and allows shareholders to withdraw rewards anytime.
-
-Vesting schedule is represented as a vector of distributions. For example, a vesting schedule of
-[3/48, 3/48, 1/48] means that after the vesting starts:
-1. The first and second periods will vest 3/48 of the total original grant.
-2. The third period will vest 1/48.
-3. All subsequent periods will also vest 1/48 (last distribution in the schedule) until the original grant runs out.
-
-Shareholder flow:
-1. Admin calls create_vesting_contract with a schedule of [3/48, 3/48, 1/48] with a vesting cliff of 1 year and
-vesting period of 1 month.
-2. After a month, a shareholder calls unlock_rewards to request rewards. They can also call vest() which would also
-unlocks rewards but since the 1 year cliff has not passed (vesting has not started), vest() would not release any of
-the original grant.
-3. After the unlocked rewards become fully withdrawable (as it's subject to staking lockup), shareholders can call
-distribute() to send all withdrawable funds to all shareholders based on the original grant's shares structure.
-4. After 1 year and 1 month, the vesting schedule now starts. Shareholders call vest() to unlock vested coins. vest()
-checks the schedule and unlocks 3/48 of the original grant in addition to any accumulated rewards since last
-unlock_rewards(). Once the unlocked coins become withdrawable, shareholders can call distribute().
-5. Assuming the shareholders forgot to call vest() for 2 months, when they call vest() again, they will unlock vested
-tokens for the next period since last vest. This would be for the first month they missed. They can call vest() a
-second time to unlock for the second month they missed.
-
-Admin flow:
-1. After creating the vesting contract, admin cannot change the vesting schedule.
-2. Admin can call update_voter, update_operator, or reset_lockup at any time to update the underlying staking
-contract.
-3. Admin can also call update_beneficiary for any shareholder. This would send all distributions (rewards, vested
-coins) of that shareholder to the beneficiary account. By defalt, if a beneficiary is not set, the distributions are
-send directly to the shareholder account.
-4. Admin can call terminate_vesting_contract to terminate the vesting. This would first finish any distribution but
-will prevent any further rewards or vesting distributions from being created. Once the locked up stake becomes
-withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting contract's withdrawal address.
+<br/> Simple vesting contract that allows specifying how much APT coins should be vesting in each fixed&#45;size period. The<br/> vesting contract also comes with staking and allows shareholders to withdraw rewards anytime.<br/><br/> Vesting schedule is represented as a vector of distributions. For example, a vesting schedule of<br/> [3/48, 3/48, 1/48] means that after the vesting starts:<br/> 1. The first and second periods will vest 3/48 of the total original grant.<br/> 2. The third period will vest 1/48.<br/> 3. All subsequent periods will also vest 1/48 (last distribution in the schedule) until the original grant runs out.<br/><br/> Shareholder flow:<br/> 1. Admin calls create_vesting_contract with a schedule of [3/48, 3/48, 1/48] with a vesting cliff of 1 year and<br/> vesting period of 1 month.<br/> 2. After a month, a shareholder calls unlock_rewards to request rewards. They can also call vest() which would also<br/> unlocks rewards but since the 1 year cliff has not passed (vesting has not started), vest() would not release any of<br/> the original grant.<br/> 3. After the unlocked rewards become fully withdrawable (as it&apos;s subject to staking lockup), shareholders can call<br/> distribute() to send all withdrawable funds to all shareholders based on the original grant&apos;s shares structure.<br/> 4. After 1 year and 1 month, the vesting schedule now starts. Shareholders call vest() to unlock vested coins. vest()<br/> checks the schedule and unlocks 3/48 of the original grant in addition to any accumulated rewards since last<br/> unlock_rewards(). Once the unlocked coins become withdrawable, shareholders can call distribute().<br/> 5. Assuming the shareholders forgot to call vest() for 2 months, when they call vest() again, they will unlock vested<br/> tokens for the next period since last vest. This would be for the first month they missed. They can call vest() a<br/> second time to unlock for the second month they missed.<br/><br/> Admin flow:<br/> 1. After creating the vesting contract, admin cannot change the vesting schedule.<br/> 2. Admin can call update_voter, update_operator, or reset_lockup at any time to update the underlying staking<br/> contract.<br/> 3. Admin can also call update_beneficiary for any shareholder. This would send all distributions (rewards, vested<br/> coins) of that shareholder to the beneficiary account. By defalt, if a beneficiary is not set, the distributions are<br/> send directly to the shareholder account.<br/> 4. Admin can call terminate_vesting_contract to terminate the vesting. This would first finish any distribution but<br/> will prevent any further rewards or vesting distributions from being created. Once the locked up stake becomes<br/> withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting contract&apos;s withdrawal address.
 
 
 -  [Struct `VestingSchedule`](#0x1_vesting_VestingSchedule)
@@ -1441,7 +1407,7 @@ The vesting account has no such management role.
 
 <a id="0x1_vesting_ESHARES_LENGTH_MISMATCH"></a>
 
-The length of shareholders and shares lists don't match.
+The length of shareholders and shares lists don&apos;t match.
 
 
 <pre><code>const ESHARES_LENGTH_MISMATCH: u64 &#61; 5;<br/></code></pre>
@@ -1450,7 +1416,7 @@ The length of shareholders and shares lists don't match.
 
 <a id="0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION"></a>
 
-Zero items were provided to a *_many function.
+Zero items were provided to a &#42;_many function.
 
 
 <pre><code>const EVEC_EMPTY_FOR_MANY_FUNCTION: u64 &#61; 16;<br/></code></pre>
@@ -1540,8 +1506,7 @@ Roles that can manage certain aspects of the vesting account beyond the main adm
 
 <a id="0x1_vesting_VESTING_POOL_ACTIVE"></a>
 
-Vesting contract states.
-Vesting contract is active and distributions can be made.
+Vesting contract states.<br/> Vesting contract is active and distributions can be made.
 
 
 <pre><code>const VESTING_POOL_ACTIVE: u64 &#61; 1;<br/></code></pre>
@@ -1569,9 +1534,7 @@ Vesting contract has been terminated and all funds have been released back to th
 
 ## Function `stake_pool_address`
 
-Return the address of the underlying stake pool (separate resource account) of the vesting contract.
-
-This errors out if the vesting contract with the provided address doesn't exist.
+Return the address of the underlying stake pool (separate resource account) of the vesting contract.<br/><br/> This errors out if the vesting contract with the provided address doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun stake_pool_address(vesting_contract_address: address): address<br/></code></pre>
@@ -1592,10 +1555,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 ## Function `vesting_start_secs`
 
-Return the vesting start timestamp (in seconds) of the vesting contract.
-Vesting will start at this time, and once a full period has passed, the first vest will become unlocked.
-
-This errors out if the vesting contract with the provided address doesn't exist.
+Return the vesting start timestamp (in seconds) of the vesting contract.<br/> Vesting will start at this time, and once a full period has passed, the first vest will become unlocked.<br/><br/> This errors out if the vesting contract with the provided address doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun vesting_start_secs(vesting_contract_address: address): u64<br/></code></pre>
@@ -1616,10 +1576,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 ## Function `period_duration_secs`
 
-Return the duration of one vesting period (in seconds).
-Each vest is released after one full period has started, starting from the specified start_timestamp_secs.
-
-This errors out if the vesting contract with the provided address doesn't exist.
+Return the duration of one vesting period (in seconds).<br/> Each vest is released after one full period has started, starting from the specified start_timestamp_secs.<br/><br/> This errors out if the vesting contract with the provided address doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun period_duration_secs(vesting_contract_address: address): u64<br/></code></pre>
@@ -1640,12 +1597,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 ## Function `remaining_grant`
 
-Return the remaining grant, consisting of unvested coins that have not been distributed to shareholders.
-Prior to start_timestamp_secs, the remaining grant will always be equal to the original grant.
-Once vesting has started, and vested tokens are distributed, the remaining grant will decrease over time,
-according to the vesting schedule.
-
-This errors out if the vesting contract with the provided address doesn't exist.
+Return the remaining grant, consisting of unvested coins that have not been distributed to shareholders.<br/> Prior to start_timestamp_secs, the remaining grant will always be equal to the original grant.<br/> Once vesting has started, and vested tokens are distributed, the remaining grant will decrease over time,<br/> according to the vesting schedule.<br/><br/> This errors out if the vesting contract with the provided address doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun remaining_grant(vesting_contract_address: address): u64<br/></code></pre>
@@ -1666,10 +1618,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 ## Function `beneficiary`
 
-Return the beneficiary account of the specified shareholder in a vesting contract.
-This is the same as the shareholder address by default and only different if it's been explicitly set.
-
-This errors out if the vesting contract with the provided address doesn't exist.
+Return the beneficiary account of the specified shareholder in a vesting contract.<br/> This is the same as the shareholder address by default and only different if it&apos;s been explicitly set.<br/><br/> This errors out if the vesting contract with the provided address doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun beneficiary(vesting_contract_address: address, shareholder: address): address<br/></code></pre>
@@ -1690,9 +1639,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 ## Function `operator_commission_percentage`
 
-Return the percentage of accumulated rewards that is paid to the operator as commission.
-
-This errors out if the vesting contract with the provided address doesn't exist.
+Return the percentage of accumulated rewards that is paid to the operator as commission.<br/><br/> This errors out if the vesting contract with the provided address doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun operator_commission_percentage(vesting_contract_address: address): u64<br/></code></pre>
@@ -1734,9 +1681,7 @@ Return all the vesting contracts a given address is an admin of.
 
 ## Function `operator`
 
-Return the operator who runs the validator for the vesting contract.
-
-This errors out if the vesting contract with the provided address doesn't exist.
+Return the operator who runs the validator for the vesting contract.<br/><br/> This errors out if the vesting contract with the provided address doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun operator(vesting_contract_address: address): address<br/></code></pre>
@@ -1757,10 +1702,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 ## Function `voter`
 
-Return the voter who will be voting on on-chain governance proposals on behalf of the vesting contract's stake
-pool.
-
-This errors out if the vesting contract with the provided address doesn't exist.
+Return the voter who will be voting on on&#45;chain governance proposals on behalf of the vesting contract&apos;s stake<br/> pool.<br/><br/> This errors out if the vesting contract with the provided address doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun voter(vesting_contract_address: address): address<br/></code></pre>
@@ -1781,15 +1723,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 ## Function `vesting_schedule`
 
-Return the vesting contract's vesting schedule. The core schedule is represented as a list of u64-based
-fractions, where the rightmmost 32 bits can be divided by 2^32 to get the fraction, and anything else is the
-whole number.
-
-For example 3/48, or 0.0625, will be represented as 268435456. The fractional portion would be
-268435456 / 2^32 = 0.0625. Since there are fewer than 32 bits, the whole number portion is effectively 0.
-So 268435456 = 0.0625.
-
-This errors out if the vesting contract with the provided address doesn't exist.
+Return the vesting contract&apos;s vesting schedule. The core schedule is represented as a list of u64&#45;based<br/> fractions, where the rightmmost 32 bits can be divided by 2^32 to get the fraction, and anything else is the<br/> whole number.<br/><br/> For example 3/48, or 0.0625, will be represented as 268435456. The fractional portion would be<br/> 268435456 / 2^32 &#61; 0.0625. Since there are fewer than 32 bits, the whole number portion is effectively 0.<br/> So 268435456 &#61; 0.0625.<br/><br/> This errors out if the vesting contract with the provided address doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun vesting_schedule(vesting_contract_address: address): vesting::VestingSchedule<br/></code></pre>
@@ -1810,10 +1744,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 ## Function `total_accumulated_rewards`
 
-Return the total accumulated rewards that have not been distributed to shareholders of the vesting contract.
-This excludes any unpaid commission that the operator has not collected.
-
-This errors out if the vesting contract with the provided address doesn't exist.
+Return the total accumulated rewards that have not been distributed to shareholders of the vesting contract.<br/> This excludes any unpaid commission that the operator has not collected.<br/><br/> This errors out if the vesting contract with the provided address doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun total_accumulated_rewards(vesting_contract_address: address): u64<br/></code></pre>
@@ -1834,10 +1765,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 ## Function `accumulated_rewards`
 
-Return the accumulated rewards that have not been distributed to the provided shareholder. Caller can also pass
-the beneficiary address instead of shareholder address.
-
-This errors out if the vesting contract with the provided address doesn't exist.
+Return the accumulated rewards that have not been distributed to the provided shareholder. Caller can also pass<br/> the beneficiary address instead of shareholder address.<br/><br/> This errors out if the vesting contract with the provided address doesn&apos;t exist.
 
 
 <pre><code>&#35;[view]<br/>public fun accumulated_rewards(vesting_contract_address: address, shareholder_or_beneficiary: address): u64<br/></code></pre>
@@ -1879,11 +1807,7 @@ Return the list of all shareholders in the vesting contract.
 
 ## Function `shareholder`
 
-Return the shareholder address given the beneficiary address in a given vesting contract. If there are multiple
-shareholders with the same beneficiary address, only the first shareholder is returned. If the given beneficiary
-address is actually a shareholder address, just return the address back.
-
-This returns 0x0 if no shareholder is found for the given beneficiary / the address is not a shareholder itself.
+Return the shareholder address given the beneficiary address in a given vesting contract. If there are multiple<br/> shareholders with the same beneficiary address, only the first shareholder is returned. If the given beneficiary<br/> address is actually a shareholder address, just return the address back.<br/><br/> This returns 0x0 if no shareholder is found for the given beneficiary / the address is not a shareholder itself.
 
 
 <pre><code>&#35;[view]<br/>public fun shareholder(vesting_contract_address: address, shareholder_or_beneficiary: address): address<br/></code></pre>
@@ -2093,8 +2017,7 @@ Terminate the vesting contract and send all funds back to the withdrawal address
 
 ## Function `admin_withdraw`
 
-Withdraw all funds to the preset vesting contract's withdrawal address. This can only be called if the contract
-has already been terminated.
+Withdraw all funds to the preset vesting contract&apos;s withdrawal address. This can only be called if the contract<br/> has already been terminated.
 
 
 <pre><code>public entry fun admin_withdraw(admin: &amp;signer, contract_address: address)<br/></code></pre>
@@ -2235,8 +2158,7 @@ has already been terminated.
 
 ## Function `reset_beneficiary`
 
-Remove the beneficiary for the given shareholder. All distributions will sent directly to the shareholder
-account.
+Remove the beneficiary for the given shareholder. All distributions will sent directly to the shareholder<br/> account.
 
 
 <pre><code>public entry fun reset_beneficiary(account: &amp;signer, contract_address: address, shareholder: address)<br/></code></pre>
@@ -2338,9 +2260,7 @@ Set the beneficiary for the operator.
 
 ## Function `get_vesting_account_signer`
 
-For emergency use in case the admin needs emergency control of vesting contract account.
-This doesn't give the admin total power as the admin would still need to follow the rules set by
-staking_contract and stake modules.
+For emergency use in case the admin needs emergency control of vesting contract account.<br/> This doesn&apos;t give the admin total power as the admin would still need to follow the rules set by<br/> staking_contract and stake modules.
 
 
 <pre><code>public fun get_vesting_account_signer(admin: &amp;signer, contract_address: address): signer<br/></code></pre>
@@ -2381,8 +2301,7 @@ staking_contract and stake modules.
 
 ## Function `create_vesting_contract_account`
 
-Create a salt for generating the resource accounts that will be holding the VestingContract.
-This address should be deterministic for the same admin and vesting contract creation nonce.
+Create a salt for generating the resource accounts that will be holding the VestingContract.<br/> This address should be deterministic for the same admin and vesting contract creation nonce.
 
 
 <pre><code>fun create_vesting_contract_account(admin: &amp;signer, contract_creation_seed: vector&lt;u8&gt;): (signer, account::SignerCapability)<br/></code></pre>
@@ -2530,100 +2449,31 @@ This address should be deterministic for the same admin and vesting contract cre
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>In order to retrieve the address of the underlying stake pool, the vesting start timestamp of the vesting contract, the duration of the vesting period, the remaining grant of a vesting contract, the beneficiary account of a shareholder in a vesting contract, the percentage of accumulated rewards that is paid to the operator as commission, the operator who runs the validator, the voter who will be voting on-chain, and the vesting schedule of a vesting contract, the supplied vesting contract should exist.</td>
-<td>Low</td>
-<td>The vesting_start_secs, period_duration_secs, remaining_grant, beneficiary, operator_commission_percentage, operator, voter, and vesting_schedule functions ensure that the supplied vesting contract address exists by calling the assert_vesting_contract_exists function.</td>
-<td>Formally verified via <a href="#high-level-req-1">assert_vesting_contract_exists</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;In order to retrieve the address of the underlying stake pool, the vesting start timestamp of the vesting contract, the duration of the vesting period, the remaining grant of a vesting contract, the beneficiary account of a shareholder in a vesting contract, the percentage of accumulated rewards that is paid to the operator as commission, the operator who runs the validator, the voter who will be voting on&#45;chain, and the vesting schedule of a vesting contract, the supplied vesting contract should exist.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The vesting_start_secs, period_duration_secs, remaining_grant, beneficiary, operator_commission_percentage, operator, voter, and vesting_schedule functions ensure that the supplied vesting contract address exists by calling the assert_vesting_contract_exists function.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;assert_vesting_contract_exists&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The vesting pool should not exceed a maximum of 30 shareholders.</td>
-<td>Medium</td>
-<td>The maximum number of shareholders a vesting pool can support is stored as a constant in MAXIMUM_SHAREHOLDERS which is passed to the pool_u64::create function.</td>
-<td>Formally verified via a <a href="#high-level-spec-2">global invariant</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The vesting pool should not exceed a maximum of 30 shareholders.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The maximum number of shareholders a vesting pool can support is stored as a constant in MAXIMUM_SHAREHOLDERS which is passed to the pool_u64::create function.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via a &lt;a href&#61;&quot;&#35;high&#45;level&#45;spec&#45;2&quot;&gt;global invariant&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>Retrieving all the vesting contracts of a given address and retrieving the list of beneficiaries from a vesting contract should never fail.</td>
-<td>Medium</td>
-<td>The function vesting_contracts checks if the supplied admin address contains an AdminStore resource and returns all the vesting contracts as a vector<address>. Otherwise it returns an empty vector. The function get_beneficiary checks for a given vesting contract, a specific shareholder exists, and if so, the beneficiary will be returned, otherwise it will simply return the address of the shareholder.</td>
-<td>Formally verified via <a href="#high-level-spec-3.1">vesting_contracts</a> and <a href="#high-level-spec-3.2">get_beneficiary</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Retrieving all the vesting contracts of a given address and retrieving the list of beneficiaries from a vesting contract should never fail.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The function vesting_contracts checks if the supplied admin address contains an AdminStore resource and returns all the vesting contracts as a vector&lt;address&gt;. Otherwise it returns an empty vector. The function get_beneficiary checks for a given vesting contract, a specific shareholder exists, and if so, the beneficiary will be returned, otherwise it will simply return the address of the shareholder.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;spec&#45;3.1&quot;&gt;vesting_contracts&lt;/a&gt; and &lt;a href&#61;&quot;&#35;high&#45;level&#45;spec&#45;3.2&quot;&gt;get_beneficiary&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>The shareholders should be able to start vesting only after the vesting cliff and the first vesting period have transpired.</td>
-<td>High</td>
-<td>The end of the vesting cliff is stored under VestingContract.vesting_schedule.start_timestamp_secs. The vest function always checks that timestamp::now_seconds is greater or equal to the end of the vesting cliff period.</td>
-<td>Audited the check for the end of vesting cliff: <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/vesting.move#L566">vest</a> module.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The shareholders should be able to start vesting only after the vesting cliff and the first vesting period have transpired.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The end of the vesting cliff is stored under VestingContract.vesting_schedule.start_timestamp_secs. The vest function always checks that timestamp::now_seconds is greater or equal to the end of the vesting cliff period.&lt;/td&gt;<br/>&lt;td&gt;Audited the check for the end of vesting cliff: &lt;a href&#61;&quot;https://github.com/aptos&#45;labs/aptos&#45;core/blob/main/aptos&#45;move/framework/aptos&#45;framework/sources/vesting.move&#35;L566&quot;&gt;vest&lt;/a&gt; module.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>In order to retrieve the total accumulated rewards that have not been distributed, the accumulated rewards of a given beneficiary, the list of al shareholders in a vesting contract,the shareholder address given the beneficiary address in a given vesting contract, to terminate a vesting contract and to distribute any withdrawable stake from the stake pool, the supplied vesting contract should exist and be active.</td>
-<td>Low</td>
-<td>The distribute, terminate_vesting_contract, shareholder, shareholders, accumulated_rewards, and total_accumulated_rewards functions ensure that the supplied vesting contract address exists and is active by calling the assert_active_vesting_contract function.</td>
-<td>Formally verified via <a href="#high-level-spec-5">ActiveVestingContractAbortsIf</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;In order to retrieve the total accumulated rewards that have not been distributed, the accumulated rewards of a given beneficiary, the list of al shareholders in a vesting contract,the shareholder address given the beneficiary address in a given vesting contract, to terminate a vesting contract and to distribute any withdrawable stake from the stake pool, the supplied vesting contract should exist and be active.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The distribute, terminate_vesting_contract, shareholder, shareholders, accumulated_rewards, and total_accumulated_rewards functions ensure that the supplied vesting contract address exists and is active by calling the assert_active_vesting_contract function.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;spec&#45;5&quot;&gt;ActiveVestingContractAbortsIf&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>6</td>
-<td>A new vesting schedule should not be allowed to start vesting in the past or to supply an empty schedule or for the period duration to be zero.</td>
-<td>High</td>
-<td>The create_vesting_schedule function ensures that the length of the schedule vector is greater than 0, that the period duration is greater than 0 and that the start_timestamp_secs is greater or equal to timestamp::now_seconds.</td>
-<td>Formally verified via <a href="#high-level-req-6">create_vesting_schedule</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;6&lt;/td&gt;<br/>&lt;td&gt;A new vesting schedule should not be allowed to start vesting in the past or to supply an empty schedule or for the period duration to be zero.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The create_vesting_schedule function ensures that the length of the schedule vector is greater than 0, that the period duration is greater than 0 and that the start_timestamp_secs is greater or equal to timestamp::now_seconds.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6&quot;&gt;create_vesting_schedule&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>7</td>
-<td>The shareholders should be able to vest the tokens from previous periods.</td>
-<td>High</td>
-<td>When vesting, the last_completed_period is checked against the next period to vest. This allows to unlock vested tokens for the next period since last vested, in case they didn't call vest for some periods.</td>
-<td>Audited that vesting doesn't skip periods, but gradually increments to allow shareholders to retrieve all the vested tokens.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;7&lt;/td&gt;<br/>&lt;td&gt;The shareholders should be able to vest the tokens from previous periods.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;When vesting, the last_completed_period is checked against the next period to vest. This allows to unlock vested tokens for the next period since last vested, in case they didn&apos;t call vest for some periods.&lt;/td&gt;<br/>&lt;td&gt;Audited that vesting doesn&apos;t skip periods, but gradually increments to allow shareholders to retrieve all the vested tokens.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>8</td>
-<td>Actions such as obtaining a list of shareholders, calculating accrued rewards, distributing withdrawable stake, and terminating the vesting contract should be accessible exclusively while the vesting contract remains active.</td>
-<td>Low</td>
-<td>Restricting access to inactive vesting contracts is achieved through the assert_active_vesting_contract function.</td>
-<td>Formally verified via <a href="#high-level-spec-8">ActiveVestingContractAbortsIf</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;8&lt;/td&gt;<br/>&lt;td&gt;Actions such as obtaining a list of shareholders, calculating accrued rewards, distributing withdrawable stake, and terminating the vesting contract should be accessible exclusively while the vesting contract remains active.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;Restricting access to inactive vesting contracts is achieved through the assert_active_vesting_contract function.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;spec&#45;8&quot;&gt;ActiveVestingContractAbortsIf&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>9</td>
-<td>The ability to terminate a vesting contract should only be available to the owner.</td>
-<td>High</td>
-<td>Limiting the access of accounts to specific function, is achieved by asserting that the signer matches the admin of the VestingContract.</td>
-<td>Formally verified via <a href="#high-level-req-9">verify_admin</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;9&lt;/td&gt;<br/>&lt;td&gt;The ability to terminate a vesting contract should only be available to the owner.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;Limiting the access of accounts to specific function, is achieved by asserting that the signer matches the admin of the VestingContract.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;9&quot;&gt;verify_admin&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>10</td>
-<td>A new vesting contract should not be allowed to have an empty list of shareholders, have a different amount of shareholders than buy-ins, and provide a withdrawal address which is either reserved or not registered for apt.</td>
-<td>High</td>
-<td>The create_vesting_contract function ensures that the withdrawal_address is not a reserved address, that it is registered for apt, that the list of shareholders is non-empty, and that the amount of shareholders matches the amount of buy_ins.</td>
-<td>Formally verified via <a href="#high-level-req-10">create_vesting_contract</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;10&lt;/td&gt;<br/>&lt;td&gt;A new vesting contract should not be allowed to have an empty list of shareholders, have a different amount of shareholders than buy&#45;ins, and provide a withdrawal address which is either reserved or not registered for apt.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The create_vesting_contract function ensures that the withdrawal_address is not a reserved address, that it is registered for apt, that the list of shareholders is non&#45;empty, and that the amount of shareholders matches the amount of buy_ins.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;10&quot;&gt;create_vesting_contract&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>11</td>
-<td>Creating a vesting contract account should require the signer (admin) to own an admin store and should enforce that the seed of the resource account is composed of the admin store's nonce, the vesting pool salt, and the custom contract creation seed.</td>
-<td>Medium</td>
-<td>The create_vesting_contract_account concatenates to the seed first the admin_store.nonce then the VESTING_POOL_SALT then the contract_creation_seed and then it is passed to the create_resource_account function.</td>
-<td>Enforced via <a href="#high-level-req-11">create_vesting_contract_account</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;11&lt;/td&gt;<br/>&lt;td&gt;Creating a vesting contract account should require the signer (admin) to own an admin store and should enforce that the seed of the resource account is composed of the admin store&apos;s nonce, the vesting pool salt, and the custom contract creation seed.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The create_vesting_contract_account concatenates to the seed first the admin_store.nonce then the VESTING_POOL_SALT then the contract_creation_seed and then it is passed to the create_resource_account function.&lt;/td&gt;<br/>&lt;td&gt;Enforced via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;11&quot;&gt;create_vesting_contract_account&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
 
 
@@ -2632,7 +2482,7 @@ This address should be deterministic for the same admin and vesting contract cre
 ### Module-level Specification
 
 
-<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/>// This enforces <a id="high-level-spec-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;spec&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 invariant forall a: address where exists&lt;VestingContract&gt;(a):<br/>    global&lt;VestingContract&gt;(a).grant_pool.shareholders_limit &lt;&#61; MAXIMUM_SHAREHOLDERS;<br/></code></pre>
 
 
@@ -2731,7 +2581,7 @@ invariant forall a: address where exists&lt;VestingContract&gt;(a):<br/>    glob
 
 
 
-<pre><code>// This enforces <a id="high-level-spec-3.1" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;spec&#45;3.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -2860,7 +2710,7 @@ aborts_if false;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-6" href="#high-level-req">high-level requirement 6</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
 aborts_if !(len(schedule) &gt; 0);<br/>aborts_if !(period_duration &gt; 0);<br/>aborts_if !exists&lt;timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);<br/>aborts_if !(start_timestamp_secs &gt;&#61; timestamp::now_seconds());<br/></code></pre>
 
 
@@ -2875,7 +2725,7 @@ aborts_if !(len(schedule) &gt; 0);<br/>aborts_if !(period_duration &gt; 0);<br/>
 
 
 
-<pre><code>pragma verify &#61; false;<br/>// This enforces <a id="high-level-req-10" href="#high-level-req">high-level requirement 10</a>:
+<pre><code>pragma verify &#61; false;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;10&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 10&lt;/a&gt;:
 aborts_if withdrawal_address &#61;&#61; @aptos_framework &#124;&#124; withdrawal_address &#61;&#61; @vm_reserved;<br/>aborts_if !exists&lt;account::Account&gt;(withdrawal_address);<br/>aborts_if !exists&lt;coin::CoinStore&lt;AptosCoin&gt;&gt;(withdrawal_address);<br/>aborts_if len(shareholders) &#61;&#61; 0;<br/>aborts_if simple_map::spec_len(buy_ins) !&#61; len(shareholders);<br/>ensures global&lt;VestingContract&gt;(result).grant_pool.shareholders_limit &#61;&#61; 30;<br/></code></pre>
 
 
@@ -3200,7 +3050,7 @@ aborts_if withdrawal_address &#61;&#61; @aptos_framework &#124;&#124; withdrawal
 
 
 
-<pre><code>pragma verify_duration_estimate &#61; 300;<br/>let admin_addr &#61; signer::address_of(admin);<br/>let admin_store &#61; global&lt;AdminStore&gt;(admin_addr);<br/>let seed &#61; bcs::to_bytes(admin_addr);<br/>let nonce &#61; bcs::to_bytes(admin_store.nonce);<br/>let first &#61; concat(seed, nonce);<br/>let second &#61; concat(first, VESTING_POOL_SALT);<br/>let end &#61; concat(second, contract_creation_seed);<br/>// This enforces <a id="high-level-req-11" href="#high-level-req">high-level requirement 11</a>:
+<pre><code>pragma verify_duration_estimate &#61; 300;<br/>let admin_addr &#61; signer::address_of(admin);<br/>let admin_store &#61; global&lt;AdminStore&gt;(admin_addr);<br/>let seed &#61; bcs::to_bytes(admin_addr);<br/>let nonce &#61; bcs::to_bytes(admin_store.nonce);<br/>let first &#61; concat(seed, nonce);<br/>let second &#61; concat(first, VESTING_POOL_SALT);<br/>let end &#61; concat(second, contract_creation_seed);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;11&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 11&lt;/a&gt;:
 let resource_addr &#61; account::spec_create_resource_address(admin_addr, end);<br/>aborts_if !exists&lt;AdminStore&gt;(admin_addr);<br/>aborts_if len(account::ZERO_AUTH_KEY) !&#61; 32;<br/>aborts_if admin_store.nonce &#43; 1 &gt; MAX_U64;<br/>let ea &#61; account::exists_at(resource_addr);<br/>include if (ea) account::CreateResourceAccountAbortsIf else account::CreateAccountAbortsIf &#123;addr: resource_addr&#125;;<br/>let acc &#61; global&lt;account::Account&gt;(resource_addr);<br/>let post post_acc &#61; global&lt;account::Account&gt;(resource_addr);<br/>aborts_if !exists&lt;coin::CoinStore&lt;AptosCoin&gt;&gt;(resource_addr) &amp;&amp; !aptos_std::type_info::spec_is_struct&lt;AptosCoin&gt;();<br/>aborts_if !exists&lt;coin::CoinStore&lt;AptosCoin&gt;&gt;(resource_addr) &amp;&amp; ea &amp;&amp; acc.guid_creation_num &#43; 2 &gt; MAX_U64;<br/>aborts_if !exists&lt;coin::CoinStore&lt;AptosCoin&gt;&gt;(resource_addr) &amp;&amp; ea &amp;&amp; acc.guid_creation_num &#43; 2 &gt;&#61; account::MAX_GUID_CREATION_NUM;<br/>ensures exists&lt;account::Account&gt;(resource_addr) &amp;&amp; post_acc.authentication_key &#61;&#61; account::ZERO_AUTH_KEY &amp;&amp;<br/>        exists&lt;coin::CoinStore&lt;AptosCoin&gt;&gt;(resource_addr);<br/>ensures signer::address_of(result_1) &#61;&#61; resource_addr;<br/>ensures result_2.account &#61;&#61; resource_addr;<br/></code></pre>
 
 
@@ -3215,7 +3065,7 @@ let resource_addr &#61; account::spec_create_resource_address(admin_addr, end);<
 
 
 
-<pre><code>// This enforces <a id="high-level-req-9" href="#high-level-req">high-level requirement 9</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;9&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 9&lt;/a&gt;:
 aborts_if signer::address_of(admin) !&#61; vesting_contract.admin;<br/></code></pre>
 
 
@@ -3230,7 +3080,7 @@ aborts_if signer::address_of(admin) !&#61; vesting_contract.admin;<br/></code></
 
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 aborts_if !exists&lt;VestingContract&gt;(contract_address);<br/></code></pre>
 
 
@@ -3311,7 +3161,7 @@ aborts_if !exists&lt;VestingContract&gt;(contract_address);<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-spec-3.2" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;spec&#45;3.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -3336,8 +3186,8 @@ aborts_if false;<br/></code></pre>
 <a id="0x1_vesting_ActiveVestingContractAbortsIf"></a>
 
 
-<pre><code>schema ActiveVestingContractAbortsIf&lt;VestingContract&gt; &#123;<br/>contract_address: address;<br/>// This enforces <a id="high-level-spec-5" href="#high-level-req">high-level requirement 5</a>:
-    aborts_if !exists&lt;VestingContract&gt;(contract_address);<br/>let vesting_contract &#61; global&lt;VestingContract&gt;(contract_address);<br/>// This enforces <a id="high-level-spec-8" href="#high-level-req">high-level requirement 8</a>:
+<pre><code>schema ActiveVestingContractAbortsIf&lt;VestingContract&gt; &#123;<br/>contract_address: address;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;spec&#45;5&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt;:
+    aborts_if !exists&lt;VestingContract&gt;(contract_address);<br/>let vesting_contract &#61; global&lt;VestingContract&gt;(contract_address);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;spec&#45;8&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 8&lt;/a&gt;:
     aborts_if vesting_contract.state !&#61; VESTING_POOL_ACTIVE;<br/>&#125;<br/></code></pre>
 
 

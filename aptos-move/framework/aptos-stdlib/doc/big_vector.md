@@ -50,8 +50,7 @@
 
 ## Struct `BigVector`
 
-A scalable vector implementation based on tables where elements are grouped into buckets.
-Each bucket has a capacity of <code>bucket_size</code> elements.
+A scalable vector implementation based on tables where elements are grouped into buckets.<br/> Each bucket has a capacity of <code>bucket_size</code> elements.
 
 
 <pre><code>struct BigVector&lt;T&gt; has store<br/></code></pre>
@@ -111,7 +110,7 @@ Cannot pop back from an empty vector
 
 <a id="0x1_big_vector_EVECTOR_NOT_EMPTY"></a>
 
-Cannot destroy a non-empty vector
+Cannot destroy a non&#45;empty vector
 
 
 <pre><code>const EVECTOR_NOT_EMPTY: u64 &#61; 2;<br/></code></pre>
@@ -131,8 +130,7 @@ bucket_size cannot be 0
 
 ## Function `empty`
 
-Regular Vector API
-Create an empty vector.
+Regular Vector API<br/> Create an empty vector.
 
 
 <pre><code>public(friend) fun empty&lt;T: store&gt;(bucket_size: u64): big_vector::BigVector&lt;T&gt;<br/></code></pre>
@@ -174,8 +172,7 @@ Create a vector of length 1 containing the passed in element.
 
 ## Function `destroy_empty`
 
-Destroy the vector <code>v</code>.
-Aborts if <code>v</code> is not empty.
+Destroy the vector <code>v</code>.<br/> Aborts if <code>v</code> is not empty.
 
 
 <pre><code>public fun destroy_empty&lt;T&gt;(v: big_vector::BigVector&lt;T&gt;)<br/></code></pre>
@@ -217,8 +214,7 @@ Destroy the vector <code>v</code> if T has <code>drop</code>
 
 ## Function `borrow`
 
-Acquire an immutable reference to the <code>i</code>th element of the vector <code>v</code>.
-Aborts if <code>i</code> is out of bounds.
+Acquire an immutable reference to the <code>i</code>th element of the vector <code>v</code>.<br/> Aborts if <code>i</code> is out of bounds.
 
 
 <pre><code>public fun borrow&lt;T&gt;(v: &amp;big_vector::BigVector&lt;T&gt;, i: u64): &amp;T<br/></code></pre>
@@ -239,8 +235,7 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `borrow_mut`
 
-Return a mutable reference to the <code>i</code>th element in the vector <code>v</code>.
-Aborts if <code>i</code> is out of bounds.
+Return a mutable reference to the <code>i</code>th element in the vector <code>v</code>.<br/> Aborts if <code>i</code> is out of bounds.
 
 
 <pre><code>public fun borrow_mut&lt;T&gt;(v: &amp;mut big_vector::BigVector&lt;T&gt;, i: u64): &amp;mut T<br/></code></pre>
@@ -261,9 +256,7 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `append`
 
-Empty and destroy the other vector, and push each of the elements in the other vector onto the lhs vector in the
-same order as they occurred in other.
-Disclaimer: This function is costly. Use it at your own discretion.
+Empty and destroy the other vector, and push each of the elements in the other vector onto the lhs vector in the<br/> same order as they occurred in other.<br/> Disclaimer: This function is costly. Use it at your own discretion.
 
 
 <pre><code>public fun append&lt;T: store&gt;(lhs: &amp;mut big_vector::BigVector&lt;T&gt;, other: big_vector::BigVector&lt;T&gt;)<br/></code></pre>
@@ -284,8 +277,7 @@ Disclaimer: This function is costly. Use it at your own discretion.
 
 ## Function `push_back`
 
-Add element <code>val</code> to the end of the vector <code>v</code>. It grows the buckets when the current buckets are full.
-This operation will cost more gas when it adds new bucket.
+Add element <code>val</code> to the end of the vector <code>v</code>. It grows the buckets when the current buckets are full.<br/> This operation will cost more gas when it adds new bucket.
 
 
 <pre><code>public fun push_back&lt;T: store&gt;(v: &amp;mut big_vector::BigVector&lt;T&gt;, val: T)<br/></code></pre>
@@ -306,9 +298,7 @@ This operation will cost more gas when it adds new bucket.
 
 ## Function `pop_back`
 
-Pop an element from the end of vector <code>v</code>. It doesn't shrink the buckets even if they're empty.
-Call <code>shrink_to_fit</code> explicity to deallocate empty buckets.
-Aborts if <code>v</code> is empty.
+Pop an element from the end of vector <code>v</code>. It doesn&apos;t shrink the buckets even if they&apos;re empty.<br/> Call <code>shrink_to_fit</code> explicity to deallocate empty buckets.<br/> Aborts if <code>v</code> is empty.
 
 
 <pre><code>public fun pop_back&lt;T&gt;(v: &amp;mut big_vector::BigVector&lt;T&gt;): T<br/></code></pre>
@@ -329,9 +319,7 @@ Aborts if <code>v</code> is empty.
 
 ## Function `remove`
 
-Remove the element at index i in the vector v and return the owned value that was previously stored at i in v.
-All elements occurring at indices greater than i will be shifted down by 1. Will abort if i is out of bounds.
-Disclaimer: This function is costly. Use it at your own discretion.
+Remove the element at index i in the vector v and return the owned value that was previously stored at i in v.<br/> All elements occurring at indices greater than i will be shifted down by 1. Will abort if i is out of bounds.<br/> Disclaimer: This function is costly. Use it at your own discretion.
 
 
 <pre><code>public fun remove&lt;T&gt;(v: &amp;mut big_vector::BigVector&lt;T&gt;, i: u64): T<br/></code></pre>
@@ -352,9 +340,7 @@ Disclaimer: This function is costly. Use it at your own discretion.
 
 ## Function `swap_remove`
 
-Swap the <code>i</code>th element of the vector <code>v</code> with the last element and then pop the vector.
-This is O(1), but does not preserve ordering of elements in the vector.
-Aborts if <code>i</code> is out of bounds.
+Swap the <code>i</code>th element of the vector <code>v</code> with the last element and then pop the vector.<br/> This is O(1), but does not preserve ordering of elements in the vector.<br/> Aborts if <code>i</code> is out of bounds.
 
 
 <pre><code>public fun swap_remove&lt;T&gt;(v: &amp;mut big_vector::BigVector&lt;T&gt;, i: u64): T<br/></code></pre>
@@ -375,8 +361,7 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `swap`
 
-Swap the elements at the i'th and j'th indices in the vector v. Will abort if either of i or j are out of bounds
-for v.
+Swap the elements at the i&apos;th and j&apos;th indices in the vector v. Will abort if either of i or j are out of bounds<br/> for v.
 
 
 <pre><code>public fun swap&lt;T&gt;(v: &amp;mut big_vector::BigVector&lt;T&gt;, i: u64, j: u64)<br/></code></pre>
@@ -397,8 +382,7 @@ for v.
 
 ## Function `reverse`
 
-Reverse the order of the elements in the vector v in-place.
-Disclaimer: This function is costly. Use it at your own discretion.
+Reverse the order of the elements in the vector v in&#45;place.<br/> Disclaimer: This function is costly. Use it at your own discretion.
 
 
 <pre><code>public fun reverse&lt;T&gt;(v: &amp;mut big_vector::BigVector&lt;T&gt;)<br/></code></pre>
@@ -419,9 +403,7 @@ Disclaimer: This function is costly. Use it at your own discretion.
 
 ## Function `index_of`
 
-Return the index of the first occurrence of an element in v that is equal to e. Returns (true, index) if such an
-element was found, and (false, 0) otherwise.
-Disclaimer: This function is costly. Use it at your own discretion.
+Return the index of the first occurrence of an element in v that is equal to e. Returns (true, index) if such an<br/> element was found, and (false, 0) otherwise.<br/> Disclaimer: This function is costly. Use it at your own discretion.
 
 
 <pre><code>public fun index_of&lt;T&gt;(v: &amp;big_vector::BigVector&lt;T&gt;, val: &amp;T): (bool, u64)<br/></code></pre>
@@ -442,8 +424,7 @@ Disclaimer: This function is costly. Use it at your own discretion.
 
 ## Function `contains`
 
-Return if an element equal to e exists in the vector v.
-Disclaimer: This function is costly. Use it at your own discretion.
+Return if an element equal to e exists in the vector v.<br/> Disclaimer: This function is costly. Use it at your own discretion.
 
 
 <pre><code>public fun contains&lt;T&gt;(v: &amp;big_vector::BigVector&lt;T&gt;, val: &amp;T): bool<br/></code></pre>
@@ -464,9 +445,7 @@ Disclaimer: This function is costly. Use it at your own discretion.
 
 ## Function `to_vector`
 
-Convert a big vector to a native vector, which is supposed to be called mostly by view functions to get an
-atomic view of the whole vector.
-Disclaimer: This function may be costly as the big vector may be huge in size. Use it at your own discretion.
+Convert a big vector to a native vector, which is supposed to be called mostly by view functions to get an<br/> atomic view of the whole vector.<br/> Disclaimer: This function may be costly as the big vector may be huge in size. Use it at your own discretion.
 
 
 <pre><code>public fun to_vector&lt;T: copy&gt;(v: &amp;big_vector::BigVector&lt;T&gt;): vector&lt;T&gt;<br/></code></pre>

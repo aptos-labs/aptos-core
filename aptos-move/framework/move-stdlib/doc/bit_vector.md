@@ -168,8 +168,7 @@ Unset the bit at <code>bit_index</code> in the <code>bitvector</code> regardless
 
 ## Function `shift_left`
 
-Shift the <code>bitvector</code> left by <code>amount</code>. If <code>amount</code> is greater than the
-bitvector's length the bitvector will be zeroed out.
+Shift the <code>bitvector</code> left by <code>amount</code>. If <code>amount</code> is greater than the<br/> bitvector&apos;s length the bitvector will be zeroed out.
 
 
 <pre><code>public fun shift_left(bitvector: &amp;mut bit_vector::BitVector, amount: u64)<br/></code></pre>
@@ -190,8 +189,7 @@ bitvector's length the bitvector will be zeroed out.
 
 ## Function `is_index_set`
 
-Return the value of the bit at <code>bit_index</code> in the <code>bitvector</code>. <code>true</code>
-represents "1" and <code>false</code> represents a 0
+Return the value of the bit at <code>bit_index</code> in the <code>bitvector</code>. <code>true</code><br/> represents &quot;1&quot; and <code>false</code> represents a 0
 
 
 <pre><code>public fun is_index_set(bitvector: &amp;bit_vector::BitVector, bit_index: u64): bool<br/></code></pre>
@@ -233,9 +231,7 @@ Return the length (number of usable bits) of this bitvector
 
 ## Function `longest_set_sequence_starting_at`
 
-Returns the length of the longest sequence of set bits starting at (and
-including) <code>start_index</code> in the <code>bitvector</code>. If there is no such
-sequence, then <code>0</code> is returned.
+Returns the length of the longest sequence of set bits starting at (and<br/> including) <code>start_index</code> in the <code>bitvector</code>. If there is no such<br/> sequence, then <code>0</code> is returned.
 
 
 <pre><code>public fun longest_set_sequence_starting_at(bitvector: &amp;bit_vector::BitVector, start_index: u64): u64<br/></code></pre>

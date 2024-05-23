@@ -3,226 +3,16 @@
 
 # Module `0x1::storage_gas`
 
-Gas parameters for global storage.
+Gas parameters for global storage.<br/><br/> &#35; General overview sections<br/><br/> [Definitions](&#35;definitions)<br/><br/> &#42; [Utilization dimensions](&#35;utilization&#45;dimensions)<br/> &#42; [Utilization ratios](&#35;utilization&#45;ratios)<br/> &#42; [Gas curve lookup](&#35;gas&#45;curve&#45;lookup)<br/> &#42; [Item&#45;wise operations](&#35;item&#45;wise&#45;operations)<br/> &#42; [Byte&#45;wise operations](&#35;byte&#45;wise&#45;operations)<br/><br/> [Function dependencies](&#35;function&#45;dependencies)<br/><br/> &#42; [Initialization](&#35;initialization)<br/> &#42; [Reconfiguration](&#35;reconfiguration)<br/> &#42; [Setting configurations](&#35;setting&#45;configurations)<br/><br/> &#35; Definitions<br/><br/> &#35;&#35; Utilization dimensions<br/><br/> Global storage gas fluctuates each epoch based on total utilization,<br/> which is defined across two dimensions:<br/><br/> 1. The number of &quot;items&quot; in global storage.<br/> 2. The number of bytes in global storage.<br/><br/> &quot;Items&quot; include:<br/><br/> 1. Resources having the <code>key</code> attribute, which have been moved into<br/>    global storage via a <code>move_to()</code> operation.<br/> 2.  Table entries.<br/><br/> &#35;&#35; Utilization ratios<br/><br/> <code>initialize()</code> sets an arbitrary &quot;target&quot; utilization for both<br/> item&#45;wise and byte&#45;wise storage, then each epoch, gas parameters are<br/> reconfigured based on the &quot;utilization ratio&quot; for each of the two<br/> utilization dimensions. The utilization ratio for a given dimension,<br/> either item&#45;wise or byte&#45;wise, is taken as the quotient of actual<br/> utilization and target utilization. For example, given a 500 GB<br/> target and 250 GB actual utilization, the byte&#45;wise utilization<br/> ratio is 50%.<br/><br/> See <code>base_8192_exponential_curve()</code> for mathematical definitions.<br/><br/> &#35;&#35; Gas curve lookup<br/><br/> The utilization ratio in a given epoch is used as a lookup value in<br/> a Eulerian approximation to an exponential curve, known as a<br/> <code>GasCurve</code>, which is defined in <code>base_8192_exponential_curve()</code>,<br/> based on a minimum gas charge and a maximum gas charge.<br/><br/> The minimum gas charge and maximum gas charge at the endpoints of<br/> the curve are set in <code>initialize()</code>, and correspond to the following<br/> operations defined in <code>StorageGas</code>:<br/><br/> 1. Per&#45;item read<br/> 2. Per&#45;item create<br/> 3. Per&#45;item write<br/> 4. Per&#45;byte read<br/> 5. Per&#45;byte create<br/> 6. Per&#45;byte write<br/><br/> For example, if the byte&#45;wise utilization ratio is 50%, then<br/> per&#45;byte reads will charge the minimum per&#45;byte gas cost, plus<br/> 1.09% of the difference between the maximum and the minimum cost.<br/> See <code>base_8192_exponential_curve()</code> for a supporting calculation.<br/><br/> &#35;&#35; Item&#45;wise operations<br/><br/> 1. Per&#45;item read gas is assessed whenever an item is read from<br/>    global storage via <code>borrow_global&lt;T&gt;()</code> or via a table entry read<br/>    operation.<br/> 2. Per&#45;item create gas is assessed whenever an item is created in<br/>    global storage via <code>move_to&lt;T&gt;()</code> or via a table entry creation<br/>    operation.<br/> 3. Per&#45;item write gas is assessed whenever an item is overwritten in<br/>    global storage via <code>borrow_global_mut&lt;T&gt;</code> or via a table entry<br/>    mutation operation.<br/><br/> &#35;&#35; Byte&#45;wise operations<br/><br/> Byte&#45;wise operations are assessed in a manner similar to per&#45;item<br/> operations, but account for the number of bytes affected by the<br/> given operation. Notably, this number denotes the total number of<br/> bytes in an &#42;entire item&#42;.<br/><br/> For example, if an operation mutates a <code>u8</code> field in a resource that<br/> has 5 other <code>u128</code> fields, the per&#45;byte gas write cost will account<br/> for $(5 &#42; 128) / 8 &#43; 1 &#61; 81$ bytes. Vectors are similarly treated<br/> as fields.<br/><br/> &#35; Function dependencies<br/><br/> The below dependency chart uses <code>mermaid.js</code> syntax, which can be<br/> automatically rendered into a diagram (depending on the browser)<br/> when viewing the documentation file generated from source code. If<br/> a browser renders the diagrams with coloring that makes it difficult<br/> to read, try a different browser.<br/><br/> &#35;&#35; Initialization<br/><br/> ```mermaid<br/><br/> flowchart LR<br/><br/> initialize &#45;&#45;&gt; base_8192_exponential_curve<br/> base_8192_exponential_curve &#45;&#45;&gt; new_gas_curve<br/> base_8192_exponential_curve &#45;&#45;&gt; new_point<br/> new_gas_curve &#45;&#45;&gt; validate_points<br/><br/> ```<br/><br/> &#35;&#35; Reconfiguration<br/><br/> ```mermaid<br/><br/> flowchart LR<br/><br/> calculate_gas &#45;&#45;&gt; Interpolate %% capitalized<br/> calculate_read_gas &#45;&#45;&gt; calculate_gas<br/> calculate_create_gas &#45;&#45;&gt; calculate_gas<br/> calculate_write_gas &#45;&#45;&gt; calculate_gas<br/> on_reconfig &#45;&#45;&gt; calculate_read_gas<br/> on_reconfig &#45;&#45;&gt; calculate_create_gas<br/> on_reconfig &#45;&#45;&gt; calculate_write_gas<br/> reconfiguration::reconfigure &#45;&#45;&gt; on_reconfig<br/><br/> ```<br/><br/> Here, the function <code>interpolate()</code> is spelled <code>Interpolate</code> because<br/> <code>interpolate</code> is a reserved word in <code>mermaid.js</code>.<br/><br/> &#35;&#35; Setting configurations<br/><br/> ```mermaid<br/><br/> flowchart LR<br/><br/> gas_schedule::set_storage_gas_config &#45;&#45;&gt; set_config<br/><br/> ```<br/><br/> &#35; Complete docgen index<br/><br/> The below index is automatically generated from source code:
 
 
-<a id="@General_overview_sections_0"></a>
-
-## General overview sections
-
-
-[Definitions](#definitions)
-
-* [Utilization dimensions](#utilization-dimensions)
-* [Utilization ratios](#utilization-ratios)
-* [Gas curve lookup](#gas-curve-lookup)
-* [Item-wise operations](#item-wise-operations)
-* [Byte-wise operations](#byte-wise-operations)
-
-[Function dependencies](#function-dependencies)
-
-* [Initialization](#initialization)
-* [Reconfiguration](#reconfiguration)
-* [Setting configurations](#setting-configurations)
-
-
-<a id="@Definitions_1"></a>
-
-## Definitions
-
-
-
-<a id="@Utilization_dimensions_2"></a>
-
-### Utilization dimensions
-
-
-Global storage gas fluctuates each epoch based on total utilization,
-which is defined across two dimensions:
-
-1. The number of "items" in global storage.
-2. The number of bytes in global storage.
-
-"Items" include:
-
-1. Resources having the <code>key</code> attribute, which have been moved into
-global storage via a <code>move_to()</code> operation.
-2.  Table entries.
-
-
-<a id="@Utilization_ratios_3"></a>
-
-### Utilization ratios
-
-
-<code>initialize()</code> sets an arbitrary "target" utilization for both
-item-wise and byte-wise storage, then each epoch, gas parameters are
-reconfigured based on the "utilization ratio" for each of the two
-utilization dimensions. The utilization ratio for a given dimension,
-either item-wise or byte-wise, is taken as the quotient of actual
-utilization and target utilization. For example, given a 500 GB
-target and 250 GB actual utilization, the byte-wise utilization
-ratio is 50%.
-
-See <code>base_8192_exponential_curve()</code> for mathematical definitions.
-
-
-<a id="@Gas_curve_lookup_4"></a>
-
-### Gas curve lookup
-
-
-The utilization ratio in a given epoch is used as a lookup value in
-a Eulerian approximation to an exponential curve, known as a
-<code>GasCurve</code>, which is defined in <code>base_8192_exponential_curve()</code>,
-based on a minimum gas charge and a maximum gas charge.
-
-The minimum gas charge and maximum gas charge at the endpoints of
-the curve are set in <code>initialize()</code>, and correspond to the following
-operations defined in <code>StorageGas</code>:
-
-1. Per-item read
-2. Per-item create
-3. Per-item write
-4. Per-byte read
-5. Per-byte create
-6. Per-byte write
-
-For example, if the byte-wise utilization ratio is 50%, then
-per-byte reads will charge the minimum per-byte gas cost, plus
-1.09% of the difference between the maximum and the minimum cost.
-See <code>base_8192_exponential_curve()</code> for a supporting calculation.
-
-
-<a id="@Item-wise_operations_5"></a>
-
-### Item-wise operations
-
-
-1. Per-item read gas is assessed whenever an item is read from
-global storage via <code>borrow_global&lt;T&gt;()</code> or via a table entry read
-operation.
-2. Per-item create gas is assessed whenever an item is created in
-global storage via <code>move_to&lt;T&gt;()</code> or via a table entry creation
-operation.
-3. Per-item write gas is assessed whenever an item is overwritten in
-global storage via <code>borrow_global_mut&lt;T&gt;</code> or via a table entry
-mutation operation.
-
-
-<a id="@Byte-wise_operations_6"></a>
-
-### Byte-wise operations
-
-
-Byte-wise operations are assessed in a manner similar to per-item
-operations, but account for the number of bytes affected by the
-given operation. Notably, this number denotes the total number of
-bytes in an *entire item*.
-
-For example, if an operation mutates a <code>u8</code> field in a resource that
-has 5 other <code>u128</code> fields, the per-byte gas write cost will account
-for $(5 * 128) / 8 + 1 = 81$ bytes. Vectors are similarly treated
-as fields.
-
-
-<a id="@Function_dependencies_7"></a>
-
-## Function dependencies
-
-
-The below dependency chart uses <code>mermaid.js</code> syntax, which can be
-automatically rendered into a diagram (depending on the browser)
-when viewing the documentation file generated from source code. If
-a browser renders the diagrams with coloring that makes it difficult
-to read, try a different browser.
-
-
-<a id="@Initialization_8"></a>
-
-### Initialization
-
-
-```mermaid
-
-flowchart LR
-
-initialize --> base_8192_exponential_curve
-base_8192_exponential_curve --> new_gas_curve
-base_8192_exponential_curve --> new_point
-new_gas_curve --> validate_points
-
-```
-
-
-<a id="@Reconfiguration_9"></a>
-
-### Reconfiguration
-
-
-```mermaid
-
-flowchart LR
-
-calculate_gas --> Interpolate %% capitalized
-calculate_read_gas --> calculate_gas
-calculate_create_gas --> calculate_gas
-calculate_write_gas --> calculate_gas
-on_reconfig --> calculate_read_gas
-on_reconfig --> calculate_create_gas
-on_reconfig --> calculate_write_gas
-reconfiguration::reconfigure --> on_reconfig
-
-```
-
-Here, the function <code>interpolate()</code> is spelled <code>Interpolate</code> because
-<code>interpolate</code> is a reserved word in <code>mermaid.js</code>.
-
-
-<a id="@Setting_configurations_10"></a>
-
-### Setting configurations
-
-
-```mermaid
-
-flowchart LR
-
-gas_schedule::set_storage_gas_config --> set_config
-
-```
-
-
-<a id="@Complete_docgen_index_11"></a>
-
-## Complete docgen index
-
-
-The below index is automatically generated from source code:
-
-
--  [General overview sections](#@General_overview_sections_0)
--  [Definitions](#@Definitions_1)
-    -  [Utilization dimensions](#@Utilization_dimensions_2)
-    -  [Utilization ratios](#@Utilization_ratios_3)
-    -  [Gas curve lookup](#@Gas_curve_lookup_4)
-    -  [Item-wise operations](#@Item-wise_operations_5)
-    -  [Byte-wise operations](#@Byte-wise_operations_6)
--  [Function dependencies](#@Function_dependencies_7)
-    -  [Initialization](#@Initialization_8)
-    -  [Reconfiguration](#@Reconfiguration_9)
-    -  [Setting configurations](#@Setting_configurations_10)
--  [Complete docgen index](#@Complete_docgen_index_11)
 -  [Resource `StorageGas`](#0x1_storage_gas_StorageGas)
 -  [Struct `Point`](#0x1_storage_gas_Point)
 -  [Struct `UsageGasConfig`](#0x1_storage_gas_UsageGasConfig)
 -  [Struct `GasCurve`](#0x1_storage_gas_GasCurve)
 -  [Resource `StorageGasConfig`](#0x1_storage_gas_StorageGasConfig)
--  [Constants](#@Constants_12)
+-  [Constants](#@Constants_0)
 -  [Function `base_8192_exponential_curve`](#0x1_storage_gas_base_8192_exponential_curve)
-    -  [Function definition](#@Function_definition_13)
-    -  [Example](#@Example_14)
-    -  [Utilization multipliers](#@Utilization_multipliers_15)
 -  [Function `new_point`](#0x1_storage_gas_new_point)
 -  [Function `new_gas_curve`](#0x1_storage_gas_new_gas_curve)
 -  [Function `new_usage_gas_config`](#0x1_storage_gas_new_usage_gas_config)
@@ -236,23 +26,23 @@ The below index is automatically generated from source code:
 -  [Function `calculate_create_gas`](#0x1_storage_gas_calculate_create_gas)
 -  [Function `calculate_write_gas`](#0x1_storage_gas_calculate_write_gas)
 -  [Function `on_reconfig`](#0x1_storage_gas_on_reconfig)
--  [Specification](#@Specification_16)
-    -  [Struct `Point`](#@Specification_16_Point)
-    -  [Struct `UsageGasConfig`](#@Specification_16_UsageGasConfig)
+-  [Specification](#@Specification_1)
+    -  [Struct `Point`](#@Specification_1_Point)
+    -  [Struct `UsageGasConfig`](#@Specification_1_UsageGasConfig)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
-    -  [Struct `GasCurve`](#@Specification_16_GasCurve)
-    -  [Function `base_8192_exponential_curve`](#@Specification_16_base_8192_exponential_curve)
-    -  [Function `new_point`](#@Specification_16_new_point)
-    -  [Function `new_gas_curve`](#@Specification_16_new_gas_curve)
-    -  [Function `new_usage_gas_config`](#@Specification_16_new_usage_gas_config)
-    -  [Function `new_storage_gas_config`](#@Specification_16_new_storage_gas_config)
-    -  [Function `set_config`](#@Specification_16_set_config)
-    -  [Function `initialize`](#@Specification_16_initialize)
-    -  [Function `validate_points`](#@Specification_16_validate_points)
-    -  [Function `calculate_gas`](#@Specification_16_calculate_gas)
-    -  [Function `interpolate`](#@Specification_16_interpolate)
-    -  [Function `on_reconfig`](#@Specification_16_on_reconfig)
+    -  [Struct `GasCurve`](#@Specification_1_GasCurve)
+    -  [Function `base_8192_exponential_curve`](#@Specification_1_base_8192_exponential_curve)
+    -  [Function `new_point`](#@Specification_1_new_point)
+    -  [Function `new_gas_curve`](#@Specification_1_new_gas_curve)
+    -  [Function `new_usage_gas_config`](#@Specification_1_new_usage_gas_config)
+    -  [Function `new_storage_gas_config`](#@Specification_1_new_storage_gas_config)
+    -  [Function `set_config`](#@Specification_1_set_config)
+    -  [Function `initialize`](#@Specification_1_initialize)
+    -  [Function `validate_points`](#@Specification_1_validate_points)
+    -  [Function `calculate_gas`](#@Specification_1_calculate_gas)
+    -  [Function `interpolate`](#@Specification_1_interpolate)
+    -  [Function `on_reconfig`](#@Specification_1_on_reconfig)
 
 
 <pre><code>use 0x1::error;<br/>use 0x1::state_storage;<br/>use 0x1::system_addresses;<br/></code></pre>
@@ -263,17 +53,7 @@ The below index is automatically generated from source code:
 
 ## Resource `StorageGas`
 
-Storage parameters, reconfigured each epoch.
-
-Parameters are updated during reconfiguration via
-<code>on_reconfig()</code>, based on storage utilization at the beginning
-of the epoch in which the reconfiguration transaction is
-executed. The gas schedule derived from these parameters will
-then be used to calculate gas for the entirety of the
-following epoch, such that the data is one epoch older than
-ideal. Notably, however, per this approach, the virtual machine
-does not need to reload gas parameters after the
-first transaction of an epoch.
+Storage parameters, reconfigured each epoch.<br/><br/> Parameters are updated during reconfiguration via<br/> <code>on_reconfig()</code>, based on storage utilization at the beginning<br/> of the epoch in which the reconfiguration transaction is<br/> executed. The gas schedule derived from these parameters will<br/> then be used to calculate gas for the entirety of the<br/> following epoch, such that the data is one epoch older than<br/> ideal. Notably, however, per this approach, the virtual machine<br/> does not need to reload gas parameters after the<br/> first transaction of an epoch.
 
 
 <pre><code>struct StorageGas has key<br/></code></pre>
@@ -330,15 +110,7 @@ first transaction of an epoch.
 
 ## Struct `Point`
 
-A point in a Eulerian curve approximation, with each coordinate
-given in basis points:
-
-| Field value | Percentage |
-|-------------|------------|
-| <code>1</code>         | 00.01 %    |
-| <code>10</code>        | 00.10 %    |
-| <code>100</code>       | 01.00 %    |
-| <code>1000</code>      | 10.00 %    |
+A point in a Eulerian curve approximation, with each coordinate<br/> given in basis points:<br/><br/> &#124; Field value &#124; Percentage &#124;<br/> &#124;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#124;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#124;<br/> &#124; <code>1</code>         &#124; 00.01 %    &#124;<br/> &#124; <code>10</code>        &#124; 00.10 %    &#124;<br/> &#124; <code>100</code>       &#124; 01.00 %    &#124;<br/> &#124; <code>1000</code>      &#124; 10.00 %    &#124;
 
 
 <pre><code>struct Point has copy, drop, store<br/></code></pre>
@@ -354,15 +126,13 @@ given in basis points:
 <code>x: u64</code>
 </dt>
 <dd>
- x-coordinate basis points, corresponding to utilization
- ratio in <code>base_8192_exponential_curve()</code>.
+ x&#45;coordinate basis points, corresponding to utilization<br/> ratio in <code>base_8192_exponential_curve()</code>.
 </dd>
 <dt>
 <code>y: u64</code>
 </dt>
 <dd>
- y-coordinate basis points, corresponding to utilization
- multiplier in <code>base_8192_exponential_curve()</code>.
+ y&#45;coordinate basis points, corresponding to utilization<br/> multiplier in <code>base_8192_exponential_curve()</code>.
 </dd>
 </dl>
 
@@ -373,11 +143,7 @@ given in basis points:
 
 ## Struct `UsageGasConfig`
 
-A gas configuration for either per-item or per-byte costs.
-
-Contains a target usage amount, as well as a Eulerian
-approximation of an exponential curve for reads, creations, and
-overwrites. See <code>StorageGasConfig</code>.
+A gas configuration for either per&#45;item or per&#45;byte costs.<br/><br/> Contains a target usage amount, as well as a Eulerian<br/> approximation of an exponential curve for reads, creations, and<br/> overwrites. See <code>StorageGasConfig</code>.
 
 
 <pre><code>struct UsageGasConfig has copy, drop, store<br/></code></pre>
@@ -422,25 +188,7 @@ overwrites. See <code>StorageGasConfig</code>.
 
 ## Struct `GasCurve`
 
-Eulerian approximation of an exponential curve.
-
-Assumes the following endpoints:
-
-* $(x_0, y_0) = (0, 0)$
-* $(x_f, y_f) = (10000, 10000)$
-
-Intermediate points must satisfy:
-
-1. $x_i > x_{i - 1}$ ( $x$ is strictly increasing).
-2. $0 \leq x_i \leq 10000$ ( $x$ is between 0 and 10000).
-3. $y_i \geq y_{i - 1}$ ( $y$ is non-decreasing).
-4. $0 \leq y_i \leq 10000$ ( $y$ is between 0 and 10000).
-
-Lookup between two successive points is calculated via linear
-interpolation, e.g., as if there were a straight line between
-them.
-
-See <code>base_8192_exponential_curve()</code>.
+Eulerian approximation of an exponential curve.<br/><br/> Assumes the following endpoints:<br/><br/> &#42; $(x_0, y_0) &#61; (0, 0)$<br/> &#42; $(x_f, y_f) &#61; (10000, 10000)$<br/><br/> Intermediate points must satisfy:<br/><br/> 1. $x_i &gt; x_&#123;i &#45; 1&#125;$ ( $x$ is strictly increasing).<br/> 2. $0 \leq x_i \leq 10000$ ( $x$ is between 0 and 10000).<br/> 3. $y_i \geq y_&#123;i &#45; 1&#125;$ ( $y$ is non&#45;decreasing).<br/> 4. $0 \leq y_i \leq 10000$ ( $y$ is between 0 and 10000).<br/><br/> Lookup between two successive points is calculated via linear<br/> interpolation, e.g., as if there were a straight line between<br/> them.<br/><br/> See <code>base_8192_exponential_curve()</code>.
 
 
 <pre><code>struct GasCurve has copy, drop, store<br/></code></pre>
@@ -479,7 +227,7 @@ See <code>base_8192_exponential_curve()</code>.
 
 ## Resource `StorageGasConfig`
 
-Gas configurations for per-item and per-byte prices.
+Gas configurations for per&#45;item and per&#45;byte prices.
 
 
 <pre><code>struct StorageGasConfig has copy, drop, key<br/></code></pre>
@@ -495,20 +243,20 @@ Gas configurations for per-item and per-byte prices.
 <code>item_config: storage_gas::UsageGasConfig</code>
 </dt>
 <dd>
- Per-item gas configuration.
+ Per&#45;item gas configuration.
 </dd>
 <dt>
 <code>byte_config: storage_gas::UsageGasConfig</code>
 </dt>
 <dd>
- Per-byte gas configuration.
+ Per&#45;byte gas configuration.
 </dd>
 </dl>
 
 
 </details>
 
-<a id="@Constants_12"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
@@ -589,65 +337,7 @@ Gas configurations for per-item and per-byte prices.
 
 ## Function `base_8192_exponential_curve`
 
-Default exponential curve having base 8192.
-
-
-<a id="@Function_definition_13"></a>
-
-### Function definition
-
-
-Gas price as a function of utilization ratio is defined as:
-
-$$g(u_r) = g_{min} + \frac{(b^{u_r} - 1)}{b - 1} \Delta_g$$
-
-$$g(u_r) = g_{min} + u_m \Delta_g$$
-
-| Variable                            | Description            |
-|-------------------------------------|------------------------|
-| $g_{min}$                           | <code>min_gas</code>              |
-| $g_{max}$                           | <code>max_gas</code>              |
-| $\Delta_{g} = g_{max} - g_{min}$    | Gas delta              |
-| $u$                                 | Utilization            |
-| $u_t$                               | Target utilization     |
-| $u_r = u / u_t$                     | Utilization ratio      |
-| $u_m = \frac{(b^{u_r} - 1)}{b - 1}$ | Utilization multiplier |
-| $b = 8192$                          | Exponent base          |
-
-
-<a id="@Example_14"></a>
-
-### Example
-
-
-Hence for a utilization ratio of 50% ( $u_r = 0.5$ ):
-
-$$g(0.5) = g_{min} + \frac{8192^{0.5} - 1}{8192 - 1} \Delta_g$$
-
-$$g(0.5) \approx g_{min} + 0.0109 \Delta_g$$
-
-Which means that the price above <code>min_gas</code> is approximately
-1.09% of the difference between <code>max_gas</code> and <code>min_gas</code>.
-
-
-<a id="@Utilization_multipliers_15"></a>
-
-### Utilization multipliers
-
-
-| $u_r$ | $u_m$ (approximate) |
-|-------|---------------------|
-| 10%   | 0.02%               |
-| 20%   | 0.06%               |
-| 30%   | 0.17%               |
-| 40%   | 0.44%               |
-| 50%   | 1.09%               |
-| 60%   | 2.71%               |
-| 70%   | 6.69%               |
-| 80%   | 16.48%              |
-| 90%   | 40.61%              |
-| 95%   | 63.72%              |
-| 99%   | 91.38%              |
+Default exponential curve having base 8192.<br/><br/> &#35; Function definition<br/><br/> Gas price as a function of utilization ratio is defined as:<br/><br/> $$g(u_r) &#61; g_&#123;min&#125; &#43; \frac&#123;(b^&#123;u_r&#125; &#45; 1)&#125;&#123;b &#45; 1&#125; \Delta_g$$<br/><br/> $$g(u_r) &#61; g_&#123;min&#125; &#43; u_m \Delta_g$$<br/><br/> &#124; Variable                            &#124; Description            &#124;<br/> &#124;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#124;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#124;<br/> &#124; $g_&#123;min&#125;$                           &#124; <code>min_gas</code>              &#124;<br/> &#124; $g_&#123;max&#125;$                           &#124; <code>max_gas</code>              &#124;<br/> &#124; $\Delta_&#123;g&#125; &#61; g_&#123;max&#125; &#45; g_&#123;min&#125;$    &#124; Gas delta              &#124;<br/> &#124; $u$                                 &#124; Utilization            &#124;<br/> &#124; $u_t$                               &#124; Target utilization     &#124;<br/> &#124; $u_r &#61; u / u_t$                     &#124; Utilization ratio      &#124;<br/> &#124; $u_m &#61; \frac&#123;(b^&#123;u_r&#125; &#45; 1)&#125;&#123;b &#45; 1&#125;$ &#124; Utilization multiplier &#124;<br/> &#124; $b &#61; 8192$                          &#124; Exponent base          &#124;<br/><br/> &#35; Example<br/><br/> Hence for a utilization ratio of 50% ( $u_r &#61; 0.5$ ):<br/><br/> $$g(0.5) &#61; g_&#123;min&#125; &#43; \frac&#123;8192^&#123;0.5&#125; &#45; 1&#125;&#123;8192 &#45; 1&#125; \Delta_g$$<br/><br/> $$g(0.5) \approx g_&#123;min&#125; &#43; 0.0109 \Delta_g$$<br/><br/> Which means that the price above <code>min_gas</code> is approximately<br/> 1.09% of the difference between <code>max_gas</code> and <code>min_gas</code>.<br/><br/> &#35; Utilization multipliers<br/><br/> &#124; $u_r$ &#124; $u_m$ (approximate) &#124;<br/> &#124;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#124;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#124;<br/> &#124; 10%   &#124; 0.02%               &#124;<br/> &#124; 20%   &#124; 0.06%               &#124;<br/> &#124; 30%   &#124; 0.17%               &#124;<br/> &#124; 40%   &#124; 0.44%               &#124;<br/> &#124; 50%   &#124; 1.09%               &#124;<br/> &#124; 60%   &#124; 2.71%               &#124;<br/> &#124; 70%   &#124; 6.69%               &#124;<br/> &#124; 80%   &#124; 16.48%              &#124;<br/> &#124; 90%   &#124; 40.61%              &#124;<br/> &#124; 95%   &#124; 63.72%              &#124;<br/> &#124; 99%   &#124; 91.38%              &#124;
 
 
 <pre><code>public fun base_8192_exponential_curve(min_gas: u64, max_gas: u64): storage_gas::GasCurve<br/></code></pre>
@@ -768,27 +458,7 @@ Which means that the price above <code>min_gas</code> is approximately
 
 ## Function `initialize`
 
-Initialize per-item and per-byte gas prices.
-
-Target utilization is set to 2 billion items and 1 TB.
-
-<code>GasCurve</code> endpoints are initialized as follows:
-
-| Data style | Operation | Minimum gas | Maximum gas |
-|------------|-----------|-------------|-------------|
-| Per item   | Read      | 300K        | 300K * 100  |
-| Per item   | Create    | 300k        | 300k * 100    |
-| Per item   | Write     | 300K        | 300K * 100  |
-| Per byte   | Read      | 300         | 300 * 100   |
-| Per byte   | Create    | 5K          | 5K * 100    |
-| Per byte   | Write     | 5K          | 5K * 100    |
-
-<code>StorageGas</code> values are additionally initialized, but per
-<code>on_reconfig()</code>, they will be reconfigured for each subsequent
-epoch after initialization.
-
-See <code>base_8192_exponential_curve()</code> fore more information on
-target utilization.
+Initialize per&#45;item and per&#45;byte gas prices.<br/><br/> Target utilization is set to 2 billion items and 1 TB.<br/><br/> <code>GasCurve</code> endpoints are initialized as follows:<br/><br/> &#124; Data style &#124; Operation &#124; Minimum gas &#124; Maximum gas &#124;<br/> &#124;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#124;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#124;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#124;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#124;<br/> &#124; Per item   &#124; Read      &#124; 300K        &#124; 300K &#42; 100  &#124;<br/> &#124; Per item   &#124; Create    &#124; 300k        &#124; 300k &#42; 100    &#124;<br/> &#124; Per item   &#124; Write     &#124; 300K        &#124; 300K &#42; 100  &#124;<br/> &#124; Per byte   &#124; Read      &#124; 300         &#124; 300 &#42; 100   &#124;<br/> &#124; Per byte   &#124; Create    &#124; 5K          &#124; 5K &#42; 100    &#124;<br/> &#124; Per byte   &#124; Write     &#124; 5K          &#124; 5K &#42; 100    &#124;<br/><br/> <code>StorageGas</code> values are additionally initialized, but per<br/> <code>on_reconfig()</code>, they will be reconfigured for each subsequent<br/> epoch after initialization.<br/><br/> See <code>base_8192_exponential_curve()</code> fore more information on<br/> target utilization.
 
 
 <pre><code>public fun initialize(aptos_framework: &amp;signer)<br/></code></pre>
@@ -945,7 +615,7 @@ target utilization.
 
 </details>
 
-<a id="@Specification_16"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -971,12 +641,12 @@ A non decreasing curve must ensure that next is greater than cur.
 <a id="0x1_storage_gas_ValidatePointsAbortsIf"></a>
 
 
-<pre><code>schema ValidatePointsAbortsIf &#123;<br/>points: vector&lt;Point&gt;;<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>schema ValidatePointsAbortsIf &#123;<br/>points: vector&lt;Point&gt;;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
     aborts_if exists i in 0..len(points) &#45; 1: (<br/>    points[i].x &gt;&#61; points[i &#43; 1].x &#124;&#124; points[i].y &gt; points[i &#43; 1].y<br/>);<br/>aborts_if len(points) &gt; 0 &amp;&amp; points[0].x &#61;&#61; 0;<br/>aborts_if len(points) &gt; 0 &amp;&amp; points[len(points) &#45; 1].x &#61;&#61; BASIS_POINT_DENOMINATION;<br/>&#125;<br/></code></pre>
 
 
 
-<a id="@Specification_16_Point"></a>
+<a id="@Specification_1_Point"></a>
 
 ### Struct `Point`
 
@@ -990,15 +660,13 @@ A non decreasing curve must ensure that next is greater than cur.
 <code>x: u64</code>
 </dt>
 <dd>
- x-coordinate basis points, corresponding to utilization
- ratio in <code>base_8192_exponential_curve()</code>.
+ x&#45;coordinate basis points, corresponding to utilization<br/> ratio in <code>base_8192_exponential_curve()</code>.
 </dd>
 <dt>
 <code>y: u64</code>
 </dt>
 <dd>
- y-coordinate basis points, corresponding to utilization
- multiplier in <code>base_8192_exponential_curve()</code>.
+ y&#45;coordinate basis points, corresponding to utilization<br/> multiplier in <code>base_8192_exponential_curve()</code>.
 </dd>
 </dl>
 
@@ -1008,7 +676,7 @@ A non decreasing curve must ensure that next is greater than cur.
 
 
 
-<a id="@Specification_16_UsageGasConfig"></a>
+<a id="@Specification_1_UsageGasConfig"></a>
 
 ### Struct `UsageGasConfig`
 
@@ -1056,46 +724,19 @@ A non decreasing curve must ensure that next is greater than cur.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>The module's initialization guarantees the creation of the StorageGasConfig resource with a precise configuration, including accurate gas curves for per-item and per-byte operations.</td>
-<td>Medium</td>
-<td>The initialize function is responsible for setting up the initial state of the module, ensuring the fulfillment of the following conditions: (1) the creation of the StorageGasConfig resource, indicating its existence witqhin the module's context, and (2) the configuration of the StorageGasConfig resource includes the precise gas curves that define the behavior of per-item and per-byte operations.</td>
-<td>Formally verified via <a href="#high-level-req-1">initialize</a>. Moreover, the native gas logic has been manually audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The module&apos;s initialization guarantees the creation of the StorageGasConfig resource with a precise configuration, including accurate gas curves for per&#45;item and per&#45;byte operations.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The initialize function is responsible for setting up the initial state of the module, ensuring the fulfillment of the following conditions: (1) the creation of the StorageGasConfig resource, indicating its existence witqhin the module&apos;s context, and (2) the configuration of the StorageGasConfig resource includes the precise gas curves that define the behavior of per&#45;item and per&#45;byte operations.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;initialize&lt;/a&gt;. Moreover, the native gas logic has been manually audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The gas curve approximates an exponential curve based on a minimum and maximum gas charge.</td>
-<td>High</td>
-<td>The validate_points function ensures that the provided vector of points represents a monotonically non-decreasing curve.</td>
-<td>Formally verified via <a href="#high-level-req-2">validate_points</a>. Moreover, the configuration logic has been manually audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The gas curve approximates an exponential curve based on a minimum and maximum gas charge.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The validate_points function ensures that the provided vector of points represents a monotonically non&#45;decreasing curve.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;validate_points&lt;/a&gt;. Moreover, the configuration logic has been manually audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>The initialized gas curve structure has values set according to the provided parameters.</td>
-<td>Low</td>
-<td>The new_gas_curve function initializes the GasCurve structure with values provided as parameters.</td>
-<td>Formally verified via <a href="#high-level-req-3">new_gas_curve</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The initialized gas curve structure has values set according to the provided parameters.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The new_gas_curve function initializes the GasCurve structure with values provided as parameters.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;new_gas_curve&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>The initialized usage gas configuration structure has values set according to the provided parameters.</td>
-<td>Low</td>
-<td>The new_usage_gas_config function initializes the UsageGasConfig structure with values provided as parameters.</td>
-<td>Formally verified via <a href="#high-level-req-4">new_usage_gas_config</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The initialized usage gas configuration structure has values set according to the provided parameters.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The new_usage_gas_config function initializes the UsageGasConfig structure with values provided as parameters.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;new_usage_gas_config&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -1107,7 +748,7 @@ A non decreasing curve must ensure that next is greater than cur.
 
 
 
-<a id="@Specification_16_GasCurve"></a>
+<a id="@Specification_1_GasCurve"></a>
 
 ### Struct `GasCurve`
 
@@ -1150,15 +791,14 @@ Invariant 2: The maximum gas charge is capped by MAX_U64 scaled down by the basi
 <pre><code>invariant max_gas &lt;&#61; MAX_U64 / BASIS_POINT_DENOMINATION;<br/></code></pre>
 
 
-Invariant 3: The x-coordinate increases monotonically and the y-coordinate increasing strictly monotonically,
-that is, the gas-curve is a monotonically increasing function.
+Invariant 3: The x&#45;coordinate increases monotonically and the y&#45;coordinate increasing strictly monotonically,<br/> that is, the gas&#45;curve is a monotonically increasing function.
 
 
 <pre><code>invariant (len(points) &gt; 0 &#61;&#61;&gt; points[0].x &gt; 0)<br/>    &amp;&amp; (len(points) &gt; 0 &#61;&#61;&gt; points[len(points) &#45; 1].x &lt; BASIS_POINT_DENOMINATION)<br/>    &amp;&amp; (forall i in 0..len(points) &#45; 1: (points[i].x &lt; points[i &#43; 1].x &amp;&amp; points[i].y &lt;&#61; points[i &#43; 1].y));<br/></code></pre>
 
 
 
-<a id="@Specification_16_base_8192_exponential_curve"></a>
+<a id="@Specification_1_base_8192_exponential_curve"></a>
 
 ### Function `base_8192_exponential_curve`
 
@@ -1172,7 +812,7 @@ that is, the gas-curve is a monotonically increasing function.
 
 
 
-<a id="@Specification_16_new_point"></a>
+<a id="@Specification_1_new_point"></a>
 
 ### Function `new_point`
 
@@ -1186,7 +826,7 @@ that is, the gas-curve is a monotonically increasing function.
 
 
 
-<a id="@Specification_16_new_gas_curve"></a>
+<a id="@Specification_1_new_gas_curve"></a>
 
 ### Function `new_gas_curve`
 
@@ -1197,12 +837,12 @@ that is, the gas-curve is a monotonically increasing function.
 A non decreasing curve must ensure that next is greater than cur.
 
 
-<pre><code>pragma verify_duration_estimate &#61; 120;<br/>include NewGasCurveAbortsIf;<br/>include ValidatePointsAbortsIf;<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>pragma verify_duration_estimate &#61; 120;<br/>include NewGasCurveAbortsIf;<br/>include ValidatePointsAbortsIf;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 ensures result &#61;&#61; GasCurve &#123;<br/>    min_gas,<br/>    max_gas,<br/>    points<br/>&#125;;<br/></code></pre>
 
 
 
-<a id="@Specification_16_new_usage_gas_config"></a>
+<a id="@Specification_1_new_usage_gas_config"></a>
 
 ### Function `new_usage_gas_config`
 
@@ -1212,12 +852,12 @@ ensures result &#61;&#61; GasCurve &#123;<br/>    min_gas,<br/>    max_gas,<br/>
 
 
 
-<pre><code>aborts_if target_usage &#61;&#61; 0;<br/>aborts_if target_usage &gt; MAX_U64 / BASIS_POINT_DENOMINATION;<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<pre><code>aborts_if target_usage &#61;&#61; 0;<br/>aborts_if target_usage &gt; MAX_U64 / BASIS_POINT_DENOMINATION;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
 ensures result &#61;&#61; UsageGasConfig &#123;<br/>    target_usage,<br/>    read_curve,<br/>    create_curve,<br/>    write_curve,<br/>&#125;;<br/></code></pre>
 
 
 
-<a id="@Specification_16_new_storage_gas_config"></a>
+<a id="@Specification_1_new_storage_gas_config"></a>
 
 ### Function `new_storage_gas_config`
 
@@ -1231,7 +871,7 @@ ensures result &#61;&#61; UsageGasConfig &#123;<br/>    target_usage,<br/>    re
 
 
 
-<a id="@Specification_16_set_config"></a>
+<a id="@Specification_1_set_config"></a>
 
 ### Function `set_config`
 
@@ -1246,7 +886,7 @@ Signer address must be @aptos_framework and StorageGasConfig exists.
 
 
 
-<a id="@Specification_16_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -1254,17 +894,15 @@ Signer address must be @aptos_framework and StorageGasConfig exists.
 <pre><code>public fun initialize(aptos_framework: &amp;signer)<br/></code></pre>
 
 
-Signer address must be @aptos_framework.
-Address @aptos_framework does not exist StorageGasConfig and StorageGas before the function call is restricted
-and exists after the function is executed.
+Signer address must be @aptos_framework.<br/> Address @aptos_framework does not exist StorageGasConfig and StorageGas before the function call is restricted<br/> and exists after the function is executed.
 
 
-<pre><code>include system_addresses::AbortsIfNotAptosFramework&#123; account: aptos_framework &#125;;<br/>pragma verify_duration_estimate &#61; 120;<br/>aborts_if exists&lt;StorageGasConfig&gt;(@aptos_framework);<br/>aborts_if exists&lt;StorageGas&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>include system_addresses::AbortsIfNotAptosFramework&#123; account: aptos_framework &#125;;<br/>pragma verify_duration_estimate &#61; 120;<br/>aborts_if exists&lt;StorageGasConfig&gt;(@aptos_framework);<br/>aborts_if exists&lt;StorageGas&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 ensures exists&lt;StorageGasConfig&gt;(@aptos_framework);<br/>ensures exists&lt;StorageGas&gt;(@aptos_framework);<br/></code></pre>
 
 
 
-<a id="@Specification_16_validate_points"></a>
+<a id="@Specification_1_validate_points"></a>
 
 ### Function `validate_points`
 
@@ -1279,7 +917,7 @@ A non decreasing curve must ensure that next is greater than cur.
 
 
 
-<a id="@Specification_16_calculate_gas"></a>
+<a id="@Specification_1_calculate_gas"></a>
 
 ### Function `calculate_gas`
 
@@ -1293,7 +931,7 @@ A non decreasing curve must ensure that next is greater than cur.
 
 
 
-<a id="@Specification_16_interpolate"></a>
+<a id="@Specification_1_interpolate"></a>
 
 ### Function `interpolate`
 
@@ -1307,7 +945,7 @@ A non decreasing curve must ensure that next is greater than cur.
 
 
 
-<a id="@Specification_16_on_reconfig"></a>
+<a id="@Specification_1_on_reconfig"></a>
 
 ### Function `on_reconfig`
 

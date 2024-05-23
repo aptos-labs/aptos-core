@@ -3,16 +3,7 @@
 
 # Module `0x1::aggregator_v2`
 
-This module provides an interface for aggregators (version 2). Aggregators are
-similar to unsigned integers and support addition and subtraction (aborting on
-underflow or on overflowing a custom upper limit). The difference from integers
-is that aggregators allow to perform both additions and subtractions in parallel
-across multiple transactions, enabling parallel execution. For example, if the
-first transaction is doing <code>try_add(X, 1)</code> for aggregator <code>X</code>, and the second is
-doing <code>try_sub(X,3)</code>, they can be executed in parallel avoiding a read-modify-write
-dependency.
-However, reading the aggregator value (i.e. calling <code>read(X)</code>) is a resource-intensive
-operation that also reduced parallelism, and should be avoided as much as possible.
+This module provides an interface for aggregators (version 2). Aggregators are<br/> similar to unsigned integers and support addition and subtraction (aborting on<br/> underflow or on overflowing a custom upper limit). The difference from integers<br/> is that aggregators allow to perform both additions and subtractions in parallel<br/> across multiple transactions, enabling parallel execution. For example, if the<br/> first transaction is doing <code>try_add(X, 1)</code> for aggregator <code>X</code>, and the second is<br/> doing <code>try_sub(X,3)</code>, they can be executed in parallel avoiding a read&#45;modify&#45;write<br/> dependency.<br/> However, reading the aggregator value (i.e. calling <code>read(X)</code>) is a resource&#45;intensive<br/> operation that also reduced parallelism, and should be avoided as much as possible.
 
 
 -  [Struct `Aggregator`](#0x1_aggregator_v2_Aggregator)
@@ -55,10 +46,7 @@ operation that also reduced parallelism, and should be avoided as much as possib
 
 ## Struct `Aggregator`
 
-Represents an integer which supports parallel additions and subtractions
-across multiple transactions. See the module description for more details.
-
-Currently supported types for IntElement are u64 and u128.
+Represents an integer which supports parallel additions and subtractions<br/> across multiple transactions. See the module description for more details.<br/><br/> Currently supported types for IntElement are u64 and u128.
 
 
 <pre><code>struct Aggregator&lt;IntElement&gt; has drop, store<br/></code></pre>
@@ -91,9 +79,7 @@ Currently supported types for IntElement are u64 and u128.
 
 ## Struct `AggregatorSnapshot`
 
-Represents a constant value, that was derived from an aggregator at given instant in time.
-Unlike read() and storing the value directly, this enables parallel execution of transactions,
-while storing snapshot of aggregator state elsewhere.
+Represents a constant value, that was derived from an aggregator at given instant in time.<br/> Unlike read() and storing the value directly, this enables parallel execution of transactions,<br/> while storing snapshot of aggregator state elsewhere.
 
 
 <pre><code>struct AggregatorSnapshot&lt;IntElement&gt; has drop, store<br/></code></pre>
@@ -182,8 +168,7 @@ The aggregator api v2 feature flag is not enabled.
 
 <a id="0x1_aggregator_v2_EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED"></a>
 
-The native aggregator function, that is in the move file, is not yet supported.
-and any calls will raise this error.
+The native aggregator function, that is in the move file, is not yet supported.<br/> and any calls will raise this error.
 
 
 <pre><code>const EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED: u64 &#61; 9;<br/></code></pre>
@@ -242,10 +227,7 @@ Returns <code>max_value</code> exceeding which aggregator overflows.
 
 ## Function `create_aggregator`
 
-Creates new aggregator, with given 'max_value'.
-
-Currently supported types for IntElement are u64 and u128.
-EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
+Creates new aggregator, with given &apos;max_value&apos;.<br/><br/> Currently supported types for IntElement are u64 and u128.<br/> EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 
 <pre><code>public fun create_aggregator&lt;IntElement: copy, drop&gt;(max_value: IntElement): aggregator_v2::Aggregator&lt;IntElement&gt;<br/></code></pre>
@@ -266,11 +248,7 @@ EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 ## Function `create_unbounded_aggregator`
 
-Creates new aggregator, without any 'max_value' on top of the implicit bound restriction
-due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).
-
-Currently supported types for IntElement are u64 and u128.
-EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
+Creates new aggregator, without any &apos;max_value&apos; on top of the implicit bound restriction<br/> due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).<br/><br/> Currently supported types for IntElement are u64 and u128.<br/> EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 
 <pre><code>public fun create_unbounded_aggregator&lt;IntElement: copy, drop&gt;(): aggregator_v2::Aggregator&lt;IntElement&gt;<br/></code></pre>
@@ -291,8 +269,7 @@ EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 ## Function `try_add`
 
-Adds <code>value</code> to aggregator.
-If addition would exceed the max_value, <code>false</code> is returned, and aggregator value is left unchanged.
+Adds <code>value</code> to aggregator.<br/> If addition would exceed the max_value, <code>false</code> is returned, and aggregator value is left unchanged.
 
 
 <pre><code>public fun try_add&lt;IntElement&gt;(aggregator: &amp;mut aggregator_v2::Aggregator&lt;IntElement&gt;, value: IntElement): bool<br/></code></pre>
@@ -333,8 +310,7 @@ If addition would exceed the max_value, <code>false</code> is returned, and aggr
 
 ## Function `try_sub`
 
-Subtracts <code>value</code> from aggregator.
-If subtraction would result in a negative value, <code>false</code> is returned, and aggregator value is left unchanged.
+Subtracts <code>value</code> from aggregator.<br/> If subtraction would result in a negative value, <code>false</code> is returned, and aggregator value is left unchanged.
 
 
 <pre><code>public fun try_sub&lt;IntElement&gt;(aggregator: &amp;mut aggregator_v2::Aggregator&lt;IntElement&gt;, value: IntElement): bool<br/></code></pre>
@@ -375,10 +351,7 @@ If subtraction would result in a negative value, <code>false</code> is returned,
 
 ## Function `read`
 
-Returns a value stored in this aggregator.
-Note: This operation is resource-intensive, and reduces parallelism.
-(Especially if called in a transaction that also modifies the aggregator,
-or has other read/write conflicts)
+Returns a value stored in this aggregator.<br/> Note: This operation is resource&#45;intensive, and reduces parallelism.<br/> (Especially if called in a transaction that also modifies the aggregator,<br/> or has other read/write conflicts)
 
 
 <pre><code>public fun read&lt;IntElement&gt;(aggregator: &amp;aggregator_v2::Aggregator&lt;IntElement&gt;): IntElement<br/></code></pre>
@@ -399,8 +372,7 @@ or has other read/write conflicts)
 
 ## Function `snapshot`
 
-Returns a wrapper of a current value of an aggregator
-Unlike read(), it is fast and avoids sequential dependencies.
+Returns a wrapper of a current value of an aggregator<br/> Unlike read(), it is fast and avoids sequential dependencies.
 
 
 <pre><code>public fun snapshot&lt;IntElement&gt;(aggregator: &amp;aggregator_v2::Aggregator&lt;IntElement&gt;): aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;<br/></code></pre>
@@ -421,8 +393,7 @@ Unlike read(), it is fast and avoids sequential dependencies.
 
 ## Function `create_snapshot`
 
-Creates a snapshot of a given value.
-Useful for when object is sometimes created via snapshot() or string_concat(), and sometimes directly.
+Creates a snapshot of a given value.<br/> Useful for when object is sometimes created via snapshot() or string_concat(), and sometimes directly.
 
 
 <pre><code>public fun create_snapshot&lt;IntElement: copy, drop&gt;(value: IntElement): aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;<br/></code></pre>
@@ -443,10 +414,7 @@ Useful for when object is sometimes created via snapshot() or string_concat(), a
 
 ## Function `read_snapshot`
 
-Returns a value stored in this snapshot.
-Note: This operation is resource-intensive, and reduces parallelism.
-(Especially if called in a transaction that also modifies the aggregator,
-or has other read/write conflicts)
+Returns a value stored in this snapshot.<br/> Note: This operation is resource&#45;intensive, and reduces parallelism.<br/> (Especially if called in a transaction that also modifies the aggregator,<br/> or has other read/write conflicts)
 
 
 <pre><code>public fun read_snapshot&lt;IntElement&gt;(snapshot: &amp;aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;): IntElement<br/></code></pre>
@@ -467,10 +435,7 @@ or has other read/write conflicts)
 
 ## Function `read_derived_string`
 
-Returns a value stored in this DerivedStringSnapshot.
-Note: This operation is resource-intensive, and reduces parallelism.
-(Especially if called in a transaction that also modifies the aggregator,
-or has other read/write conflicts)
+Returns a value stored in this DerivedStringSnapshot.<br/> Note: This operation is resource&#45;intensive, and reduces parallelism.<br/> (Especially if called in a transaction that also modifies the aggregator,<br/> or has other read/write conflicts)
 
 
 <pre><code>public fun read_derived_string(snapshot: &amp;aggregator_v2::DerivedStringSnapshot): string::String<br/></code></pre>
@@ -491,8 +456,7 @@ or has other read/write conflicts)
 
 ## Function `create_derived_string`
 
-Creates a DerivedStringSnapshot of a given value.
-Useful for when object is sometimes created via string_concat(), and sometimes directly.
+Creates a DerivedStringSnapshot of a given value.<br/> Useful for when object is sometimes created via string_concat(), and sometimes directly.
 
 
 <pre><code>public fun create_derived_string(value: string::String): aggregator_v2::DerivedStringSnapshot<br/></code></pre>
@@ -513,10 +477,7 @@ Useful for when object is sometimes created via string_concat(), and sometimes d
 
 ## Function `derive_string_concat`
 
-Concatenates <code>before</code>, <code>snapshot</code> and <code>after</code> into a single string.
-snapshot passed needs to have integer type - currently supported types are u64 and u128.
-Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
-If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
+Concatenates <code>before</code>, <code>snapshot</code> and <code>after</code> into a single string.<br/> snapshot passed needs to have integer type &#45; currently supported types are u64 and u128.<br/> Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.<br/> If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
 
 
 <pre><code>public fun derive_string_concat&lt;IntElement&gt;(before: string::String, snapshot: &amp;aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;, after: string::String): aggregator_v2::DerivedStringSnapshot<br/></code></pre>

@@ -3,17 +3,7 @@
 
 # Module `0x1::config_buffer`
 
-This wrapper helps store an on-chain config for the next epoch.
-
-Once reconfigure with DKG is introduced, every on-chain config <code>C</code> should do the following.
-- Support async update when DKG is enabled. This is typically done by 3 steps below.
-- Implement <code>C::set_for_next_epoch()</code> using <code>upsert()</code> function in this module.
-- Implement <code>C::on_new_epoch()</code> using <code>extract()</code> function in this module.
-- Update <code>0x1::reconfiguration_with_dkg::finish()</code> to call <code>C::on_new_epoch()</code>.
-- Support sychronous update when DKG is disabled.
-This is typically done by implementing <code>C::set()</code> to update the config resource directly.
-
-NOTE: on-chain config <code>0x1::state::ValidatorSet</code> implemented its own buffer.
+This wrapper helps store an on&#45;chain config for the next epoch.<br/><br/> Once reconfigure with DKG is introduced, every on&#45;chain config <code>C</code> should do the following.<br/> &#45; Support async update when DKG is enabled. This is typically done by 3 steps below.<br/>   &#45; Implement <code>C::set_for_next_epoch()</code> using <code>upsert()</code> function in this module.<br/>   &#45; Implement <code>C::on_new_epoch()</code> using <code>extract()</code> function in this module.<br/>   &#45; Update <code>0x1::reconfiguration_with_dkg::finish()</code> to call <code>C::on_new_epoch()</code>.<br/> &#45; Support sychronous update when DKG is disabled.<br/>   This is typically done by implementing <code>C::set()</code> to update the config resource directly.<br/><br/> NOTE: on&#45;chain config <code>0x1::state::ValidatorSet</code> implemented its own buffer.
 
 
 -  [Resource `PendingConfigs`](#0x1_config_buffer_PendingConfigs)
@@ -117,9 +107,7 @@ Check whether there is a pending config payload for <code>T</code>.
 
 ## Function `upsert`
 
-Upsert an on-chain config to the buffer for the next epoch.
-
-Typically used in <code>X::set_for_next_epoch()</code> where X is an on-chain config.
+Upsert an on&#45;chain config to the buffer for the next epoch.<br/><br/> Typically used in <code>X::set_for_next_epoch()</code> where X is an on&#45;chain config.
 
 
 <pre><code>public(friend) fun upsert&lt;T: drop, store&gt;(config: T)<br/></code></pre>
@@ -140,10 +128,7 @@ Typically used in <code>X::set_for_next_epoch()</code> where X is an on-chain co
 
 ## Function `extract`
 
-Take the buffered config <code>T</code> out (buffer cleared). Abort if the buffer is empty.
-Should only be used at the end of a reconfiguration.
-
-Typically used in <code>X::on_new_epoch()</code> where X is an on-chaon config.
+Take the buffered config <code>T</code> out (buffer cleared). Abort if the buffer is empty.<br/> Should only be used at the end of a reconfiguration.<br/><br/> Typically used in <code>X::on_new_epoch()</code> where X is an on&#45;chaon config.
 
 
 <pre><code>public fun extract&lt;T: store&gt;(): T<br/></code></pre>

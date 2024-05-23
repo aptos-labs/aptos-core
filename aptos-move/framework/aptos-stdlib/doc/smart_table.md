@@ -3,12 +3,7 @@
 
 # Module `0x1::smart_table`
 
-A smart table implementation based on linear hashing. (https://en.wikipedia.org/wiki/Linear_hashing)
-Compare to Table, it uses less storage slots but has higher chance of collision, a trade-off between space and time.
-Compare to other dynamic hashing implementation, linear hashing splits one bucket a time instead of doubling buckets
-when expanding to avoid unexpected gas cost.
-SmartTable uses faster hash function SipHash instead of cryptographically secure hash functions like sha3-256 since
-it tolerates collisions.
+A smart table implementation based on linear hashing. (https://en.wikipedia.org/wiki/Linear_hashing)<br/> Compare to Table, it uses less storage slots but has higher chance of collision, a trade&#45;off between space and time.<br/> Compare to other dynamic hashing implementation, linear hashing splits one bucket a time instead of doubling buckets<br/> when expanding to avoid unexpected gas cost.<br/> SmartTable uses faster hash function SipHash instead of cryptographically secure hash functions like sha3&#45;256 since<br/> it tolerates collisions.
 
 
 -  [Struct `Entry`](#0x1_smart_table_Entry)
@@ -175,7 +170,7 @@ SmartTable entry contains both the key and value.
 
 <a id="0x1_smart_table_ENOT_EMPTY"></a>
 
-Cannot destroy non-empty hashmap
+Cannot destroy non&#45;empty hashmap
 
 
 <pre><code>const ENOT_EMPTY: u64 &#61; 3;<br/></code></pre>
@@ -279,12 +274,7 @@ Create an empty SmartTable with default configurations.
 
 ## Function `new_with_config`
 
-Create an empty SmartTable with customized configurations.
-<code>num_initial_buckets</code>: The number of buckets on initialization. 0 means using default value.
-<code>split_load_threshold</code>: The percent number which once reached, split will be triggered. 0 means using default
-value.
-<code>target_bucket_size</code>: The target number of entries per bucket, though not guaranteed. 0 means not set and will
-dynamically assgined by the contract code.
+Create an empty SmartTable with customized configurations.<br/> <code>num_initial_buckets</code>: The number of buckets on initialization. 0 means using default value.<br/> <code>split_load_threshold</code>: The percent number which once reached, split will be triggered. 0 means using default<br/> value.<br/> <code>target_bucket_size</code>: The target number of entries per bucket, though not guaranteed. 0 means not set and will<br/> dynamically assgined by the contract code.
 
 
 <pre><code>public fun new_with_config&lt;K: copy, drop, store, V: store&gt;(num_initial_buckets: u64, split_load_threshold: u8, target_bucket_size: u64): smart_table::SmartTable&lt;K, V&gt;<br/></code></pre>
@@ -305,8 +295,7 @@ dynamically assgined by the contract code.
 
 ## Function `destroy_empty`
 
-Destroy empty table.
-Aborts if it's not empty.
+Destroy empty table.<br/> Aborts if it&apos;s not empty.
 
 
 <pre><code>public fun destroy_empty&lt;K, V&gt;(table: smart_table::SmartTable&lt;K, V&gt;)<br/></code></pre>
@@ -369,11 +358,7 @@ Clear a table completely when T has <code>drop</code>.
 
 ## Function `add`
 
-Add (key, value) pair in the hash map, it may grow one bucket if current load factor exceeds the threshold.
-Note it may not split the actual overflowed bucket. Instead, it was determined by <code>num_buckets</code> and <code>level</code>.
-For standard linear hash algorithm, it is stored as a variable but <code>num_buckets</code> here could be leveraged.
-Abort if <code>key</code> already exists.
-Note: This method may occasionally cost much more gas when triggering bucket split.
+Add (key, value) pair in the hash map, it may grow one bucket if current load factor exceeds the threshold.<br/> Note it may not split the actual overflowed bucket. Instead, it was determined by <code>num_buckets</code> and <code>level</code>.<br/> For standard linear hash algorithm, it is stored as a variable but <code>num_buckets</code> here could be leveraged.<br/> Abort if <code>key</code> already exists.<br/> Note: This method may occasionally cost much more gas when triggering bucket split.
 
 
 <pre><code>public fun add&lt;K, V&gt;(table: &amp;mut smart_table::SmartTable&lt;K, V&gt;, key: K, value: V)<br/></code></pre>
@@ -435,9 +420,7 @@ Add multiple key/value pairs to the smart table. The keys must not already exist
 
 ## Function `to_simple_map`
 
-Convert a smart table to a simple_map, which is supposed to be called mostly by view functions to get an atomic
-view of the whole table.
-Disclaimer: This function may be costly as the smart table may be huge in size. Use it at your own discretion.
+Convert a smart table to a simple_map, which is supposed to be called mostly by view functions to get an atomic<br/> view of the whole table.<br/> Disclaimer: This function may be costly as the smart table may be huge in size. Use it at your own discretion.
 
 
 <pre><code>public fun to_simple_map&lt;K: copy, drop, store, V: copy, store&gt;(table: &amp;smart_table::SmartTable&lt;K, V&gt;): simple_map::SimpleMap&lt;K, V&gt;<br/></code></pre>
@@ -458,10 +441,7 @@ Disclaimer: This function may be costly as the smart table may be huge in size. 
 
 ## Function `keys`
 
-Get all keys in a smart table.
-
-For a large enough smart table this function will fail due to execution gas limits, and
-<code>keys_paginated</code> should be used instead.
+Get all keys in a smart table.<br/><br/> For a large enough smart table this function will fail due to execution gas limits, and<br/> <code>keys_paginated</code> should be used instead.
 
 
 <pre><code>public fun keys&lt;K: copy, drop, store, V: copy, store&gt;(table_ref: &amp;smart_table::SmartTable&lt;K, V&gt;): vector&lt;K&gt;<br/></code></pre>
@@ -482,19 +462,7 @@ For a large enough smart table this function will fail due to execution gas limi
 
 ## Function `keys_paginated`
 
-Get keys from a smart table, paginated.
-
-This function can be used to paginate all keys in a large smart table outside of runtime,
-e.g. through chained view function calls. The maximum <code>num_keys_to_get</code> before hitting gas
-limits depends on the data types in the smart table.
-
-When starting pagination, pass <code>starting_bucket_index</code> = <code>starting_vector_index</code> = 0.
-
-The function will then return a vector of keys, an optional bucket index, and an optional
-vector index. The unpacked return indices can then be used as inputs to another pagination
-call, which will return a vector of more keys. This process can be repeated until the
-returned bucket index and vector index value options are both none, which means that
-pagination is complete. For an example, see <code>test_keys()</code>.
+Get keys from a smart table, paginated.<br/><br/> This function can be used to paginate all keys in a large smart table outside of runtime,<br/> e.g. through chained view function calls. The maximum <code>num_keys_to_get</code> before hitting gas<br/> limits depends on the data types in the smart table.<br/><br/> When starting pagination, pass <code>starting_bucket_index</code> &#61; <code>starting_vector_index</code> &#61; 0.<br/><br/> The function will then return a vector of keys, an optional bucket index, and an optional<br/> vector index. The unpacked return indices can then be used as inputs to another pagination<br/> call, which will return a vector of more keys. This process can be repeated until the<br/> returned bucket index and vector index value options are both none, which means that<br/> pagination is complete. For an example, see <code>test_keys()</code>.
 
 
 <pre><code>public fun keys_paginated&lt;K: copy, drop, store, V: copy, store&gt;(table_ref: &amp;smart_table::SmartTable&lt;K, V&gt;, starting_bucket_index: u64, starting_vector_index: u64, num_keys_to_get: u64): (vector&lt;K&gt;, option::Option&lt;u64&gt;, option::Option&lt;u64&gt;)<br/></code></pre>
@@ -537,9 +505,7 @@ Decide which is the next bucket to split and split it into two with the elements
 
 ## Function `bucket_index`
 
-Return the expected bucket index to find the hash.
-Basically, it use different base <code>1 &lt;&lt; level</code> vs <code>1 &lt;&lt; (level &#43; 1)</code> in modulo operation based on the target
-bucket index compared to the index of the next bucket to split.
+Return the expected bucket index to find the hash.<br/> Basically, it use different base <code>1 &lt;&lt; level</code> vs <code>1 &lt;&lt; (level &#43; 1)</code> in modulo operation based on the target<br/> bucket index compared to the index of the next bucket to split.
 
 
 <pre><code>fun bucket_index(level: u8, num_buckets: u64, hash: u64): u64<br/></code></pre>
@@ -560,8 +526,7 @@ bucket index compared to the index of the next bucket to split.
 
 ## Function `borrow`
 
-Acquire an immutable reference to the value which <code>key</code> maps to.
-Aborts if there is no entry for <code>key</code>.
+Acquire an immutable reference to the value which <code>key</code> maps to.<br/> Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun borrow&lt;K: drop, V&gt;(table: &amp;smart_table::SmartTable&lt;K, V&gt;, key: K): &amp;V<br/></code></pre>
@@ -582,8 +547,7 @@ Aborts if there is no entry for <code>key</code>.
 
 ## Function `borrow_with_default`
 
-Acquire an immutable reference to the value which <code>key</code> maps to.
-Returns specified default value if there is no entry for <code>key</code>.
+Acquire an immutable reference to the value which <code>key</code> maps to.<br/> Returns specified default value if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun borrow_with_default&lt;K: copy, drop, V&gt;(table: &amp;smart_table::SmartTable&lt;K, V&gt;, key: K, default: &amp;V): &amp;V<br/></code></pre>
@@ -604,8 +568,7 @@ Returns specified default value if there is no entry for <code>key</code>.
 
 ## Function `borrow_mut`
 
-Acquire a mutable reference to the value which <code>key</code> maps to.
-Aborts if there is no entry for <code>key</code>.
+Acquire a mutable reference to the value which <code>key</code> maps to.<br/> Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun borrow_mut&lt;K: drop, V&gt;(table: &amp;mut smart_table::SmartTable&lt;K, V&gt;, key: K): &amp;mut V<br/></code></pre>
@@ -626,8 +589,7 @@ Aborts if there is no entry for <code>key</code>.
 
 ## Function `borrow_mut_with_default`
 
-Acquire a mutable reference to the value which <code>key</code> maps to.
-Insert the pair (<code>key</code>, <code>default</code>) first if there is no entry for <code>key</code>.
+Acquire a mutable reference to the value which <code>key</code> maps to.<br/> Insert the pair (<code>key</code>, <code>default</code>) first if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun borrow_mut_with_default&lt;K: copy, drop, V: drop&gt;(table: &amp;mut smart_table::SmartTable&lt;K, V&gt;, key: K, default: V): &amp;mut V<br/></code></pre>
@@ -669,8 +631,7 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 
 ## Function `remove`
 
-Remove from <code>table</code> and return the value which <code>key</code> maps to.
-Aborts if there is no entry for <code>key</code>.
+Remove from <code>table</code> and return the value which <code>key</code> maps to.<br/> Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun remove&lt;K: copy, drop, V&gt;(table: &amp;mut smart_table::SmartTable&lt;K, V&gt;, key: K): V<br/></code></pre>
@@ -691,8 +652,7 @@ Aborts if there is no entry for <code>key</code>.
 
 ## Function `upsert`
 
-Insert the pair (<code>key</code>, <code>value</code>) if there is no entry for <code>key</code>.
-update the value of the entry for <code>key</code> to <code>value</code> otherwise
+Insert the pair (<code>key</code>, <code>value</code>) if there is no entry for <code>key</code>.<br/> update the value of the entry for <code>key</code> to <code>value</code> otherwise
 
 
 <pre><code>public fun upsert&lt;K: copy, drop, V: drop&gt;(table: &amp;mut smart_table::SmartTable&lt;K, V&gt;, key: K, value: V)<br/></code></pre>
@@ -797,7 +757,7 @@ Update <code>target_bucket_size</code>.
 
 ## Function `for_each_ref`
 
-Apply the function to a reference of each key-value pair in the table.
+Apply the function to a reference of each key&#45;value pair in the table.
 
 
 <pre><code>public fun for_each_ref&lt;K, V&gt;(table: &amp;smart_table::SmartTable&lt;K, V&gt;, f: &#124;(&amp;K, &amp;V)&#124;)<br/></code></pre>
@@ -818,7 +778,7 @@ Apply the function to a reference of each key-value pair in the table.
 
 ## Function `for_each_mut`
 
-Apply the function to a mutable reference of each key-value pair in the table.
+Apply the function to a mutable reference of each key&#45;value pair in the table.
 
 
 <pre><code>public fun for_each_mut&lt;K, V&gt;(table: &amp;mut smart_table::SmartTable&lt;K, V&gt;, f: &#124;(&amp;K, &amp;mut V)&#124;)<br/></code></pre>
@@ -839,7 +799,7 @@ Apply the function to a mutable reference of each key-value pair in the table.
 
 ## Function `map_ref`
 
-Map the function over the references of key-value pairs in the table without modifying it.
+Map the function over the references of key&#45;value pairs in the table without modifying it.
 
 
 <pre><code>public fun map_ref&lt;K: copy, drop, store, V1, V2: store&gt;(table: &amp;smart_table::SmartTable&lt;K, V1&gt;, f: &#124;&amp;V1&#124;V2): smart_table::SmartTable&lt;K, V2&gt;<br/></code></pre>
@@ -860,7 +820,7 @@ Map the function over the references of key-value pairs in the table without mod
 
 ## Function `any`
 
-Return true if any key-value pair in the table satisfies the predicate.
+Return true if any key&#45;value pair in the table satisfies the predicate.
 
 
 <pre><code>public fun any&lt;K, V&gt;(table: &amp;smart_table::SmartTable&lt;K, V&gt;, p: &#124;(&amp;K, &amp;V)&#124;bool): bool<br/></code></pre>

@@ -3,8 +3,7 @@
 
 # Module `0x1::multi_ed25519`
 
-Exports MultiEd25519 multi-signatures in Move.
-This module has the exact same interface as the Ed25519 module.
+Exports MultiEd25519 multi&#45;signatures in Move.<br/> This module has the exact same interface as the Ed25519 module.
 
 
 -  [Struct `UnvalidatedPublicKey`](#0x1_multi_ed25519_UnvalidatedPublicKey)
@@ -49,7 +48,6 @@ This module has the exact same interface as the Ed25519 module.
     -  [Function `public_key_validate_internal`](#@Specification_1_public_key_validate_internal)
     -  [Function `public_key_validate_v2_internal`](#@Specification_1_public_key_validate_v2_internal)
     -  [Function `signature_verify_strict_internal`](#@Specification_1_signature_verify_strict_internal)
-    -  [Helper functions](#@Helper_functions_2)
 
 
 <pre><code>use 0x1::bcs;<br/>use 0x1::ed25519;<br/>use 0x1::error;<br/>use 0x1::features;<br/>use 0x1::hash;<br/>use 0x1::option;<br/></code></pre>
@@ -60,10 +58,7 @@ This module has the exact same interface as the Ed25519 module.
 
 ## Struct `UnvalidatedPublicKey`
 
-An *unvalidated*, k out of n MultiEd25519 public key. The <code>bytes</code> field contains (1) several chunks of
-<code>ed25519::PUBLIC_KEY_NUM_BYTES</code> bytes, each encoding a Ed25519 PK, and (2) a single byte encoding the threshold k.
-*Unvalidated* means there is no guarantee that the underlying PKs are valid elliptic curve points of non-small
-order.
+An &#42;unvalidated&#42;, k out of n MultiEd25519 public key. The <code>bytes</code> field contains (1) several chunks of<br/> <code>ed25519::PUBLIC_KEY_NUM_BYTES</code> bytes, each encoding a Ed25519 PK, and (2) a single byte encoding the threshold k.<br/> &#42;Unvalidated&#42; means there is no guarantee that the underlying PKs are valid elliptic curve points of non&#45;small<br/> order.
 
 
 <pre><code>struct UnvalidatedPublicKey has copy, drop, store<br/></code></pre>
@@ -90,11 +85,7 @@ order.
 
 ## Struct `ValidatedPublicKey`
 
-A *validated* k out of n MultiEd25519 public key. *Validated* means that all the underlying PKs will be
-elliptic curve points that are NOT of small-order. It does not necessarily mean they will be prime-order points.
-This struct encodes the public key exactly as <code>UnvalidatedPublicKey</code>.
-
-For now, this struct is not used in any verification functions, but it might be in the future.
+A &#42;validated&#42; k out of n MultiEd25519 public key. &#42;Validated&#42; means that all the underlying PKs will be<br/> elliptic curve points that are NOT of small&#45;order. It does not necessarily mean they will be prime&#45;order points.<br/> This struct encodes the public key exactly as <code>UnvalidatedPublicKey</code>.<br/><br/> For now, this struct is not used in any verification functions, but it might be in the future.
 
 
 <pre><code>struct ValidatedPublicKey has copy, drop, store<br/></code></pre>
@@ -121,10 +112,7 @@ For now, this struct is not used in any verification functions, but it might be 
 
 ## Struct `Signature`
 
-A purported MultiEd25519 multi-signature that can be verified via <code>signature_verify_strict</code> or
-<code>signature_verify_strict_t</code>. The <code>bytes</code> field contains (1) several chunks of <code>ed25519::SIGNATURE_NUM_BYTES</code>
-bytes, each encoding a Ed25519 signature, and (2) a <code>BITMAP_NUM_OF_BYTES</code>-byte bitmap encoding the signer
-identities.
+A purported MultiEd25519 multi&#45;signature that can be verified via <code>signature_verify_strict</code> or<br/> <code>signature_verify_strict_t</code>. The <code>bytes</code> field contains (1) several chunks of <code>ed25519::SIGNATURE_NUM_BYTES</code><br/> bytes, each encoding a Ed25519 signature, and (2) a <code>BITMAP_NUM_OF_BYTES</code>&#45;byte bitmap encoding the signer<br/> identities.
 
 
 <pre><code>struct Signature has copy, drop, store<br/></code></pre>
@@ -181,8 +169,7 @@ Wrong number of bytes were given as input when deserializing an Ed25519 signatur
 
 <a id="0x1_multi_ed25519_SIGNATURE_SCHEME_ID"></a>
 
-The identifier of the MultiEd25519 signature scheme, which is used when deriving Aptos authentication keys by hashing
-it together with an MultiEd25519 public key.
+The identifier of the MultiEd25519 signature scheme, which is used when deriving Aptos authentication keys by hashing<br/> it together with an MultiEd25519 public key.
 
 
 <pre><code>const SIGNATURE_SCHEME_ID: u8 &#61; 1;<br/></code></pre>
@@ -191,8 +178,7 @@ it together with an MultiEd25519 public key.
 
 <a id="0x1_multi_ed25519_BITMAP_NUM_OF_BYTES"></a>
 
-When serializing a MultiEd25519 signature, the bitmap that indicates the signers will be encoded using this many
-bytes.
+When serializing a MultiEd25519 signature, the bitmap that indicates the signers will be encoded using this many<br/> bytes.
 
 
 <pre><code>const BITMAP_NUM_OF_BYTES: u64 &#61; 4;<br/></code></pre>
@@ -210,8 +196,7 @@ The threshold must be in the range <code>[1, n]</code>, where n is the total num
 
 <a id="0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES"></a>
 
-The size of an individual Ed25519 public key, in bytes.
-(A MultiEd25519 public key consists of several of these, plus the threshold.)
+The size of an individual Ed25519 public key, in bytes.<br/> (A MultiEd25519 public key consists of several of these, plus the threshold.)
 
 
 <pre><code>const INDIVIDUAL_PUBLIC_KEY_NUM_BYTES: u64 &#61; 32;<br/></code></pre>
@@ -220,8 +205,7 @@ The size of an individual Ed25519 public key, in bytes.
 
 <a id="0x1_multi_ed25519_INDIVIDUAL_SIGNATURE_NUM_BYTES"></a>
 
-The size of an individual Ed25519 signature, in bytes.
-(A MultiEd25519 signature consists of several of these, plus the signer bitmap.)
+The size of an individual Ed25519 signature, in bytes.<br/> (A MultiEd25519 signature consists of several of these, plus the signer bitmap.)
 
 
 <pre><code>const INDIVIDUAL_SIGNATURE_NUM_BYTES: u64 &#61; 64;<br/></code></pre>
@@ -230,7 +214,7 @@ The size of an individual Ed25519 signature, in bytes.
 
 <a id="0x1_multi_ed25519_MAX_NUMBER_OF_PUBLIC_KEYS"></a>
 
-Max number of ed25519 public keys allowed in multi-ed25519 keys
+Max number of ed25519 public keys allowed in multi&#45;ed25519 keys
 
 
 <pre><code>const MAX_NUMBER_OF_PUBLIC_KEYS: u64 &#61; 32;<br/></code></pre>
@@ -250,16 +234,7 @@ When serializing a MultiEd25519 public key, the threshold k will be encoded usin
 
 ## Function `new_unvalidated_public_key_from_bytes`
 
-Parses the input 32 bytes as an *unvalidated* MultiEd25519 public key.
-
-NOTE: This function could have also checked that the # of sub-PKs is > 0, but it did not. However, since such
-invalid PKs are rejected during signature verification  (see <code>bugfix_unvalidated_pk_from_zero_subpks</code>) they
-will not cause problems.
-
-We could fix this API by adding a new one that checks the # of sub-PKs is > 0, but it is likely not a good idea
-to reproduce the PK validation logic in Move. We should not have done so in the first place. Instead, we will
-leave it as is and continue assuming <code>UnvalidatedPublicKey</code> objects could be invalid PKs that will safely be
-rejected during signature verification.
+Parses the input 32 bytes as an &#42;unvalidated&#42; MultiEd25519 public key.<br/><br/> NOTE: This function could have also checked that the &#35; of sub&#45;PKs is &gt; 0, but it did not. However, since such<br/> invalid PKs are rejected during signature verification  (see <code>bugfix_unvalidated_pk_from_zero_subpks</code>) they<br/> will not cause problems.<br/><br/> We could fix this API by adding a new one that checks the &#35; of sub&#45;PKs is &gt; 0, but it is likely not a good idea<br/> to reproduce the PK validation logic in Move. We should not have done so in the first place. Instead, we will<br/> leave it as is and continue assuming <code>UnvalidatedPublicKey</code> objects could be invalid PKs that will safely be<br/> rejected during signature verification.
 
 
 <pre><code>public fun new_unvalidated_public_key_from_bytes(bytes: vector&lt;u8&gt;): multi_ed25519::UnvalidatedPublicKey<br/></code></pre>
@@ -280,9 +255,7 @@ rejected during signature verification.
 
 ## Function `new_validated_public_key_from_bytes`
 
-DEPRECATED: Use <code>new_validated_public_key_from_bytes_v2</code> instead. See <code>public_key_validate_internal</code> comments.
-
-(Incorrectly) parses the input bytes as a *validated* MultiEd25519 public key.
+DEPRECATED: Use <code>new_validated_public_key_from_bytes_v2</code> instead. See <code>public_key_validate_internal</code> comments.<br/><br/> (Incorrectly) parses the input bytes as a &#42;validated&#42; MultiEd25519 public key.
 
 
 <pre><code>public fun new_validated_public_key_from_bytes(bytes: vector&lt;u8&gt;): option::Option&lt;multi_ed25519::ValidatedPublicKey&gt;<br/></code></pre>
@@ -303,7 +276,7 @@ DEPRECATED: Use <code>new_validated_public_key_from_bytes_v2</code> instead. See
 
 ## Function `new_validated_public_key_from_bytes_v2`
 
-Parses the input bytes as a *validated* MultiEd25519 public key (see <code>public_key_validate_internal_v2</code>).
+Parses the input bytes as a &#42;validated&#42; MultiEd25519 public key (see <code>public_key_validate_internal_v2</code>).
 
 
 <pre><code>public fun new_validated_public_key_from_bytes_v2(bytes: vector&lt;u8&gt;): option::Option&lt;multi_ed25519::ValidatedPublicKey&gt;<br/></code></pre>
@@ -324,7 +297,7 @@ Parses the input bytes as a *validated* MultiEd25519 public key (see <code>publi
 
 ## Function `new_signature_from_bytes`
 
-Parses the input bytes as a purported MultiEd25519 multi-signature.
+Parses the input bytes as a purported MultiEd25519 multi&#45;signature.
 
 
 <pre><code>public fun new_signature_from_bytes(bytes: vector&lt;u8&gt;): multi_ed25519::Signature<br/></code></pre>
@@ -387,7 +360,7 @@ Moves a ValidatedPublicKey into an UnvalidatedPublicKey, which can be used in th
 
 ## Function `unvalidated_public_key_to_bytes`
 
-Serializes an UnvalidatedPublicKey struct to 32-bytes.
+Serializes an UnvalidatedPublicKey struct to 32&#45;bytes.
 
 
 <pre><code>public fun unvalidated_public_key_to_bytes(pk: &amp;multi_ed25519::UnvalidatedPublicKey): vector&lt;u8&gt;<br/></code></pre>
@@ -408,7 +381,7 @@ Serializes an UnvalidatedPublicKey struct to 32-bytes.
 
 ## Function `validated_public_key_to_bytes`
 
-Serializes a ValidatedPublicKey struct to 32-bytes.
+Serializes a ValidatedPublicKey struct to 32&#45;bytes.
 
 
 <pre><code>public fun validated_public_key_to_bytes(pk: &amp;multi_ed25519::ValidatedPublicKey): vector&lt;u8&gt;<br/></code></pre>
@@ -429,7 +402,7 @@ Serializes a ValidatedPublicKey struct to 32-bytes.
 
 ## Function `signature_to_bytes`
 
-Serializes a Signature struct to 64-bytes.
+Serializes a Signature struct to 64&#45;bytes.
 
 
 <pre><code>public fun signature_to_bytes(sig: &amp;multi_ed25519::Signature): vector&lt;u8&gt;<br/></code></pre>
@@ -450,10 +423,7 @@ Serializes a Signature struct to 64-bytes.
 
 ## Function `public_key_validate`
 
-DEPRECATED: Use <code>public_key_validate_v2</code> instead. See <code>public_key_validate_internal</code> comments.
-
-Takes in an *unvalidated* public key and attempts to validate it.
-Returns <code>Some(ValidatedPublicKey)</code> if successful and <code>None</code> otherwise.
+DEPRECATED: Use <code>public_key_validate_v2</code> instead. See <code>public_key_validate_internal</code> comments.<br/><br/> Takes in an &#42;unvalidated&#42; public key and attempts to validate it.<br/> Returns <code>Some(ValidatedPublicKey)</code> if successful and <code>None</code> otherwise.
 
 
 <pre><code>public fun public_key_validate(pk: &amp;multi_ed25519::UnvalidatedPublicKey): option::Option&lt;multi_ed25519::ValidatedPublicKey&gt;<br/></code></pre>
@@ -474,8 +444,7 @@ Returns <code>Some(ValidatedPublicKey)</code> if successful and <code>None</code
 
 ## Function `public_key_validate_v2`
 
-Takes in an *unvalidated* public key and attempts to validate it.
-Returns <code>Some(ValidatedPublicKey)</code> if successful and <code>None</code> otherwise.
+Takes in an &#42;unvalidated&#42; public key and attempts to validate it.<br/> Returns <code>Some(ValidatedPublicKey)</code> if successful and <code>None</code> otherwise.
 
 
 <pre><code>public fun public_key_validate_v2(pk: &amp;multi_ed25519::UnvalidatedPublicKey): option::Option&lt;multi_ed25519::ValidatedPublicKey&gt;<br/></code></pre>
@@ -496,8 +465,7 @@ Returns <code>Some(ValidatedPublicKey)</code> if successful and <code>None</code
 
 ## Function `signature_verify_strict`
 
-Verifies a purported MultiEd25519 <code>multisignature</code> under an *unvalidated* <code>public_key</code> on the specified <code>message</code>.
-This call will validate the public key by checking it is NOT in the small subgroup.
+Verifies a purported MultiEd25519 <code>multisignature</code> under an &#42;unvalidated&#42; <code>public_key</code> on the specified <code>message</code>.<br/> This call will validate the public key by checking it is NOT in the small subgroup.
 
 
 <pre><code>public fun signature_verify_strict(multisignature: &amp;multi_ed25519::Signature, public_key: &amp;multi_ed25519::UnvalidatedPublicKey, message: vector&lt;u8&gt;): bool<br/></code></pre>
@@ -518,8 +486,7 @@ This call will validate the public key by checking it is NOT in the small subgro
 
 ## Function `signature_verify_strict_t`
 
-This function is used to verify a multi-signature on any BCS-serializable type T. For now, it is used to verify the
-proof of private key ownership when rotating authentication keys.
+This function is used to verify a multi&#45;signature on any BCS&#45;serializable type T. For now, it is used to verify the<br/> proof of private key ownership when rotating authentication keys.
 
 
 <pre><code>public fun signature_verify_strict_t&lt;T: drop&gt;(multisignature: &amp;multi_ed25519::Signature, public_key: &amp;multi_ed25519::UnvalidatedPublicKey, data: T): bool<br/></code></pre>
@@ -540,7 +507,7 @@ proof of private key ownership when rotating authentication keys.
 
 ## Function `unvalidated_public_key_to_authentication_key`
 
-Derives the Aptos-specific authentication key of the given Ed25519 public key.
+Derives the Aptos&#45;specific authentication key of the given Ed25519 public key.
 
 
 <pre><code>public fun unvalidated_public_key_to_authentication_key(pk: &amp;multi_ed25519::UnvalidatedPublicKey): vector&lt;u8&gt;<br/></code></pre>
@@ -561,12 +528,7 @@ Derives the Aptos-specific authentication key of the given Ed25519 public key.
 
 ## Function `unvalidated_public_key_num_sub_pks`
 
-Returns the number n of sub-PKs in an unvalidated t-out-of-n MultiEd25519 PK.
-If this <code>UnvalidatedPublicKey</code> would pass validation in <code>public_key_validate</code>, then the returned # of sub-PKs
-can be relied upon as correct.
-
-We provide this API as a cheaper alternative to calling <code>public_key_validate</code> and then <code>validated_public_key_num_sub_pks</code>
-when the input <code>pk</code> is known to be valid.
+Returns the number n of sub&#45;PKs in an unvalidated t&#45;out&#45;of&#45;n MultiEd25519 PK.<br/> If this <code>UnvalidatedPublicKey</code> would pass validation in <code>public_key_validate</code>, then the returned &#35; of sub&#45;PKs<br/> can be relied upon as correct.<br/><br/> We provide this API as a cheaper alternative to calling <code>public_key_validate</code> and then <code>validated_public_key_num_sub_pks</code><br/> when the input <code>pk</code> is known to be valid.
 
 
 <pre><code>public fun unvalidated_public_key_num_sub_pks(pk: &amp;multi_ed25519::UnvalidatedPublicKey): u8<br/></code></pre>
@@ -587,8 +549,7 @@ when the input <code>pk</code> is known to be valid.
 
 ## Function `unvalidated_public_key_threshold`
 
-Returns the number t of sub-PKs in an unvalidated t-out-of-n MultiEd25519 PK (i.e., the threshold) or <code>None</code>
-if <code>bytes</code> does not correctly encode such a PK.
+Returns the number t of sub&#45;PKs in an unvalidated t&#45;out&#45;of&#45;n MultiEd25519 PK (i.e., the threshold) or <code>None</code><br/> if <code>bytes</code> does not correctly encode such a PK.
 
 
 <pre><code>public fun unvalidated_public_key_threshold(pk: &amp;multi_ed25519::UnvalidatedPublicKey): option::Option&lt;u8&gt;<br/></code></pre>
@@ -609,7 +570,7 @@ if <code>bytes</code> does not correctly encode such a PK.
 
 ## Function `validated_public_key_to_authentication_key`
 
-Derives the Aptos-specific authentication key of the given Ed25519 public key.
+Derives the Aptos&#45;specific authentication key of the given Ed25519 public key.
 
 
 <pre><code>public fun validated_public_key_to_authentication_key(pk: &amp;multi_ed25519::ValidatedPublicKey): vector&lt;u8&gt;<br/></code></pre>
@@ -630,8 +591,7 @@ Derives the Aptos-specific authentication key of the given Ed25519 public key.
 
 ## Function `validated_public_key_num_sub_pks`
 
-Returns the number n of sub-PKs in a validated t-out-of-n MultiEd25519 PK.
-Since the format of this PK has been validated, the returned # of sub-PKs is guaranteed to be correct.
+Returns the number n of sub&#45;PKs in a validated t&#45;out&#45;of&#45;n MultiEd25519 PK.<br/> Since the format of this PK has been validated, the returned &#35; of sub&#45;PKs is guaranteed to be correct.
 
 
 <pre><code>public fun validated_public_key_num_sub_pks(pk: &amp;multi_ed25519::ValidatedPublicKey): u8<br/></code></pre>
@@ -652,7 +612,7 @@ Since the format of this PK has been validated, the returned # of sub-PKs is gua
 
 ## Function `validated_public_key_threshold`
 
-Returns the number t of sub-PKs in a validated t-out-of-n MultiEd25519 PK (i.e., the threshold).
+Returns the number t of sub&#45;PKs in a validated t&#45;out&#45;of&#45;n MultiEd25519 PK (i.e., the threshold).
 
 
 <pre><code>public fun validated_public_key_threshold(pk: &amp;multi_ed25519::ValidatedPublicKey): u8<br/></code></pre>
@@ -673,9 +633,7 @@ Returns the number t of sub-PKs in a validated t-out-of-n MultiEd25519 PK (i.e.,
 
 ## Function `check_and_get_threshold`
 
-Checks that the serialized format of a t-out-of-n MultiEd25519 PK correctly encodes 1 <= n <= 32 sub-PKs.
-(All <code>ValidatedPublicKey</code> objects are guaranteed to pass this check.)
-Returns the threshold t <= n of the PK.
+Checks that the serialized format of a t&#45;out&#45;of&#45;n MultiEd25519 PK correctly encodes 1 &lt;&#61; n &lt;&#61; 32 sub&#45;PKs.<br/> (All <code>ValidatedPublicKey</code> objects are guaranteed to pass this check.)<br/> Returns the threshold t &lt;&#61; n of the PK.
 
 
 <pre><code>public fun check_and_get_threshold(bytes: vector&lt;u8&gt;): option::Option&lt;u8&gt;<br/></code></pre>
@@ -696,7 +654,7 @@ Returns the threshold t <= n of the PK.
 
 ## Function `public_key_bytes_to_authentication_key`
 
-Derives the Aptos-specific authentication key of the given Ed25519 public key.
+Derives the Aptos&#45;specific authentication key of the given Ed25519 public key.
 
 
 <pre><code>fun public_key_bytes_to_authentication_key(pk_bytes: vector&lt;u8&gt;): vector&lt;u8&gt;<br/></code></pre>
@@ -717,20 +675,7 @@ Derives the Aptos-specific authentication key of the given Ed25519 public key.
 
 ## Function `public_key_validate_internal`
 
-DEPRECATED: Use <code>public_key_validate_internal_v2</code> instead. This function was NOT correctly implemented:
-
-1. It does not check that the # of sub public keys is > 0, which leads to invalid <code>ValidatedPublicKey</code> objects
-against which no signature will verify, since <code>signature_verify_strict_internal</code> will reject such invalid PKs.
-This is not a security issue, but a correctness issue. See <code>bugfix_validated_pk_from_zero_subpks</code>.
-2. It charges too much gas: if the first sub-PK is invalid, it will charge for verifying all remaining sub-PKs.
-
-DEPRECATES:
-- new_validated_public_key_from_bytes
-- public_key_validate
-
-Return <code>true</code> if the bytes in <code>public_key</code> can be parsed as a valid MultiEd25519 public key: i.e., all underlying
-PKs pass point-on-curve and not-in-small-subgroup checks.
-Returns <code>false</code> otherwise.
+DEPRECATED: Use <code>public_key_validate_internal_v2</code> instead. This function was NOT correctly implemented:<br/><br/>  1. It does not check that the &#35; of sub public keys is &gt; 0, which leads to invalid <code>ValidatedPublicKey</code> objects<br/>     against which no signature will verify, since <code>signature_verify_strict_internal</code> will reject such invalid PKs.<br/>     This is not a security issue, but a correctness issue. See <code>bugfix_validated_pk_from_zero_subpks</code>.<br/>  2. It charges too much gas: if the first sub&#45;PK is invalid, it will charge for verifying all remaining sub&#45;PKs.<br/><br/> DEPRECATES:<br/>  &#45; new_validated_public_key_from_bytes<br/>  &#45; public_key_validate<br/><br/> Return <code>true</code> if the bytes in <code>public_key</code> can be parsed as a valid MultiEd25519 public key: i.e., all underlying<br/> PKs pass point&#45;on&#45;curve and not&#45;in&#45;small&#45;subgroup checks.<br/> Returns <code>false</code> otherwise.
 
 
 <pre><code>fun public_key_validate_internal(bytes: vector&lt;u8&gt;): bool<br/></code></pre>
@@ -751,9 +696,7 @@ Returns <code>false</code> otherwise.
 
 ## Function `public_key_validate_v2_internal`
 
-Return <code>true</code> if the bytes in <code>public_key</code> can be parsed as a valid MultiEd25519 public key: i.e., all underlying
-sub-PKs pass point-on-curve and not-in-small-subgroup checks.
-Returns <code>false</code> otherwise.
+Return <code>true</code> if the bytes in <code>public_key</code> can be parsed as a valid MultiEd25519 public key: i.e., all underlying<br/> sub&#45;PKs pass point&#45;on&#45;curve and not&#45;in&#45;small&#45;subgroup checks.<br/> Returns <code>false</code> otherwise.
 
 
 <pre><code>fun public_key_validate_v2_internal(bytes: vector&lt;u8&gt;): bool<br/></code></pre>
@@ -774,11 +717,7 @@ Returns <code>false</code> otherwise.
 
 ## Function `signature_verify_strict_internal`
 
-Return true if the MultiEd25519 <code>multisignature</code> on <code>message</code> verifies against the MultiEd25519 <code>public_key</code>.
-Returns <code>false</code> if either:
-- The PKs in <code>public_key</code> do not all pass points-on-curve or not-in-small-subgroup checks,
-- The signatures in <code>multisignature</code> do not all pass points-on-curve or not-in-small-subgroup checks,
-- the <code>multisignature</code> on <code>message</code> does not verify.
+Return true if the MultiEd25519 <code>multisignature</code> on <code>message</code> verifies against the MultiEd25519 <code>public_key</code>.<br/> Returns <code>false</code> if either:<br/> &#45; The PKs in <code>public_key</code> do not all pass points&#45;on&#45;curve or not&#45;in&#45;small&#45;subgroup checks,<br/> &#45; The signatures in <code>multisignature</code> do not all pass points&#45;on&#45;curve or not&#45;in&#45;small&#45;subgroup checks,<br/> &#45; the <code>multisignature</code> on <code>message</code> does not verify.
 
 
 <pre><code>fun signature_verify_strict_internal(multisignature: vector&lt;u8&gt;, public_key: vector&lt;u8&gt;, message: vector&lt;u8&gt;): bool<br/></code></pre>
@@ -1005,11 +944,7 @@ Returns <code>false</code> if either:
 <pre><code>pragma opaque;<br/>aborts_if false;<br/>ensures result &#61;&#61; spec_signature_verify_strict_internal(multisignature, public_key, message);<br/></code></pre>
 
 
-
-<a id="@Helper_functions_2"></a>
-
-### Helper functions
-
+&#35; Helper functions
 
 
 <a id="0x1_multi_ed25519_spec_check_and_get_threshold"></a>

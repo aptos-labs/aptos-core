@@ -70,7 +70,7 @@ A <code>String</code> holds a sequence of bytes which is guaranteed to be in utf
 
 <a id="0x1_function_info_EINVALID_FUNCTION"></a>
 
-Function specified in the FunctionInfo doesn't exist on chain.
+Function specified in the FunctionInfo doesn&apos;t exist on chain.
 
 
 <pre><code>const EINVALID_FUNCTION: u64 &#61; 2;<br/></code></pre>
@@ -88,7 +88,7 @@ String is not a valid Move identifier
 
 <a id="0x1_function_info_ENOT_ACTIVATED"></a>
 
-Feature hasn't been activated yet.
+Feature hasn&apos;t been activated yet.
 
 
 <pre><code>const ENOT_ACTIVATED: u64 &#61; 3;<br/></code></pre>
@@ -140,16 +140,7 @@ Creates a new function info from names.
 
 ## Function `check_dispatch_type_compatibility`
 
-Check if the dispatch target function meets the type requirements of the disptach entry point.
-
-framework_function is the dispatch native function defined in the aptos_framework.
-dispatch_target is the function passed in by the user.
-
-dispatch_target should have the same signature (same argument type, same generics constraint) except
-that the framework_function will have a <code>&amp;FunctionInfo</code> in the last argument that will instruct the VM which
-function to jump to.
-
-dispatch_target also needs to be public so the type signature will remain unchanged.
+Check if the dispatch target function meets the type requirements of the disptach entry point.<br/><br/> framework_function is the dispatch native function defined in the aptos_framework.<br/> dispatch_target is the function passed in by the user.<br/><br/> dispatch_target should have the same signature (same argument type, same generics constraint) except<br/> that the framework_function will have a <code>&amp;FunctionInfo</code> in the last argument that will instruct the VM which<br/> function to jump to.<br/><br/> dispatch_target also needs to be public so the type signature will remain unchanged.
 
 
 <pre><code>public(friend) fun check_dispatch_type_compatibility(framework_function: &amp;function_info::FunctionInfo, dispatch_target: &amp;function_info::FunctionInfo): bool<br/></code></pre>
@@ -170,15 +161,7 @@ dispatch_target also needs to be public so the type signature will remain unchan
 
 ## Function `load_module_from_function`
 
-Load up a function into VM's loader and charge for its dependencies
-
-It is **critical** to make sure that this function is invoked before <code>check_dispatch_type_compatibility</code>
-or performing any other dispatching logic to ensure:
-1. We properly charge gas for the function to dispatch.
-2. The function is loaded in the cache so that we can perform further type checking/dispatching logic.
-
-Calling <code>check_dispatch_type_compatibility_impl</code> or dispatch without loading up the module would yield an error
-if such module isn't accessed previously in the transaction.
+Load up a function into VM&apos;s loader and charge for its dependencies<br/><br/> It is &#42;&#42;critical&#42;&#42; to make sure that this function is invoked before <code>check_dispatch_type_compatibility</code><br/> or performing any other dispatching logic to ensure:<br/> 1. We properly charge gas for the function to dispatch.<br/> 2. The function is loaded in the cache so that we can perform further type checking/dispatching logic.<br/><br/> Calling <code>check_dispatch_type_compatibility_impl</code> or dispatch without loading up the module would yield an error<br/> if such module isn&apos;t accessed previously in the transaction.
 
 
 <pre><code>public(friend) fun load_module_from_function(f: &amp;function_info::FunctionInfo)<br/></code></pre>

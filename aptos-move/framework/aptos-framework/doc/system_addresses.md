@@ -199,7 +199,7 @@ The operation can only be performed by the VM
 
 ## Function `is_framework_reserved_address`
 
-Return true if <code>addr</code> is 0x0 or under the on chain governance's control.
+Return true if <code>addr</code> is 0x0 or under the on chain governance&apos;s control.
 
 
 <pre><code>public fun is_framework_reserved_address(addr: address): bool<br/></code></pre>
@@ -332,38 +332,17 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>Asserting that a provided address corresponds to the Core Resources address should always yield a true result when matched.</td>
-<td>Low</td>
-<td>The assert_core_resource and assert_core_resource_address functions ensure that the provided signer or address belong to the @core_resources account.</td>
-<td>Formally verified via <a href="#high-level-req-1">AbortsIfNotCoreResource</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Asserting that a provided address corresponds to the Core Resources address should always yield a true result when matched.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The assert_core_resource and assert_core_resource_address functions ensure that the provided signer or address belong to the @core_resources account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;AbortsIfNotCoreResource&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>Asserting that a provided address corresponds to the Aptos Framework Resources address should always yield a true result when matched.</td>
-<td>High</td>
-<td>The assert_aptos_framework function ensures that the provided signer belongs to the @aptos_framework account.</td>
-<td>Formally verified via <a href="#high-level-req-2">AbortsIfNotAptosFramework</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;Asserting that a provided address corresponds to the Aptos Framework Resources address should always yield a true result when matched.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The assert_aptos_framework function ensures that the provided signer belongs to the @aptos_framework account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;AbortsIfNotAptosFramework&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>Asserting that a provided address corresponds to the VM address should always yield a true result when matched.</td>
-<td>High</td>
-<td>The assert_vm function ensure that the provided signer belongs to the @vm_reserved account.</td>
-<td>Formally verified via <a href="#high-level-req-3">AbortsIfNotVM</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Asserting that a provided address corresponds to the VM address should always yield a true result when matched.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The assert_vm function ensure that the provided signer belongs to the @vm_reserved account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;AbortsIfNotVM&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -464,7 +443,7 @@ Specifies that a function aborts if the account does not have the aptos framewor
 <a id="0x1_system_addresses_AbortsIfNotAptosFramework"></a>
 
 
-<pre><code>schema AbortsIfNotAptosFramework &#123;<br/>account: signer;<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>schema AbortsIfNotAptosFramework &#123;<br/>account: signer;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
     aborts_if signer::address_of(account) !&#61; @aptos_framework with error::PERMISSION_DENIED;<br/>&#125;<br/></code></pre>
 
 
@@ -488,7 +467,7 @@ Specifies that a function aborts if the account does not have the VM reserved ad
 <a id="0x1_system_addresses_AbortsIfNotVM"></a>
 
 
-<pre><code>schema AbortsIfNotVM &#123;<br/>account: signer;<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>schema AbortsIfNotVM &#123;<br/>account: signer;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
     aborts_if signer::address_of(account) !&#61; @vm_reserved with error::PERMISSION_DENIED;<br/>&#125;<br/></code></pre>
 
 

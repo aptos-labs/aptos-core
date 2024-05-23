@@ -3,16 +3,7 @@
 
 # Module `0x1::vector`
 
-A variable-sized container that can hold any type. Indexing is 0-based, and
-vectors are growable. This module has many native functions.
-Verification of modules that use this one uses model functions that are implemented
-directly in Boogie. The specification language has built-in functions operations such
-as <code>singleton_vector</code>. There are some helper functions defined here for specifications in other
-modules as well.
-
->Note: We did not verify most of the
-Move functions here because many have loops, requiring loop invariants to prove, and
-the return on investment didn't seem worth it for these simple functions.
+A variable&#45;sized container that can hold any type. Indexing is 0&#45;based, and<br/> vectors are growable. This module has many native functions.<br/> Verification of modules that use this one uses model functions that are implemented<br/> directly in Boogie. The specification language has built&#45;in functions operations such<br/> as <code>singleton_vector</code>. There are some helper functions defined here for specifications in other<br/> modules as well.<br/><br/> &gt;Note: We did not verify most of the<br/> Move functions here because many have loops, requiring loop invariants to prove, and<br/> the return on investment didn&apos;t seem worth it for these simple functions.
 
 
 -  [Constants](#@Constants_0)
@@ -67,7 +58,6 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `range_with_step`](#0x1_vector_range_with_step)
 -  [Function `slice`](#0x1_vector_slice)
 -  [Specification](#@Specification_1)
-    -  [Helper Functions](#@Helper_Functions_2)
     -  [Function `singleton`](#@Specification_1_singleton)
     -  [Function `reverse`](#@Specification_1_reverse)
     -  [Function `reverse_slice`](#@Specification_1_reverse_slice)
@@ -186,8 +176,7 @@ Return the length of the vector.
 
 ## Function `borrow`
 
-Acquire an immutable reference to the <code>i</code>th element of the vector <code>v</code>.
-Aborts if <code>i</code> is out of bounds.
+Acquire an immutable reference to the <code>i</code>th element of the vector <code>v</code>.<br/> Aborts if <code>i</code> is out of bounds.
 
 
 <pre><code>&#35;[bytecode_instruction]<br/>public fun borrow&lt;Element&gt;(v: &amp;vector&lt;Element&gt;, i: u64): &amp;Element<br/></code></pre>
@@ -229,8 +218,7 @@ Add element <code>e</code> to the end of the vector <code>v</code>.
 
 ## Function `borrow_mut`
 
-Return a mutable reference to the <code>i</code>th element in the vector <code>v</code>.
-Aborts if <code>i</code> is out of bounds.
+Return a mutable reference to the <code>i</code>th element in the vector <code>v</code>.<br/> Aborts if <code>i</code> is out of bounds.
 
 
 <pre><code>&#35;[bytecode_instruction]<br/>public fun borrow_mut&lt;Element&gt;(v: &amp;mut vector&lt;Element&gt;, i: u64): &amp;mut Element<br/></code></pre>
@@ -251,8 +239,7 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `pop_back`
 
-Pop an element from the end of vector <code>v</code>.
-Aborts if <code>v</code> is empty.
+Pop an element from the end of vector <code>v</code>.<br/> Aborts if <code>v</code> is empty.
 
 
 <pre><code>&#35;[bytecode_instruction]<br/>public fun pop_back&lt;Element&gt;(v: &amp;mut vector&lt;Element&gt;): Element<br/></code></pre>
@@ -273,8 +260,7 @@ Aborts if <code>v</code> is empty.
 
 ## Function `destroy_empty`
 
-Destroy the vector <code>v</code>.
-Aborts if <code>v</code> is not empty.
+Destroy the vector <code>v</code>.<br/> Aborts if <code>v</code> is not empty.
 
 
 <pre><code>&#35;[bytecode_instruction]<br/>public fun destroy_empty&lt;Element&gt;(v: vector&lt;Element&gt;)<br/></code></pre>
@@ -295,8 +281,7 @@ Aborts if <code>v</code> is not empty.
 
 ## Function `swap`
 
-Swaps the elements at the <code>i</code>th and <code>j</code>th indices in the vector <code>v</code>.
-Aborts if <code>i</code> or <code>j</code> is out of bounds.
+Swaps the elements at the <code>i</code>th and <code>j</code>th indices in the vector <code>v</code>.<br/> Aborts if <code>i</code> or <code>j</code> is out of bounds.
 
 
 <pre><code>&#35;[bytecode_instruction]<br/>public fun swap&lt;Element&gt;(v: &amp;mut vector&lt;Element&gt;, i: u64, j: u64)<br/></code></pre>
@@ -506,8 +491,7 @@ Return true if <code>e</code> is in the vector <code>v</code>.
 
 ## Function `index_of`
 
-Return <code>(true, i)</code> if <code>e</code> is in the vector <code>v</code> at index <code>i</code>.
-Otherwise, returns <code>(false, 0)</code>.
+Return <code>(true, i)</code> if <code>e</code> is in the vector <code>v</code> at index <code>i</code>.<br/> Otherwise, returns <code>(false, 0)</code>.
 
 
 <pre><code>public fun index_of&lt;Element&gt;(v: &amp;vector&lt;Element&gt;, e: &amp;Element): (bool, u64)<br/></code></pre>
@@ -528,9 +512,7 @@ Otherwise, returns <code>(false, 0)</code>.
 
 ## Function `find`
 
-Return <code>(true, i)</code> if there's an element that matches the predicate. If there are multiple elements that match
-the predicate, only the index of the first one is returned.
-Otherwise, returns <code>(false, 0)</code>.
+Return <code>(true, i)</code> if there&apos;s an element that matches the predicate. If there are multiple elements that match<br/> the predicate, only the index of the first one is returned.<br/> Otherwise, returns <code>(false, 0)</code>.
 
 
 <pre><code>public fun find&lt;Element&gt;(v: &amp;vector&lt;Element&gt;, f: &#124;&amp;Element&#124;bool): (bool, u64)<br/></code></pre>
@@ -551,8 +533,7 @@ Otherwise, returns <code>(false, 0)</code>.
 
 ## Function `insert`
 
-Insert a new element at position 0 <= i <= length, using O(length - i) time.
-Aborts if out of bounds.
+Insert a new element at position 0 &lt;&#61; i &lt;&#61; length, using O(length &#45; i) time.<br/> Aborts if out of bounds.
 
 
 <pre><code>public fun insert&lt;Element&gt;(v: &amp;mut vector&lt;Element&gt;, i: u64, e: Element)<br/></code></pre>
@@ -573,9 +554,7 @@ Aborts if out of bounds.
 
 ## Function `remove`
 
-Remove the <code>i</code>th element of the vector <code>v</code>, shifting all subsequent elements.
-This is O(n) and preserves ordering of elements in the vector.
-Aborts if <code>i</code> is out of bounds.
+Remove the <code>i</code>th element of the vector <code>v</code>, shifting all subsequent elements.<br/> This is O(n) and preserves ordering of elements in the vector.<br/> Aborts if <code>i</code> is out of bounds.
 
 
 <pre><code>public fun remove&lt;Element&gt;(v: &amp;mut vector&lt;Element&gt;, i: u64): Element<br/></code></pre>
@@ -596,12 +575,7 @@ Aborts if <code>i</code> is out of bounds.
 
 ## Function `remove_value`
 
-Remove the first occurrence of a given value in the vector <code>v</code> and return it in a vector, shifting all
-subsequent elements.
-This is O(n) and preserves ordering of elements in the vector.
-This returns an empty vector if the value isn't present in the vector.
-Note that this cannot return an option as option uses vector and there'd be a circular dependency between option
-and vector.
+Remove the first occurrence of a given value in the vector <code>v</code> and return it in a vector, shifting all<br/> subsequent elements.<br/> This is O(n) and preserves ordering of elements in the vector.<br/> This returns an empty vector if the value isn&apos;t present in the vector.<br/> Note that this cannot return an option as option uses vector and there&apos;d be a circular dependency between option<br/> and vector.
 
 
 <pre><code>public fun remove_value&lt;Element&gt;(v: &amp;mut vector&lt;Element&gt;, val: &amp;Element): vector&lt;Element&gt;<br/></code></pre>
@@ -622,9 +596,7 @@ and vector.
 
 ## Function `swap_remove`
 
-Swap the <code>i</code>th element of the vector <code>v</code> with the last element and then pop the vector.
-This is O(1), but does not preserve ordering of elements in the vector.
-Aborts if <code>i</code> is out of bounds.
+Swap the <code>i</code>th element of the vector <code>v</code> with the last element and then pop the vector.<br/> This is O(1), but does not preserve ordering of elements in the vector.<br/> Aborts if <code>i</code> is out of bounds.
 
 
 <pre><code>public fun swap_remove&lt;Element&gt;(v: &amp;mut vector&lt;Element&gt;, i: u64): Element<br/></code></pre>
@@ -729,8 +701,7 @@ Apply the function to each pair of elements in the two given vectors, consuming 
 
 ## Function `zip_reverse`
 
-Apply the function to each pair of elements in the two given vectors in the reverse order, consuming them.
-This errors out if the vectors are not of the same length.
+Apply the function to each pair of elements in the two given vectors in the reverse order, consuming them.<br/> This errors out if the vectors are not of the same length.
 
 
 <pre><code>public fun zip_reverse&lt;Element1, Element2&gt;(v1: vector&lt;Element1&gt;, v2: vector&lt;Element2&gt;, f: &#124;(Element1, Element2)&#124;)<br/></code></pre>
@@ -751,8 +722,7 @@ This errors out if the vectors are not of the same length.
 
 ## Function `zip_ref`
 
-Apply the function to the references of each pair of elements in the two given vectors.
-This errors out if the vectors are not of the same length.
+Apply the function to the references of each pair of elements in the two given vectors.<br/> This errors out if the vectors are not of the same length.
 
 
 <pre><code>public fun zip_ref&lt;Element1, Element2&gt;(v1: &amp;vector&lt;Element1&gt;, v2: &amp;vector&lt;Element2&gt;, f: &#124;(&amp;Element1, &amp;Element2)&#124;)<br/></code></pre>
@@ -815,8 +785,7 @@ Apply the function to a mutable reference to each element in the vector.
 
 ## Function `zip_mut`
 
-Apply the function to mutable references to each pair of elements in the two given vectors.
-This errors out if the vectors are not of the same length.
+Apply the function to mutable references to each pair of elements in the two given vectors.<br/> This errors out if the vectors are not of the same length.
 
 
 <pre><code>public fun zip_mut&lt;Element1, Element2&gt;(v1: &amp;mut vector&lt;Element1&gt;, v2: &amp;mut vector&lt;Element2&gt;, f: &#124;(&amp;mut Element1, &amp;mut Element2)&#124;)<br/></code></pre>
@@ -858,8 +827,7 @@ Apply the function to a mutable reference of each element in the vector with its
 
 ## Function `fold`
 
-Fold the function over the elements. For example, <code>fold(vector[1,2,3], 0, f)</code> will execute
-<code>f(f(f(0, 1), 2), 3)</code>
+Fold the function over the elements. For example, <code>fold(vector[1,2,3], 0, f)</code> will execute<br/> <code>f(f(f(0, 1), 2), 3)</code>
 
 
 <pre><code>public fun fold&lt;Accumulator, Element&gt;(v: vector&lt;Element&gt;, init: Accumulator, f: &#124;(Accumulator, Element)&#124;Accumulator): Accumulator<br/></code></pre>
@@ -880,8 +848,7 @@ Fold the function over the elements. For example, <code>fold(vector[1,2,3], 0, f
 
 ## Function `foldr`
 
-Fold right like fold above but working right to left. For example, <code>fold(vector[1,2,3], 0, f)</code> will execute
-<code>f(1, f(2, f(3, 0)))</code>
+Fold right like fold above but working right to left. For example, <code>fold(vector[1,2,3], 0, f)</code> will execute<br/> <code>f(1, f(2, f(3, 0)))</code>
 
 
 <pre><code>public fun foldr&lt;Accumulator, Element&gt;(v: vector&lt;Element&gt;, init: Accumulator, f: &#124;(Element, Accumulator)&#124;Accumulator): Accumulator<br/></code></pre>
@@ -902,8 +869,7 @@ Fold right like fold above but working right to left. For example, <code>fold(ve
 
 ## Function `map_ref`
 
-Map the function over the references of the elements of the vector, producing a new vector without modifying the
-original vector.
+Map the function over the references of the elements of the vector, producing a new vector without modifying the<br/> original vector.
 
 
 <pre><code>public fun map_ref&lt;Element, NewElement&gt;(v: &amp;vector&lt;Element&gt;, f: &#124;&amp;Element&#124;NewElement): vector&lt;NewElement&gt;<br/></code></pre>
@@ -924,8 +890,7 @@ original vector.
 
 ## Function `zip_map_ref`
 
-Map the function over the references of the element pairs of two vectors, producing a new vector from the return
-values without modifying the original vectors.
+Map the function over the references of the element pairs of two vectors, producing a new vector from the return<br/> values without modifying the original vectors.
 
 
 <pre><code>public fun zip_map_ref&lt;Element1, Element2, NewElement&gt;(v1: &amp;vector&lt;Element1&gt;, v2: &amp;vector&lt;Element2&gt;, f: &#124;(&amp;Element1, &amp;Element2)&#124;NewElement): vector&lt;NewElement&gt;<br/></code></pre>
@@ -1009,9 +974,7 @@ Filter the vector using the boolean function, removing all elements for which <c
 
 ## Function `partition`
 
-Partition, sorts all elements for which pred is true to the front.
-Preserves the relative order of the elements for which pred is true,
-BUT NOT for the elements for which pred is false.
+Partition, sorts all elements for which pred is true to the front.<br/> Preserves the relative order of the elements for which pred is true,<br/> BUT NOT for the elements for which pred is false.
 
 
 <pre><code>public fun partition&lt;Element&gt;(v: &amp;mut vector&lt;Element&gt;, pred: &#124;&amp;Element&#124;bool): u64<br/></code></pre>
@@ -1032,8 +995,7 @@ BUT NOT for the elements for which pred is false.
 
 ## Function `rotate`
 
-rotate(&mut [1, 2, 3, 4, 5], 2) -> [3, 4, 5, 1, 2] in place, returns the split point
-ie. 3 in the example above
+rotate(&amp;mut [1, 2, 3, 4, 5], 2) &#45;&gt; [3, 4, 5, 1, 2] in place, returns the split point<br/> ie. 3 in the example above
 
 
 <pre><code>public fun rotate&lt;Element&gt;(v: &amp;mut vector&lt;Element&gt;, rot: u64): u64<br/></code></pre>
@@ -1054,8 +1016,7 @@ ie. 3 in the example above
 
 ## Function `rotate_slice`
 
-Same as above but on a sub-slice of an array [left, right) with left <= rot <= right
-returns the
+Same as above but on a sub&#45;slice of an array [left, right) with left &lt;&#61; rot &lt;&#61; right<br/> returns the
 
 
 <pre><code>public fun rotate_slice&lt;Element&gt;(v: &amp;mut vector&lt;Element&gt;, left: u64, rot: u64, right: u64): u64<br/></code></pre>
@@ -1076,8 +1037,7 @@ returns the
 
 ## Function `stable_partition`
 
-Partition the array based on a predicate p, this routine is stable and thus
-preserves the relative order of the elements in the two partitions.
+Partition the array based on a predicate p, this routine is stable and thus<br/> preserves the relative order of the elements in the two partitions.
 
 
 <pre><code>public fun stable_partition&lt;Element&gt;(v: &amp;mut vector&lt;Element&gt;, p: &#124;&amp;Element&#124;bool): u64<br/></code></pre>
@@ -1140,8 +1100,7 @@ Return true if all elements in the vector satisfy the predicate.
 
 ## Function `destroy`
 
-Destroy a vector, just a wrapper around for_each_reverse with a descriptive name
-when used in the context of destroying a vector.
+Destroy a vector, just a wrapper around for_each_reverse with a descriptive name<br/> when used in the context of destroying a vector.
 
 
 <pre><code>public fun destroy&lt;Element&gt;(v: vector&lt;Element&gt;, d: &#124;Element&#124;)<br/></code></pre>
@@ -1223,11 +1182,7 @@ when used in the context of destroying a vector.
 ## Specification
 
 
-
-<a id="@Helper_Functions_2"></a>
-
-### Helper Functions
-
+&#35; Helper Functions
 
 Check if <code>v1</code> is equal to the result of adding <code>e</code> at the end of <code>v2</code>
 

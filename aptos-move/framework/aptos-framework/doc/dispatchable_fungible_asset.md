@@ -3,21 +3,7 @@
 
 # Module `0x1::dispatchable_fungible_asset`
 
-This defines the fungible asset module that can issue fungible asset of any <code>Metadata</code> object. The
-metadata object can be any object that equipped with <code>Metadata</code> resource.
-
-The dispatchable_fungible_asset wraps the existing fungible_asset module and adds the ability for token issuer
-to customize the logic for withdraw and deposit operations. For example:
-
-- Deflation token: a fixed percentage of token will be destructed upon transfer.
-- Transfer allowlist: token can only be transfered to addresses in the allow list.
-- Predicated transfer: transfer can only happen when some certain predicate has been met.
-- Loyalty token: a fixed loyalty will be paid to a designated address when a fungible asset transfer happens
-
-The api listed here intended to be an in-place replacement for defi applications that uses fungible_asset api directly
-and is safe for non-dispatchable (aka vanilla) fungible assets as well.
-
-See AIP-73 for further discussion
+This defines the fungible asset module that can issue fungible asset of any <code>Metadata</code> object. The<br/> metadata object can be any object that equipped with <code>Metadata</code> resource.<br/><br/> The dispatchable_fungible_asset wraps the existing fungible_asset module and adds the ability for token issuer<br/> to customize the logic for withdraw and deposit operations. For example:<br/><br/> &#45; Deflation token: a fixed percentage of token will be destructed upon transfer.<br/> &#45; Transfer allowlist: token can only be transfered to addresses in the allow list.<br/> &#45; Predicated transfer: transfer can only happen when some certain predicate has been met.<br/> &#45; Loyalty token: a fixed loyalty will be paid to a designated address when a fungible asset transfer happens<br/><br/> The api listed here intended to be an in&#45;place replacement for defi applications that uses fungible_asset api directly<br/> and is safe for non&#45;dispatchable (aka vanilla) fungible assets as well.<br/><br/> See AIP&#45;73 for further discussion<br/>
 
 
 -  [Resource `TransferRefStore`](#0x1_dispatchable_fungible_asset_TransferRefStore)
@@ -102,7 +88,7 @@ Dispatch target is not loaded.
 
 <a id="0x1_dispatchable_fungible_asset_ESTORE_NOT_FOUND"></a>
 
-TransferRefStore doesn't exist on the fungible asset type.
+TransferRefStore doesn&apos;t exist on the fungible asset type.
 
 
 <pre><code>const ESTORE_NOT_FOUND: u64 &#61; 1;<br/></code></pre>
@@ -133,9 +119,7 @@ TransferRefStore doesn't exist on the fungible asset type.
 
 ## Function `withdraw`
 
-Withdraw <code>amount</code> of the fungible asset from <code>store</code> by the owner.
-
-The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
+Withdraw <code>amount</code> of the fungible asset from <code>store</code> by the owner.<br/><br/> The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
 
 
 <pre><code>public fun withdraw&lt;T: key&gt;(owner: &amp;signer, store: object::Object&lt;T&gt;, amount: u64): fungible_asset::FungibleAsset<br/></code></pre>
@@ -156,9 +140,7 @@ The semantics of deposit will be governed by the function specified in DispatchF
 
 ## Function `deposit`
 
-Deposit <code>amount</code> of the fungible asset to <code>store</code>.
-
-The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
+Deposit <code>amount</code> of the fungible asset to <code>store</code>.<br/><br/> The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
 
 
 <pre><code>public fun deposit&lt;T: key&gt;(store: object::Object&lt;T&gt;, fa: fungible_asset::FungibleAsset)<br/></code></pre>
@@ -179,8 +161,7 @@ The semantics of deposit will be governed by the function specified in DispatchF
 
 ## Function `transfer`
 
-Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, which should be owned by <code>sender</code>, to <code>receiver</code>.
-Note: it does not move the underlying object.
+Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, which should be owned by <code>sender</code>, to <code>receiver</code>.<br/> Note: it does not move the underlying object.
 
 
 <pre><code>public entry fun transfer&lt;T: key&gt;(sender: &amp;signer, from: object::Object&lt;T&gt;, to: object::Object&lt;T&gt;, amount: u64)<br/></code></pre>
@@ -201,9 +182,7 @@ Note: it does not move the underlying object.
 
 ## Function `transfer_assert_minimum_deposit`
 
-Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, which should be owned by <code>sender</code>, to <code>receiver</code>.
-The recipient is guranteed to receive asset greater than the expected amount.
-Note: it does not move the underlying object.
+Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, which should be owned by <code>sender</code>, to <code>receiver</code>.<br/> The recipient is guranteed to receive asset greater than the expected amount.<br/> Note: it does not move the underlying object.
 
 
 <pre><code>public entry fun transfer_assert_minimum_deposit&lt;T: key&gt;(sender: &amp;signer, from: object::Object&lt;T&gt;, to: object::Object&lt;T&gt;, amount: u64, expected: u64)<br/></code></pre>
@@ -224,9 +203,7 @@ Note: it does not move the underlying object.
 
 ## Function `derived_balance`
 
-Get the derived value of store using the overloaded hook.
-
-The semantics of value will be governed by the function specified in DispatchFunctionStore.
+Get the derived value of store using the overloaded hook.<br/><br/> The semantics of value will be governed by the function specified in DispatchFunctionStore.
 
 
 <pre><code>&#35;[view]<br/>public fun derived_balance&lt;T: key&gt;(store: object::Object&lt;T&gt;): u64<br/></code></pre>

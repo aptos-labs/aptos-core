@@ -88,13 +88,7 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<<<<<<< HEAD
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenOfferId">TokenOfferId</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
-=======
-<pre><code>struct TokenOfferId has copy, drop, store<br/></code></pre>
->>>>>>> 836dec57a9 (mdx docs)
+<pre><code>&#35;[event]<br/>struct TokenOfferId has copy, drop, store<br/></code></pre>
 
 
 
@@ -164,13 +158,7 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<<<<<<< HEAD
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a> <b>has</b> drop, store
-</code></pre>
-=======
-<pre><code>struct TokenOfferEvent has drop, store<br/></code></pre>
->>>>>>> 836dec57a9 (mdx docs)
+<pre><code>&#35;[event]<br/>struct TokenOfferEvent has drop, store<br/></code></pre>
 
 
 
@@ -208,13 +196,7 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<<<<<<< HEAD
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a> <b>has</b> drop, store
-</code></pre>
-=======
-<pre><code>struct TokenCancelOfferEvent has drop, store<br/></code></pre>
->>>>>>> 836dec57a9 (mdx docs)
+<pre><code>&#35;[event]<br/>struct TokenCancelOfferEvent has drop, store<br/></code></pre>
 
 
 
@@ -290,13 +272,7 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<<<<<<< HEAD
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a> <b>has</b> drop, store
-</code></pre>
-=======
-<pre><code>struct TokenClaimEvent has drop, store<br/></code></pre>
->>>>>>> 836dec57a9 (mdx docs)
+<pre><code>&#35;[event]<br/>struct TokenClaimEvent has drop, store<br/></code></pre>
 
 
 
@@ -373,7 +349,7 @@ This module provides the foundation for transferring of Tokens
 
 <a id="0x3_token_transfers_ETOKEN_OFFER_NOT_EXIST"></a>
 
-Token offer doesn't exist
+Token offer doesn&apos;t exist
 
 
 <pre><code>const ETOKEN_OFFER_NOT_EXIST: u64 &#61; 1;<br/></code></pre>

@@ -71,8 +71,7 @@ The type provided for <code>unpack</code> is not the same as was given for <code
 
 ## Function `pack`
 
-Pack a value into the <code>Any</code> representation. Because Any can be stored, dropped, and copied this is
-also required from <code>T</code>.
+Pack a value into the <code>Any</code> representation. Because Any can be stored, dropped, and copied this is<br/> also required from <code>T</code>.
 
 
 <pre><code>public fun pack&lt;T: copy, drop, store&gt;(x: T): copyable_any::Any<br/></code></pre>

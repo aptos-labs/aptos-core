@@ -201,54 +201,21 @@
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>When updating the Vesting operator, it should be updated throughout all depending units.</td>
-<td>Medium</td>
-<td>The VestingContract contains a StakingInfo object that has an operator field, and this operator is mapped to a StakingContract object that in turn encompasses a StakePool object where the operator matches.</td>
-<td>Audited that it ensures the two operator fields hold the new value after the update.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;When updating the Vesting operator, it should be updated throughout all depending units.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The VestingContract contains a StakingInfo object that has an operator field, and this operator is mapped to a StakingContract object that in turn encompasses a StakePool object where the operator matches.&lt;/td&gt;<br/>&lt;td&gt;Audited that it ensures the two operator fields hold the new value after the update.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>When updating the Vesting voter, it should be updated throughout all depending units.</td>
-<td>Medium</td>
-<td>The VestingContract contains a StakingInfo object that has an operator field, and this operator is mapped to a StakingContract object that in turn encompasses a StakePool object where the operator matches.</td>
-<td>Audited that it ensures the two operator fields hold the new value after the update.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;When updating the Vesting voter, it should be updated throughout all depending units.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The VestingContract contains a StakingInfo object that has an operator field, and this operator is mapped to a StakingContract object that in turn encompasses a StakePool object where the operator matches.&lt;/td&gt;<br/>&lt;td&gt;Audited that it ensures the two operator fields hold the new value after the update.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>The operator and voter of a Vesting Contract should only be updated by the owner of the contract.</td>
-<td>High</td>
-<td>The owner-operator-voter model, as defined in the documentation, grants distinct abilities to each role. Therefore, it's crucial to ensure that only the owner has the authority to modify the operator or voter, to prevent the compromise of the StakePool.</td>
-<td>Audited that it ensures the signer owns the AdminStore resource and that the operator or voter intended for the update actually exists.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The operator and voter of a Vesting Contract should only be updated by the owner of the contract.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The owner&#45;operator&#45;voter model, as defined in the documentation, grants distinct abilities to each role. Therefore, it&apos;s crucial to ensure that only the owner has the authority to modify the operator or voter, to prevent the compromise of the StakePool.&lt;/td&gt;<br/>&lt;td&gt;Audited that it ensures the signer owns the AdminStore resource and that the operator or voter intended for the update actually exists.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>The operator and voter of a Staking Contract should only be updated by the owner of the contract.</td>
-<td>High</td>
-<td>The owner-operator-voter model, as defined in the documentation, grants distinct abilities to each role. Therefore, it's crucial to ensure that only the owner has the authority to modify the operator or voter, to prevent the compromise of the StakePool.</td>
-<td>Audited the patterns of updating operators and voters in the staking contract.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The operator and voter of a Staking Contract should only be updated by the owner of the contract.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The owner&#45;operator&#45;voter model, as defined in the documentation, grants distinct abilities to each role. Therefore, it&apos;s crucial to ensure that only the owner has the authority to modify the operator or voter, to prevent the compromise of the StakePool.&lt;/td&gt;<br/>&lt;td&gt;Audited the patterns of updating operators and voters in the staking contract.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>Staking Contract's operators should be unique inside a store.</td>
-<td>Medium</td>
-<td>Duplicates among operators could result in incorrectly updating the operator or voter associated with the incorrect StakingContract.</td>
-<td>Enforced via <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/staking_contract.move#L87">SimpleMap</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;Staking Contract&apos;s operators should be unique inside a store.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;Duplicates among operators could result in incorrectly updating the operator or voter associated with the incorrect StakingContract.&lt;/td&gt;<br/>&lt;td&gt;Enforced via &lt;a href&#61;&quot;https://github.com/aptos&#45;labs/aptos&#45;core/blob/main/aptos&#45;move/framework/aptos&#45;framework/sources/staking_contract.move&#35;L87&quot;&gt;SimpleMap&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -334,8 +301,7 @@ Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf a
 <pre><code>public entry fun set_stake_pool_operator(owner: &amp;signer, new_operator: address)<br/></code></pre>
 
 
-Aborts if stake_pool is exists and when OwnerCapability or stake_pool_exists
-One of them are not exists
+Aborts if stake_pool is exists and when OwnerCapability or stake_pool_exists<br/> One of them are not exists
 
 
 <pre><code>include SetStakePoolOperator;<br/></code></pre>
@@ -377,8 +343,7 @@ One of them are not exists
 <pre><code>include SetStakingContractVoter;<br/></code></pre>
 
 
-Make sure staking_contract_exists first
-Then abort if the resource is not exist
+Make sure staking_contract_exists first<br/> Then abort if the resource is not exist
 
 
 <a id="0x1_staking_proxy_SetStakingContractVoter"></a>

@@ -3,9 +3,7 @@
 
 # Module `0x4::property_map`
 
-<code>PropertyMap</code> provides generic metadata support for <code>AptosToken</code>. It is a specialization of
-<code>SimpleMap</code> that enforces strict typing with minimal storage use by using constant u64 to
-represent types and storing values in bcs format.
+<code>PropertyMap</code> provides generic metadata support for <code>AptosToken</code>. It is a specialization of<br/> <code>SimpleMap</code> that enforces strict typing with minimal storage use by using constant u64 to<br/> represent types and storing values in bcs format.
 
 
 -  [Resource `PropertyMap`](#0x4_property_map_PropertyMap)
@@ -54,8 +52,7 @@ represent types and storing values in bcs format.
 
 ## Resource `PropertyMap`
 
-A Map for typed key to value mapping, the contract using it
-should keep track of what keys are what types, and parse them accordingly.
+A Map for typed key to value mapping, the contract using it<br/> should keep track of what keys are what types, and parse them accordingly.
 
 
 <pre><code>&#35;[resource_group_member(&#35;[group &#61; 0x1::object::ObjectGroup])]<br/>struct PropertyMap has drop, key<br/></code></pre>
@@ -543,9 +540,7 @@ Validates property value type against its expected type
 
 ## Function `read`
 
-Read the property and get it's external type in it's bcs encoded format
-
-The preferred method is to use <code>read_&lt;type&gt;</code> where the type is already known.
+Read the property and get it&apos;s external type in it&apos;s bcs encoded format<br/><br/> The preferred method is to use <code>read_&lt;type&gt;</code> where the type is already known.
 
 
 <pre><code>public fun read&lt;T: key&gt;(object: &amp;object::Object&lt;T&gt;, key: &amp;string::String): (string::String, vector&lt;u8&gt;)<br/></code></pre>
@@ -828,7 +823,7 @@ Add a property, already bcs encoded as a <code>vector&lt;u8&gt;</code>
 
 ## Function `add_typed`
 
-Add a property that isn't already encoded as a <code>vector&lt;u8&gt;</code>
+Add a property that isn&apos;t already encoded as a <code>vector&lt;u8&gt;</code>
 
 
 <pre><code>public fun add_typed&lt;T: drop&gt;(ref: &amp;property_map::MutatorRef, key: string::String, value: T)<br/></code></pre>

@@ -3,30 +3,8 @@
 
 # Module `0x1::features`
 
-Defines feature flags for Aptos. Those are used in Aptos specific implementations of features in
-the Move stdlib, the Aptos stdlib, and the Aptos framework.
-
-============================================================================================
-Feature Flag Definitions
-
-Each feature flag should come with documentation which justifies the need of the flag.
-Introduction of a new feature flag requires approval of framework owners. Be frugal when
-introducing new feature flags, as too many can make it hard to understand the code.
-
-Each feature flag should come with a specification of a lifetime:
-
-- a *transient* feature flag is only needed until a related code rollout has happened. This
-is typically associated with the introduction of new native Move functions, and is only used
-from Move code. The owner of this feature is obliged to remove it once this can be done.
-
-- a *permanent* feature flag is required to stay around forever. Typically, those flags guard
-behavior in native code, and the behavior with or without the feature need to be preserved
-for playback.
-
-Note that removing a feature flag still requires the function which tests for the feature
-(like <code>code_dependency_check_enabled</code> below) to stay around for compatibility reasons, as it
-is a public function. However, once the feature flag is disabled, those functions can constantly
-return true.
+Defines feature flags for Aptos. Those are used in Aptos specific implementations of features in<br/> the Move stdlib, the Aptos stdlib, and the Aptos framework.<br/><br/> &#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;<br/> Feature Flag Definitions<br/><br/> Each feature flag should come with documentation which justifies the need of the flag.<br/> Introduction of a new feature flag requires approval of framework owners. Be frugal when<br/> introducing new feature flags, as too many can make it hard to understand the code.<br/><br/> Each feature flag should come with a specification of a lifetime:<br/><br/> &#45; a &#42;transient&#42; feature flag is only needed until a related code rollout has happened. This<br/>   is typically associated with the introduction of new native Move functions, and is only used<br/>   from Move code. The owner of this feature is obliged to remove it once this can be done.<br/><br/> &#45; a &#42;permanent&#42; feature flag is required to stay around forever. Typically, those flags guard<br/>   behavior in native code, and the behavior with or without the feature need to be preserved<br/>   for playback.<br/><br/> Note that removing a feature flag still requires the function which tests for the feature
+(like <code>code_dependency_check_enabled</code> below) to stay around for compatibility reasons, as it<br/> is a public function. However, once the feature flag is disabled, those functions can constantly<br/> return true.
 
 
 -  [Resource `Features`](#0x1_features_Features)
@@ -178,8 +156,7 @@ The enabled features, represented by a bitset stored on chain.
 
 ## Resource `PendingFeatures`
 
-This resource holds the feature vec updates received in the current epoch.
-On epoch change, the updates take effect and this buffer is cleared.
+This resource holds the feature vec updates received in the current epoch.<br/> On epoch change, the updates take effect and this buffer is cleared.
 
 
 <pre><code>struct PendingFeatures has key<br/></code></pre>
@@ -209,9 +186,7 @@ On epoch change, the updates take effect and this buffer is cleared.
 
 <a id="0x1_features_AGGREGATOR_V2_API"></a>
 
-Whether the Aggregator V2 API feature is enabled.
-Once enabled, the functions from aggregator_v2.move will be available for use.
-Lifetime: transient
+Whether the Aggregator V2 API feature is enabled.<br/> Once enabled, the functions from aggregator_v2.move will be available for use.<br/> Lifetime: transient
 
 
 <pre><code>const AGGREGATOR_V2_API: u64 &#61; 30;<br/></code></pre>
@@ -220,9 +195,7 @@ Lifetime: transient
 
 <a id="0x1_features_AGGREGATOR_V2_DELAYED_FIELDS"></a>
 
-Whether the Aggregator V2 delayed fields feature is enabled.
-Once enabled, Aggregator V2 functions become parallel.
-Lifetime: transient
+Whether the Aggregator V2 delayed fields feature is enabled.<br/> Once enabled, Aggregator V2 functions become parallel.<br/> Lifetime: transient
 
 
 <pre><code>const AGGREGATOR_V2_DELAYED_FIELDS: u64 &#61; 36;<br/></code></pre>
@@ -231,9 +204,7 @@ Lifetime: transient
 
 <a id="0x1_features_APTOS_STD_CHAIN_ID_NATIVES"></a>
 
-Whether the new <code>aptos_stdlib::type_info::chain_id()</code> native for fetching the chain ID is enabled.
-This is needed because of the introduction of a new native function.
-Lifetime: transient
+Whether the new <code>aptos_stdlib::type_info::chain_id()</code> native for fetching the chain ID is enabled.<br/> This is needed because of the introduction of a new native function.<br/> Lifetime: transient
 
 
 <pre><code>const APTOS_STD_CHAIN_ID_NATIVES: u64 &#61; 4;<br/></code></pre>
@@ -242,8 +213,7 @@ Lifetime: transient
 
 <a id="0x1_features_APTOS_UNIQUE_IDENTIFIERS"></a>
 
-Whether enable MOVE functions to call create_auid method to create AUIDs.
-Lifetime: transient
+Whether enable MOVE functions to call create_auid method to create AUIDs.<br/> Lifetime: transient
 
 
 <pre><code>const APTOS_UNIQUE_IDENTIFIERS: u64 &#61; 23;<br/></code></pre>
@@ -252,9 +222,7 @@ Lifetime: transient
 
 <a id="0x1_features_BLAKE2B_256_NATIVE"></a>
 
-Whether the new BLAKE2B-256 hash function native is enabled.
-This is needed because of the introduction of new native function(s).
-Lifetime: transient
+Whether the new BLAKE2B&#45;256 hash function native is enabled.<br/> This is needed because of the introduction of new native function(s).<br/> Lifetime: transient
 
 
 <pre><code>const BLAKE2B_256_NATIVE: u64 &#61; 8;<br/></code></pre>
@@ -263,9 +231,7 @@ Lifetime: transient
 
 <a id="0x1_features_BLS12_381_STRUCTURES"></a>
 
-Whether the generic algebra implementation for BLS12381 operations are enabled.
-
-Lifetime: transient
+Whether the generic algebra implementation for BLS12381 operations are enabled.<br/><br/> Lifetime: transient
 
 
 <pre><code>const BLS12_381_STRUCTURES: u64 &#61; 13;<br/></code></pre>
@@ -274,9 +240,7 @@ Lifetime: transient
 
 <a id="0x1_features_BN254_STRUCTURES"></a>
 
-Whether the generic algebra implementation for BN254 operations are enabled.
-
-Lifetime: transient
+Whether the generic algebra implementation for BN254 operations are enabled.<br/><br/> Lifetime: transient
 
 
 <pre><code>const BN254_STRUCTURES: u64 &#61; 43;<br/></code></pre>
@@ -285,9 +249,7 @@ Lifetime: transient
 
 <a id="0x1_features_BULLETPROOFS_NATIVES"></a>
 
-Whether the Bulletproofs zero-knowledge range proof module is enabled, and the related native function is
-available. This is needed because of the introduction of a new native function.
-Lifetime: transient
+Whether the Bulletproofs zero&#45;knowledge range proof module is enabled, and the related native function is<br/> available. This is needed because of the introduction of a new native function.<br/> Lifetime: transient
 
 
 <pre><code>const BULLETPROOFS_NATIVES: u64 &#61; 24;<br/></code></pre>
@@ -296,8 +258,7 @@ Lifetime: transient
 
 <a id="0x1_features_CHARGE_INVARIANT_VIOLATION"></a>
 
-Charge invariant violation error.
-Lifetime: transient
+Charge invariant violation error.<br/> Lifetime: transient
 
 
 <pre><code>const CHARGE_INVARIANT_VIOLATION: u64 &#61; 20;<br/></code></pre>
@@ -306,9 +267,7 @@ Lifetime: transient
 
 <a id="0x1_features_CODE_DEPENDENCY_CHECK"></a>
 
-Whether validation of package dependencies is enabled, and the related native function is
-available. This is needed because of introduction of a new native function.
-Lifetime: transient
+Whether validation of package dependencies is enabled, and the related native function is<br/> available. This is needed because of introduction of a new native function.<br/> Lifetime: transient
 
 
 <pre><code>const CODE_DEPENDENCY_CHECK: u64 &#61; 1;<br/></code></pre>
@@ -317,9 +276,7 @@ Lifetime: transient
 
 <a id="0x1_features_COIN_TO_FUNGIBLE_ASSET_MIGRATION"></a>
 
-Whether migration from coin to fungible asset feature is enabled.
-
-Lifetime: transient
+Whether migration from coin to fungible asset feature is enabled.<br/><br/> Lifetime: transient
 
 
 <pre><code>const COIN_TO_FUNGIBLE_ASSET_MIGRATION: u64 &#61; 60;<br/></code></pre>
@@ -328,8 +285,7 @@ Lifetime: transient
 
 <a id="0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES"></a>
 
-Whether gas fees are collected and distributed to the block proposers.
-Lifetime: transient
+Whether gas fees are collected and distributed to the block proposers.<br/> Lifetime: transient
 
 
 <pre><code>const COLLECT_AND_DISTRIBUTE_GAS_FEES: u64 &#61; 6;<br/></code></pre>
@@ -338,8 +294,7 @@ Lifetime: transient
 
 <a id="0x1_features_COMMISSION_CHANGE_DELEGATION_POOL"></a>
 
-Whether the operator commission rate change in delegation pool is enabled.
-Lifetime: transient
+Whether the operator commission rate change in delegation pool is enabled.<br/> Lifetime: transient
 
 
 <pre><code>const COMMISSION_CHANGE_DELEGATION_POOL: u64 &#61; 42;<br/></code></pre>
@@ -348,9 +303,7 @@ Lifetime: transient
 
 <a id="0x1_features_CONCURRENT_FUNGIBLE_ASSETS"></a>
 
-Whether enable Fungible Asset creation
-to create higher throughput concurrent variants.
-Lifetime: transient
+Whether enable Fungible Asset creation<br/> to create higher throughput concurrent variants.<br/> Lifetime: transient
 
 
 <pre><code>const CONCURRENT_FUNGIBLE_ASSETS: u64 &#61; 50;<br/></code></pre>
@@ -359,9 +312,7 @@ Lifetime: transient
 
 <a id="0x1_features_CONCURRENT_TOKEN_V2"></a>
 
-Whether enable TokenV2 collection creation and Fungible Asset creation
-to create higher throughput concurrent variants.
-Lifetime: transient
+Whether enable TokenV2 collection creation and Fungible Asset creation<br/> to create higher throughput concurrent variants.<br/> Lifetime: transient
 
 
 <pre><code>const CONCURRENT_TOKEN_V2: u64 &#61; 37;<br/></code></pre>
@@ -370,9 +321,7 @@ Lifetime: transient
 
 <a id="0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES"></a>
 
-Whether generic algebra basic operation support in <code>crypto_algebra.move</code> are enabled.
-
-Lifetime: transient
+Whether generic algebra basic operation support in <code>crypto_algebra.move</code> are enabled.<br/><br/> Lifetime: transient
 
 
 <pre><code>const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 &#61; 12;<br/></code></pre>
@@ -381,8 +330,7 @@ Lifetime: transient
 
 <a id="0x1_features_DELEGATION_POOLS"></a>
 
-Whether delegation pools are enabled.
-Lifetime: transient
+Whether delegation pools are enabled.<br/> Lifetime: transient
 
 
 <pre><code>const DELEGATION_POOLS: u64 &#61; 11;<br/></code></pre>
@@ -391,8 +339,7 @@ Lifetime: transient
 
 <a id="0x1_features_DELEGATION_POOL_ALLOWLISTING"></a>
 
-Whether delegators allowlisting for delegation pools is supported.
-Lifetime: transient
+Whether delegators allowlisting for delegation pools is supported.<br/> Lifetime: transient
 
 
 <pre><code>const DELEGATION_POOL_ALLOWLISTING: u64 &#61; 56;<br/></code></pre>
@@ -401,8 +348,7 @@ Lifetime: transient
 
 <a id="0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING"></a>
 
-Whether enable paritial governance voting on delegation_pool.
-Lifetime: transient
+Whether enable paritial governance voting on delegation_pool.<br/> Lifetime: transient
 
 
 <pre><code>const DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING: u64 &#61; 21;<br/></code></pre>
@@ -411,9 +357,7 @@ Lifetime: transient
 
 <a id="0x1_features_DISPATCHABLE_FUNGIBLE_ASSET"></a>
 
-Whether the dispatchable fungible asset standard feature is enabled.
-
-Lifetime: transient
+Whether the dispatchable fungible asset standard feature is enabled.<br/><br/> Lifetime: transient
 
 
 <pre><code>const DISPATCHABLE_FUNGIBLE_ASSET: u64 &#61; 63;<br/></code></pre>
@@ -430,8 +374,7 @@ Lifetime: transient
 
 <a id="0x1_features_ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH"></a>
 
-Whether native_public_key_validate aborts when a public key of the wrong length is given
-Lifetime: ephemeral
+Whether native_public_key_validate aborts when a public key of the wrong length is given<br/> Lifetime: ephemeral
 
 
 <pre><code>const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 &#61; 14;<br/></code></pre>
@@ -465,8 +408,7 @@ The provided signer has not a framework address.
 
 <a id="0x1_features_FEE_PAYER_ENABLED"></a>
 
-Whether alternate gas payer is supported
-Lifetime: transient
+Whether alternate gas payer is supported<br/> Lifetime: transient
 
 
 <pre><code>const FEE_PAYER_ENABLED: u64 &#61; 22;<br/></code></pre>
@@ -484,9 +426,7 @@ Deprecated by <code>aptos_framework::jwk_consensus_config::JWKConsensusConfig</c
 
 <a id="0x1_features_KEYLESS_ACCOUNTS"></a>
 
-Whether the OIDB feature is enabled, possibly with the ZK-less verification mode.
-
-Lifetime: transient
+Whether the OIDB feature is enabled, possibly with the ZK&#45;less verification mode.<br/><br/> Lifetime: transient
 
 
 <pre><code>const KEYLESS_ACCOUNTS: u64 &#61; 46;<br/></code></pre>
@@ -495,9 +435,7 @@ Lifetime: transient
 
 <a id="0x1_features_KEYLESS_ACCOUNTS_WITH_PASSKEYS"></a>
 
-Whether keyless accounts support passkey-based ephemeral signatures.
-
-Lifetime: transient
+Whether keyless accounts support passkey&#45;based ephemeral signatures.<br/><br/> Lifetime: transient
 
 
 <pre><code>const KEYLESS_ACCOUNTS_WITH_PASSKEYS: u64 &#61; 54;<br/></code></pre>
@@ -506,9 +444,7 @@ Lifetime: transient
 
 <a id="0x1_features_KEYLESS_BUT_ZKLESS_ACCOUNTS"></a>
 
-Whether the ZK-less mode of the keyless accounts feature is enabled.
-
-Lifetime: transient
+Whether the ZK&#45;less mode of the keyless accounts feature is enabled.<br/><br/> Lifetime: transient
 
 
 <pre><code>const KEYLESS_BUT_ZKLESS_ACCOUNTS: u64 &#61; 47;<br/></code></pre>
@@ -534,9 +470,7 @@ Whether checking the maximum object nesting is enabled.
 
 <a id="0x1_features_MODULE_EVENT"></a>
 
-Whether emit function in <code>event.move</code> are enabled for module events.
-
-Lifetime: transient
+Whether emit function in <code>event.move</code> are enabled for module events.<br/><br/> Lifetime: transient
 
 
 <pre><code>const MODULE_EVENT: u64 &#61; 26;<br/></code></pre>
@@ -545,9 +479,7 @@ Lifetime: transient
 
 <a id="0x1_features_MODULE_EVENT_MIGRATION"></a>
 
-Whether aptos_framwork enables the behavior of module event migration.
-
-Lifetime: transient
+Whether aptos_framwork enables the behavior of module event migration.<br/><br/> Lifetime: transient
 
 
 <pre><code>const MODULE_EVENT_MIGRATION: u64 &#61; 57;<br/></code></pre>
@@ -556,7 +488,7 @@ Lifetime: transient
 
 <a id="0x1_features_MULTISIG_ACCOUNTS"></a>
 
-Whether multisig accounts (different from accounts with multi-ed25519 auth keys) are enabled.
+Whether multisig accounts (different from accounts with multi&#45;ed25519 auth keys) are enabled.
 
 
 <pre><code>const MULTISIG_ACCOUNTS: u64 &#61; 10;<br/></code></pre>
@@ -565,9 +497,7 @@ Whether multisig accounts (different from accounts with multi-ed25519 auth keys)
 
 <a id="0x1_features_MULTISIG_V2_ENHANCEMENT"></a>
 
-Whether the Multisig V2 enhancement feature is enabled.
-
-Lifetime: transient
+Whether the Multisig V2 enhancement feature is enabled.<br/><br/> Lifetime: transient
 
 
 <pre><code>const MULTISIG_V2_ENHANCEMENT: u64 &#61; 55;<br/></code></pre>
@@ -576,9 +506,7 @@ Lifetime: transient
 
 <a id="0x1_features_MULTI_ED25519_PK_VALIDATE_V2_NATIVES"></a>
 
-Whether the new <code>aptos_stdlib::multi_ed25519::public_key_validate_internal_v2()</code> native is enabled.
-This is needed because of the introduction of a new native function.
-Lifetime: transient
+Whether the new <code>aptos_stdlib::multi_ed25519::public_key_validate_internal_v2()</code> native is enabled.<br/> This is needed because of the introduction of a new native function.<br/> Lifetime: transient
 
 
 <pre><code>const MULTI_ED25519_PK_VALIDATE_V2_NATIVES: u64 &#61; 7;<br/></code></pre>
@@ -605,8 +533,7 @@ Whether we use more efficient native implementation of computing object derived 
 
 <a id="0x1_features_OPERATOR_BENEFICIARY_CHANGE"></a>
 
-Whether allow changing beneficiaries for operators.
-Lifetime: transient
+Whether allow changing beneficiaries for operators.<br/> Lifetime: transient
 
 
 <pre><code>const OPERATOR_BENEFICIARY_CHANGE: u64 &#61; 39;<br/></code></pre>
@@ -615,8 +542,7 @@ Lifetime: transient
 
 <a id="0x1_features_PARTIAL_GOVERNANCE_VOTING"></a>
 
-Whether enable paritial governance voting on aptos_governance.
-Lifetime: transient
+Whether enable paritial governance voting on aptos_governance.<br/> Lifetime: transient
 
 
 <pre><code>const PARTIAL_GOVERNANCE_VOTING: u64 &#61; 17;<br/></code></pre>
@@ -625,8 +551,7 @@ Lifetime: transient
 
 <a id="0x1_features_PERIODICAL_REWARD_RATE_DECREASE"></a>
 
-Whether reward rate decreases periodically.
-Lifetime: transient
+Whether reward rate decreases periodically.<br/> Lifetime: transient
 
 
 <pre><code>const PERIODICAL_REWARD_RATE_DECREASE: u64 &#61; 16;<br/></code></pre>
@@ -652,8 +577,7 @@ Deprecated by <code>aptos_framework::randomness_config::RandomnessConfig</code>.
 
 <a id="0x1_features_RESOURCE_GROUPS"></a>
 
-Whether resource groups are enabled.
-This is needed because of new attributes for structs and a change in storage representation.
+Whether resource groups are enabled.<br/> This is needed because of new attributes for structs and a change in storage representation.
 
 
 <pre><code>const RESOURCE_GROUPS: u64 &#61; 9;<br/></code></pre>
@@ -686,9 +610,7 @@ This is needed because of new attributes for structs and a change in storage rep
 
 <a id="0x1_features_SHA_512_AND_RIPEMD_160_NATIVES"></a>
 
-Whether the new SHA2-512, SHA3-512 and RIPEMD-160 hash function natives are enabled.
-This is needed because of the introduction of new native functions.
-Lifetime: transient
+Whether the new SHA2&#45;512, SHA3&#45;512 and RIPEMD&#45;160 hash function natives are enabled.<br/> This is needed because of the introduction of new native functions.<br/> Lifetime: transient
 
 
 <pre><code>const SHA_512_AND_RIPEMD_160_NATIVES: u64 &#61; 3;<br/></code></pre>
@@ -697,8 +619,7 @@ Lifetime: transient
 
 <a id="0x1_features_SIGNATURE_CHECKER_V2_SCRIPT_FIX"></a>
 
-Whether the fix for a counting bug in the script path of the signature checker pass is enabled.
-Lifetime: transient
+Whether the fix for a counting bug in the script path of the signature checker pass is enabled.<br/> Lifetime: transient
 
 
 <pre><code>const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 &#61; 29;<br/></code></pre>
@@ -707,8 +628,7 @@ Lifetime: transient
 
 <a id="0x1_features_SIGNER_NATIVE_FORMAT_FIX"></a>
 
-Fix the native formatter for signer.
-Lifetime: transient
+Fix the native formatter for signer.<br/> Lifetime: transient
 
 
 <pre><code>const SIGNER_NATIVE_FORMAT_FIX: u64 &#61; 25;<br/></code></pre>
@@ -725,8 +645,7 @@ Lifetime: transient
 
 <a id="0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION"></a>
 
-Whether the automatic creation of accounts is enabled for sponsored transactions.
-Lifetime: transient
+Whether the automatic creation of accounts is enabled for sponsored transactions.<br/> Lifetime: transient
 
 
 <pre><code>const SPONSORED_AUTOMATIC_ACCOUNT_CREATION: u64 &#61; 34;<br/></code></pre>
@@ -735,9 +654,7 @@ Lifetime: transient
 
 <a id="0x1_features_STRUCT_CONSTRUCTORS"></a>
 
-Whether struct constructors are enabled
-
-Lifetime: transient
+Whether struct constructors are enabled<br/><br/> Lifetime: transient
 
 
 <pre><code>const STRUCT_CONSTRUCTORS: u64 &#61; 15;<br/></code></pre>
@@ -746,10 +663,7 @@ Lifetime: transient
 
 <a id="0x1_features_TRANSACTION_CONTEXT_EXTENSION"></a>
 
-Whether the transaction context extension is enabled. This feature allows the module
-<code>transaction_context</code> to provide contextual information about the user transaction.
-
-Lifetime: transient
+Whether the transaction context extension is enabled. This feature allows the module<br/> <code>transaction_context</code> to provide contextual information about the user transaction.<br/><br/> Lifetime: transient
 
 
 <pre><code>const TRANSACTION_CONTEXT_EXTENSION: u64 &#61; 59;<br/></code></pre>
@@ -758,9 +672,7 @@ Lifetime: transient
 
 <a id="0x1_features_TREAT_FRIEND_AS_PRIVATE"></a>
 
-Whether during upgrade compatibility checking, friend functions should be treated similar like
-private functions.
-Lifetime: permanent
+Whether during upgrade compatibility checking, friend functions should be treated similar like<br/> private functions.<br/> Lifetime: permanent
 
 
 <pre><code>const TREAT_FRIEND_AS_PRIVATE: u64 &#61; 2;<br/></code></pre>
@@ -769,8 +681,7 @@ Lifetime: permanent
 
 <a id="0x1_features_VM_BINARY_FORMAT_V6"></a>
 
-Whether to allow the use of binary format version v6.
-Lifetime: transient
+Whether to allow the use of binary format version v6.<br/> Lifetime: transient
 
 
 <pre><code>const VM_BINARY_FORMAT_V6: u64 &#61; 5;<br/></code></pre>
@@ -2509,11 +2420,7 @@ Lifetime: transient
 
 ## Function `change_feature_flags`
 
-Deprecated to prevent validator set changes during DKG.
-
-Genesis/tests should use <code>change_feature_flags_internal()</code> for feature vec initialization.
-
-Governance proposals should use <code>change_feature_flags_for_next_epoch()</code> to enable/disable features.
+Deprecated to prevent validator set changes during DKG.<br/><br/> Genesis/tests should use <code>change_feature_flags_internal()</code> for feature vec initialization.<br/><br/> Governance proposals should use <code>change_feature_flags_for_next_epoch()</code> to enable/disable features.
 
 
 <pre><code>public fun change_feature_flags(_framework: &amp;signer, _enable: vector&lt;u64&gt;, _disable: vector&lt;u64&gt;)<br/></code></pre>
@@ -2576,10 +2483,7 @@ Enable and disable features for the next epoch.
 
 ## Function `on_new_epoch`
 
-Apply all the pending feature flag changes. Should only be used at the end of a reconfiguration with DKG.
-
-While the scope is public, it can only be usd in system transactions like <code>block_prologue</code> and governance proposals,
-who have permission to set the flag that's checked in <code>extract()</code>.
+Apply all the pending feature flag changes. Should only be used at the end of a reconfiguration with DKG.<br/><br/> While the scope is public, it can only be usd in system transactions like <code>block_prologue</code> and governance proposals,<br/> who have permission to set the flag that&apos;s checked in <code>extract()</code>.
 
 
 <pre><code>public fun on_new_epoch(framework: &amp;signer)<br/></code></pre>

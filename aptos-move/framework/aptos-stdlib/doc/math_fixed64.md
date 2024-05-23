@@ -90,8 +90,7 @@ Exponent function with a precission of 9 digits.
 
 ## Function `log2_plus_64`
 
-Because log2 is negative for values < 1 we instead return log2(x) + 64 which
-is positive for all values of x.
+Because log2 is negative for values &lt; 1 we instead return log2(x) &#43; 64 which<br/> is positive for all values of x.
 
 
 <pre><code>public fun log2_plus_64(x: fixed_point64::FixedPoint64): fixed_point64::FixedPoint64<br/></code></pre>
@@ -153,7 +152,7 @@ Integer power of a fixed point number
 
 ## Function `mul_div`
 
-Specialized function for x * y / z that omits intermediate shifting
+Specialized function for x &#42; y / z that omits intermediate shifting
 
 
 <pre><code>public fun mul_div(x: fixed_point64::FixedPoint64, y: fixed_point64::FixedPoint64, z: fixed_point64::FixedPoint64): fixed_point64::FixedPoint64<br/></code></pre>

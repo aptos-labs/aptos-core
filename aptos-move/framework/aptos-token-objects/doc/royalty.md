@@ -3,9 +3,7 @@
 
 # Module `0x4::royalty`
 
-This defines an object-based Royalty. The royalty can be applied to either a collection or a
-token. Applications should read the royalty from the token, as it will read the appropriate
-royalty.
+This defines an object&#45;based Royalty. The royalty can be applied to either a collection or a<br/> token. Applications should read the royalty from the token, as it will read the appropriate<br/> royalty.
 
 
 -  [Resource `Royalty`](#0x4_royalty_Royalty)
@@ -31,10 +29,7 @@ royalty.
 
 ## Resource `Royalty`
 
-The royalty of a token within this collection
-
-Royalties are optional for a collection.  Royalty percentage is calculated
-by (numerator / denominator) * 100%
+The royalty of a token within this collection<br/><br/> Royalties are optional for a collection.  Royalty percentage is calculated<br/> by (numerator / denominator) &#42; 100%
 
 
 <pre><code>&#35;[resource_group_member(&#35;[group &#61; 0x1::object::ObjectGroup])]<br/>struct Royalty has copy, drop, key<br/></code></pre>
@@ -62,8 +57,7 @@ by (numerator / denominator) * 100%
 <code>payee_address: address</code>
 </dt>
 <dd>
- The recipient of royalty payments. See the <code>shared_account</code> for how to handle multiple
- creators.
+ The recipient of royalty payments. See the <code>shared_account</code> for how to handle multiple<br/> creators.
 </dd>
 </dl>
 

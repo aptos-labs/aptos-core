@@ -49,7 +49,7 @@ This module defines a struct storing the metadata of the block and new block eve
 
 ## Resource `BlockResource`
 
-Should be in-sync with BlockResource rust struct in new_block.rs
+Should be in&#45;sync with BlockResource rust struct in new_block.rs
 
 
 <pre><code>struct BlockResource has key<br/></code></pre>
@@ -133,7 +133,7 @@ Store new block events as a move resource, internally using a circular buffer.
 
 ## Struct `NewBlockEvent`
 
-Should be in-sync with NewBlockEvent rust struct in new_block.rs
+Should be in&#45;sync with NewBlockEvent rust struct in new_block.rs
 
 
 <pre><code>struct NewBlockEvent has copy, drop, store<br/></code></pre>
@@ -191,7 +191,7 @@ Should be in-sync with NewBlockEvent rust struct in new_block.rs
 <code>time_microseconds: u64</code>
 </dt>
 <dd>
- On-chain time during the block at the given height
+ On&#45;chain time during the block at the given height
 </dd>
 </dl>
 
@@ -235,7 +235,7 @@ Event emitted when a proposal is created.
 
 ## Struct `NewBlock`
 
-Should be in-sync with NewBlockEvent rust struct in new_block.rs
+Should be in&#45;sync with NewBlockEvent rust struct in new_block.rs
 
 
 <pre><code>&#35;[event]<br/>struct NewBlock has drop, store<br/></code></pre>
@@ -293,7 +293,7 @@ Should be in-sync with NewBlockEvent rust struct in new_block.rs
 <code>time_microseconds: u64</code>
 </dt>
 <dd>
- On-chain time during the block at the given height
+ On&#45;chain time during the block at the given height
 </dd>
 </dl>
 
@@ -407,7 +407,7 @@ This can only be called during Genesis.
 
 ## Function `initialize_commit_history`
 
-Initialize the commit history resource if it's not in genesis.
+Initialize the commit history resource if it&apos;s not in genesis.
 
 
 <pre><code>public fun initialize_commit_history(fx: &amp;signer, max_capacity: u32)<br/></code></pre>
@@ -428,8 +428,7 @@ Initialize the commit history resource if it's not in genesis.
 
 ## Function `update_epoch_interval_microsecs`
 
-Update the epoch interval.
-Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+Update the epoch interval.<br/> Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
 
 
 <pre><code>public fun update_epoch_interval_microsecs(aptos_framework: &amp;signer, new_epoch_interval: u64)<br/></code></pre>
@@ -491,8 +490,7 @@ Return epoch interval in seconds.
 
 ## Function `block_prologue`
 
-Set the metadata for the current block.
-The runtime always runs this before executing the transactions in a block.
+Set the metadata for the current block.<br/> The runtime always runs this before executing the transactions in a block.
 
 
 <pre><code>fun block_prologue(vm: signer, hash: address, epoch: u64, round: u64, proposer: address, failed_proposer_indices: vector&lt;u64&gt;, previous_block_votes_bitvec: vector&lt;u8&gt;, timestamp: u64)<br/></code></pre>
@@ -576,8 +574,7 @@ Emit the event and update height and global timestamp
 
 ## Function `emit_genesis_block_event`
 
-Emit a <code>NewBlockEvent</code> event. This function will be invoked by genesis directly to generate the very first
-reconfiguration event.
+Emit a <code>NewBlockEvent</code> event. This function will be invoked by genesis directly to generate the very first<br/> reconfiguration event.
 
 
 <pre><code>fun emit_genesis_block_event(vm: signer)<br/></code></pre>
@@ -598,8 +595,7 @@ reconfiguration event.
 
 ## Function `emit_writeset_block_event`
 
-Emit a <code>NewBlockEvent</code> event. This function will be invoked by write set script directly to generate the
-new block event for WriteSetPayload.
+Emit a <code>NewBlockEvent</code> event. This function will be invoked by write set script directly to generate the<br/>  new block event for WriteSetPayload.
 
 
 <pre><code>public fun emit_writeset_block_event(vm_signer: &amp;signer, fake_block_hash: address)<br/></code></pre>
@@ -627,54 +623,21 @@ new block event for WriteSetPayload.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>During the module's initialization, it guarantees that the BlockResource resource moves under the Aptos framework account with initial values.</td>
-<td>High</td>
-<td>The initialize function is responsible for setting up the initial state of the module, ensuring that the following conditions are met (1) the BlockResource resource is created, indicating its existence within the module's context, and moved under the Aptos framework account, (2) the block height is set to zero during initialization, and (3) the epoch interval is greater than zero.</td>
-<td>Formally Verified via <a href="#high-level-req-1">Initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;During the module&apos;s initialization, it guarantees that the BlockResource resource moves under the Aptos framework account with initial values.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The initialize function is responsible for setting up the initial state of the module, ensuring that the following conditions are met (1) the BlockResource resource is created, indicating its existence within the module&apos;s context, and moved under the Aptos framework account, (2) the block height is set to zero during initialization, and (3) the epoch interval is greater than zero.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;Initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>Only the Aptos framework address may execute the following functionalities: (1) initialize BlockResource, and (2) update the epoch interval.</td>
-<td>Critical</td>
-<td>The initialize and  update_epoch_interval_microsecs functions ensure that only aptos_framework can call them.</td>
-<td>Formally Verified via <a href="#high-level-req-2.1">Initialize</a> and <a href="#high-level-req-2.2">update_epoch_interval_microsecs</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;Only the Aptos framework address may execute the following functionalities: (1) initialize BlockResource, and (2) update the epoch interval.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The initialize and  update_epoch_interval_microsecs functions ensure that only aptos_framework can call them.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.1&quot;&gt;Initialize&lt;/a&gt; and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.2&quot;&gt;update_epoch_interval_microsecs&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>When updating the epoch interval, its value must be greater than zero and BlockResource must exist.</td>
-<td>High</td>
-<td>The update_epoch_interval_microsecs function asserts that new_epoch_interval is greater than zero and updates BlockResource's state.</td>
-<td>Formally verified via <a href="#high-level-req-3.1">UpdateEpochIntervalMicrosecs</a> and <a href="#high-level-req-3.2">epoch_interval</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;When updating the epoch interval, its value must be greater than zero and BlockResource must exist.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The update_epoch_interval_microsecs function asserts that new_epoch_interval is greater than zero and updates BlockResource&apos;s state.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3.1&quot;&gt;UpdateEpochIntervalMicrosecs&lt;/a&gt; and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3.2&quot;&gt;epoch_interval&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>Only a valid proposer or the virtual machine is authorized to produce blocks.</td>
-<td>Critical</td>
-<td>During the execution of the block_prologue function, the validity of the proposer address is verified when setting the metadata for the current block.</td>
-<td>Formally Verified via <a href="#high-level-req-4">block_prologue</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;Only a valid proposer or the virtual machine is authorized to produce blocks.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;During the execution of the block_prologue function, the validity of the proposer address is verified when setting the metadata for the current block.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;block_prologue&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>While emitting a new block event, the number of them is equal to the current block height.</td>
-<td>Medium</td>
-<td>The emit_new_block_event function asserts that the number of new block events equals the current block height.</td>
-<td>Formally Verified via <a href="#high-level-req-5">emit_new_block_event</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;While emitting a new block event, the number of them is equal to the current block height.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The emit_new_block_event function asserts that the number of new block events equals the current block height.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5&quot;&gt;emit_new_block_event&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -724,7 +687,7 @@ new block event for WriteSetPayload.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-3.2" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 invariant epoch_interval &gt; 0;<br/></code></pre>
 
 
@@ -773,15 +736,10 @@ invariant epoch_interval &gt; 0;<br/></code></pre>
 <pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, epoch_interval_microsecs: u64)<br/></code></pre>
 
 
-The caller is aptos_framework.
-The new_epoch_interval must be greater than 0.
-The BlockResource is not under the caller before initializing.
-The Account is not under the caller until the BlockResource is created for the caller.
-Make sure The BlockResource under the caller existed after initializing.
-The number of new events created does not exceed MAX_U64.
+The caller is aptos_framework.<br/> The new_epoch_interval must be greater than 0.<br/> The BlockResource is not under the caller before initializing.<br/> The Account is not under the caller until the BlockResource is created for the caller.<br/> Make sure The BlockResource under the caller existed after initializing.<br/> The number of new events created does not exceed MAX_U64.
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 include Initialize;<br/>include NewEventHandle;<br/>let addr &#61; signer::address_of(aptos_framework);<br/>let account &#61; global&lt;account::Account&gt;(addr);<br/>aborts_if account.guid_creation_num &#43; 2 &gt;&#61; account::MAX_GUID_CREATION_NUM;<br/></code></pre>
 
 
@@ -794,12 +752,10 @@ include Initialize;<br/>include NewEventHandle;<br/>let addr &#61; signer::addre
 <pre><code>public fun update_epoch_interval_microsecs(aptos_framework: &amp;signer, new_epoch_interval: u64)<br/></code></pre>
 
 
-The caller is @aptos_framework.
-The new_epoch_interval must be greater than 0.
-The BlockResource existed under the @aptos_framework.
+The caller is @aptos_framework.<br/> The new_epoch_interval must be greater than 0.<br/> The BlockResource existed under the @aptos_framework.
 
 
-<pre><code>// This enforces <a id="high-level-req-3.1" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 include UpdateEpochIntervalMicrosecs;<br/></code></pre>
 
 
@@ -808,7 +764,7 @@ include UpdateEpochIntervalMicrosecs;<br/></code></pre>
 <a id="0x1_block_UpdateEpochIntervalMicrosecs"></a>
 
 
-<pre><code>schema UpdateEpochIntervalMicrosecs &#123;<br/>aptos_framework: signer;<br/>new_epoch_interval: u64;<br/>let addr &#61; signer::address_of(aptos_framework);<br/>// This enforces <a id="high-level-req-2.2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>schema UpdateEpochIntervalMicrosecs &#123;<br/>aptos_framework: signer;<br/>new_epoch_interval: u64;<br/>let addr &#61; signer::address_of(aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
     aborts_if addr !&#61; @aptos_framework;<br/>aborts_if new_epoch_interval &#61;&#61; 0;<br/>aborts_if !exists&lt;BlockResource&gt;(addr);<br/>let post block_resource &#61; global&lt;BlockResource&gt;(addr);<br/>ensures block_resource.epoch_interval &#61;&#61; new_epoch_interval;<br/>&#125;<br/></code></pre>
 
 
@@ -893,7 +849,7 @@ include UpdateEpochIntervalMicrosecs;<br/></code></pre>
 
 
 
-<pre><code>let proposer &#61; new_block_event.proposer;<br/>let timestamp &#61; new_block_event.time_microseconds;<br/>requires chain_status::is_operating();<br/>requires system_addresses::is_vm(vm);<br/>requires (proposer &#61;&#61; @vm_reserved) &#61;&#61;&gt; (timestamp::spec_now_microseconds() &#61;&#61; timestamp);<br/>requires (proposer !&#61; @vm_reserved) &#61;&#61;&gt; (timestamp::spec_now_microseconds() &lt; timestamp);<br/>// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
+<pre><code>let proposer &#61; new_block_event.proposer;<br/>let timestamp &#61; new_block_event.time_microseconds;<br/>requires chain_status::is_operating();<br/>requires system_addresses::is_vm(vm);<br/>requires (proposer &#61;&#61; @vm_reserved) &#61;&#61;&gt; (timestamp::spec_now_microseconds() &#61;&#61; timestamp);<br/>requires (proposer !&#61; @vm_reserved) &#61;&#61;&gt; (timestamp::spec_now_microseconds() &lt; timestamp);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt;:
 requires event::counter(event_handle) &#61;&#61; new_block_event.height;<br/>aborts_if false;<br/></code></pre>
 
 
@@ -920,10 +876,7 @@ requires event::counter(event_handle) &#61;&#61; new_block_event.height;<br/>abo
 <pre><code>public fun emit_writeset_block_event(vm_signer: &amp;signer, fake_block_hash: address)<br/></code></pre>
 
 
-The caller is @vm_reserved.
-The BlockResource existed under the @aptos_framework.
-The Configuration existed under the @aptos_framework.
-The CurrentTimeMicroseconds existed under the @aptos_framework.
+The caller is @vm_reserved.<br/> The BlockResource existed under the @aptos_framework.<br/> The Configuration existed under the @aptos_framework.<br/> The CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 <pre><code>requires chain_status::is_operating();<br/>include EmitWritesetBlockEvent;<br/></code></pre>

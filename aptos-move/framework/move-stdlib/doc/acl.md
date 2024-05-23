@@ -3,10 +3,7 @@
 
 # Module `0x1::acl`
 
-Access control list (acl) module. An acl is a list of account addresses who
-have the access permission to a certain object.
-This module uses a <code>vector</code> to represent the list, but can be refactored to
-use a "set" instead when it's available in the language in the future.
+Access control list (acl) module. An acl is a list of account addresses who<br/> have the access permission to a certain object.<br/> This module uses a <code>vector</code> to represent the list, but can be refactored to<br/> use a &quot;set&quot; instead when it&apos;s available in the language in the future.
 
 
 -  [Struct `ACL`](#0x1_acl_ACL)

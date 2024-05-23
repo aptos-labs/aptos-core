@@ -3,8 +3,7 @@
 
 # Module `0x1::aptos_coin`
 
-This module defines a minimal and generic Coin and Balance.
-modified from https://github.com/move-language/move/tree/main/language/documentation/tutorial
+This module defines a minimal and generic Coin and Balance.<br/> modified from https://github.com/move&#45;language/move/tree/main/language/documentation/tutorial
 
 
 -  [Resource `AptosCoin`](#0x1_aptos_coin_AptosCoin)
@@ -219,8 +218,7 @@ Can only called during genesis to initialize the Aptos coin.
 
 ## Function `destroy_mint_cap`
 
-Only called during genesis to destroy the aptos framework account's mint capability once all initial validators
-and accounts have been initialized during genesis.
+Only called during genesis to destroy the aptos framework account&apos;s mint capability once all initial validators<br/> and accounts have been initialized during genesis.
 
 
 <pre><code>public(friend) fun destroy_mint_cap(aptos_framework: &amp;signer)<br/></code></pre>
@@ -241,8 +239,7 @@ and accounts have been initialized during genesis.
 
 ## Function `configure_accounts_for_test`
 
-Can only be called during genesis for tests to grant mint capability to aptos framework and core resources
-accounts.
+Can only be called during genesis for tests to grant mint capability to aptos framework and core resources<br/> accounts.
 
 
 <pre><code>public(friend) fun configure_accounts_for_test(aptos_framework: &amp;signer, core_resources: &amp;signer, mint_cap: coin::MintCapability&lt;aptos_coin::AptosCoin&gt;)<br/></code></pre>
@@ -263,8 +260,7 @@ accounts.
 
 ## Function `mint`
 
-Only callable in tests and testnets where the core resources account exists.
-Create new coins and deposit them into dst_addr's account.
+Only callable in tests and testnets where the core resources account exists.<br/> Create new coins and deposit them into dst_addr&apos;s account.
 
 
 <pre><code>public entry fun mint(account: &amp;signer, dst_addr: address, amount: u64)<br/></code></pre>
@@ -285,8 +281,7 @@ Create new coins and deposit them into dst_addr's account.
 
 ## Function `delegate_mint_capability`
 
-Only callable in tests and testnets where the core resources account exists.
-Create delegated token for the address so the account could claim MintCapability later.
+Only callable in tests and testnets where the core resources account exists.<br/> Create delegated token for the address so the account could claim MintCapability later.
 
 
 <pre><code>public entry fun delegate_mint_capability(account: signer, to: address)<br/></code></pre>
@@ -307,8 +302,7 @@ Create delegated token for the address so the account could claim MintCapability
 
 ## Function `claim_mint_capability`
 
-Only callable in tests and testnets where the core resources account exists.
-Claim the delegated mint capability and destroy the delegated token.
+Only callable in tests and testnets where the core resources account exists.<br/> Claim the delegated mint capability and destroy the delegated token.
 
 
 <pre><code>public entry fun claim_mint_capability(account: &amp;signer)<br/></code></pre>
@@ -356,38 +350,17 @@ Claim the delegated mint capability and destroy the delegated token.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>The native token, APT, must be initialized during genesis.</td>
-<td>Medium</td>
-<td>The initialize function is only called once, during genesis.</td>
-<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The native token, APT, must be initialized during genesis.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The initialize function is only called once, during genesis.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The APT coin may only be created exactly once.</td>
-<td>Medium</td>
-<td>The initialization function may only be called once.</td>
-<td>Enforced through the <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move">coin</a> module, which has been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The APT coin may only be created exactly once.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The initialization function may only be called once.&lt;/td&gt;<br/>&lt;td&gt;Enforced through the &lt;a href&#61;&quot;https://github.com/aptos&#45;labs/aptos&#45;core/blob/main/aptos&#45;move/framework/aptos&#45;framework/sources/coin.move&quot;&gt;coin&lt;/a&gt; module, which has been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>Any type of operation on the APT coin should fail if the user has not registered for the coin.</td>
-<td>Medium</td>
-<td>Coin operations may succeed only on valid user coin registration.</td>
-<td>Enforced through the <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move">coin</a> module, which has been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;Any type of operation on the APT coin should fail if the user has not registered for the coin.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;Coin operations may succeed only on valid user coin registration.&lt;/td&gt;<br/>&lt;td&gt;Enforced through the &lt;a href&#61;&quot;https://github.com/aptos&#45;labs/aptos&#45;core/blob/main/aptos&#45;move/framework/aptos&#45;framework/sources/coin.move&quot;&gt;coin&lt;/a&gt; module, which has been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -409,8 +382,8 @@ Claim the delegated mint capability and destroy the delegated token.
 
 
 
-<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if !string::spec_internal_check_utf8(b&quot;Aptos Coin&quot;);<br/>aborts_if !string::spec_internal_check_utf8(b&quot;APT&quot;);<br/>aborts_if exists&lt;MintCapStore&gt;(addr);<br/>aborts_if exists&lt;coin::CoinInfo&lt;AptosCoin&gt;&gt;(addr);<br/>aborts_if !exists&lt;aggregator_factory::AggregatorFactory&gt;(addr);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-ensures exists&lt;MintCapStore&gt;(addr);<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if !string::spec_internal_check_utf8(b&quot;Aptos Coin&quot;);<br/>aborts_if !string::spec_internal_check_utf8(b&quot;APT&quot;);<br/>aborts_if exists&lt;MintCapStore&gt;(addr);<br/>aborts_if exists&lt;coin::CoinInfo&lt;AptosCoin&gt;&gt;(addr);<br/>aborts_if !exists&lt;aggregator_factory::AggregatorFactory&gt;(addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
+ensures exists&lt;MintCapStore&gt;(addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 ensures global&lt;MintCapStore&gt;(addr).mint_cap &#61;&#61;  MintCapability&lt;AptosCoin&gt; &#123;&#125;;<br/>ensures exists&lt;coin::CoinInfo&lt;AptosCoin&gt;&gt;(addr);<br/>ensures result_1 &#61;&#61; BurnCapability&lt;AptosCoin&gt; &#123;&#125;;<br/>ensures result_2 &#61;&#61; MintCapability&lt;AptosCoin&gt; &#123;&#125;;<br/></code></pre>
 
 

@@ -3,10 +3,7 @@
 
 # Module `0x3::property_map`
 
-PropertyMap is a specialization of SimpleMap for Tokens.
-It maps a String key to a PropertyValue that consists of type (string) and value (vector<u8>)
-It provides basic on-chain serialization of primitive and string to property value with type information
-It also supports deserializing property value to it original type.
+PropertyMap is a specialization of SimpleMap for Tokens.<br/> It maps a String key to a PropertyValue that consists of type (string) and value (vector&lt;u8&gt;)<br/> It provides basic on&#45;chain serialization of primitive and string to property value with type information<br/> It also supports deserializing property value to it original type.
 
 
 -  [Struct `PropertyMap`](#0x3_property_map_PropertyMap)
@@ -139,7 +136,7 @@ The property key already exists
 
 <a id="0x3_property_map_EKEY_COUNT_NOT_MATCH_TYPE_COUNT"></a>
 
-Property key and type count don't match
+Property key and type count don&apos;t match
 
 
 <pre><code>const EKEY_COUNT_NOT_MATCH_TYPE_COUNT: u64 &#61; 5;<br/></code></pre>
@@ -148,7 +145,7 @@ Property key and type count don't match
 
 <a id="0x3_property_map_EKEY_COUNT_NOT_MATCH_VALUE_COUNT"></a>
 
-Property key and value count don't match
+Property key and value count don&apos;t match
 
 
 <pre><code>const EKEY_COUNT_NOT_MATCH_VALUE_COUNT: u64 &#61; 4;<br/></code></pre>
@@ -166,7 +163,7 @@ The name (key) of the property is too long
 
 <a id="0x3_property_map_EPROPERTY_NOT_EXIST"></a>
 
-The property doesn't exist
+The property doesn&apos;t exist
 
 
 <pre><code>const EPROPERTY_NOT_EXIST: u64 &#61; 3;<br/></code></pre>
@@ -184,7 +181,7 @@ The number of property exceeds the limit
 
 <a id="0x3_property_map_ETYPE_NOT_MATCH"></a>
 
-Property type doesn't match
+Property type doesn&apos;t match
 
 
 <pre><code>const ETYPE_NOT_MATCH: u64 &#61; 6;<br/></code></pre>
@@ -596,8 +593,7 @@ Return the values of all properties in the property map in the order they are ad
 
 ## Function `update_property_map`
 
-Update the property in the existing property map
-Allow updating existing keys' value and add new key-value pairs
+Update the property in the existing property map<br/> Allow updating existing keys&apos; value and add new key&#45;value pairs
 
 
 <pre><code>public fun update_property_map(map: &amp;mut property_map::PropertyMap, keys: vector&lt;string::String&gt;, values: vector&lt;vector&lt;u8&gt;&gt;, types: vector&lt;string::String&gt;)<br/></code></pre>
@@ -833,8 +829,7 @@ create a property value from generic type data
 <pre><code>public fun read_string(map: &amp;property_map::PropertyMap, key: &amp;string::String): string::String<br/></code></pre>
 
 
-Check utf8 for correctness and whether equal
-to <code>prop.type</code>
+Check utf8 for correctness and whether equal<br/> to <code>prop.type</code>
 
 
 <pre><code>pragma aborts_if_is_partial;<br/>aborts_if !simple_map::spec_contains_key(map.map, key);<br/>aborts_if !string::spec_internal_check_utf8(b&quot;0x1::string::String&quot;);<br/>let prop &#61; simple_map::spec_get(map.map, key);<br/>aborts_if prop.type !&#61; spec_utf8(b&quot;0x1::string::String&quot;);<br/>aborts_if !aptos_std::from_bcs::deserializable&lt;String&gt;(prop.value);<br/></code></pre>

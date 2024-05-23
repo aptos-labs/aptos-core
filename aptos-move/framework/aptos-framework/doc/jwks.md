@@ -3,12 +3,7 @@
 
 # Module `0x1::jwks`
 
-JWK functions and structs.
-
-Note: An important design constraint for this module is that the JWK consensus Rust code is unable to
-spawn a VM and make a Move function call. Instead, the JWK consensus Rust code will have to directly
-write some of the resources in this file. As a result, the structs in this file are declared so as to
-have a simple layout which is easily accessible in Rust.
+JWK functions and structs.<br/><br/> Note: An important design constraint for this module is that the JWK consensus Rust code is unable to<br/> spawn a VM and make a Move function call. Instead, the JWK consensus Rust code will have to directly<br/> write some of the resources in this file. As a result, the structs in this file are declared so as to<br/> have a simple layout which is easily accessible in Rust.
 
 
 -  [Struct `OIDCProvider`](#0x1_jwks_OIDCProvider)
@@ -83,14 +78,13 @@ An OIDC provider.
 <code>name: vector&lt;u8&gt;</code>
 </dt>
 <dd>
- The utf-8 encoded issuer string. E.g., b"https://www.facebook.com".
+ The utf&#45;8 encoded issuer string. E.g., b&quot;https://www.facebook.com&quot;.
 </dd>
 <dt>
 <code>config_url: vector&lt;u8&gt;</code>
 </dt>
 <dd>
- The ut8-8 encoded OpenID configuration URL of the provider.
- E.g., b"https://www.facebook.com/.well-known/openid-configuration/".
+ The ut8&#45;8 encoded OpenID configuration URL of the provider.<br/> E.g., b&quot;https://www.facebook.com/.well&#45;known/openid&#45;configuration/&quot;.
 </dd>
 </dl>
 
@@ -128,8 +122,7 @@ A list of OIDC providers whose JWKs should be watched by validators. Maintained 
 
 ## Struct `UnsupportedJWK`
 
-An JWK variant that represents the JWKs which were observed but not yet supported by Aptos.
-Observing <code>UnsupportedJWK</code>s means the providers adopted a new key type/format, and the system should be updated.
+An JWK variant that represents the JWKs which were observed but not yet supported by Aptos.<br/> Observing <code>UnsupportedJWK</code>s means the providers adopted a new key type/format, and the system should be updated.
 
 
 <pre><code>struct UnsupportedJWK has copy, drop, store<br/></code></pre>
@@ -229,10 +222,7 @@ A JSON web key.
 <code>variant: copyable_any::Any</code>
 </dt>
 <dd>
- A <code>JWK</code> variant packed as an <code>Any</code>.
- Currently the variant type is one of the following.
- - <code>RSA_JWK</code>
- - <code>UnsupportedJWK</code>
+ A <code>JWK</code> variant packed as an <code>Any</code>.<br/> Currently the variant type is one of the following.<br/> &#45; <code>RSA_JWK</code><br/> &#45; <code>UnsupportedJWK</code>
 </dd>
 </dl>
 
@@ -259,22 +249,19 @@ A provider and its <code>JWK</code>s.
 <code>issuer: vector&lt;u8&gt;</code>
 </dt>
 <dd>
- The utf-8 encoding of the issuer string (e.g., "https://www.facebook.com").
+ The utf&#45;8 encoding of the issuer string (e.g., &quot;https://www.facebook.com&quot;).
 </dd>
 <dt>
 <code>version: u64</code>
 </dt>
 <dd>
- A version number is needed by JWK consensus to dedup the updates.
- e.g, when on chain version = 5, multiple nodes can propose an update with version = 6.
- Bumped every time the JWKs for the current issuer is updated.
- The Rust authenticator only uses the latest version.
+ A version number is needed by JWK consensus to dedup the updates.<br/> e.g, when on chain version &#61; 5, multiple nodes can propose an update with version &#61; 6.<br/> Bumped every time the JWKs for the current issuer is updated.<br/> The Rust authenticator only uses the latest version.
 </dd>
 <dt>
 <code>jwks: vector&lt;jwks::JWK&gt;</code>
 </dt>
 <dd>
- Vector of <code>JWK</code>'s sorted by their unique ID (from <code>get_jwk_id</code>) in dictionary order.
+ Vector of <code>JWK</code>&apos;s sorted by their unique ID (from <code>get_jwk_id</code>) in dictionary order.
 </dd>
 </dl>
 
@@ -388,12 +375,7 @@ A small edit or patch that is applied to a <code>AllProvidersJWKs</code> to obta
 <code>variant: copyable_any::Any</code>
 </dt>
 <dd>
- A <code>Patch</code> variant packed as an <code>Any</code>.
- Currently the variant type is one of the following.
- - <code>PatchRemoveAll</code>
- - <code>PatchRemoveIssuer</code>
- - <code>PatchRemoveJWK</code>
- - <code>PatchUpsertJWK</code>
+ A <code>Patch</code> variant packed as an <code>Any</code>.<br/> Currently the variant type is one of the following.<br/> &#45; <code>PatchRemoveAll</code><br/> &#45; <code>PatchRemoveIssuer</code><br/> &#45; <code>PatchRemoveJWK</code><br/> &#45; <code>PatchUpsertJWK</code>
 </dd>
 </dl>
 
@@ -524,9 +506,7 @@ A <code>Patch</code> variant to upsert a JWK for an issuer.
 
 ## Resource `Patches`
 
-A sequence of <code>Patch</code> objects that are applied *one by one* to the <code>ObservedJWKs</code>.
-
-Maintained by governance proposals.
+A sequence of <code>Patch</code> objects that are applied &#42;one by one&#42; to the <code>ObservedJWKs</code>.<br/><br/> Maintained by governance proposals.
 
 
 <pre><code>struct Patches has key<br/></code></pre>
@@ -553,8 +533,7 @@ Maintained by governance proposals.
 
 ## Resource `PatchedJWKs`
 
-The result of applying the <code>Patches</code> to the <code>ObservedJWKs</code>.
-This is what applications should consume.
+The result of applying the <code>Patches</code> to the <code>ObservedJWKs</code>.<br/> This is what applications should consume.
 
 
 <pre><code>struct PatchedJWKs has drop, key<br/></code></pre>
@@ -674,9 +653,7 @@ This is what applications should consume.
 
 ## Function `get_patched_jwk`
 
-Get a JWK by issuer and key ID from the <code>PatchedJWKs</code>.
-Abort if such a JWK does not exist.
-More convenient to call from Rust, since it does not wrap the JWK in an <code>Option</code>.
+Get a JWK by issuer and key ID from the <code>PatchedJWKs</code>.<br/> Abort if such a JWK does not exist.<br/> More convenient to call from Rust, since it does not wrap the JWK in an <code>Option</code>.
 
 
 <pre><code>public fun get_patched_jwk(issuer: vector&lt;u8&gt;, jwk_id: vector&lt;u8&gt;): jwks::JWK<br/></code></pre>
@@ -697,8 +674,7 @@ More convenient to call from Rust, since it does not wrap the JWK in an <code>Op
 
 ## Function `try_get_patched_jwk`
 
-Get a JWK by issuer and key ID from the <code>PatchedJWKs</code>, if it exists.
-More convenient to call from Move, since it does not abort.
+Get a JWK by issuer and key ID from the <code>PatchedJWKs</code>, if it exists.<br/> More convenient to call from Move, since it does not abort.
 
 
 <pre><code>public fun try_get_patched_jwk(issuer: vector&lt;u8&gt;, jwk_id: vector&lt;u8&gt;): option::Option&lt;jwks::JWK&gt;<br/></code></pre>
@@ -719,9 +695,7 @@ More convenient to call from Move, since it does not abort.
 
 ## Function `upsert_oidc_provider`
 
-Deprecated by <code>upsert_oidc_provider_for_next_epoch()</code>.
-
-TODO: update all the tests that reference this function, then disable this function.
+Deprecated by <code>upsert_oidc_provider_for_next_epoch()</code>.<br/><br/> TODO: update all the tests that reference this function, then disable this function.
 
 
 <pre><code>public fun upsert_oidc_provider(fx: &amp;signer, name: vector&lt;u8&gt;, config_url: vector&lt;u8&gt;): option::Option&lt;vector&lt;u8&gt;&gt;<br/></code></pre>
@@ -742,16 +716,7 @@ TODO: update all the tests that reference this function, then disable this funct
 
 ## Function `upsert_oidc_provider_for_next_epoch`
 
-Used in on-chain governances to update the supported OIDC providers, effective starting next epoch.
-Example usage:
-```
-aptos_framework::jwks::upsert_oidc_provider_for_next_epoch(
-&framework_signer,
-b"https://accounts.google.com",
-b"https://accounts.google.com/.well-known/openid-configuration"
-);
-aptos_framework::aptos_governance::reconfigure(&framework_signer);
-```
+Used in on&#45;chain governances to update the supported OIDC providers, effective starting next epoch.<br/> Example usage:<br/> ```<br/> aptos_framework::jwks::upsert_oidc_provider_for_next_epoch(<br/>     &amp;framework_signer,<br/>     b&quot;https://accounts.google.com&quot;,<br/>     b&quot;https://accounts.google.com/.well&#45;known/openid&#45;configuration&quot;<br/> );<br/> aptos_framework::aptos_governance::reconfigure(&amp;framework_signer);<br/> ```
 
 
 <pre><code>public fun upsert_oidc_provider_for_next_epoch(fx: &amp;signer, name: vector&lt;u8&gt;, config_url: vector&lt;u8&gt;): option::Option&lt;vector&lt;u8&gt;&gt;<br/></code></pre>
@@ -772,9 +737,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 
 ## Function `remove_oidc_provider`
 
-Deprecated by <code>remove_oidc_provider_for_next_epoch()</code>.
-
-TODO: update all the tests that reference this function, then disable this function.
+Deprecated by <code>remove_oidc_provider_for_next_epoch()</code>.<br/><br/> TODO: update all the tests that reference this function, then disable this function.
 
 
 <pre><code>public fun remove_oidc_provider(fx: &amp;signer, name: vector&lt;u8&gt;): option::Option&lt;vector&lt;u8&gt;&gt;<br/></code></pre>
@@ -795,15 +758,7 @@ TODO: update all the tests that reference this function, then disable this funct
 
 ## Function `remove_oidc_provider_for_next_epoch`
 
-Used in on-chain governances to update the supported OIDC providers, effective starting next epoch.
-Example usage:
-```
-aptos_framework::jwks::remove_oidc_provider_for_next_epoch(
-&framework_signer,
-b"https://accounts.google.com",
-);
-aptos_framework::aptos_governance::reconfigure(&framework_signer);
-```
+Used in on&#45;chain governances to update the supported OIDC providers, effective starting next epoch.<br/> Example usage:<br/> ```<br/> aptos_framework::jwks::remove_oidc_provider_for_next_epoch(<br/>     &amp;framework_signer,<br/>     b&quot;https://accounts.google.com&quot;,<br/> );<br/> aptos_framework::aptos_governance::reconfigure(&amp;framework_signer);<br/> ```
 
 
 <pre><code>public fun remove_oidc_provider_for_next_epoch(fx: &amp;signer, name: vector&lt;u8&gt;): option::Option&lt;vector&lt;u8&gt;&gt;<br/></code></pre>
@@ -929,7 +884,7 @@ Create a <code>Patch</code> that removes the entry of a given issuer, if exists.
 
 ## Function `new_patch_upsert_jwk`
 
-Create a <code>Patch</code> that upserts a JWK into an issuer's JWK set.
+Create a <code>Patch</code> that upserts a JWK into an issuer&apos;s JWK set.
 
 
 <pre><code>public fun new_patch_upsert_jwk(issuer: vector&lt;u8&gt;, jwk: jwks::JWK): jwks::Patch<br/></code></pre>
@@ -1013,8 +968,7 @@ Initialize some JWK resources. Should only be invoked by genesis.
 
 ## Function `remove_oidc_provider_internal`
 
-Helper function that removes an OIDC provider from the <code>SupportedOIDCProviders</code>.
-Returns the old config URL of the provider, if any, as an <code>Option</code>.
+Helper function that removes an OIDC provider from the <code>SupportedOIDCProviders</code>.<br/> Returns the old config URL of the provider, if any, as an <code>Option</code>.
 
 
 <pre><code>fun remove_oidc_provider_internal(provider_set: &amp;mut jwks::SupportedOIDCProviders, name: vector&lt;u8&gt;): option::Option&lt;vector&lt;u8&gt;&gt;<br/></code></pre>
@@ -1035,10 +989,7 @@ Returns the old config URL of the provider, if any, as an <code>Option</code>.
 
 ## Function `upsert_into_observed_jwks`
 
-Only used by validators to publish their observed JWK update.
-
-NOTE: It is assumed verification has been done to ensure each update is quorum-certified,
-and its <code>version</code> equals to the on-chain version + 1.
+Only used by validators to publish their observed JWK update.<br/><br/> NOTE: It is assumed verification has been done to ensure each update is quorum&#45;certified,<br/> and its <code>version</code> equals to the on&#45;chain version &#43; 1.
 
 
 <pre><code>public fun upsert_into_observed_jwks(fx: &amp;signer, provider_jwks_vec: vector&lt;jwks::ProviderJWKs&gt;)<br/></code></pre>
@@ -1059,9 +1010,7 @@ and its <code>version</code> equals to the on-chain version + 1.
 
 ## Function `remove_issuer_from_observed_jwks`
 
-Only used by governance to delete an issuer from <code>ObservedJWKs</code>, if it exists.
-
-Return the potentially existing <code>ProviderJWKs</code> of the given issuer.
+Only used by governance to delete an issuer from <code>ObservedJWKs</code>, if it exists.<br/><br/> Return the potentially existing <code>ProviderJWKs</code> of the given issuer.
 
 
 <pre><code>public fun remove_issuer_from_observed_jwks(fx: &amp;signer, issuer: vector&lt;u8&gt;): option::Option&lt;jwks::ProviderJWKs&gt;<br/></code></pre>
@@ -1166,8 +1115,7 @@ Get the ID of a JWK.
 
 ## Function `upsert_provider_jwks`
 
-Upsert a <code>ProviderJWKs</code> into an <code>AllProvidersJWKs</code>. If this upsert replaced an existing entry, return it.
-Maintains the sorted-by-issuer invariant in <code>AllProvidersJWKs</code>.
+Upsert a <code>ProviderJWKs</code> into an <code>AllProvidersJWKs</code>. If this upsert replaced an existing entry, return it.<br/> Maintains the sorted&#45;by&#45;issuer invariant in <code>AllProvidersJWKs</code>.
 
 
 <pre><code>fun upsert_provider_jwks(jwks: &amp;mut jwks::AllProvidersJWKs, provider_jwks: jwks::ProviderJWKs): option::Option&lt;jwks::ProviderJWKs&gt;<br/></code></pre>
@@ -1188,8 +1136,7 @@ Maintains the sorted-by-issuer invariant in <code>AllProvidersJWKs</code>.
 
 ## Function `remove_issuer`
 
-Remove the entry of an issuer from a <code>AllProvidersJWKs</code> and return the entry, if exists.
-Maintains the sorted-by-issuer invariant in <code>AllProvidersJWKs</code>.
+Remove the entry of an issuer from a <code>AllProvidersJWKs</code> and return the entry, if exists.<br/> Maintains the sorted&#45;by&#45;issuer invariant in <code>AllProvidersJWKs</code>.
 
 
 <pre><code>fun remove_issuer(jwks: &amp;mut jwks::AllProvidersJWKs, issuer: vector&lt;u8&gt;): option::Option&lt;jwks::ProviderJWKs&gt;<br/></code></pre>
@@ -1252,8 +1199,7 @@ Remove the entry of a key ID from a <code>ProviderJWKs</code> and return the ent
 
 ## Function `apply_patch`
 
-Modify an <code>AllProvidersJWKs</code> object with a <code>Patch</code>.
-Maintains the sorted-by-issuer invariant in <code>AllProvidersJWKs</code>.
+Modify an <code>AllProvidersJWKs</code> object with a <code>Patch</code>.<br/> Maintains the sorted&#45;by&#45;issuer invariant in <code>AllProvidersJWKs</code>.
 
 
 <pre><code>fun apply_patch(jwks: &amp;mut jwks::AllProvidersJWKs, patch: jwks::Patch)<br/></code></pre>

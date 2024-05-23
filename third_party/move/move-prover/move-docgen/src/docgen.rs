@@ -1778,8 +1778,17 @@ impl<'env> Docgen<'env> {
                     .unwrap()
                 }
             } else {
-                decorated_text.push(chr);
-                decorated_text.extend(chars.take_while_ref(non_code_filter))
+                if self.options.is_mdx_compatible() {
+                    decorated_text.push_str(&self.decorate_code(&chr.to_string()));
+                } else {
+                    decorated_text.push(chr);
+                }
+                if self.options.is_mdx_compatible() {
+                    let str = chars.take_while_ref(non_code_filter).collect::<String>();
+                    decorated_text.push_str(&self.decorate_code(&str));
+                } else {
+                    decorated_text.extend(chars.take_while_ref(non_code_filter))
+                }
             }
         }
         decorated_text

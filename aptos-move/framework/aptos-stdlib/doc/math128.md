@@ -114,7 +114,7 @@ Return the average of two.
 
 ## Function `gcd`
 
-Return greatest common divisor of <code>a</code> & <code>b</code>, via the Euclidean algorithm.
+Return greatest common divisor of <code>a</code> &amp; <code>b</code>, via the Euclidean algorithm.
 
 
 <pre><code>public fun gcd(a: u128, b: u128): u128<br/></code></pre>
@@ -135,7 +135,7 @@ Return greatest common divisor of <code>a</code> & <code>b</code>, via the Eucli
 
 ## Function `mul_div`
 
-Returns a * b / c going through u256 to prevent intermediate overflow
+Returns a &#42; b / c going through u256 to prevent intermediate overflow
 
 
 <pre><code>public fun mul_div(a: u128, b: u128, c: u128): u128<br/></code></pre>

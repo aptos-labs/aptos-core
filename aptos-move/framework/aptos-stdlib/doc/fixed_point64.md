@@ -3,8 +3,7 @@
 
 # Module `0x1::fixed_point64`
 
-Defines a fixed-point numeric type with a 64-bit integer part and
-a 64-bit fractional part.
+Defines a fixed&#45;point numeric type with a 64&#45;bit integer part and<br/> a 64&#45;bit fractional part.
 
 
 -  [Struct `FixedPoint64`](#0x1_fixed_point64_FixedPoint64)
@@ -58,15 +57,7 @@ a 64-bit fractional part.
 
 ## Struct `FixedPoint64`
 
-Define a fixed-point numeric type with 64 fractional bits.
-This is just a u128 integer but it is wrapped in a struct to
-make a unique type. This is a binary representation, so decimal
-values may not be exactly representable, but it provides more
-than 9 decimal digits of precision both before and after the
-decimal point (18 digits total). For comparison, double precision
-floating-point has less than 16 decimal digits of precision, so
-be careful about using floating-point to convert these values to
-decimal.
+Define a fixed&#45;point numeric type with 64 fractional bits.<br/> This is just a u128 integer but it is wrapped in a struct to<br/> make a unique type. This is a binary representation, so decimal<br/> values may not be exactly representable, but it provides more<br/> than 9 decimal digits of precision both before and after the<br/> decimal point (18 digits total). For comparison, double precision<br/> floating&#45;point has less than 16 decimal digits of precision, so<br/> be careful about using floating&#45;point to convert these values to<br/> decimal.
 
 
 <pre><code>struct FixedPoint64 has copy, drop, store<br/></code></pre>
@@ -160,7 +151,7 @@ The computed ratio when converting to a <code>FixedPoint64</code> would be unrep
 
 ## Function `sub`
 
-Returns x - y. x must be not less than y.
+Returns x &#45; y. x must be not less than y.
 
 
 <pre><code>public fun sub(x: fixed_point64::FixedPoint64, y: fixed_point64::FixedPoint64): fixed_point64::FixedPoint64<br/></code></pre>
@@ -181,7 +172,7 @@ Returns x - y. x must be not less than y.
 
 ## Function `add`
 
-Returns x + y. The result cannot be greater than MAX_U128.
+Returns x &#43; y. The result cannot be greater than MAX_U128.
 
 
 <pre><code>public fun add(x: fixed_point64::FixedPoint64, y: fixed_point64::FixedPoint64): fixed_point64::FixedPoint64<br/></code></pre>
@@ -202,9 +193,7 @@ Returns x + y. The result cannot be greater than MAX_U128.
 
 ## Function `multiply_u128`
 
-Multiply a u128 integer by a fixed-point number, truncating any
-fractional part of the product. This will abort if the product
-overflows.
+Multiply a u128 integer by a fixed&#45;point number, truncating any<br/> fractional part of the product. This will abort if the product<br/> overflows.
 
 
 <pre><code>public fun multiply_u128(val: u128, multiplier: fixed_point64::FixedPoint64): u128<br/></code></pre>
@@ -225,9 +214,7 @@ overflows.
 
 ## Function `divide_u128`
 
-Divide a u128 integer by a fixed-point number, truncating any
-fractional part of the quotient. This will abort if the divisor
-is zero or if the quotient overflows.
+Divide a u128 integer by a fixed&#45;point number, truncating any<br/> fractional part of the quotient. This will abort if the divisor<br/> is zero or if the quotient overflows.
 
 
 <pre><code>public fun divide_u128(val: u128, divisor: fixed_point64::FixedPoint64): u128<br/></code></pre>
@@ -248,16 +235,7 @@ is zero or if the quotient overflows.
 
 ## Function `create_from_rational`
 
-Create a fixed-point value from a rational number specified by its
-numerator and denominator. Calling this function should be preferred
-for using <code>Self::create_from_raw_value</code> which is also available.
-This will abort if the denominator is zero. It will also
-abort if the numerator is nonzero and the ratio is not in the range
-2^-64 .. 2^64-1. When specifying decimal fractions, be careful about
-rounding errors: if you round to display N digits after the decimal
-point, you can use a denominator of 10^N to avoid numbers where the
-very small imprecision in the binary representation could change the
-rounding, e.g., 0.0125 will round down to 0.012 instead of up to 0.013.
+Create a fixed&#45;point value from a rational number specified by its<br/> numerator and denominator. Calling this function should be preferred<br/> for using <code>Self::create_from_raw_value</code> which is also available.<br/> This will abort if the denominator is zero. It will also<br/> abort if the numerator is nonzero and the ratio is not in the range<br/> 2^&#45;64 .. 2^64&#45;1. When specifying decimal fractions, be careful about<br/> rounding errors: if you round to display N digits after the decimal<br/> point, you can use a denominator of 10^N to avoid numbers where the<br/> very small imprecision in the binary representation could change the<br/> rounding, e.g., 0.0125 will round down to 0.012 instead of up to 0.013.
 
 
 <pre><code>public fun create_from_rational(numerator: u128, denominator: u128): fixed_point64::FixedPoint64<br/></code></pre>
@@ -299,9 +277,7 @@ Create a fixedpoint value from a raw value.
 
 ## Function `get_raw_value`
 
-Accessor for the raw u128 value. Other less common operations, such as
-adding or subtracting FixedPoint64 values, can be done using the raw
-values directly.
+Accessor for the raw u128 value. Other less common operations, such as<br/> adding or subtracting FixedPoint64 values, can be done using the raw<br/> values directly.
 
 
 <pre><code>public fun get_raw_value(num: fixed_point64::FixedPoint64): u128<br/></code></pre>
@@ -385,7 +361,7 @@ Returns the larger of the two FixedPoint64 numbers.
 
 ## Function `less_or_equal`
 
-Returns true if num1 <= num2
+Returns true if num1 &lt;&#61; num2
 
 
 <pre><code>public fun less_or_equal(num1: fixed_point64::FixedPoint64, num2: fixed_point64::FixedPoint64): bool<br/></code></pre>
@@ -406,7 +382,7 @@ Returns true if num1 <= num2
 
 ## Function `less`
 
-Returns true if num1 < num2
+Returns true if num1 &lt; num2
 
 
 <pre><code>public fun less(num1: fixed_point64::FixedPoint64, num2: fixed_point64::FixedPoint64): bool<br/></code></pre>
@@ -427,7 +403,7 @@ Returns true if num1 < num2
 
 ## Function `greater_or_equal`
 
-Returns true if num1 >= num2
+Returns true if num1 &gt;&#61; num2
 
 
 <pre><code>public fun greater_or_equal(num1: fixed_point64::FixedPoint64, num2: fixed_point64::FixedPoint64): bool<br/></code></pre>
@@ -448,7 +424,7 @@ Returns true if num1 >= num2
 
 ## Function `greater`
 
-Returns true if num1 > num2
+Returns true if num1 &gt; num2
 
 
 <pre><code>public fun greater(num1: fixed_point64::FixedPoint64, num2: fixed_point64::FixedPoint64): bool<br/></code></pre>
@@ -469,7 +445,7 @@ Returns true if num1 > num2
 
 ## Function `equal`
 
-Returns true if num1 = num2
+Returns true if num1 &#61; num2
 
 
 <pre><code>public fun equal(num1: fixed_point64::FixedPoint64, num2: fixed_point64::FixedPoint64): bool<br/></code></pre>
@@ -490,7 +466,7 @@ Returns true if num1 = num2
 
 ## Function `almost_equal`
 
-Returns true if num1 almost equals to num2, which means abs(num1-num2) <= precision
+Returns true if num1 almost equals to num2, which means abs(num1&#45;num2) &lt;&#61; precision
 
 
 <pre><code>public fun almost_equal(num1: fixed_point64::FixedPoint64, num2: fixed_point64::FixedPoint64, precision: fixed_point64::FixedPoint64): bool<br/></code></pre>

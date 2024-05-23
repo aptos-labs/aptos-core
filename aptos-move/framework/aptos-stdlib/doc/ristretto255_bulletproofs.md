@@ -3,11 +3,7 @@
 
 # Module `0x1::ristretto255_bulletproofs`
 
-This module implements a Bulletproof range proof verifier on the Ristretto255 curve.
-
-A Bulletproof-based zero-knowledge range proof is a proof that a Pedersen commitment
-$c = v G + r H$ commits to an $n$-bit value $v$ (i.e., $v \in [0, 2^n)$). Currently, this module only supports
-$n \in \{8, 16, 32, 64\}$ for the number of bits.
+This module implements a Bulletproof range proof verifier on the Ristretto255 curve.<br/><br/> A Bulletproof&#45;based zero&#45;knowledge range proof is a proof that a Pedersen commitment<br/> $c &#61; v G &#43; r H$ commits to an $n$&#45;bit value $v$ (i.e., $v \in [0, 2^n)$). Currently, this module only supports<br/> $n \in \&#123;8, 16, 32, 64\&#125;$ for the number of bits.
 
 
 -  [Struct `RangeProof`](#0x1_ristretto255_bulletproofs_RangeProof)
@@ -30,8 +26,7 @@ $n \in \{8, 16, 32, 64\}$ for the number of bits.
 
 ## Struct `RangeProof`
 
-Represents a zero-knowledge range proof that a value committed inside a Pedersen commitment lies in
-<code>[0, 2^&#123;MAX_RANGE_BITS&#125;)</code>.
+Represents a zero&#45;knowledge range proof that a value committed inside a Pedersen commitment lies in<br/> <code>[0, 2^&#123;MAX_RANGE_BITS&#125;)</code>.
 
 
 <pre><code>struct RangeProof has copy, drop, store<br/></code></pre>
@@ -79,7 +74,7 @@ There was an error deserializing the range proof.
 
 <a id="0x1_ristretto255_bulletproofs_E_RANGE_NOT_SUPPORTED"></a>
 
-The range proof system only supports proving ranges of type $[0, 2^b)$ where $b \in \{8, 16, 32, 64\}$.
+The range proof system only supports proving ranges of type $[0, 2^b)$ where $b \in \&#123;8, 16, 32, 64\&#125;$.
 
 
 <pre><code>const E_RANGE_NOT_SUPPORTED: u64 &#61; 3;<br/></code></pre>
@@ -97,7 +92,7 @@ The committed value given to the prover is too large.
 
 <a id="0x1_ristretto255_bulletproofs_MAX_RANGE_BITS"></a>
 
-The maximum range supported by the Bulletproofs library is $[0, 2^{64})$.
+The maximum range supported by the Bulletproofs library is $[0, 2^&#123;64&#125;)$.
 
 
 <pre><code>const MAX_RANGE_BITS: u64 &#61; 64;<br/></code></pre>
@@ -108,7 +103,7 @@ The maximum range supported by the Bulletproofs library is $[0, 2^{64})$.
 
 ## Function `get_max_range_bits`
 
-Returns the maximum # of bits that the range proof system can verify proofs for.
+Returns the maximum &#35; of bits that the range proof system can verify proofs for.
 
 
 <pre><code>public fun get_max_range_bits(): u64<br/></code></pre>
@@ -129,8 +124,7 @@ Returns the maximum # of bits that the range proof system can verify proofs for.
 
 ## Function `range_proof_from_bytes`
 
-Deserializes a range proof from a sequence of bytes. The serialization format is the same as the format in
-the zkcrypto's <code>bulletproofs</code> library (https://docs.rs/bulletproofs/4.0.0/bulletproofs/struct.RangeProof.html#method.from_bytes).
+Deserializes a range proof from a sequence of bytes. The serialization format is the same as the format in<br/> the zkcrypto&apos;s <code>bulletproofs</code> library (https://docs.rs/bulletproofs/4.0.0/bulletproofs/struct.RangeProof.html&#35;method.from_bytes).
 
 
 <pre><code>public fun range_proof_from_bytes(bytes: vector&lt;u8&gt;): ristretto255_bulletproofs::RangeProof<br/></code></pre>
@@ -151,7 +145,7 @@ the zkcrypto's <code>bulletproofs</code> library (https://docs.rs/bulletproofs/4
 
 ## Function `range_proof_to_bytes`
 
-Returns the byte-representation of a range proof.
+Returns the byte&#45;representation of a range proof.
 
 
 <pre><code>public fun range_proof_to_bytes(proof: &amp;ristretto255_bulletproofs::RangeProof): vector&lt;u8&gt;<br/></code></pre>
@@ -172,12 +166,7 @@ Returns the byte-representation of a range proof.
 
 ## Function `verify_range_proof_pedersen`
 
-Verifies a zero-knowledge range proof that the value <code>v</code> committed in <code>com</code> (under the default Bulletproofs
-commitment key; see <code>pedersen::new_commitment_for_bulletproof</code>) satisfies $v \in [0, 2^b)$. Only works
-for $b \in \{8, 16, 32, 64\}$. Additionally, checks that the prover used <code>dst</code> as the domain-separation
-tag (DST).
-
-WARNING: The DST check is VERY important for security as it prevents proofs computed for one application
+Verifies a zero&#45;knowledge range proof that the value <code>v</code> committed in <code>com</code> (under the default Bulletproofs<br/> commitment key; see <code>pedersen::new_commitment_for_bulletproof</code>) satisfies $v \in [0, 2^b)$. Only works<br/> for $b \in \&#123;8, 16, 32, 64\&#125;$. Additionally, checks that the prover used <code>dst</code> as the domain&#45;separation<br/> tag (DST).<br/><br/> WARNING: The DST check is VERY important for security as it prevents proofs computed for one application
 (a.k.a., a _domain_) with <code>dst_1</code> from verifying in a different application with <code>dst_2 !&#61; dst_1</code>.
 
 
@@ -199,8 +188,7 @@ WARNING: The DST check is VERY important for security as it prevents proofs comp
 
 ## Function `verify_range_proof`
 
-Verifies a zero-knowledge range proof that the value <code>v</code> committed in <code>com</code> (as v * val_base + r * rand_base,
-for some randomness <code>r</code>) satisfies <code>v</code> in <code>[0, 2^num_bits)</code>. Only works for <code>num_bits</code> in <code>&#123;8, 16, 32, 64&#125;</code>.
+Verifies a zero&#45;knowledge range proof that the value <code>v</code> committed in <code>com</code> (as v &#42; val_base &#43; r &#42; rand_base,<br/> for some randomness <code>r</code>) satisfies <code>v</code> in <code>[0, 2^num_bits)</code>. Only works for <code>num_bits</code> in <code>&#123;8, 16, 32, 64&#125;</code>.
 
 
 <pre><code>public fun verify_range_proof(com: &amp;ristretto255::RistrettoPoint, val_base: &amp;ristretto255::RistrettoPoint, rand_base: &amp;ristretto255::RistrettoPoint, proof: &amp;ristretto255_bulletproofs::RangeProof, num_bits: u64, dst: vector&lt;u8&gt;): bool<br/></code></pre>
@@ -221,9 +209,7 @@ for some randomness <code>r</code>) satisfies <code>v</code> in <code>[0, 2^num_
 
 ## Function `verify_range_proof_internal`
 
-Aborts with <code>error::invalid_argument(E_DESERIALIZE_RANGE_PROOF)</code> if <code>proof</code> is not a valid serialization of a
-range proof.
-Aborts with <code>error::invalid_argument(E_RANGE_NOT_SUPPORTED)</code> if an unsupported <code>num_bits</code> is provided.
+Aborts with <code>error::invalid_argument(E_DESERIALIZE_RANGE_PROOF)</code> if <code>proof</code> is not a valid serialization of a<br/> range proof.<br/> Aborts with <code>error::invalid_argument(E_RANGE_NOT_SUPPORTED)</code> if an unsupported <code>num_bits</code> is provided.
 
 
 <pre><code>fun verify_range_proof_internal(com: vector&lt;u8&gt;, val_base: &amp;ristretto255::RistrettoPoint, rand_base: &amp;ristretto255::RistrettoPoint, proof: vector&lt;u8&gt;, num_bits: u64, dst: vector&lt;u8&gt;): bool<br/></code></pre>

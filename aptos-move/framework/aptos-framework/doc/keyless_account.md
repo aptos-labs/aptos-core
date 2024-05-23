@@ -3,8 +3,7 @@
 
 # Module `0x1::keyless_account`
 
-This module is responsible for configuring keyless blockchain accounts which were introduced in
-[AIP-61](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-61.md).
+This module is responsible for configuring keyless blockchain accounts which were introduced in<br/> [AIP&#45;61](https://github.com/aptos&#45;foundation/AIPs/blob/main/aips/aip&#45;61.md).
 
 
 -  [Struct `Group`](#0x1_keyless_account_Group)
@@ -64,7 +63,7 @@ This module is responsible for configuring keyless blockchain accounts which wer
 
 ## Resource `Groth16VerificationKey`
 
-The 288-byte Groth16 verification key (VK) for the ZK relation that implements keyless accounts
+The 288&#45;byte Groth16 verification key (VK) for the ZK relation that implements keyless accounts
 
 
 <pre><code>&#35;[resource_group_member(&#35;[group &#61; 0x1::keyless_account::Group])]<br/>struct Groth16VerificationKey has drop, store, key<br/></code></pre>
@@ -80,32 +79,31 @@ The 288-byte Groth16 verification key (VK) for the ZK relation that implements k
 <code>alpha_g1: vector&lt;u8&gt;</code>
 </dt>
 <dd>
- 32-byte serialization of <code>alpha &#42; G</code>, where <code>G</code> is the generator of <code>G1</code>.
+ 32&#45;byte serialization of <code>alpha &#42; G</code>, where <code>G</code> is the generator of <code>G1</code>.
 </dd>
 <dt>
 <code>beta_g2: vector&lt;u8&gt;</code>
 </dt>
 <dd>
- 64-byte serialization of <code>alpha &#42; H</code>, where <code>H</code> is the generator of <code>G2</code>.
+ 64&#45;byte serialization of <code>alpha &#42; H</code>, where <code>H</code> is the generator of <code>G2</code>.
 </dd>
 <dt>
 <code>gamma_g2: vector&lt;u8&gt;</code>
 </dt>
 <dd>
- 64-byte serialization of <code>gamma &#42; H</code>, where <code>H</code> is the generator of <code>G2</code>.
+ 64&#45;byte serialization of <code>gamma &#42; H</code>, where <code>H</code> is the generator of <code>G2</code>.
 </dd>
 <dt>
 <code>delta_g2: vector&lt;u8&gt;</code>
 </dt>
 <dd>
- 64-byte serialization of <code>delta &#42; H</code>, where <code>H</code> is the generator of <code>G2</code>.
+ 64&#45;byte serialization of <code>delta &#42; H</code>, where <code>H</code> is the generator of <code>G2</code>.
 </dd>
 <dt>
 <code>gamma_abc_g1: vector&lt;vector&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
- <code>\forall i \in &#123;0, ..., \ell&#125;, 64&#45;byte serialization of gamma^&#123;&#45;1&#125; &#42; (beta &#42; a_i &#43; alpha &#42; b_i &#43; c_i) &#42; H</code>, where
- <code>H</code> is the generator of <code>G1</code> and <code>\ell</code> is 1 for the ZK relation.
+ <code>\forall i \in &#123;0, ..., \ell&#125;, 64&#45;byte serialization of gamma^&#123;&#45;1&#125; &#42; (beta &#42; a_i &#43; alpha &#42; b_i &#43; c_i) &#42; H</code>, where<br/> <code>H</code> is the generator of <code>G1</code> and <code>\ell</code> is 1 for the ZK relation.
 </dd>
 </dl>
 
@@ -131,10 +129,7 @@ The 288-byte Groth16 verification key (VK) for the ZK relation that implements k
 <code>override_aud_vals: vector&lt;string::String&gt;</code>
 </dt>
 <dd>
- An override <code>aud</code> for the identity of a recovery service, which will help users recover their keyless accounts
- associated with dapps or wallets that have disappeared.
- IMPORTANT: This recovery service **cannot** on its own take over user accounts; a user must first sign in
- via OAuth in the recovery service in order to allow it to rotate any of that user's keyless accounts.
+ An override <code>aud</code> for the identity of a recovery service, which will help users recover their keyless accounts<br/> associated with dapps or wallets that have disappeared.<br/> IMPORTANT: This recovery service &#42;&#42;cannot&#42;&#42; on its own take over user accounts; a user must first sign in<br/> via OAuth in the recovery service in order to allow it to rotate any of that user&apos;s keyless accounts.
 </dd>
 <dt>
 <code>max_signatures_per_txn: u16</code>
@@ -164,7 +159,7 @@ The 288-byte Groth16 verification key (VK) for the ZK relation that implements k
 <code>max_iss_val_bytes: u16</code>
 </dt>
 <dd>
- The max length of the value of the JWT's <code>iss</code> field supported in our circuit (e.g., <code>&quot;https://accounts.google.com&quot;</code>)
+ The max length of the value of the JWT&apos;s <code>iss</code> field supported in our circuit (e.g., <code>&quot;https://accounts.google.com&quot;</code>)
 </dd>
 <dt>
 <code>max_extra_field_bytes: u16</code>
@@ -176,7 +171,7 @@ The 288-byte Groth16 verification key (VK) for the ZK relation that implements k
 <code>max_jwt_header_b64_bytes: u32</code>
 </dt>
 <dd>
- The max length of the base64url-encoded JWT header in bytes supported in our circuit
+ The max length of the base64url&#45;encoded JWT header in bytes supported in our circuit
 </dd>
 </dl>
 
@@ -259,7 +254,7 @@ The training wheels PK needs to be 32 bytes long.
 
 ## Function `validate_groth16_vk`
 
-Pre-validate the VK to actively-prevent incorrect VKs from being set on-chain.
+Pre&#45;validate the VK to actively&#45;prevent incorrect VKs from being set on&#45;chain.
 
 
 <pre><code>fun validate_groth16_vk(vk: &amp;keyless_account::Groth16VerificationKey)<br/></code></pre>
@@ -270,21 +265,7 @@ Pre-validate the VK to actively-prevent incorrect VKs from being set on-chain.
 <summary>Implementation</summary>
 
 
-<<<<<<< HEAD
-<pre><code><b>fun</b> <a href="keyless_account.md#0x1_keyless_account_validate_groth16_vk">validate_groth16_vk</a>(vk: &<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>) {
-    // Could be leveraged <b>to</b> speed up the VM deserialization of the VK by 2x, since it can <b>assume</b> the points are valid.
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G1">bn254_algebra::G1</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG1Compr">bn254_algebra::FormatG1Compr</a>&gt;(&vk.alpha_g1)), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G1_SERIALIZATION">E_INVALID_BN254_G1_SERIALIZATION</a>);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G2">bn254_algebra::G2</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG2Compr">bn254_algebra::FormatG2Compr</a>&gt;(&vk.beta_g2)), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G2_SERIALIZATION">E_INVALID_BN254_G2_SERIALIZATION</a>);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G2">bn254_algebra::G2</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG2Compr">bn254_algebra::FormatG2Compr</a>&gt;(&vk.gamma_g2)), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G2_SERIALIZATION">E_INVALID_BN254_G2_SERIALIZATION</a>);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G2">bn254_algebra::G2</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG2Compr">bn254_algebra::FormatG2Compr</a>&gt;(&vk.delta_g2)), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G2_SERIALIZATION">E_INVALID_BN254_G2_SERIALIZATION</a>);
-    for (i in 0..<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&vk.gamma_abc_g1)) {
-        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra_deserialize">crypto_algebra::deserialize</a>&lt;<a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_G1">bn254_algebra::G1</a>, <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra_FormatG1Compr">bn254_algebra::FormatG1Compr</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&vk.gamma_abc_g1, i))), <a href="keyless_account.md#0x1_keyless_account_E_INVALID_BN254_G1_SERIALIZATION">E_INVALID_BN254_G1_SERIALIZATION</a>);
-    };
-}
-</code></pre>
-=======
-<pre><code>fun validate_groth16_vk(vk: &amp;Groth16VerificationKey) &#123;<br/>    // Could be leveraged to speed up the VM deserialization of the VK by 2x, since it can assume the points are valid.<br/>    assert!(option::is_some(&amp;crypto_algebra::deserialize&lt;bn254_algebra::G1, bn254_algebra::FormatG1Compr&gt;(&amp;vk.alpha_g1)), E_INVALID_BN254_G1_SERIALIZATION);<br/>    assert!(option::is_some(&amp;crypto_algebra::deserialize&lt;bn254_algebra::G2, bn254_algebra::FormatG2Compr&gt;(&amp;vk.beta_g2)), E_INVALID_BN254_G2_SERIALIZATION);<br/>    assert!(option::is_some(&amp;crypto_algebra::deserialize&lt;bn254_algebra::G2, bn254_algebra::FormatG2Compr&gt;(&amp;vk.gamma_g2)), E_INVALID_BN254_G2_SERIALIZATION);<br/>    assert!(option::is_some(&amp;crypto_algebra::deserialize&lt;bn254_algebra::G2, bn254_algebra::FormatG2Compr&gt;(&amp;vk.delta_g2)), E_INVALID_BN254_G2_SERIALIZATION);<br/>    for(i in 0..vector::length(&amp;vk.gamma_abc_g1)) &#123;<br/>        assert!(option::is_some(&amp;crypto_algebra::deserialize&lt;bn254_algebra::G1, bn254_algebra::FormatG1Compr&gt;(vector::borrow(&amp;vk.gamma_abc_g1, i))), E_INVALID_BN254_G1_SERIALIZATION);<br/>    &#125;;<br/>&#125;<br/></code></pre>
->>>>>>> 836dec57a9 (mdx docs)
+<pre><code>fun validate_groth16_vk(vk: &amp;Groth16VerificationKey) &#123;<br/>    // Could be leveraged to speed up the VM deserialization of the VK by 2x, since it can assume the points are valid.<br/>    assert!(option::is_some(&amp;crypto_algebra::deserialize&lt;bn254_algebra::G1, bn254_algebra::FormatG1Compr&gt;(&amp;vk.alpha_g1)), E_INVALID_BN254_G1_SERIALIZATION);<br/>    assert!(option::is_some(&amp;crypto_algebra::deserialize&lt;bn254_algebra::G2, bn254_algebra::FormatG2Compr&gt;(&amp;vk.beta_g2)), E_INVALID_BN254_G2_SERIALIZATION);<br/>    assert!(option::is_some(&amp;crypto_algebra::deserialize&lt;bn254_algebra::G2, bn254_algebra::FormatG2Compr&gt;(&amp;vk.gamma_g2)), E_INVALID_BN254_G2_SERIALIZATION);<br/>    assert!(option::is_some(&amp;crypto_algebra::deserialize&lt;bn254_algebra::G2, bn254_algebra::FormatG2Compr&gt;(&amp;vk.delta_g2)), E_INVALID_BN254_G2_SERIALIZATION);<br/>    for (i in 0..vector::length(&amp;vk.gamma_abc_g1)) &#123;<br/>        assert!(option::is_some(&amp;crypto_algebra::deserialize&lt;bn254_algebra::G1, bn254_algebra::FormatG1Compr&gt;(vector::borrow(&amp;vk.gamma_abc_g1, i))), E_INVALID_BN254_G1_SERIALIZATION);<br/>    &#125;;<br/>&#125;<br/></code></pre>
 
 
 
@@ -294,10 +275,7 @@ Pre-validate the VK to actively-prevent incorrect VKs from being set on-chain.
 
 ## Function `update_groth16_verification_key`
 
-Sets the Groth16 verification key, only callable during genesis. To call during governance proposals, use
-<code>set_groth16_verification_key_for_next_epoch</code>.
-
-WARNING: See <code>set_groth16_verification_key_for_next_epoch</code> for caveats.
+Sets the Groth16 verification key, only callable during genesis. To call during governance proposals, use<br/> <code>set_groth16_verification_key_for_next_epoch</code>.<br/><br/> WARNING: See <code>set_groth16_verification_key_for_next_epoch</code> for caveats.
 
 
 <pre><code>public fun update_groth16_verification_key(fx: &amp;signer, vk: keyless_account::Groth16VerificationKey)<br/></code></pre>
@@ -318,10 +296,7 @@ WARNING: See <code>set_groth16_verification_key_for_next_epoch</code> for caveat
 
 ## Function `update_configuration`
 
-Sets the keyless configuration, only callable during genesis. To call during governance proposals, use
-<code>set_configuration_for_next_epoch</code>.
-
-WARNING: See <code>set_configuration_for_next_epoch</code> for caveats.
+Sets the keyless configuration, only callable during genesis. To call during governance proposals, use<br/> <code>set_configuration_for_next_epoch</code>.<br/><br/> WARNING: See <code>set_configuration_for_next_epoch</code> for caveats.
 
 
 <pre><code>public fun update_configuration(fx: &amp;signer, config: keyless_account::Configuration)<br/></code></pre>
@@ -422,13 +397,7 @@ WARNING: See <code>set_configuration_for_next_epoch</code> for caveats.
 
 ## Function `set_groth16_verification_key_for_next_epoch`
 
-Queues up a change to the Groth16 verification key. The change will only be effective after reconfiguration.
-Only callable via governance proposal.
-
-WARNING: To mitigate against DoS attacks, a VK change should be done together with a training wheels PK change,
-so that old ZKPs for the old VK cannot be replayed as potentially-valid ZKPs.
-
-WARNING: If a malicious key is set, this would lead to stolen funds.
+Queues up a change to the Groth16 verification key. The change will only be effective after reconfiguration.<br/> Only callable via governance proposal.<br/><br/> WARNING: To mitigate against DoS attacks, a VK change should be done together with a training wheels PK change,<br/> so that old ZKPs for the old VK cannot be replayed as potentially&#45;valid ZKPs.<br/><br/> WARNING: If a malicious key is set, this would lead to stolen funds.
 
 
 <pre><code>public fun set_groth16_verification_key_for_next_epoch(fx: &amp;signer, vk: keyless_account::Groth16VerificationKey)<br/></code></pre>
@@ -449,11 +418,7 @@ WARNING: If a malicious key is set, this would lead to stolen funds.
 
 ## Function `set_configuration_for_next_epoch`
 
-Queues up a change to the keyless configuration. The change will only be effective after reconfiguration. Only
-callable via governance proposal.
-
-WARNING: A malicious <code>Configuration</code> could lead to DoS attacks, create liveness issues, or enable a malicious
-recovery service provider to phish users' accounts.
+Queues up a change to the keyless configuration. The change will only be effective after reconfiguration. Only<br/> callable via governance proposal.<br/><br/> WARNING: A malicious <code>Configuration</code> could lead to DoS attacks, create liveness issues, or enable a malicious<br/> recovery service provider to phish users&apos; accounts.
 
 
 <pre><code>public fun set_configuration_for_next_epoch(fx: &amp;signer, config: keyless_account::Configuration)<br/></code></pre>
@@ -474,10 +439,7 @@ recovery service provider to phish users' accounts.
 
 ## Function `update_training_wheels_for_next_epoch`
 
-Convenience method to queue up a change to the training wheels PK. The change will only be effective after
-reconfiguration. Only callable via governance proposal.
-
-WARNING: If a malicious key is set, this *could* lead to stolen funds.
+Convenience method to queue up a change to the training wheels PK. The change will only be effective after<br/> reconfiguration. Only callable via governance proposal.<br/><br/> WARNING: If a malicious key is set, this &#42;could&#42; lead to stolen funds.
 
 
 <pre><code>public fun update_training_wheels_for_next_epoch(fx: &amp;signer, pk: option::Option&lt;vector&lt;u8&gt;&gt;)<br/></code></pre>
@@ -498,8 +460,7 @@ WARNING: If a malicious key is set, this *could* lead to stolen funds.
 
 ## Function `update_max_exp_horizon_for_next_epoch`
 
-Convenience method to queues up a change to the max expiration horizon. The change will only be effective after
-reconfiguration. Only callable via governance proposal.
+Convenience method to queues up a change to the max expiration horizon. The change will only be effective after<br/> reconfiguration. Only callable via governance proposal.
 
 
 <pre><code>public fun update_max_exp_horizon_for_next_epoch(fx: &amp;signer, max_exp_horizon_secs: u64)<br/></code></pre>
@@ -520,11 +481,7 @@ reconfiguration. Only callable via governance proposal.
 
 ## Function `remove_all_override_auds_for_next_epoch`
 
-Convenience method to queue up clearing the set of override <code>aud</code>'s. The change will only be effective after
-reconfiguration. Only callable via governance proposal.
-
-WARNING: When no override <code>aud</code> is set, recovery of keyless accounts associated with applications that disappeared
-is no longer possible.
+Convenience method to queue up clearing the set of override <code>aud</code>&apos;s. The change will only be effective after<br/> reconfiguration. Only callable via governance proposal.<br/><br/> WARNING: When no override <code>aud</code> is set, recovery of keyless accounts associated with applications that disappeared<br/> is no longer possible.
 
 
 <pre><code>public fun remove_all_override_auds_for_next_epoch(fx: &amp;signer)<br/></code></pre>
@@ -545,10 +502,7 @@ is no longer possible.
 
 ## Function `add_override_aud_for_next_epoch`
 
-Convenience method to queue up an append to to the set of override <code>aud</code>'s. The change will only be effective
-after reconfiguration. Only callable via governance proposal.
-
-WARNING: If a malicious override <code>aud</code> is set, this *could* lead to stolen funds.
+Convenience method to queue up an append to to the set of override <code>aud</code>&apos;s. The change will only be effective<br/> after reconfiguration. Only callable via governance proposal.<br/><br/> WARNING: If a malicious override <code>aud</code> is set, this &#42;could&#42; lead to stolen funds.
 
 
 <pre><code>public fun add_override_aud_for_next_epoch(fx: &amp;signer, aud: string::String)<br/></code></pre>
@@ -580,32 +534,7 @@ Only used in reconfigurations to apply the queued up configuration changes, if t
 <summary>Implementation</summary>
 
 
-<<<<<<< HEAD
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_on_new_epoch">on_new_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>, <a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
-
-    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>&gt;()) {
-        <b>let</b> vk = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>();
-        <b>if</b> (<b>exists</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>&gt;(@aptos_framework) = vk;
-        } <b>else</b> {
-            <b>move_to</b>(fx, vk);
-        }
-    };
-
-    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;()) {
-        <b>let</b> config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>();
-        <b>if</b> (<b>exists</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;(@aptos_framework) = config;
-        } <b>else</b> {
-            <b>move_to</b>(fx, config);
-        }
-    };
-}
-</code></pre>
-=======
-<pre><code>public(friend) fun on_new_epoch(fx: &amp;signer) acquires Groth16VerificationKey, Configuration &#123;<br/>    system_addresses::assert_aptos_framework(fx);<br/><br/>    if (config_buffer::does_exist&lt;Groth16VerificationKey&gt;()) &#123;<br/>        let vk &#61; config_buffer::extract();<br/>        if (exists&lt;Groth16VerificationKey&gt;(@aptos_framework)) &#123;<br/>            &#42;borrow_global_mut&lt;Groth16VerificationKey&gt;(@aptos_framework) &#61; vk;<br/>        &#125; else &#123;<br/>            move_to(fx, vk);<br/>        &#125;<br/>    &#125;;<br/><br/>    if(config_buffer::does_exist&lt;Configuration&gt;()) &#123;<br/>        let config &#61; config_buffer::extract();<br/>        if (exists&lt;Configuration&gt;(@aptos_framework)) &#123;<br/>            &#42;borrow_global_mut&lt;Configuration&gt;(@aptos_framework) &#61; config;<br/>        &#125; else &#123;<br/>            move_to(fx, config);<br/>        &#125;<br/>    &#125;;<br/>&#125;<br/></code></pre>
->>>>>>> 836dec57a9 (mdx docs)
+<pre><code>public(friend) fun on_new_epoch(fx: &amp;signer) acquires Groth16VerificationKey, Configuration &#123;<br/>    system_addresses::assert_aptos_framework(fx);<br/><br/>    if (config_buffer::does_exist&lt;Groth16VerificationKey&gt;()) &#123;<br/>        let vk &#61; config_buffer::extract();<br/>        if (exists&lt;Groth16VerificationKey&gt;(@aptos_framework)) &#123;<br/>            &#42;borrow_global_mut&lt;Groth16VerificationKey&gt;(@aptos_framework) &#61; vk;<br/>        &#125; else &#123;<br/>            move_to(fx, vk);<br/>        &#125;<br/>    &#125;;<br/><br/>    if (config_buffer::does_exist&lt;Configuration&gt;()) &#123;<br/>        let config &#61; config_buffer::extract();<br/>        if (exists&lt;Configuration&gt;(@aptos_framework)) &#123;<br/>            &#42;borrow_global_mut&lt;Configuration&gt;(@aptos_framework) &#61; config;<br/>        &#125; else &#123;<br/>            move_to(fx, config);<br/>        &#125;<br/>    &#125;;<br/>&#125;<br/></code></pre>
 
 
 

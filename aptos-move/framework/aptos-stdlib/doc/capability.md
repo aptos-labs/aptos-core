@@ -3,100 +3,14 @@
 
 # Module `0x1::capability`
 
-A module which defines the basic concept of
-[*capabilities*](https://en.wikipedia.org/wiki/Capability-based_security) for managing access control.
-
-EXPERIMENTAL
+A module which defines the basic concept of<br/> [&#42;capabilities&#42;](https://en.wikipedia.org/wiki/Capability&#45;based_security) for managing access control.<br/><br/> EXPERIMENTAL<br/><br/> &#35; Overview<br/><br/> A capability is a unforgeable token which testifies that a signer has authorized a certain operation.<br/> The token is valid during the transaction where it is obtained. Since the type <code>capability::Cap</code> has<br/> no ability to be stored in global memory, capabilities cannot leak out of a transaction. For every function<br/> called within a transaction which has a capability as a parameter, it is guaranteed that the capability<br/> has been obtained via a proper signer&#45;based authorization step previously in the transaction&apos;s execution.<br/><br/> &#35;&#35; Usage<br/><br/> Initializing and acquiring capabilities is usually encapsulated in a module with a type<br/> tag which can only be constructed by this module.<br/><br/> ```<br/> module Pkg::Feature &#123;<br/>   use std::capability::Cap;<br/><br/>   /// A type tag used in Cap&lt;Feature&gt;. Only this module can create an instance,<br/>   /// and there is no public function other than Self::acquire which returns a value of this type.<br/>   /// This way, this module has full control how Cap&lt;Feature&gt; is given out.<br/>   struct Feature has drop &#123;&#125;<br/><br/>   /// Initializes this module.<br/>   public fun initialize(s: &amp;signer) &#123;<br/>     // Create capability. This happens once at module initialization time.<br/>     // One needs to provide a witness for being the owner of Feature<br/>     // in the 2nd parameter.<br/>     &lt;&lt;additional conditions allowing to initialize this capability&gt;&gt;<br/>     capability::create&lt;Feature&gt;(s, &amp;Feature&#123;&#125;);<br/>   &#125;<br/><br/>   /// Acquires the capability to work with this feature.<br/>   public fun acquire(s: &amp;signer): Cap&lt;Feature&gt; &#123;<br/>     &lt;&lt;additional conditions allowing to acquire this capability&gt;&gt;<br/>     capability::acquire&lt;Feature&gt;(s, &amp;Feature&#123;&#125;);<br/>   &#125;<br/><br/>   /// Does something related to the feature. The caller must pass a Cap&lt;Feature&gt;.<br/>   public fun do_something(_cap: Cap&lt;Feature&gt;) &#123; ... &#125;<br/> &#125;<br/> ```<br/><br/> &#35;&#35; Delegation<br/><br/> Capabilities come with the optional feature of &#42;delegation&#42;. Via <code>Self::delegate</code>, an owner of a capability<br/> can designate another signer to be also capable of acquiring the capability. Like the original creator,<br/> the delegate needs to present his signer to obtain the capability in his transactions. Delegation can<br/> be revoked via <code>Self::revoke</code>, removing this access right from the delegate.<br/><br/> While the basic authorization mechanism for delegates is the same as with core capabilities, the<br/> target of delegation might be subject of restrictions which need to be specified and verified. This can<br/> be done via global invariants in the specification language. For example, in order to prevent delegation<br/> all together for a capability, one can use the following invariant:<br/><br/> ```<br/>   invariant forall a: address where capability::spec_has_cap&lt;Feature&gt;(a):<br/>               len(capability::spec_delegates&lt;Feature&gt;(a)) &#61;&#61; 0;<br/> ```<br/><br/> Similarly, the following invariant would enforce that delegates, if existent, must satisfy a certain<br/> predicate:<br/><br/> ```<br/>   invariant forall a: address where capability::spec_has_cap&lt;Feature&gt;(a):<br/>               forall d in capability::spec_delegates&lt;Feature&gt;(a):<br/>                  is_valid_delegate_for_feature(d);<br/> ```<br/>
 
 
-<a id="@Overview_0"></a>
-
-## Overview
-
-
-A capability is a unforgeable token which testifies that a signer has authorized a certain operation.
-The token is valid during the transaction where it is obtained. Since the type <code>capability::Cap</code> has
-no ability to be stored in global memory, capabilities cannot leak out of a transaction. For every function
-called within a transaction which has a capability as a parameter, it is guaranteed that the capability
-has been obtained via a proper signer-based authorization step previously in the transaction's execution.
-
-
-<a id="@Usage_1"></a>
-
-### Usage
-
-
-Initializing and acquiring capabilities is usually encapsulated in a module with a type
-tag which can only be constructed by this module.
-
-```
-module Pkg::Feature {
-use std::capability::Cap;
-
-/// A type tag used in Cap<Feature>. Only this module can create an instance,
-/// and there is no public function other than Self::acquire which returns a value of this type.
-/// This way, this module has full control how Cap<Feature> is given out.
-struct Feature has drop {}
-
-/// Initializes this module.
-public fun initialize(s: &signer) {
-// Create capability. This happens once at module initialization time.
-// One needs to provide a witness for being the owner of Feature
-// in the 2nd parameter.
-<<additional conditions allowing to initialize this capability>>
-capability::create<Feature>(s, &Feature{});
-}
-
-/// Acquires the capability to work with this feature.
-public fun acquire(s: &signer): Cap<Feature> {
-<<additional conditions allowing to acquire this capability>>
-capability::acquire<Feature>(s, &Feature{});
-}
-
-/// Does something related to the feature. The caller must pass a Cap<Feature>.
-public fun do_something(_cap: Cap<Feature>) { ... }
-}
-```
-
-
-<a id="@Delegation_2"></a>
-
-### Delegation
-
-
-Capabilities come with the optional feature of *delegation*. Via <code>Self::delegate</code>, an owner of a capability
-can designate another signer to be also capable of acquiring the capability. Like the original creator,
-the delegate needs to present his signer to obtain the capability in his transactions. Delegation can
-be revoked via <code>Self::revoke</code>, removing this access right from the delegate.
-
-While the basic authorization mechanism for delegates is the same as with core capabilities, the
-target of delegation might be subject of restrictions which need to be specified and verified. This can
-be done via global invariants in the specification language. For example, in order to prevent delegation
-all together for a capability, one can use the following invariant:
-
-```
-invariant forall a: address where capability::spec_has_cap<Feature>(a):
-len(capability::spec_delegates<Feature>(a)) == 0;
-```
-
-Similarly, the following invariant would enforce that delegates, if existent, must satisfy a certain
-predicate:
-
-```
-invariant forall a: address where capability::spec_has_cap<Feature>(a):
-forall d in capability::spec_delegates<Feature>(a):
-is_valid_delegate_for_feature(d);
-```
-
-
--  [Overview](#@Overview_0)
-    -  [Usage](#@Usage_1)
-    -  [Delegation](#@Delegation_2)
 -  [Struct `Cap`](#0x1_capability_Cap)
 -  [Struct `LinearCap`](#0x1_capability_LinearCap)
 -  [Resource `CapState`](#0x1_capability_CapState)
 -  [Resource `CapDelegateState`](#0x1_capability_CapDelegateState)
--  [Constants](#@Constants_3)
+-  [Constants](#@Constants_0)
 -  [Function `create`](#0x1_capability_create)
 -  [Function `acquire`](#0x1_capability_acquire)
 -  [Function `acquire_linear`](#0x1_capability_acquire_linear)
@@ -107,14 +21,14 @@ is_valid_delegate_for_feature(d);
 -  [Function `revoke`](#0x1_capability_revoke)
 -  [Function `remove_element`](#0x1_capability_remove_element)
 -  [Function `add_element`](#0x1_capability_add_element)
--  [Specification](#@Specification_4)
-    -  [Function `create`](#@Specification_4_create)
-    -  [Function `acquire`](#@Specification_4_acquire)
-    -  [Function `acquire_linear`](#@Specification_4_acquire_linear)
-    -  [Function `delegate`](#@Specification_4_delegate)
-    -  [Function `revoke`](#@Specification_4_revoke)
-    -  [Function `remove_element`](#@Specification_4_remove_element)
-    -  [Function `add_element`](#@Specification_4_add_element)
+-  [Specification](#@Specification_1)
+    -  [Function `create`](#@Specification_1_create)
+    -  [Function `acquire`](#@Specification_1_acquire)
+    -  [Function `acquire_linear`](#@Specification_1_acquire_linear)
+    -  [Function `delegate`](#@Specification_1_delegate)
+    -  [Function `revoke`](#@Specification_1_revoke)
+    -  [Function `remove_element`](#@Specification_1_remove_element)
+    -  [Function `add_element`](#@Specification_1_add_element)
 
 
 <pre><code>use 0x1::error;<br/>use 0x1::signer;<br/>use 0x1::vector;<br/></code></pre>
@@ -152,8 +66,7 @@ The token representing an acquired capability. Cannot be stored in memory, but c
 
 ## Struct `LinearCap`
 
-A linear version of a capability token. This can be used if an acquired capability should be enforced
-to be used only once for an authorization.
+A linear version of a capability token. This can be used if an acquired capability should be enforced<br/> to be used only once for an authorization.
 
 
 <pre><code>struct LinearCap&lt;Feature&gt; has drop<br/></code></pre>
@@ -230,7 +143,7 @@ An internal data structure for representing a configured delegated capability.
 
 </details>
 
-<a id="@Constants_3"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
@@ -266,8 +179,7 @@ Account does not have delegated permissions
 
 ## Function `create`
 
-Creates a new capability class, owned by the passed signer. A caller must pass a witness that
-they own the <code>Feature</code> type parameter.
+Creates a new capability class, owned by the passed signer. A caller must pass a witness that<br/> they own the <code>Feature</code> type parameter.
 
 
 <pre><code>public fun create&lt;Feature&gt;(owner: &amp;signer, _feature_witness: &amp;Feature)<br/></code></pre>
@@ -288,9 +200,7 @@ they own the <code>Feature</code> type parameter.
 
 ## Function `acquire`
 
-Acquires a capability token. Only the owner of the capability class, or an authorized delegate,
-can succeed with this operation. A caller must pass a witness that they own the <code>Feature</code> type
-parameter.
+Acquires a capability token. Only the owner of the capability class, or an authorized delegate,<br/> can succeed with this operation. A caller must pass a witness that they own the <code>Feature</code> type<br/> parameter.
 
 
 <pre><code>public fun acquire&lt;Feature&gt;(requester: &amp;signer, _feature_witness: &amp;Feature): capability::Cap&lt;Feature&gt;<br/></code></pre>
@@ -311,8 +221,7 @@ parameter.
 
 ## Function `acquire_linear`
 
-Acquires a linear capability token. It is up to the module which owns <code>Feature</code> to decide
-whether to expose a linear or non-linear capability.
+Acquires a linear capability token. It is up to the module which owns <code>Feature</code> to decide<br/> whether to expose a linear or non&#45;linear capability.
 
 
 <pre><code>public fun acquire_linear&lt;Feature&gt;(requester: &amp;signer, _feature_witness: &amp;Feature): capability::LinearCap&lt;Feature&gt;<br/></code></pre>
@@ -354,8 +263,7 @@ Helper to validate an acquire. Returns the root address of the capability.
 
 ## Function `root_addr`
 
-Returns the root address associated with the given capability token. Only the owner
-of the feature can do this.
+Returns the root address associated with the given capability token. Only the owner<br/> of the feature can do this.
 
 
 <pre><code>public fun root_addr&lt;Feature&gt;(cap: capability::Cap&lt;Feature&gt;, _feature_witness: &amp;Feature): address<br/></code></pre>
@@ -397,8 +305,7 @@ Returns the root address associated with the given linear capability token.
 
 ## Function `delegate`
 
-Registers a delegation relation. If the relation already exists, this function does
-nothing.
+Registers a delegation relation. If the relation already exists, this function does<br/> nothing.
 
 
 <pre><code>public fun delegate&lt;Feature&gt;(cap: capability::Cap&lt;Feature&gt;, _feature_witness: &amp;Feature, to: &amp;signer)<br/></code></pre>
@@ -478,7 +385,7 @@ Helper to add an element to a vector.
 
 </details>
 
-<a id="@Specification_4"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -510,7 +417,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a id="@Specification_4_create"></a>
+<a id="@Specification_1_create"></a>
 
 ### Function `create`
 
@@ -524,7 +431,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a id="@Specification_4_acquire"></a>
+<a id="@Specification_1_acquire"></a>
 
 ### Function `acquire`
 
@@ -538,7 +445,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a id="@Specification_4_acquire_linear"></a>
+<a id="@Specification_1_acquire_linear"></a>
 
 ### Function `acquire_linear`
 
@@ -560,7 +467,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a id="@Specification_4_delegate"></a>
+<a id="@Specification_1_delegate"></a>
 
 ### Function `delegate`
 
@@ -574,7 +481,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a id="@Specification_4_revoke"></a>
+<a id="@Specification_1_revoke"></a>
 
 ### Function `revoke`
 
@@ -588,7 +495,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a id="@Specification_4_remove_element"></a>
+<a id="@Specification_1_remove_element"></a>
 
 ### Function `remove_element`
 
@@ -598,7 +505,7 @@ Helper specification function to check whether a delegated capability exists at 
 
 
 
-<a id="@Specification_4_add_element"></a>
+<a id="@Specification_1_add_element"></a>
 
 ### Function `add_element`
 

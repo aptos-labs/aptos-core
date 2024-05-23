@@ -3,44 +3,7 @@
 
 # Module `0x1::ristretto255`
 
-This module contains functions for Ristretto255 curve arithmetic, assuming addition as the group operation.
-
-The order of the Ristretto255 elliptic curve group is $\ell = 2^252 + 27742317777372353535851937790883648493$, same
-as the order of the prime-order subgroup of Curve25519.
-
-This module provides two structs for encoding Ristretto elliptic curves to the developer:
-
-- First, a 32-byte-sized CompressedRistretto struct, which is used to persist points in storage.
-
-- Second, a larger, in-memory, RistrettoPoint struct, which is decompressable from a CompressedRistretto struct. This
-larger struct can be used for fast arithmetic operations (additions, multiplications, etc.). The results can be saved
-back into storage by compressing RistrettoPoint structs back to CompressedRistretto structs.
-
-This module also provides a Scalar struct for persisting scalars in storage and doing fast arithmetic on them.
-
-One invariant maintained by this module is that all CompressedRistretto structs store a canonically-encoded point,
-which can always be decompressed into a valid point on the curve as a RistrettoPoint struct. Unfortunately, due to
-limitations in our underlying curve25519-dalek elliptic curve library, this decompression will unnecessarily verify
-the validity of the point and thus slightly decrease performance.
-
-Similarly, all Scalar structs store a canonically-encoded scalar, which can always be safely operated on using
-arithmetic operations.
-
-In the future, we might support additional features:
-
-* For scalars:
-- batch_invert()
-
-* For points:
-- double()
-+ The challenge is that curve25519-dalek does NOT export double for Ristretto points (nor for Edwards)
-
-- double_and_compress_batch()
-
-- fixed-base, variable-time via optional_mixed_multiscalar_mul() in VartimePrecomputedMultiscalarMul
-+ This would require a storage-friendly RistrettoBasepointTable and an in-memory variant of it too
-+ Similar to the CompressedRistretto and RistrettoPoint structs in this module
-+ The challenge is that curve25519-dalek's RistrettoBasepointTable is not serializable
+This module contains functions for Ristretto255 curve arithmetic, assuming addition as the group operation.<br/><br/> The order of the Ristretto255 elliptic curve group is $\ell &#61; 2^252 &#43; 27742317777372353535851937790883648493$, same<br/> as the order of the prime&#45;order subgroup of Curve25519.<br/><br/> This module provides two structs for encoding Ristretto elliptic curves to the developer:<br/><br/>  &#45; First, a 32&#45;byte&#45;sized CompressedRistretto struct, which is used to persist points in storage.<br/><br/>  &#45; Second, a larger, in&#45;memory, RistrettoPoint struct, which is decompressable from a CompressedRistretto struct. This<br/> larger struct can be used for fast arithmetic operations (additions, multiplications, etc.). The results can be saved<br/> back into storage by compressing RistrettoPoint structs back to CompressedRistretto structs.<br/><br/> This module also provides a Scalar struct for persisting scalars in storage and doing fast arithmetic on them.<br/><br/> One invariant maintained by this module is that all CompressedRistretto structs store a canonically&#45;encoded point,<br/> which can always be decompressed into a valid point on the curve as a RistrettoPoint struct. Unfortunately, due to<br/> limitations in our underlying curve25519&#45;dalek elliptic curve library, this decompression will unnecessarily verify<br/> the validity of the point and thus slightly decrease performance.<br/><br/> Similarly, all Scalar structs store a canonically&#45;encoded scalar, which can always be safely operated on using<br/> arithmetic operations.<br/><br/> In the future, we might support additional features:<br/><br/> &#42; For scalars:<br/>    &#45; batch_invert()<br/><br/>  &#42; For points:<br/>    &#45; double()<br/>      &#43; The challenge is that curve25519&#45;dalek does NOT export double for Ristretto points (nor for Edwards)<br/><br/>    &#45; double_and_compress_batch()<br/><br/>    &#45; fixed&#45;base, variable&#45;time via optional_mixed_multiscalar_mul() in VartimePrecomputedMultiscalarMul<br/>      &#43; This would require a storage&#45;friendly RistrettoBasepointTable and an in&#45;memory variant of it too<br/>      &#43; Similar to the CompressedRistretto and RistrettoPoint structs in this module<br/>      &#43; The challenge is that curve25519&#45;dalek&apos;s RistrettoBasepointTable is not serializable
 
 
 -  [Struct `Scalar`](#0x1_ristretto255_Scalar)
@@ -126,7 +89,6 @@ In the future, we might support additional features:
 -  [Function `scalar_sub_internal`](#0x1_ristretto255_scalar_sub_internal)
 -  [Function `scalar_neg_internal`](#0x1_ristretto255_scalar_neg_internal)
 -  [Specification](#@Specification_1)
-    -  [Helper functions](#@Helper_functions_2)
     -  [Function `point_equals`](#@Specification_1_point_equals)
     -  [Function `double_scalar_mul`](#@Specification_1_double_scalar_mul)
     -  [Function `multi_scalar_mul`](#@Specification_1_multi_scalar_mul)
@@ -189,8 +151,7 @@ In the future, we might support additional features:
 
 ## Struct `Scalar`
 
-This struct represents a scalar as a little-endian byte encoding of an integer in $\mathbb{Z}_\ell$, which is
-stored in <code>data</code>. Here, \ell denotes the order of the scalar field (and the underlying elliptic curve group).
+This struct represents a scalar as a little&#45;endian byte encoding of an integer in $\mathbb&#123;Z&#125;_\ell$, which is<br/> stored in <code>data</code>. Here, \ell denotes the order of the scalar field (and the underlying elliptic curve group).
 
 
 <pre><code>struct Scalar has copy, drop, store<br/></code></pre>
@@ -217,9 +178,7 @@ stored in <code>data</code>. Here, \ell denotes the order of the scalar field (a
 
 ## Struct `CompressedRistretto`
 
-This struct represents a serialized point on the Ristretto255 curve, in 32 bytes.
-This struct can be decompressed from storage into an in-memory RistrettoPoint, on which fast curve arithmetic
-can be performed.
+This struct represents a serialized point on the Ristretto255 curve, in 32 bytes.<br/> This struct can be decompressed from storage into an in&#45;memory RistrettoPoint, on which fast curve arithmetic<br/> can be performed.
 
 
 <pre><code>struct CompressedRistretto has copy, drop, store<br/></code></pre>
@@ -246,10 +205,7 @@ can be performed.
 
 ## Struct `RistrettoPoint`
 
-This struct represents an in-memory Ristretto255 point and supports fast curve arithmetic.
-
-An important invariant: There will never be two RistrettoPoint's constructed with the same handle. One can have
-immutable references to the same RistrettoPoint, of course.
+This struct represents an in&#45;memory Ristretto255 point and supports fast curve arithmetic.<br/><br/> An important invariant: There will never be two RistrettoPoint&apos;s constructed with the same handle. One can have<br/> immutable references to the same RistrettoPoint, of course.
 
 
 <pre><code>struct RistrettoPoint has drop<br/></code></pre>
@@ -342,7 +298,7 @@ The hash of the basepoint of the Ristretto255 group using SHA3_512
 
 <a id="0x1_ristretto255_L_MINUS_ONE"></a>
 
-<code>ORDER_ELL</code> - 1: i.e., the "largest", reduced scalar in the field
+<code>ORDER_ELL</code> &#45; 1: i.e., the &quot;largest&quot;, reduced scalar in the field
 
 
 <pre><code>const L_MINUS_ONE: vector&lt;u8&gt; &#61; [236, 211, 245, 92, 26, 99, 18, 88, 214, 156, 247, 162, 222, 249, 222, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16];<br/></code></pre>
@@ -351,7 +307,7 @@ The hash of the basepoint of the Ristretto255 group using SHA3_512
 
 <a id="0x1_ristretto255_MAX_POINT_NUM_BYTES"></a>
 
-The maximum size in bytes of a canonically-encoded Ristretto255 point is 32 bytes.
+The maximum size in bytes of a canonically&#45;encoded Ristretto255 point is 32 bytes.
 
 
 <pre><code>const MAX_POINT_NUM_BYTES: u64 &#61; 32;<br/></code></pre>
@@ -360,7 +316,7 @@ The maximum size in bytes of a canonically-encoded Ristretto255 point is 32 byte
 
 <a id="0x1_ristretto255_MAX_SCALAR_NUM_BITS"></a>
 
-The maximum size in bits of a canonically-encoded Scalar is 256 bits.
+The maximum size in bits of a canonically&#45;encoded Scalar is 256 bits.
 
 
 <pre><code>const MAX_SCALAR_NUM_BITS: u64 &#61; 256;<br/></code></pre>
@@ -369,7 +325,7 @@ The maximum size in bits of a canonically-encoded Scalar is 256 bits.
 
 <a id="0x1_ristretto255_MAX_SCALAR_NUM_BYTES"></a>
 
-The maximum size in bytes of a canonically-encoded Scalar is 32 bytes.
+The maximum size in bytes of a canonically&#45;encoded Scalar is 32 bytes.
 
 
 <pre><code>const MAX_SCALAR_NUM_BYTES: u64 &#61; 32;<br/></code></pre>
@@ -378,7 +334,7 @@ The maximum size in bytes of a canonically-encoded Scalar is 32 bytes.
 
 <a id="0x1_ristretto255_ORDER_ELL"></a>
 
-The order of the Ristretto255 group and its scalar field, in little-endian.
+The order of the Ristretto255 group and its scalar field, in little&#45;endian.
 
 
 <pre><code>const ORDER_ELL: vector&lt;u8&gt; &#61; [237, 211, 245, 92, 26, 99, 18, 88, 214, 156, 247, 162, 222, 249, 222, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16];<br/></code></pre>
@@ -452,8 +408,7 @@ Returns the basepoint (generator) of the Ristretto255 group as a compressed poin
 
 ## Function `hash_to_point_base`
 
-Returns the hash-to-point result of serializing the basepoint of the Ristretto255 group.
-For use as the random value basepoint in Pedersen commitments
+Returns the hash&#45;to&#45;point result of serializing the basepoint of the Ristretto255 group.<br/> For use as the random value basepoint in Pedersen commitments
 
 
 <pre><code>public fun hash_to_point_base(): ristretto255::RistrettoPoint<br/></code></pre>
@@ -495,8 +450,7 @@ Returns the basepoint (generator) of the Ristretto255 group
 
 ## Function `basepoint_mul`
 
-Multiplies the basepoint (generator) of the Ristretto255 group by a scalar and returns the result.
-This call is much faster than <code>point_mul(&amp;basepoint(), &amp;some_scalar)</code> because of precomputation tables.
+Multiplies the basepoint (generator) of the Ristretto255 group by a scalar and returns the result.<br/> This call is much faster than <code>point_mul(&amp;basepoint(), &amp;some_scalar)</code> because of precomputation tables.
 
 
 <pre><code>public fun basepoint_mul(a: &amp;ristretto255::Scalar): ristretto255::RistrettoPoint<br/></code></pre>
@@ -517,8 +471,7 @@ This call is much faster than <code>point_mul(&amp;basepoint(), &amp;some_scalar
 
 ## Function `new_compressed_point_from_bytes`
 
-Creates a new CompressedRistretto point from a sequence of 32 bytes. If those bytes do not represent a valid
-point, returns None.
+Creates a new CompressedRistretto point from a sequence of 32 bytes. If those bytes do not represent a valid<br/> point, returns None.
 
 
 <pre><code>public fun new_compressed_point_from_bytes(bytes: vector&lt;u8&gt;): option::Option&lt;ristretto255::CompressedRistretto&gt;<br/></code></pre>
@@ -539,8 +492,7 @@ point, returns None.
 
 ## Function `new_point_from_bytes`
 
-Creates a new RistrettoPoint from a sequence of 32 bytes. If those bytes do not represent a valid point,
-returns None.
+Creates a new RistrettoPoint from a sequence of 32 bytes. If those bytes do not represent a valid point,<br/> returns None.
 
 
 <pre><code>public fun new_point_from_bytes(bytes: vector&lt;u8&gt;): option::Option&lt;ristretto255::RistrettoPoint&gt;<br/></code></pre>
@@ -582,9 +534,7 @@ Given a compressed ristretto point <code>point</code>, returns the byte represen
 
 ## Function `new_point_from_sha512`
 
-DEPRECATED: Use the more clearly-named <code>new_point_from_sha2_512</code>
-
-Hashes the input to a uniformly-at-random RistrettoPoint via SHA512.
+DEPRECATED: Use the more clearly&#45;named <code>new_point_from_sha2_512</code><br/><br/> Hashes the input to a uniformly&#45;at&#45;random RistrettoPoint via SHA512.
 
 
 <pre><code>public fun new_point_from_sha512(sha2_512_input: vector&lt;u8&gt;): ristretto255::RistrettoPoint<br/></code></pre>
@@ -605,7 +555,7 @@ Hashes the input to a uniformly-at-random RistrettoPoint via SHA512.
 
 ## Function `new_point_from_sha2_512`
 
-Hashes the input to a uniformly-at-random RistrettoPoint via SHA2-512.
+Hashes the input to a uniformly&#45;at&#45;random RistrettoPoint via SHA2&#45;512.
 
 
 <pre><code>public fun new_point_from_sha2_512(sha2_512_input: vector&lt;u8&gt;): ristretto255::RistrettoPoint<br/></code></pre>
@@ -626,8 +576,7 @@ Hashes the input to a uniformly-at-random RistrettoPoint via SHA2-512.
 
 ## Function `new_point_from_64_uniform_bytes`
 
-Samples a uniformly-at-random RistrettoPoint given a sequence of 64 uniformly-at-random bytes. This function
-can be used to build a collision-resistant hash function that maps 64-byte messages to RistrettoPoint's.
+Samples a uniformly&#45;at&#45;random RistrettoPoint given a sequence of 64 uniformly&#45;at&#45;random bytes. This function<br/> can be used to build a collision&#45;resistant hash function that maps 64&#45;byte messages to RistrettoPoint&apos;s.
 
 
 <pre><code>public fun new_point_from_64_uniform_bytes(bytes: vector&lt;u8&gt;): option::Option&lt;ristretto255::RistrettoPoint&gt;<br/></code></pre>
@@ -711,9 +660,7 @@ Compresses a RistrettoPoint to a CompressedRistretto which can be put in storage
 
 ## Function `point_to_bytes`
 
-Returns the sequence of bytes representin this Ristretto point.
-To convert a RistrettoPoint 'p' to bytes, first compress it via <code>c &#61; point_compress(&amp;p)</code>, and then call this
-function on <code>c</code>.
+Returns the sequence of bytes representin this Ristretto point.<br/> To convert a RistrettoPoint &apos;p&apos; to bytes, first compress it via <code>c &#61; point_compress(&amp;p)</code>, and then call this<br/> function on <code>c</code>.
 
 
 <pre><code>public fun point_to_bytes(point: &amp;ristretto255::CompressedRistretto): vector&lt;u8&gt;<br/></code></pre>
@@ -734,7 +681,7 @@ function on <code>c</code>.
 
 ## Function `point_mul`
 
-Returns a * point.
+Returns a &#42; point.
 
 
 <pre><code>public fun point_mul(point: &amp;ristretto255::RistrettoPoint, a: &amp;ristretto255::Scalar): ristretto255::RistrettoPoint<br/></code></pre>
@@ -755,7 +702,7 @@ Returns a * point.
 
 ## Function `point_mul_assign`
 
-Sets a *= point and returns 'a'.
+Sets a &#42;&#61; point and returns &apos;a&apos;.
 
 
 <pre><code>public fun point_mul_assign(point: &amp;mut ristretto255::RistrettoPoint, a: &amp;ristretto255::Scalar): &amp;mut ristretto255::RistrettoPoint<br/></code></pre>
@@ -776,7 +723,7 @@ Sets a *= point and returns 'a'.
 
 ## Function `basepoint_double_mul`
 
-Returns (a * a_base + b * base_point), where base_point is the Ristretto basepoint encoded in <code>BASE_POINT</code>.
+Returns (a &#42; a_base &#43; b &#42; base_point), where base_point is the Ristretto basepoint encoded in <code>BASE_POINT</code>.
 
 
 <pre><code>public fun basepoint_double_mul(a: &amp;ristretto255::Scalar, a_base: &amp;ristretto255::RistrettoPoint, b: &amp;ristretto255::Scalar): ristretto255::RistrettoPoint<br/></code></pre>
@@ -797,7 +744,7 @@ Returns (a * a_base + b * base_point), where base_point is the Ristretto basepoi
 
 ## Function `point_add`
 
-Returns a + b
+Returns a &#43; b
 
 
 <pre><code>public fun point_add(a: &amp;ristretto255::RistrettoPoint, b: &amp;ristretto255::RistrettoPoint): ristretto255::RistrettoPoint<br/></code></pre>
@@ -818,7 +765,7 @@ Returns a + b
 
 ## Function `point_add_assign`
 
-Sets a += b and returns 'a'.
+Sets a &#43;&#61; b and returns &apos;a&apos;.
 
 
 <pre><code>public fun point_add_assign(a: &amp;mut ristretto255::RistrettoPoint, b: &amp;ristretto255::RistrettoPoint): &amp;mut ristretto255::RistrettoPoint<br/></code></pre>
@@ -839,7 +786,7 @@ Sets a += b and returns 'a'.
 
 ## Function `point_sub`
 
-Returns a - b
+Returns a &#45; b
 
 
 <pre><code>public fun point_sub(a: &amp;ristretto255::RistrettoPoint, b: &amp;ristretto255::RistrettoPoint): ristretto255::RistrettoPoint<br/></code></pre>
@@ -860,7 +807,7 @@ Returns a - b
 
 ## Function `point_sub_assign`
 
-Sets a -= b and returns 'a'.
+Sets a &#45;&#61; b and returns &apos;a&apos;.
 
 
 <pre><code>public fun point_sub_assign(a: &amp;mut ristretto255::RistrettoPoint, b: &amp;ristretto255::RistrettoPoint): &amp;mut ristretto255::RistrettoPoint<br/></code></pre>
@@ -881,7 +828,7 @@ Sets a -= b and returns 'a'.
 
 ## Function `point_neg`
 
-Returns -a
+Returns &#45;a
 
 
 <pre><code>public fun point_neg(a: &amp;ristretto255::RistrettoPoint): ristretto255::RistrettoPoint<br/></code></pre>
@@ -902,7 +849,7 @@ Returns -a
 
 ## Function `point_neg_assign`
 
-Sets a = -a, and returns 'a'.
+Sets a &#61; &#45;a, and returns &apos;a&apos;.
 
 
 <pre><code>public fun point_neg_assign(a: &amp;mut ristretto255::RistrettoPoint): &amp;mut ristretto255::RistrettoPoint<br/></code></pre>
@@ -944,8 +891,7 @@ Returns true if the two RistrettoPoints are the same points on the elliptic curv
 
 ## Function `double_scalar_mul`
 
-Computes a double-scalar multiplication, returning a_1 p_1 + a_2 p_2
-This function is much faster than computing each a_i p_i using <code>point_mul</code> and adding up the results using <code>point_add</code>.
+Computes a double&#45;scalar multiplication, returning a_1 p_1 &#43; a_2 p_2<br/> This function is much faster than computing each a_i p_i using <code>point_mul</code> and adding up the results using <code>point_add</code>.
 
 
 <pre><code>public fun double_scalar_mul(scalar1: &amp;ristretto255::Scalar, point1: &amp;ristretto255::RistrettoPoint, scalar2: &amp;ristretto255::Scalar, point2: &amp;ristretto255::RistrettoPoint): ristretto255::RistrettoPoint<br/></code></pre>
@@ -966,8 +912,7 @@ This function is much faster than computing each a_i p_i using <code>point_mul</
 
 ## Function `multi_scalar_mul`
 
-Computes a multi-scalar multiplication, returning a_1 p_1 + a_2 p_2 + ... + a_n p_n.
-This function is much faster than computing each a_i p_i using <code>point_mul</code> and adding up the results using <code>point_add</code>.
+Computes a multi&#45;scalar multiplication, returning a_1 p_1 &#43; a_2 p_2 &#43; ... &#43; a_n p_n.<br/> This function is much faster than computing each a_i p_i using <code>point_mul</code> and adding up the results using <code>point_add</code>.
 
 
 <pre><code>public fun multi_scalar_mul(points: &amp;vector&lt;ristretto255::RistrettoPoint&gt;, scalars: &amp;vector&lt;ristretto255::Scalar&gt;): ristretto255::RistrettoPoint<br/></code></pre>
@@ -988,8 +933,7 @@ This function is much faster than computing each a_i p_i using <code>point_mul</
 
 ## Function `new_scalar_from_bytes`
 
-Given a sequence of 32 bytes, checks if they canonically-encode a Scalar and return it.
-Otherwise, returns None.
+Given a sequence of 32 bytes, checks if they canonically&#45;encode a Scalar and return it.<br/> Otherwise, returns None.
 
 
 <pre><code>public fun new_scalar_from_bytes(bytes: vector&lt;u8&gt;): option::Option&lt;ristretto255::Scalar&gt;<br/></code></pre>
@@ -1010,9 +954,7 @@ Otherwise, returns None.
 
 ## Function `new_scalar_from_sha512`
 
-DEPRECATED: Use the more clearly-named <code>new_scalar_from_sha2_512</code>
-
-Hashes the input to a uniformly-at-random Scalar via SHA2-512
+DEPRECATED: Use the more clearly&#45;named <code>new_scalar_from_sha2_512</code><br/><br/> Hashes the input to a uniformly&#45;at&#45;random Scalar via SHA2&#45;512
 
 
 <pre><code>public fun new_scalar_from_sha512(sha2_512_input: vector&lt;u8&gt;): ristretto255::Scalar<br/></code></pre>
@@ -1033,7 +975,7 @@ Hashes the input to a uniformly-at-random Scalar via SHA2-512
 
 ## Function `new_scalar_from_sha2_512`
 
-Hashes the input to a uniformly-at-random Scalar via SHA2-512
+Hashes the input to a uniformly&#45;at&#45;random Scalar via SHA2&#45;512
 
 
 <pre><code>public fun new_scalar_from_sha2_512(sha2_512_input: vector&lt;u8&gt;): ristretto255::Scalar<br/></code></pre>
@@ -1138,7 +1080,7 @@ Creates a Scalar from an u128.
 
 ## Function `new_scalar_reduced_from_32_bytes`
 
-Creates a Scalar from 32 bytes by reducing the little-endian-encoded number in those bytes modulo $\ell$.
+Creates a Scalar from 32 bytes by reducing the little&#45;endian&#45;encoded number in those bytes modulo $\ell$.
 
 
 <pre><code>public fun new_scalar_reduced_from_32_bytes(bytes: vector&lt;u8&gt;): option::Option&lt;ristretto255::Scalar&gt;<br/></code></pre>
@@ -1159,8 +1101,7 @@ Creates a Scalar from 32 bytes by reducing the little-endian-encoded number in t
 
 ## Function `new_scalar_uniform_from_64_bytes`
 
-Samples a scalar uniformly-at-random given 64 uniform-at-random bytes as input by reducing the little-endian-encoded number
-in those bytes modulo $\ell$.
+Samples a scalar uniformly&#45;at&#45;random given 64 uniform&#45;at&#45;random bytes as input by reducing the little&#45;endian&#45;encoded number<br/> in those bytes modulo $\ell$.
 
 
 <pre><code>public fun new_scalar_uniform_from_64_bytes(bytes: vector&lt;u8&gt;): option::Option&lt;ristretto255::Scalar&gt;<br/></code></pre>
@@ -1286,8 +1227,7 @@ Returns true if the two scalars are equal.
 
 ## Function `scalar_invert`
 
-Returns the inverse s^{-1} mod \ell of a scalar s.
-Returns None if s is zero.
+Returns the inverse s^&#123;&#45;1&#125; mod \ell of a scalar s.<br/> Returns None if s is zero.
 
 
 <pre><code>public fun scalar_invert(s: &amp;ristretto255::Scalar): option::Option&lt;ristretto255::Scalar&gt;<br/></code></pre>
@@ -1329,8 +1269,7 @@ Returns the product of the two scalars.
 
 ## Function `scalar_mul_assign`
 
-Computes the product of 'a' and 'b' and assigns the result to 'a'.
-Returns 'a'.
+Computes the product of &apos;a&apos; and &apos;b&apos; and assigns the result to &apos;a&apos;.<br/> Returns &apos;a&apos;.
 
 
 <pre><code>public fun scalar_mul_assign(a: &amp;mut ristretto255::Scalar, b: &amp;ristretto255::Scalar): &amp;mut ristretto255::Scalar<br/></code></pre>
@@ -1372,8 +1311,7 @@ Returns the sum of the two scalars.
 
 ## Function `scalar_add_assign`
 
-Computes the sum of 'a' and 'b' and assigns the result to 'a'
-Returns 'a'.
+Computes the sum of &apos;a&apos; and &apos;b&apos; and assigns the result to &apos;a&apos;<br/> Returns &apos;a&apos;.
 
 
 <pre><code>public fun scalar_add_assign(a: &amp;mut ristretto255::Scalar, b: &amp;ristretto255::Scalar): &amp;mut ristretto255::Scalar<br/></code></pre>
@@ -1415,8 +1353,7 @@ Returns the difference of the two scalars.
 
 ## Function `scalar_sub_assign`
 
-Subtracts 'b' from 'a' and assigns the result to 'a'.
-Returns 'a'.
+Subtracts &apos;b&apos; from &apos;a&apos; and assigns the result to &apos;a&apos;.<br/> Returns &apos;a&apos;.
 
 
 <pre><code>public fun scalar_sub_assign(a: &amp;mut ristretto255::Scalar, b: &amp;ristretto255::Scalar): &amp;mut ristretto255::Scalar<br/></code></pre>
@@ -1437,7 +1374,7 @@ Returns 'a'.
 
 ## Function `scalar_neg`
 
-Returns the negation of 'a': i.e., $(0 - a) \mod \ell$.
+Returns the negation of &apos;a&apos;: i.e., $(0 &#45; a) \mod \ell$.
 
 
 <pre><code>public fun scalar_neg(a: &amp;ristretto255::Scalar): ristretto255::Scalar<br/></code></pre>
@@ -1458,8 +1395,7 @@ Returns the negation of 'a': i.e., $(0 - a) \mod \ell$.
 
 ## Function `scalar_neg_assign`
 
-Replaces 'a' by its negation.
-Returns 'a'.
+Replaces &apos;a&apos; by its negation.<br/>  Returns &apos;a&apos;.
 
 
 <pre><code>public fun scalar_neg_assign(a: &amp;mut ristretto255::Scalar): &amp;mut ristretto255::Scalar<br/></code></pre>
@@ -1480,7 +1416,7 @@ Returns 'a'.
 
 ## Function `scalar_to_bytes`
 
-Returns the byte-representation of the scalar.
+Returns the byte&#45;representation of the scalar.
 
 
 <pre><code>public fun scalar_to_bytes(s: &amp;ristretto255::Scalar): vector&lt;u8&gt;<br/></code></pre>
@@ -1781,10 +1717,7 @@ Returns the byte-representation of the scalar.
 
 ## Function `multi_scalar_mul_internal`
 
-The generic arguments are needed to deal with some Move VM peculiarities which prevent us from borrowing the
-points (or scalars) inside a &vector in Rust.
-
-WARNING: This function can only be called with P = RistrettoPoint and S = Scalar.
+The generic arguments are needed to deal with some Move VM peculiarities which prevent us from borrowing the<br/> points (or scalars) inside a &amp;vector in Rust.<br/><br/> WARNING: This function can only be called with P &#61; RistrettoPoint and S &#61; Scalar.
 
 
 <pre><code>fun multi_scalar_mul_internal&lt;P, S&gt;(points: &amp;vector&lt;P&gt;, scalars: &amp;vector&lt;S&gt;): u64<br/></code></pre>
@@ -2025,11 +1958,7 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 ## Specification
 
-
-<a id="@Helper_functions_2"></a>
-
-### Helper functions
-
+&#35; Helper functions
 
 
 <a id="0x1_ristretto255_spec_scalar_is_zero"></a>

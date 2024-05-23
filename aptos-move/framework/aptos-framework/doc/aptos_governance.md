@@ -3,17 +3,7 @@
 
 # Module `0x1::aptos_governance`
 
-
-AptosGovernance represents the on-chain governance of the Aptos network. Voting power is calculated based on the
-current epoch's voting power of the proposer or voter's backing stake pool. In addition, for it to count,
-the stake pool's lockup needs to be at least as long as the proposal's duration.
-
-It provides the following flow:
-1. Proposers can create a proposal by calling AptosGovernance::create_proposal. The proposer's backing stake pool
-needs to have the minimum proposer stake required. Off-chain components can subscribe to CreateProposalEvent to
-track proposal creation and proposal ids.
-2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. A stake pool can vote
-on a proposal multiple times as long as the total voting power of these votes doesn't exceed its total voting power.
+<br/> AptosGovernance represents the on&#45;chain governance of the Aptos network. Voting power is calculated based on the<br/> current epoch&apos;s voting power of the proposer or voter&apos;s backing stake pool. In addition, for it to count,<br/> the stake pool&apos;s lockup needs to be at least as long as the proposal&apos;s duration.<br/><br/> It provides the following flow:<br/> 1. Proposers can create a proposal by calling AptosGovernance::create_proposal. The proposer&apos;s backing stake pool<br/> needs to have the minimum proposer stake required. Off&#45;chain components can subscribe to CreateProposalEvent to<br/> track proposal creation and proposal ids.<br/> 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. A stake pool can vote<br/> on a proposal multiple times as long as the total voting power of these votes doesn&apos;t exceed its total voting power.
 
 
 -  [Resource `GovernanceResponsbility`](#0x1_aptos_governance_GovernanceResponsbility)
@@ -103,7 +93,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 
 ## Resource `GovernanceResponsbility`
 
-Store the SignerCapabilities of accounts under the on-chain governance's control.
+Store the SignerCapabilities of accounts under the on&#45;chain governance&apos;s control.
 
 
 <pre><code>struct GovernanceResponsbility has key<br/></code></pre>
@@ -130,8 +120,7 @@ Store the SignerCapabilities of accounts under the on-chain governance's control
 
 ## Resource `GovernanceConfig`
 
-Configurations of the AptosGovernance, set during Genesis and can be updated by the same process offered
-by this AptosGovernance module.
+Configurations of the AptosGovernance, set during Genesis and can be updated by the same process offered<br/> by this AptosGovernance module.
 
 
 <pre><code>struct GovernanceConfig has key<br/></code></pre>
@@ -256,8 +245,7 @@ Records to track the voting power usage of each stake pool on each proposal.
 
 ## Resource `ApprovedExecutionHashes`
 
-Used to track which execution script hashes have been approved by governance.
-This is required to bypass cases where the execution scripts exceed the size limit imposed by mempool.
+Used to track which execution script hashes have been approved by governance.<br/> This is required to bypass cases where the execution scripts exceed the size limit imposed by mempool.
 
 
 <pre><code>struct ApprovedExecutionHashes has key<br/></code></pre>
@@ -374,7 +362,7 @@ Event emitted when a proposal is created.
 
 ## Struct `VoteEvent`
 
-Event emitted when there's a vote on a proposa;
+Event emitted when there&apos;s a vote on a proposa;
 
 
 <pre><code>struct VoteEvent has drop, store<br/></code></pre>
@@ -515,7 +503,7 @@ Event emitted when a proposal is created.
 
 ## Struct `Vote`
 
-Event emitted when there's a vote on a proposa;
+Event emitted when there&apos;s a vote on a proposa;
 
 
 <pre><code>&#35;[event]<br/>struct Vote has drop, store<br/></code></pre>
@@ -616,7 +604,7 @@ Event emitted when the governance configs are updated.
 
 <a id="0x1_aptos_governance_PROPOSAL_STATE_SUCCEEDED"></a>
 
-This matches the same enum const in voting. We have to duplicate it as Move doesn't have support for enums yet.
+This matches the same enum const in voting. We have to duplicate it as Move doesn&apos;t have support for enums yet.
 
 
 <pre><code>const PROPOSAL_STATE_SUCCEEDED: u64 &#61; 1;<br/></code></pre>
@@ -697,7 +685,7 @@ The specified stake pool must be part of the validator set
 
 <a id="0x1_aptos_governance_EPARTIAL_VOTING_NOT_INITIALIZED"></a>
 
-Partial voting feature hasn't been properly initialized.
+Partial voting feature hasn&apos;t been properly initialized.
 
 
 <pre><code>const EPARTIAL_VOTING_NOT_INITIALIZED: u64 &#61; 13;<br/></code></pre>
@@ -761,8 +749,7 @@ Proposal metadata attribute keys.
 
 ## Function `store_signer_cap`
 
-Can be called during genesis or by the governance itself.
-Stores the signer capability for a given address.
+Can be called during genesis or by the governance itself.<br/> Stores the signer capability for a given address.
 
 
 <pre><code>public fun store_signer_cap(aptos_framework: &amp;signer, signer_address: address, signer_cap: account::SignerCapability)<br/></code></pre>
@@ -783,9 +770,7 @@ Stores the signer capability for a given address.
 
 ## Function `initialize`
 
-Initializes the state for Aptos Governance. Can only be called during Genesis with a signer
-for the aptos_framework (0x1) account.
-This function is private because it's called directly from the vm.
+Initializes the state for Aptos Governance. Can only be called during Genesis with a signer<br/> for the aptos_framework (0x1) account.<br/> This function is private because it&apos;s called directly from the vm.
 
 
 <pre><code>fun initialize(aptos_framework: &amp;signer, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64)<br/></code></pre>
@@ -806,8 +791,7 @@ This function is private because it's called directly from the vm.
 
 ## Function `update_governance_config`
 
-Update the governance configurations. This can only be called as part of resolving a proposal in this same
-AptosGovernance.
+Update the governance configurations. This can only be called as part of resolving a proposal in this same<br/> AptosGovernance.
 
 
 <pre><code>public fun update_governance_config(aptos_framework: &amp;signer, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64)<br/></code></pre>
@@ -828,8 +812,7 @@ AptosGovernance.
 
 ## Function `initialize_partial_voting`
 
-Initializes the state for Aptos Governance partial voting. Can only be called through Aptos governance
-proposals with a signer for the aptos_framework (0x1) account.
+Initializes the state for Aptos Governance partial voting. Can only be called through Aptos governance<br/> proposals with a signer for the aptos_framework (0x1) account.
 
 
 <pre><code>public fun initialize_partial_voting(aptos_framework: &amp;signer)<br/></code></pre>
@@ -931,8 +914,7 @@ Return true if a stake pool has already voted on a proposal before partial gover
 
 ## Function `get_remaining_voting_power`
 
-Return remaining voting power of a stake pool on a proposal.
-Note: a stake pool's voting power on a proposal could increase over time(e.g. rewards/new stake).
+Return remaining voting power of a stake pool on a proposal.<br/> Note: a stake pool&apos;s voting power on a proposal could increase over time(e.g. rewards/new stake).
 
 
 <pre><code>&#35;[view]<br/>public fun get_remaining_voting_power(stake_pool: address, proposal_id: u64): u64<br/></code></pre>
@@ -953,9 +935,7 @@ Note: a stake pool's voting power on a proposal could increase over time(e.g. re
 
 ## Function `create_proposal`
 
-Create a single-step proposal with the backing <code>stake_pool</code>.
-@param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
-only the exact script with matching hash can be successfully executed.
+Create a single&#45;step proposal with the backing <code>stake_pool</code>.<br/> @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,<br/> only the exact script with matching hash can be successfully executed.
 
 
 <pre><code>public entry fun create_proposal(proposer: &amp;signer, stake_pool: address, execution_hash: vector&lt;u8&gt;, metadata_location: vector&lt;u8&gt;, metadata_hash: vector&lt;u8&gt;)<br/></code></pre>
@@ -976,9 +956,7 @@ only the exact script with matching hash can be successfully executed.
 
 ## Function `create_proposal_v2`
 
-Create a single-step or multi-step proposal with the backing <code>stake_pool</code>.
-@param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
-only the exact script with matching hash can be successfully executed.
+Create a single&#45;step or multi&#45;step proposal with the backing <code>stake_pool</code>.<br/> @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,<br/> only the exact script with matching hash can be successfully executed.
 
 
 <pre><code>public entry fun create_proposal_v2(proposer: &amp;signer, stake_pool: address, execution_hash: vector&lt;u8&gt;, metadata_location: vector&lt;u8&gt;, metadata_hash: vector&lt;u8&gt;, is_multi_step_proposal: bool)<br/></code></pre>
@@ -999,10 +977,7 @@ only the exact script with matching hash can be successfully executed.
 
 ## Function `create_proposal_v2_impl`
 
-Create a single-step or multi-step proposal with the backing <code>stake_pool</code>.
-@param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
-only the exact script with matching hash can be successfully executed.
-Return proposal_id when a proposal is successfully created.
+Create a single&#45;step or multi&#45;step proposal with the backing <code>stake_pool</code>.<br/> @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,<br/> only the exact script with matching hash can be successfully executed.<br/> Return proposal_id when a proposal is successfully created.
 
 
 <pre><code>public fun create_proposal_v2_impl(proposer: &amp;signer, stake_pool: address, execution_hash: vector&lt;u8&gt;, metadata_location: vector&lt;u8&gt;, metadata_hash: vector&lt;u8&gt;, is_multi_step_proposal: bool): u64<br/></code></pre>
@@ -1065,10 +1040,7 @@ Vote on proposal with <code>proposal_id</code> and specified voting power from <
 
 ## Function `vote_internal`
 
-Vote on proposal with <code>proposal_id</code> and specified voting_power from <code>stake_pool</code>.
-If voting_power is more than all the left voting power of <code>stake_pool</code>, use all the left voting power.
-If a stake pool has already voted on a proposal before partial governance voting is enabled, the stake pool
-cannot vote on the proposal even after partial governance voting is enabled.
+Vote on proposal with <code>proposal_id</code> and specified voting_power from <code>stake_pool</code>.<br/> If voting_power is more than all the left voting power of <code>stake_pool</code>, use all the left voting power.<br/> If a stake pool has already voted on a proposal before partial governance voting is enabled, the stake pool<br/> cannot vote on the proposal even after partial governance voting is enabled.
 
 
 <pre><code>fun vote_internal(voter: &amp;signer, stake_pool: address, proposal_id: u64, voting_power: u64, should_pass: bool)<br/></code></pre>
@@ -1109,9 +1081,7 @@ cannot vote on the proposal even after partial governance voting is enabled.
 
 ## Function `add_approved_script_hash`
 
-Add the execution script hash of a successful governance proposal to the approved list.
-This is needed to bypass the mempool transaction size limit for approved governance proposal transactions that
-are too large (e.g. module upgrades).
+Add the execution script hash of a successful governance proposal to the approved list.<br/> This is needed to bypass the mempool transaction size limit for approved governance proposal transactions that<br/> are too large (e.g. module upgrades).
 
 
 <pre><code>public fun add_approved_script_hash(proposal_id: u64)<br/></code></pre>
@@ -1132,8 +1102,7 @@ are too large (e.g. module upgrades).
 
 ## Function `resolve`
 
-Resolve a successful single-step proposal. This would fail if the proposal is not successful (not enough votes or more no
-than yes).
+Resolve a successful single&#45;step proposal. This would fail if the proposal is not successful (not enough votes or more no<br/> than yes).
 
 
 <pre><code>public fun resolve(proposal_id: u64, signer_address: address): signer<br/></code></pre>
@@ -1154,7 +1123,7 @@ than yes).
 
 ## Function `resolve_multi_step_proposal`
 
-Resolve a successful multi-step proposal. This would fail if the proposal is not successful.
+Resolve a successful multi&#45;step proposal. This would fail if the proposal is not successful.
 
 
 <pre><code>public fun resolve_multi_step_proposal(proposal_id: u64, signer_address: address, next_execution_hash: vector&lt;u8&gt;): signer<br/></code></pre>
@@ -1175,7 +1144,7 @@ Resolve a successful multi-step proposal. This would fail if the proposal is not
 
 ## Function `remove_approved_hash`
 
-Remove an approved proposal's execution script hash.
+Remove an approved proposal&apos;s execution script hash.
 
 
 <pre><code>public fun remove_approved_hash(proposal_id: u64)<br/></code></pre>
@@ -1196,15 +1165,7 @@ Remove an approved proposal's execution script hash.
 
 ## Function `reconfigure`
 
-Manually reconfigure. Called at the end of a governance txn that alters on-chain configs.
-
-WARNING: this function always ensures a reconfiguration starts, but when the reconfiguration finishes depends.
-- If feature <code>RECONFIGURE_WITH_DKG</code> is disabled, it finishes immediately.
-- At the end of the calling transaction, we will be in a new epoch.
-- If feature <code>RECONFIGURE_WITH_DKG</code> is enabled, it starts DKG, and the new epoch will start in a block prologue after DKG finishes.
-
-This behavior affects when an update of an on-chain config (e.g. <code>ConsensusConfig</code>, <code>Features</code>) takes effect,
-since such updates are applied whenever we enter an new epoch.
+Manually reconfigure. Called at the end of a governance txn that alters on&#45;chain configs.<br/><br/> WARNING: this function always ensures a reconfiguration starts, but when the reconfiguration finishes depends.<br/> &#45; If feature <code>RECONFIGURE_WITH_DKG</code> is disabled, it finishes immediately.<br/>   &#45; At the end of the calling transaction, we will be in a new epoch.<br/> &#45; If feature <code>RECONFIGURE_WITH_DKG</code> is enabled, it starts DKG, and the new epoch will start in a block prologue after DKG finishes.<br/><br/> This behavior affects when an update of an on&#45;chain config (e.g. <code>ConsensusConfig</code>, <code>Features</code>) takes effect,<br/> since such updates are applied whenever we enter an new epoch.
 
 
 <pre><code>public entry fun reconfigure(aptos_framework: &amp;signer)<br/></code></pre>
@@ -1225,12 +1186,7 @@ since such updates are applied whenever we enter an new epoch.
 
 ## Function `force_end_epoch`
 
-Change epoch immediately.
-If <code>RECONFIGURE_WITH_DKG</code> is enabled and we are in the middle of a DKG,
-stop waiting for DKG and enter the new epoch without randomness.
-
-WARNING: currently only used by tests. In most cases you should use <code>reconfigure()</code> instead.
-TODO: migrate these tests to be aware of async reconfiguration.
+Change epoch immediately.<br/> If <code>RECONFIGURE_WITH_DKG</code> is enabled and we are in the middle of a DKG,<br/> stop waiting for DKG and enter the new epoch without randomness.<br/><br/> WARNING: currently only used by tests. In most cases you should use <code>reconfigure()</code> instead.<br/> TODO: migrate these tests to be aware of async reconfiguration.
 
 
 <pre><code>public entry fun force_end_epoch(aptos_framework: &amp;signer)<br/></code></pre>
@@ -1251,8 +1207,7 @@ TODO: migrate these tests to be aware of async reconfiguration.
 
 ## Function `force_end_epoch_test_only`
 
-<code>force_end_epoch()</code> equivalent but only called in testnet,
-where the core resources account exists and has been granted power to mint Aptos coins.
+<code>force_end_epoch()</code> equivalent but only called in testnet,<br/> where the core resources account exists and has been granted power to mint Aptos coins.
 
 
 <pre><code>public entry fun force_end_epoch_test_only(aptos_framework: &amp;signer)<br/></code></pre>
@@ -1336,7 +1291,7 @@ Return the voting power a stake pool has with respect to governance proposals.
 
 ## Function `get_signer`
 
-Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
+Return a signer for making changes to 0x1 as part of on&#45;chain governance proposal process.
 
 
 <pre><code>fun get_signer(signer_address: address): signer<br/></code></pre>
@@ -1424,46 +1379,19 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>The create proposal function calls create proposal v2.</td>
-<td>Low</td>
-<td>The create_proposal function internally calls create_proposal_v2.</td>
-<td>This is manually audited to ensure create_proposal_v2 is called in create_proposal.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The create proposal function calls create proposal v2.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The create_proposal function internally calls create_proposal_v2.&lt;/td&gt;<br/>&lt;td&gt;This is manually audited to ensure create_proposal_v2 is called in create_proposal.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The proposer must have a stake equal to or greater than the required bond amount.</td>
-<td>High</td>
-<td>The create_proposal_v2 function verifies that the stake balance equals or exceeds the required proposer stake amount.</td>
-<td>Formally verified in <a href="#high-level-req-2">CreateProposalAbortsIf</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The proposer must have a stake equal to or greater than the required bond amount.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The create_proposal_v2 function verifies that the stake balance equals or exceeds the required proposer stake amount.&lt;/td&gt;<br/>&lt;td&gt;Formally verified in &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;CreateProposalAbortsIf&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>The Approved execution hashes resources that exist when the vote function is called.</td>
-<td>Low</td>
-<td>The Vote function acquires the Approved execution hashes resources.</td>
-<td>Formally verified in <a href="#high-level-req-3">VoteAbortIf</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The Approved execution hashes resources that exist when the vote function is called.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The Vote function acquires the Approved execution hashes resources.&lt;/td&gt;<br/>&lt;td&gt;Formally verified in &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;VoteAbortIf&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>The execution script hash of a successful governance proposal is added to the approved list if the proposal can be resolved.</td>
-<td>Medium</td>
-<td>The add_approved_script_hash function asserts that proposal_state == PROPOSAL_STATE_SUCCEEDED.</td>
-<td>Formally verified in <a href="#high-level-req-4">AddApprovedScriptHash</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The execution script hash of a successful governance proposal is added to the approved list if the proposal can be resolved.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The add_approved_script_hash function asserts that proposal_state &#61;&#61; PROPOSAL_STATE_SUCCEEDED.&lt;/td&gt;<br/>&lt;td&gt;Formally verified in &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;AddApprovedScriptHash&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -1497,10 +1425,7 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 <pre><code>fun initialize(aptos_framework: &amp;signer, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64)<br/></code></pre>
 
 
-Signer address must be @aptos_framework.
-The signer does not allow these resources (GovernanceProposal, GovernanceConfig, GovernanceEvents, VotingRecords, ApprovedExecutionHashes) to exist.
-The signer must have an Account.
-Limit addition overflow.
+Signer address must be @aptos_framework.<br/> The signer does not allow these resources (GovernanceProposal, GovernanceConfig, GovernanceEvents, VotingRecords, ApprovedExecutionHashes) to exist.<br/> The signer must have an Account.<br/> Limit addition overflow.
 
 
 <pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>let register_account &#61; global&lt;account::Account&gt;(addr);<br/>aborts_if exists&lt;voting::VotingForum&lt;GovernanceProposal&gt;&gt;(addr);<br/>aborts_if !exists&lt;account::Account&gt;(addr);<br/>aborts_if register_account.guid_creation_num &#43; 7 &gt; MAX_U64;<br/>aborts_if register_account.guid_creation_num &#43; 7 &gt;&#61; account::MAX_GUID_CREATION_NUM;<br/>aborts_if !type_info::spec_is_struct&lt;GovernanceProposal&gt;();<br/>include InitializeAbortIf;<br/>ensures exists&lt;voting::VotingForum&lt;governance_proposal::GovernanceProposal&gt;&gt;(addr);<br/>ensures exists&lt;GovernanceConfig&gt;(addr);<br/>ensures exists&lt;GovernanceEvents&gt;(addr);<br/>ensures exists&lt;VotingRecords&gt;(addr);<br/>ensures exists&lt;ApprovedExecutionHashes&gt;(addr);<br/></code></pre>
@@ -1515,8 +1440,7 @@ Limit addition overflow.
 <pre><code>public fun update_governance_config(aptos_framework: &amp;signer, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64)<br/></code></pre>
 
 
-Signer address must be @aptos_framework.
-Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
+Signer address must be @aptos_framework.<br/> Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
 
 
 <pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>let governance_config &#61; global&lt;GovernanceConfig&gt;(@aptos_framework);<br/>let post new_governance_config &#61; global&lt;GovernanceConfig&gt;(@aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if !exists&lt;GovernanceConfig&gt;(@aptos_framework);<br/>aborts_if !exists&lt;GovernanceEvents&gt;(@aptos_framework);<br/>modifies global&lt;GovernanceConfig&gt;(addr);<br/>ensures new_governance_config.voting_duration_secs &#61;&#61; voting_duration_secs;<br/>ensures new_governance_config.min_voting_threshold &#61;&#61; min_voting_threshold;<br/>ensures new_governance_config.required_proposer_stake &#61;&#61; required_proposer_stake;<br/></code></pre>
@@ -1531,8 +1455,7 @@ Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
 <pre><code>public fun initialize_partial_voting(aptos_framework: &amp;signer)<br/></code></pre>
 
 
-Signer address must be @aptos_framework.
-Abort if structs have already been created.
+Signer address must be @aptos_framework.<br/> Abort if structs have already been created.
 
 
 <pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if exists&lt;VotingRecordsV2&gt;(@aptos_framework);<br/>ensures exists&lt;VotingRecordsV2&gt;(@aptos_framework);<br/></code></pre>
@@ -1700,9 +1623,7 @@ The same as spec of <code>create_proposal_v2()</code>.
 <pre><code>public entry fun vote(voter: &amp;signer, stake_pool: address, proposal_id: u64, should_pass: bool)<br/></code></pre>
 
 
-stake_pool must exist StakePool.
-The delegated voter under the resource StakePool of the stake_pool must be the voter address.
-Address @aptos_framework must exist VotingRecords and GovernanceProposal.
+stake_pool must exist StakePool.<br/> The delegated voter under the resource StakePool of the stake_pool must be the voter address.<br/> Address @aptos_framework must exist VotingRecords and GovernanceProposal.
 
 
 <pre><code>pragma verify_duration_estimate &#61; 60;<br/>requires chain_status::is_operating();<br/>include VoteAbortIf  &#123;<br/>    voting_power: MAX_U64<br/>&#125;;<br/></code></pre>
@@ -1717,10 +1638,7 @@ Address @aptos_framework must exist VotingRecords and GovernanceProposal.
 <pre><code>public entry fun partial_vote(voter: &amp;signer, stake_pool: address, proposal_id: u64, voting_power: u64, should_pass: bool)<br/></code></pre>
 
 
-stake_pool must exist StakePool.
-The delegated voter under the resource StakePool of the stake_pool must be the voter address.
-Address @aptos_framework must exist VotingRecords and GovernanceProposal.
-Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting flag is enabled.
+stake_pool must exist StakePool.<br/> The delegated voter under the resource StakePool of the stake_pool must be the voter address.<br/> Address @aptos_framework must exist VotingRecords and GovernanceProposal.<br/> Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting flag is enabled.
 
 
 <pre><code>pragma verify_duration_estimate &#61; 60;<br/>requires chain_status::is_operating();<br/>include VoteAbortIf;<br/></code></pre>
@@ -1735,10 +1653,7 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
 <pre><code>fun vote_internal(voter: &amp;signer, stake_pool: address, proposal_id: u64, voting_power: u64, should_pass: bool)<br/></code></pre>
 
 
-stake_pool must exist StakePool.
-The delegated voter under the resource StakePool of the stake_pool must be the voter address.
-Address @aptos_framework must exist VotingRecords and GovernanceProposal.
-Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting flag is enabled.
+stake_pool must exist StakePool.<br/> The delegated voter under the resource StakePool of the stake_pool must be the voter address.<br/> Address @aptos_framework must exist VotingRecords and GovernanceProposal.<br/> Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting flag is enabled.
 
 
 <pre><code>pragma verify_duration_estimate &#61; 60;<br/>requires chain_status::is_operating();<br/>include VoteAbortIf;<br/></code></pre>
@@ -1749,7 +1664,7 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
 <a id="0x1_aptos_governance_VoteAbortIf"></a>
 
 
-<pre><code>schema VoteAbortIf &#123;<br/>voter: &amp;signer;<br/>stake_pool: address;<br/>proposal_id: u64;<br/>should_pass: bool;<br/>voting_power: u64;<br/>include VotingGetDelegatedVoterAbortsIf &#123; sign: voter &#125;;<br/>aborts_if spec_proposal_expiration &lt;&#61; locked_until &amp;&amp; !exists&lt;timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);<br/>let spec_proposal_expiration &#61; voting::spec_get_proposal_expiration_secs&lt;GovernanceProposal&gt;(@aptos_framework, proposal_id);<br/>let locked_until &#61; global&lt;stake::StakePool&gt;(stake_pool).locked_until_secs;<br/>let remain_zero_1_cond &#61; (spec_proposal_expiration &gt; locked_until &#124;&#124; timestamp::spec_now_seconds() &gt; spec_proposal_expiration);<br/>let record_key &#61; RecordKey &#123;<br/>    stake_pool,<br/>    proposal_id,<br/>&#125;;<br/>let entirely_voted &#61; spec_has_entirely_voted(stake_pool, proposal_id, record_key);<br/>aborts_if !remain_zero_1_cond &amp;&amp; !exists&lt;VotingRecords&gt;(@aptos_framework);<br/>include !remain_zero_1_cond &amp;&amp; !entirely_voted &#61;&#61;&gt; GetVotingPowerAbortsIf &#123;<br/>    pool_address: stake_pool<br/>&#125;;<br/>let staking_config &#61; global&lt;staking_config::StakingConfig&gt;(@aptos_framework);<br/>let spec_voting_power &#61; spec_get_voting_power(stake_pool, staking_config);<br/>let voting_records_v2 &#61; borrow_global&lt;VotingRecordsV2&gt;(@aptos_framework);<br/>let used_voting_power &#61; if (smart_table::spec_contains(voting_records_v2.votes, record_key)) &#123;<br/>    smart_table::spec_get(voting_records_v2.votes, record_key)<br/>&#125; else &#123;<br/>    0<br/>&#125;;<br/>aborts_if !remain_zero_1_cond &amp;&amp; !entirely_voted &amp;&amp; features::spec_partial_governance_voting_enabled() &amp;&amp;<br/>    used_voting_power &gt; 0 &amp;&amp; spec_voting_power &lt; used_voting_power;<br/>let remaining_power &#61; spec_get_remaining_voting_power(stake_pool, proposal_id);<br/>let real_voting_power &#61;  min(voting_power, remaining_power);<br/>aborts_if !(real_voting_power &gt; 0);<br/>aborts_if !exists&lt;VotingRecords&gt;(@aptos_framework);<br/>let voting_records &#61; global&lt;VotingRecords&gt;(@aptos_framework);<br/>let allow_validator_set_change &#61; global&lt;staking_config::StakingConfig&gt;(@aptos_framework).allow_validator_set_change;<br/>let stake_pool_res &#61; global&lt;stake::StakePool&gt;(stake_pool);<br/>aborts_if !exists&lt;voting::VotingForum&lt;GovernanceProposal&gt;&gt;(@aptos_framework);<br/>let voting_forum &#61; global&lt;voting::VotingForum&lt;GovernanceProposal&gt;&gt;(@aptos_framework);<br/>let proposal &#61; table::spec_get(voting_forum.proposals, proposal_id);<br/>aborts_if !table::spec_contains(voting_forum.proposals, proposal_id);<br/>let proposal_expiration &#61; proposal.expiration_secs;<br/>let locked_until_secs &#61; global&lt;stake::StakePool&gt;(stake_pool).locked_until_secs;<br/>aborts_if proposal_expiration &gt; locked_until_secs;<br/>aborts_if timestamp::now_seconds() &gt; proposal_expiration;<br/>aborts_if proposal.is_resolved;<br/>aborts_if !string::spec_internal_check_utf8(voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);<br/>let execution_key &#61; utf8(voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);<br/>aborts_if simple_map::spec_contains_key(proposal.metadata, execution_key) &amp;&amp;<br/>          simple_map::spec_get(proposal.metadata, execution_key) !&#61; std::bcs::to_bytes(false);<br/>aborts_if<br/>    if (should_pass) &#123; proposal.yes_votes &#43; real_voting_power &gt; MAX_U128 &#125; else &#123; proposal.no_votes &#43; real_voting_power &gt; MAX_U128 &#125;;<br/>let post post_voting_forum &#61; global&lt;voting::VotingForum&lt;GovernanceProposal&gt;&gt;(@aptos_framework);<br/>let post post_proposal &#61; table::spec_get(post_voting_forum.proposals, proposal_id);<br/>aborts_if !string::spec_internal_check_utf8(voting::RESOLVABLE_TIME_METADATA_KEY);<br/>let key &#61; utf8(voting::RESOLVABLE_TIME_METADATA_KEY);<br/>ensures simple_map::spec_contains_key(post_proposal.metadata, key);<br/>ensures simple_map::spec_get(post_proposal.metadata, key) &#61;&#61; std::bcs::to_bytes(timestamp::now_seconds());<br/>aborts_if features::spec_partial_governance_voting_enabled() &amp;&amp; used_voting_power &#43; real_voting_power &gt; MAX_U64;<br/>aborts_if !features::spec_partial_governance_voting_enabled() &amp;&amp; table::spec_contains(voting_records.votes, record_key);<br/>aborts_if !exists&lt;GovernanceEvents&gt;(@aptos_framework);<br/>let early_resolution_threshold &#61; option::spec_borrow(proposal.early_resolution_vote_threshold);<br/>let is_voting_period_over &#61; timestamp::spec_now_seconds() &gt; proposal_expiration;<br/>let new_proposal_yes_votes_0 &#61; proposal.yes_votes &#43; real_voting_power;<br/>let can_be_resolved_early_0 &#61; option::spec_is_some(proposal.early_resolution_vote_threshold) &amp;&amp;<br/>                            (new_proposal_yes_votes_0 &gt;&#61; early_resolution_threshold &#124;&#124;<br/>                             proposal.no_votes &gt;&#61; early_resolution_threshold);<br/>let is_voting_closed_0 &#61; is_voting_period_over &#124;&#124; can_be_resolved_early_0;<br/>let proposal_state_successed_0 &#61; is_voting_closed_0 &amp;&amp; new_proposal_yes_votes_0 &gt; proposal.no_votes &amp;&amp;<br/>                                 new_proposal_yes_votes_0 &#43; proposal.no_votes &gt;&#61; proposal.min_vote_threshold;<br/>let new_proposal_no_votes_0 &#61; proposal.no_votes &#43; real_voting_power;<br/>let can_be_resolved_early_1 &#61; option::spec_is_some(proposal.early_resolution_vote_threshold) &amp;&amp;<br/>                            (proposal.yes_votes &gt;&#61; early_resolution_threshold &#124;&#124;<br/>                             new_proposal_no_votes_0 &gt;&#61; early_resolution_threshold);<br/>let is_voting_closed_1 &#61; is_voting_period_over &#124;&#124; can_be_resolved_early_1;<br/>let proposal_state_successed_1 &#61; is_voting_closed_1 &amp;&amp; proposal.yes_votes &gt; new_proposal_no_votes_0 &amp;&amp;<br/>                                 proposal.yes_votes &#43; new_proposal_no_votes_0 &gt;&#61; proposal.min_vote_threshold;<br/>let new_proposal_yes_votes_1 &#61; proposal.yes_votes &#43; real_voting_power;<br/>let can_be_resolved_early_2 &#61; option::spec_is_some(proposal.early_resolution_vote_threshold) &amp;&amp;<br/>                            (new_proposal_yes_votes_1 &gt;&#61; early_resolution_threshold &#124;&#124;<br/>                             proposal.no_votes &gt;&#61; early_resolution_threshold);<br/>let is_voting_closed_2 &#61; is_voting_period_over &#124;&#124; can_be_resolved_early_2;<br/>let proposal_state_successed_2 &#61; is_voting_closed_2 &amp;&amp; new_proposal_yes_votes_1 &gt; proposal.no_votes &amp;&amp;<br/>                                 new_proposal_yes_votes_1 &#43; proposal.no_votes &gt;&#61; proposal.min_vote_threshold;<br/>let new_proposal_no_votes_1 &#61; proposal.no_votes &#43; real_voting_power;<br/>let can_be_resolved_early_3 &#61; option::spec_is_some(proposal.early_resolution_vote_threshold) &amp;&amp;<br/>                            (proposal.yes_votes &gt;&#61; early_resolution_threshold &#124;&#124;<br/>                             new_proposal_no_votes_1 &gt;&#61; early_resolution_threshold);<br/>let is_voting_closed_3 &#61; is_voting_period_over &#124;&#124; can_be_resolved_early_3;<br/>let proposal_state_successed_3 &#61; is_voting_closed_3 &amp;&amp; proposal.yes_votes &gt; new_proposal_no_votes_1 &amp;&amp;<br/>                                 proposal.yes_votes &#43; new_proposal_no_votes_1 &gt;&#61; proposal.min_vote_threshold;<br/>let post can_be_resolved_early &#61; option::spec_is_some(proposal.early_resolution_vote_threshold) &amp;&amp;<br/>                            (post_proposal.yes_votes &gt;&#61; early_resolution_threshold &#124;&#124;<br/>                             post_proposal.no_votes &gt;&#61; early_resolution_threshold);<br/>let post is_voting_closed &#61; is_voting_period_over &#124;&#124; can_be_resolved_early;<br/>let post proposal_state_successed &#61; is_voting_closed &amp;&amp; post_proposal.yes_votes &gt; post_proposal.no_votes &amp;&amp;<br/>                                 post_proposal.yes_votes &#43; post_proposal.no_votes &gt;&#61; proposal.min_vote_threshold;<br/>let execution_hash &#61; proposal.execution_hash;<br/>let post post_approved_hashes &#61; global&lt;ApprovedExecutionHashes&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>schema VoteAbortIf &#123;<br/>voter: &amp;signer;<br/>stake_pool: address;<br/>proposal_id: u64;<br/>should_pass: bool;<br/>voting_power: u64;<br/>include VotingGetDelegatedVoterAbortsIf &#123; sign: voter &#125;;<br/>aborts_if spec_proposal_expiration &lt;&#61; locked_until &amp;&amp; !exists&lt;timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);<br/>let spec_proposal_expiration &#61; voting::spec_get_proposal_expiration_secs&lt;GovernanceProposal&gt;(@aptos_framework, proposal_id);<br/>let locked_until &#61; global&lt;stake::StakePool&gt;(stake_pool).locked_until_secs;<br/>let remain_zero_1_cond &#61; (spec_proposal_expiration &gt; locked_until &#124;&#124; timestamp::spec_now_seconds() &gt; spec_proposal_expiration);<br/>let record_key &#61; RecordKey &#123;<br/>    stake_pool,<br/>    proposal_id,<br/>&#125;;<br/>let entirely_voted &#61; spec_has_entirely_voted(stake_pool, proposal_id, record_key);<br/>aborts_if !remain_zero_1_cond &amp;&amp; !exists&lt;VotingRecords&gt;(@aptos_framework);<br/>include !remain_zero_1_cond &amp;&amp; !entirely_voted &#61;&#61;&gt; GetVotingPowerAbortsIf &#123;<br/>    pool_address: stake_pool<br/>&#125;;<br/>let staking_config &#61; global&lt;staking_config::StakingConfig&gt;(@aptos_framework);<br/>let spec_voting_power &#61; spec_get_voting_power(stake_pool, staking_config);<br/>let voting_records_v2 &#61; borrow_global&lt;VotingRecordsV2&gt;(@aptos_framework);<br/>let used_voting_power &#61; if (smart_table::spec_contains(voting_records_v2.votes, record_key)) &#123;<br/>    smart_table::spec_get(voting_records_v2.votes, record_key)<br/>&#125; else &#123;<br/>    0<br/>&#125;;<br/>aborts_if !remain_zero_1_cond &amp;&amp; !entirely_voted &amp;&amp; features::spec_partial_governance_voting_enabled() &amp;&amp;<br/>    used_voting_power &gt; 0 &amp;&amp; spec_voting_power &lt; used_voting_power;<br/>let remaining_power &#61; spec_get_remaining_voting_power(stake_pool, proposal_id);<br/>let real_voting_power &#61;  min(voting_power, remaining_power);<br/>aborts_if !(real_voting_power &gt; 0);<br/>aborts_if !exists&lt;VotingRecords&gt;(@aptos_framework);<br/>let voting_records &#61; global&lt;VotingRecords&gt;(@aptos_framework);<br/>let allow_validator_set_change &#61; global&lt;staking_config::StakingConfig&gt;(@aptos_framework).allow_validator_set_change;<br/>let stake_pool_res &#61; global&lt;stake::StakePool&gt;(stake_pool);<br/>aborts_if !exists&lt;voting::VotingForum&lt;GovernanceProposal&gt;&gt;(@aptos_framework);<br/>let voting_forum &#61; global&lt;voting::VotingForum&lt;GovernanceProposal&gt;&gt;(@aptos_framework);<br/>let proposal &#61; table::spec_get(voting_forum.proposals, proposal_id);<br/>aborts_if !table::spec_contains(voting_forum.proposals, proposal_id);<br/>let proposal_expiration &#61; proposal.expiration_secs;<br/>let locked_until_secs &#61; global&lt;stake::StakePool&gt;(stake_pool).locked_until_secs;<br/>aborts_if proposal_expiration &gt; locked_until_secs;<br/>aborts_if timestamp::now_seconds() &gt; proposal_expiration;<br/>aborts_if proposal.is_resolved;<br/>aborts_if !string::spec_internal_check_utf8(voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);<br/>let execution_key &#61; utf8(voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);<br/>aborts_if simple_map::spec_contains_key(proposal.metadata, execution_key) &amp;&amp;<br/>          simple_map::spec_get(proposal.metadata, execution_key) !&#61; std::bcs::to_bytes(false);<br/>aborts_if<br/>    if (should_pass) &#123; proposal.yes_votes &#43; real_voting_power &gt; MAX_U128 &#125; else &#123; proposal.no_votes &#43; real_voting_power &gt; MAX_U128 &#125;;<br/>let post post_voting_forum &#61; global&lt;voting::VotingForum&lt;GovernanceProposal&gt;&gt;(@aptos_framework);<br/>let post post_proposal &#61; table::spec_get(post_voting_forum.proposals, proposal_id);<br/>aborts_if !string::spec_internal_check_utf8(voting::RESOLVABLE_TIME_METADATA_KEY);<br/>let key &#61; utf8(voting::RESOLVABLE_TIME_METADATA_KEY);<br/>ensures simple_map::spec_contains_key(post_proposal.metadata, key);<br/>ensures simple_map::spec_get(post_proposal.metadata, key) &#61;&#61; std::bcs::to_bytes(timestamp::now_seconds());<br/>aborts_if features::spec_partial_governance_voting_enabled() &amp;&amp; used_voting_power &#43; real_voting_power &gt; MAX_U64;<br/>aborts_if !features::spec_partial_governance_voting_enabled() &amp;&amp; table::spec_contains(voting_records.votes, record_key);<br/>aborts_if !exists&lt;GovernanceEvents&gt;(@aptos_framework);<br/>let early_resolution_threshold &#61; option::spec_borrow(proposal.early_resolution_vote_threshold);<br/>let is_voting_period_over &#61; timestamp::spec_now_seconds() &gt; proposal_expiration;<br/>let new_proposal_yes_votes_0 &#61; proposal.yes_votes &#43; real_voting_power;<br/>let can_be_resolved_early_0 &#61; option::spec_is_some(proposal.early_resolution_vote_threshold) &amp;&amp;<br/>                            (new_proposal_yes_votes_0 &gt;&#61; early_resolution_threshold &#124;&#124;<br/>                             proposal.no_votes &gt;&#61; early_resolution_threshold);<br/>let is_voting_closed_0 &#61; is_voting_period_over &#124;&#124; can_be_resolved_early_0;<br/>let proposal_state_successed_0 &#61; is_voting_closed_0 &amp;&amp; new_proposal_yes_votes_0 &gt; proposal.no_votes &amp;&amp;<br/>                                 new_proposal_yes_votes_0 &#43; proposal.no_votes &gt;&#61; proposal.min_vote_threshold;<br/>let new_proposal_no_votes_0 &#61; proposal.no_votes &#43; real_voting_power;<br/>let can_be_resolved_early_1 &#61; option::spec_is_some(proposal.early_resolution_vote_threshold) &amp;&amp;<br/>                            (proposal.yes_votes &gt;&#61; early_resolution_threshold &#124;&#124;<br/>                             new_proposal_no_votes_0 &gt;&#61; early_resolution_threshold);<br/>let is_voting_closed_1 &#61; is_voting_period_over &#124;&#124; can_be_resolved_early_1;<br/>let proposal_state_successed_1 &#61; is_voting_closed_1 &amp;&amp; proposal.yes_votes &gt; new_proposal_no_votes_0 &amp;&amp;<br/>                                 proposal.yes_votes &#43; new_proposal_no_votes_0 &gt;&#61; proposal.min_vote_threshold;<br/>let new_proposal_yes_votes_1 &#61; proposal.yes_votes &#43; real_voting_power;<br/>let can_be_resolved_early_2 &#61; option::spec_is_some(proposal.early_resolution_vote_threshold) &amp;&amp;<br/>                            (new_proposal_yes_votes_1 &gt;&#61; early_resolution_threshold &#124;&#124;<br/>                             proposal.no_votes &gt;&#61; early_resolution_threshold);<br/>let is_voting_closed_2 &#61; is_voting_period_over &#124;&#124; can_be_resolved_early_2;<br/>let proposal_state_successed_2 &#61; is_voting_closed_2 &amp;&amp; new_proposal_yes_votes_1 &gt; proposal.no_votes &amp;&amp;<br/>                                 new_proposal_yes_votes_1 &#43; proposal.no_votes &gt;&#61; proposal.min_vote_threshold;<br/>let new_proposal_no_votes_1 &#61; proposal.no_votes &#43; real_voting_power;<br/>let can_be_resolved_early_3 &#61; option::spec_is_some(proposal.early_resolution_vote_threshold) &amp;&amp;<br/>                            (proposal.yes_votes &gt;&#61; early_resolution_threshold &#124;&#124;<br/>                             new_proposal_no_votes_1 &gt;&#61; early_resolution_threshold);<br/>let is_voting_closed_3 &#61; is_voting_period_over &#124;&#124; can_be_resolved_early_3;<br/>let proposal_state_successed_3 &#61; is_voting_closed_3 &amp;&amp; proposal.yes_votes &gt; new_proposal_no_votes_1 &amp;&amp;<br/>                                 proposal.yes_votes &#43; new_proposal_no_votes_1 &gt;&#61; proposal.min_vote_threshold;<br/>let post can_be_resolved_early &#61; option::spec_is_some(proposal.early_resolution_vote_threshold) &amp;&amp;<br/>                            (post_proposal.yes_votes &gt;&#61; early_resolution_threshold &#124;&#124;<br/>                             post_proposal.no_votes &gt;&#61; early_resolution_threshold);<br/>let post is_voting_closed &#61; is_voting_period_over &#124;&#124; can_be_resolved_early;<br/>let post proposal_state_successed &#61; is_voting_closed &amp;&amp; post_proposal.yes_votes &gt; post_proposal.no_votes &amp;&amp;<br/>                                 post_proposal.yes_votes &#43; post_proposal.no_votes &gt;&#61; proposal.min_vote_threshold;<br/>let execution_hash &#61; proposal.execution_hash;<br/>let post post_approved_hashes &#61; global&lt;ApprovedExecutionHashes&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
     aborts_if<br/>    if (should_pass) &#123;<br/>        proposal_state_successed_0 &amp;&amp; !exists&lt;ApprovedExecutionHashes&gt;(@aptos_framework)<br/>    &#125; else &#123;<br/>        proposal_state_successed_1 &amp;&amp; !exists&lt;ApprovedExecutionHashes&gt;(@aptos_framework)<br/>    &#125;;<br/>aborts_if<br/>    if (should_pass) &#123;<br/>        proposal_state_successed_2 &amp;&amp; !exists&lt;ApprovedExecutionHashes&gt;(@aptos_framework)<br/>    &#125; else &#123;<br/>        proposal_state_successed_3 &amp;&amp; !exists&lt;ApprovedExecutionHashes&gt;(@aptos_framework)<br/>    &#125;;<br/>ensures proposal_state_successed &#61;&#61;&gt; simple_map::spec_contains_key(post_approved_hashes.hashes, proposal_id) &amp;&amp;<br/>                                     simple_map::spec_get(post_approved_hashes.hashes, proposal_id) &#61;&#61; execution_hash;<br/>aborts_if features::spec_partial_governance_voting_enabled() &amp;&amp; !exists&lt;VotingRecordsV2&gt;(@aptos_framework);<br/>&#125;<br/></code></pre>
 
 
@@ -1772,7 +1687,7 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
 <a id="0x1_aptos_governance_AddApprovedScriptHash"></a>
 
 
-<pre><code>schema AddApprovedScriptHash &#123;<br/>proposal_id: u64;<br/>aborts_if !exists&lt;ApprovedExecutionHashes&gt;(@aptos_framework);<br/>aborts_if !exists&lt;voting::VotingForum&lt;GovernanceProposal&gt;&gt;(@aptos_framework);<br/>let voting_forum &#61; global&lt;voting::VotingForum&lt;GovernanceProposal&gt;&gt;(@aptos_framework);<br/>let proposal &#61; table::spec_get(voting_forum.proposals, proposal_id);<br/>aborts_if !table::spec_contains(voting_forum.proposals, proposal_id);<br/>let early_resolution_threshold &#61; option::spec_borrow(proposal.early_resolution_vote_threshold);<br/>aborts_if timestamp::now_seconds() &lt;&#61; proposal.expiration_secs &amp;&amp;<br/>    (option::spec_is_none(proposal.early_resolution_vote_threshold) &#124;&#124;<br/>    proposal.yes_votes &lt; early_resolution_threshold &amp;&amp; proposal.no_votes &lt; early_resolution_threshold);<br/>aborts_if (timestamp::now_seconds() &gt; proposal.expiration_secs &#124;&#124;<br/>    option::spec_is_some(proposal.early_resolution_vote_threshold) &amp;&amp; (proposal.yes_votes &gt;&#61; early_resolution_threshold &#124;&#124;<br/>                                                                       proposal.no_votes &gt;&#61; early_resolution_threshold)) &amp;&amp;<br/>    (proposal.yes_votes &lt;&#61; proposal.no_votes &#124;&#124; proposal.yes_votes &#43; proposal.no_votes &lt; proposal.min_vote_threshold);<br/>let post post_approved_hashes &#61; global&lt;ApprovedExecutionHashes&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<pre><code>schema AddApprovedScriptHash &#123;<br/>proposal_id: u64;<br/>aborts_if !exists&lt;ApprovedExecutionHashes&gt;(@aptos_framework);<br/>aborts_if !exists&lt;voting::VotingForum&lt;GovernanceProposal&gt;&gt;(@aptos_framework);<br/>let voting_forum &#61; global&lt;voting::VotingForum&lt;GovernanceProposal&gt;&gt;(@aptos_framework);<br/>let proposal &#61; table::spec_get(voting_forum.proposals, proposal_id);<br/>aborts_if !table::spec_contains(voting_forum.proposals, proposal_id);<br/>let early_resolution_threshold &#61; option::spec_borrow(proposal.early_resolution_vote_threshold);<br/>aborts_if timestamp::now_seconds() &lt;&#61; proposal.expiration_secs &amp;&amp;<br/>    (option::spec_is_none(proposal.early_resolution_vote_threshold) &#124;&#124;<br/>    proposal.yes_votes &lt; early_resolution_threshold &amp;&amp; proposal.no_votes &lt; early_resolution_threshold);<br/>aborts_if (timestamp::now_seconds() &gt; proposal.expiration_secs &#124;&#124;<br/>    option::spec_is_some(proposal.early_resolution_vote_threshold) &amp;&amp; (proposal.yes_votes &gt;&#61; early_resolution_threshold &#124;&#124;<br/>                                                                       proposal.no_votes &gt;&#61; early_resolution_threshold)) &amp;&amp;<br/>    (proposal.yes_votes &lt;&#61; proposal.no_votes &#124;&#124; proposal.yes_votes &#43; proposal.no_votes &lt; proposal.min_vote_threshold);<br/>let post post_approved_hashes &#61; global&lt;ApprovedExecutionHashes&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
     ensures simple_map::spec_contains_key(post_approved_hashes.hashes, proposal_id) &amp;&amp;<br/>    simple_map::spec_get(post_approved_hashes.hashes, proposal_id) &#61;&#61; proposal.execution_hash;<br/>&#125;<br/></code></pre>
 
 
@@ -1901,8 +1816,7 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 <pre><code>public fun toggle_features(aptos_framework: &amp;signer, enable: vector&lt;u64&gt;, disable: vector&lt;u64&gt;)<br/></code></pre>
 
 
-Signer address must be @aptos_framework.
-Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
+Signer address must be @aptos_framework.<br/> Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
 
 
 <pre><code>pragma verify &#61; false;<br/>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>include reconfiguration_with_dkg::FinishRequirement &#123;<br/>    framework: aptos_framework<br/>&#125;;<br/>include stake::GetReconfigStartTimeRequirement;<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>requires chain_status::is_operating();<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br/>requires exists&lt;staking_config::StakingRewardsConfig&gt;(@aptos_framework);<br/>include staking_config::StakingRewardsConfigRequirement;<br/></code></pre>
@@ -1917,9 +1831,7 @@ Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
 <pre><code>public fun get_signer_testnet_only(core_resources: &amp;signer, signer_address: address): signer<br/></code></pre>
 
 
-Signer address must be @core_resources.
-signer must exist in MintCapStore.
-Address @aptos_framework must exist GovernanceResponsbility.
+Signer address must be @core_resources.<br/> signer must exist in MintCapStore.<br/> Address @aptos_framework must exist GovernanceResponsbility.
 
 
 <pre><code>aborts_if signer::address_of(core_resources) !&#61; @core_resources;<br/>aborts_if !exists&lt;aptos_coin::MintCapStore&gt;(signer::address_of(core_resources));<br/>include GetSignerAbortsIf;<br/></code></pre>
@@ -1934,9 +1846,7 @@ Address @aptos_framework must exist GovernanceResponsbility.
 <pre><code>&#35;[view]<br/>public fun get_voting_power(pool_address: address): u64<br/></code></pre>
 
 
-Address @aptos_framework must exist StakingConfig.
-limit addition overflow.
-pool_address must exist in StakePool.
+Address @aptos_framework must exist StakingConfig.<br/> limit addition overflow.<br/> pool_address must exist in StakePool.
 
 
 <pre><code>include GetVotingPowerAbortsIf;<br/>let staking_config &#61; global&lt;staking_config::StakingConfig&gt;(@aptos_framework);<br/>let allow_validator_set_change &#61; staking_config.allow_validator_set_change;<br/>let stake_pool_res &#61; global&lt;stake::StakePool&gt;(pool_address);<br/>ensures allow_validator_set_change &#61;&#61;&gt; result &#61;&#61; stake_pool_res.active.value &#43; stake_pool_res.pending_active.value &#43; stake_pool_res.pending_inactive.value;<br/>ensures !allow_validator_set_change &#61;&#61;&gt; if (stake::spec_is_current_epoch_validator(pool_address)) &#123;<br/>    result &#61;&#61; stake_pool_res.active.value &#43; stake_pool_res.pending_inactive.value<br/>&#125; else &#123;<br/>    result &#61;&#61; 0<br/>&#125;;<br/>ensures result &#61;&#61; spec_get_voting_power(pool_address, staking_config);<br/></code></pre>

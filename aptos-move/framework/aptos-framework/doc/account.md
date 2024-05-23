@@ -338,17 +338,7 @@ Resource representing an account.
 
 ## Resource `OriginatingAddress`
 
-It is easy to fetch the authentication key of an address by simply reading it from the <code>Account</code> struct at that address.
-The table in this struct makes it possible to do a reverse lookup: it maps an authentication key, to the address of the account which has that authentication key set.
-
-This mapping is needed when recovering wallets for accounts whose authentication key has been rotated.
-
-For example, imagine a freshly-created wallet with address <code>a</code> and thus also with authentication key <code>a</code>, derived from a PK <code>pk_a</code> with corresponding SK <code>sk_a</code>.
-It is easy to recover such a wallet given just the secret key <code>sk_a</code>, since the PK can be derived from the SK, the authentication key can then be derived from the PK, and the address equals the authentication key (since there was no key rotation).
-
-However, if such a wallet rotates its authentication key to <code>b</code> derived from a different PK <code>pk_b</code> with SK <code>sk_b</code>, how would account recovery work?
-The recovered address would no longer be 'a'; it would be <code>b</code>, which is incorrect.
-This struct solves this problem by mapping the new authentication key <code>b</code> to the original address <code>a</code> and thus helping the wallet software during recovery find the correct address.
+It is easy to fetch the authentication key of an address by simply reading it from the <code>Account</code> struct at that address.<br/> The table in this struct makes it possible to do a reverse lookup: it maps an authentication key, to the address of the account which has that authentication key set.<br/><br/> This mapping is needed when recovering wallets for accounts whose authentication key has been rotated.<br/><br/> For example, imagine a freshly&#45;created wallet with address <code>a</code> and thus also with authentication key <code>a</code>, derived from a PK <code>pk_a</code> with corresponding SK <code>sk_a</code>.<br/> It is easy to recover such a wallet given just the secret key <code>sk_a</code>, since the PK can be derived from the SK, the authentication key can then be derived from the PK, and the address equals the authentication key (since there was no key rotation).<br/><br/> However, if such a wallet rotates its authentication key to <code>b</code> derived from a different PK <code>pk_b</code> with SK <code>sk_b</code>, how would account recovery work?<br/> The recovered address would no longer be &apos;a&apos;; it would be <code>b</code>, which is incorrect.<br/> This struct solves this problem by mapping the new authentication key <code>b</code> to the original address <code>a</code> and thus helping the wallet software during recovery find the correct address.
 
 
 <pre><code>struct OriginatingAddress has key<br/></code></pre>
@@ -375,11 +365,7 @@ This struct solves this problem by mapping the new authentication key <code>b</c
 
 ## Struct `RotationProofChallenge`
 
-This structs stores the challenge message that should be signed during key rotation. First, this struct is
-signed by the account owner's current public key, which proves possession of a capability to rotate the key.
-Second, this struct is signed by the new public key that the account owner wants to rotate to, which proves
-knowledge of this new public key's associated secret key. These two signatures cannot be replayed in another
-context because they include the TXN's unique sequence number.
+This structs stores the challenge message that should be signed during key rotation. First, this struct is<br/> signed by the account owner&apos;s current public key, which proves possession of a capability to rotate the key.<br/> Second, this struct is signed by the new public key that the account owner wants to rotate to, which proves<br/> knowledge of this new public key&apos;s associated secret key. These two signatures cannot be replayed in another<br/> context because they include the TXN&apos;s unique sequence number.
 
 
 <pre><code>struct RotationProofChallenge has copy, drop<br/></code></pre>
@@ -424,7 +410,7 @@ context because they include the TXN's unique sequence number.
 
 ## Struct `RotationCapabilityOfferProofChallenge`
 
-Deprecated struct - newest version is <code>RotationCapabilityOfferProofChallengeV2</code>
+Deprecated struct &#45; newest version is <code>RotationCapabilityOfferProofChallengeV2</code>
 
 
 <pre><code>struct RotationCapabilityOfferProofChallenge has drop<br/></code></pre>
@@ -457,7 +443,7 @@ Deprecated struct - newest version is <code>RotationCapabilityOfferProofChalleng
 
 ## Struct `SignerCapabilityOfferProofChallenge`
 
-Deprecated struct - newest version is <code>SignerCapabilityOfferProofChallengeV2</code>
+Deprecated struct &#45; newest version is <code>SignerCapabilityOfferProofChallengeV2</code>
 
 
 <pre><code>struct SignerCapabilityOfferProofChallenge has drop<br/></code></pre>
@@ -490,9 +476,7 @@ Deprecated struct - newest version is <code>SignerCapabilityOfferProofChallengeV
 
 ## Struct `RotationCapabilityOfferProofChallengeV2`
 
-This struct stores the challenge message that should be signed by the source account, when the source account
-is delegating its rotation capability to the <code>recipient_address</code>.
-This V2 struct adds the <code>chain_id</code> and <code>source_address</code> to the challenge message, which prevents replaying the challenge message.
+This struct stores the challenge message that should be signed by the source account, when the source account<br/> is delegating its rotation capability to the <code>recipient_address</code>.<br/> This V2 struct adds the <code>chain_id</code> and <code>source_address</code> to the challenge message, which prevents replaying the challenge message.
 
 
 <pre><code>struct RotationCapabilityOfferProofChallengeV2 has drop<br/></code></pre>
@@ -586,11 +570,7 @@ This V2 struct adds the <code>chain_id</code> and <code>source_address</code> to
 
 <a id="0x1_account_DERIVE_RESOURCE_ACCOUNT_SCHEME"></a>
 
-Scheme identifier used when hashing an account's address together with a seed to derive the address (not the
-authentication key) of a resource account. This is an abuse of the notion of a scheme identifier which, for now,
-serves to domain separate hashes used to derive resource account addresses from hashes used to derive
-authentication keys. Without such separation, an adversary could create (and get a signer for) a resource account
-whose address matches an existing address of a MultiEd25519 wallet.
+Scheme identifier used when hashing an account&apos;s address together with a seed to derive the address (not the<br/> authentication key) of a resource account. This is an abuse of the notion of a scheme identifier which, for now,<br/> serves to domain separate hashes used to derive resource account addresses from hashes used to derive<br/> authentication keys. Without such separation, an adversary could create (and get a signer for) a resource account<br/> whose address matches an existing address of a MultiEd25519 wallet.
 
 
 <pre><code>const DERIVE_RESOURCE_ACCOUNT_SCHEME: u8 &#61; 255;<br/></code></pre>
@@ -661,7 +641,7 @@ The caller does not have a valid rotation capability offer from the other accoun
 
 <a id="0x1_account_EINVALID_ORIGINATING_ADDRESS"></a>
 
-Abort the transaction if the expected originating address is different from the originating address on-chain
+Abort the transaction if the expected originating address is different from the originating address on&#45;chain
 
 
 <pre><code>const EINVALID_ORIGINATING_ADDRESS: u64 &#61; 13;<br/></code></pre>
@@ -679,7 +659,7 @@ Specified proof of knowledge required to prove ownership of a public key is inva
 
 <a id="0x1_account_EINVALID_SCHEME"></a>
 
-Specified scheme required to proceed with the smart contract operation - can only be ED25519_SCHEME(0) OR MULTI_ED25519_SCHEME(1)
+Specified scheme required to proceed with the smart contract operation &#45; can only be ED25519_SCHEME(0) OR MULTI_ED25519_SCHEME(1)
 
 
 <pre><code>const EINVALID_SCHEME: u64 &#61; 12;<br/></code></pre>
@@ -697,7 +677,7 @@ The provided authentication key has an invalid length
 
 <a id="0x1_account_ENO_CAPABILITY"></a>
 
-The caller does not have a digital-signature-based capability to call this function
+The caller does not have a digital&#45;signature&#45;based capability to call this function
 
 
 <pre><code>const ENO_CAPABILITY: u64 &#61; 9;<br/></code></pre>
@@ -723,7 +703,7 @@ The specified rotation capablity offer does not exist at the specified offerer a
 
 <a id="0x1_account_ENO_SUCH_SIGNER_CAPABILITY"></a>
 
-The signer capability offer doesn't exist at the given address
+The signer capability offer doesn&apos;t exist at the given address
 
 
 <pre><code>const ENO_SUCH_SIGNER_CAPABILITY: u64 &#61; 14;<br/></code></pre>
@@ -741,7 +721,7 @@ Address to create is not a valid reserved address for Aptos framework
 
 <a id="0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST"></a>
 
-Offerer address doesn't exist
+Offerer address doesn&apos;t exist
 
 
 <pre><code>const EOFFERER_ADDRESS_DOES_NOT_EXIST: u64 &#61; 17;<br/></code></pre>
@@ -892,9 +872,7 @@ Only called during genesis to initialize system resources for this module.
 
 ## Function `create_account`
 
-Publishes a new <code>Account</code> resource under <code>new_address</code>. A signer representing <code>new_address</code>
-is returned. This way, the caller of this function can publish additional resources under
-<code>new_address</code>.
+Publishes a new <code>Account</code> resource under <code>new_address</code>. A signer representing <code>new_address</code><br/> is returned. This way, the caller of this function can publish additional resources under<br/> <code>new_address</code>.
 
 
 <pre><code>public(friend) fun create_account(new_address: address): signer<br/></code></pre>
@@ -1035,11 +1013,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 ## Function `rotate_authentication_key_internal`
 
-This function is used to rotate a resource account's authentication key to <code>new_auth_key</code>. This is done in
-many contexts:
-1. During normal key rotation via <code>rotate_authentication_key</code> or <code>rotate_authentication_key_call</code>
-2. During resource account initialization so that no private key can control the resource account
-3. During multisig_v2 account creation
+This function is used to rotate a resource account&apos;s authentication key to <code>new_auth_key</code>. This is done in<br/> many contexts:<br/> 1. During normal key rotation via <code>rotate_authentication_key</code> or <code>rotate_authentication_key_call</code><br/> 2. During resource account initialization so that no private key can control the resource account<br/> 3. During multisig_v2 account creation
 
 
 <pre><code>public(friend) fun rotate_authentication_key_internal(account: &amp;signer, new_auth_key: vector&lt;u8&gt;)<br/></code></pre>
@@ -1060,11 +1034,7 @@ many contexts:
 
 ## Function `rotate_authentication_key_call`
 
-Private entry function for key rotation that allows the signer to update their authentication key.
-Note that this does not update the <code>OriginatingAddress</code> table because the <code>new_auth_key</code> is not "verified": it
-does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
-the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
-the format expected in <code>rotate_authentication_key</code>.
+Private entry function for key rotation that allows the signer to update their authentication key.<br/> Note that this does not update the <code>OriginatingAddress</code> table because the <code>new_auth_key</code> is not &quot;verified&quot;: it<br/> does not come with a proof&#45;of&#45;knowledge of the underlying SK. Nonetheless, we need this functionality due to<br/> the introduction of non&#45;standard key algorithms, such as passkeys, which cannot produce proofs&#45;of&#45;knowledge in<br/> the format expected in <code>rotate_authentication_key</code>.
 
 
 <pre><code>entry fun rotate_authentication_key_call(account: &amp;signer, new_auth_key: vector&lt;u8&gt;)<br/></code></pre>
@@ -1085,34 +1055,7 @@ the format expected in <code>rotate_authentication_key</code>.
 
 ## Function `rotate_authentication_key`
 
-Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
-To authorize the rotation, we need two signatures:
-- the first signature <code>cap_rotate_key</code> refers to the signature by the account owner's current key on a valid <code>RotationProofChallenge</code>,
-demonstrating that the user intends to and has the capability to rotate the authentication key of this account;
-- the second signature <code>cap_update_table</code> refers to the signature by the new key (that the account owner wants to rotate to) on a
-valid <code>RotationProofChallenge</code>, demonstrating that the user owns the new private key, and has the authority to update the
-<code>OriginatingAddress</code> map with the new address mapping <code>&lt;new_address, originating_address&gt;</code>.
-To verify these two signatures, we need their corresponding public key and public key scheme: we use <code>from_scheme</code> and <code>from_public_key_bytes</code>
-to verify <code>cap_rotate_key</code>, and <code>to_scheme</code> and <code>to_public_key_bytes</code> to verify <code>cap_update_table</code>.
-A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519 keys.
-<code>originating address</code> refers to an account's original/first address.
-
-Here is an example attack if we don't ask for the second signature <code>cap_update_table</code>:
-Alice has rotated her account <code>addr_a</code> to <code>new_addr_a</code>. As a result, the following entry is created, to help Alice when recovering her wallet:
-<code>OriginatingAddress[new_addr_a]</code> -> <code>addr_a</code>
-Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
-(Fortunately, she still has her secret key <code>new_sk_a</code> associated with her new address <code>new_addr_a</code>, so she can do this.)
-
-But Bob likes to mess with Alice.
-Bob creates an account <code>addr_b</code> and maliciously rotates it to Alice's new address <code>new_addr_a</code>. Since we are no longer checking a PoK,
-Bob can easily do this.
-
-Now, the table will be updated to make Alice's new address point to Bob's address: <code>OriginatingAddress[new_addr_a]</code> -> <code>addr_b</code>.
-When Alice recovers her account, her wallet will display the attacker's address (Bob's) <code>addr_b</code> as her address.
-Now Alice will give <code>addr_b</code> to everyone to pay her, but the money will go to Bob.
-
-Because we ask for a valid <code>cap_update_table</code>, this kind of attack is not possible. Bob would not have the secret key of Alice's address
-to rotate his address to Alice's address in the first place.
+Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.<br/> To authorize the rotation, we need two signatures:<br/> &#45; the first signature <code>cap_rotate_key</code> refers to the signature by the account owner&apos;s current key on a valid <code>RotationProofChallenge</code>,<br/> demonstrating that the user intends to and has the capability to rotate the authentication key of this account;<br/> &#45; the second signature <code>cap_update_table</code> refers to the signature by the new key (that the account owner wants to rotate to) on a<br/> valid <code>RotationProofChallenge</code>, demonstrating that the user owns the new private key, and has the authority to update the<br/> <code>OriginatingAddress</code> map with the new address mapping <code>&lt;new_address, originating_address&gt;</code>.<br/> To verify these two signatures, we need their corresponding public key and public key scheme: we use <code>from_scheme</code> and <code>from_public_key_bytes</code><br/> to verify <code>cap_rotate_key</code>, and <code>to_scheme</code> and <code>to_public_key_bytes</code> to verify <code>cap_update_table</code>.<br/> A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi&#45;Ed25519 keys.<br/> <code>originating address</code> refers to an account&apos;s original/first address.<br/><br/> Here is an example attack if we don&apos;t ask for the second signature <code>cap_update_table</code>:<br/> Alice has rotated her account <code>addr_a</code> to <code>new_addr_a</code>. As a result, the following entry is created, to help Alice when recovering her wallet:<br/> <code>OriginatingAddress[new_addr_a]</code> &#45;&gt; <code>addr_a</code><br/> Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.<br/> (Fortunately, she still has her secret key <code>new_sk_a</code> associated with her new address <code>new_addr_a</code>, so she can do this.)<br/><br/> But Bob likes to mess with Alice.<br/> Bob creates an account <code>addr_b</code> and maliciously rotates it to Alice&apos;s new address <code>new_addr_a</code>. Since we are no longer checking a PoK,<br/> Bob can easily do this.<br/><br/> Now, the table will be updated to make Alice&apos;s new address point to Bob&apos;s address: <code>OriginatingAddress[new_addr_a]</code> &#45;&gt; <code>addr_b</code>.<br/> When Alice recovers her account, her wallet will display the attacker&apos;s address (Bob&apos;s) <code>addr_b</code> as her address.<br/> Now Alice will give <code>addr_b</code> to everyone to pay her, but the money will go to Bob.<br/><br/> Because we ask for a valid <code>cap_update_table</code>, this kind of attack is not possible. Bob would not have the secret key of Alice&apos;s address<br/> to rotate his address to Alice&apos;s address in the first place.
 
 
 <pre><code>public entry fun rotate_authentication_key(account: &amp;signer, from_scheme: u8, from_public_key_bytes: vector&lt;u8&gt;, to_scheme: u8, to_public_key_bytes: vector&lt;u8&gt;, cap_rotate_key: vector&lt;u8&gt;, cap_update_table: vector&lt;u8&gt;)<br/></code></pre>
@@ -1153,23 +1096,8 @@ to rotate his address to Alice's address in the first place.
 
 ## Function `offer_rotation_capability`
 
-Offers rotation capability on behalf of <code>account</code> to the account at address <code>recipient_address</code>.
-An account can delegate its rotation capability to only one other address at one time. If the account
-has an existing rotation capability offer, calling this function will update the rotation capability offer with
-the new <code>recipient_address</code>.
-Here, <code>rotation_capability_sig_bytes</code> signature indicates that this key rotation is authorized by the account owner,
-and prevents the classic "time-of-check time-of-use" attack.
-For example, users usually rely on what the wallet displays to them as the transaction's outcome. Consider a contract that with 50% probability
-(based on the current timestamp in Move), rotates somebody's key. The wallet might be unlucky and get an outcome where nothing is rotated,
-incorrectly telling the user nothing bad will happen. But when the transaction actually gets executed, the attacker gets lucky and
-the execution path triggers the account key rotation.
-We prevent such attacks by asking for this extra signature authorizing the key rotation.
-
-@param rotation_capability_sig_bytes is the signature by the account owner's key on <code>RotationCapabilityOfferProofChallengeV2</code>.
-@param account_scheme is the scheme of the account (ed25519 or multi_ed25519).
-@param account_public_key_bytes is the public key of the account owner.
-@param recipient_address is the address of the recipient of the rotation capability - note that if there's an existing rotation capability
-offer, calling this function will replace the previous <code>recipient_address</code> upon successful verification.
+Offers rotation capability on behalf of <code>account</code> to the account at address <code>recipient_address</code>.<br/> An account can delegate its rotation capability to only one other address at one time. If the account<br/> has an existing rotation capability offer, calling this function will update the rotation capability offer with<br/> the new <code>recipient_address</code>.<br/> Here, <code>rotation_capability_sig_bytes</code> signature indicates that this key rotation is authorized by the account owner,<br/> and prevents the classic &quot;time&#45;of&#45;check time&#45;of&#45;use&quot; attack.<br/> For example, users usually rely on what the wallet displays to them as the transaction&apos;s outcome. Consider a contract that with 50% probability
+(based on the current timestamp in Move), rotates somebody&apos;s key. The wallet might be unlucky and get an outcome where nothing is rotated,<br/> incorrectly telling the user nothing bad will happen. But when the transaction actually gets executed, the attacker gets lucky and<br/> the execution path triggers the account key rotation.<br/> We prevent such attacks by asking for this extra signature authorizing the key rotation.<br/><br/> @param rotation_capability_sig_bytes is the signature by the account owner&apos;s key on <code>RotationCapabilityOfferProofChallengeV2</code>.<br/> @param account_scheme is the scheme of the account (ed25519 or multi_ed25519).<br/> @param account_public_key_bytes is the public key of the account owner.<br/> @param recipient_address is the address of the recipient of the rotation capability &#45; note that if there&apos;s an existing rotation capability<br/> offer, calling this function will replace the previous <code>recipient_address</code> upon successful verification.
 
 
 <pre><code>public entry fun offer_rotation_capability(account: &amp;signer, rotation_capability_sig_bytes: vector&lt;u8&gt;, account_scheme: u8, account_public_key_bytes: vector&lt;u8&gt;, recipient_address: address)<br/></code></pre>
@@ -1274,15 +1202,7 @@ Revoke any rotation capability offer in the specified account.
 
 ## Function `offer_signer_capability`
 
-Offers signer capability on behalf of <code>account</code> to the account at address <code>recipient_address</code>.
-An account can delegate its signer capability to only one other address at one time.
-<code>signer_capability_key_bytes</code> is the <code>SignerCapabilityOfferProofChallengeV2</code> signed by the account owner's key
-<code>account_scheme</code> is the scheme of the account (ed25519 or multi_ed25519).
-<code>account_public_key_bytes</code> is the public key of the account owner.
-<code>recipient_address</code> is the address of the recipient of the signer capability - note that if there's an existing
-<code>recipient_address</code> in the account owner's <code>SignerCapabilityOffer</code>, this will replace the
-previous <code>recipient_address</code> upon successful verification (the previous recipient will no longer have access
-to the account owner's signer capability).
+Offers signer capability on behalf of <code>account</code> to the account at address <code>recipient_address</code>.<br/> An account can delegate its signer capability to only one other address at one time.<br/> <code>signer_capability_key_bytes</code> is the <code>SignerCapabilityOfferProofChallengeV2</code> signed by the account owner&apos;s key<br/> <code>account_scheme</code> is the scheme of the account (ed25519 or multi_ed25519).<br/> <code>account_public_key_bytes</code> is the public key of the account owner.<br/> <code>recipient_address</code> is the address of the recipient of the signer capability &#45; note that if there&apos;s an existing<br/> <code>recipient_address</code> in the account owner&apos;s <code>SignerCapabilityOffer</code>, this will replace the<br/> previous <code>recipient_address</code> upon successful verification (the previous recipient will no longer have access<br/> to the account owner&apos;s signer capability).
 
 
 <pre><code>public entry fun offer_signer_capability(account: &amp;signer, signer_capability_sig_bytes: vector&lt;u8&gt;, account_scheme: u8, account_public_key_bytes: vector&lt;u8&gt;, recipient_address: address)<br/></code></pre>
@@ -1345,8 +1265,7 @@ Returns the address of the account that has a signer capability offer from the a
 
 ## Function `revoke_signer_capability`
 
-Revoke the account owner's signer capability offer for <code>to_be_revoked_address</code> (i.e., the address that
-has a signer capability offer from <code>account</code> but will be revoked in this function).
+Revoke the account owner&apos;s signer capability offer for <code>to_be_revoked_address</code> (i.e., the address that<br/> has a signer capability offer from <code>account</code> but will be revoked in this function).
 
 
 <pre><code>public entry fun revoke_signer_capability(account: &amp;signer, to_be_revoked_address: address)<br/></code></pre>
@@ -1388,8 +1307,7 @@ Revoke any signer capability offer in the specified account.
 
 ## Function `create_authorized_signer`
 
-Return an authorized signer of the offerer, if there's an existing signer capability offer for <code>account</code>
-at the offerer's address.
+Return an authorized signer of the offerer, if there&apos;s an existing signer capability offer for <code>account</code><br/> at the offerer&apos;s address.
 
 
 <pre><code>public fun create_authorized_signer(account: &amp;signer, offerer_address: address): signer<br/></code></pre>
@@ -1431,8 +1349,7 @@ Helper functions for authentication key rotation.
 
 ## Function `update_auth_key_and_originating_address_table`
 
-Update the <code>OriginatingAddress</code> table, so that we can find the originating address using the latest address
-in the event of key recovery.
+Update the <code>OriginatingAddress</code> table, so that we can find the originating address using the latest address<br/> in the event of key recovery.
 
 
 <pre><code>fun update_auth_key_and_originating_address_table(originating_addr: address, account_resource: &amp;mut account::Account, new_auth_key_vector: vector&lt;u8&gt;)<br/></code></pre>
@@ -1453,9 +1370,7 @@ in the event of key recovery.
 
 ## Function `create_resource_address`
 
-Basic account creation methods.
-This is a helper function to compute resource addresses. Computation of the address
-involves the use of a cryptographic hash operation and should be use thoughtfully.
+Basic account creation methods.<br/> This is a helper function to compute resource addresses. Computation of the address<br/> involves the use of a cryptographic hash operation and should be use thoughtfully.
 
 
 <pre><code>public fun create_resource_address(source: &amp;address, seed: vector&lt;u8&gt;): address<br/></code></pre>
@@ -1476,15 +1391,7 @@ involves the use of a cryptographic hash operation and should be use thoughtfull
 
 ## Function `create_resource_account`
 
-A resource account is used to manage resources independent of an account managed by a user.
-In Aptos a resource account is created based upon the sha3 256 of the source's address and additional seed data.
-A resource account can only be created once, this is designated by setting the
-<code>Account::signer_capability_offer::for</code> to the address of the resource account. While an entity may call
-<code>create_account</code> to attempt to claim an account ahead of the creation of a resource account, if found Aptos will
-transition ownership of the account over to the resource account. This is done by validating that the account has
-yet to execute any transactions and that the <code>Account::signer_capability_offer::for</code> is none. The probability of a
-collision where someone has legitimately produced a private key that maps to a resource account address is less
-than <code>(1/2)^(256)</code>.
+A resource account is used to manage resources independent of an account managed by a user.<br/> In Aptos a resource account is created based upon the sha3 256 of the source&apos;s address and additional seed data.<br/> A resource account can only be created once, this is designated by setting the<br/> <code>Account::signer_capability_offer::for</code> to the address of the resource account. While an entity may call<br/> <code>create_account</code> to attempt to claim an account ahead of the creation of a resource account, if found Aptos will<br/> transition ownership of the account over to the resource account. This is done by validating that the account has<br/> yet to execute any transactions and that the <code>Account::signer_capability_offer::for</code> is none. The probability of a<br/> collision where someone has legitimately produced a private key that maps to a resource account address is less<br/> than <code>(1/2)^(256)</code>.
 
 
 <pre><code>public fun create_resource_account(source: &amp;signer, seed: vector&lt;u8&gt;): (signer, account::SignerCapability)<br/></code></pre>
@@ -1657,110 +1564,35 @@ Capability based functions for efficient use.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>The initialization of the account module should result in the proper system initialization with valid and consistent resources.</td>
-<td>High</td>
-<td>Initialization of the account module creates a valid address_map table and moves the resources to the OriginatingAddress under the aptos_framework account.</td>
-<td>Audited that the address_map table is created and populated correctly with the expected initial values.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The initialization of the account module should result in the proper system initialization with valid and consistent resources.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;Initialization of the account module creates a valid address_map table and moves the resources to the OriginatingAddress under the aptos_framework account.&lt;/td&gt;<br/>&lt;td&gt;Audited that the address_map table is created and populated correctly with the expected initial values.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>After successfully creating an account, the account resources should initialize with the default data, ensuring the proper initialization of the account state.</td>
-<td>High</td>
-<td>Creating an account via the create_account function validates the state and moves a new account resource under new_address.</td>
-<td>Formally verified via <a href="#high-level-req-2">create_account</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;After successfully creating an account, the account resources should initialize with the default data, ensuring the proper initialization of the account state.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;Creating an account via the create_account function validates the state and moves a new account resource under new_address.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;create_account&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>Checking the existence of an account under a given address never results in an abort.</td>
-<td>Low</td>
-<td>The exists_at function returns a boolean value indicating the existence of an account under the given address.</td>
-<td>Formally verified by the <a href="#high-level-req-3">aborts_if</a> condition.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Checking the existence of an account under a given address never results in an abort.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The exists_at function returns a boolean value indicating the existence of an account under the given address.&lt;/td&gt;<br/>&lt;td&gt;Formally verified by the &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;aborts_if&lt;/a&gt; condition.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>The account module maintains bounded sequence numbers for all accounts, guaranteeing they remain within the specified limit.</td>
-<td>Medium</td>
-<td>The sequence number of an account may only increase up to MAX_U64 in a succeeding manner.</td>
-<td>Formally verified via <a href="#high-level-req-4">increment_sequence_number</a> that it remains within the defined boundary of MAX_U64.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The account module maintains bounded sequence numbers for all accounts, guaranteeing they remain within the specified limit.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The sequence number of an account may only increase up to MAX_U64 in a succeeding manner.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;increment_sequence_number&lt;/a&gt; that it remains within the defined boundary of MAX_U64.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>Only the ed25519 and multied25519 signature schemes are permissible.</td>
-<td>Low</td>
-<td>Exclusively perform key rotation using either the ed25519 or multied25519 signature schemes. Currently restricts the offering of rotation/signing capabilities to the ed25519 or multied25519 schemes.</td>
-<td>Formally Verified: <a href="#high-level-req-5.1">rotate_authentication_key</a>, <a href="#high-level-req-5.2">offer_rotation_capability</a>, and <a href="#high-level-req-5.3">offer_signer_capability</a>. Verified that it aborts if the account_scheme is not ED25519_SCHEME and not MULTI_ED25519_SCHEME. Audited that the scheme enums correspond correctly to signature logic.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;Only the ed25519 and multied25519 signature schemes are permissible.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;Exclusively perform key rotation using either the ed25519 or multied25519 signature schemes. Currently restricts the offering of rotation/signing capabilities to the ed25519 or multied25519 schemes.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified: &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5.1&quot;&gt;rotate_authentication_key&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5.2&quot;&gt;offer_rotation_capability&lt;/a&gt;, and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5.3&quot;&gt;offer_signer_capability&lt;/a&gt;. Verified that it aborts if the account_scheme is not ED25519_SCHEME and not MULTI_ED25519_SCHEME. Audited that the scheme enums correspond correctly to signature logic.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>6</td>
-<td>Exclusively permit the rotation of the authentication key of an account for the account owner or any user who possesses rotation capabilities associated with that account.</td>
-<td>Critical</td>
-<td>In the rotate_authentication_key function, the authentication key derived from the from_public_key_bytes should match the signer's current authentication key. Only the delegate_signer granted the rotation capabilities may invoke the rotate_authentication_key_with_rotation_capability function.</td>
-<td>Formally Verified via <a href="#high-level-req-6.1">rotate_authentication_key</a> and <a href="#high-level-req-6.2">rotate_authentication_key_with_rotation_capability</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;6&lt;/td&gt;<br/>&lt;td&gt;Exclusively permit the rotation of the authentication key of an account for the account owner or any user who possesses rotation capabilities associated with that account.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;In the rotate_authentication_key function, the authentication key derived from the from_public_key_bytes should match the signer&apos;s current authentication key. Only the delegate_signer granted the rotation capabilities may invoke the rotate_authentication_key_with_rotation_capability function.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.1&quot;&gt;rotate_authentication_key&lt;/a&gt; and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.2&quot;&gt;rotate_authentication_key_with_rotation_capability&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>7</td>
-<td>Only the owner of an account may offer or revoke the following capabilities: (1) offer_rotation_capability, (2) offer_signer_capability, (3) revoke_rotation_capability, and (4) revoke_signer_capability.</td>
-<td>Critical</td>
-<td>An account resource may only be modified by the owner of the account utilizing: rotation_capability_offer, signer_capability_offer.</td>
-<td>Formally verified via <a href="#high-level-req-7.1">offer_rotation_capability</a>, <a href="#high-level-req-7.2">offer_signer_capability</a>, and <a href="#high-level-req-7.3">revoke_rotation_capability</a>. and <a href="#high-level-req-7.4">revoke_signer_capability</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;7&lt;/td&gt;<br/>&lt;td&gt;Only the owner of an account may offer or revoke the following capabilities: (1) offer_rotation_capability, (2) offer_signer_capability, (3) revoke_rotation_capability, and (4) revoke_signer_capability.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;An account resource may only be modified by the owner of the account utilizing: rotation_capability_offer, signer_capability_offer.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;7.1&quot;&gt;offer_rotation_capability&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;7.2&quot;&gt;offer_signer_capability&lt;/a&gt;, and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;7.3&quot;&gt;revoke_rotation_capability&lt;/a&gt;. and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;7.4&quot;&gt;revoke_signer_capability&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>8</td>
-<td>The capability to create a signer for the account is exclusively reserved for either the account owner or the account that has been granted the signing capabilities.</td>
-<td>Critical</td>
-<td>Signer creation for the account may only be successfully executed by explicitly granting the signing capabilities with the create_authorized_signer function.</td>
-<td>Formally verified via <a href="#high-level-req-8">create_authorized_signer</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;8&lt;/td&gt;<br/>&lt;td&gt;The capability to create a signer for the account is exclusively reserved for either the account owner or the account that has been granted the signing capabilities.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;Signer creation for the account may only be successfully executed by explicitly granting the signing capabilities with the create_authorized_signer function.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;8&quot;&gt;create_authorized_signer&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>9</td>
-<td>Rotating the authentication key requires two valid signatures. With the private key of the current authentication key. With the private key of the new authentication key.</td>
-<td>Critical</td>
-<td>The rotate_authentication_key verifies two signatures (current and new) before rotating to the new key. The first signature ensures the user has the intended capability, and the second signature ensures that the user owns the new key.</td>
-<td>Formally verified via <a href="#high-level-req-9.1">rotate_authentication_key</a> and <a href="#high-level-req-9.2">rotate_authentication_key_with_rotation_capability</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;9&lt;/td&gt;<br/>&lt;td&gt;Rotating the authentication key requires two valid signatures. With the private key of the current authentication key. With the private key of the new authentication key.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The rotate_authentication_key verifies two signatures (current and new) before rotating to the new key. The first signature ensures the user has the intended capability, and the second signature ensures that the user owns the new key.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;9.1&quot;&gt;rotate_authentication_key&lt;/a&gt; and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;9.2&quot;&gt;rotate_authentication_key_with_rotation_capability&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>10</td>
-<td>The rotation of the authentication key updates the account's authentication key with the newly supplied one.</td>
-<td>High</td>
-<td>The auth_key may only update to the provided new_auth_key after verifying the signature.</td>
-<td>Formally Verified in <a href="#high-level-req-10">rotate_authentication_key_internal</a> that the authentication key of an account is modified to the provided authentication key if the signature verification was successful.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;10&lt;/td&gt;<br/>&lt;td&gt;The rotation of the authentication key updates the account&apos;s authentication key with the newly supplied one.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The auth_key may only update to the provided new_auth_key after verifying the signature.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified in &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;10&quot;&gt;rotate_authentication_key_internal&lt;/a&gt; that the authentication key of an account is modified to the provided authentication key if the signature verification was successful.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>11</td>
-<td>The creation number is monotonically increasing.</td>
-<td>Low</td>
-<td>The guid_creation_num in the Account structure is monotonically increasing.</td>
-<td>Formally Verified via <a href="#high-level-req-11">guid_creation_num</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;11&lt;/td&gt;<br/>&lt;td&gt;The creation number is monotonically increasing.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The guid_creation_num in the Account structure is monotonically increasing.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;11&quot;&gt;guid_creation_num&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>12</td>
-<td>The Account resource is persistent.</td>
-<td>Low</td>
-<td>The Account structure assigned to the address should be persistent.</td>
-<td>Audited that the Account structure is persistent.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;12&lt;/td&gt;<br/>&lt;td&gt;The Account resource is persistent.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The Account structure assigned to the address should be persistent.&lt;/td&gt;<br/>&lt;td&gt;Audited that the Account structure is persistent.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -1780,8 +1612,7 @@ Capability based functions for efficient use.
 <pre><code>public(friend) fun initialize(aptos_framework: &amp;signer)<br/></code></pre>
 
 
-Only the address <code>@aptos_framework</code> can call.
-OriginatingAddress does not exist under <code>@aptos_framework</code> before the call.
+Only the address <code>@aptos_framework</code> can call.<br/> OriginatingAddress does not exist under <code>@aptos_framework</code> before the call.
 
 
 <pre><code>let aptos_addr &#61; signer::address_of(aptos_framework);<br/>aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);<br/>aborts_if exists&lt;OriginatingAddress&gt;(aptos_addr);<br/>ensures exists&lt;OriginatingAddress&gt;(aptos_addr);<br/></code></pre>
@@ -1824,12 +1655,10 @@ Ensure that the account exists at the end of the call.
 <pre><code>public(friend) fun create_account(new_address: address): signer<br/></code></pre>
 
 
-Check if the bytes of the new address is 32.
-The Account does not exist under the new address before creating the account.
-Limit the new account address is not @vm_reserved / @aptos_framework / @aptos_toke.
+Check if the bytes of the new address is 32.<br/> The Account does not exist under the new address before creating the account.<br/> Limit the new account address is not @vm_reserved / @aptos_framework / @aptos_toke.
 
 
-<pre><code>include CreateAccountAbortsIf &#123;addr: new_address&#125;;<br/>aborts_if new_address &#61;&#61; @vm_reserved &#124;&#124; new_address &#61;&#61; @aptos_framework &#124;&#124; new_address &#61;&#61; @aptos_token;<br/>ensures signer::address_of(result) &#61;&#61; new_address;<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>include CreateAccountAbortsIf &#123;addr: new_address&#125;;<br/>aborts_if new_address &#61;&#61; @vm_reserved &#124;&#124; new_address &#61;&#61; @aptos_framework &#124;&#124; new_address &#61;&#61; @aptos_token;<br/>ensures signer::address_of(result) &#61;&#61; new_address;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 ensures exists&lt;Account&gt;(new_address);<br/></code></pre>
 
 
@@ -1842,8 +1671,7 @@ ensures exists&lt;Account&gt;(new_address);<br/></code></pre>
 <pre><code>fun create_account_unchecked(new_address: address): signer<br/></code></pre>
 
 
-Check if the bytes of the new address is 32.
-The Account does not exist under the new address before creating the account.
+Check if the bytes of the new address is 32.<br/> The Account does not exist under the new address before creating the account.
 
 
 <pre><code>include CreateAccountAbortsIf &#123;addr: new_address&#125;;<br/>ensures signer::address_of(result) &#61;&#61; new_address;<br/>ensures exists&lt;Account&gt;(new_address);<br/></code></pre>
@@ -1860,7 +1688,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -1909,11 +1737,10 @@ aborts_if false;<br/></code></pre>
 <pre><code>public(friend) fun increment_sequence_number(addr: address)<br/></code></pre>
 
 
-The Account existed under the address.
-The sequence_number of the Account is up to MAX_U64.
+The Account existed under the address.<br/> The sequence_number of the Account is up to MAX_U64.
 
 
-<pre><code>let sequence_number &#61; global&lt;Account&gt;(addr).sequence_number;<br/>aborts_if !exists&lt;Account&gt;(addr);<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<pre><code>let sequence_number &#61; global&lt;Account&gt;(addr).sequence_number;<br/>aborts_if !exists&lt;Account&gt;(addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
 aborts_if sequence_number &#61;&#61; MAX_U64;<br/>modifies global&lt;Account&gt;(addr);<br/>let post post_sequence_number &#61; global&lt;Account&gt;(addr).sequence_number;<br/>ensures post_sequence_number &#61;&#61; sequence_number &#43; 1;<br/></code></pre>
 
 
@@ -1940,11 +1767,10 @@ aborts_if sequence_number &#61;&#61; MAX_U64;<br/>modifies global&lt;Account&gt;
 <pre><code>public(friend) fun rotate_authentication_key_internal(account: &amp;signer, new_auth_key: vector&lt;u8&gt;)<br/></code></pre>
 
 
-The Account existed under the signer before the call.
-The length of new_auth_key is 32.
+The Account existed under the signer before the call.<br/> The length of new_auth_key is 32.
 
 
-<pre><code>let addr &#61; signer::address_of(account);<br/>// This enforces <a id="high-level-req-10" href="#high-level-req">high-level requirement 10</a>:
+<pre><code>let addr &#61; signer::address_of(account);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;10&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 10&lt;/a&gt;:
 let post account_resource &#61; global&lt;Account&gt;(addr);<br/>aborts_if !exists&lt;Account&gt;(addr);<br/>aborts_if vector::length(new_auth_key) !&#61; 32;<br/>modifies global&lt;Account&gt;(addr);<br/>ensures account_resource.authentication_key &#61;&#61; new_auth_key;<br/></code></pre>
 
 
@@ -1959,7 +1785,7 @@ let post account_resource &#61; global&lt;Account&gt;(addr);<br/>aborts_if !exis
 
 
 
-<pre><code>let addr &#61; signer::address_of(account);<br/>// This enforces <a id="high-level-req-10" href="#high-level-req">high-level requirement 10</a>:
+<pre><code>let addr &#61; signer::address_of(account);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;10&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 10&lt;/a&gt;:
 let post account_resource &#61; global&lt;Account&gt;(addr);<br/>aborts_if !exists&lt;Account&gt;(addr);<br/>aborts_if vector::length(new_auth_key) !&#61; 32;<br/>modifies global&lt;Account&gt;(addr);<br/>ensures account_resource.authentication_key &#61;&#61; new_auth_key;<br/></code></pre>
 
 
@@ -1980,13 +1806,12 @@ let post account_resource &#61; global&lt;Account&gt;(addr);<br/>aborts_if !exis
 <pre><code>public entry fun rotate_authentication_key(account: &amp;signer, from_scheme: u8, from_public_key_bytes: vector&lt;u8&gt;, to_scheme: u8, to_public_key_bytes: vector&lt;u8&gt;, cap_rotate_key: vector&lt;u8&gt;, cap_update_table: vector&lt;u8&gt;)<br/></code></pre>
 
 
-The Account existed under the signer
-The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
+The Account existed under the signer<br/> The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
-<pre><code>let addr &#61; signer::address_of(account);<br/>let account_resource &#61; global&lt;Account&gt;(addr);<br/>aborts_if !exists&lt;Account&gt;(addr);<br/>// This enforces <a id="high-level-req-6.1" href="#high-level-req">high-level requirement 6</a>:
-include from_scheme &#61;&#61; ED25519_SCHEME &#61;&#61;&gt; ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf &#123; bytes: from_public_key_bytes &#125;;<br/>aborts_if from_scheme &#61;&#61; ED25519_SCHEME &amp;&amp; (&#123;<br/>    let expected_auth_key &#61; ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);<br/>    account_resource.authentication_key !&#61; expected_auth_key<br/>&#125;);<br/>include from_scheme &#61;&#61; MULTI_ED25519_SCHEME &#61;&#61;&gt; multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf &#123; bytes: from_public_key_bytes &#125;;<br/>aborts_if from_scheme &#61;&#61; MULTI_ED25519_SCHEME &amp;&amp; (&#123;<br/>    let from_auth_key &#61; multi_ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);<br/>    account_resource.authentication_key !&#61; from_auth_key<br/>&#125;);<br/>// This enforces <a id="high-level-req-5.1" href="#high-level-req">high-level requirement 5</a>:
-aborts_if from_scheme !&#61; ED25519_SCHEME &amp;&amp; from_scheme !&#61; MULTI_ED25519_SCHEME;<br/>let curr_auth_key &#61; from_bcs::deserialize&lt;address&gt;(account_resource.authentication_key);<br/>aborts_if !from_bcs::deserializable&lt;address&gt;(account_resource.authentication_key);<br/>let challenge &#61; RotationProofChallenge &#123;<br/>    sequence_number: account_resource.sequence_number,<br/>    originator: addr,<br/>    current_auth_key: curr_auth_key,<br/>    new_public_key: to_public_key_bytes,<br/>&#125;;<br/>// This enforces <a id="high-level-req-9.1" href="#high-level-req">high-level requirement 9</a>:
+<pre><code>let addr &#61; signer::address_of(account);<br/>let account_resource &#61; global&lt;Account&gt;(addr);<br/>aborts_if !exists&lt;Account&gt;(addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
+include from_scheme &#61;&#61; ED25519_SCHEME &#61;&#61;&gt; ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf &#123; bytes: from_public_key_bytes &#125;;<br/>aborts_if from_scheme &#61;&#61; ED25519_SCHEME &amp;&amp; (&#123;<br/>    let expected_auth_key &#61; ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);<br/>    account_resource.authentication_key !&#61; expected_auth_key<br/>&#125;);<br/>include from_scheme &#61;&#61; MULTI_ED25519_SCHEME &#61;&#61;&gt; multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf &#123; bytes: from_public_key_bytes &#125;;<br/>aborts_if from_scheme &#61;&#61; MULTI_ED25519_SCHEME &amp;&amp; (&#123;<br/>    let from_auth_key &#61; multi_ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);<br/>    account_resource.authentication_key !&#61; from_auth_key<br/>&#125;);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt;:
+aborts_if from_scheme !&#61; ED25519_SCHEME &amp;&amp; from_scheme !&#61; MULTI_ED25519_SCHEME;<br/>let curr_auth_key &#61; from_bcs::deserialize&lt;address&gt;(account_resource.authentication_key);<br/>aborts_if !from_bcs::deserializable&lt;address&gt;(account_resource.authentication_key);<br/>let challenge &#61; RotationProofChallenge &#123;<br/>    sequence_number: account_resource.sequence_number,<br/>    originator: addr,<br/>    current_auth_key: curr_auth_key,<br/>    new_public_key: to_public_key_bytes,<br/>&#125;;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;9.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 9&lt;/a&gt;:
 include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf &#123;<br/>    scheme: from_scheme,<br/>    public_key_bytes: from_public_key_bytes,<br/>    signature: cap_rotate_key,<br/>    challenge,<br/>&#125;;<br/>include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf &#123;<br/>    scheme: to_scheme,<br/>    public_key_bytes: to_public_key_bytes,<br/>    signature: cap_update_table,<br/>    challenge,<br/>&#125;;<br/>let originating_addr &#61; addr;<br/>let new_auth_key_vector &#61; spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);<br/>let address_map &#61; global&lt;OriginatingAddress&gt;(@aptos_framework).address_map;<br/>let new_auth_key &#61; from_bcs::deserialize&lt;address&gt;(new_auth_key_vector);<br/>aborts_if !exists&lt;OriginatingAddress&gt;(@aptos_framework);<br/>aborts_if !from_bcs::deserializable&lt;address&gt;(account_resource.authentication_key);<br/>aborts_if table::spec_contains(address_map, curr_auth_key) &amp;&amp;<br/>    table::spec_get(address_map, curr_auth_key) !&#61; originating_addr;<br/>aborts_if !from_bcs::deserializable&lt;address&gt;(new_auth_key_vector);<br/>aborts_if curr_auth_key !&#61; new_auth_key &amp;&amp; table::spec_contains(address_map, new_auth_key);<br/>include UpdateAuthKeyAndOriginatingAddressTableAbortsIf &#123;<br/>    originating_addr: addr,<br/>&#125;;<br/>let post auth_key &#61; global&lt;Account&gt;(addr).authentication_key;<br/>ensures auth_key &#61;&#61; new_auth_key_vector;<br/></code></pre>
 
 
@@ -2001,8 +1826,8 @@ include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf &#123;<br/>    sc
 
 
 
-<pre><code>aborts_if !exists&lt;Account&gt;(rotation_cap_offerer_address);<br/>let delegate_address &#61; signer::address_of(delegate_signer);<br/>let offerer_account_resource &#61; global&lt;Account&gt;(rotation_cap_offerer_address);<br/>aborts_if !from_bcs::deserializable&lt;address&gt;(offerer_account_resource.authentication_key);<br/>let curr_auth_key &#61; from_bcs::deserialize&lt;address&gt;(offerer_account_resource.authentication_key);<br/>aborts_if !exists&lt;Account&gt;(delegate_address);<br/>let challenge &#61; RotationProofChallenge &#123;<br/>    sequence_number: global&lt;Account&gt;(delegate_address).sequence_number,<br/>    originator: rotation_cap_offerer_address,<br/>    current_auth_key: curr_auth_key,<br/>    new_public_key: new_public_key_bytes,<br/>&#125;;<br/>// This enforces <a id="high-level-req-6.2" href="#high-level-req">high-level requirement 6</a>:
-aborts_if !option::spec_contains(offerer_account_resource.rotation_capability_offer.for, delegate_address);<br/>// This enforces <a id="high-level-req-9.1" href="#high-level-req">high-level requirement 9</a>:
+<pre><code>aborts_if !exists&lt;Account&gt;(rotation_cap_offerer_address);<br/>let delegate_address &#61; signer::address_of(delegate_signer);<br/>let offerer_account_resource &#61; global&lt;Account&gt;(rotation_cap_offerer_address);<br/>aborts_if !from_bcs::deserializable&lt;address&gt;(offerer_account_resource.authentication_key);<br/>let curr_auth_key &#61; from_bcs::deserialize&lt;address&gt;(offerer_account_resource.authentication_key);<br/>aborts_if !exists&lt;Account&gt;(delegate_address);<br/>let challenge &#61; RotationProofChallenge &#123;<br/>    sequence_number: global&lt;Account&gt;(delegate_address).sequence_number,<br/>    originator: rotation_cap_offerer_address,<br/>    current_auth_key: curr_auth_key,<br/>    new_public_key: new_public_key_bytes,<br/>&#125;;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
+aborts_if !option::spec_contains(offerer_account_resource.rotation_capability_offer.for, delegate_address);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;9.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 9&lt;/a&gt;:
 include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf &#123;<br/>    scheme: new_scheme,<br/>    public_key_bytes: new_public_key_bytes,<br/>    signature: cap_update_table,<br/>    challenge,<br/>&#125;;<br/>let new_auth_key_vector &#61; spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);<br/>let address_map &#61; global&lt;OriginatingAddress&gt;(@aptos_framework).address_map;<br/>aborts_if !exists&lt;OriginatingAddress&gt;(@aptos_framework);<br/>aborts_if !from_bcs::deserializable&lt;address&gt;(offerer_account_resource.authentication_key);<br/>aborts_if table::spec_contains(address_map, curr_auth_key) &amp;&amp;<br/>    table::spec_get(address_map, curr_auth_key) !&#61; rotation_cap_offerer_address;<br/>aborts_if !from_bcs::deserializable&lt;address&gt;(new_auth_key_vector);<br/>let new_auth_key &#61; from_bcs::deserialize&lt;address&gt;(new_auth_key_vector);<br/>aborts_if curr_auth_key !&#61; new_auth_key &amp;&amp; table::spec_contains(address_map, new_auth_key);<br/>include UpdateAuthKeyAndOriginatingAddressTableAbortsIf &#123;<br/>    originating_addr: rotation_cap_offerer_address,<br/>    account_resource: offerer_account_resource,<br/>&#125;;<br/>let post auth_key &#61; global&lt;Account&gt;(rotation_cap_offerer_address).authentication_key;<br/>ensures auth_key &#61;&#61; new_auth_key_vector;<br/></code></pre>
 
 
@@ -2017,8 +1842,8 @@ include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf &#123;<br/>    sc
 
 
 
-<pre><code>let source_address &#61; signer::address_of(account);<br/>let account_resource &#61; global&lt;Account&gt;(source_address);<br/>let proof_challenge &#61; RotationCapabilityOfferProofChallengeV2 &#123;<br/>    chain_id: global&lt;chain_id::ChainId&gt;(@aptos_framework).id,<br/>    sequence_number: account_resource.sequence_number,<br/>    source_address,<br/>    recipient_address,<br/>&#125;;<br/>aborts_if !exists&lt;chain_id::ChainId&gt;(@aptos_framework);<br/>aborts_if !exists&lt;Account&gt;(recipient_address);<br/>aborts_if !exists&lt;Account&gt;(source_address);<br/>include account_scheme &#61;&#61; ED25519_SCHEME &#61;&#61;&gt; ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf &#123; bytes: account_public_key_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; ED25519_SCHEME &amp;&amp; (&#123;<br/>    let expected_auth_key &#61; ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);<br/>    account_resource.authentication_key !&#61; expected_auth_key<br/>&#125;);<br/>include account_scheme &#61;&#61; ED25519_SCHEME &#61;&#61;&gt; ed25519::NewSignatureFromBytesAbortsIf &#123; bytes: rotation_capability_sig_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; ED25519_SCHEME &amp;&amp; !ed25519::spec_signature_verify_strict_t(<br/>    ed25519::Signature &#123; bytes: rotation_capability_sig_bytes &#125;,<br/>    ed25519::UnvalidatedPublicKey &#123; bytes: account_public_key_bytes &#125;,<br/>    proof_challenge<br/>);<br/>include account_scheme &#61;&#61; MULTI_ED25519_SCHEME &#61;&#61;&gt; multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf &#123; bytes: account_public_key_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; MULTI_ED25519_SCHEME &amp;&amp; (&#123;<br/>    let expected_auth_key &#61; multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);<br/>    account_resource.authentication_key !&#61; expected_auth_key<br/>&#125;);<br/>include account_scheme &#61;&#61; MULTI_ED25519_SCHEME &#61;&#61;&gt; multi_ed25519::NewSignatureFromBytesAbortsIf &#123; bytes: rotation_capability_sig_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; MULTI_ED25519_SCHEME &amp;&amp; !multi_ed25519::spec_signature_verify_strict_t(<br/>    multi_ed25519::Signature &#123; bytes: rotation_capability_sig_bytes &#125;,<br/>    multi_ed25519::UnvalidatedPublicKey &#123; bytes: account_public_key_bytes &#125;,<br/>    proof_challenge<br/>);<br/>// This enforces <a id="high-level-req-5.2" href="#high-level-req">high-level requirement 5</a>:
-aborts_if account_scheme !&#61; ED25519_SCHEME &amp;&amp; account_scheme !&#61; MULTI_ED25519_SCHEME;<br/>// This enforces <a id="high-level-req-7.1" href="#high-level-req">high-level requirement 7</a>:
+<pre><code>let source_address &#61; signer::address_of(account);<br/>let account_resource &#61; global&lt;Account&gt;(source_address);<br/>let proof_challenge &#61; RotationCapabilityOfferProofChallengeV2 &#123;<br/>    chain_id: global&lt;chain_id::ChainId&gt;(@aptos_framework).id,<br/>    sequence_number: account_resource.sequence_number,<br/>    source_address,<br/>    recipient_address,<br/>&#125;;<br/>aborts_if !exists&lt;chain_id::ChainId&gt;(@aptos_framework);<br/>aborts_if !exists&lt;Account&gt;(recipient_address);<br/>aborts_if !exists&lt;Account&gt;(source_address);<br/>include account_scheme &#61;&#61; ED25519_SCHEME &#61;&#61;&gt; ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf &#123; bytes: account_public_key_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; ED25519_SCHEME &amp;&amp; (&#123;<br/>    let expected_auth_key &#61; ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);<br/>    account_resource.authentication_key !&#61; expected_auth_key<br/>&#125;);<br/>include account_scheme &#61;&#61; ED25519_SCHEME &#61;&#61;&gt; ed25519::NewSignatureFromBytesAbortsIf &#123; bytes: rotation_capability_sig_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; ED25519_SCHEME &amp;&amp; !ed25519::spec_signature_verify_strict_t(<br/>    ed25519::Signature &#123; bytes: rotation_capability_sig_bytes &#125;,<br/>    ed25519::UnvalidatedPublicKey &#123; bytes: account_public_key_bytes &#125;,<br/>    proof_challenge<br/>);<br/>include account_scheme &#61;&#61; MULTI_ED25519_SCHEME &#61;&#61;&gt; multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf &#123; bytes: account_public_key_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; MULTI_ED25519_SCHEME &amp;&amp; (&#123;<br/>    let expected_auth_key &#61; multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);<br/>    account_resource.authentication_key !&#61; expected_auth_key<br/>&#125;);<br/>include account_scheme &#61;&#61; MULTI_ED25519_SCHEME &#61;&#61;&gt; multi_ed25519::NewSignatureFromBytesAbortsIf &#123; bytes: rotation_capability_sig_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; MULTI_ED25519_SCHEME &amp;&amp; !multi_ed25519::spec_signature_verify_strict_t(<br/>    multi_ed25519::Signature &#123; bytes: rotation_capability_sig_bytes &#125;,<br/>    multi_ed25519::UnvalidatedPublicKey &#123; bytes: account_public_key_bytes &#125;,<br/>    proof_challenge<br/>);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt;:
+aborts_if account_scheme !&#61; ED25519_SCHEME &amp;&amp; account_scheme !&#61; MULTI_ED25519_SCHEME;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;7.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 7&lt;/a&gt;:
 modifies global&lt;Account&gt;(source_address);<br/>let post offer_for &#61; global&lt;Account&gt;(source_address).rotation_capability_offer.for;<br/>ensures option::spec_borrow(offer_for) &#61;&#61; recipient_address;<br/></code></pre>
 
 
@@ -2075,7 +1900,7 @@ modifies global&lt;Account&gt;(source_address);<br/>let post offer_for &#61; glo
 
 
 
-<pre><code>let addr &#61; signer::address_of(account);<br/>modifies global&lt;Account&gt;(addr);<br/>aborts_if !exists&lt;Account&gt;(addr);<br/>let account_resource &#61; global&lt;Account&gt;(addr);<br/>// This enforces <a id="high-level-req-7.3" href="#high-level-req">high-level requirement 7</a>:
+<pre><code>let addr &#61; signer::address_of(account);<br/>modifies global&lt;Account&gt;(addr);<br/>aborts_if !exists&lt;Account&gt;(addr);<br/>let account_resource &#61; global&lt;Account&gt;(addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;7.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 7&lt;/a&gt;:
 aborts_if !option::is_some(account_resource.rotation_capability_offer.for);<br/>let post offer_for &#61; global&lt;Account&gt;(addr).rotation_capability_offer.for;<br/>ensures !option::spec_is_some(offer_for);<br/></code></pre>
 
 
@@ -2088,12 +1913,11 @@ aborts_if !option::is_some(account_resource.rotation_capability_offer.for);<br/>
 <pre><code>public entry fun offer_signer_capability(account: &amp;signer, signer_capability_sig_bytes: vector&lt;u8&gt;, account_scheme: u8, account_public_key_bytes: vector&lt;u8&gt;, recipient_address: address)<br/></code></pre>
 
 
-The Account existed under the signer.
-The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
+The Account existed under the signer.<br/> The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 
 
-<pre><code>let source_address &#61; signer::address_of(account);<br/>let account_resource &#61; global&lt;Account&gt;(source_address);<br/>let proof_challenge &#61; SignerCapabilityOfferProofChallengeV2 &#123;<br/>    sequence_number: account_resource.sequence_number,<br/>    source_address,<br/>    recipient_address,<br/>&#125;;<br/>aborts_if !exists&lt;Account&gt;(recipient_address);<br/>aborts_if !exists&lt;Account&gt;(source_address);<br/>include account_scheme &#61;&#61; ED25519_SCHEME &#61;&#61;&gt; ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf &#123; bytes: account_public_key_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; ED25519_SCHEME &amp;&amp; (&#123;<br/>    let expected_auth_key &#61; ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);<br/>    account_resource.authentication_key !&#61; expected_auth_key<br/>&#125;);<br/>include account_scheme &#61;&#61; ED25519_SCHEME &#61;&#61;&gt; ed25519::NewSignatureFromBytesAbortsIf &#123; bytes: signer_capability_sig_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; ED25519_SCHEME &amp;&amp; !ed25519::spec_signature_verify_strict_t(<br/>    ed25519::Signature &#123; bytes: signer_capability_sig_bytes &#125;,<br/>    ed25519::UnvalidatedPublicKey &#123; bytes: account_public_key_bytes &#125;,<br/>    proof_challenge<br/>);<br/>include account_scheme &#61;&#61; MULTI_ED25519_SCHEME &#61;&#61;&gt; multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf &#123; bytes: account_public_key_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; MULTI_ED25519_SCHEME &amp;&amp; (&#123;<br/>    let expected_auth_key &#61; multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);<br/>    account_resource.authentication_key !&#61; expected_auth_key<br/>&#125;);<br/>include account_scheme &#61;&#61; MULTI_ED25519_SCHEME &#61;&#61;&gt; multi_ed25519::NewSignatureFromBytesAbortsIf &#123; bytes: signer_capability_sig_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; MULTI_ED25519_SCHEME &amp;&amp; !multi_ed25519::spec_signature_verify_strict_t(<br/>    multi_ed25519::Signature &#123; bytes: signer_capability_sig_bytes &#125;,<br/>    multi_ed25519::UnvalidatedPublicKey &#123; bytes: account_public_key_bytes &#125;,<br/>    proof_challenge<br/>);<br/>// This enforces <a id="high-level-req-5.3" href="#high-level-req">high-level requirement 5</a>:
-aborts_if account_scheme !&#61; ED25519_SCHEME &amp;&amp; account_scheme !&#61; MULTI_ED25519_SCHEME;<br/>// This enforces <a id="high-level-req-7.2" href="#high-level-req">high-level requirement 7</a>:
+<pre><code>let source_address &#61; signer::address_of(account);<br/>let account_resource &#61; global&lt;Account&gt;(source_address);<br/>let proof_challenge &#61; SignerCapabilityOfferProofChallengeV2 &#123;<br/>    sequence_number: account_resource.sequence_number,<br/>    source_address,<br/>    recipient_address,<br/>&#125;;<br/>aborts_if !exists&lt;Account&gt;(recipient_address);<br/>aborts_if !exists&lt;Account&gt;(source_address);<br/>include account_scheme &#61;&#61; ED25519_SCHEME &#61;&#61;&gt; ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf &#123; bytes: account_public_key_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; ED25519_SCHEME &amp;&amp; (&#123;<br/>    let expected_auth_key &#61; ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);<br/>    account_resource.authentication_key !&#61; expected_auth_key<br/>&#125;);<br/>include account_scheme &#61;&#61; ED25519_SCHEME &#61;&#61;&gt; ed25519::NewSignatureFromBytesAbortsIf &#123; bytes: signer_capability_sig_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; ED25519_SCHEME &amp;&amp; !ed25519::spec_signature_verify_strict_t(<br/>    ed25519::Signature &#123; bytes: signer_capability_sig_bytes &#125;,<br/>    ed25519::UnvalidatedPublicKey &#123; bytes: account_public_key_bytes &#125;,<br/>    proof_challenge<br/>);<br/>include account_scheme &#61;&#61; MULTI_ED25519_SCHEME &#61;&#61;&gt; multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf &#123; bytes: account_public_key_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; MULTI_ED25519_SCHEME &amp;&amp; (&#123;<br/>    let expected_auth_key &#61; multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);<br/>    account_resource.authentication_key !&#61; expected_auth_key<br/>&#125;);<br/>include account_scheme &#61;&#61; MULTI_ED25519_SCHEME &#61;&#61;&gt; multi_ed25519::NewSignatureFromBytesAbortsIf &#123; bytes: signer_capability_sig_bytes &#125;;<br/>aborts_if account_scheme &#61;&#61; MULTI_ED25519_SCHEME &amp;&amp; !multi_ed25519::spec_signature_verify_strict_t(<br/>    multi_ed25519::Signature &#123; bytes: signer_capability_sig_bytes &#125;,<br/>    multi_ed25519::UnvalidatedPublicKey &#123; bytes: account_public_key_bytes &#125;,<br/>    proof_challenge<br/>);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt;:
+aborts_if account_scheme !&#61; ED25519_SCHEME &amp;&amp; account_scheme !&#61; MULTI_ED25519_SCHEME;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;7.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 7&lt;/a&gt;:
 modifies global&lt;Account&gt;(source_address);<br/>let post offer_for &#61; global&lt;Account&gt;(source_address).signer_capability_offer.for;<br/>ensures option::spec_borrow(offer_for) &#61;&#61; recipient_address;<br/></code></pre>
 
 
@@ -2134,8 +1958,7 @@ modifies global&lt;Account&gt;(source_address);<br/>let post offer_for &#61; glo
 <pre><code>public entry fun revoke_signer_capability(account: &amp;signer, to_be_revoked_address: address)<br/></code></pre>
 
 
-The Account existed under the signer.
-The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address.
+The Account existed under the signer.<br/> The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address.
 
 
 <pre><code>aborts_if !exists&lt;Account&gt;(to_be_revoked_address);<br/>let addr &#61; signer::address_of(account);<br/>let account_resource &#61; global&lt;Account&gt;(addr);<br/>aborts_if !exists&lt;Account&gt;(addr);<br/>aborts_if !option::spec_contains(account_resource.signer_capability_offer.for,to_be_revoked_address);<br/>modifies global&lt;Account&gt;(addr);<br/>ensures exists&lt;Account&gt;(to_be_revoked_address);<br/></code></pre>
@@ -2152,7 +1975,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<pre><code>modifies global&lt;Account&gt;(signer::address_of(account));<br/>// This enforces <a id="high-level-req-7.4" href="#high-level-req">high-level requirement 7</a>:
+<pre><code>modifies global&lt;Account&gt;(signer::address_of(account));<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;7.4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 7&lt;/a&gt;:
 aborts_if !exists&lt;Account&gt;(signer::address_of(account));<br/>let account_resource &#61; global&lt;Account&gt;(signer::address_of(account));<br/>aborts_if !option::is_some(account_resource.signer_capability_offer.for);<br/></code></pre>
 
 
@@ -2165,11 +1988,10 @@ aborts_if !exists&lt;Account&gt;(signer::address_of(account));<br/>let account_r
 <pre><code>public fun create_authorized_signer(account: &amp;signer, offerer_address: address): signer<br/></code></pre>
 
 
-The Account existed under the signer.
-The value of signer_capability_offer.for of Account resource under the signer is offerer_address.
+The Account existed under the signer.<br/> The value of signer_capability_offer.for of Account resource under the signer is offerer_address.
 
 
-<pre><code>// This enforces <a id="high-level-req-8" href="#high-level-req">high-level requirement 8</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;8&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 8&lt;/a&gt;:
 include AccountContainsAddr&#123;<br/>    account,<br/>    address: offerer_address,<br/>&#125;;<br/>modifies global&lt;Account&gt;(offerer_address);<br/>ensures exists&lt;Account&gt;(offerer_address);<br/>ensures signer::address_of(result) &#61;&#61; offerer_address;<br/></code></pre>
 
 
@@ -2178,7 +2000,7 @@ include AccountContainsAddr&#123;<br/>    account,<br/>    address: offerer_addr
 <a id="0x1_account_AccountContainsAddr"></a>
 
 
-<pre><code>schema AccountContainsAddr &#123;<br/>account: signer;<br/>address: address;<br/>let addr &#61; signer::address_of(account);<br/>let account_resource &#61; global&lt;Account&gt;(address);<br/>aborts_if !exists&lt;Account&gt;(address);<br/>// This enforces <a id="high-level-spec-3" href="create_signer.md#high-level-req">high-level requirement 3</a> of the <a href="create_signer.md">create_signer</a> module:
+<pre><code>schema AccountContainsAddr &#123;<br/>account: signer;<br/>address: address;<br/>let addr &#61; signer::address_of(account);<br/>let account_resource &#61; global&lt;Account&gt;(address);<br/>aborts_if !exists&lt;Account&gt;(address);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;spec&#45;3&quot; href&#61;&quot;create_signer.md&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt; of the &lt;a href&#61;&quot;create_signer.md&quot;&gt;create_signer&lt;/a&gt; module:
     aborts_if !option::spec_contains(account_resource.signer_capability_offer.for,addr);<br/>&#125;<br/></code></pre>
 
 
@@ -2235,8 +2057,7 @@ include AccountContainsAddr&#123;<br/>    account,<br/>    address: offerer_addr
 <pre><code>public fun create_resource_address(source: &amp;address, seed: vector&lt;u8&gt;): address<br/></code></pre>
 
 
-The Account existed under the signer
-The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address
+The Account existed under the signer<br/> The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address
 
 
 <pre><code>pragma opaque;<br/>pragma aborts_if_is_strict &#61; false;<br/>aborts_if [abstract] false;<br/>ensures [abstract] result &#61;&#61; spec_create_resource_address(source, seed);<br/></code></pre>
@@ -2273,9 +2094,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
 <pre><code>public(friend) fun create_framework_reserved_account(addr: address): (signer, account::SignerCapability)<br/></code></pre>
 
 
-Check if the bytes of the new address is 32.
-The Account does not exist under the new address before creating the account.
-The system reserved addresses is @0x1 / @0x2 / @0x3 / @0x4 / @0x5  / @0x6 / @0x7 / @0x8 / @0x9 / @0xa.
+Check if the bytes of the new address is 32.<br/> The Account does not exist under the new address before creating the account.<br/> The system reserved addresses is @0x1 / @0x2 / @0x3 / @0x4 / @0x5  / @0x6 / @0x7 / @0x8 / @0x9 / @0xa.
 
 
 <pre><code>aborts_if spec_is_framework_address(addr);<br/>include CreateAccountAbortsIf &#123;addr&#125;;<br/>ensures signer::address_of(result_1) &#61;&#61; addr;<br/>ensures result_2 &#61;&#61; SignerCapability &#123; account: addr &#125;;<br/></code></pre>
@@ -2298,11 +2117,10 @@ The system reserved addresses is @0x1 / @0x2 / @0x3 / @0x4 / @0x5  / @0x6 / @0x7
 <pre><code>public fun create_guid(account_signer: &amp;signer): guid::GUID<br/></code></pre>
 
 
-The Account existed under the signer.
-The guid_creation_num of the ccount resource is up to MAX_U64.
+The Account existed under the signer.<br/> The guid_creation_num of the ccount resource is up to MAX_U64.
 
 
-<pre><code>let addr &#61; signer::address_of(account_signer);<br/>include NewEventHandleAbortsIf &#123;<br/>    account: account_signer,<br/>&#125;;<br/>modifies global&lt;Account&gt;(addr);<br/>// This enforces <a id="high-level-req-11" href="#high-level-req">high-level requirement 11</a>:
+<pre><code>let addr &#61; signer::address_of(account_signer);<br/>include NewEventHandleAbortsIf &#123;<br/>    account: account_signer,<br/>&#125;;<br/>modifies global&lt;Account&gt;(addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;11&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 11&lt;/a&gt;:
 ensures global&lt;Account&gt;(addr).guid_creation_num &#61;&#61; old(global&lt;Account&gt;(addr).guid_creation_num) &#43; 1;<br/></code></pre>
 
 
@@ -2315,8 +2133,7 @@ ensures global&lt;Account&gt;(addr).guid_creation_num &#61;&#61; old(global&lt;A
 <pre><code>public fun new_event_handle&lt;T: drop, store&gt;(account: &amp;signer): event::EventHandle&lt;T&gt;<br/></code></pre>
 
 
-The Account existed under the signer.
-The guid_creation_num of the Account is up to MAX_U64.
+The Account existed under the signer.<br/> The guid_creation_num of the Account is up to MAX_U64.
 
 
 <pre><code>include NewEventHandleAbortsIf;<br/></code></pre>

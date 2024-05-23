@@ -36,7 +36,6 @@ This module defines the Option type and its methods to represent and handle an o
 -  [Function `any`](#0x1_option_any)
 -  [Function `destroy`](#0x1_option_destroy)
 -  [Specification](#@Specification_1)
-    -  [Helper Schema](#@Helper_Schema_2)
     -  [Struct `Option`](#@Specification_1_Option)
     -  [Function `none`](#@Specification_1_none)
     -  [Function `some`](#@Specification_1_some)
@@ -66,8 +65,7 @@ This module defines the Option type and its methods to represent and handle an o
 
 ## Struct `Option`
 
-Abstraction of a value that may or may not be present. Implemented with a vector of size
-zero or one because Move bytecode does not have ADTs.
+Abstraction of a value that may or may not be present. Implemented with a vector of size<br/> zero or one because Move bytecode does not have ADTs.
 
 
 <pre><code>struct Option&lt;Element&gt; has copy, drop, store<br/></code></pre>
@@ -97,8 +95,7 @@ zero or one because Move bytecode does not have ADTs.
 
 <a id="0x1_option_EOPTION_IS_SET"></a>
 
-The <code>Option</code> is in an invalid state for the operation attempted.
-The <code>Option</code> is <code>Some</code> while it should be <code>None</code>.
+The <code>Option</code> is in an invalid state for the operation attempted.<br/> The <code>Option</code> is <code>Some</code> while it should be <code>None</code>.
 
 
 <pre><code>const EOPTION_IS_SET: u64 &#61; 262144;<br/></code></pre>
@@ -107,8 +104,7 @@ The <code>Option</code> is <code>Some</code> while it should be <code>None</code
 
 <a id="0x1_option_EOPTION_NOT_SET"></a>
 
-The <code>Option</code> is in an invalid state for the operation attempted.
-The <code>Option</code> is <code>None</code> while it should be <code>Some</code>.
+The <code>Option</code> is in an invalid state for the operation attempted.<br/> The <code>Option</code> is <code>None</code> while it should be <code>Some</code>.
 
 
 <pre><code>const EOPTION_NOT_SET: u64 &#61; 262145;<br/></code></pre>
@@ -232,8 +228,7 @@ Return true if <code>t</code> holds a value
 
 ## Function `contains`
 
-Return true if the value in <code>t</code> is equal to <code>e_ref</code>
-Always returns <code>false</code> if <code>t</code> does not hold a value
+Return true if the value in <code>t</code> is equal to <code>e_ref</code><br/> Always returns <code>false</code> if <code>t</code> does not hold a value
 
 
 <pre><code>public fun contains&lt;Element&gt;(t: &amp;option::Option&lt;Element&gt;, e_ref: &amp;Element): bool<br/></code></pre>
@@ -254,8 +249,7 @@ Always returns <code>false</code> if <code>t</code> does not hold a value
 
 ## Function `borrow`
 
-Return an immutable reference to the value inside <code>t</code>
-Aborts if <code>t</code> does not hold a value
+Return an immutable reference to the value inside <code>t</code><br/> Aborts if <code>t</code> does not hold a value
 
 
 <pre><code>public fun borrow&lt;Element&gt;(t: &amp;option::Option&lt;Element&gt;): &amp;Element<br/></code></pre>
@@ -276,8 +270,7 @@ Aborts if <code>t</code> does not hold a value
 
 ## Function `borrow_with_default`
 
-Return a reference to the value inside <code>t</code> if it holds one
-Return <code>default_ref</code> if <code>t</code> does not hold a value
+Return a reference to the value inside <code>t</code> if it holds one<br/> Return <code>default_ref</code> if <code>t</code> does not hold a value
 
 
 <pre><code>public fun borrow_with_default&lt;Element&gt;(t: &amp;option::Option&lt;Element&gt;, default_ref: &amp;Element): &amp;Element<br/></code></pre>
@@ -298,8 +291,7 @@ Return <code>default_ref</code> if <code>t</code> does not hold a value
 
 ## Function `get_with_default`
 
-Return the value inside <code>t</code> if it holds one
-Return <code>default</code> if <code>t</code> does not hold a value
+Return the value inside <code>t</code> if it holds one<br/> Return <code>default</code> if <code>t</code> does not hold a value
 
 
 <pre><code>public fun get_with_default&lt;Element: copy, drop&gt;(t: &amp;option::Option&lt;Element&gt;, default: Element): Element<br/></code></pre>
@@ -320,8 +312,7 @@ Return <code>default</code> if <code>t</code> does not hold a value
 
 ## Function `fill`
 
-Convert the none option <code>t</code> to a some option by adding <code>e</code>.
-Aborts if <code>t</code> already holds a value
+Convert the none option <code>t</code> to a some option by adding <code>e</code>.<br/> Aborts if <code>t</code> already holds a value
 
 
 <pre><code>public fun fill&lt;Element&gt;(t: &amp;mut option::Option&lt;Element&gt;, e: Element)<br/></code></pre>
@@ -342,8 +333,7 @@ Aborts if <code>t</code> already holds a value
 
 ## Function `extract`
 
-Convert a <code>some</code> option to a <code>none</code> by removing and returning the value stored inside <code>t</code>
-Aborts if <code>t</code> does not hold a value
+Convert a <code>some</code> option to a <code>none</code> by removing and returning the value stored inside <code>t</code><br/> Aborts if <code>t</code> does not hold a value
 
 
 <pre><code>public fun extract&lt;Element&gt;(t: &amp;mut option::Option&lt;Element&gt;): Element<br/></code></pre>
@@ -364,8 +354,7 @@ Aborts if <code>t</code> does not hold a value
 
 ## Function `borrow_mut`
 
-Return a mutable reference to the value inside <code>t</code>
-Aborts if <code>t</code> does not hold a value
+Return a mutable reference to the value inside <code>t</code><br/> Aborts if <code>t</code> does not hold a value
 
 
 <pre><code>public fun borrow_mut&lt;Element&gt;(t: &amp;mut option::Option&lt;Element&gt;): &amp;mut Element<br/></code></pre>
@@ -386,8 +375,7 @@ Aborts if <code>t</code> does not hold a value
 
 ## Function `swap`
 
-Swap the old value inside <code>t</code> with <code>e</code> and return the old value
-Aborts if <code>t</code> does not hold a value
+Swap the old value inside <code>t</code> with <code>e</code> and return the old value<br/> Aborts if <code>t</code> does not hold a value
 
 
 <pre><code>public fun swap&lt;Element&gt;(t: &amp;mut option::Option&lt;Element&gt;, e: Element): Element<br/></code></pre>
@@ -408,9 +396,7 @@ Aborts if <code>t</code> does not hold a value
 
 ## Function `swap_or_fill`
 
-Swap the old value inside <code>t</code> with <code>e</code> and return the old value;
-or if there is no old value, fill it with <code>e</code>.
-Different from swap(), swap_or_fill() allows for <code>t</code> not holding a value.
+Swap the old value inside <code>t</code> with <code>e</code> and return the old value;<br/> or if there is no old value, fill it with <code>e</code>.<br/> Different from swap(), swap_or_fill() allows for <code>t</code> not holding a value.
 
 
 <pre><code>public fun swap_or_fill&lt;Element&gt;(t: &amp;mut option::Option&lt;Element&gt;, e: Element): option::Option&lt;Element&gt;<br/></code></pre>
@@ -452,8 +438,7 @@ Destroys <code>t.</code> If <code>t</code> holds a value, return it. Returns <co
 
 ## Function `destroy_some`
 
-Unpack <code>t</code> and return its contents
-Aborts if <code>t</code> does not hold a value
+Unpack <code>t</code> and return its contents<br/> Aborts if <code>t</code> does not hold a value
 
 
 <pre><code>public fun destroy_some&lt;Element&gt;(t: option::Option&lt;Element&gt;): Element<br/></code></pre>
@@ -474,8 +459,7 @@ Aborts if <code>t</code> does not hold a value
 
 ## Function `destroy_none`
 
-Unpack <code>t</code>
-Aborts if <code>t</code> holds a value
+Unpack <code>t</code><br/> Aborts if <code>t</code> holds a value
 
 
 <pre><code>public fun destroy_none&lt;Element&gt;(t: option::Option&lt;Element&gt;)<br/></code></pre>
@@ -496,8 +480,7 @@ Aborts if <code>t</code> holds a value
 
 ## Function `to_vec`
 
-Convert <code>t</code> into a vector of length 1 if it is <code>Some</code>,
-and an empty vector otherwise
+Convert <code>t</code> into a vector of length 1 if it is <code>Some</code>,<br/> and an empty vector otherwise
 
 
 <pre><code>public fun to_vec&lt;Element&gt;(t: option::Option&lt;Element&gt;): vector&lt;Element&gt;<br/></code></pre>
@@ -713,11 +696,7 @@ Utility function to destroy an option that is not droppable.
 <pre><code>pragma aborts_if_is_strict;<br/></code></pre>
 
 
-
-<a id="@Helper_Schema_2"></a>
-
-### Helper Schema
-
+&#35; Helper Schema
 
 
 <a id="0x1_option_AbortsIfNone"></a>
@@ -746,8 +725,7 @@ Utility function to destroy an option that is not droppable.
 </dl>
 
 
-The size of vector is always less than equal to 1
-because it's 0 for "none" or 1 for "some".
+The size of vector is always less than equal to 1<br/> because it&apos;s 0 for &quot;none&quot; or 1 for &quot;some&quot;.
 
 
 <pre><code>invariant len(vec) &lt;&#61; 1;<br/></code></pre>

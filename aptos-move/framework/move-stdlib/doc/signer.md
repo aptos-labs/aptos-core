@@ -18,13 +18,7 @@
 
 ## Function `borrow_address`
 
-Borrows the address of the signer
-Conceptually, you can think of the <code>signer</code> as being a struct wrapper around an
-address
-```
-struct signer has drop { addr: address }
-```
-<code>borrow_address</code> borrows this inner field
+Borrows the address of the signer<br/> Conceptually, you can think of the <code>signer</code> as being a struct wrapper around an<br/> address<br/> ```<br/> struct signer has drop &#123; addr: address &#125;<br/> ```<br/> <code>borrow_address</code> borrows this inner field
 
 
 <pre><code>public fun borrow_address(s: &amp;signer): &amp;address<br/></code></pre>

@@ -3,16 +3,7 @@
 
 # Module `0x1::create_signer`
 
-Provides a common place for exporting <code>create_signer</code> across the Aptos Framework.
-
-To use create_signer, add the module below, such that:
-<code>friend aptos_framework::friend_wants_create_signer</code>
-where <code>friend_wants_create_signer</code> is the module that needs <code>create_signer</code>.
-
-Note, that this is only available within the Aptos Framework.
-
-This exists to make auditing straight forward and to limit the need to depend
-on account to have access to this.
+Provides a common place for exporting <code>create_signer</code> across the Aptos Framework.<br/><br/> To use create_signer, add the module below, such that:<br/> <code>friend aptos_framework::friend_wants_create_signer</code><br/> where <code>friend_wants_create_signer</code> is the module that needs <code>create_signer</code>.<br/><br/> Note, that this is only available within the Aptos Framework.<br/><br/> This exists to make auditing straight forward and to limit the need to depend<br/> on account to have access to this.
 
 
 -  [Function `create_signer`](#0x1_create_signer_create_signer)
@@ -57,46 +48,19 @@ on account to have access to this.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>Obtaining a signer for an arbitrary account should only be available within the Aptos Framework.</td>
-<td>Critical</td>
-<td>The create_signer::create_signer function only allows friend modules to retrieve the signer for an arbitrarily address.</td>
-<td>Enforced through function visibility.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Obtaining a signer for an arbitrary account should only be available within the Aptos Framework.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The create_signer::create_signer function only allows friend modules to retrieve the signer for an arbitrarily address.&lt;/td&gt;<br/>&lt;td&gt;Enforced through function visibility.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The account owner should have the ability to create a signer for their account.</td>
-<td>Medium</td>
-<td>Before an Account resource is created, a signer is created for the specified new_address, and later, the Account resource is assigned to this signer.</td>
-<td>Enforced by the <a href="https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-vm/types/src/values/values_impl.rs#L1129">move vm</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The account owner should have the ability to create a signer for their account.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;Before an Account resource is created, a signer is created for the specified new_address, and later, the Account resource is assigned to this signer.&lt;/td&gt;<br/>&lt;td&gt;Enforced by the &lt;a href&#61;&quot;https://github.com/aptos&#45;labs/aptos&#45;core/blob/main/third_party/move/move&#45;vm/types/src/values/values_impl.rs&#35;L1129&quot;&gt;move vm&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>An account should only be able to create a signer for another account if that account has granted it signing capabilities.</td>
-<td>Critical</td>
-<td>The Account resource holds a signer_capability_offer field which allows the owner to share the signer capability with other accounts.</td>
-<td>Formally verified via <a href="account.md#high-level-spec-3">AccountContainsAddr</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;An account should only be able to create a signer for another account if that account has granted it signing capabilities.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The Account resource holds a signer_capability_offer field which allows the owner to share the signer capability with other accounts.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;account.md&#35;high&#45;level&#45;spec&#45;3&quot;&gt;AccountContainsAddr&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>A signer should be returned for addresses that are not registered as accounts.</td>
-<td>Low</td>
-<td>The signer is just a struct that wraps an address, allows for non-accounts to have a signer.</td>
-<td>Formally verified via <a href="#0x1_create_signer_create_signer">create_signer</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;A signer should be returned for addresses that are not registered as accounts.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The signer is just a struct that wraps an address, allows for non&#45;accounts to have a signer.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;0x1_create_signer_create_signer&quot;&gt;create_signer&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>

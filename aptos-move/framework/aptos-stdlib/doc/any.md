@@ -24,17 +24,7 @@
 
 ## Struct `Any`
 
-A type which can represent a value of any type. This allows for representation of 'unknown' future
-values. For example, to define a resource such that it can be later be extended without breaking
-changes one can do
-
-```move
-struct Resource {
-field: Type,
-...
-extension: Option<Any>
-}
-```
+A type which can represent a value of any type. This allows for representation of &apos;unknown&apos; future<br/> values. For example, to define a resource such that it can be later be extended without breaking<br/> changes one can do<br/><br/> ```move<br/>   struct Resource &#123;<br/>      field: Type,<br/>      ...<br/>      extension: Option&lt;Any&gt;<br/>   &#125;<br/> ```
 
 
 <pre><code>struct Any has drop, store<br/></code></pre>
@@ -81,8 +71,7 @@ The type provided for <code>unpack</code> is not the same as was given for <code
 
 ## Function `pack`
 
-Pack a value into the <code>Any</code> representation. Because Any can be stored and dropped, this is
-also required from <code>T</code>.
+Pack a value into the <code>Any</code> representation. Because Any can be stored and dropped, this is<br/> also required from <code>T</code>.
 
 
 <pre><code>public fun pack&lt;T: drop, store&gt;(x: T): any::Any<br/></code></pre>

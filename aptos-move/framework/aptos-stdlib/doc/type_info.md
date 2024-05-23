@@ -145,9 +145,7 @@
 
 ## Function `chain_id`
 
-Returns the current chain ID, mirroring what <code>aptos_framework::chain_id::get()</code> would return, except in <code>&#35;[test]</code>
-functions, where this will always return <code>4u8</code> as the chain ID, whereas <code>aptos_framework::chain_id::get()</code> will
-return whichever ID was passed to <code>aptos_framework::chain_id::initialize_for_test()</code>.
+Returns the current chain ID, mirroring what <code>aptos_framework::chain_id::get()</code> would return, except in <code>&#35;[test]</code><br/> functions, where this will always return <code>4u8</code> as the chain ID, whereas <code>aptos_framework::chain_id::get()</code> will<br/> return whichever ID was passed to <code>aptos_framework::chain_id::initialize_for_test()</code>.
 
 
 <pre><code>public fun chain_id(): u8<br/></code></pre>
@@ -189,9 +187,7 @@ Return the <code>TypeInfo</code> struct containing  for the type <code>T</code>.
 
 ## Function `type_name`
 
-Return the human readable string for the type, including the address, module name, and any type arguments.
-Example: 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
-Or: 0x1::table::Table<0x1::string::String, 0x1::string::String>
+Return the human readable string for the type, including the address, module name, and any type arguments.<br/> Example: 0x1::coin::CoinStore&lt;0x1::aptos_coin::AptosCoin&gt;<br/> Or: 0x1::table::Table&lt;0x1::string::String, 0x1::string::String&gt;
 
 
 <pre><code>public fun type_name&lt;T&gt;(): string::String<br/></code></pre>
@@ -232,13 +228,7 @@ Or: 0x1::table::Table<0x1::string::String, 0x1::string::String>
 
 ## Function `size_of_val`
 
-Return the BCS size, in bytes, of value at <code>val_ref</code>.
-
-See the [BCS spec](https://github.com/diem/bcs)
-
-See <code>test_size_of_val()</code> for an analysis of common types and
-nesting patterns, as well as <code>test_size_of_val_vectors()</code> for an
-analysis of vector size dynamism.
+Return the BCS size, in bytes, of value at <code>val_ref</code>.<br/><br/> See the [BCS spec](https://github.com/diem/bcs)<br/><br/> See <code>test_size_of_val()</code> for an analysis of common types and<br/> nesting patterns, as well as <code>test_size_of_val_vectors()</code> for an<br/> analysis of vector size dynamism.
 
 
 <pre><code>public fun size_of_val&lt;T&gt;(val_ref: &amp;T): u64<br/></code></pre>

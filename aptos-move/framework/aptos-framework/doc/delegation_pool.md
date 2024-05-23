@@ -3,115 +3,15 @@
 
 # Module `0x1::delegation_pool`
 
-
-Allow multiple delegators to participate in the same stake pool in order to collect the minimum
-stake required to join the validator set. Delegators are rewarded out of the validator rewards
-proportionally to their stake and provided the same stake-management API as the stake pool owner.
-
-The main accounting logic in the delegation pool contract handles the following:
-1. Tracks how much stake each delegator owns, privately deposited as well as earned.
-Accounting individual delegator stakes is achieved through the shares-based pool defined at
-<code>aptos_std::pool_u64</code>, hence delegators own shares rather than absolute stakes into the delegation pool.
-2. Tracks rewards earned by the stake pool, implicitly by the delegation one, in the meantime
-and distribute them accordingly.
-3. Tracks lockup cycles on the stake pool in order to separate inactive stake (not earning rewards)
-from pending_inactive stake (earning rewards) and allow its delegators to withdraw the former.
-4. Tracks how much commission fee has to be paid to the operator out of incoming rewards before
-distributing them to the internal pool_u64 pools.
-
-In order to distinguish between stakes in different states and route rewards accordingly,
-separate pool_u64 pools are used for individual stake states:
-1. one of <code>active</code> + <code>pending_active</code> stake
-2. one of <code>inactive</code> stake FOR each past observed lockup cycle (OLC) on the stake pool
-3. one of <code>pending_inactive</code> stake scheduled during this ongoing OLC
-
-As stake-state transitions and rewards are computed only at the stake pool level, the delegation pool
-gets outdated. To mitigate this, at any interaction with the delegation pool, a process of synchronization
-to the underlying stake pool is executed before the requested operation itself.
-
-At synchronization:
-- stake deviations between the two pools are actually the rewards produced in the meantime.
-- the commission fee is extracted from the rewards, the remaining stake is distributed to the internal
-pool_u64 pools and then the commission stake used to buy shares for operator.
-- if detecting that the lockup expired on the stake pool, the delegation pool will isolate its
-pending_inactive stake (now inactive) and create a new pool_u64 to host future pending_inactive stake
-scheduled this newly started lockup.
-Detecting a lockup expiration on the stake pool resumes to detecting new inactive stake.
-
-Accounting main invariants:
-- each stake-management operation (add/unlock/reactivate/withdraw) and operator change triggers
-the synchronization process before executing its own function.
-- each OLC maps to one or more real lockups on the stake pool, but not the opposite. Actually, only a real
-lockup with 'activity' (which inactivated some unlocking stake) triggers the creation of a new OLC.
-- unlocking and/or unlocked stake originating from different real lockups are never mixed together into
-the same pool_u64. This invalidates the accounting of which rewards belong to whom.
-- no delegator can have unlocking and/or unlocked stake (pending withdrawals) in different OLCs. This ensures
-delegators do not have to keep track of the OLCs when they unlocked. When creating a new pending withdrawal,
-the existing one is executed (withdrawn) if is already inactive.
-- <code>add_stake</code> fees are always refunded, but only after the epoch when they have been charged ends.
-- withdrawing pending_inactive stake (when validator had gone inactive before its lockup expired)
-does not inactivate any stake additional to the requested one to ensure OLC would not advance indefinitely.
-- the pending withdrawal exists at an OLC iff delegator owns some shares within the shares pool of that OLC.
-
-Example flow:
-<ol>
-<li>A node operator creates a delegation pool by calling
-<code>initialize_delegation_pool</code> and sets
-its commission fee to 0% (for simplicity). A stake pool is created with no initial stake and owned by
-a resource account controlled by the delegation pool.</li>
-<li>Delegator A adds 100 stake which is converted to 100 shares into the active pool_u64</li>
-<li>Operator joins the validator set as the stake pool has now the minimum stake</li>
-<li>The stake pool earned rewards and now has 200 active stake. A's active shares are worth 200 coins as
-the commission fee is 0%.</li>
-<li></li>
-<ol>
-<li>A requests <code>unlock</code> for 100 stake</li>
-<li>Synchronization detects 200 - 100 active rewards which are entirely (0% commission) added to the active pool.</li>
-<li>100 coins = (100 * 100) / 200 = 50 shares are redeemed from the active pool and exchanged for 100 shares
-into the pending_inactive one on A's behalf</li>
-</ol>
-<li>Delegator B adds 200 stake which is converted to (200 * 50) / 100 = 100 shares into the active pool</li>
-<li>The stake pool earned rewards and now has 600 active and 200 pending_inactive stake.</li>
-<li></li>
-<ol>
-<li>A requests <code>reactivate_stake</code> for 100 stake</li>
-<li>
-Synchronization detects 600 - 300 active and 200 - 100 pending_inactive rewards which are both entirely
-distributed to their corresponding pools
-</li>
-<li>
-100 coins = (100 * 100) / 200 = 50 shares are redeemed from the pending_inactive pool and exchanged for
-(100 * 150) / 600 = 25 shares into the active one on A's behalf
-</li>
-</ol>
-<li>The lockup expires on the stake pool, inactivating the entire pending_inactive stake</li>
-<li></li>
-<ol>
-<li>B requests <code>unlock</code> for 100 stake</li>
-<li>
-Synchronization detects no active or pending_inactive rewards, but 0 -> 100 inactive stake on the stake pool,
-so it advances the observed lockup cycle and creates a pool_u64 for the new lockup, hence allowing previous
-pending_inactive shares to be redeemed</li>
-<li>
-100 coins = (100 * 175) / 700 = 25 shares are redeemed from the active pool and exchanged for 100 shares
-into the new pending_inactive one on B's behalf
-</li>
-</ol>
-<li>The stake pool earned rewards and now has some pending_inactive rewards.</li>
-<li></li>
-<ol>
-<li>A requests <code>withdraw</code> for its entire inactive stake</li>
-<li>
-Synchronization detects no new inactive stake, but some pending_inactive rewards which are distributed
-to the (2nd) pending_inactive pool
-</li>
-<li>
-A's 50 shares = (50 * 100) / 50 = 100 coins are redeemed from the (1st) inactive pool and 100 stake is
-transferred to A
-</li>
-</ol>
-</ol>
-
+<br/>Allow multiple delegators to participate in the same stake pool in order to collect the minimum<br/>stake required to join the validator set. Delegators are rewarded out of the validator rewards<br/>proportionally to their stake and provided the same stake&#45;management API as the stake pool owner.<br/><br/>The main accounting logic in the delegation pool contract handles the following:<br/>1. Tracks how much stake each delegator owns, privately deposited as well as earned.<br/>Accounting individual delegator stakes is achieved through the shares&#45;based pool defined at
+&lt;code&gt;aptos_std::pool_u64&lt;/code&gt;, hence delegators own shares rather than absolute stakes into the delegation pool.<br/>2. Tracks rewards earned by the stake pool, implicitly by the delegation one, in the meantime<br/>and distribute them accordingly.<br/>3. Tracks lockup cycles on the stake pool in order to separate inactive stake (not earning rewards)<br/>from pending_inactive stake (earning rewards) and allow its delegators to withdraw the former.<br/>4. Tracks how much commission fee has to be paid to the operator out of incoming rewards before<br/>distributing them to the internal pool_u64 pools.<br/><br/>In order to distinguish between stakes in different states and route rewards accordingly,<br/>separate pool_u64 pools are used for individual stake states:<br/>1. one of &lt;code&gt;active&lt;/code&gt; &#43; &lt;code&gt;pending_active&lt;/code&gt; stake<br/>2. one of &lt;code&gt;inactive&lt;/code&gt; stake FOR each past observed lockup cycle (OLC) on the stake pool<br/>3. one of &lt;code&gt;pending_inactive&lt;/code&gt; stake scheduled during this ongoing OLC<br/><br/>As stake&#45;state transitions and rewards are computed only at the stake pool level, the delegation pool<br/>gets outdated. To mitigate this, at any interaction with the delegation pool, a process of synchronization<br/>to the underlying stake pool is executed before the requested operation itself.<br/><br/>At synchronization:<br/> &#45; stake deviations between the two pools are actually the rewards produced in the meantime.<br/> &#45; the commission fee is extracted from the rewards, the remaining stake is distributed to the internal<br/>pool_u64 pools and then the commission stake used to buy shares for operator.<br/> &#45; if detecting that the lockup expired on the stake pool, the delegation pool will isolate its<br/>pending_inactive stake (now inactive) and create a new pool_u64 to host future pending_inactive stake<br/>scheduled this newly started lockup.<br/>Detecting a lockup expiration on the stake pool resumes to detecting new inactive stake.<br/><br/>Accounting main invariants:<br/> &#45; each stake&#45;management operation (add/unlock/reactivate/withdraw) and operator change triggers<br/>the synchronization process before executing its own function.<br/> &#45; each OLC maps to one or more real lockups on the stake pool, but not the opposite. Actually, only a real<br/>lockup with &apos;activity&apos; (which inactivated some unlocking stake) triggers the creation of a new OLC.<br/> &#45; unlocking and/or unlocked stake originating from different real lockups are never mixed together into<br/>the same pool_u64. This invalidates the accounting of which rewards belong to whom.<br/> &#45; no delegator can have unlocking and/or unlocked stake (pending withdrawals) in different OLCs. This ensures<br/>delegators do not have to keep track of the OLCs when they unlocked. When creating a new pending withdrawal,<br/>the existing one is executed (withdrawn) if is already inactive.<br/> &#45; &lt;code&gt;add_stake&lt;/code&gt; fees are always refunded, but only after the epoch when they have been charged ends.<br/> &#45; withdrawing pending_inactive stake (when validator had gone inactive before its lockup expired)<br/>does not inactivate any stake additional to the requested one to ensure OLC would not advance indefinitely.<br/> &#45; the pending withdrawal exists at an OLC iff delegator owns some shares within the shares pool of that OLC.<br/><br/>Example flow:<br/>&lt;ol&gt;<br/>&lt;li&gt;A node operator creates a delegation pool by calling
+&lt;code&gt;initialize_delegation_pool&lt;/code&gt; and sets<br/>its commission fee to 0% (for simplicity). A stake pool is created with no initial stake and owned by<br/>a resource account controlled by the delegation pool.&lt;/li&gt;<br/>&lt;li&gt;Delegator A adds 100 stake which is converted to 100 shares into the active pool_u64&lt;/li&gt;<br/>&lt;li&gt;Operator joins the validator set as the stake pool has now the minimum stake&lt;/li&gt;<br/>&lt;li&gt;The stake pool earned rewards and now has 200 active stake. A&apos;s active shares are worth 200 coins as<br/>the commission fee is 0%.&lt;/li&gt;<br/>&lt;li&gt;&lt;/li&gt;<br/>&lt;ol&gt;<br/>    &lt;li&gt;A requests &lt;code&gt;unlock&lt;/code&gt; for 100 stake&lt;/li&gt;<br/>    &lt;li&gt;Synchronization detects 200 &#45; 100 active rewards which are entirely (0% commission) added to the active pool.&lt;/li&gt;<br/>    &lt;li&gt;100 coins &#61; (100 &#42; 100) / 200 &#61; 50 shares are redeemed from the active pool and exchanged for 100 shares<br/>into the pending_inactive one on A&apos;s behalf&lt;/li&gt;<br/>&lt;/ol&gt;<br/>&lt;li&gt;Delegator B adds 200 stake which is converted to (200 &#42; 50) / 100 &#61; 100 shares into the active pool&lt;/li&gt;<br/>&lt;li&gt;The stake pool earned rewards and now has 600 active and 200 pending_inactive stake.&lt;/li&gt;<br/>&lt;li&gt;&lt;/li&gt;<br/>&lt;ol&gt;<br/>    &lt;li&gt;A requests &lt;code&gt;reactivate_stake&lt;/code&gt; for 100 stake&lt;/li&gt;<br/>    &lt;li&gt;<br/>    Synchronization detects 600 &#45; 300 active and 200 &#45; 100 pending_inactive rewards which are both entirely<br/>    distributed to their corresponding pools
+&lt;/li&gt;<br/>    &lt;li&gt;<br/>    100 coins &#61; (100 &#42; 100) / 200 &#61; 50 shares are redeemed from the pending_inactive pool and exchanged for
+(100 &#42; 150) / 600 &#61; 25 shares into the active one on A&apos;s behalf
+&lt;/li&gt;<br/>&lt;/ol&gt;<br/>&lt;li&gt;The lockup expires on the stake pool, inactivating the entire pending_inactive stake&lt;/li&gt;<br/>&lt;li&gt;&lt;/li&gt;<br/>&lt;ol&gt;<br/>    &lt;li&gt;B requests &lt;code&gt;unlock&lt;/code&gt; for 100 stake&lt;/li&gt;<br/>    &lt;li&gt;<br/>    Synchronization detects no active or pending_inactive rewards, but 0 &#45;&gt; 100 inactive stake on the stake pool,<br/>    so it advances the observed lockup cycle and creates a pool_u64 for the new lockup, hence allowing previous<br/>    pending_inactive shares to be redeemed&lt;/li&gt;<br/>    &lt;li&gt;<br/>    100 coins &#61; (100 &#42; 175) / 700 &#61; 25 shares are redeemed from the active pool and exchanged for 100 shares<br/>    into the new pending_inactive one on B&apos;s behalf
+&lt;/li&gt;<br/>&lt;/ol&gt;<br/>&lt;li&gt;The stake pool earned rewards and now has some pending_inactive rewards.&lt;/li&gt;<br/>&lt;li&gt;&lt;/li&gt;<br/>&lt;ol&gt;<br/>    &lt;li&gt;A requests &lt;code&gt;withdraw&lt;/code&gt; for its entire inactive stake&lt;/li&gt;<br/>    &lt;li&gt;<br/>    Synchronization detects no new inactive stake, but some pending_inactive rewards which are distributed<br/>    to the (2nd) pending_inactive pool
+&lt;/li&gt;<br/>    &lt;li&gt;<br/>    A&apos;s 50 shares &#61; (50 &#42; 100) / 50 &#61; 100 coins are redeemed from the (1st) inactive pool and 100 stake is<br/>    transferred to A
+&lt;/li&gt;<br/>&lt;/ol&gt;<br/>&lt;/ol&gt;<br/>
 
 
 -  [Resource `DelegationPoolOwnership`](#0x1_delegation_pool_DelegationPoolOwnership)
@@ -506,8 +406,7 @@ Track total voting power of each voter.
 
 ## Resource `GovernanceRecords`
 
-Track governance information of a delegation(e.g. voter delegation/voting power calculation).
-This struct should be stored in the delegation pool resource account.
+Track governance information of a delegation(e.g. voter delegation/voting power calculation).<br/> This struct should be stored in the delegation pool resource account.
 
 
 <pre><code>struct GovernanceRecords has key<br/></code></pre>
@@ -628,9 +527,7 @@ This struct should be stored in the delegation pool resource account.
 
 ## Resource `DelegationPoolAllowlisting`
 
-Tracks a delegation pool's allowlist of delegators.
-If allowlisting is enabled, existing delegators are not implicitly allowlisted and they can be individually
-evicted later by the pool owner.
+Tracks a delegation pool&apos;s allowlist of delegators.<br/> If allowlisting is enabled, existing delegators are not implicitly allowlisted and they can be individually<br/> evicted later by the pool owner.
 
 
 <pre><code>struct DelegationPoolAllowlisting has key<br/></code></pre>
@@ -1563,7 +1460,7 @@ Function is deprecated.
 
 <a id="0x1_delegation_pool_EDISABLED_FUNCTION"></a>
 
-The function is disabled or hasn't been enabled.
+The function is disabled or hasn&apos;t been enabled.
 
 
 <pre><code>const EDISABLED_FUNCTION: u64 &#61; 13;<br/></code></pre>
@@ -1697,7 +1594,7 @@ Delegators allowlisting is not supported.
 
 <a id="0x1_delegation_pool_EDELEGATOR_ACTIVE_BALANCE_TOO_LOW"></a>
 
-Delegator's active balance cannot be less than <code>MIN_COINS_ON_SHARES_POOL</code>.
+Delegator&apos;s active balance cannot be less than <code>MIN_COINS_ON_SHARES_POOL</code>.
 
 
 <pre><code>const EDELEGATOR_ACTIVE_BALANCE_TOO_LOW: u64 &#61; 8;<br/></code></pre>
@@ -1715,7 +1612,7 @@ Cannot add/reactivate stake unless being allowlisted by the pool owner.
 
 <a id="0x1_delegation_pool_EDELEGATOR_PENDING_INACTIVE_BALANCE_TOO_LOW"></a>
 
-Delegator's pending_inactive balance cannot be less than <code>MIN_COINS_ON_SHARES_POOL</code>.
+Delegator&apos;s pending_inactive balance cannot be less than <code>MIN_COINS_ON_SHARES_POOL</code>.
 
 
 <pre><code>const EDELEGATOR_PENDING_INACTIVE_BALANCE_TOO_LOW: u64 &#61; 9;<br/></code></pre>
@@ -1724,7 +1621,7 @@ Delegator's pending_inactive balance cannot be less than <code>MIN_COINS_ON_SHAR
 
 <a id="0x1_delegation_pool_EINVALID_COMMISSION_PERCENTAGE"></a>
 
-Commission percentage has to be between 0 and <code>MAX_FEE</code> - 100%.
+Commission percentage has to be between 0 and <code>MAX_FEE</code> &#45; 100%.
 
 
 <pre><code>const EINVALID_COMMISSION_PERCENTAGE: u64 &#61; 5;<br/></code></pre>
@@ -1751,7 +1648,7 @@ Changing beneficiaries for operators is not supported.
 
 <a id="0x1_delegation_pool_EPARTIAL_GOVERNANCE_VOTING_NOT_ENABLED"></a>
 
-Partial governance voting hasn't been enabled on this delegation pool.
+Partial governance voting hasn&apos;t been enabled on this delegation pool.
 
 
 <pre><code>const EPARTIAL_GOVERNANCE_VOTING_NOT_ENABLED: u64 &#61; 14;<br/></code></pre>
@@ -1769,10 +1666,7 @@ There is a pending withdrawal to be executed before <code>unlock</code>ing any n
 
 <a id="0x1_delegation_pool_ESLASHED_INACTIVE_STAKE_ON_PAST_OLC"></a>
 
-Slashing (if implemented) should not be applied to already <code>inactive</code> stake.
-Not only it invalidates the accounting of past observed lockup cycles (OLC),
-but is also unfair to delegators whose stake has been inactive before validator started misbehaving.
-Additionally, the inactive stake does not count on the voting power of validator.
+Slashing (if implemented) should not be applied to already <code>inactive</code> stake.<br/> Not only it invalidates the accounting of past observed lockup cycles (OLC),<br/> but is also unfair to delegators whose stake has been inactive before validator started misbehaving.<br/> Additionally, the inactive stake does not count on the voting power of validator.
 
 
 <pre><code>const ESLASHED_INACTIVE_STAKE_ON_PAST_OLC: u64 &#61; 7;<br/></code></pre>
@@ -1826,12 +1720,7 @@ Maximum operator percentage fee(of double digit precision): 22.85% is represente
 
 <a id="0x1_delegation_pool_MIN_COINS_ON_SHARES_POOL"></a>
 
-Minimum coins to exist on a shares pool at all times.
-Enforced per delegator for both active and pending_inactive pools.
-This constraint ensures the share price cannot overly increase and lead to
-substantial losses when buying shares (can lose at most 1 share which may
-be worth a lot if current share price is high).
-This constraint is not enforced on inactive pools as they only allow redeems
+Minimum coins to exist on a shares pool at all times.<br/> Enforced per delegator for both active and pending_inactive pools.<br/> This constraint ensures the share price cannot overly increase and lead to<br/> substantial losses when buying shares (can lose at most 1 share which may<br/> be worth a lot if current share price is high).<br/> This constraint is not enforced on inactive pools as they only allow redeems
 (can lose at most 1 coin regardless of current share price).
 
 
@@ -1849,9 +1738,7 @@ This constraint is not enforced on inactive pools as they only allow redeems
 
 <a id="0x1_delegation_pool_NULL_SHAREHOLDER"></a>
 
-Special shareholder temporarily owning the <code>add_stake</code> fees charged during this epoch.
-On each <code>add_stake</code> operation any resulted fee is used to buy active shares for this shareholder.
-First synchronization after this epoch ends will distribute accumulated fees to the rest of the pool as refunds.
+Special shareholder temporarily owning the <code>add_stake</code> fees charged during this epoch.<br/> On each <code>add_stake</code> operation any resulted fee is used to buy active shares for this shareholder.<br/> First synchronization after this epoch ends will distribute accumulated fees to the rest of the pool as refunds.
 
 
 <pre><code>const NULL_SHAREHOLDER: address &#61; 0x0;<br/></code></pre>
@@ -2060,8 +1947,7 @@ Return the number of delegators owning active stake within <code>pool_address</c
 
 ## Function `get_delegation_pool_stake`
 
-Return the stake amounts on <code>pool_address</code> in the different states:
-(<code>active</code>,<code>inactive</code>,<code>pending_active</code>,<code>pending_inactive</code>)
+Return the stake amounts on <code>pool_address</code> in the different states:<br/> (<code>active</code>,<code>inactive</code>,<code>pending_active</code>,<code>pending_inactive</code>)
 
 
 <pre><code>&#35;[view]<br/>public fun get_delegation_pool_stake(pool_address: address): (u64, u64, u64, u64)<br/></code></pre>
@@ -2082,8 +1968,7 @@ Return the stake amounts on <code>pool_address</code> in the different states:
 
 ## Function `get_pending_withdrawal`
 
-Return whether the given delegator has any withdrawable stake. If they recently requested to unlock
-some stake and the stake pool's lockup cycle has not ended, their coins are not withdrawable yet.
+Return whether the given delegator has any withdrawable stake. If they recently requested to unlock<br/> some stake and the stake pool&apos;s lockup cycle has not ended, their coins are not withdrawable yet.
 
 
 <pre><code>&#35;[view]<br/>public fun get_pending_withdrawal(pool_address: address, delegator_address: address): (bool, u64)<br/></code></pre>
@@ -2107,8 +1992,7 @@ some stake and the stake pool's lockup cycle has not ended, their coins are not 
 
 ## Function `get_stake`
 
-Return total stake owned by <code>delegator_address</code> within delegation pool <code>pool_address</code>
-in each of its individual states: (<code>active</code>,<code>inactive</code>,<code>pending_inactive</code>)
+Return total stake owned by <code>delegator_address</code> within delegation pool <code>pool_address</code><br/> in each of its individual states: (<code>active</code>,<code>inactive</code>,<code>pending_inactive</code>)
 
 
 <pre><code>&#35;[view]<br/>public fun get_stake(pool_address: address, delegator_address: address): (u64, u64, u64)<br/></code></pre>
@@ -2129,14 +2013,7 @@ in each of its individual states: (<code>active</code>,<code>inactive</code>,<co
 
 ## Function `get_add_stake_fee`
 
-Return refundable stake to be extracted from added <code>amount</code> at <code>add_stake</code> operation on pool <code>pool_address</code>.
-If the validator produces rewards this epoch, added stake goes directly to <code>pending_active</code> and
-does not earn rewards. However, all shares within a pool appreciate uniformly and when this epoch ends:
-- either added shares are still <code>pending_active</code> and steal from rewards of existing <code>active</code> stake
-- or have moved to <code>pending_inactive</code> and get full rewards (they displaced <code>active</code> stake at <code>unlock</code>)
-To mitigate this, some of the added stake is extracted and fed back into the pool as placeholder
-for the rewards the remaining stake would have earned if active:
-extracted-fee = (amount - extracted-fee) * reward-rate% * (100% - operator-commission%)
+Return refundable stake to be extracted from added <code>amount</code> at <code>add_stake</code> operation on pool <code>pool_address</code>.<br/> If the validator produces rewards this epoch, added stake goes directly to <code>pending_active</code> and<br/> does not earn rewards. However, all shares within a pool appreciate uniformly and when this epoch ends:<br/> &#45; either added shares are still <code>pending_active</code> and steal from rewards of existing <code>active</code> stake<br/> &#45; or have moved to <code>pending_inactive</code> and get full rewards (they displaced <code>active</code> stake at <code>unlock</code>)<br/> To mitigate this, some of the added stake is extracted and fed back into the pool as placeholder<br/> for the rewards the remaining stake would have earned if active:<br/> extracted&#45;fee &#61; (amount &#45; extracted&#45;fee) &#42; reward&#45;rate% &#42; (100% &#45; operator&#45;commission%)
 
 
 <pre><code>&#35;[view]<br/>public fun get_add_stake_fee(pool_address: address, amount: u64): u64<br/></code></pre>
@@ -2157,9 +2034,7 @@ extracted-fee = (amount - extracted-fee) * reward-rate% * (100% - operator-commi
 
 ## Function `can_withdraw_pending_inactive`
 
-Return whether <code>pending_inactive</code> stake can be directly withdrawn from
-the delegation pool, implicitly its stake pool, in the special case
-the validator had gone inactive before its lockup expired.
+Return whether <code>pending_inactive</code> stake can be directly withdrawn from<br/> the delegation pool, implicitly its stake pool, in the special case<br/> the validator had gone inactive before its lockup expired.
 
 
 <pre><code>&#35;[view]<br/>public fun can_withdraw_pending_inactive(pool_address: address): bool<br/></code></pre>
@@ -2180,8 +2055,7 @@ the validator had gone inactive before its lockup expired.
 
 ## Function `calculate_and_update_voter_total_voting_power`
 
-Return the total voting power of a delegator in a delegation pool. This function syncs DelegationPool to the
-latest state.
+Return the total voting power of a delegator in a delegation pool. This function syncs DelegationPool to the<br/> latest state.
 
 
 <pre><code>&#35;[view]<br/>public fun calculate_and_update_voter_total_voting_power(pool_address: address, voter: address): u64<br/></code></pre>
@@ -2202,8 +2076,7 @@ latest state.
 
 ## Function `calculate_and_update_remaining_voting_power`
 
-Return the remaining voting power of a delegator in a delegation pool on a proposal. This function syncs DelegationPool to the
-latest state.
+Return the remaining voting power of a delegator in a delegation pool on a proposal. This function syncs DelegationPool to the<br/> latest state.
 
 
 <pre><code>&#35;[view]<br/>public fun calculate_and_update_remaining_voting_power(pool_address: address, voter_address: address, proposal_id: u64): u64<br/></code></pre>
@@ -2224,8 +2097,7 @@ latest state.
 
 ## Function `calculate_and_update_delegator_voter`
 
-Return the latest delegated voter of a delegator in a delegation pool. This function syncs DelegationPool to the
-latest state.
+Return the latest delegated voter of a delegator in a delegation pool. This function syncs DelegationPool to the<br/> latest state.
 
 
 <pre><code>&#35;[view]<br/>public fun calculate_and_update_delegator_voter(pool_address: address, delegator_address: address): address<br/></code></pre>
@@ -2330,10 +2202,7 @@ Return whether allowlisting is enabled for the provided delegation pool.
 
 ## Function `delegator_allowlisted`
 
-Return whether the provided delegator is allowlisted.
-A delegator is allowlisted if:
-- allowlisting is disabled on the pool
-- delegator is part of the allowlist
+Return whether the provided delegator is allowlisted.<br/> A delegator is allowlisted if:<br/> &#45; allowlisting is disabled on the pool<br/> &#45; delegator is part of the allowlist
 
 
 <pre><code>&#35;[view]<br/>public fun delegator_allowlisted(pool_address: address, delegator_address: address): bool<br/></code></pre>
@@ -2375,10 +2244,7 @@ Return allowlist or revert if allowlisting is not enabled for the provided deleg
 
 ## Function `initialize_delegation_pool`
 
-Initialize a delegation pool of custom fixed <code>operator_commission_percentage</code>.
-A resource account is created from <code>owner</code> signer and its supplied <code>delegation_pool_creation_seed</code>
-to host the delegation pool resource and own the underlying stake pool.
-Ownership over setting the operator/voter is granted to <code>owner</code> who has both roles initially.
+Initialize a delegation pool of custom fixed <code>operator_commission_percentage</code>.<br/> A resource account is created from <code>owner</code> signer and its supplied <code>delegation_pool_creation_seed</code><br/> to host the delegation pool resource and own the underlying stake pool.<br/> Ownership over setting the operator/voter is granted to <code>owner</code> who has both roles initially.
 
 
 <pre><code>public entry fun initialize_delegation_pool(owner: &amp;signer, operator_commission_percentage: u64, delegation_pool_creation_seed: vector&lt;u8&gt;)<br/></code></pre>
@@ -2420,8 +2286,7 @@ Return the beneficiary address of the operator.
 
 ## Function `enable_partial_governance_voting`
 
-Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
-The existing voter will be replaced. The function is permissionless.
+Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.<br/> The existing voter will be replaced. The function is permissionless.
 
 
 <pre><code>public entry fun enable_partial_governance_voting(pool_address: address)<br/></code></pre>
@@ -2442,11 +2307,7 @@ The existing voter will be replaced. The function is permissionless.
 
 ## Function `vote`
 
-Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
-1. The voting period of the proposal hasn't ended.
-2. The delegation pool's lockup period ends after the voting period of the proposal.
-3. The voter still has spare voting power on this proposal.
-4. The delegation pool never votes on the proposal before enabling partial governance voting.
+Vote on a proposal with a voter&apos;s voting power. To successfully vote, the following conditions must be met:<br/> 1. The voting period of the proposal hasn&apos;t ended.<br/> 2. The delegation pool&apos;s lockup period ends after the voting period of the proposal.<br/> 3. The voter still has spare voting power on this proposal.<br/> 4. The delegation pool never votes on the proposal before enabling partial governance voting.
 
 
 <pre><code>public entry fun vote(voter: &amp;signer, pool_address: address, proposal_id: u64, voting_power: u64, should_pass: bool)<br/></code></pre>
@@ -2467,9 +2328,7 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
 
 ## Function `create_proposal`
 
-A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
-voting power in THIS delegation pool must be not less than the minimum required voting power specified in
-<code>aptos_governance.move</code>.
+A voter could create a governance proposal by this function. To successfully create a proposal, the voter&apos;s<br/> voting power in THIS delegation pool must be not less than the minimum required voting power specified in<br/> <code>aptos_governance.move</code>.
 
 
 <pre><code>public entry fun create_proposal(voter: &amp;signer, pool_address: address, execution_hash: vector&lt;u8&gt;, metadata_location: vector&lt;u8&gt;, metadata_hash: vector&lt;u8&gt;, is_multi_step_proposal: bool)<br/></code></pre>
@@ -2670,8 +2529,7 @@ voting power in THIS delegation pool must be not less than the minimum required 
 
 ## Function `retrieve_stake_pool_owner`
 
-Retrieves the shared resource account owning the stake pool in order
-to forward a stake-management operation to this underlying pool.
+Retrieves the shared resource account owning the stake pool in order<br/> to forward a stake&#45;management operation to this underlying pool.
 
 
 <pre><code>fun retrieve_stake_pool_owner(pool: &amp;delegation_pool::DelegationPool): signer<br/></code></pre>
@@ -2818,7 +2676,7 @@ Borrow the mutable used voting power of a voter on a proposal.
 
 ## Function `update_and_borrow_mut_delegator_vote_delegation`
 
-Update VoteDelegation of a delegator to up-to-date then borrow_mut it.
+Update VoteDelegation of a delegator to up&#45;to&#45;date then borrow_mut it.
 
 
 <pre><code>fun update_and_borrow_mut_delegator_vote_delegation(pool: &amp;delegation_pool::DelegationPool, governance_records: &amp;mut delegation_pool::GovernanceRecords, delegator: address): &amp;mut delegation_pool::VoteDelegation<br/></code></pre>
@@ -2839,7 +2697,7 @@ Update VoteDelegation of a delegator to up-to-date then borrow_mut it.
 
 ## Function `update_and_borrow_mut_delegated_votes`
 
-Update DelegatedVotes of a voter to up-to-date then borrow_mut it.
+Update DelegatedVotes of a voter to up&#45;to&#45;date then borrow_mut it.
 
 
 <pre><code>fun update_and_borrow_mut_delegated_votes(pool: &amp;delegation_pool::DelegationPool, governance_records: &amp;mut delegation_pool::GovernanceRecords, voter: address): &amp;mut delegation_pool::DelegatedVotes<br/></code></pre>
@@ -2880,8 +2738,7 @@ Update DelegatedVotes of a voter to up-to-date then borrow_mut it.
 
 ## Function `calculate_total_voting_power`
 
-Given the amounts of shares in <code>active_shares</code> pool and <code>inactive_shares</code> pool, calculate the total voting
-power, which equals to the sum of the coin amounts.
+Given the amounts of shares in <code>active_shares</code> pool and <code>inactive_shares</code> pool, calculate the total voting<br/> power, which equals to the sum of the coin amounts.
 
 
 <pre><code>fun calculate_total_voting_power(delegation_pool: &amp;delegation_pool::DelegationPool, latest_delegated_votes: &amp;delegation_pool::DelegatedVotes): u64<br/></code></pre>
@@ -2902,7 +2759,7 @@ power, which equals to the sum of the coin amounts.
 
 ## Function `calculate_and_update_delegator_voter_internal`
 
-Update VoteDelegation of a delegator to up-to-date then return the latest voter.
+Update VoteDelegation of a delegator to up&#45;to&#45;date then return the latest voter.
 
 
 <pre><code>fun calculate_and_update_delegator_voter_internal(pool: &amp;delegation_pool::DelegationPool, governance_records: &amp;mut delegation_pool::GovernanceRecords, delegator: address): address<br/></code></pre>
@@ -2923,7 +2780,7 @@ Update VoteDelegation of a delegator to up-to-date then return the latest voter.
 
 ## Function `calculate_and_update_delegated_votes`
 
-Update DelegatedVotes of a voter to up-to-date then return the total voting power of this voter.
+Update DelegatedVotes of a voter to up&#45;to&#45;date then return the total voting power of this voter.
 
 
 <pre><code>fun calculate_and_update_delegated_votes(pool: &amp;delegation_pool::DelegationPool, governance_records: &amp;mut delegation_pool::GovernanceRecords, voter: address): u64<br/></code></pre>
@@ -2985,10 +2842,7 @@ Allows an owner to change the operator of the underlying stake pool.
 
 ## Function `set_beneficiary_for_operator`
 
-Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
-beneficiary. To ensure payment to the current beneficiary, one should first call <code>synchronize_delegation_pool</code>
-before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
-one for each pool.
+Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new<br/> beneficiary. To ensure payment to the current beneficiary, one should first call <code>synchronize_delegation_pool</code><br/> before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate<br/> one for each pool.
 
 
 <pre><code>public entry fun set_beneficiary_for_operator(operator: &amp;signer, new_beneficiary: address)<br/></code></pre>
@@ -3051,8 +2905,7 @@ Allows an owner to change the delegated voter of the underlying stake pool.
 
 ## Function `delegate_voting_power`
 
-Allows a delegator to delegate its voting power to a voter. If this delegator already has a delegated voter,
-this change won't take effects until the next lockup period.
+Allows a delegator to delegate its voting power to a voter. If this delegator already has a delegated voter,<br/> this change won&apos;t take effects until the next lockup period.
 
 
 <pre><code>public entry fun delegate_voting_power(delegator: &amp;signer, pool_address: address, new_voter: address)<br/></code></pre>
@@ -3199,8 +3052,7 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
 
 ## Function `unlock`
 
-Unlock <code>amount</code> from the active + pending_active stake of <code>delegator</code> or
-at most how much active stake there is on the stake pool.
+Unlock <code>amount</code> from the active &#43; pending_active stake of <code>delegator</code> or<br/> at most how much active stake there is on the stake pool.
 
 
 <pre><code>public entry fun unlock(delegator: &amp;signer, pool_address: address, amount: u64)<br/></code></pre>
@@ -3303,9 +3155,7 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
 
 ## Function `pending_withdrawal_exists`
 
-Return the unique observed lockup cycle where delegator <code>delegator_address</code> may have
-unlocking (or already unlocked) stake to be withdrawn from delegation pool <code>pool</code>.
-A bool is returned to signal if a pending withdrawal exists at all.
+Return the unique observed lockup cycle where delegator <code>delegator_address</code> may have<br/> unlocking (or already unlocked) stake to be withdrawn from delegation pool <code>pool</code>.<br/> A bool is returned to signal if a pending withdrawal exists at all.
 
 
 <pre><code>fun pending_withdrawal_exists(pool: &amp;delegation_pool::DelegationPool, delegator_address: address): (bool, delegation_pool::ObservedLockupCycle)<br/></code></pre>
@@ -3326,8 +3176,7 @@ A bool is returned to signal if a pending withdrawal exists at all.
 
 ## Function `pending_inactive_shares_pool_mut`
 
-Return a mutable reference to the shares pool of <code>pending_inactive</code> stake on the
-delegation pool, always the last item in <code>inactive_shares</code>.
+Return a mutable reference to the shares pool of <code>pending_inactive</code> stake on the<br/> delegation pool, always the last item in <code>inactive_shares</code>.
 
 
 <pre><code>fun pending_inactive_shares_pool_mut(pool: &amp;mut delegation_pool::DelegationPool): &amp;mut pool_u64_unbound::Pool<br/></code></pre>
@@ -3368,10 +3217,7 @@ delegation pool, always the last item in <code>inactive_shares</code>.
 
 ## Function `execute_pending_withdrawal`
 
-Execute the pending withdrawal of <code>delegator_address</code> on delegation pool <code>pool</code>
-if existing and already inactive to allow the creation of a new one.
-<code>pending_inactive</code> stake would be left untouched even if withdrawable and should
-be explicitly withdrawn by delegator
+Execute the pending withdrawal of <code>delegator_address</code> on delegation pool <code>pool</code><br/> if existing and already inactive to allow the creation of a new one.<br/> <code>pending_inactive</code> stake would be left untouched even if withdrawable and should<br/> be explicitly withdrawn by delegator
 
 
 <pre><code>fun execute_pending_withdrawal(pool: &amp;mut delegation_pool::DelegationPool, delegator_address: address)<br/></code></pre>
@@ -3392,8 +3238,7 @@ be explicitly withdrawn by delegator
 
 ## Function `buy_in_active_shares`
 
-Buy shares into the active pool on behalf of delegator <code>shareholder</code> who
-deposited <code>coins_amount</code>. This function doesn't make any coin transfer.
+Buy shares into the active pool on behalf of delegator <code>shareholder</code> who<br/> deposited <code>coins_amount</code>. This function doesn&apos;t make any coin transfer.
 
 
 <pre><code>fun buy_in_active_shares(pool: &amp;mut delegation_pool::DelegationPool, shareholder: address, coins_amount: u64): u128<br/></code></pre>
@@ -3414,10 +3259,7 @@ deposited <code>coins_amount</code>. This function doesn't make any coin transfe
 
 ## Function `buy_in_pending_inactive_shares`
 
-Buy shares into the pending_inactive pool on behalf of delegator <code>shareholder</code> who
-redeemed <code>coins_amount</code> from the active pool to schedule it for unlocking.
-If delegator's pending withdrawal exists and has been inactivated, execute it firstly
-to ensure there is always only one withdrawal request.
+Buy shares into the pending_inactive pool on behalf of delegator <code>shareholder</code> who<br/> redeemed <code>coins_amount</code> from the active pool to schedule it for unlocking.<br/> If delegator&apos;s pending withdrawal exists and has been inactivated, execute it firstly<br/> to ensure there is always only one withdrawal request.
 
 
 <pre><code>fun buy_in_pending_inactive_shares(pool: &amp;mut delegation_pool::DelegationPool, shareholder: address, coins_amount: u64): u128<br/></code></pre>
@@ -3438,8 +3280,7 @@ to ensure there is always only one withdrawal request.
 
 ## Function `amount_to_shares_to_redeem`
 
-Convert <code>coins_amount</code> of coins to be redeemed from shares pool <code>shares_pool</code>
-to the exact number of shares to redeem in order to achieve this.
+Convert <code>coins_amount</code> of coins to be redeemed from shares pool <code>shares_pool</code><br/> to the exact number of shares to redeem in order to achieve this.
 
 
 <pre><code>fun amount_to_shares_to_redeem(shares_pool: &amp;pool_u64_unbound::Pool, shareholder: address, coins_amount: u64): u128<br/></code></pre>
@@ -3460,10 +3301,7 @@ to the exact number of shares to redeem in order to achieve this.
 
 ## Function `redeem_active_shares`
 
-Redeem shares from the active pool on behalf of delegator <code>shareholder</code> who
-wants to unlock <code>coins_amount</code> of its active stake.
-Extracted coins will be used to buy shares into the pending_inactive pool and
-be available for withdrawal when current OLC ends.
+Redeem shares from the active pool on behalf of delegator <code>shareholder</code> who<br/> wants to unlock <code>coins_amount</code> of its active stake.<br/> Extracted coins will be used to buy shares into the pending_inactive pool and<br/> be available for withdrawal when current OLC ends.
 
 
 <pre><code>fun redeem_active_shares(pool: &amp;mut delegation_pool::DelegationPool, shareholder: address, coins_amount: u64): u64<br/></code></pre>
@@ -3484,12 +3322,7 @@ be available for withdrawal when current OLC ends.
 
 ## Function `redeem_inactive_shares`
 
-Redeem shares from the inactive pool at <code>lockup_cycle</code> < current OLC on behalf of
-delegator <code>shareholder</code> who wants to withdraw <code>coins_amount</code> of its unlocked stake.
-Redeem shares from the pending_inactive pool at <code>lockup_cycle</code> == current OLC on behalf of
-delegator <code>shareholder</code> who wants to reactivate <code>coins_amount</code> of its unlocking stake.
-For latter case, extracted coins will be used to buy shares into the active pool and
-escape inactivation when current lockup ends.
+Redeem shares from the inactive pool at <code>lockup_cycle</code> &lt; current OLC on behalf of<br/> delegator <code>shareholder</code> who wants to withdraw <code>coins_amount</code> of its unlocked stake.<br/> Redeem shares from the pending_inactive pool at <code>lockup_cycle</code> &#61;&#61; current OLC on behalf of<br/> delegator <code>shareholder</code> who wants to reactivate <code>coins_amount</code> of its unlocking stake.<br/> For latter case, extracted coins will be used to buy shares into the active pool and<br/> escape inactivation when current lockup ends.
 
 
 <pre><code>fun redeem_inactive_shares(pool: &amp;mut delegation_pool::DelegationPool, shareholder: address, coins_amount: u64, lockup_cycle: delegation_pool::ObservedLockupCycle): u64<br/></code></pre>
@@ -3510,9 +3343,7 @@ escape inactivation when current lockup ends.
 
 ## Function `calculate_stake_pool_drift`
 
-Calculate stake deviations between the delegation and stake pools in order to
-capture the rewards earned in the meantime, resulted operator commission and
-whether the lockup expired on the stake pool.
+Calculate stake deviations between the delegation and stake pools in order to<br/> capture the rewards earned in the meantime, resulted operator commission and<br/> whether the lockup expired on the stake pool.
 
 
 <pre><code>fun calculate_stake_pool_drift(pool: &amp;delegation_pool::DelegationPool): (bool, u64, u64, u64, u64)<br/></code></pre>
@@ -3533,8 +3364,7 @@ whether the lockup expired on the stake pool.
 
 ## Function `synchronize_delegation_pool`
 
-Synchronize delegation and stake pools: distribute yet-undetected rewards to the corresponding internal
-shares pools, assign commission to operator and eventually prepare delegation pool for a new lockup cycle.
+Synchronize delegation and stake pools: distribute yet&#45;undetected rewards to the corresponding internal<br/> shares pools, assign commission to operator and eventually prepare delegation pool for a new lockup cycle.
 
 
 <pre><code>public entry fun synchronize_delegation_pool(pool_address: address)<br/></code></pre>
@@ -3683,102 +3513,33 @@ Deprecated, prefer math64::mul_div
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>Every DelegationPool has only one corresponding StakePool stored at the same address.</td>
-<td>Critical</td>
-<td>Upon calling the initialize_delegation_pool function, a resource account is created from the "owner" signer to host the delegation pool resource and own the underlying stake pool.</td>
-<td>Audited that the address of StakePool equals address of DelegationPool and the data invariant on the DelegationPool.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Every DelegationPool has only one corresponding StakePool stored at the same address.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;Upon calling the initialize_delegation_pool function, a resource account is created from the &quot;owner&quot; signer to host the delegation pool resource and own the underlying stake pool.&lt;/td&gt;<br/>&lt;td&gt;Audited that the address of StakePool equals address of DelegationPool and the data invariant on the DelegationPool.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The signer capability within the delegation pool has an address equal to the address of the delegation pool.</td>
-<td>Critical</td>
-<td>The initialize_delegation_pool function moves the DelegationPool resource to the address associated with stake_pool_signer, which also possesses the signer capability.</td>
-<td>Audited that the address of signer cap equals address of DelegationPool.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The signer capability within the delegation pool has an address equal to the address of the delegation pool.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The initialize_delegation_pool function moves the DelegationPool resource to the address associated with stake_pool_signer, which also possesses the signer capability.&lt;/td&gt;<br/>&lt;td&gt;Audited that the address of signer cap equals address of DelegationPool.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>A delegator holds shares exclusively in one inactive shares pool, which could either be an already inactive pool or the pending_inactive pool.</td>
-<td>High</td>
-<td>The get_stake function returns the inactive stake owned by a delegator and checks which state the shares are in via the get_pending_withdrawal function.</td>
-<td>Audited that either inactive or pending_inactive stake after invoking the get_stake function is zero and both are never non-zero.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;A delegator holds shares exclusively in one inactive shares pool, which could either be an already inactive pool or the pending_inactive pool.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The get_stake function returns the inactive stake owned by a delegator and checks which state the shares are in via the get_pending_withdrawal function.&lt;/td&gt;<br/>&lt;td&gt;Audited that either inactive or pending_inactive stake after invoking the get_stake function is zero and both are never non&#45;zero.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>The specific pool in which the delegator possesses inactive shares becomes designated as the pending withdrawal pool for that delegator.</td>
-<td>Medium</td>
-<td>The get_pending_withdrawal function checks if any pending withdrawal exists for a delegate address and if there is neither inactive nor pending_inactive stake, the pending_withdrawal_exists returns false.</td>
-<td>This has been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The specific pool in which the delegator possesses inactive shares becomes designated as the pending withdrawal pool for that delegator.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The get_pending_withdrawal function checks if any pending withdrawal exists for a delegate address and if there is neither inactive nor pending_inactive stake, the pending_withdrawal_exists returns false.&lt;/td&gt;<br/>&lt;td&gt;This has been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>The existence of a pending withdrawal implies that it is associated with a pool where the delegator possesses inactive shares.</td>
-<td>Medium</td>
-<td>In the get_pending_withdrawal function, if withdrawal_exists is true, the function returns true and a non-zero amount</td>
-<td>get_pending_withdrawal has been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;The existence of a pending withdrawal implies that it is associated with a pool where the delegator possesses inactive shares.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;In the get_pending_withdrawal function, if withdrawal_exists is true, the function returns true and a non&#45;zero amount&lt;/td&gt;<br/>&lt;td&gt;get_pending_withdrawal has been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>6</td>
-<td>An inactive shares pool should have coins allocated to it; otherwise, it should become deleted.</td>
-<td>Medium</td>
-<td>The redeem_inactive_shares function has a check that destroys the inactive shares pool, given that it is empty.</td>
-<td>shares pools have been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;6&lt;/td&gt;<br/>&lt;td&gt;An inactive shares pool should have coins allocated to it; otherwise, it should become deleted.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The redeem_inactive_shares function has a check that destroys the inactive shares pool, given that it is empty.&lt;/td&gt;<br/>&lt;td&gt;shares pools have been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>7</td>
-<td>The index of the pending withdrawal will not exceed the current OLC on DelegationPool.</td>
-<td>High</td>
-<td>The get_pending_withdrawal function has a check which ensures that withdrawal_olc.index < pool.observed_lockup_cycle.index.</td>
-<td>This has been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;7&lt;/td&gt;<br/>&lt;td&gt;The index of the pending withdrawal will not exceed the current OLC on DelegationPool.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The get_pending_withdrawal function has a check which ensures that withdrawal_olc.index &lt; pool.observed_lockup_cycle.index.&lt;/td&gt;<br/>&lt;td&gt;This has been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>8</td>
-<td>Slashing is not possible for inactive stakes.</td>
-<td>Critical</td>
-<td>The number of inactive staked coins must be greater than or equal to the total_coins_inactive of the pool.</td>
-<td>This has been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;8&lt;/td&gt;<br/>&lt;td&gt;Slashing is not possible for inactive stakes.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The number of inactive staked coins must be greater than or equal to the total_coins_inactive of the pool.&lt;/td&gt;<br/>&lt;td&gt;This has been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>9</td>
-<td>The delegator's active or pending inactive stake will always meet or exceed the minimum allowed value.</td>
-<td>Medium</td>
-<td>The add_stake, unlock and reactivate_stake functions ensure the active_shares or pending_inactive_shares balance for the delegator is greater than or equal to the MIN_COINS_ON_SHARES_POOL value.</td>
-<td>Audited the comparison of active_shares or inactive_shares balance for the delegator with the MIN_COINS_ON_SHARES_POOL value.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;9&lt;/td&gt;<br/>&lt;td&gt;The delegator&apos;s active or pending inactive stake will always meet or exceed the minimum allowed value.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The add_stake, unlock and reactivate_stake functions ensure the active_shares or pending_inactive_shares balance for the delegator is greater than or equal to the MIN_COINS_ON_SHARES_POOL value.&lt;/td&gt;<br/>&lt;td&gt;Audited the comparison of active_shares or inactive_shares balance for the delegator with the MIN_COINS_ON_SHARES_POOL value.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>10</td>
-<td>The delegation pool exists at a given address.</td>
-<td>Low</td>
-<td>Functions that operate on the DelegationPool abort if there is no DelegationPool struct under the given pool_address.</td>
-<td>Audited that there is no DelegationPool structure assigned to the pool_address given as a parameter.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;10&lt;/td&gt;<br/>&lt;td&gt;The delegation pool exists at a given address.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;Functions that operate on the DelegationPool abort if there is no DelegationPool struct under the given pool_address.&lt;/td&gt;<br/>&lt;td&gt;Audited that there is no DelegationPool structure assigned to the pool_address given as a parameter.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>11</td>
-<td>The initialization of the delegation pool is contingent upon enabling the delegation pools feature.</td>
-<td>Critical</td>
-<td>The initialize_delegation_pool function should proceed if the DELEGATION_POOLS feature is enabled.</td>
-<td>This has been audited.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;11&lt;/td&gt;<br/>&lt;td&gt;The initialization of the delegation pool is contingent upon enabling the delegation pools feature.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The initialize_delegation_pool function should proceed if the DELEGATION_POOLS feature is enabled.&lt;/td&gt;<br/>&lt;td&gt;This has been audited.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>

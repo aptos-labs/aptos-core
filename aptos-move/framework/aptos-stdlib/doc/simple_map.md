@@ -3,12 +3,7 @@
 
 # Module `0x1::simple_map`
 
-This module provides a solution for unsorted maps, that is it has the properties that
-1) Keys point to Values
-2) Each Key must be unique
-3) A Key can be found within O(N) time
-4) The keys are unsorted.
-5) Adds and removals take O(N) time
+This module provides a solution for unsorted maps, that is it has the properties that<br/> 1) Keys point to Values<br/> 2) Each Key must be unique<br/> 3) A Key can be found within O(N) time<br/> 4) The keys are unsorted.<br/> 5) Adds and removals take O(N) time
 
 
 -  [Struct `SimpleMap`](#0x1_simple_map_SimpleMap)
@@ -202,8 +197,7 @@ Create a SimpleMap from a vector of keys and values. The keys must be unique.
 
 ## Function `create`
 
-Create an empty SimpleMap.
-This function is deprecated, use <code>new</code> instead.
+Create an empty SimpleMap.<br/> This function is deprecated, use <code>new</code> instead.
 
 
 <pre><code>&#35;[deprecated]<br/>public fun create&lt;Key: store, Value: store&gt;(): simple_map::SimpleMap&lt;Key, Value&gt;<br/></code></pre>
@@ -409,8 +403,7 @@ Return all values in the map. This requires values to be copyable.
 
 ## Function `to_vec_pair`
 
-Transform the map into two vectors with the keys and values respectively
-Primarily used to destroy a map
+Transform the map into two vectors with the keys and values respectively<br/> Primarily used to destroy a map
 
 
 <pre><code>public fun to_vec_pair&lt;Key: store, Value: store&gt;(map: simple_map::SimpleMap&lt;Key, Value&gt;): (vector&lt;Key&gt;, vector&lt;Value&gt;)<br/></code></pre>
@@ -431,8 +424,7 @@ Primarily used to destroy a map
 
 ## Function `destroy`
 
-For maps that cannot be dropped this is a utility to destroy them
-using lambdas to destroy the individual keys and values.
+For maps that cannot be dropped this is a utility to destroy them<br/> using lambdas to destroy the individual keys and values.
 
 
 <pre><code>public fun destroy&lt;Key: store, Value: store&gt;(map: simple_map::SimpleMap&lt;Key, Value&gt;, dk: &#124;Key&#124;, dv: &#124;Value&#124;)<br/></code></pre>

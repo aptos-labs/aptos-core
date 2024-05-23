@@ -3,36 +3,7 @@
 
 # Module `0x1::object_code_deployment`
 
-This module allows users to deploy, upgrade and freeze modules deployed to objects on-chain.
-This enables users to deploy modules to an object with a unique address each time they are published.
-This modules provides an alternative method to publish code on-chain, where code is deployed to objects rather than accounts.
-This is encouraged as it abstracts the necessary resources needed for deploying modules,
-along with the required authorization to upgrade and freeze modules.
-
-The functionalities of this module are as follows.
-
-Publishing modules flow:
-1. Create a new object with the address derived from the publisher address and the object seed.
-2. Publish the module passed in the function via <code>metadata_serialized</code> and <code>code</code> to the newly created object.
-3. Emits 'Publish' event with the address of the newly created object.
-4. Create a <code>ManagingRefs</code> which stores the extend ref of the newly created object.
-Note: This is needed to upgrade the code as the signer must be generated to upgrade the existing code in an object.
-
-Upgrading modules flow:
-1. Assert the <code>code_object</code> passed in the function is owned by the <code>publisher</code>.
-2. Assert the <code>code_object</code> passed in the function exists in global storage.
-2. Retrieve the <code>ExtendRef</code> from the <code>code_object</code> and generate the signer from this.
-3. Upgrade the module with the <code>metadata_serialized</code> and <code>code</code> passed in the function.
-4. Emits 'Upgrade' event with the address of the object with the upgraded code.
-Note: If the modules were deployed as immutable when calling <code>publish</code>, the upgrade will fail.
-
-Freezing modules flow:
-1. Assert the <code>code_object</code> passed in the function exists in global storage.
-2. Assert the <code>code_object</code> passed in the function is owned by the <code>publisher</code>.
-3. Mark all the modules in the <code>code_object</code> as immutable.
-4. Emits 'Freeze' event with the address of the object with the frozen code.
-Note: There is no unfreeze function as this gives no benefit if the user can freeze/unfreeze modules at will.
-Once modules are marked as immutable, they cannot be made mutable again.
+This module allows users to deploy, upgrade and freeze modules deployed to objects on&#45;chain.<br/> This enables users to deploy modules to an object with a unique address each time they are published.<br/> This modules provides an alternative method to publish code on&#45;chain, where code is deployed to objects rather than accounts.<br/> This is encouraged as it abstracts the necessary resources needed for deploying modules,<br/> along with the required authorization to upgrade and freeze modules.<br/><br/> The functionalities of this module are as follows.<br/><br/> Publishing modules flow:<br/> 1. Create a new object with the address derived from the publisher address and the object seed.<br/> 2. Publish the module passed in the function via <code>metadata_serialized</code> and <code>code</code> to the newly created object.<br/> 3. Emits &apos;Publish&apos; event with the address of the newly created object.<br/> 4. Create a <code>ManagingRefs</code> which stores the extend ref of the newly created object.<br/> Note: This is needed to upgrade the code as the signer must be generated to upgrade the existing code in an object.<br/><br/> Upgrading modules flow:<br/> 1. Assert the <code>code_object</code> passed in the function is owned by the <code>publisher</code>.<br/> 2. Assert the <code>code_object</code> passed in the function exists in global storage.<br/> 2. Retrieve the <code>ExtendRef</code> from the <code>code_object</code> and generate the signer from this.<br/> 3. Upgrade the module with the <code>metadata_serialized</code> and <code>code</code> passed in the function.<br/> 4. Emits &apos;Upgrade&apos; event with the address of the object with the upgraded code.<br/> Note: If the modules were deployed as immutable when calling <code>publish</code>, the upgrade will fail.<br/><br/> Freezing modules flow:<br/> 1. Assert the <code>code_object</code> passed in the function exists in global storage.<br/> 2. Assert the <code>code_object</code> passed in the function is owned by the <code>publisher</code>.<br/> 3. Mark all the modules in the <code>code_object</code> as immutable.<br/> 4. Emits &apos;Freeze&apos; event with the address of the object with the frozen code.<br/> Note: There is no unfreeze function as this gives no benefit if the user can freeze/unfreeze modules at will.<br/>       Once modules are marked as immutable, they cannot be made mutable again.
 
 
 -  [Resource `ManagingRefs`](#0x1_object_code_deployment_ManagingRefs)
@@ -202,10 +173,7 @@ Object code deployment feature not supported.
 
 ## Function `publish`
 
-Creates a new object with a unique address derived from the publisher address and the object seed.
-Publishes the code passed in the function to the newly created object.
-The caller must provide package metadata describing the package via <code>metadata_serialized</code> and
-the code to be published via <code>code</code>. This contains a vector of modules to be deployed on-chain.
+Creates a new object with a unique address derived from the publisher address and the object seed.<br/> Publishes the code passed in the function to the newly created object.<br/> The caller must provide package metadata describing the package via <code>metadata_serialized</code> and<br/> the code to be published via <code>code</code>. This contains a vector of modules to be deployed on&#45;chain.
 
 
 <pre><code>public entry fun publish(publisher: &amp;signer, metadata_serialized: vector&lt;u8&gt;, code: vector&lt;vector&lt;u8&gt;&gt;)<br/></code></pre>
@@ -246,10 +214,7 @@ the code to be published via <code>code</code>. This contains a vector of module
 
 ## Function `upgrade`
 
-Upgrades the existing modules at the <code>code_object</code> address with the new modules passed in <code>code</code>,
-along with the metadata <code>metadata_serialized</code>.
-Note: If the modules were deployed as immutable when calling <code>publish</code>, the upgrade will fail.
-Requires the publisher to be the owner of the <code>code_object</code>.
+Upgrades the existing modules at the <code>code_object</code> address with the new modules passed in <code>code</code>,<br/> along with the metadata <code>metadata_serialized</code>.<br/> Note: If the modules were deployed as immutable when calling <code>publish</code>, the upgrade will fail.<br/> Requires the publisher to be the owner of the <code>code_object</code>.
 
 
 <pre><code>public entry fun upgrade(publisher: &amp;signer, metadata_serialized: vector&lt;u8&gt;, code: vector&lt;vector&lt;u8&gt;&gt;, code_object: object::Object&lt;code::PackageRegistry&gt;)<br/></code></pre>
@@ -270,9 +235,7 @@ Requires the publisher to be the owner of the <code>code_object</code>.
 
 ## Function `freeze_code_object`
 
-Make an existing upgradable package immutable. Once this is called, the package cannot be made upgradable again.
-Each <code>code_object</code> should only have one package, as one package is deployed per object in this module.
-Requires the <code>publisher</code> to be the owner of the <code>code_object</code>.
+Make an existing upgradable package immutable. Once this is called, the package cannot be made upgradable again.<br/> Each <code>code_object</code> should only have one package, as one package is deployed per object in this module.<br/> Requires the <code>publisher</code> to be the owner of the <code>code_object</code>.
 
 
 <pre><code>public entry fun freeze_code_object(publisher: &amp;signer, code_object: object::Object&lt;code::PackageRegistry&gt;)<br/></code></pre>

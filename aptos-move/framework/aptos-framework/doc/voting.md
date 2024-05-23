@@ -3,27 +3,8 @@
 
 # Module `0x1::voting`
 
-
-This is the general Voting module that can be used as part of a DAO Governance. Voting is designed to be used by
-standalone governance modules, who has full control over the voting flow and is responsible for voting power
-calculation and including proper capabilities when creating the proposal so resolution can go through.
-On-chain governance of the Aptos network also uses Voting.
-
-The voting flow:
-1. The Voting module can be deployed at a known address (e.g. 0x1 for Aptos on-chain governance)
-2. The governance module, e.g. AptosGovernance, can be deployed later and define a GovernanceProposal resource type
-that can also contain other information such as Capability resource for authorization.
-3. The governance module's owner can then register the ProposalType with Voting. This also hosts the proposal list
-(forum) on the calling account.
-4. A proposer, through the governance module, can call Voting::create_proposal to create a proposal. create_proposal
-cannot be called directly not through the governance module. A script hash of the resolution script that can later
-be called to execute the proposal is required.
-5. A voter, through the governance module, can call Voting::vote on a proposal. vote requires passing a &ProposalType
-and thus only the governance module that registers ProposalType can call vote.
-6. Once the proposal's expiration time has passed and more than the defined threshold has voted yes on the proposal,
-anyone can call resolve which returns the content of the proposal (of type ProposalType) that can be used to execute.
-7. Only the resolution script with the same script hash specified in the proposal can call Voting::resolve as part of
-the resolution process.
+<br/> This is the general Voting module that can be used as part of a DAO Governance. Voting is designed to be used by<br/> standalone governance modules, who has full control over the voting flow and is responsible for voting power<br/> calculation and including proper capabilities when creating the proposal so resolution can go through.<br/> On&#45;chain governance of the Aptos network also uses Voting.<br/><br/> The voting flow:<br/> 1. The Voting module can be deployed at a known address (e.g. 0x1 for Aptos on&#45;chain governance)<br/> 2. The governance module, e.g. AptosGovernance, can be deployed later and define a GovernanceProposal resource type<br/> that can also contain other information such as Capability resource for authorization.<br/> 3. The governance module&apos;s owner can then register the ProposalType with Voting. This also hosts the proposal list
+(forum) on the calling account.<br/> 4. A proposer, through the governance module, can call Voting::create_proposal to create a proposal. create_proposal<br/> cannot be called directly not through the governance module. A script hash of the resolution script that can later<br/> be called to execute the proposal is required.<br/> 5. A voter, through the governance module, can call Voting::vote on a proposal. vote requires passing a &amp;ProposalType<br/> and thus only the governance module that registers ProposalType can call vote.<br/> 6. Once the proposal&apos;s expiration time has passed and more than the defined threshold has voted yes on the proposal,<br/> anyone can call resolve which returns the content of the proposal (of type ProposalType) that can be used to execute.<br/> 7. Only the resolution script with the same script hash specified in the proposal can call Voting::resolve as part of<br/> the resolution process.
 
 
 -  [Struct `Proposal`](#0x1_voting_Proposal)
@@ -121,20 +102,13 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 <code>execution_content: option::Option&lt;ProposalType&gt;</code>
 </dt>
 <dd>
- Required. Should contain enough information to execute later, for example the required capability.
- This is stored as an option so we can return it to governance when the proposal is resolved.
+ Required. Should contain enough information to execute later, for example the required capability.<br/> This is stored as an option so we can return it to governance when the proposal is resolved.
 </dd>
 <dt>
 <code>metadata: simple_map::SimpleMap&lt;string::String, vector&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
- Optional. Value is serialized value of an attribute.
- Currently, we have three attributes that are used by the voting flow.
- 1. RESOLVABLE_TIME_METADATA_KEY: this is uesed to record the resolvable time to ensure that resolution has to be done non-atomically.
- 2. IS_MULTI_STEP_PROPOSAL_KEY: this is used to track if a proposal is single-step or multi-step.
- 3. IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY: this attribute only applies to multi-step proposals. A single-step proposal will not have
- this field in its metadata map. The value is used to indicate if a multi-step proposal is in execution. If yes, we will disable further
- voting for this multi-step proposal.
+ Optional. Value is serialized value of an attribute.<br/> Currently, we have three attributes that are used by the voting flow.<br/> 1. RESOLVABLE_TIME_METADATA_KEY: this is uesed to record the resolvable time to ensure that resolution has to be done non&#45;atomically.<br/> 2. IS_MULTI_STEP_PROPOSAL_KEY: this is used to track if a proposal is single&#45;step or multi&#45;step.<br/> 3. IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY: this attribute only applies to multi&#45;step proposals. A single&#45;step proposal will not have<br/> this field in its metadata map. The value is used to indicate if a multi&#45;step proposal is in execution. If yes, we will disable further<br/> voting for this multi&#45;step proposal.
 </dd>
 <dt>
 <code>creation_time_secs: u64</code>
@@ -146,8 +120,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 <code>execution_hash: vector&lt;u8&gt;</code>
 </dt>
 <dd>
- Required. The hash for the execution script module. Only the same exact script module can resolve this
- proposal.
+ Required. The hash for the execution script module. Only the same exact script module can resolve this<br/> proposal.
 </dd>
 <dt>
 <code>min_vote_threshold: u128</code>
@@ -165,17 +138,13 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 <code>early_resolution_vote_threshold: option::Option&lt;u128&gt;</code>
 </dt>
 <dd>
- Optional. Early resolution threshold. If specified, the proposal can be resolved early if the total
- number of yes or no votes passes this threshold.
- For example, this can be set to 50% of the total supply of the voting token, so if > 50% vote yes or no,
- the proposal can be resolved before expiration.
+ Optional. Early resolution threshold. If specified, the proposal can be resolved early if the total<br/> number of yes or no votes passes this threshold.<br/> For example, this can be set to 50% of the total supply of the voting token, so if &gt; 50% vote yes or no,<br/> the proposal can be resolved before expiration.
 </dd>
 <dt>
 <code>yes_votes: u128</code>
 </dt>
 <dd>
- Number of votes for each outcome.
- u128 since the voting power is already u64 and can add up to more than u64 can hold.
+ Number of votes for each outcome.<br/> u128 since the voting power is already u64 and can add up to more than u64 can hold.
 </dd>
 <dt>
 <code>no_votes: u128</code>
@@ -219,8 +188,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 <code>proposals: table::Table&lt;u64, voting::Proposal&lt;ProposalType&gt;&gt;</code>
 </dt>
 <dd>
- Use Table for execution optimization instead of Vector for gas cost since Vector is read entirely into memory
- during execution while only relevant Table entries are.
+ Use Table for execution optimization instead of Vector for gas cost since Vector is read entirely into memory<br/> during execution while only relevant Table entries are.
 </dd>
 <dt>
 <code>events: voting::VotingEvents</code>
@@ -232,7 +200,7 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 <code>next_proposal_id: u64</code>
 </dt>
 <dd>
- Unique identifier for a proposal. This allows for 2 * 10**19 proposals.
+ Unique identifier for a proposal. This allows for 2 &#42; 10&#42;&#42;19 proposals.
 </dd>
 </dl>
 
@@ -583,8 +551,7 @@ Minimum vote threshold cannot be higher than early resolution threshold.
 
 <a id="0x1_voting_EMULTI_STEP_PROPOSAL_CANNOT_USE_SINGLE_STEP_RESOLVE_FUNCTION"></a>
 
-If a proposal is multi-step, we need to use <code>resolve_proposal_v2()</code> to resolve it.
-If we use <code>resolve()</code> to resolve a multi-step proposal, it will fail with EMULTI_STEP_PROPOSAL_CANNOT_USE_SINGLE_STEP_RESOLVE_FUNCTION.
+If a proposal is multi&#45;step, we need to use <code>resolve_proposal_v2()</code> to resolve it.<br/> If we use <code>resolve()</code> to resolve a multi&#45;step proposal, it will fail with EMULTI_STEP_PROPOSAL_CANNOT_USE_SINGLE_STEP_RESOLVE_FUNCTION.
 
 
 <pre><code>const EMULTI_STEP_PROPOSAL_CANNOT_USE_SINGLE_STEP_RESOLVE_FUNCTION: u64 &#61; 10;<br/></code></pre>
@@ -593,7 +560,7 @@ If we use <code>resolve()</code> to resolve a multi-step proposal, it will fail 
 
 <a id="0x1_voting_EMULTI_STEP_PROPOSAL_IN_EXECUTION"></a>
 
-Cannot vote if the specified multi-step proposal is in execution.
+Cannot vote if the specified multi&#45;step proposal is in execution.
 
 
 <pre><code>const EMULTI_STEP_PROPOSAL_IN_EXECUTION: u64 &#61; 9;<br/></code></pre>
@@ -629,7 +596,7 @@ Proposal cannot contain an empty execution script hash
 
 <a id="0x1_voting_EPROPOSAL_EXECUTION_HASH_NOT_MATCHING"></a>
 
-Current script's execution hash does not match the specified proposal's
+Current script&apos;s execution hash does not match the specified proposal&apos;s
 
 
 <pre><code>const EPROPOSAL_EXECUTION_HASH_NOT_MATCHING: u64 &#61; 1;<br/></code></pre>
@@ -638,7 +605,7 @@ Current script's execution hash does not match the specified proposal's
 
 <a id="0x1_voting_EPROPOSAL_IS_SINGLE_STEP"></a>
 
-Cannot call <code>is_multi_step_proposal_in_execution()</code> on single-step proposals.
+Cannot call <code>is_multi_step_proposal_in_execution()</code> on single&#45;step proposals.
 
 
 <pre><code>const EPROPOSAL_IS_SINGLE_STEP: u64 &#61; 12;<br/></code></pre>
@@ -647,7 +614,7 @@ Cannot call <code>is_multi_step_proposal_in_execution()</code> on single-step pr
 
 <a id="0x1_voting_EPROPOSAL_VOTING_ALREADY_ENDED"></a>
 
-Proposal's voting period has already ended.
+Proposal&apos;s voting period has already ended.
 
 
 <pre><code>const EPROPOSAL_VOTING_ALREADY_ENDED: u64 &#61; 5;<br/></code></pre>
@@ -665,7 +632,7 @@ Resolution of a proposal cannot happen atomically in the same transaction as the
 
 <a id="0x1_voting_ESINGLE_STEP_PROPOSAL_CANNOT_HAVE_NEXT_EXECUTION_HASH"></a>
 
-If we call <code>resolve_proposal_v2()</code> to resolve a single-step proposal, the <code>next_execution_hash</code> parameter should be an empty vector.
+If we call <code>resolve_proposal_v2()</code> to resolve a single&#45;step proposal, the <code>next_execution_hash</code> parameter should be an empty vector.
 
 
 <pre><code>const ESINGLE_STEP_PROPOSAL_CANNOT_HAVE_NEXT_EXECUTION_HASH: u64 &#61; 11;<br/></code></pre>
@@ -683,7 +650,7 @@ Voting forum has already been registered.
 
 <a id="0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY"></a>
 
-Key used to track if the multi-step proposal is in execution / resolving in progress.
+Key used to track if the multi&#45;step proposal is in execution / resolving in progress.
 
 
 <pre><code>const IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY: vector&lt;u8&gt; &#61; [73, 83, 95, 77, 85, 76, 84, 73, 95, 83, 84, 69, 80, 95, 80, 82, 79, 80, 79, 83, 65, 76, 95, 73, 78, 95, 69, 88, 69, 67, 85, 84, 73, 79, 78];<br/></code></pre>
@@ -692,7 +659,7 @@ Key used to track if the multi-step proposal is in execution / resolving in prog
 
 <a id="0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY"></a>
 
-Key used to track if the proposal is multi-step
+Key used to track if the proposal is multi&#45;step
 
 
 <pre><code>const IS_MULTI_STEP_PROPOSAL_KEY: vector&lt;u8&gt; &#61; [73, 83, 95, 77, 85, 76, 84, 73, 95, 83, 84, 69, 80, 95, 80, 82, 79, 80, 79, 83, 65, 76, 95, 75, 69, 89];<br/></code></pre>
@@ -727,7 +694,7 @@ ProposalStateEnum representing proposal state.
 
 <a id="0x1_voting_RESOLVABLE_TIME_METADATA_KEY"></a>
 
-Key used to track the resolvable time in the proposal's metadata.
+Key used to track the resolvable time in the proposal&apos;s metadata.
 
 
 <pre><code>const RESOLVABLE_TIME_METADATA_KEY: vector&lt;u8&gt; &#61; [82, 69, 83, 79, 76, 86, 65, 66, 76, 69, 95, 84, 73, 77, 69, 95, 77, 69, 84, 65, 68, 65, 84, 65, 95, 75, 69, 89];<br/></code></pre>
@@ -758,18 +725,7 @@ Key used to track the resolvable time in the proposal's metadata.
 
 ## Function `create_proposal`
 
-Create a single-step proposal with the given parameters
-
-@param voting_forum_address The forum's address where the proposal will be stored.
-@param execution_content The execution content that will be given back at resolution time. This can contain
-data such as a capability resource used to scope the execution.
-@param execution_hash The hash for the execution script module. Only the same exact script module can resolve
-this proposal.
-@param min_vote_threshold The minimum number of votes needed to consider this proposal successful.
-@param expiration_secs The time in seconds at which the proposal expires and can potentially be resolved.
-@param early_resolution_vote_threshold The vote threshold for early resolution of this proposal.
-@param metadata A simple_map that stores information about this proposal.
-@return The proposal id.
+Create a single&#45;step proposal with the given parameters<br/><br/> @param voting_forum_address The forum&apos;s address where the proposal will be stored.<br/> @param execution_content The execution content that will be given back at resolution time. This can contain<br/> data such as a capability resource used to scope the execution.<br/> @param execution_hash The hash for the execution script module. Only the same exact script module can resolve<br/> this proposal.<br/> @param min_vote_threshold The minimum number of votes needed to consider this proposal successful.<br/> @param expiration_secs The time in seconds at which the proposal expires and can potentially be resolved.<br/> @param early_resolution_vote_threshold The vote threshold for early resolution of this proposal.<br/> @param metadata A simple_map that stores information about this proposal.<br/> @return The proposal id.
 
 
 <pre><code>public fun create_proposal&lt;ProposalType: store&gt;(proposer: address, voting_forum_address: address, execution_content: ProposalType, execution_hash: vector&lt;u8&gt;, min_vote_threshold: u128, expiration_secs: u64, early_resolution_vote_threshold: option::Option&lt;u128&gt;, metadata: simple_map::SimpleMap&lt;string::String, vector&lt;u8&gt;&gt;): u64<br/></code></pre>
@@ -790,19 +746,7 @@ this proposal.
 
 ## Function `create_proposal_v2`
 
-Create a single-step or a multi-step proposal with the given parameters
-
-@param voting_forum_address The forum's address where the proposal will be stored.
-@param execution_content The execution content that will be given back at resolution time. This can contain
-data such as a capability resource used to scope the execution.
-@param execution_hash The sha-256 hash for the execution script module. Only the same exact script module can
-resolve this proposal.
-@param min_vote_threshold The minimum number of votes needed to consider this proposal successful.
-@param expiration_secs The time in seconds at which the proposal expires and can potentially be resolved.
-@param early_resolution_vote_threshold The vote threshold for early resolution of this proposal.
-@param metadata A simple_map that stores information about this proposal.
-@param is_multi_step_proposal A bool value that indicates if the proposal is single-step or multi-step.
-@return The proposal id.
+Create a single&#45;step or a multi&#45;step proposal with the given parameters<br/><br/> @param voting_forum_address The forum&apos;s address where the proposal will be stored.<br/> @param execution_content The execution content that will be given back at resolution time. This can contain<br/> data such as a capability resource used to scope the execution.<br/> @param execution_hash The sha&#45;256 hash for the execution script module. Only the same exact script module can<br/> resolve this proposal.<br/> @param min_vote_threshold The minimum number of votes needed to consider this proposal successful.<br/> @param expiration_secs The time in seconds at which the proposal expires and can potentially be resolved.<br/> @param early_resolution_vote_threshold The vote threshold for early resolution of this proposal.<br/> @param metadata A simple_map that stores information about this proposal.<br/> @param is_multi_step_proposal A bool value that indicates if the proposal is single&#45;step or multi&#45;step.<br/> @return The proposal id.
 
 
 <pre><code>public fun create_proposal_v2&lt;ProposalType: store&gt;(proposer: address, voting_forum_address: address, execution_content: ProposalType, execution_hash: vector&lt;u8&gt;, min_vote_threshold: u128, expiration_secs: u64, early_resolution_vote_threshold: option::Option&lt;u128&gt;, metadata: simple_map::SimpleMap&lt;string::String, vector&lt;u8&gt;&gt;, is_multi_step_proposal: bool): u64<br/></code></pre>
@@ -823,14 +767,7 @@ resolve this proposal.
 
 ## Function `vote`
 
-Vote on the given proposal.
-
-@param _proof Required so only the governance module that defines ProposalType can initiate voting.
-This guarantees that voting eligibility and voting power are controlled by the right governance.
-@param voting_forum_address The address of the forum where the proposals are stored.
-@param proposal_id The proposal id.
-@param num_votes Number of votes. Voting power should be calculated by governance.
-@param should_pass Whether the votes are for yes or no.
+Vote on the given proposal.<br/><br/> @param _proof Required so only the governance module that defines ProposalType can initiate voting.<br/>               This guarantees that voting eligibility and voting power are controlled by the right governance.<br/> @param voting_forum_address The address of the forum where the proposals are stored.<br/> @param proposal_id The proposal id.<br/> @param num_votes Number of votes. Voting power should be calculated by governance.<br/> @param should_pass Whether the votes are for yes or no.
 
 
 <pre><code>public fun vote&lt;ProposalType: store&gt;(_proof: &amp;ProposalType, voting_forum_address: address, proposal_id: u64, num_votes: u64, should_pass: bool)<br/></code></pre>
@@ -851,7 +788,7 @@ This guarantees that voting eligibility and voting power are controlled by the r
 
 ## Function `is_proposal_resolvable`
 
-Common checks on if a proposal is resolvable, regardless if the proposal is single-step or multi-step.
+Common checks on if a proposal is resolvable, regardless if the proposal is single&#45;step or multi&#45;step.
 
 
 <pre><code>fun is_proposal_resolvable&lt;ProposalType: store&gt;(voting_forum_address: address, proposal_id: u64)<br/></code></pre>
@@ -872,11 +809,7 @@ Common checks on if a proposal is resolvable, regardless if the proposal is sing
 
 ## Function `resolve`
 
-Resolve a single-step proposal with given id. Can only be done if there are at least as many votes as min required and
-there are more yes votes than no. If either of these conditions is not met, this will revert.
-
-@param voting_forum_address The address of the forum where the proposals are stored.
-@param proposal_id The proposal id.
+Resolve a single&#45;step proposal with given id. Can only be done if there are at least as many votes as min required and<br/> there are more yes votes than no. If either of these conditions is not met, this will revert.<br/><br/> @param voting_forum_address The address of the forum where the proposals are stored.<br/> @param proposal_id The proposal id.
 
 
 <pre><code>public fun resolve&lt;ProposalType: store&gt;(voting_forum_address: address, proposal_id: u64): ProposalType<br/></code></pre>
@@ -897,14 +830,7 @@ there are more yes votes than no. If either of these conditions is not met, this
 
 ## Function `resolve_proposal_v2`
 
-Resolve a single-step or a multi-step proposal with the given id.
-Can only be done if there are at least as many votes as min required and
-there are more yes votes than no. If either of these conditions is not met, this will revert.
-
-
-@param voting_forum_address The address of the forum where the proposals are stored.
-@param proposal_id The proposal id.
-@param next_execution_hash The next execution hash if the given proposal is multi-step.
+Resolve a single&#45;step or a multi&#45;step proposal with the given id.<br/> Can only be done if there are at least as many votes as min required and<br/> there are more yes votes than no. If either of these conditions is not met, this will revert.<br/><br/><br/> @param voting_forum_address The address of the forum where the proposals are stored.<br/> @param proposal_id The proposal id.<br/> @param next_execution_hash The next execution hash if the given proposal is multi&#45;step.
 
 
 <pre><code>public fun resolve_proposal_v2&lt;ProposalType: store&gt;(voting_forum_address: address, proposal_id: u64, next_execution_hash: vector&lt;u8&gt;)<br/></code></pre>
@@ -1047,11 +973,7 @@ Return true if the proposal has reached early resolution threshold (if specified
 
 ## Function `get_proposal_state`
 
-Return the state of the proposal with given id.
-
-@param voting_forum_address The address of the forum where the proposals are stored.
-@param proposal_id The proposal id.
-@return Proposal state as an enum value.
+Return the state of the proposal with given id.<br/><br/> @param voting_forum_address The address of the forum where the proposals are stored.<br/> @param proposal_id The proposal id.<br/> @return Proposal state as an enum value.
 
 
 <pre><code>&#35;[view]<br/>public fun get_proposal_state&lt;ProposalType: store&gt;(voting_forum_address: address, proposal_id: u64): u64<br/></code></pre>
@@ -1072,7 +994,7 @@ Return the state of the proposal with given id.
 
 ## Function `get_proposal_creation_secs`
 
-Return the proposal's creation time.
+Return the proposal&apos;s creation time.
 
 
 <pre><code>&#35;[view]<br/>public fun get_proposal_creation_secs&lt;ProposalType: store&gt;(voting_forum_address: address, proposal_id: u64): u64<br/></code></pre>
@@ -1093,7 +1015,7 @@ Return the proposal's creation time.
 
 ## Function `get_proposal_expiration_secs`
 
-Return the proposal's expiration time.
+Return the proposal&apos;s expiration time.
 
 
 <pre><code>&#35;[view]<br/>public fun get_proposal_expiration_secs&lt;ProposalType: store&gt;(voting_forum_address: address, proposal_id: u64): u64<br/></code></pre>
@@ -1114,7 +1036,7 @@ Return the proposal's expiration time.
 
 ## Function `get_execution_hash`
 
-Return the proposal's execution hash.
+Return the proposal&apos;s execution hash.
 
 
 <pre><code>&#35;[view]<br/>public fun get_execution_hash&lt;ProposalType: store&gt;(voting_forum_address: address, proposal_id: u64): vector&lt;u8&gt;<br/></code></pre>
@@ -1135,7 +1057,7 @@ Return the proposal's execution hash.
 
 ## Function `get_min_vote_threshold`
 
-Return the proposal's minimum vote threshold
+Return the proposal&apos;s minimum vote threshold
 
 
 <pre><code>&#35;[view]<br/>public fun get_min_vote_threshold&lt;ProposalType: store&gt;(voting_forum_address: address, proposal_id: u64): u128<br/></code></pre>
@@ -1156,7 +1078,7 @@ Return the proposal's minimum vote threshold
 
 ## Function `get_early_resolution_vote_threshold`
 
-Return the proposal's early resolution minimum vote threshold (optionally set)
+Return the proposal&apos;s early resolution minimum vote threshold (optionally set)
 
 
 <pre><code>&#35;[view]<br/>public fun get_early_resolution_vote_threshold&lt;ProposalType: store&gt;(voting_forum_address: address, proposal_id: u64): option::Option&lt;u128&gt;<br/></code></pre>
@@ -1177,7 +1099,7 @@ Return the proposal's early resolution minimum vote threshold (optionally set)
 
 ## Function `get_votes`
 
-Return the proposal's current vote count (yes_votes, no_votes)
+Return the proposal&apos;s current vote count (yes_votes, no_votes)
 
 
 <pre><code>&#35;[view]<br/>public fun get_votes&lt;ProposalType: store&gt;(voting_forum_address: address, proposal_id: u64): (u128, u128)<br/></code></pre>
@@ -1239,7 +1161,7 @@ Return true if the governance proposal has already been resolved.
 
 ## Function `is_multi_step_proposal_in_execution`
 
-Return true if the multi-step governance proposal is in execution.
+Return true if the multi&#45;step governance proposal is in execution.
 
 
 <pre><code>&#35;[view]<br/>public fun is_multi_step_proposal_in_execution&lt;ProposalType: store&gt;(voting_forum_address: address, proposal_id: u64): bool<br/></code></pre>
@@ -1308,44 +1230,17 @@ Return true if the voting period of the given proposal has already ended.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>The proposal ID in a voting forum is unique and always increases monotonically with each new proposal created for that voting forum.</td>
-<td>High</td>
-<td>The create_proposal and create_proposal_v2 create a new proposal with a unique ID derived from the voting_forum's next_proposal_id incrementally.</td>
-<td>Formally verified via <a href="#high-level-req-1">create_proposal</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The proposal ID in a voting forum is unique and always increases monotonically with each new proposal created for that voting forum.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The create_proposal and create_proposal_v2 create a new proposal with a unique ID derived from the voting_forum&apos;s next_proposal_id incrementally.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;create_proposal&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>While voting, it ensures that only the governance module that defines ProposalType may initiate voting and that the proposal under vote exists in the specified voting forum.</td>
-<td>Critical</td>
-<td>The vote function verifies the eligibility and validity of a proposal before allowing voting. It ensures that only the correct governance module initiates voting. The function checks if the proposal is currently eligible for voting by confirming it has not resolved and the voting period has not ended.</td>
-<td>Formally verified via <a href="#high-level-req-2">vote</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;While voting, it ensures that only the governance module that defines ProposalType may initiate voting and that the proposal under vote exists in the specified voting forum.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The vote function verifies the eligibility and validity of a proposal before allowing voting. It ensures that only the correct governance module initiates voting. The function checks if the proposal is currently eligible for voting by confirming it has not resolved and the voting period has not ended.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;vote&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>After resolving a single-step proposal, the corresponding proposal is guaranteed to be marked as successfully resolved.</td>
-<td>High</td>
-<td>Upon invoking the resolve function on a proposal, it undergoes a series of checks to ensure its validity. These include verifying if the proposal exists, is a single-step proposal, and meets the criteria for resolution. If the checks pass, the proposal's is_resolved flag becomes true, indicating a successful resolution.</td>
-<td>Formally verified via <a href="#high-level-req-3">resolve</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;After resolving a single&#45;step proposal, the corresponding proposal is guaranteed to be marked as successfully resolved.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;Upon invoking the resolve function on a proposal, it undergoes a series of checks to ensure its validity. These include verifying if the proposal exists, is a single&#45;step proposal, and meets the criteria for resolution. If the checks pass, the proposal&apos;s is_resolved flag becomes true, indicating a successful resolution.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;resolve&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>In the context of v2 proposal resolving, both single-step and multi-step proposals are accurately handled. It ensures that for single-step proposals, the next execution hash is empty and resolves the proposal, while for multi-step proposals, it guarantees that the next execution hash corresponds to the hash of the next step, maintaining the integrity of the proposal execution sequence.</td>
-<td>Medium</td>
-<td>The function resolve_proposal_v2 correctly handles both single-step and multi-step proposals. For single-step proposals, it ensures that the next_execution_hash parameter is empty and resolves the proposal. For multi-step proposals, it ensures that the next_execution_hash parameter contains the hash of the next step.</td>
-<td>Formally verified via <a href="#high-level-req-4">resolve_proposal_v2</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;In the context of v2 proposal resolving, both single&#45;step and multi&#45;step proposals are accurately handled. It ensures that for single&#45;step proposals, the next execution hash is empty and resolves the proposal, while for multi&#45;step proposals, it guarantees that the next execution hash corresponds to the hash of the next step, maintaining the integrity of the proposal execution sequence.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The function resolve_proposal_v2 correctly handles both single&#45;step and multi&#45;step proposals. For single&#45;step proposals, it ensures that the next_execution_hash parameter is empty and resolves the proposal. For multi&#45;step proposals, it ensures that the next_execution_hash parameter contains the hash of the next step.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;resolve_proposal_v2&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
 
 
@@ -1382,7 +1277,7 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<pre><code>requires chain_status::is_operating();<br/>include CreateProposalAbortsIfAndEnsures&lt;ProposalType&gt;&#123;is_multi_step_proposal: false&#125;;<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>requires chain_status::is_operating();<br/>include CreateProposalAbortsIfAndEnsures&lt;ProposalType&gt;&#123;is_multi_step_proposal: false&#125;;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 ensures result &#61;&#61; old(global&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address)).next_proposal_id;<br/></code></pre>
 
 
@@ -1419,7 +1314,7 @@ ensures result &#61;&#61; old(global&lt;VotingForum&lt;ProposalType&gt;&gt;(voti
 
 
 
-<pre><code>requires chain_status::is_operating();<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>requires chain_status::is_operating();<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if !exists&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address);<br/>let voting_forum &#61; global&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address);<br/>let proposal &#61; table::spec_get(voting_forum.proposals, proposal_id);<br/>aborts_if !table::spec_contains(voting_forum.proposals, proposal_id);<br/>aborts_if is_voting_period_over(proposal);<br/>aborts_if proposal.is_resolved;<br/>aborts_if !exists&lt;timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);<br/>aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);<br/>let execution_key &#61; std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);<br/>aborts_if simple_map::spec_contains_key(proposal.metadata, execution_key) &amp;&amp;<br/>          simple_map::spec_get(proposal.metadata, execution_key) !&#61; std::bcs::serialize(false);<br/>aborts_if if (should_pass) &#123; proposal.yes_votes &#43; num_votes &gt; MAX_U128 &#125; else &#123; proposal.no_votes &#43; num_votes &gt; MAX_U128 &#125;;<br/>aborts_if !std::string::spec_internal_check_utf8(RESOLVABLE_TIME_METADATA_KEY);<br/>let post post_voting_forum &#61; global&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address);<br/>let post post_proposal &#61; table::spec_get(post_voting_forum.proposals, proposal_id);<br/>ensures if (should_pass) &#123;<br/>    post_proposal.yes_votes &#61;&#61; proposal.yes_votes &#43; num_votes<br/>&#125; else &#123;<br/>    post_proposal.no_votes &#61;&#61; proposal.no_votes &#43; num_votes<br/>&#125;;<br/>let timestamp_secs_bytes &#61; std::bcs::serialize(timestamp::spec_now_seconds());<br/>let key &#61; std::string::spec_utf8(RESOLVABLE_TIME_METADATA_KEY);<br/>ensures simple_map::spec_get(post_proposal.metadata, key) &#61;&#61; timestamp_secs_bytes;<br/></code></pre>
 
 
@@ -1456,7 +1351,7 @@ aborts_if !exists&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address);<
 
 
 
-<pre><code>requires chain_status::is_operating();<br/>include IsProposalResolvableAbortsIf&lt;ProposalType&gt;;<br/>aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);<br/>let voting_forum &#61; global&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address);<br/>let proposal &#61; table::spec_get(voting_forum.proposals, proposal_id);<br/>let multi_step_key &#61; std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_KEY);<br/>let has_multi_step_key &#61; simple_map::spec_contains_key(proposal.metadata, multi_step_key);<br/>aborts_if has_multi_step_key &amp;&amp; !from_bcs::deserializable&lt;bool&gt;(simple_map::spec_get(proposal.metadata, multi_step_key));<br/>aborts_if has_multi_step_key &amp;&amp; from_bcs::deserialize&lt;bool&gt;(simple_map::spec_get(proposal.metadata, multi_step_key));<br/>let post post_voting_forum &#61; global&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address);<br/>let post post_proposal &#61; table::spec_get(post_voting_forum.proposals, proposal_id);<br/>aborts_if !exists&lt;timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>requires chain_status::is_operating();<br/>include IsProposalResolvableAbortsIf&lt;ProposalType&gt;;<br/>aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);<br/>let voting_forum &#61; global&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address);<br/>let proposal &#61; table::spec_get(voting_forum.proposals, proposal_id);<br/>let multi_step_key &#61; std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_KEY);<br/>let has_multi_step_key &#61; simple_map::spec_contains_key(proposal.metadata, multi_step_key);<br/>aborts_if has_multi_step_key &amp;&amp; !from_bcs::deserializable&lt;bool&gt;(simple_map::spec_get(proposal.metadata, multi_step_key));<br/>aborts_if has_multi_step_key &amp;&amp; from_bcs::deserialize&lt;bool&gt;(simple_map::spec_get(proposal.metadata, multi_step_key));<br/>let post post_voting_forum &#61; global&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address);<br/>let post post_proposal &#61; table::spec_get(post_voting_forum.proposals, proposal_id);<br/>aborts_if !exists&lt;timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 ensures post_proposal.is_resolved &#61;&#61; true;<br/>ensures post_proposal.resolution_time_secs &#61;&#61; timestamp::spec_now_seconds();<br/>aborts_if option::spec_is_none(proposal.execution_content);<br/>ensures result &#61;&#61; option::spec_borrow(proposal.execution_content);<br/>ensures option::spec_is_none(post_proposal.execution_content);<br/></code></pre>
 
 
@@ -1471,7 +1366,7 @@ ensures post_proposal.is_resolved &#61;&#61; true;<br/>ensures post_proposal.res
 
 
 
-<pre><code>pragma verify_duration_estimate &#61; 300;<br/>requires chain_status::is_operating();<br/>include IsProposalResolvableAbortsIf&lt;ProposalType&gt;;<br/>let voting_forum &#61; global&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address);<br/>let proposal &#61; table::spec_get(voting_forum.proposals, proposal_id);<br/>let post post_voting_forum &#61; global&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address);<br/>let post post_proposal &#61; table::spec_get(post_voting_forum.proposals, proposal_id);<br/>let multi_step_in_execution_key &#61; std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);<br/>aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);<br/>aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);<br/>ensures (simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key) &amp;&amp; len(next_execution_hash) !&#61; 0) &#61;&#61;&gt;<br/>    simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key) &#61;&#61; std::bcs::serialize(true);<br/>ensures (simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key) &amp;&amp;<br/>    (len(next_execution_hash) &#61;&#61; 0 &amp;&amp; !is_multi_step)) &#61;&#61;&gt;<br/>    simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key) &#61;&#61; std::bcs::serialize(true);<br/>let multi_step_key &#61; std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_KEY);<br/>aborts_if simple_map::spec_contains_key(proposal.metadata, multi_step_key) &amp;&amp;<br/>    !from_bcs::deserializable&lt;bool&gt;(simple_map::spec_get(proposal.metadata, multi_step_key));<br/>let is_multi_step &#61; simple_map::spec_contains_key(proposal.metadata, multi_step_key) &amp;&amp;<br/>    from_bcs::deserialize(simple_map::spec_get(proposal.metadata, multi_step_key));<br/>aborts_if !is_multi_step &amp;&amp; len(next_execution_hash) !&#61; 0;<br/>aborts_if len(next_execution_hash) &#61;&#61; 0 &amp;&amp; !exists&lt;timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);<br/>aborts_if len(next_execution_hash) &#61;&#61; 0 &amp;&amp; is_multi_step &amp;&amp; !simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key);<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<pre><code>pragma verify_duration_estimate &#61; 300;<br/>requires chain_status::is_operating();<br/>include IsProposalResolvableAbortsIf&lt;ProposalType&gt;;<br/>let voting_forum &#61; global&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address);<br/>let proposal &#61; table::spec_get(voting_forum.proposals, proposal_id);<br/>let post post_voting_forum &#61; global&lt;VotingForum&lt;ProposalType&gt;&gt;(voting_forum_address);<br/>let post post_proposal &#61; table::spec_get(post_voting_forum.proposals, proposal_id);<br/>let multi_step_in_execution_key &#61; std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);<br/>aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);<br/>aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);<br/>ensures (simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key) &amp;&amp; len(next_execution_hash) !&#61; 0) &#61;&#61;&gt;<br/>    simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key) &#61;&#61; std::bcs::serialize(true);<br/>ensures (simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key) &amp;&amp;<br/>    (len(next_execution_hash) &#61;&#61; 0 &amp;&amp; !is_multi_step)) &#61;&#61;&gt;<br/>    simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key) &#61;&#61; std::bcs::serialize(true);<br/>let multi_step_key &#61; std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_KEY);<br/>aborts_if simple_map::spec_contains_key(proposal.metadata, multi_step_key) &amp;&amp;<br/>    !from_bcs::deserializable&lt;bool&gt;(simple_map::spec_get(proposal.metadata, multi_step_key));<br/>let is_multi_step &#61; simple_map::spec_contains_key(proposal.metadata, multi_step_key) &amp;&amp;<br/>    from_bcs::deserialize(simple_map::spec_get(proposal.metadata, multi_step_key));<br/>aborts_if !is_multi_step &amp;&amp; len(next_execution_hash) !&#61; 0;<br/>aborts_if len(next_execution_hash) &#61;&#61; 0 &amp;&amp; !exists&lt;timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);<br/>aborts_if len(next_execution_hash) &#61;&#61; 0 &amp;&amp; is_multi_step &amp;&amp; !simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
 ensures len(next_execution_hash) &#61;&#61; 0 &#61;&#61;&gt; post_proposal.resolution_time_secs &#61;&#61; timestamp::spec_now_seconds();<br/>ensures len(next_execution_hash) &#61;&#61; 0 &#61;&#61;&gt; post_proposal.is_resolved &#61;&#61; true;<br/>ensures (len(next_execution_hash) &#61;&#61; 0 &amp;&amp; is_multi_step) &#61;&#61;&gt; simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key) &#61;&#61; std::bcs::serialize(false);<br/>ensures len(next_execution_hash) !&#61; 0 &#61;&#61;&gt; post_proposal.execution_hash &#61;&#61; next_execution_hash;<br/></code></pre>
 
 

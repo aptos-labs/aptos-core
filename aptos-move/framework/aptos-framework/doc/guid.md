@@ -38,7 +38,7 @@ A module for generating globally unique identifiers
 
 ## Struct `GUID`
 
-A globally unique identifier derived from the sender's address and a counter
+A globally unique identifier derived from the sender&apos;s address and a counter
 
 
 <pre><code>struct GUID has drop, store<br/></code></pre>
@@ -65,7 +65,7 @@ A globally unique identifier derived from the sender's address and a counter
 
 ## Struct `ID`
 
-A non-privileged identifier that can be freely created by anyone. Useful for looking up GUID's.
+A non&#45;privileged identifier that can be freely created by anyone. Useful for looking up GUID&apos;s.
 
 
 <pre><code>struct ID has copy, drop, store<br/></code></pre>
@@ -133,7 +133,7 @@ Create and return a new GUID from a trusted module.
 
 ## Function `create_id`
 
-Create a non-privileged id from <code>addr</code> and <code>creation_num</code>
+Create a non&#45;privileged id from <code>addr</code> and <code>creation_num</code>
 
 
 <pre><code>public fun create_id(addr: address, creation_num: u64): guid::ID<br/></code></pre>
@@ -154,7 +154,7 @@ Create a non-privileged id from <code>addr</code> and <code>creation_num</code>
 
 ## Function `id`
 
-Get the non-privileged ID associated with a GUID
+Get the non&#45;privileged ID associated with a GUID
 
 
 <pre><code>public fun id(guid: &amp;guid::GUID): guid::ID<br/></code></pre>
@@ -259,7 +259,7 @@ Return the creation number associated with the guid::ID
 
 ## Function `eq_id`
 
-Return true if the GUID's ID is <code>id</code>
+Return true if the GUID&apos;s ID is <code>id</code>
 
 
 <pre><code>public fun eq_id(guid: &amp;guid::GUID, id: &amp;guid::ID): bool<br/></code></pre>
@@ -287,44 +287,17 @@ Return true if the GUID's ID is <code>id</code>
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>The creation of GUID constructs a unique GUID by combining an address with an incremented creation number.</td>
-<td>Low</td>
-<td>The create function generates a new GUID by combining an address with an incremented creation number, effectively creating a unique identifier.</td>
-<td>Enforced via <a href="#high-level-req-1">create</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The creation of GUID constructs a unique GUID by combining an address with an incremented creation number.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The create function generates a new GUID by combining an address with an incremented creation number, effectively creating a unique identifier.&lt;/td&gt;<br/>&lt;td&gt;Enforced via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;create&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The operations on GUID and ID, such as construction, field access, and equality comparison, should not abort.</td>
-<td>Low</td>
-<td>The following functions will never abort: (1) create_id, (2) id, (3) creator_address, (4) id_creator_address, (5) creation_num, (6) id_creation_num, and (7) eq_id.</td>
-<td>Verified via <a href="#high-level-req-2.1">create_id</a>, <a href="#high-level-req-2.2">id</a>, <a href="#high-level-req-2.3">creator_address</a>, <a href="#high-level-req-2.4">id_creator_address</a>, <a href="#high-level-req-2.5">creation_num</a>, <a href="#high-level-req-2.6">id_creation_num</a>, and <a href="#high-level-req-2.7">eq_id</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The operations on GUID and ID, such as construction, field access, and equality comparison, should not abort.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The following functions will never abort: (1) create_id, (2) id, (3) creator_address, (4) id_creator_address, (5) creation_num, (6) id_creation_num, and (7) eq_id.&lt;/td&gt;<br/>&lt;td&gt;Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.1&quot;&gt;create_id&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.2&quot;&gt;id&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.3&quot;&gt;creator_address&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.4&quot;&gt;id_creator_address&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.5&quot;&gt;creation_num&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.6&quot;&gt;id_creation_num&lt;/a&gt;, and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.7&quot;&gt;eq_id&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>The creation number should increment by 1 with each new creation.</td>
-<td>Low</td>
-<td>An account can only own up to MAX_U64 resources. Not incrementing the guid_creation_num constantly could lead to shrinking the space for new resources.</td>
-<td>Enforced via <a href="#high-level-req-3">create</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The creation number should increment by 1 with each new creation.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;An account can only own up to MAX_U64 resources. Not incrementing the guid_creation_num constantly could lead to shrinking the space for new resources.&lt;/td&gt;<br/>&lt;td&gt;Enforced via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;create&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>The creation number and address of an ID / GUID must be immutable.</td>
-<td>Medium</td>
-<td>The addr and creation_num values are meant to be constant and never updated as they are unique and used for identification.</td>
-<td>Audited: This is enforced through missing functionality to update the creation_num or addr.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The creation number and address of an ID / GUID must be immutable.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The addr and creation_num values are meant to be constant and never updated as they are unique and used for identification.&lt;/td&gt;<br/>&lt;td&gt;Audited: This is enforced through missing functionality to update the creation_num or addr.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
 
 
@@ -347,8 +320,8 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<pre><code>aborts_if creation_num_ref &#43; 1 &gt; MAX_U64;<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-ensures result.id.creation_num &#61;&#61; old(creation_num_ref);<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>aborts_if creation_num_ref &#43; 1 &gt; MAX_U64;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
+ensures result.id.creation_num &#61;&#61; old(creation_num_ref);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 ensures creation_num_ref &#61;&#61; old(creation_num_ref) &#43; 1;<br/></code></pre>
 
 
@@ -363,7 +336,7 @@ ensures creation_num_ref &#61;&#61; old(creation_num_ref) &#43; 1;<br/></code></
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.1" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -378,7 +351,7 @@ aborts_if false;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.2" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -393,7 +366,7 @@ aborts_if false;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.3" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -408,7 +381,7 @@ aborts_if false;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.4" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -423,7 +396,7 @@ aborts_if false;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.5" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.5&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -438,7 +411,7 @@ aborts_if false;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.6" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.6&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 
@@ -453,7 +426,7 @@ aborts_if false;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.7" href="#high-level-req">high-level requirement 2</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.7&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
 aborts_if false;<br/></code></pre>
 
 

@@ -3,8 +3,7 @@
 
 # Module `0x1::consensus_config`
 
-Maintains the consensus config for the blockchain. The config is stored in a
-Reconfiguration, and may be updated by root.
+Maintains the consensus config for the blockchain. The config is stored in a<br/> Reconfiguration, and may be updated by root.
 
 
 -  [Resource `ConsensusConfig`](#0x1_consensus_config_ConsensusConfig)
@@ -95,11 +94,7 @@ Publishes the ConsensusConfig config.
 
 ## Function `set`
 
-Deprecated by <code>set_for_next_epoch()</code>.
-
-WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
-
-TODO: update all the tests that reference this function, then disable this function.
+Deprecated by <code>set_for_next_epoch()</code>.<br/><br/> WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!<br/><br/> TODO: update all the tests that reference this function, then disable this function.
 
 
 <pre><code>public fun set(account: &amp;signer, config: vector&lt;u8&gt;)<br/></code></pre>
@@ -120,12 +115,7 @@ TODO: update all the tests that reference this function, then disable this funct
 
 ## Function `set_for_next_epoch`
 
-This can be called by on-chain governance to update on-chain consensus configs for the next epoch.
-Example usage:
-```
-aptos_framework::consensus_config::set_for_next_epoch(&framework_signer, some_config_bytes);
-aptos_framework::aptos_governance::reconfigure(&framework_signer);
-```
+This can be called by on&#45;chain governance to update on&#45;chain consensus configs for the next epoch.<br/> Example usage:<br/> ```<br/> aptos_framework::consensus_config::set_for_next_epoch(&amp;framework_signer, some_config_bytes);<br/> aptos_framework::aptos_governance::reconfigure(&amp;framework_signer);<br/> ```
 
 
 <pre><code>public fun set_for_next_epoch(account: &amp;signer, config: vector&lt;u8&gt;)<br/></code></pre>
@@ -214,38 +204,17 @@ Only used in reconfigurations to apply the pending <code>ConsensusConfig</code>,
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>During genesis, the Aptos framework account should be assigned the consensus config resource.</td>
-<td>Medium</td>
-<td>The consensus_config::initialize function calls the assert_aptos_framework function to ensure that the signer is the aptos_framework and then assigns the ConsensusConfig resource to it.</td>
-<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;During genesis, the Aptos framework account should be assigned the consensus config resource.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The consensus_config::initialize function calls the assert_aptos_framework function to ensure that the signer is the aptos_framework and then assigns the ConsensusConfig resource to it.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>Only aptos framework account is allowed to update the consensus configuration.</td>
-<td>Medium</td>
-<td>The consensus_config::set function ensures that the signer is aptos_framework.</td>
-<td>Formally verified via <a href="#high-level-req-2">set</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;Only aptos framework account is allowed to update the consensus configuration.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The consensus_config::set function ensures that the signer is aptos_framework.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;set&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>Only a valid configuration can be used during initialization and update.</td>
-<td>Medium</td>
-<td>Both the initialize and set functions validate the config by ensuring its length to be greater than 0.</td>
-<td>Formally verified via <a href="#high-level-req-3.1">initialize</a> and <a href="#high-level-req-3.2">set</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Only a valid configuration can be used during initialization and update.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;Both the initialize and set functions validate the config by ensuring its length to be greater than 0.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3.1&quot;&gt;initialize&lt;/a&gt; and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3.2&quot;&gt;set&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -265,12 +234,11 @@ Only used in reconfigurations to apply the pending <code>ConsensusConfig</code>,
 <pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, config: vector&lt;u8&gt;)<br/></code></pre>
 
 
-Ensure caller is admin.
-Aborts if StateStorageUsage already exists.
+Ensure caller is admin.<br/> Aborts if StateStorageUsage already exists.
 
 
-<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-aborts_if !system_addresses::is_aptos_framework_address(addr);<br/>aborts_if exists&lt;ConsensusConfig&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-3.1" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
+aborts_if !system_addresses::is_aptos_framework_address(addr);<br/>aborts_if exists&lt;ConsensusConfig&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 aborts_if !(len(config) &gt; 0);<br/>ensures global&lt;ConsensusConfig&gt;(addr) &#61;&#61; ConsensusConfig &#123; config &#125;;<br/></code></pre>
 
 
@@ -283,12 +251,11 @@ aborts_if !(len(config) &gt; 0);<br/>ensures global&lt;ConsensusConfig&gt;(addr)
 <pre><code>public fun set(account: &amp;signer, config: vector&lt;u8&gt;)<br/></code></pre>
 
 
-Ensure the caller is admin and <code>ConsensusConfig</code> should be existed.
-When setting now time must be later than last_reconfiguration_time.
+Ensure the caller is admin and <code>ConsensusConfig</code> should be existed.<br/> When setting now time must be later than last_reconfiguration_time.
 
 
-<pre><code>pragma verify_duration_estimate &#61; 600;<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>include staking_config::StakingRewardsConfigRequirement;<br/>let addr &#61; signer::address_of(account);<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-aborts_if !system_addresses::is_aptos_framework_address(addr);<br/>aborts_if !exists&lt;ConsensusConfig&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-3.2" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>pragma verify_duration_estimate &#61; 600;<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>include staking_config::StakingRewardsConfigRequirement;<br/>let addr &#61; signer::address_of(account);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
+aborts_if !system_addresses::is_aptos_framework_address(addr);<br/>aborts_if !exists&lt;ConsensusConfig&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 aborts_if !(len(config) &gt; 0);<br/>requires chain_status::is_genesis();<br/>requires timestamp::spec_now_microseconds() &gt;&#61; reconfiguration::last_reconfiguration_time();<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br/>ensures global&lt;ConsensusConfig&gt;(@aptos_framework).config &#61;&#61; config;<br/></code></pre>
 
 

@@ -3,8 +3,7 @@
 
 # Module `0x1::execution_config`
 
-Maintains the execution config for the blockchain. The config is stored in a
-Reconfiguration, and may be updated by root.
+Maintains the execution config for the blockchain. The config is stored in a<br/> Reconfiguration, and may be updated by root.
 
 
 -  [Resource `ExecutionConfig`](#0x1_execution_config_ExecutionConfig)
@@ -66,11 +65,7 @@ The provided on chain config bytes are empty or invalid
 
 ## Function `set`
 
-Deprecated by <code>set_for_next_epoch()</code>.
-
-WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
-
-TODO: update all the tests that reference this function, then disable this function.
+Deprecated by <code>set_for_next_epoch()</code>.<br/><br/> WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!<br/><br/> TODO: update all the tests that reference this function, then disable this function.
 
 
 <pre><code>public fun set(account: &amp;signer, config: vector&lt;u8&gt;)<br/></code></pre>
@@ -91,12 +86,7 @@ TODO: update all the tests that reference this function, then disable this funct
 
 ## Function `set_for_next_epoch`
 
-This can be called by on-chain governance to update on-chain execution configs for the next epoch.
-Example usage:
-```
-aptos_framework::execution_config::set_for_next_epoch(&framework_signer, some_config_bytes);
-aptos_framework::aptos_governance::reconfigure(&framework_signer);
-```
+This can be called by on&#45;chain governance to update on&#45;chain execution configs for the next epoch.<br/> Example usage:<br/> ```<br/> aptos_framework::execution_config::set_for_next_epoch(&amp;framework_signer, some_config_bytes);<br/> aptos_framework::aptos_governance::reconfigure(&amp;framework_signer);<br/> ```
 
 
 <pre><code>public fun set_for_next_epoch(account: &amp;signer, config: vector&lt;u8&gt;)<br/></code></pre>
@@ -152,8 +142,7 @@ Only used in reconfigurations to apply the pending <code>ExecutionConfig</code>,
 <pre><code>public fun set(account: &amp;signer, config: vector&lt;u8&gt;)<br/></code></pre>
 
 
-Ensure the caller is admin
-When setting now time must be later than last_reconfiguration_time.
+Ensure the caller is admin<br/> When setting now time must be later than last_reconfiguration_time.
 
 
 <pre><code>pragma verify_duration_estimate &#61; 600;<br/>let addr &#61; signer::address_of(account);<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>requires chain_status::is_genesis();<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;staking_config::StakingRewardsConfig&gt;(@aptos_framework);<br/>requires len(config) &gt; 0;<br/>include features::spec_periodical_reward_rate_decrease_enabled() &#61;&#61;&gt; staking_config::StakingRewardsConfigEnabledRequirement;<br/>include aptos_coin::ExistsAptosCoin;<br/>requires system_addresses::is_aptos_framework_address(addr);<br/>requires timestamp::spec_now_microseconds() &gt;&#61; reconfiguration::last_reconfiguration_time();<br/>ensures exists&lt;ExecutionConfig&gt;(@aptos_framework);<br/></code></pre>

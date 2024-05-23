@@ -234,8 +234,7 @@ Appends bytes which must be in valid utf8 format.
 
 ## Function `insert`
 
-Insert the other string at the byte index in given string. The index must be at a valid utf8 char
-boundary.
+Insert the other string at the byte index in given string. The index must be at a valid utf8 char<br/> boundary.
 
 
 <pre><code>public fun insert(s: &amp;mut string::String, at: u64, o: string::String)<br/></code></pre>
@@ -256,9 +255,7 @@ boundary.
 
 ## Function `sub_string`
 
-Returns a sub-string using the given byte indices, where <code>i</code> is the first byte position and <code>j</code> is the start
-of the first byte not included (or the length of the string). The indices must be at valid utf8 char boundaries,
-guaranteeing that the result is valid utf8.
+Returns a sub&#45;string using the given byte indices, where <code>i</code> is the first byte position and <code>j</code> is the start<br/> of the first byte not included (or the length of the string). The indices must be at valid utf8 char boundaries,<br/> guaranteeing that the result is valid utf8.
 
 
 <pre><code>public fun sub_string(s: &amp;string::String, i: u64, j: u64): string::String<br/></code></pre>

@@ -104,8 +104,7 @@ Stores mint capability to mint the refunds.
 
 ## Resource `CollectedFeesPerBlock`
 
-Stores information about the block proposer and the amount of fees
-collected when executing the block.
+Stores information about the block proposer and the amount of fees<br/> collected when executing the block.
 
 
 <pre><code>struct CollectedFeesPerBlock has key<br/></code></pre>
@@ -144,25 +143,7 @@ collected when executing the block.
 
 ## Struct `FeeStatement`
 
-Breakdown of fee charge and refund for a transaction.
-The structure is:
-
-- Net charge or refund (not in the statement)
-- total charge: total_charge_gas_units, matches <code>gas_used</code> in the on-chain <code>TransactionInfo</code>.
-This is the sum of the sub-items below. Notice that there's potential precision loss when
-the conversion between internal and external gas units and between native token and gas
-units, so it's possible that the numbers don't add up exactly. -- This number is the final
-charge, while the break down is merely informational.
-- gas charge for execution (CPU time): <code>execution_gas_units</code>
-- gas charge for IO (storage random access): <code>io_gas_units</code>
-- storage fee charge (storage space): <code>storage_fee_octas</code>, to be included in
-<code>total_charge_gas_unit</code>, this number is converted to gas units according to the user
-specified <code>gas_unit_price</code> on the transaction.
-- storage deletion refund: <code>storage_fee_refund_octas</code>, this is not included in <code>gas_used</code> or
-<code>total_charge_gas_units</code>, the net charge / refund is calculated by
-<code>total_charge_gas_units</code> * <code>gas_unit_price</code> - <code>storage_fee_refund_octas</code>.
-
-This is meant to emitted as a module event.
+Breakdown of fee charge and refund for a transaction.<br/> The structure is:<br/><br/> &#45; Net charge or refund (not in the statement)<br/>    &#45; total charge: total_charge_gas_units, matches <code>gas_used</code> in the on&#45;chain <code>TransactionInfo</code>.<br/>      This is the sum of the sub&#45;items below. Notice that there&apos;s potential precision loss when<br/>      the conversion between internal and external gas units and between native token and gas<br/>      units, so it&apos;s possible that the numbers don&apos;t add up exactly. &#45;&#45; This number is the final<br/>      charge, while the break down is merely informational.<br/>        &#45; gas charge for execution (CPU time): <code>execution_gas_units</code><br/>        &#45; gas charge for IO (storage random access): <code>io_gas_units</code><br/>        &#45; storage fee charge (storage space): <code>storage_fee_octas</code>, to be included in<br/>          <code>total_charge_gas_unit</code>, this number is converted to gas units according to the user<br/>          specified <code>gas_unit_price</code> on the transaction.<br/>    &#45; storage deletion refund: <code>storage_fee_refund_octas</code>, this is not included in <code>gas_used</code> or<br/>      <code>total_charge_gas_units</code>, the net charge / refund is calculated by<br/>      <code>total_charge_gas_units</code> &#42; <code>gas_unit_price</code> &#45; <code>storage_fee_refund_octas</code>.<br/><br/> This is meant to emitted as a module event.
 
 
 <pre><code>&#35;[event]<br/>struct FeeStatement has drop, store<br/></code></pre>
@@ -216,8 +197,7 @@ This is meant to emitted as a module event.
 
 <a id="0x1_transaction_fee_EALREADY_COLLECTING_FEES"></a>
 
-Gas fees are already being collected and the struct holding
-information about collected amounts is already published.
+Gas fees are already being collected and the struct holding<br/> information about collected amounts is already published.
 
 
 <pre><code>const EALREADY_COLLECTING_FEES: u64 &#61; 1;<br/></code></pre>
@@ -246,8 +226,7 @@ No longer supported.
 
 ## Function `initialize_fee_collection_and_distribution`
 
-Initializes the resource storing information about gas fees collection and
-distribution. Should be called by on-chain governance.
+Initializes the resource storing information about gas fees collection and<br/> distribution. Should be called by on&#45;chain governance.
 
 
 <pre><code>public fun initialize_fee_collection_and_distribution(aptos_framework: &amp;signer, burn_percentage: u8)<br/></code></pre>
@@ -288,7 +267,7 @@ distribution. Should be called by on-chain governance.
 
 ## Function `upgrade_burn_percentage`
 
-Sets the burn percentage for collected fees to a new value. Should be called by on-chain governance.
+Sets the burn percentage for collected fees to a new value. Should be called by on&#45;chain governance.
 
 
 <pre><code>public fun upgrade_burn_percentage(aptos_framework: &amp;signer, new_burn_percentage: u8)<br/></code></pre>
@@ -309,8 +288,7 @@ Sets the burn percentage for collected fees to a new value. Should be called by 
 
 ## Function `register_proposer_for_fee_collection`
 
-Registers the proposer of the block for gas fees collection. This function
-can only be called at the beginning of the block.
+Registers the proposer of the block for gas fees collection. This function<br/> can only be called at the beginning of the block.
 
 
 <pre><code>public(friend) fun register_proposer_for_fee_collection(proposer_addr: address)<br/></code></pre>
@@ -352,9 +330,7 @@ Burns a specified fraction of the coin.
 
 ## Function `process_collected_fees`
 
-Calculates the fee which should be distributed to the block proposer at the
-end of an epoch, and records it in the system. This function can only be called
-at the beginning of the block or during reconfiguration.
+Calculates the fee which should be distributed to the block proposer at the<br/> end of an epoch, and records it in the system. This function can only be called<br/> at the beginning of the block or during reconfiguration.
 
 
 <pre><code>public(friend) fun process_collected_fees()<br/></code></pre>
@@ -527,62 +503,23 @@ Only called during genesis.
 
 ### High-level Requirements
 
-<table>
-<tr>
-<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
-</tr>
+&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>1</td>
-<td>Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn Aptos coins.</td>
-<td>Critical</td>
-<td>The AptosCoinCapabilities structure is defined in this module and it stores burn capability to burn the gas fees.</td>
-<td>Formally Verified via <a href="#high-level-req-1">module</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn Aptos coins.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The AptosCoinCapabilities structure is defined in this module and it stores burn capability to burn the gas fees.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;module&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>2</td>
-<td>The initialization function may only be called once.</td>
-<td>Medium</td>
-<td>The initialize_fee_collection_and_distribution function ensures CollectedFeesPerBlock does not already exist.</td>
-<td>Formally verified via <a href="#high-level-req-2">initialize_fee_collection_and_distribution</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The initialization function may only be called once.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The initialize_fee_collection_and_distribution function ensures CollectedFeesPerBlock does not already exist.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;initialize_fee_collection_and_distribution&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>3</td>
-<td>Only the admin address is authorized to call the initialization function.</td>
-<td>Critical</td>
-<td>The initialize_fee_collection_and_distribution function ensures only the Aptos framework address calls it.</td>
-<td>Formally verified via <a href="#high-level-req-3">initialize_fee_collection_and_distribution</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Only the admin address is authorized to call the initialization function.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The initialize_fee_collection_and_distribution function ensures only the Aptos framework address calls it.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;initialize_fee_collection_and_distribution&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>4</td>
-<td>The percentage of the burnt collected fee is always a value from 0 to 100.</td>
-<td>Medium</td>
-<td>During the initialization of CollectedFeesPerBlock in Initialize_fee_collection_and_distribution, and while upgrading burn percentage, it asserts that burn_percentage is within the specified limits.</td>
-<td>Formally verified via <a href="#high-level-req-4">CollectedFeesPerBlock</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The percentage of the burnt collected fee is always a value from 0 to 100.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;During the initialization of CollectedFeesPerBlock in Initialize_fee_collection_and_distribution, and while upgrading burn percentage, it asserts that burn_percentage is within the specified limits.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;CollectedFeesPerBlock&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>5</td>
-<td>Prior to upgrading the burn percentage, it must process all the fees collected up to that point.</td>
-<td>Critical</td>
-<td>The upgrade_burn_percentage function ensures process_collected_fees function is called before updating the burn percentage.</td>
-<td>Formally verified in <a href="#high-level-req-5">ProcessCollectedFeesRequiresAndEnsures</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;Prior to upgrading the burn percentage, it must process all the fees collected up to that point.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The upgrade_burn_percentage function ensures process_collected_fees function is called before updating the burn percentage.&lt;/td&gt;<br/>&lt;td&gt;Formally verified in &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5&quot;&gt;ProcessCollectedFeesRequiresAndEnsures&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-<tr>
-<td>6</td>
-<td>The presence of the resource, indicating collected fees per block under the Aptos framework account, is a prerequisite for the successful execution of the following functionalities: Upgrading burn percentage. Registering a block proposer. Processing collected fees.</td>
-<td>Low</td>
-<td>The functions: upgrade_burn_percentage, register_proposer_for_fee_collection, and process_collected_fees all ensure that the CollectedFeesPerBlock resource exists under aptos_framework by calling the is_fees_collection_enabled method, which returns a boolean value confirming if the resource exists or not.</td>
-<td>Formally verified via <a href="#high-level-req-6.1">register_proposer_for_fee_collection</a>, <a href="#high-level-req-6.2">process_collected_fees</a>, and <a href="#high-level-req-6.3">upgrade_burn_percentage</a>.</td>
-</tr>
+&lt;tr&gt;<br/>&lt;td&gt;6&lt;/td&gt;<br/>&lt;td&gt;The presence of the resource, indicating collected fees per block under the Aptos framework account, is a prerequisite for the successful execution of the following functionalities: Upgrading burn percentage. Registering a block proposer. Processing collected fees.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The functions: upgrade_burn_percentage, register_proposer_for_fee_collection, and process_collected_fees all ensure that the CollectedFeesPerBlock resource exists under aptos_framework by calling the is_fees_collection_enabled method, which returns a boolean value confirming if the resource exists or not.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.1&quot;&gt;register_proposer_for_fee_collection&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.2&quot;&gt;process_collected_fees&lt;/a&gt;, and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.3&quot;&gt;upgrade_burn_percentage&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
 
-</table>
+&lt;/table&gt;<br/>
 
-
+<br/>
 
 
 <a id="module-level-spec"></a>
@@ -590,7 +527,7 @@ Only called during genesis.
 ### Module-level Specification
 
 
-<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
 invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;AptosCoinCapabilities&gt;(@aptos_framework);<br/></code></pre>
 
 
@@ -627,7 +564,7 @@ invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;Ap
 
 
 
-<pre><code>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
 invariant burn_percentage &lt;&#61; 100;<br/></code></pre>
 
 
@@ -642,8 +579,8 @@ invariant burn_percentage &lt;&#61; 100;<br/></code></pre>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-aborts_if exists&lt;CollectedFeesPerBlock&gt;(@aptos_framework);<br/>aborts_if burn_percentage &gt; 100;<br/>let aptos_addr &#61; signer::address_of(aptos_framework);<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
+aborts_if exists&lt;CollectedFeesPerBlock&gt;(@aptos_framework);<br/>aborts_if burn_percentage &gt; 100;<br/>let aptos_addr &#61; signer::address_of(aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
 aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);<br/>aborts_if exists&lt;ValidatorFees&gt;(aptos_addr);<br/>include system_addresses::AbortsIfNotAptosFramework &#123; account: aptos_framework &#125;;<br/>include aggregator_factory::CreateAggregatorInternalAbortsIf;<br/>aborts_if exists&lt;CollectedFeesPerBlock&gt;(aptos_addr);<br/>ensures exists&lt;ValidatorFees&gt;(aptos_addr);<br/>ensures exists&lt;CollectedFeesPerBlock&gt;(aptos_addr);<br/></code></pre>
 
 
@@ -658,7 +595,7 @@ aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);<br/>aborts_
 
 
 
-<pre><code>aborts_if new_burn_percentage &gt; 100;<br/>let aptos_addr &#61; signer::address_of(aptos_framework);<br/>aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);<br/>// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a> and <a id="high-level-req-6.3" href="#high-level-req">high-level requirement 6</a>:
+<pre><code>aborts_if new_burn_percentage &gt; 100;<br/>let aptos_addr &#61; signer::address_of(aptos_framework);<br/>aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt; and &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
 include ProcessCollectedFeesRequiresAndEnsures;<br/>ensures exists&lt;CollectedFeesPerBlock&gt;(@aptos_framework) &#61;&#61;&gt;<br/>    global&lt;CollectedFeesPerBlock&gt;(@aptos_framework).burn_percentage &#61;&#61; new_burn_percentage;<br/></code></pre>
 
 
@@ -673,7 +610,7 @@ include ProcessCollectedFeesRequiresAndEnsures;<br/>ensures exists&lt;CollectedF
 
 
 
-<pre><code>aborts_if false;<br/>// This enforces <a id="high-level-req-6.1" href="#high-level-req">high-level requirement 6</a>:
+<pre><code>aborts_if false;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
 ensures is_fees_collection_enabled() &#61;&#61;&gt;<br/>    option::spec_borrow(global&lt;CollectedFeesPerBlock&gt;(@aptos_framework).proposer) &#61;&#61; proposer_addr;<br/></code></pre>
 
 
@@ -727,7 +664,7 @@ ensures is_fees_collection_enabled() &#61;&#61;&gt;<br/>    option::spec_borrow(
 
 
 
-<pre><code>// This enforces <a id="high-level-req-6.2" href="#high-level-req">high-level requirement 6</a>:
+<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
 include ProcessCollectedFeesRequiresAndEnsures;<br/></code></pre>
 
 
@@ -783,8 +720,7 @@ include ProcessCollectedFeesRequiresAndEnsures;<br/></code></pre>
 <pre><code>public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &amp;signer, burn_cap: coin::BurnCapability&lt;aptos_coin::AptosCoin&gt;)<br/></code></pre>
 
 
-Ensure caller is admin.
-Aborts if <code>AptosCoinCapabilities</code> already exists.
+Ensure caller is admin.<br/> Aborts if <code>AptosCoinCapabilities</code> already exists.
 
 
 <pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if !system_addresses::is_aptos_framework_address(addr);<br/>aborts_if exists&lt;AptosCoinCapabilities&gt;(addr);<br/>ensures exists&lt;AptosCoinCapabilities&gt;(addr);<br/></code></pre>
@@ -799,8 +735,7 @@ Aborts if <code>AptosCoinCapabilities</code> already exists.
 <pre><code>public(friend) fun store_aptos_coin_mint_cap(aptos_framework: &amp;signer, mint_cap: coin::MintCapability&lt;aptos_coin::AptosCoin&gt;)<br/></code></pre>
 
 
-Ensure caller is admin.
-Aborts if <code>AptosCoinMintCapability</code> already exists.
+Ensure caller is admin.<br/> Aborts if <code>AptosCoinMintCapability</code> already exists.
 
 
 <pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if !system_addresses::is_aptos_framework_address(addr);<br/>aborts_if exists&lt;AptosCoinMintCapability&gt;(addr);<br/>ensures exists&lt;AptosCoinMintCapability&gt;(addr);<br/></code></pre>

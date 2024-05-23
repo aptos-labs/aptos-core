@@ -3,9 +3,7 @@
 
 # Module `0x1::reconfiguration_state`
 
-Reconfiguration meta-state resources and util functions.
-
-WARNING: <code>reconfiguration_state::initialize()</code> is required before <code>RECONFIGURE_WITH_DKG</code> can be enabled.
+Reconfiguration meta&#45;state resources and util functions.<br/><br/> WARNING: <code>reconfiguration_state::initialize()</code> is required before <code>RECONFIGURE_WITH_DKG</code> can be enabled.
 
 
 -  [Resource `State`](#0x1_reconfiguration_state_State)
@@ -52,10 +50,7 @@ Reconfiguration drivers update this resources to notify other modules of some re
 <code>variant: copyable_any::Any</code>
 </dt>
 <dd>
- The state variant packed as an <code>Any</code>.
- Currently the variant type is one of the following.
- - <code>ReconfigStateInactive</code>
- - <code>ReconfigStateActive</code>
+ The state variant packed as an <code>Any</code>.<br/> Currently the variant type is one of the following.<br/> &#45; <code>ReconfigStateInactive</code><br/> &#45; <code>ReconfigStateActive</code>
 </dd>
 </dl>
 
@@ -193,7 +188,7 @@ A state variant indicating a reconfiguration is in progress.
 
 ## Function `is_in_progress`
 
-Return whether the reconfiguration state is marked "in progress".
+Return whether the reconfiguration state is marked &quot;in progress&quot;.
 
 
 <pre><code>public(friend) fun is_in_progress(): bool<br/></code></pre>
@@ -214,10 +209,7 @@ Return whether the reconfiguration state is marked "in progress".
 
 ## Function `on_reconfig_start`
 
-Called at the beginning of a reconfiguration (either immediate or async)
-to mark the reconfiguration state "in progress" if it is currently "stopped".
-
-Also record the current time as the reconfiguration start time. (Some module, e.g., <code>stake.move</code>, needs this info).
+Called at the beginning of a reconfiguration (either immediate or async)<br/> to mark the reconfiguration state &quot;in progress&quot; if it is currently &quot;stopped&quot;.<br/><br/> Also record the current time as the reconfiguration start time. (Some module, e.g., <code>stake.move</code>, needs this info).
 
 
 <pre><code>public(friend) fun on_reconfig_start()<br/></code></pre>
@@ -238,8 +230,7 @@ Also record the current time as the reconfiguration start time. (Some module, e.
 
 ## Function `start_time_secs`
 
-Get the unix time when the currently in-progress reconfiguration started.
-Abort if the reconfiguration state is not "in progress".
+Get the unix time when the currently in&#45;progress reconfiguration started.<br/> Abort if the reconfiguration state is not &quot;in progress&quot;.
 
 
 <pre><code>public(friend) fun start_time_secs(): u64<br/></code></pre>
@@ -260,8 +251,7 @@ Abort if the reconfiguration state is not "in progress".
 
 ## Function `on_reconfig_finish`
 
-Called at the end of every reconfiguration to mark the state as "stopped".
-Abort if the current state is not "in progress".
+Called at the end of every reconfiguration to mark the state as &quot;stopped&quot;.<br/> Abort if the current state is not &quot;in progress&quot;.
 
 
 <pre><code>public(friend) fun on_reconfig_finish()<br/></code></pre>
@@ -302,10 +292,7 @@ Abort if the current state is not "in progress".
 <code>variant: copyable_any::Any</code>
 </dt>
 <dd>
- The state variant packed as an <code>Any</code>.
- Currently the variant type is one of the following.
- - <code>ReconfigStateInactive</code>
- - <code>ReconfigStateActive</code>
+ The state variant packed as an <code>Any</code>.<br/> Currently the variant type is one of the following.<br/> &#45; <code>ReconfigStateInactive</code><br/> &#45; <code>ReconfigStateActive</code>
 </dd>
 </dl>
 

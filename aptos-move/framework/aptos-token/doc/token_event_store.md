@@ -326,7 +326,7 @@ Event emitted when the collection maximum is mutated
 
 ## Struct `OptInTransferEvent`
 
-Event emitted when an user opt-in the direct transfer
+Event emitted when an user opt&#45;in the direct transfer
 
 
 <pre><code>struct OptInTransferEvent has drop, store<br/></code></pre>
@@ -342,7 +342,7 @@ Event emitted when an user opt-in the direct transfer
 <code>opt_in: bool</code>
 </dt>
 <dd>
- True if the user opt in, false if the user opt-out
+ True if the user opt in, false if the user opt&#45;out
 </dd>
 </dl>
 
@@ -353,7 +353,7 @@ Event emitted when an user opt-in the direct transfer
 
 ## Struct `OptInTransfer`
 
-Event emitted when an user opt-in the direct transfer
+Event emitted when an user opt&#45;in the direct transfer
 
 
 <pre><code>&#35;[event]<br/>struct OptInTransfer has drop, store<br/></code></pre>
@@ -375,7 +375,7 @@ Event emitted when an user opt-in the direct transfer
 <code>opt_in: bool</code>
 </dt>
 <dd>
- True if the user opt in, false if the user opt-out
+ True if the user opt in, false if the user opt&#45;out
 </dd>
 </dl>
 
@@ -989,7 +989,7 @@ Event emitted when the token maximum is mutated
 <code>opt_in_events: event::EventHandle&lt;token_event_store::OptInTransferEvent&gt;</code>
 </dt>
 <dd>
- token transfer opt-in event
+ token transfer opt&#45;in event
 </dd>
 <dt>
 <code>uri_mutate_events: event::EventHandle&lt;token_event_store::UriMutationEvent&gt;</code>
@@ -1119,7 +1119,7 @@ Emit the collection maximum mutation event
 
 ## Function `emit_token_opt_in_event`
 
-Emit the direct opt-in event
+Emit the direct opt&#45;in event
 
 
 <pre><code>public(friend) fun emit_token_opt_in_event(account: &amp;signer, opt_in: bool)<br/></code></pre>
@@ -1264,8 +1264,7 @@ Emit maximum mutation event
 <pre><code>pragma verify &#61; true;<br/>let addr &#61; signer::address_of(acct);<br/>include InitializeTokenEventStoreAbortsIf &#123;creator : acct&#125;;<br/></code></pre>
 
 
-Adjust the overflow value according to the
-number of registered events
+Adjust the overflow value according to the<br/> number of registered events
 
 
 <a id="0x3_token_event_store_InitializeTokenEventStoreAbortsIf"></a>

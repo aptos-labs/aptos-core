@@ -3,12 +3,7 @@
 
 # Module `0x1::table`
 
-Type of large-scale storage tables.
-source: https://github.com/move-language/move/blob/1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e/language/extensions/move-table-extension/sources/Table.move#L1
-
-It implements the Table type which supports individual table items to be represented by
-separate global state items. The number of items and a unique handle are tracked on the table
-struct itself, while the operations are implemented as native functions. No traversal is provided.
+Type of large&#45;scale storage tables.<br/> source: https://github.com/move&#45;language/move/blob/1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e/language/extensions/move&#45;table&#45;extension/sources/Table.move&#35;L1<br/><br/> It implements the Table type which supports individual table items to be represented by<br/> separate global state items. The number of items and a unique handle are tracked on the table<br/> struct itself, while the operations are implemented as native functions. No traversal is provided.
 
 
 -  [Struct `Table`](#0x1_table_Table)
@@ -127,9 +122,7 @@ Create a new Table.
 
 ## Function `add`
 
-Add a new entry to the table. Aborts if an entry for this
-key already exists. The entry itself is not stored in the
-table, and cannot be discovered from it.
+Add a new entry to the table. Aborts if an entry for this<br/> key already exists. The entry itself is not stored in the<br/> table, and cannot be discovered from it.
 
 
 <pre><code>public fun add&lt;K: copy, drop, V&gt;(table: &amp;mut table::Table&lt;K, V&gt;, key: K, val: V)<br/></code></pre>
@@ -150,8 +143,7 @@ table, and cannot be discovered from it.
 
 ## Function `borrow`
 
-Acquire an immutable reference to the value which <code>key</code> maps to.
-Aborts if there is no entry for <code>key</code>.
+Acquire an immutable reference to the value which <code>key</code> maps to.<br/> Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun borrow&lt;K: copy, drop, V&gt;(table: &amp;table::Table&lt;K, V&gt;, key: K): &amp;V<br/></code></pre>
@@ -172,8 +164,7 @@ Aborts if there is no entry for <code>key</code>.
 
 ## Function `borrow_with_default`
 
-Acquire an immutable reference to the value which <code>key</code> maps to.
-Returns specified default value if there is no entry for <code>key</code>.
+Acquire an immutable reference to the value which <code>key</code> maps to.<br/> Returns specified default value if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun borrow_with_default&lt;K: copy, drop, V&gt;(table: &amp;table::Table&lt;K, V&gt;, key: K, default: &amp;V): &amp;V<br/></code></pre>
@@ -194,8 +185,7 @@ Returns specified default value if there is no entry for <code>key</code>.
 
 ## Function `borrow_mut`
 
-Acquire a mutable reference to the value which <code>key</code> maps to.
-Aborts if there is no entry for <code>key</code>.
+Acquire a mutable reference to the value which <code>key</code> maps to.<br/> Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun borrow_mut&lt;K: copy, drop, V&gt;(table: &amp;mut table::Table&lt;K, V&gt;, key: K): &amp;mut V<br/></code></pre>
@@ -216,8 +206,7 @@ Aborts if there is no entry for <code>key</code>.
 
 ## Function `borrow_mut_with_default`
 
-Acquire a mutable reference to the value which <code>key</code> maps to.
-Insert the pair (<code>key</code>, <code>default</code>) first if there is no entry for <code>key</code>.
+Acquire a mutable reference to the value which <code>key</code> maps to.<br/> Insert the pair (<code>key</code>, <code>default</code>) first if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun borrow_mut_with_default&lt;K: copy, drop, V: drop&gt;(table: &amp;mut table::Table&lt;K, V&gt;, key: K, default: V): &amp;mut V<br/></code></pre>
@@ -238,8 +227,7 @@ Insert the pair (<code>key</code>, <code>default</code>) first if there is no en
 
 ## Function `upsert`
 
-Insert the pair (<code>key</code>, <code>value</code>) if there is no entry for <code>key</code>.
-update the value of the entry for <code>key</code> to <code>value</code> otherwise
+Insert the pair (<code>key</code>, <code>value</code>) if there is no entry for <code>key</code>.<br/> update the value of the entry for <code>key</code> to <code>value</code> otherwise
 
 
 <pre><code>public fun upsert&lt;K: copy, drop, V: drop&gt;(table: &amp;mut table::Table&lt;K, V&gt;, key: K, value: V)<br/></code></pre>
@@ -260,8 +248,7 @@ update the value of the entry for <code>key</code> to <code>value</code> otherwi
 
 ## Function `remove`
 
-Remove from <code>table</code> and return the value which <code>key</code> maps to.
-Aborts if there is no entry for <code>key</code>.
+Remove from <code>table</code> and return the value which <code>key</code> maps to.<br/> Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code>public fun remove&lt;K: copy, drop, V&gt;(table: &amp;mut table::Table&lt;K, V&gt;, key: K): V<br/></code></pre>

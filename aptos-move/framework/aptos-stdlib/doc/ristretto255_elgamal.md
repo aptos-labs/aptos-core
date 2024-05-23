@@ -3,15 +3,7 @@
 
 # Module `0x1::ristretto255_elgamal`
 
-This module implements an ElGamal encryption API, over the Ristretto255 curve, that can be used with the
-Bulletproofs module.
-
-An ElGamal *ciphertext* is an encryption of a value <code>v</code> under a basepoint <code>G</code> and public key <code>Y &#61; sk &#42; G</code>, where <code>sk</code>
-is the corresponding secret key, is <code>(v &#42; G &#43; r &#42; Y, r &#42; G)</code>, for a random scalar <code>r</code>.
-
-Note that we place the value <code>v</code> "in the exponent" of <code>G</code> so that ciphertexts are additively homomorphic: i.e., so
-that <code>Enc_Y(v, r) &#43; Enc_Y(v&apos;, r&apos;) &#61; Enc_Y(v &#43; v&apos;, r &#43; r&apos;)</code> where <code>v, v&apos;</code> are plaintext messages, <code>Y</code> is a public key and <code>r, r&apos;</code>
-are the randomness of the ciphertexts.
+This module implements an ElGamal encryption API, over the Ristretto255 curve, that can be used with the<br/> Bulletproofs module.<br/><br/> An ElGamal &#42;ciphertext&#42; is an encryption of a value <code>v</code> under a basepoint <code>G</code> and public key <code>Y &#61; sk &#42; G</code>, where <code>sk</code><br/> is the corresponding secret key, is <code>(v &#42; G &#43; r &#42; Y, r &#42; G)</code>, for a random scalar <code>r</code>.<br/><br/> Note that we place the value <code>v</code> &quot;in the exponent&quot; of <code>G</code> so that ciphertexts are additively homomorphic: i.e., so<br/> that <code>Enc_Y(v, r) &#43; Enc_Y(v&apos;, r&apos;) &#61; Enc_Y(v &#43; v&apos;, r &#43; r&apos;)</code> where <code>v, v&apos;</code> are plaintext messages, <code>Y</code> is a public key and <code>r, r&apos;</code><br/> are the randomness of the ciphertexts.
 
 
 -  [Struct `Ciphertext`](#0x1_ristretto255_elgamal_Ciphertext)
@@ -224,8 +216,7 @@ Given a public key, returns the underlying <code>CompressedRistretto</code> poin
 
 ## Function `new_ciphertext_from_bytes`
 
-Creates a new ciphertext from two serialized Ristretto255 points: the first 32 bytes store <code>r &#42; G</code> while the
-next 32 bytes store <code>v &#42; G &#43; r &#42; Y</code>, where <code>Y</code> is the public key.
+Creates a new ciphertext from two serialized Ristretto255 points: the first 32 bytes store <code>r &#42; G</code> while the<br/> next 32 bytes store <code>v &#42; G &#43; r &#42; Y</code>, where <code>Y</code> is the public key.
 
 
 <pre><code>public fun new_ciphertext_from_bytes(bytes: vector&lt;u8&gt;): option::Option&lt;ristretto255_elgamal::Ciphertext&gt;<br/></code></pre>
@@ -246,8 +237,7 @@ next 32 bytes store <code>v &#42; G &#43; r &#42; Y</code>, where <code>Y</code>
 
 ## Function `new_ciphertext_no_randomness`
 
-Creates a new ciphertext <code>(val &#42; G &#43; 0 &#42; Y, 0 &#42; G) &#61; (val &#42; G, 0 &#42; G)</code> where <code>G</code> is the Ristretto255 basepoint
-and the randomness is set to zero.
+Creates a new ciphertext <code>(val &#42; G &#43; 0 &#42; Y, 0 &#42; G) &#61; (val &#42; G, 0 &#42; G)</code> where <code>G</code> is the Ristretto255 basepoint<br/> and the randomness is set to zero.
 
 
 <pre><code>public fun new_ciphertext_no_randomness(val: &amp;ristretto255::Scalar): ristretto255_elgamal::Ciphertext<br/></code></pre>
@@ -331,7 +321,7 @@ Given a ciphertext <code>ct</code>, serializes that ciphertext into bytes.
 
 ## Function `ciphertext_into_points`
 
-Moves the ciphertext into a pair of <code>RistrettoPoint</code>'s.
+Moves the ciphertext into a pair of <code>RistrettoPoint</code>&apos;s.
 
 
 <pre><code>public fun ciphertext_into_points(c: ristretto255_elgamal::Ciphertext): (ristretto255::RistrettoPoint, ristretto255::RistrettoPoint)<br/></code></pre>
@@ -352,7 +342,7 @@ Moves the ciphertext into a pair of <code>RistrettoPoint</code>'s.
 
 ## Function `ciphertext_as_points`
 
-Returns the pair of <code>RistrettoPoint</code>'s representing the ciphertext.
+Returns the pair of <code>RistrettoPoint</code>&apos;s representing the ciphertext.
 
 
 <pre><code>public fun ciphertext_as_points(c: &amp;ristretto255_elgamal::Ciphertext): (&amp;ristretto255::RistrettoPoint, &amp;ristretto255::RistrettoPoint)<br/></code></pre>
@@ -415,8 +405,7 @@ Creates a new decompressed ciphertext from a compressed ciphertext.
 
 ## Function `ciphertext_add`
 
-Homomorphically combines two ciphertexts <code>lhs</code> and <code>rhs</code> as <code>lhs &#43; rhs</code>.
-Useful for re-randomizing the ciphertext or updating the committed value.
+Homomorphically combines two ciphertexts <code>lhs</code> and <code>rhs</code> as <code>lhs &#43; rhs</code>.<br/> Useful for re&#45;randomizing the ciphertext or updating the committed value.
 
 
 <pre><code>public fun ciphertext_add(lhs: &amp;ristretto255_elgamal::Ciphertext, rhs: &amp;ristretto255_elgamal::Ciphertext): ristretto255_elgamal::Ciphertext<br/></code></pre>
@@ -458,8 +447,7 @@ Like <code>ciphertext_add</code> but assigns <code>lhs &#61; lhs &#43; rhs</code
 
 ## Function `ciphertext_sub`
 
-Homomorphically combines two ciphertexts <code>lhs</code> and <code>rhs</code> as <code>lhs &#45; rhs</code>.
-Useful for re-randomizing the ciphertext or updating the committed value.
+Homomorphically combines two ciphertexts <code>lhs</code> and <code>rhs</code> as <code>lhs &#45; rhs</code>.<br/> Useful for re&#45;randomizing the ciphertext or updating the committed value.
 
 
 <pre><code>public fun ciphertext_sub(lhs: &amp;ristretto255_elgamal::Ciphertext, rhs: &amp;ristretto255_elgamal::Ciphertext): ristretto255_elgamal::Ciphertext<br/></code></pre>
