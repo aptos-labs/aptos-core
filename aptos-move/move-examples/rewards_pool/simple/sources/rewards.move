@@ -7,6 +7,8 @@ module rewards::rewards {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
     use aptos_framework::coin::Coin;
+    use aptos_framework::object::{Self, Object};
+    use aptos_framework::code::PackageRegistry;
 
     /// Caller is not authorised to perform the action.
     const ENOT_AUTHORISED: u64 = 1;
@@ -72,9 +74,10 @@ module rewards::rewards {
         aptos_account::deposit_coins(user_address, rewards);
     }
 
-    /// Transfer the admin role to a new address.
-    public entry fun transfer_admin_role(admin: &signer, new_admin: address) acquires RewardStore {
+    /// Transfer the code object to a new admin address and change the admin field in RewardsStore. 
+    public entry fun transfer_admin_role(admin: &signer, code_object: Object<PackageRegistry>, new_admin: address) acquires RewardStore {
         assert_is_admin(signer::address_of(admin));
+        object::transfer(admin, code_object, new_admin);
         let rewards_store = borrow_global_mut<RewardStore>(@rewards);
         rewards_store.admin = new_admin;
     }

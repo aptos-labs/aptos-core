@@ -1,9 +1,10 @@
 [package]
 name = "rewards"
 version = "1.0.0"
+upgrade_policy = "compatible"
 
 [addresses]
-rewards = "_"
+rewards = "0x69b83f7ca17aab62faae4c9be4d4094380debb9b26a42f0eea1f9af65db19abc"
 
 [dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }
