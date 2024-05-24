@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use arbitrary::Unstructured;
 use move_smith::{ast::*, codegen::*, move_smith::*, utils::*};
 use num_bigint::BigUint;
