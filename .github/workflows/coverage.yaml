@@ -69,7 +69,7 @@ jobs:
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov nextest --lcov --output-path lcov_smoke.info -vv --no-fail-fast -p smoke-test
+      - run: cargo llvm-cov nextest --lcov --output-path lcov_smoke.info -vv --ignore-run-fail -p smoke-test
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
           RUST_MIN_STACK: 33554432
