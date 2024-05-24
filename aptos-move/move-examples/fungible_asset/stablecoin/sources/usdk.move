@@ -49,6 +49,7 @@ module stablecoin::usdk {
 
     struct Approval has drop {
         owner: address,
+        to: address,
         nonce: u64,
         chain_id: u8,
         spender: address,
@@ -73,7 +74,7 @@ module stablecoin::usdk {
     #[event]
     struct Pause has drop, store {
         pauser: address,
-        paused: bool,
+        is_paused: bool,
     }
 
     #[event]
@@ -168,6 +169,7 @@ module stablecoin::usdk {
 
         let expected_message = Approval {
             owner: from,
+            to: to,
             nonce: account::get_sequence_number(from),
             chain_id: chain_id::get(),
             spender: signer::address_of(spender),
@@ -207,6 +209,7 @@ module stablecoin::usdk {
         assert_not_paused();
         assert_is_minter(minter);
         assert_not_denylisted(to);
+        if (amount == 0) { return };
 
         let management = borrow_global<Management>(usdk_address());
         let tokens = fungible_asset::mint(&management.mint_ref, amount);
@@ -233,6 +236,8 @@ module stablecoin::usdk {
     ) acquires Management, Roles, State {
         assert_not_paused();
         assert_is_minter(minter);
+        if (amount == 0) { return };
+
         let management = borrow_global<Management>(usdk_address());
         let tokens = fungible_asset::withdraw_with_ref(
             &management.transfer_ref,
@@ -254,11 +259,12 @@ module stablecoin::usdk {
         let roles = borrow_global<Roles>(usdk_address());
         assert!(signer::address_of(pauser) == roles.pauser, EUNAUTHORIZED);
         let state = borrow_global_mut<State>(usdk_address());
+        if (state.paused == paused) { return };
         state.paused = paused;
 
         event::emit(Pause {
             pauser: signer::address_of(pauser),
-            paused,
+            is_paused: paused,
         });
     }
 
@@ -314,8 +320,10 @@ module stablecoin::usdk {
 
     // Check that the account is not denylisted by checking the frozen flag on the primary store
     fun assert_not_denylisted(account: address) {
-        let primary_store = primary_fungible_store::ensure_primary_store_exists(account, metadata());
-        assert!(!fungible_asset::is_frozen(primary_store), EDENYLISTED);
+        let metadata = metadata();
+        if (primary_fungible_store::primary_store_exists(account, metadata)) {
+            assert!(!fungible_asset::is_frozen(primary_fungible_store::primary_store(account, metadata)), EDENYLISTED);
+        }
     }
 
     #[test_only]
