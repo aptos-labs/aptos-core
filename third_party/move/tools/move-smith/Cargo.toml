@@ -7,9 +7,9 @@ edition = "2021"
 
 [dependencies]
 arbitrary = { workspace = true }
+num-bigint = { workspace = true }
 rand = { workspace = true }
 tempfile = { workspace = true }
-num-bigint = { workspace = true }
 
 move-compiler = { path = "../../move-compiler" }
 move-stdlib = { path = "../../move-stdlib" }
