@@ -10304,7 +10304,6 @@ dependencies = [
  "codespan-reporting",
  "colored",
  "datatest-stable",
- "difference",
  "httpmock",
  "move-binary-format",
  "move-bytecode-viewer",

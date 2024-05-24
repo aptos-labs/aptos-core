@@ -14,7 +14,6 @@ anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 colored = { workspace = true }
-difference = { workspace = true }
 once_cell = { workspace = true }
 tempfile = { workspace = true }
 

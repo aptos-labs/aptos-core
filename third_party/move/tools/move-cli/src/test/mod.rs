@@ -221,12 +221,12 @@ pub fn run_one(
         command
     };
 
-    if storage_dir.exists() || build_output.exists() {
-        // need to clean before testing
-        cli_command_template()
-            .arg("sandbox")
-            .arg("clean")
-            .output()?;
+    if storage_dir.exists() {
+        fs::remove_dir_all(&storage_dir)?;
+    }
+
+    if build_output.exists() {
+        fs::remove_dir_all(&build_output)?;
     }
     let mut output = "".to_string();
 
@@ -319,11 +319,12 @@ pub fn run_one(
     // check that the test command didn't create a src dir
     let run_move_clean = !read_bool_env_var(NO_MOVE_CLEAN);
     if run_move_clean {
-        // run the clean command to ensure that temporary state is cleaned up
-        cli_command_template()
-            .arg("sandbox")
-            .arg("clean")
-            .output()?;
+        if storage_dir.exists() {
+            fs::remove_dir_all(&storage_dir)?;
+        }
+        if build_output.exists() {
+            fs::remove_dir_all(&build_output)?;
+        }
 
         // check that build and storage was deleted
         assert!(
