@@ -409,6 +409,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-move-stdlib",
  "aptos-proptest-helpers",
  "aptos-runtimes",
  "aptos-sdk",
@@ -10195,6 +10196,7 @@ dependencies = [
  "move-model",
  "move-prover",
  "move-prover-test-utils",
+ "move-stdlib",
  "serde",
  "tempfile",
 ]
@@ -10547,6 +10549,7 @@ name = "move-examples"
 version = "0.1.1"
 dependencies = [
  "move-cli",
+ "move-stdlib",
 ]
 
 [[package]]
@@ -10671,6 +10674,7 @@ dependencies = [
  "move-core-types",
  "move-docgen",
  "move-model",
+ "move-stdlib",
  "move-symbol-pool",
  "move-to-yul",
  "named-lock",
