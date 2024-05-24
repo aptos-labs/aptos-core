@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::{ast::Module, move_smith::MoveSmith};
 use arbitrary::{Result, Unstructured};
 use move_compiler::{

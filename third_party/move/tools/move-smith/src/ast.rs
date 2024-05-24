@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use num_bigint::BigUint;
 
 #[derive(Debug, Clone)]
