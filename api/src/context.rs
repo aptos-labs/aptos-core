@@ -576,7 +576,7 @@ impl Context {
 
         // We can only get the max_transactions page size
         let max_txns = std::cmp::min(
-            self.node_config.api.max_transactions_page_size,
+            self.node_config.api.max_block_transactions_page_size,
             (last_version - first_version + 1) as u16,
         );
         let txns = if with_transactions {
