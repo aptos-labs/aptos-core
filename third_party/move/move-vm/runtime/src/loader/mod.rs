@@ -363,39 +363,20 @@ impl Loader {
     ) -> VMResult<Arc<CompiledScript>> {
         let script = data_store.load_compiled_script_to_cache(script, hash_value)?;
 
-        match self.verify_script(&script) {
-            Ok(_) => {
-                // verify dependencies
-                let loaded_deps = script
-                    .immediate_dependencies()
-                    .into_iter()
-                    .map(|module_id| self.load_module(&module_id, data_store, module_store))
-                    .collect::<VMResult<_>>()?;
-                self.verify_script_dependencies(&script, loaded_deps)?;
-                Ok(script)
-            },
-            Err(err) => Err(err),
-        }
-    }
-
-    // Script verification steps.
-    // See `verify_module()` for module verification steps.
-    fn verify_script(&self, script: &CompiledScript) -> VMResult<()> {
-        fail::fail_point!("verifier-failpoint-3", |_| { Ok(()) });
-
-        move_bytecode_verifier::verify_script_with_config(&self.vm_config.verifier_config, script)
-    }
-
-    fn verify_script_dependencies(
-        &self,
-        script: &CompiledScript,
-        dependencies: Vec<Arc<Module>>,
-    ) -> VMResult<()> {
-        let mut deps = vec![];
-        for dep in &dependencies {
-            deps.push(dep.module());
-        }
-        dependencies::verify_script(script, deps)
+        // Verification:
+        //   - Local, using a bytecode verifier.
+        //   - Global, loading & verifying module dependencies.
+        move_bytecode_verifier::verify_script_with_config(
+            &self.vm_config.verifier_config,
+            script.as_ref(),
+        )?;
+        let loaded_deps = script
+            .immediate_dependencies()
+            .into_iter()
+            .map(|module_id| self.load_module(&module_id, data_store, module_store))
+            .collect::<VMResult<Vec<_>>>()?;
+        dependencies::verify_script(&script, loaded_deps.iter().map(|m| m.module()))?;
+        Ok(script)
     }
 
     //
