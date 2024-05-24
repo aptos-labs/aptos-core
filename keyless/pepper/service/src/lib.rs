@@ -17,7 +17,7 @@ use aptos_keyless_pepper_common::{
         slip_10::{get_aptos_derivation_path, ExtendedPepper},
         VUF,
     },
-    PepperInput, PepperRequest, PepperResponse,
+    PepperInput, PepperRequest, PepperResponse, SignatureResponse,
 };
 use aptos_logger::info;
 use aptos_types::{
@@ -59,7 +59,7 @@ pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFa
         derivation_path,
     } = request;
 
-    let (pepper_base, pepper, address) = process_common(
+    let (_pepper_base, pepper, address) = process_common(
         &session_id,
         jwt,
         epk,
@@ -72,9 +72,38 @@ pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFa
     )?;
 
     Ok(PepperResponse {
-        signature: pepper_base,
         pepper,
         address: address.to_vec(),
+    })
+}
+
+pub fn process_signature_v0(
+    request: PepperRequest,
+) -> Result<SignatureResponse, ProcessingFailure> {
+    let session_id = Uuid::new_v4();
+    let PepperRequest {
+        jwt,
+        epk,
+        exp_date_secs,
+        epk_blinder,
+        uid_key,
+        derivation_path,
+    } = request;
+
+    let (pepper_base, _pepper, _address) = process_common(
+        &session_id,
+        jwt,
+        epk,
+        exp_date_secs,
+        epk_blinder,
+        uid_key,
+        derivation_path,
+        false,
+        None,
+    )?;
+
+    Ok(SignatureResponse {
+        signature: pepper_base,
     })
 }
 
