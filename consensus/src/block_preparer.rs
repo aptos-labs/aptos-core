@@ -10,6 +10,7 @@ use crate::{
 };
 use aptos_consensus_types::{block::Block, pipelined_block::OrderedBlockWindow};
 use aptos_executor_types::ExecutorResult;
+use aptos_logger::info;
 use aptos_types::transaction::SignedTransaction;
 use std::sync::Arc;
 
@@ -46,8 +47,20 @@ impl BlockPreparer {
             txns.extend(block_txns);
         }
         // We take the ordered block's max_txns
-        let (_, max_txns_from_block_to_execute) =
+        let (current_block_txns, max_txns_from_block_to_execute) =
             self.payload_manager.get_transactions(block).await?;
+        txns.extend(current_block_txns);
+
+        info!(
+            "BlockPreparer: Prepared {} transactions for block {} and window {:?}",
+            txns.len(),
+            block.id(),
+            block_window
+                .blocks()
+                .iter()
+                .map(|b| b.id())
+                .collect::<Vec<_>>()
+        );
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
