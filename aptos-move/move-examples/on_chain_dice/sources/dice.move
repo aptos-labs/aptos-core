@@ -7,6 +7,7 @@ module module_owner::dice {
         rolls: vector<u64>,
     }
 
+    #[randomness]
     entry fun roll_v0(_account: signer) {
         let _ = randomness::u64_range(0, 6);
     }

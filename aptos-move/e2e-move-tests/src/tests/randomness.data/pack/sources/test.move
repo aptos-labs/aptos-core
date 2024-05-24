@@ -17,7 +17,7 @@ module 0x1::test {
         let _ = randomness::u64_integer();
     }
 
-    #[lint_allow_unsafe_randomness]
+    #[lint::allow_unsafe_randomness]
     public entry fun fail_if_not_annotated_and_using_randomness() {
         let _ = randomness::u64_integer();
     }

@@ -34,7 +34,7 @@ use std::{
 };
 use thiserror::Error;
 
-const ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE: &str = "lint_allow_unsafe_randomness";
+const ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE: &str = "lint::allow_unsafe_randomness";
 const INIT_MODULE_FUN: &str = "init_module";
 const LEGACY_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
 const ERROR_PREFIX: &str = "E";
@@ -578,7 +578,7 @@ impl<'a> ExtendedChecker<'a> {
                     self.env.error(
                         &fun.get_id_loc(),
                         "entry function calling randomness features must \
-                    use the `#[randomness]` attribute",
+                    use the `#[randomness]` attribute.",
                     )
                 }
                 continue;
@@ -594,16 +594,19 @@ impl<'a> ExtendedChecker<'a> {
             if self.calls_randomness(fun_id) {
                 self.env.error(
                     &fun.get_id_loc(),
-                    "public function exposes functionality of the `randomness` module \
+                    &format!(
+                        "public function exposes functionality of the `randomness` module \
                     which can be unsafe. Consult the randomness documentation for an explanation \
                     of this error. To skip this check, add \
-                    attribute `#[lint_allow_unsafe_randomness]`",
+                    attribute `#[{}]`.",
+                        ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE
+                    ),
                 )
             }
         }
     }
 
-    /// Checks whether given function calls random functionality. This walks the call graph
+    /// Checks whether given function calls randomness functionality. This walks the call graph
     /// recursively and stops as soon as a random call is found.
     fn calls_randomness(&mut self, fun: QualifiedId<FunId>) -> bool {
         if let Some(is_caller) = self.randomness_caller_cache.get(&fun) {

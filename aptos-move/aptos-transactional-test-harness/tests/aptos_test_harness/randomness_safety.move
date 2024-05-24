@@ -9,7 +9,7 @@ module alice::randomness_user {
         randomness::u8_integer()
     }
 
-    #[lint_allow_unsafe_randomness]
+    #[lint::allow_unsafe_randomness]
     /// Allow to export randomness user for testing
     public fun uses_randomness_indirect(): u8 {
         uses_randomness()
@@ -31,7 +31,7 @@ module alice::randomness_test {
     }
 
     // Ok because randomness caller is exempted
-    #[lint_allow_unsafe_randomness]
+    #[lint::allow_unsafe_randomness]
     public fun randomness_ok_since_overridden(): u8 {
         randomness_user::uses_randomness_indirect()
     }
