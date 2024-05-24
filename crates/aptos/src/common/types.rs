@@ -1526,11 +1526,11 @@ pub struct TransactionOptions {
 
 impl TransactionOptions {
     /// Builds a rest client
-    fn rest_client(&self) -> CliTypedResult<Client> {
+    pub(crate) fn rest_client(&self) -> CliTypedResult<Client> {
         self.rest_options.client(&self.profile_options)
     }
 
-    pub fn get_transaction_account_type(&self) -> CliTypedResult<AccountType> {
+    pub(crate) fn get_transaction_account_type(&self) -> CliTypedResult<AccountType> {
         if self.private_key_options.private_key.is_some()
             || self.private_key_options.private_key_file.is_some()
         {
@@ -1602,14 +1602,35 @@ impl TransactionOptions {
             .into_inner())
     }
 
-    /// Submit a transaction
-    pub async fn submit_transaction(
+    pub(crate) fn get_now_timestamp_checked(
         &self,
-        payload: TransactionPayload,
-    ) -> CliTypedResult<Transaction> {
-        let client = self.rest_client()?;
-        let (sender_public_key, sender_address) = self.get_public_key_and_address()?;
+        onchain_timestamp_usecs: u64,
+    ) -> CliTypedResult<u64> {
+        // Retrieve local time, and ensure it's within an expected skew of the blockchain
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|err| CliError::UnexpectedError(err.to_string()))?
+            .as_secs();
+        let now_usecs = now * US_IN_SECS;
 
+        // Warn local user that clock is skewed behind the blockchain.
+        // There will always be a little lag from real time to blockchain time
+        if now_usecs < onchain_timestamp_usecs - ACCEPTED_CLOCK_SKEW_US {
+            eprintln!("Local clock is is skewed from blockchain clock.  Clock is more than {} seconds behind the blockchain {}", ACCEPTED_CLOCK_SKEW_US, onchain_timestamp_usecs / US_IN_SECS );
+        }
+        Ok(now)
+    }
+
+    pub(crate) async fn compute_gas_price_and_max_gas(
+        &self,
+        payload: &TransactionPayload,
+        client: &Client,
+        sender_address: &AccountAddress,
+        sender_public_key: &Ed25519PublicKey,
+        sequence_number: u64,
+        chain_id: ChainId,
+        expiration_time_secs: u64,
+    ) -> CliTypedResult<(u64, u64)> {
         // Ask to confirm price if the gas unit price is estimated above the lowest value when
         // it is automatically estimated
         let ask_to_confirm_price;
@@ -1622,27 +1643,6 @@ impl TransactionOptions {
             ask_to_confirm_price = true;
             gas_unit_price
         };
-
-        // Get sequence number for account
-        let (account, state) = get_account_with_state(&client, sender_address).await?;
-        let sequence_number = account.sequence_number;
-
-        // Retrieve local time, and ensure it's within an expected skew of the blockchain
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|err| CliError::UnexpectedError(err.to_string()))?
-            .as_secs();
-        let now_usecs = now * US_IN_SECS;
-
-        // Warn local user that clock is skewed behind the blockchain.
-        // There will always be a little lag from real time to blockchain time
-        if now_usecs < state.timestamp_usecs - ACCEPTED_CLOCK_SKEW_US {
-            eprintln!("Local clock is is skewed from blockchain clock.  Clock is more than {} seconds behind the blockchain {}", ACCEPTED_CLOCK_SKEW_US, state.timestamp_usecs / US_IN_SECS );
-        }
-        let expiration_time_secs = now + self.gas_options.expiration_secs;
-
-        let chain_id = ChainId::new(state.chain_id);
-        // TODO: Check auth key against current private key and provide a better message
 
         let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
             // If the gas unit price was estimated ask, but otherwise you've chosen hwo much you want to spend
@@ -1657,7 +1657,7 @@ impl TransactionOptions {
 
             let unsigned_transaction = transaction_factory
                 .payload(payload.clone())
-                .sender(sender_address)
+                .sender(*sender_address)
                 .sequence_number(sequence_number)
                 .expiration_timestamp_secs(expiration_time_secs)
                 .build();
@@ -1697,6 +1697,39 @@ impl TransactionOptions {
             prompt_yes_with_override(&message, self.prompt_options)?;
             adjusted_max_gas
         };
+
+        Ok((gas_unit_price, max_gas))
+    }
+
+    /// Submit a transaction
+    pub async fn submit_transaction(
+        &self,
+        payload: TransactionPayload,
+    ) -> CliTypedResult<Transaction> {
+        let client = self.rest_client()?;
+        let (sender_public_key, sender_address) = self.get_public_key_and_address()?;
+
+        // Get sequence number for account
+        let (account, state) = get_account_with_state(&client, sender_address).await?;
+        let sequence_number = account.sequence_number;
+
+        let now = self.get_now_timestamp_checked(state.timestamp_usecs)?;
+        let expiration_time_secs = now + self.gas_options.expiration_secs;
+
+        let chain_id = ChainId::new(state.chain_id);
+        // TODO: Check auth key against current private key and provide a better message
+
+        let (gas_unit_price, max_gas) = self
+            .compute_gas_price_and_max_gas(
+                &payload,
+                &client,
+                &sender_address,
+                &sender_public_key,
+                sequence_number,
+                chain_id,
+                expiration_time_secs,
+            )
+            .await?;
 
         // Sign and submit transaction
         let transaction_factory = TransactionFactory::new(chain_id)

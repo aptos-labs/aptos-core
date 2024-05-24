@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use self::submit_repeatedly::submit_repeatedly;
 use crate::{
     account::derive_resource_account::ResourceAccountSeed,
     common::{
@@ -72,6 +73,7 @@ mod manifest;
 pub mod package_hooks;
 mod show;
 pub mod stored_package;
+mod submit_repeatedly;
 
 /// Tool for Move related operations
 ///
@@ -99,6 +101,7 @@ pub enum MoveTool {
     Publish(PublishPackage),
     Run(RunFunction),
     RunScript(RunScript),
+    RunRepeatedly(RunFunctionRepeatedly),
     #[clap(subcommand, hide = true)]
     Show(show::ShowTool),
     Test(TestPackage),
@@ -131,6 +134,7 @@ impl MoveTool {
             MoveTool::Prove(tool) => tool.execute_serialized().await,
             MoveTool::Publish(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
+            MoveTool::RunRepeatedly(tool) => tool.execute_serialized().await,
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Show(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
@@ -1443,6 +1447,43 @@ impl CliCommand<TransactionSummary> for RunFunction {
             &self.txn_options,
         )
         .await
+    }
+}
+
+/// Run a Move function
+#[derive(Parser)]
+pub struct RunFunctionRepeatedly {
+    #[clap(flatten)]
+    pub(crate) entry_function_args: EntryFunctionArguments,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+
+    #[clap(long)]
+    num_times: usize,
+
+    #[clap(long, default_value = "10")]
+    single_request_api_batch_size: usize,
+
+    #[clap(long, default_value = "10")]
+    parallel_requests_outstanding: usize,
+}
+
+#[async_trait]
+impl CliCommand<String> for RunFunctionRepeatedly {
+    fn command_name(&self) -> &'static str {
+        "RunFunctionRepeatedly"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        submit_repeatedly(
+            &self.txn_options,
+            TransactionPayload::EntryFunction(self.entry_function_args.try_into()?),
+            self.num_times,
+            self.single_request_api_batch_size,
+            self.parallel_requests_outstanding,
+        )
+        .await
+        .map(|v| format!("Committed {} txns", v))
     }
 }
 
