@@ -80,7 +80,7 @@ impl InMemoryCache {
         })
     }
 
-    async fn latest_version(&self) -> u64 {
+    pub async fn latest_version(&self) -> u64 {
         self.cache_metadata.read().await.latest_version
     }
 

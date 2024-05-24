@@ -274,9 +274,7 @@ impl VMRuntime {
                     dummy_locals.store_loc(
                         idx,
                         self.deserialize_arg(module_store, inner_t, arg_bytes)?,
-                        self.loader
-                            .vm_config()
-                            .enable_invariant_violation_check_in_swap_loc,
+                        self.loader.vm_config().check_invariant_in_swap_loc,
                     )?;
                     dummy_locals.borrow_loc(idx)
                 },

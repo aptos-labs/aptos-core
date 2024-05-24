@@ -297,6 +297,7 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
     )
 }
 
+// PackagePaths here contains .move files only
 static PRECOMPILED_APTOS_FRAMEWORK_V1: Lazy<Option<(FullyCompiledProgram, Vec<PackagePaths>)>> =
     Lazy::new(|| {
         if get_move_compiler_block_v1_from_env() {
