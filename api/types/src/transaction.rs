@@ -313,6 +313,7 @@ impl From<(&BlockMetadata, TransactionInfo, Vec<Event>)> for Transaction {
             proposer: txn.proposer().into(),
             failed_proposer_indices: txn.failed_proposer_indices().clone(),
             timestamp: txn.timestamp_usecs().into(),
+            randomness: None,
         })
     }
 }
@@ -329,6 +330,7 @@ impl From<(&BlockMetadataExt, TransactionInfo, Vec<Event>)> for Transaction {
             proposer: txn.proposer().into(),
             failed_proposer_indices: txn.failed_proposer_indices().clone(),
             timestamp: txn.timestamp_usecs().into(),
+            randomness: txn.randomness().map(|inner| inner.into()),
         })
     }
 }
@@ -559,6 +561,9 @@ pub struct BlockMetadataTransaction {
     /// The indices of the proposers who failed to propose
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
+    /// Randomness information
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub randomness: Option<Randomness>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
@@ -1938,4 +1943,30 @@ pub struct GasEstimation {
     pub gas_estimate: u64,
     /// The prioritized estimate for the gas unit price
     pub prioritized_gas_estimate: Option<u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct Randomness {
+    metadata: RandMetadata,
+    randomness: Vec<u8>,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct RandMetadata {
+    pub epoch: u64,
+    pub round: u64,
+}
+
+impl From<aptos_types::randomness::Randomness> for Randomness {
+    fn from(input: aptos_types::randomness::Randomness) -> Self {
+        let metadata = input.metadata();
+
+        Randomness {
+            metadata: RandMetadata {
+                epoch: metadata.epoch,
+                round: metadata.round,
+            },
+            randomness: input.randomness_cloned(),
+        }
+    }
 }

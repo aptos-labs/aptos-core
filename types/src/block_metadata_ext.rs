@@ -104,6 +104,13 @@ impl BlockMetadataExt {
             BlockMetadataExt::V1(obj) => obj.round,
         }
     }
+
+    pub fn randomness(&self) -> Option<Randomness> {
+        match self {
+            BlockMetadataExt::V0(_) => None,
+            BlockMetadataExt::V1(obj) => obj.randomness.clone(),
+        }
+    }
 }
 
 impl From<BlockMetadata> for BlockMetadataExt {
