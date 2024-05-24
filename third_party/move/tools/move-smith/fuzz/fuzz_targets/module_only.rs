@@ -3,13 +3,9 @@
 
 #![no_main]
 
-use libfuzzer_sys::fuzz_target;
-use move_smith::{
-    ast::Module,
-    utils::compile_modules,
-    MoveSmith, CodeGenerator
-};
 use arbitrary::Unstructured;
+use libfuzzer_sys::fuzz_target;
+use move_smith::{ast::Module, utils::compile_modules, CodeGenerator, MoveSmith};
 
 fuzz_target!(|data: &[u8]| {
     let u = &mut Unstructured::new(data);
