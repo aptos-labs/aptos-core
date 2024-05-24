@@ -15,7 +15,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{Changes, Op},
+    effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     resolver::MoveResolver,
@@ -146,7 +146,7 @@ pub type Message = (AccountAddress, u64, Vec<Vec<u8>>);
 
 /// A structure to represent success for the execution of an async session operation.
 pub struct AsyncSuccess<'r> {
-    pub change_set: Changes<(Arc<CompiledModule>, Bytes), Bytes>,
+    pub change_set: ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>,
     pub messages: Vec<Message>,
     pub gas_used: Gas,
     pub ext: NativeContextExtensions<'r>,
@@ -384,7 +384,7 @@ fn make_extensions(
 }
 
 fn publish_actor_state(
-    change_set: &mut Changes<(Arc<CompiledModule>, Bytes), Bytes>,
+    change_set: &mut ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>,
     actor_addr: AccountAddress,
     state_tag: StructTag,
     state: Vec<u8>,

@@ -7,7 +7,7 @@ use bytes::Bytes;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::Changes,
+    effects::ChangeSet,
     identifier::Identifier,
     language_storage::ModuleId,
     u256::U256,
@@ -91,7 +91,7 @@ fn run(
     fun_name: &str,
     arg_val0: MoveValue,
 ) -> VMResult<(
-    Changes<(Arc<CompiledModule>, Bytes), Bytes>,
+    ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>,
     SerializedReturnValues,
 )> {
     let module_id = &module.0;

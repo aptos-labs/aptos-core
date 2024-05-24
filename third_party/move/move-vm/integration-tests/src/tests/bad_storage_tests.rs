@@ -7,7 +7,7 @@ use bytes::Bytes;
 use move_binary_format::{errors::PartialVMError, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{Changes, Op},
+    effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
@@ -603,7 +603,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
     let m_id = m.self_id();
     let s = as_module(units.pop().unwrap());
 
-    let mut delta = Changes::new();
+    let mut delta = ChangeSet::empty();
     delta
         .add_module_op(m.self_id(), Op::New(Arc::new(m)))
         .unwrap();

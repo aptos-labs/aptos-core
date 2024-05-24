@@ -16,7 +16,7 @@ use move_bytecode_utils::Modules;
 use move_compiler::unit_test::{ExpectedFailure, ModuleTestPlan, TestCase, TestPlan};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{Changes, Op},
+    effects::{ChangeSet, Op},
     identifier::IdentStr,
     value::serialize_values,
     vm_status::StatusCode,
@@ -100,7 +100,7 @@ fn setup_test_storage<'a>(
 /// Print the updates to storage represented by `cs` in the context of the starting storage state
 /// `storage`.
 fn print_resources_and_extensions(
-    cs: &Changes<(Arc<CompiledModule>, Bytes), Bytes>,
+    cs: &ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>,
     extensions: NativeContextExtensions,
     storage: &InMemoryStorage,
 ) -> Result<String> {
@@ -135,7 +135,7 @@ impl TestRunner {
         // TODO: maybe we should require the clients to always pass in a list of native functions so
         // we don't have to make assumptions about their gas parameters.
         native_function_table: Option<NativeFunctionTable>,
-        genesis_state: Option<Changes<(Arc<CompiledModule>, Bytes), Bytes>>,
+        genesis_state: Option<ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>>,
         cost_table: Option<CostTable>,
         record_writeset: bool,
         #[cfg(feature = "evm-backend")] evm: bool,
@@ -265,7 +265,7 @@ impl SharedTestingConfig {
         function_name: &str,
         test_info: &TestCase,
     ) -> (
-        VMResult<Changes<(Arc<CompiledModule>, Bytes), Bytes>>,
+        VMResult<ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>>,
         VMResult<NativeContextExtensions>,
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,

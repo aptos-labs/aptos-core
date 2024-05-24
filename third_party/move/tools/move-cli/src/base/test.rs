@@ -4,6 +4,7 @@
 use super::reroot_path;
 use crate::{base::test_validation, NativeFunctionRecord};
 use anyhow::{bail, Result};
+use bytes::Bytes;
 use clap::*;
 use codespan_reporting::term::{termcolor, termcolor::StandardStream};
 use move_command_line_common::files::{FileHash, MOVE_COVERAGE_MAP_EXTENSION};
@@ -98,7 +99,7 @@ impl Test {
         path: Option<PathBuf>,
         config: BuildConfig,
         natives: Vec<NativeFunctionRecord>,
-        genesis: ChangeSet,
+        genesis: ChangeSet<Bytes, Bytes>,
         cost_table: Option<CostTable>,
     ) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
@@ -159,10 +160,10 @@ pub enum UnitTestResult {
 
 pub fn run_move_unit_tests<W: Write + Send>(
     pkg_path: &Path,
-    mut build_config: move_package::BuildConfig,
+    mut build_config: BuildConfig,
     mut unit_test_config: UnitTestingConfig,
     natives: Vec<NativeFunctionRecord>,
-    genesis: ChangeSet,
+    genesis: ChangeSet<Bytes, Bytes>,
     cost_table: Option<CostTable>,
     compute_coverage: bool,
     writer: &mut W,
@@ -175,7 +176,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     build_config.generate_move_model = test_validation::needs_validation();
 
     // Build the resolution graph (resolution graph diagnostics are only needed for CLI commands so
-    // ignore them by passing a vector as the writer)
+    // ignore them by passing a vector as the writer).
     let resolution_graph = build_config
         .clone()
         .resolution_graph_for_package(pkg_path, &mut Vec::new())?;

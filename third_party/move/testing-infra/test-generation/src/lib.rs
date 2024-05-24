@@ -33,7 +33,7 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{Changes, Op},
+    effects::{ChangeSet, Op},
     language_storage::TypeTag,
     resolver::MoveResolver,
     value::MoveValue,
@@ -145,7 +145,7 @@ fn execute_function_in_module(
             move_stdlib::natives::GasParameters::zeros(),
         ));
 
-        let mut changeset = Changes::new();
+        let mut changeset = ChangeSet::empty();
         changeset
             .add_module_op(module_id.clone(), Op::New(Arc::new(module)))
             .unwrap();

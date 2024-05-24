@@ -11,7 +11,7 @@ use move_binary_format::{
 use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChanges, Changes, Op},
+    effects::{AccountChangeSet, ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
@@ -88,7 +88,7 @@ impl TableResolver for BlankStorage {
 #[derive(Debug, Clone)]
 pub struct DeltaStorage<'a, 'b, S> {
     base: &'a S,
-    change_set: &'b Changes<Arc<CompiledModule>, Bytes>,
+    change_set: &'b ChangeSet<Arc<CompiledModule>, Bytes>,
 }
 
 impl<'a, 'b, S: ModuleResolver<Module = Arc<CompiledModule>>> ModuleResolver
@@ -156,7 +156,7 @@ impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
 }
 
 impl<'a, 'b, S: MoveResolver<Arc<CompiledModule>, PartialVMError>> DeltaStorage<'a, 'b, S> {
-    pub fn new(base: &'a S, delta: &'b Changes<Arc<CompiledModule>, Bytes>) -> Self {
+    pub fn new(base: &'a S, delta: &'b ChangeSet<Arc<CompiledModule>, Bytes>) -> Self {
         Self {
             base,
             change_set: delta,
@@ -245,7 +245,7 @@ where
 impl InMemoryAccountStorage {
     fn apply(
         &mut self,
-        account_changeset: AccountChanges<Arc<CompiledModule>, Bytes>,
+        account_changeset: AccountChangeSet<Arc<CompiledModule>, Bytes>,
     ) -> PartialVMResult<()> {
         let (modules, resources) = account_changeset.into_inner();
         apply_changes(&mut self.modules, modules)?;
@@ -264,7 +264,7 @@ impl InMemoryAccountStorage {
 impl InMemoryStorage {
     pub fn apply_extended(
         &mut self,
-        changeset: Changes<Arc<CompiledModule>, Bytes>,
+        changeset: ChangeSet<Arc<CompiledModule>, Bytes>,
         #[cfg(feature = "table-extension")] table_changes: TableChangeSet,
     ) -> PartialVMResult<()> {
         for (addr, account_changeset) in changeset.into_inner() {
@@ -286,7 +286,10 @@ impl InMemoryStorage {
         Ok(())
     }
 
-    pub fn apply(&mut self, changeset: Changes<Arc<CompiledModule>, Bytes>) -> PartialVMResult<()> {
+    pub fn apply(
+        &mut self,
+        changeset: ChangeSet<Arc<CompiledModule>, Bytes>,
+    ) -> PartialVMResult<()> {
         self.apply_extended(
             changeset,
             #[cfg(feature = "table-extension")]

@@ -10344,6 +10344,7 @@ name = "move-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "clap 4.4.14",
  "codespan-reporting",
  "colored",

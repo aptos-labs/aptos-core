@@ -15,7 +15,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChanges, Changes, Op},
+    effects::{AccountChangeSet, ChangeSet, Op},
     gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -119,7 +119,7 @@ impl<'r> TransactionDataCache<'r> {
     pub(crate) fn into_effects(
         self,
         loader: &Loader,
-    ) -> PartialVMResult<Changes<(Arc<CompiledModule>, Bytes), Bytes>> {
+    ) -> PartialVMResult<ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
                 value
@@ -139,8 +139,8 @@ impl<'r> TransactionDataCache<'r> {
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         loader: &Loader,
-    ) -> PartialVMResult<Changes<(Arc<CompiledModule>, Bytes), Resource>> {
-        let mut change_set = Changes::<(Arc<CompiledModule>, Bytes), Resource>::new();
+    ) -> PartialVMResult<ChangeSet<(Arc<CompiledModule>, Bytes), Resource>> {
+        let mut change_set = ChangeSet::<(Arc<CompiledModule>, Bytes), Resource>::empty();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
             for (module_name, (module_blob, is_republishing)) in account_data_cache.module_map {
@@ -169,10 +169,7 @@ impl<'r> TransactionDataCache<'r> {
             }
             if !modules.is_empty() || !resources.is_empty() {
                 change_set
-                    .add_account_changeset(
-                        addr,
-                        AccountChanges::from_modules_resources(modules, resources),
-                    )
+                    .add_account_change_set(addr, AccountChangeSet::new(modules, resources))
                     .expect("accounts should be unique");
             }
         }

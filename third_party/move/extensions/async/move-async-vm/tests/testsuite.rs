@@ -18,7 +18,7 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{Changes, Op},
+    effects::{ChangeSet, Op},
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
@@ -185,7 +185,7 @@ impl Harness {
         }
     }
 
-    fn commit_changeset(&self, changeset: Changes<(Arc<CompiledModule>, Bytes), Bytes>) {
+    fn commit_changeset(&self, changeset: ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>) {
         for (addr, change) in changeset.into_inner() {
             for (struct_tag, op) in change.into_inner().1 {
                 self.log(format!(

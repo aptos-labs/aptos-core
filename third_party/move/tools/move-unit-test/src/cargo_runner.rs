@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::UnitTestingConfig;
+use bytes::Bytes;
 use move_command_line_common::files::find_filenames;
 use move_core_types::effects::ChangeSet;
 use move_vm_runtime::native_functions::NativeFunctionTable;
@@ -14,7 +15,7 @@ pub fn run_tests_with_config_and_filter(
     source_pattern: &str,
     dep_root: Option<&str>,
     native_function_table: Option<NativeFunctionTable>,
-    genesis_state: Option<ChangeSet>,
+    genesis_state: Option<ChangeSet<Bytes, Bytes>>,
     cost_table: Option<CostTable>,
 ) {
     let get_files = |root_path, pat| {

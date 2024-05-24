@@ -7,6 +7,7 @@ pub mod extensions;
 pub mod test_reporter;
 pub mod test_runner;
 
+use bytes::Bytes;
 use clap::*;
 use move_command_line_common::files::verify_and_create_named_address_mapping;
 use move_compiler::{
@@ -214,7 +215,7 @@ impl UnitTestingConfig {
         &self,
         test_plan: TestPlan,
         _native_function_table: Option<NativeFunctionTable>,
-        _genesis_state: Option<ChangeSet>,
+        _genesis_state: Option<ChangeSet<Bytes, Bytes>>,
         _cost_table: Option<CostTable>,
         writer: W,
     ) -> Result<(W, bool)> {
