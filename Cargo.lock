@@ -10830,6 +10830,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-smith"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "move-compiler",
+ "move-stdlib",
+ "num-bigint 0.3.3",
+ "rand 0.7.3",
+ "tempfile",
+]
+
+[[package]]
+name = "move-smith-fuzz"
+version = "0.0.0"
+dependencies = [
+ "arbitrary",
+ "libfuzzer-sys",
+ "move-smith",
+]
+
+[[package]]
 name = "move-stackless-bytecode"
 version = "0.1.0"
 dependencies = [

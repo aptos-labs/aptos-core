@@ -1,0 +1,5 @@
+*.html
+*.css
+*.profraw
+*.profdata
+coverage/
