@@ -176,7 +176,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
 
         // Remove any prior entries.
         let mut prev_tag_and_sizes: HashMap<T, Option<usize>> =
-            self.remove(shifted_idx.clone()).into_iter().collect();
+            self.remove(shifted_idx.clone(), true).into_iter().collect();
 
         // Changes the set of values, or the size of the entries (that might have been
         // used even when marked as an estimate, if self.size_changed was still false).
@@ -247,7 +247,9 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         }
     }
 
-    fn remove(&mut self, shifted_idx: ShiftedTxnIndex) -> Vec<(T, Option<usize>)> {
+    // Replacing is true when called from 'write' and false when called from pub remove (case when
+    // a write from a prior speculative execution is being fully removed).
+    fn remove(&mut self, shifted_idx: ShiftedTxnIndex, replacing: bool) -> Vec<(T, Option<usize>)> {
         // Remove idx updates first, then entries.
         let idx_update_tags: Vec<(T, Option<usize>)> = self
             .idx_to_update
@@ -268,6 +270,10 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                     .remove(&shifted_idx),
                 "Entry for tag / idx must exist to be removed"
             );
+        }
+
+        if !replacing && !idx_update_tags.is_empty() {
+            self.size_changed = true;
         }
 
         idx_update_tags
@@ -465,7 +471,10 @@ impl<
         self.group_values
             .get_mut(key)
             .expect("Path must exist")
-            .remove(ShiftedTxnIndex::new(txn_idx));
+            .remove(
+                ShiftedTxnIndex::new(txn_idx),
+                false, /* not replacing */
+            );
     }
 
     /// Read the latest value corresponding to a tag at a given group (identified by key).
@@ -746,6 +755,14 @@ mod test {
             // tags 0, 1
             (0..2).map(|i| (i, (TestValue::creation_with_len(2), None))),
         );
+
+        map.write(
+            ap.clone(),
+            5,
+            3,
+            // tags 0, 1
+            (0..2).map(|i| (i, (TestValue::creation_with_len(2), None))),
+        );
         assert_matches!(map.get_group_size(&ap, 12), Err(Uninitialized));
 
         map.set_raw_base_values(
@@ -812,6 +829,135 @@ mod test {
 
         map.remove(&ap, 5);
         assert_ok_eq!(map.get_group_size(&ap, 6), exp_size_4);
+    }
+
+    #[test]
+    fn size_changed_dependency() {
+        let ap = KeyType(b"/foo/f".to_vec());
+        let map = VersionedGroupData::<KeyType<Vec<u8>>, usize, TestValue>::new();
+
+        map.write(
+            ap.clone(),
+            5,
+            0,
+            // tags 0, 1
+            (0..2).map(|i| (i, (TestValue::creation_with_len(2), None))),
+        );
+
+        map.set_raw_base_values(
+            ap.clone(),
+            // base tag 1, 2, 3, 4
+            (1..5).map(|i| (i, TestValue::creation_with_len(1))),
+        );
+        // Incarnation 0 and base values should not affect size_changed flag.
+        assert!(!map.group_values.get(&ap).unwrap().size_changed);
+
+        let tag: usize = 5;
+        let one_entry_len = TestValue::creation_with_len(1).bytes().unwrap().len();
+        let two_entry_len = TestValue::creation_with_len(2).bytes().unwrap().len();
+        let exp_size = group_size_as_sum(vec![(&tag, two_entry_len); 2].into_iter().chain(vec![
+            (
+                &tag,
+                one_entry_len
+            );
+            3
+        ]))
+        .unwrap();
+        let exp_size_with_ones =
+            group_size_as_sum(vec![(&tag, one_entry_len); 5].into_iter()).unwrap();
+
+        // Despite estimates, should still return size.
+        map.mark_estimate(&ap, 5);
+        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size);
+        assert!(map.validate_group_size(&ap, 12, exp_size));
+        assert!(!map.validate_group_size(&ap, 12, exp_size_with_ones));
+
+        // Same write again won't change size.
+        map.write(
+            ap.clone(),
+            5,
+            1,
+            (0..2).map(|i| (i, (TestValue::creation_with_len(2), None))),
+        );
+        assert!(!map.group_values.get(&ap).unwrap().size_changed);
+        map.mark_estimate(&ap, 5);
+        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size);
+        assert!(map.validate_group_size(&ap, 12, exp_size));
+        assert!(!map.validate_group_size(&ap, 12, exp_size_with_ones));
+
+        // Removing nothing won't change size.
+        map.remove(&ap, 6);
+        assert!(!map.group_values.get(&ap).unwrap().size_changed);
+
+        map.write(
+            ap.clone(),
+            5,
+            2,
+            (0..2).map(|i| (i, (TestValue::creation_with_len(1), None))),
+        );
+        // Size has changed between speculative writes.
+        assert!(map.group_values.get(&ap).unwrap().size_changed);
+        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size_with_ones);
+        assert!(map.validate_group_size(&ap, 12, exp_size_with_ones));
+        assert!(!map.validate_group_size(&ap, 12, exp_size));
+
+        map.mark_estimate(&ap, 5);
+        assert_matches!(
+            map.get_group_size(&ap, 12),
+            Err(MVGroupError::Dependency(5))
+        );
+        assert!(!map.validate_group_size(&ap, 12, exp_size_with_ones));
+        assert!(!map.validate_group_size(&ap, 12, exp_size));
+
+        // Next check that size change gets properly set w. differing set of writes.
+        let ap_1 = KeyType(b"/foo/1".to_vec());
+        let ap_2 = KeyType(b"/foo/2".to_vec());
+        let ap_3 = KeyType(b"/foo/3".to_vec());
+
+        map.write(
+            ap_1.clone(),
+            5,
+            0,
+            // tags 0, 1
+            (0..2).map(|i| (i, (TestValue::creation_with_len(2), None))),
+        );
+        assert!(!map.group_values.get(&ap_1).unwrap().size_changed);
+        map.write(
+            ap_1.clone(),
+            5,
+            1,
+            // tags 0, 1
+            (0..1).map(|i| (i, (TestValue::creation_with_len(2), None))),
+        );
+        assert!(map.group_values.get(&ap_1).unwrap().size_changed);
+
+        map.write(
+            ap_2.clone(),
+            5,
+            0,
+            // tags 0, 1
+            (0..2).map(|i| (i, (TestValue::creation_with_len(2), None))),
+        );
+        assert!(!map.group_values.get(&ap_2).unwrap().size_changed);
+        map.write(
+            ap_2.clone(),
+            5,
+            1,
+            // tags 0, 1
+            (1..3).map(|i| (i, (TestValue::creation_with_len(2), None))),
+        );
+        assert!(map.group_values.get(&ap_2).unwrap().size_changed);
+
+        map.write(
+            ap_3.clone(),
+            5,
+            0,
+            // tags 0, 1
+            (0..2).map(|i| (i, (TestValue::creation_with_len(2), None))),
+        );
+        assert!(!map.group_values.get(&ap_3).unwrap().size_changed);
+        map.remove(&ap_3, 5);
+        assert!(map.group_values.get(&ap_3).unwrap().size_changed);
     }
 
     fn finalize_group_as_hashmap(

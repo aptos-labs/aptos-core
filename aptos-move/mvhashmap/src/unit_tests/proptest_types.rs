@@ -83,6 +83,10 @@ impl<V: Into<Vec<u8>> + Clone + Debug> TransactionWrite for Value<V> {
         unimplemented!("Irrelevant for the test")
     }
 
+    fn eq_ignoring_bytes(&self, _other: &Value<V>) -> bool {
+        unimplemented!("Irrelevant for the test")
+    }
+
     fn set_bytes(&mut self, bytes: Bytes) {
         self.maybe_bytes = Some(bytes);
     }

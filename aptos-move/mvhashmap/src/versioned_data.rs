@@ -369,24 +369,23 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         incarnation: Incarnation,
         data: V,
     ) -> bool {
-        let maybe_metadata = data.as_state_value_metadata();
+        let arc_data = Arc::new(data);
 
         let mut v = self.values.entry(key).or_default();
         let prev_entry = v.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
             CachePadded::new(Entry::new_write_from(
                 incarnation,
-                ValueWithLayout::Exchanged(Arc::new(data), None),
+                ValueWithLayout::Exchanged(arc_data.clone(), None),
             )),
         );
 
         // Changes versioned metadata that was stored.
         prev_entry.map_or(true, |entry| -> bool {
             if let EntryCell::Write(_, existing_v) = &entry.cell {
-                existing_v
+                !existing_v
                     .extract_value_no_layout()
-                    .as_state_value_metadata()
-                    != maybe_metadata
+                    .eq_ignoring_bytes(&*arc_data)
             } else {
                 unreachable!("Group metadata can't be written at AggregatorV1 key");
             }
