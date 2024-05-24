@@ -24,7 +24,7 @@ Maintains the version number for the blockchain.
     -  [Function `initialize_for_test`](#@Specification_1_initialize_for_test)
 
 
-<pre><code>use 0x1::chain_status;<br/>use 0x1::config_buffer;<br/>use 0x1::error;<br/>use 0x1::reconfiguration;<br/>use 0x1::signer;<br/>use 0x1::system_addresses;<br/></code></pre>
+<pre><code><b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;<br /><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;<br /><b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;<br /><b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;<br /></code></pre>
 
 
 
@@ -34,7 +34,7 @@ Maintains the version number for the blockchain.
 
 
 
-<pre><code>struct Version has drop, store, key<br/></code></pre>
+<pre><code><b>struct</b> <a href="version.md#0x1_version_Version">Version</a> <b>has</b> drop, store, key<br /></code></pre>
 
 
 
@@ -60,7 +60,7 @@ Maintains the version number for the blockchain.
 
 
 
-<pre><code>struct SetVersionCapability has key<br/></code></pre>
+<pre><code><b>struct</b> <a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a> <b>has</b> key<br /></code></pre>
 
 
 
@@ -90,7 +90,7 @@ Maintains the version number for the blockchain.
 Specified major version number must be greater than current version number.
 
 
-<pre><code>const EINVALID_MAJOR_VERSION_NUMBER: u64 &#61; 1;<br/></code></pre>
+<pre><code><b>const</b> <a href="version.md#0x1_version_EINVALID_MAJOR_VERSION_NUMBER">EINVALID_MAJOR_VERSION_NUMBER</a>: u64 &#61; 1;<br /></code></pre>
 
 
 
@@ -99,7 +99,7 @@ Specified major version number must be greater than current version number.
 Account is not authorized to make this change.
 
 
-<pre><code>const ENOT_AUTHORIZED: u64 &#61; 2;<br/></code></pre>
+<pre><code><b>const</b> <a href="version.md#0x1_version_ENOT_AUTHORIZED">ENOT_AUTHORIZED</a>: u64 &#61; 2;<br /></code></pre>
 
 
 
@@ -107,10 +107,11 @@ Account is not authorized to make this change.
 
 ## Function `initialize`
 
-Only called during genesis.<br/> Publishes the Version config.
+Only called during genesis.
+Publishes the Version config.
 
 
-<pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, initial_version: u64)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_initialize">initialize</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, initial_version: u64)<br /></code></pre>
 
 
 
@@ -118,7 +119,7 @@ Only called during genesis.<br/> Publishes the Version config.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, initial_version: u64) &#123;<br/>    system_addresses::assert_aptos_framework(aptos_framework);<br/><br/>    move_to(aptos_framework, Version &#123; major: initial_version &#125;);<br/>    // Give aptos framework account capability to call set version. This allows on chain governance to do it through<br/>    // control of the aptos framework account.<br/>    move_to(aptos_framework, SetVersionCapability &#123;&#125;);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_initialize">initialize</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, initial_version: u64) &#123;<br />    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);<br /><br />    <b>move_to</b>(aptos_framework, <a href="version.md#0x1_version_Version">Version</a> &#123; major: initial_version &#125;);<br />    // Give aptos framework <a href="account.md#0x1_account">account</a> capability <b>to</b> call set <a href="version.md#0x1_version">version</a>. This allows on chain governance <b>to</b> do it through<br />    // control of the aptos framework <a href="account.md#0x1_account">account</a>.<br />    <b>move_to</b>(aptos_framework, <a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a> &#123;&#125;);<br />&#125;<br /></code></pre>
 
 
 
@@ -128,10 +129,14 @@ Only called during genesis.<br/> Publishes the Version config.
 
 ## Function `set_version`
 
-Deprecated by <code>set_for_next_epoch()</code>.<br/><br/> WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!<br/><br/> TODO: update all the tests that reference this function, then disable this function.
+Deprecated by <code><a href="version.md#0x1_version_set_for_next_epoch">set_for_next_epoch</a>()</code>.
+
+WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
+
+TODO: update all the tests that reference this function, then disable this function.
 
 
-<pre><code>public entry fun set_version(account: &amp;signer, major: u64)<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="version.md#0x1_version_set_version">set_version</a>(<a href="account.md#0x1_account">account</a>: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, major: u64)<br /></code></pre>
 
 
 
@@ -139,7 +144,7 @@ Deprecated by <code>set_for_next_epoch()</code>.<br/><br/> WARNING: calling this
 <summary>Implementation</summary>
 
 
-<pre><code>public entry fun set_version(account: &amp;signer, major: u64) acquires Version &#123;<br/>    assert!(exists&lt;SetVersionCapability&gt;(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));<br/>    chain_status::assert_genesis();<br/><br/>    let old_major &#61; borrow_global&lt;Version&gt;(@aptos_framework).major;<br/>    assert!(old_major &lt; major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));<br/><br/>    let config &#61; borrow_global_mut&lt;Version&gt;(@aptos_framework);<br/>    config.major &#61; major;<br/><br/>    // Need to trigger reconfiguration so validator nodes can sync on the updated version.<br/>    reconfiguration::reconfigure();<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="version.md#0x1_version_set_version">set_version</a>(<a href="account.md#0x1_account">account</a>: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, major: u64) <b>acquires</b> <a href="version.md#0x1_version_Version">Version</a> &#123;<br />    <b>assert</b>!(<b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="version.md#0x1_version_ENOT_AUTHORIZED">ENOT_AUTHORIZED</a>));<br />    <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();<br /><br />    <b>let</b> old_major &#61; <b>borrow_global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework).major;<br />    <b>assert</b>!(old_major &lt; major, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="version.md#0x1_version_EINVALID_MAJOR_VERSION_NUMBER">EINVALID_MAJOR_VERSION_NUMBER</a>));<br /><br />    <b>let</b> config &#61; <b>borrow_global_mut</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework);<br />    config.major &#61; major;<br /><br />    // Need <b>to</b> trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> so validator nodes can sync on the updated <a href="version.md#0x1_version">version</a>.<br />    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();<br />&#125;<br /></code></pre>
 
 
 
@@ -149,10 +154,13 @@ Deprecated by <code>set_for_next_epoch()</code>.<br/><br/> WARNING: calling this
 
 ## Function `set_for_next_epoch`
 
-Used in on&#45;chain governances to update the major version for the next epoch.<br/> Example usage:<br/> &#45; <code>aptos_framework::version::set_for_next_epoch(&amp;framework_signer, new_version);</code><br/> &#45; <code>aptos_framework::aptos_governance::reconfigure(&amp;framework_signer);</code>
+Used in on&#45;chain governances to update the major version for the next epoch.
+Example usage:
+&#45; <code>aptos_framework::version::set_for_next_epoch(&amp;framework_signer, new_version);</code>
+&#45; <code>aptos_framework::aptos_governance::reconfigure(&amp;framework_signer);</code>
 
 
-<pre><code>public entry fun set_for_next_epoch(account: &amp;signer, major: u64)<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="version.md#0x1_version_set_for_next_epoch">set_for_next_epoch</a>(<a href="account.md#0x1_account">account</a>: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, major: u64)<br /></code></pre>
 
 
 
@@ -160,7 +168,7 @@ Used in on&#45;chain governances to update the major version for the next epoch.
 <summary>Implementation</summary>
 
 
-<pre><code>public entry fun set_for_next_epoch(account: &amp;signer, major: u64) acquires Version &#123;<br/>    assert!(exists&lt;SetVersionCapability&gt;(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));<br/>    let old_major &#61; borrow_global&lt;Version&gt;(@aptos_framework).major;<br/>    assert!(old_major &lt; major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));<br/>    config_buffer::upsert(Version &#123;major&#125;);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="version.md#0x1_version_set_for_next_epoch">set_for_next_epoch</a>(<a href="account.md#0x1_account">account</a>: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, major: u64) <b>acquires</b> <a href="version.md#0x1_version_Version">Version</a> &#123;<br />    <b>assert</b>!(<b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="version.md#0x1_version_ENOT_AUTHORIZED">ENOT_AUTHORIZED</a>));<br />    <b>let</b> old_major &#61; <b>borrow_global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework).major;<br />    <b>assert</b>!(old_major &lt; major, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="version.md#0x1_version_EINVALID_MAJOR_VERSION_NUMBER">EINVALID_MAJOR_VERSION_NUMBER</a>));<br />    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="version.md#0x1_version_Version">Version</a> &#123;major&#125;);<br />&#125;<br /></code></pre>
 
 
 
@@ -170,10 +178,10 @@ Used in on&#45;chain governances to update the major version for the next epoch.
 
 ## Function `on_new_epoch`
 
-Only used in reconfigurations to apply the pending <code>Version</code>, if there is any.
+Only used in reconfigurations to apply the pending <code><a href="version.md#0x1_version_Version">Version</a></code>, if there is any.
 
 
-<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_on_new_epoch">on_new_epoch</a>(framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)<br /></code></pre>
 
 
 
@@ -181,7 +189,7 @@ Only used in reconfigurations to apply the pending <code>Version</code>, if ther
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer) acquires Version &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    if (config_buffer::does_exist&lt;Version&gt;()) &#123;<br/>        let new_value &#61; config_buffer::extract&lt;Version&gt;();<br/>        if (exists&lt;Version&gt;(@aptos_framework)) &#123;<br/>            &#42;borrow_global_mut&lt;Version&gt;(@aptos_framework) &#61; new_value;<br/>        &#125; else &#123;<br/>            move_to(framework, new_value);<br/>        &#125;<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_on_new_epoch">on_new_epoch</a>(framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="version.md#0x1_version_Version">Version</a> &#123;<br />    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);<br />    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;()) &#123;<br />        <b>let</b> new_value &#61; <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;();<br />        <b>if</b> (<b>exists</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework)) &#123;<br />            &#42;<b>borrow_global_mut</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework) &#61; new_value;<br />        &#125; <b>else</b> &#123;<br />            <b>move_to</b>(framework, new_value);<br />        &#125;<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -191,10 +199,11 @@ Only used in reconfigurations to apply the pending <code>Version</code>, if ther
 
 ## Function `initialize_for_test`
 
-Only called in tests and testnets. This allows the core resources account, which only exists in tests/testnets,<br/> to update the version.
+Only called in tests and testnets. This allows the core resources account, which only exists in tests/testnets,
+to update the version.
 
 
-<pre><code>fun initialize_for_test(core_resources: &amp;signer)<br/></code></pre>
+<pre><code><b>fun</b> <a href="version.md#0x1_version_initialize_for_test">initialize_for_test</a>(core_resources: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)<br /></code></pre>
 
 
 
@@ -202,7 +211,7 @@ Only called in tests and testnets. This allows the core resources account, which
 <summary>Implementation</summary>
 
 
-<pre><code>fun initialize_for_test(core_resources: &amp;signer) &#123;<br/>    system_addresses::assert_core_resource(core_resources);<br/>    move_to(core_resources, SetVersionCapability &#123;&#125;);<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="version.md#0x1_version_initialize_for_test">initialize_for_test</a>(core_resources: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) &#123;<br />    <a href="system_addresses.md#0x1_system_addresses_assert_core_resource">system_addresses::assert_core_resource</a>(core_resources);<br />    <b>move_to</b>(core_resources, <a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a> &#123;&#125;);<br />&#125;<br /></code></pre>
 
 
 
@@ -219,15 +228,30 @@ Only called in tests and testnets. This allows the core resources account, which
 
 ### High-level Requirements
 
-&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;During genesis, the Version resource should be initialized with the initial version and stored along with its capability under the aptos framework account.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The initialize function ensures that the signer is the aptos framework account and stores the Version and SetVersionCapability resources in it.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>1</td>
+<td>During genesis, the Version resource should be initialized with the initial version and stored along with its capability under the aptos framework account.</td>
+<td>Medium</td>
+<td>The initialize function ensures that the signer is the aptos framework account and stores the Version and SetVersionCapability resources in it.</td>
+<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The version should be updateable after initialization, but only by the Aptos framework account and with an increasing version number.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The version number for the blockchain should be updatable whenever necessary. This functionality is provided by the set_version function which ensures that the new version is greater than the previous one.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;set_version&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>2</td>
+<td>The version should be updateable after initialization, but only by the Aptos framework account and with an increasing version number.</td>
+<td>Medium</td>
+<td>The version number for the blockchain should be updatable whenever necessary. This functionality is provided by the set_version function which ensures that the new version is greater than the previous one.</td>
+<td>Formally verified via <a href="#high-level-req-2">set_version</a>.</td>
+</tr>
 
-&lt;/table&gt;<br/>
+</table>
 
-<br/>
+
 
 
 <a id="module-level-spec"></a>
@@ -235,7 +259,7 @@ Only called in tests and testnets. This allows the core resources account, which
 ### Module-level Specification
 
 
-<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/></code></pre>
+<pre><code><b>pragma</b> verify &#61; <b>true</b>;<br /><b>pragma</b> aborts_if_is_strict;<br /></code></pre>
 
 
 
@@ -244,14 +268,14 @@ Only called in tests and testnets. This allows the core resources account, which
 ### Function `initialize`
 
 
-<pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, initial_version: u64)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_initialize">initialize</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, initial_version: u64)<br /></code></pre>
 
 
 Abort if resource already exists in <code>@aptos_framwork</code> when initializing.
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
-aborts_if signer::address_of(aptos_framework) !&#61; @aptos_framework;<br/>aborts_if exists&lt;Version&gt;(@aptos_framework);<br/>aborts_if exists&lt;SetVersionCapability&gt;(@aptos_framework);<br/>ensures exists&lt;Version&gt;(@aptos_framework);<br/>ensures exists&lt;SetVersionCapability&gt;(@aptos_framework);<br/>ensures global&lt;Version&gt;(@aptos_framework) &#61;&#61; Version &#123; major: initial_version &#125;;<br/>ensures global&lt;SetVersionCapability&gt;(@aptos_framework) &#61;&#61; SetVersionCapability &#123;&#125;;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high&#45;level requirement 1</a>:
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework) !&#61; @aptos_framework;<br /><b>aborts_if</b> <b>exists</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework);<br /><b>aborts_if</b> <b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(@aptos_framework);<br /><b>ensures</b> <b>exists</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework);<br /><b>ensures</b> <b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(@aptos_framework);<br /><b>ensures</b> <b>global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework) &#61;&#61; <a href="version.md#0x1_version_Version">Version</a> &#123; major: initial_version &#125;;<br /><b>ensures</b> <b>global</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(@aptos_framework) &#61;&#61; <a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a> &#123;&#125;;<br /></code></pre>
 
 
 
@@ -260,13 +284,13 @@ aborts_if signer::address_of(aptos_framework) !&#61; @aptos_framework;<br/>abort
 ### Function `set_version`
 
 
-<pre><code>public entry fun set_version(account: &amp;signer, major: u64)<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="version.md#0x1_version_set_version">set_version</a>(<a href="account.md#0x1_account">account</a>: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, major: u64)<br /></code></pre>
 
 
 
 
-<pre><code>pragma verify_duration_estimate &#61; 120;<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>include staking_config::StakingRewardsConfigRequirement;<br/>requires chain_status::is_genesis();<br/>requires timestamp::spec_now_microseconds() &gt;&#61; reconfiguration::last_reconfiguration_time();<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br/>aborts_if !exists&lt;SetVersionCapability&gt;(signer::address_of(account));<br/>aborts_if !exists&lt;Version&gt;(@aptos_framework);<br/>let old_major &#61; global&lt;Version&gt;(@aptos_framework).major;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if !(old_major &lt; major);<br/>ensures global&lt;Version&gt;(@aptos_framework).major &#61;&#61; major;<br/></code></pre>
+<pre><code><b>pragma</b> verify_duration_estimate &#61; 120;<br /><b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;<br /><b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;<br /><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>();<br /><b>requires</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &gt;&#61; <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();<br /><b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);<br /><b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br /><b>aborts_if</b> !<b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));<br /><b>aborts_if</b> !<b>exists</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework);<br /><b>let</b> old_major &#61; <b>global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework).major;<br />// This enforces <a id="high-level-req-2" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> !(old_major &lt; major);<br /><b>ensures</b> <b>global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework).major &#61;&#61; major;<br /></code></pre>
 
 
 
@@ -275,12 +299,12 @@ aborts_if !(old_major &lt; major);<br/>ensures global&lt;Version&gt;(@aptos_fram
 ### Function `set_for_next_epoch`
 
 
-<pre><code>public entry fun set_for_next_epoch(account: &amp;signer, major: u64)<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="version.md#0x1_version_set_for_next_epoch">set_for_next_epoch</a>(<a href="account.md#0x1_account">account</a>: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, major: u64)<br /></code></pre>
 
 
 
 
-<pre><code>aborts_if !exists&lt;SetVersionCapability&gt;(signer::address_of(account));<br/>aborts_if !exists&lt;Version&gt;(@aptos_framework);<br/>aborts_if global&lt;Version&gt;(@aptos_framework).major &gt;&#61; major;<br/>aborts_if !exists&lt;config_buffer::PendingConfigs&gt;(@aptos_framework);<br/></code></pre>
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));<br /><b>aborts_if</b> !<b>exists</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework);<br /><b>aborts_if</b> <b>global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework).major &gt;&#61; major;<br /><b>aborts_if</b> !<b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">config_buffer::PendingConfigs</a>&gt;(@aptos_framework);<br /></code></pre>
 
 
 
@@ -289,12 +313,12 @@ aborts_if !(old_major &lt; major);<br/>ensures global&lt;Version&gt;(@aptos_fram
 ### Function `on_new_epoch`
 
 
-<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_on_new_epoch">on_new_epoch</a>(framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)<br /></code></pre>
 
 
 
 
-<pre><code>requires @aptos_framework &#61;&#61; std::signer::address_of(framework);<br/>include config_buffer::OnNewEpochRequirement&lt;Version&gt;;<br/>aborts_if false;<br/></code></pre>
+<pre><code><b>requires</b> @aptos_framework &#61;&#61; std::signer::address_of(framework);<br /><b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;;<br /><b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 
@@ -303,13 +327,13 @@ aborts_if !(old_major &lt; major);<br/>ensures global&lt;Version&gt;(@aptos_fram
 ### Function `initialize_for_test`
 
 
-<pre><code>fun initialize_for_test(core_resources: &amp;signer)<br/></code></pre>
+<pre><code><b>fun</b> <a href="version.md#0x1_version_initialize_for_test">initialize_for_test</a>(core_resources: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)<br /></code></pre>
 
 
 This module turns on <code>aborts_if_is_strict</code>, so need to add spec for test function <code>initialize_for_test</code>.
 
 
-<pre><code>pragma verify &#61; false;<br/></code></pre>
+<pre><code><b>pragma</b> verify &#61; <b>false</b>;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -3,7 +3,21 @@
 
 # Module `0x1::dispatchable_fungible_asset`
 
-This defines the fungible asset module that can issue fungible asset of any <code>Metadata</code> object. The<br/> metadata object can be any object that equipped with <code>Metadata</code> resource.<br/><br/> The dispatchable_fungible_asset wraps the existing fungible_asset module and adds the ability for token issuer<br/> to customize the logic for withdraw and deposit operations. For example:<br/><br/> &#45; Deflation token: a fixed percentage of token will be destructed upon transfer.<br/> &#45; Transfer allowlist: token can only be transfered to addresses in the allow list.<br/> &#45; Predicated transfer: transfer can only happen when some certain predicate has been met.<br/> &#45; Loyalty token: a fixed loyalty will be paid to a designated address when a fungible asset transfer happens<br/><br/> The api listed here intended to be an in&#45;place replacement for defi applications that uses fungible_asset api directly<br/> and is safe for non&#45;dispatchable (aka vanilla) fungible assets as well.<br/><br/> See AIP&#45;73 for further discussion<br/>
+This defines the fungible asset module that can issue fungible asset of any <code>Metadata</code> object. The
+metadata object can be any object that equipped with <code>Metadata</code> resource.
+
+The dispatchable_fungible_asset wraps the existing fungible_asset module and adds the ability for token issuer
+to customize the logic for withdraw and deposit operations. For example:
+
+&#45; Deflation token: a fixed percentage of token will be destructed upon transfer.
+&#45; Transfer allowlist: token can only be transfered to addresses in the allow list.
+&#45; Predicated transfer: transfer can only happen when some certain predicate has been met.
+&#45; Loyalty token: a fixed loyalty will be paid to a designated address when a fungible asset transfer happens
+
+The api listed here intended to be an in&#45;place replacement for defi applications that uses fungible_asset api directly
+and is safe for non&#45;dispatchable (aka vanilla) fungible assets as well.
+
+See AIP&#45;73 for further discussion
 
 
 -  [Resource `TransferRefStore`](#0x1_dispatchable_fungible_asset_TransferRefStore)
@@ -24,7 +38,7 @@ This defines the fungible asset module that can issue fungible asset of any <cod
     -  [Function `dispatchable_derived_balance`](#@Specification_1_dispatchable_derived_balance)
 
 
-<pre><code>use 0x1::error;<br/>use 0x1::features;<br/>use 0x1::function_info;<br/>use 0x1::fungible_asset;<br/>use 0x1::object;<br/>use 0x1::option;<br/></code></pre>
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;<br /><b>use</b> <a href="function_info.md#0x1_function_info">0x1::function_info</a>;<br /><b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;<br /><b>use</b> <a href="object.md#0x1_object">0x1::object</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;<br /></code></pre>
 
 
 
@@ -34,7 +48,7 @@ This defines the fungible asset module that can issue fungible asset of any <cod
 
 
 
-<pre><code>&#35;[resource_group_member(&#35;[group &#61; 0x1::object::ObjectGroup])]<br/>struct TransferRefStore has key<br/></code></pre>
+<pre><code>&#35;[resource_group_member(&#35;[group &#61; <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]<br /><b>struct</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a> <b>has</b> key<br /></code></pre>
 
 
 
@@ -44,7 +58,7 @@ This defines the fungible asset module that can issue fungible asset of any <cod
 
 <dl>
 <dt>
-<code>transfer_ref: fungible_asset::TransferRef</code>
+<code>transfer_ref: <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a></code>
 </dt>
 <dd>
 
@@ -64,7 +78,7 @@ This defines the fungible asset module that can issue fungible asset of any <cod
 Feature is not activated yet on the network.
 
 
-<pre><code>const ENOT_ACTIVATED: u64 &#61; 3;<br/></code></pre>
+<pre><code><b>const</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>: u64 &#61; 3;<br /></code></pre>
 
 
 
@@ -73,7 +87,7 @@ Feature is not activated yet on the network.
 Recipient is not getting the guaranteed value;
 
 
-<pre><code>const EAMOUNT_MISMATCH: u64 &#61; 2;<br/></code></pre>
+<pre><code><b>const</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_EAMOUNT_MISMATCH">EAMOUNT_MISMATCH</a>: u64 &#61; 2;<br /></code></pre>
 
 
 
@@ -82,7 +96,7 @@ Recipient is not getting the guaranteed value;
 Dispatch target is not loaded.
 
 
-<pre><code>const ENOT_LOADED: u64 &#61; 4;<br/></code></pre>
+<pre><code><b>const</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_LOADED">ENOT_LOADED</a>: u64 &#61; 4;<br /></code></pre>
 
 
 
@@ -91,7 +105,7 @@ Dispatch target is not loaded.
 TransferRefStore doesn&apos;t exist on the fungible asset type.
 
 
-<pre><code>const ESTORE_NOT_FOUND: u64 &#61; 1;<br/></code></pre>
+<pre><code><b>const</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ESTORE_NOT_FOUND">ESTORE_NOT_FOUND</a>: u64 &#61; 1;<br /></code></pre>
 
 
 
@@ -101,7 +115,7 @@ TransferRefStore doesn&apos;t exist on the fungible asset type.
 
 
 
-<pre><code>public fun register_dispatch_functions(constructor_ref: &amp;object::ConstructorRef, withdraw_function: option::Option&lt;function_info::FunctionInfo&gt;, deposit_function: option::Option&lt;function_info::FunctionInfo&gt;, derived_balance_function: option::Option&lt;function_info::FunctionInfo&gt;)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_register_dispatch_functions">register_dispatch_functions</a>(constructor_ref: &amp;<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, withdraw_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;, deposit_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;, derived_balance_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;)<br /></code></pre>
 
 
 
@@ -109,7 +123,7 @@ TransferRefStore doesn&apos;t exist on the fungible asset type.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun register_dispatch_functions(<br/>    constructor_ref: &amp;ConstructorRef,<br/>    withdraw_function: Option&lt;FunctionInfo&gt;,<br/>    deposit_function: Option&lt;FunctionInfo&gt;,<br/>    derived_balance_function: Option&lt;FunctionInfo&gt;,<br/>) &#123;<br/>    fungible_asset::register_dispatch_functions(<br/>        constructor_ref,<br/>        withdraw_function,<br/>        deposit_function,<br/>        derived_balance_function,<br/>    );<br/>    let store_obj &#61; &amp;object::generate_signer(constructor_ref);<br/>    move_to&lt;TransferRefStore&gt;(<br/>        store_obj,<br/>        TransferRefStore &#123;<br/>            transfer_ref: fungible_asset::generate_transfer_ref(constructor_ref),<br/>        &#125;<br/>    );<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_register_dispatch_functions">register_dispatch_functions</a>(<br />    constructor_ref: &amp;ConstructorRef,<br />    withdraw_function: Option&lt;FunctionInfo&gt;,<br />    deposit_function: Option&lt;FunctionInfo&gt;,<br />    derived_balance_function: Option&lt;FunctionInfo&gt;,<br />) &#123;<br />    <a href="fungible_asset.md#0x1_fungible_asset_register_dispatch_functions">fungible_asset::register_dispatch_functions</a>(<br />        constructor_ref,<br />        withdraw_function,<br />        deposit_function,<br />        derived_balance_function,<br />    );<br />    <b>let</b> store_obj &#61; &amp;<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);<br />    <b>move_to</b>&lt;<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a>&gt;(<br />        store_obj,<br />        <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a> &#123;<br />            transfer_ref: <a href="fungible_asset.md#0x1_fungible_asset_generate_transfer_ref">fungible_asset::generate_transfer_ref</a>(constructor_ref),<br />        &#125;<br />    );<br />&#125;<br /></code></pre>
 
 
 
@@ -119,10 +133,12 @@ TransferRefStore doesn&apos;t exist on the fungible asset type.
 
 ## Function `withdraw`
 
-Withdraw <code>amount</code> of the fungible asset from <code>store</code> by the owner.<br/><br/> The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
+Withdraw <code>amount</code> of the fungible asset from <code>store</code> by the owner.
+
+The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
 
 
-<pre><code>public fun withdraw&lt;T: key&gt;(owner: &amp;signer, store: object::Object&lt;T&gt;, amount: u64): fungible_asset::FungibleAsset<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_withdraw">withdraw</a>&lt;T: key&gt;(owner: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a><br /></code></pre>
 
 
 
@@ -130,7 +146,7 @@ Withdraw <code>amount</code> of the fungible asset from <code>store</code> by th
 <summary>Implementation</summary>
 
 
-<pre><code>public fun withdraw&lt;T: key&gt;(<br/>    owner: &amp;signer,<br/>    store: Object&lt;T&gt;,<br/>    amount: u64,<br/>): FungibleAsset acquires TransferRefStore &#123;<br/>    fungible_asset::withdraw_sanity_check(owner, store, false);<br/>    let func_opt &#61; fungible_asset::withdraw_dispatch_function(store);<br/>    if (option::is_some(&amp;func_opt)) &#123;<br/>        assert!(<br/>            features::dispatchable_fungible_asset_enabled(),<br/>            error::aborted(ENOT_ACTIVATED)<br/>        );<br/>        let start_balance &#61; fungible_asset::balance(store);<br/>        let func &#61; option::borrow(&amp;func_opt);<br/>        function_info::load_module_from_function(func);<br/>        let fa &#61; dispatchable_withdraw(<br/>            store,<br/>            amount,<br/>            borrow_transfer_ref(store),<br/>            func,<br/>        );<br/>        let end_balance &#61; fungible_asset::balance(store);<br/>        assert!(amount &lt;&#61; start_balance &#45; end_balance, error::aborted(EAMOUNT_MISMATCH));<br/>        fa<br/>    &#125; else &#123;<br/>        fungible_asset::withdraw_internal(object::object_address(&amp;store), amount)<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_withdraw">withdraw</a>&lt;T: key&gt;(<br />    owner: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,<br />    store: Object&lt;T&gt;,<br />    amount: u64,<br />): FungibleAsset <b>acquires</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a> &#123;<br />    <a href="fungible_asset.md#0x1_fungible_asset_withdraw_sanity_check">fungible_asset::withdraw_sanity_check</a>(owner, store, <b>false</b>);<br />    <b>let</b> func_opt &#61; <a href="fungible_asset.md#0x1_fungible_asset_withdraw_dispatch_function">fungible_asset::withdraw_dispatch_function</a>(store);<br />    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&amp;func_opt)) &#123;<br />        <b>assert</b>!(<br />            <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),<br />            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)<br />        );<br />        <b>let</b> start_balance &#61; <a href="fungible_asset.md#0x1_fungible_asset_balance">fungible_asset::balance</a>(store);<br />        <b>let</b> func &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&amp;func_opt);<br />        <a href="function_info.md#0x1_function_info_load_module_from_function">function_info::load_module_from_function</a>(func);<br />        <b>let</b> fa &#61; <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_withdraw">dispatchable_withdraw</a>(<br />            store,<br />            amount,<br />            <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_borrow_transfer_ref">borrow_transfer_ref</a>(store),<br />            func,<br />        );<br />        <b>let</b> end_balance &#61; <a href="fungible_asset.md#0x1_fungible_asset_balance">fungible_asset::balance</a>(store);<br />        <b>assert</b>!(amount &lt;&#61; start_balance &#45; end_balance, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_EAMOUNT_MISMATCH">EAMOUNT_MISMATCH</a>));<br />        fa<br />    &#125; <b>else</b> &#123;<br />        <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&amp;store), amount)<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -140,10 +156,12 @@ Withdraw <code>amount</code> of the fungible asset from <code>store</code> by th
 
 ## Function `deposit`
 
-Deposit <code>amount</code> of the fungible asset to <code>store</code>.<br/><br/> The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
+Deposit <code>amount</code> of the fungible asset to <code>store</code>.
+
+The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
 
 
-<pre><code>public fun deposit&lt;T: key&gt;(store: object::Object&lt;T&gt;, fa: fungible_asset::FungibleAsset)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_deposit">deposit</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)<br /></code></pre>
 
 
 
@@ -151,7 +169,7 @@ Deposit <code>amount</code> of the fungible asset to <code>store</code>.<br/><br
 <summary>Implementation</summary>
 
 
-<pre><code>public fun deposit&lt;T: key&gt;(store: Object&lt;T&gt;, fa: FungibleAsset) acquires TransferRefStore &#123;<br/>    fungible_asset::deposit_sanity_check(store, false);<br/>    let func_opt &#61; fungible_asset::deposit_dispatch_function(store);<br/>    if (option::is_some(&amp;func_opt)) &#123;<br/>        assert!(<br/>            features::dispatchable_fungible_asset_enabled(),<br/>            error::aborted(ENOT_ACTIVATED)<br/>        );<br/>        let func &#61; option::borrow(&amp;func_opt);<br/>        function_info::load_module_from_function(func);<br/>        dispatchable_deposit(<br/>            store,<br/>            fa,<br/>            borrow_transfer_ref(store),<br/>            func<br/>        )<br/>    &#125; else &#123;<br/>        fungible_asset::deposit_internal(store, fa)<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_deposit">deposit</a>&lt;T: key&gt;(store: Object&lt;T&gt;, fa: FungibleAsset) <b>acquires</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a> &#123;<br />    <a href="fungible_asset.md#0x1_fungible_asset_deposit_sanity_check">fungible_asset::deposit_sanity_check</a>(store, <b>false</b>);<br />    <b>let</b> func_opt &#61; <a href="fungible_asset.md#0x1_fungible_asset_deposit_dispatch_function">fungible_asset::deposit_dispatch_function</a>(store);<br />    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&amp;func_opt)) &#123;<br />        <b>assert</b>!(<br />            <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),<br />            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)<br />        );<br />        <b>let</b> func &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&amp;func_opt);<br />        <a href="function_info.md#0x1_function_info_load_module_from_function">function_info::load_module_from_function</a>(func);<br />        <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_deposit">dispatchable_deposit</a>(<br />            store,<br />            fa,<br />            <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_borrow_transfer_ref">borrow_transfer_ref</a>(store),<br />            func<br />        )<br />    &#125; <b>else</b> &#123;<br />        <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(store, fa)<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -161,10 +179,11 @@ Deposit <code>amount</code> of the fungible asset to <code>store</code>.<br/><br
 
 ## Function `transfer`
 
-Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, which should be owned by <code>sender</code>, to <code>receiver</code>.<br/> Note: it does not move the underlying object.
+Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, which should be owned by <code>sender</code>, to <code>receiver</code>.
+Note: it does not move the underlying object.
 
 
-<pre><code>public entry fun transfer&lt;T: key&gt;(sender: &amp;signer, from: object::Object&lt;T&gt;, to: object::Object&lt;T&gt;, amount: u64)<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer">transfer</a>&lt;T: key&gt;(sender: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, <b>to</b>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64)<br /></code></pre>
 
 
 
@@ -172,7 +191,7 @@ Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, 
 <summary>Implementation</summary>
 
 
-<pre><code>public entry fun transfer&lt;T: key&gt;(<br/>    sender: &amp;signer,<br/>    from: Object&lt;T&gt;,<br/>    to: Object&lt;T&gt;,<br/>    amount: u64,<br/>) acquires TransferRefStore &#123;<br/>    let fa &#61; withdraw(sender, from, amount);<br/>    deposit(to, fa);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer">transfer</a>&lt;T: key&gt;(<br />    sender: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,<br />    from: Object&lt;T&gt;,<br />    <b>to</b>: Object&lt;T&gt;,<br />    amount: u64,<br />) <b>acquires</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a> &#123;<br />    <b>let</b> fa &#61; <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_withdraw">withdraw</a>(sender, from, amount);<br />    <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_deposit">deposit</a>(<b>to</b>, fa);<br />&#125;<br /></code></pre>
 
 
 
@@ -182,10 +201,12 @@ Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, 
 
 ## Function `transfer_assert_minimum_deposit`
 
-Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, which should be owned by <code>sender</code>, to <code>receiver</code>.<br/> The recipient is guranteed to receive asset greater than the expected amount.<br/> Note: it does not move the underlying object.
+Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, which should be owned by <code>sender</code>, to <code>receiver</code>.
+The recipient is guranteed to receive asset greater than the expected amount.
+Note: it does not move the underlying object.
 
 
-<pre><code>public entry fun transfer_assert_minimum_deposit&lt;T: key&gt;(sender: &amp;signer, from: object::Object&lt;T&gt;, to: object::Object&lt;T&gt;, amount: u64, expected: u64)<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer_assert_minimum_deposit">transfer_assert_minimum_deposit</a>&lt;T: key&gt;(sender: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, <b>to</b>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64, expected: u64)<br /></code></pre>
 
 
 
@@ -193,7 +214,7 @@ Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, 
 <summary>Implementation</summary>
 
 
-<pre><code>public entry fun transfer_assert_minimum_deposit&lt;T: key&gt;(<br/>    sender: &amp;signer,<br/>    from: Object&lt;T&gt;,<br/>    to: Object&lt;T&gt;,<br/>    amount: u64,<br/>    expected: u64<br/>) acquires TransferRefStore &#123;<br/>    let start &#61; fungible_asset::balance(to);<br/>    let fa &#61; withdraw(sender, from, amount);<br/>    deposit(to, fa);<br/>    let end &#61; fungible_asset::balance(to);<br/>    assert!(end &#45; start &gt;&#61; expected, error::aborted(EAMOUNT_MISMATCH));<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer_assert_minimum_deposit">transfer_assert_minimum_deposit</a>&lt;T: key&gt;(<br />    sender: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,<br />    from: Object&lt;T&gt;,<br />    <b>to</b>: Object&lt;T&gt;,<br />    amount: u64,<br />    expected: u64<br />) <b>acquires</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a> &#123;<br />    <b>let</b> start &#61; <a href="fungible_asset.md#0x1_fungible_asset_balance">fungible_asset::balance</a>(<b>to</b>);<br />    <b>let</b> fa &#61; <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_withdraw">withdraw</a>(sender, from, amount);<br />    <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_deposit">deposit</a>(<b>to</b>, fa);<br />    <b>let</b> end &#61; <a href="fungible_asset.md#0x1_fungible_asset_balance">fungible_asset::balance</a>(<b>to</b>);<br />    <b>assert</b>!(end &#45; start &gt;&#61; expected, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_EAMOUNT_MISMATCH">EAMOUNT_MISMATCH</a>));<br />&#125;<br /></code></pre>
 
 
 
@@ -203,10 +224,12 @@ Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, 
 
 ## Function `derived_balance`
 
-Get the derived value of store using the overloaded hook.<br/><br/> The semantics of value will be governed by the function specified in DispatchFunctionStore.
+Get the derived value of store using the overloaded hook.
+
+The semantics of value will be governed by the function specified in DispatchFunctionStore.
 
 
-<pre><code>&#35;[view]<br/>public fun derived_balance&lt;T: key&gt;(store: object::Object&lt;T&gt;): u64<br/></code></pre>
+<pre><code>&#35;[view]<br /><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_balance">derived_balance</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): u64<br /></code></pre>
 
 
 
@@ -214,7 +237,7 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 <summary>Implementation</summary>
 
 
-<pre><code>public fun derived_balance&lt;T: key&gt;(store: Object&lt;T&gt;): u64 &#123;<br/>    let func_opt &#61; fungible_asset::derived_balance_dispatch_function(store);<br/>    if (option::is_some(&amp;func_opt)) &#123;<br/>        assert!(<br/>            features::dispatchable_fungible_asset_enabled(),<br/>            error::aborted(ENOT_ACTIVATED)<br/>        );<br/>        let func &#61; option::borrow(&amp;func_opt);<br/>        function_info::load_module_from_function(func);<br/>        dispatchable_derived_balance(store, func)<br/>    &#125; else &#123;<br/>        fungible_asset::balance(store)<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_balance">derived_balance</a>&lt;T: key&gt;(store: Object&lt;T&gt;): u64 &#123;<br />    <b>let</b> func_opt &#61; <a href="fungible_asset.md#0x1_fungible_asset_derived_balance_dispatch_function">fungible_asset::derived_balance_dispatch_function</a>(store);<br />    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&amp;func_opt)) &#123;<br />        <b>assert</b>!(<br />            <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),<br />            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)<br />        );<br />        <b>let</b> func &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&amp;func_opt);<br />        <a href="function_info.md#0x1_function_info_load_module_from_function">function_info::load_module_from_function</a>(func);<br />        <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_balance">dispatchable_derived_balance</a>(store, func)<br />    &#125; <b>else</b> &#123;<br />        <a href="fungible_asset.md#0x1_fungible_asset_balance">fungible_asset::balance</a>(store)<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -226,7 +249,7 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 
 
 
-<pre><code>fun borrow_transfer_ref&lt;T: key&gt;(metadata: object::Object&lt;T&gt;): &amp;fungible_asset::TransferRef<br/></code></pre>
+<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_borrow_transfer_ref">borrow_transfer_ref</a>&lt;T: key&gt;(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): &amp;<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a><br /></code></pre>
 
 
 
@@ -234,7 +257,7 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 <summary>Implementation</summary>
 
 
-<pre><code>inline fun borrow_transfer_ref&lt;T: key&gt;(metadata: Object&lt;T&gt;): &amp;TransferRef acquires TransferRefStore &#123;<br/>    let metadata_addr &#61; object::object_address(<br/>        &amp;fungible_asset::store_metadata(metadata)<br/>    );<br/>    assert!(<br/>        exists&lt;TransferRefStore&gt;(metadata_addr),<br/>        error::not_found(ESTORE_NOT_FOUND)<br/>    );<br/>    &amp;borrow_global&lt;TransferRefStore&gt;(metadata_addr).transfer_ref<br/>&#125;<br/></code></pre>
+<pre><code>inline <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_borrow_transfer_ref">borrow_transfer_ref</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): &amp;TransferRef <b>acquires</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a> &#123;<br />    <b>let</b> metadata_addr &#61; <a href="object.md#0x1_object_object_address">object::object_address</a>(<br />        &amp;<a href="fungible_asset.md#0x1_fungible_asset_store_metadata">fungible_asset::store_metadata</a>(metadata)<br />    );<br />    <b>assert</b>!(<br />        <b>exists</b>&lt;<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a>&gt;(metadata_addr),<br />        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ESTORE_NOT_FOUND">ESTORE_NOT_FOUND</a>)<br />    );<br />    &amp;<b>borrow_global</b>&lt;<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a>&gt;(metadata_addr).transfer_ref<br />&#125;<br /></code></pre>
 
 
 
@@ -246,7 +269,7 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 
 
 
-<pre><code>fun dispatchable_withdraw&lt;T: key&gt;(store: object::Object&lt;T&gt;, amount: u64, transfer_ref: &amp;fungible_asset::TransferRef, function: &amp;function_info::FunctionInfo): fungible_asset::FungibleAsset<br/></code></pre>
+<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_withdraw">dispatchable_withdraw</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64, transfer_ref: &amp;<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, function: &amp;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a><br /></code></pre>
 
 
 
@@ -254,7 +277,7 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 <summary>Implementation</summary>
 
 
-<pre><code>native fun dispatchable_withdraw&lt;T: key&gt;(<br/>    store: Object&lt;T&gt;,<br/>    amount: u64,<br/>    transfer_ref: &amp;TransferRef,<br/>    function: &amp;FunctionInfo,<br/>): FungibleAsset;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_withdraw">dispatchable_withdraw</a>&lt;T: key&gt;(<br />    store: Object&lt;T&gt;,<br />    amount: u64,<br />    transfer_ref: &amp;TransferRef,<br />    function: &amp;FunctionInfo,<br />): FungibleAsset;<br /></code></pre>
 
 
 
@@ -266,7 +289,7 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 
 
 
-<pre><code>fun dispatchable_deposit&lt;T: key&gt;(store: object::Object&lt;T&gt;, fa: fungible_asset::FungibleAsset, transfer_ref: &amp;fungible_asset::TransferRef, function: &amp;function_info::FunctionInfo)<br/></code></pre>
+<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_deposit">dispatchable_deposit</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>, transfer_ref: &amp;<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, function: &amp;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>)<br /></code></pre>
 
 
 
@@ -274,7 +297,7 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 <summary>Implementation</summary>
 
 
-<pre><code>native fun dispatchable_deposit&lt;T: key&gt;(<br/>    store: Object&lt;T&gt;,<br/>    fa: FungibleAsset,<br/>    transfer_ref: &amp;TransferRef,<br/>    function: &amp;FunctionInfo,<br/>);<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_deposit">dispatchable_deposit</a>&lt;T: key&gt;(<br />    store: Object&lt;T&gt;,<br />    fa: FungibleAsset,<br />    transfer_ref: &amp;TransferRef,<br />    function: &amp;FunctionInfo,<br />);<br /></code></pre>
 
 
 
@@ -286,7 +309,7 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 
 
 
-<pre><code>fun dispatchable_derived_balance&lt;T: key&gt;(store: object::Object&lt;T&gt;, function: &amp;function_info::FunctionInfo): u64<br/></code></pre>
+<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_balance">dispatchable_derived_balance</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, function: &amp;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): u64<br /></code></pre>
 
 
 
@@ -294,7 +317,7 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 <summary>Implementation</summary>
 
 
-<pre><code>native fun dispatchable_derived_balance&lt;T: key&gt;(<br/>    store: Object&lt;T&gt;,<br/>    function: &amp;FunctionInfo,<br/>): u64;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_balance">dispatchable_derived_balance</a>&lt;T: key&gt;(<br />    store: Object&lt;T&gt;,<br />    function: &amp;FunctionInfo,<br />): u64;<br /></code></pre>
 
 
 
@@ -306,7 +329,7 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 
 
 
-<pre><code>pragma verify &#61; false;<br/></code></pre>
+<pre><code><b>pragma</b> verify &#61; <b>false</b>;<br /></code></pre>
 
 
 
@@ -315,12 +338,12 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 ### Function `dispatchable_withdraw`
 
 
-<pre><code>fun dispatchable_withdraw&lt;T: key&gt;(store: object::Object&lt;T&gt;, amount: u64, transfer_ref: &amp;fungible_asset::TransferRef, function: &amp;function_info::FunctionInfo): fungible_asset::FungibleAsset<br/></code></pre>
+<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_withdraw">dispatchable_withdraw</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64, transfer_ref: &amp;<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, function: &amp;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a><br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -329,12 +352,12 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 ### Function `dispatchable_deposit`
 
 
-<pre><code>fun dispatchable_deposit&lt;T: key&gt;(store: object::Object&lt;T&gt;, fa: fungible_asset::FungibleAsset, transfer_ref: &amp;fungible_asset::TransferRef, function: &amp;function_info::FunctionInfo)<br/></code></pre>
+<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_deposit">dispatchable_deposit</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>, transfer_ref: &amp;<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, function: &amp;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>)<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -343,12 +366,12 @@ Get the derived value of store using the overloaded hook.<br/><br/> The semantic
 ### Function `dispatchable_derived_balance`
 
 
-<pre><code>fun dispatchable_derived_balance&lt;T: key&gt;(store: object::Object&lt;T&gt;, function: &amp;function_info::FunctionInfo): u64<br/></code></pre>
+<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_balance">dispatchable_derived_balance</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, function: &amp;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): u64<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

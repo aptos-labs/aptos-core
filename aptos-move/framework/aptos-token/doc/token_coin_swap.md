@@ -25,7 +25,7 @@ Deprecated module
 -  [Specification](#@Specification_1)
 
 
-<pre><code>use 0x1::error;<br/>use 0x1::event;<br/>use 0x1::string;<br/>use 0x1::table;<br/>use 0x1::type_info;<br/>use 0x3::token;<br/></code></pre>
+<pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;<br /><b>use</b> <a href="../../aptos-framework/doc/event.md#0x1_event">0x1::event</a>;<br /><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;<br /><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;<br /><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/type_info.md#0x1_type_info">0x1::type_info</a>;<br /><b>use</b> <a href="token.md#0x3_token">0x3::token</a>;<br /></code></pre>
 
 
 
@@ -36,7 +36,7 @@ Deprecated module
 TokenCoinSwap records a swap ask for swapping token_amount with CoinType with a minimal price per token
 
 
-<pre><code>struct TokenCoinSwap&lt;CoinType&gt; has drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="token_coin_swap.md#0x3_token_coin_swap_TokenCoinSwap">TokenCoinSwap</a>&lt;CoinType&gt; <b>has</b> drop, store<br /></code></pre>
 
 
 
@@ -69,7 +69,7 @@ TokenCoinSwap records a swap ask for swapping token_amount with CoinType with a 
 The listing of all tokens for swapping stored at token owner&apos;s account
 
 
-<pre><code>struct TokenListings&lt;CoinType&gt; has key<br/></code></pre>
+<pre><code><b>struct</b> <a href="token_coin_swap.md#0x3_token_coin_swap_TokenListings">TokenListings</a>&lt;CoinType&gt; <b>has</b> key<br /></code></pre>
 
 
 
@@ -79,19 +79,19 @@ The listing of all tokens for swapping stored at token owner&apos;s account
 
 <dl>
 <dt>
-<code>listings: table::Table&lt;token::TokenId, token_coin_swap::TokenCoinSwap&lt;CoinType&gt;&gt;</code>
+<code>listings: <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="token.md#0x3_token_TokenId">token::TokenId</a>, <a href="token_coin_swap.md#0x3_token_coin_swap_TokenCoinSwap">token_coin_swap::TokenCoinSwap</a>&lt;CoinType&gt;&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>listing_events: event::EventHandle&lt;token_coin_swap::TokenListingEvent&gt;</code>
+<code>listing_events: <a href="../../aptos-framework/doc/event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="token_coin_swap.md#0x3_token_coin_swap_TokenListingEvent">token_coin_swap::TokenListingEvent</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>swap_events: event::EventHandle&lt;token_coin_swap::TokenSwapEvent&gt;</code>
+<code>swap_events: <a href="../../aptos-framework/doc/event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="token_coin_swap.md#0x3_token_coin_swap_TokenSwapEvent">token_coin_swap::TokenSwapEvent</a>&gt;</code>
 </dt>
 <dd>
 
@@ -108,7 +108,7 @@ The listing of all tokens for swapping stored at token owner&apos;s account
 TokenEscrow holds the tokens that cannot be withdrawn or transferred
 
 
-<pre><code>struct TokenEscrow has store<br/></code></pre>
+<pre><code><b>struct</b> <a href="token_coin_swap.md#0x3_token_coin_swap_TokenEscrow">TokenEscrow</a> <b>has</b> store<br /></code></pre>
 
 
 
@@ -118,7 +118,7 @@ TokenEscrow holds the tokens that cannot be withdrawn or transferred
 
 <dl>
 <dt>
-<code>token: token::Token</code>
+<code><a href="token.md#0x3_token">token</a>: <a href="token.md#0x3_token_Token">token::Token</a></code>
 </dt>
 <dd>
 
@@ -141,7 +141,7 @@ TokenEscrow holds the tokens that cannot be withdrawn or transferred
 TokenStoreEscrow holds a map of token id to their tokenEscrow
 
 
-<pre><code>struct TokenStoreEscrow has key<br/></code></pre>
+<pre><code><b>struct</b> <a href="token_coin_swap.md#0x3_token_coin_swap_TokenStoreEscrow">TokenStoreEscrow</a> <b>has</b> key<br /></code></pre>
 
 
 
@@ -151,7 +151,7 @@ TokenStoreEscrow holds a map of token id to their tokenEscrow
 
 <dl>
 <dt>
-<code>token_escrows: table::Table&lt;token::TokenId, token_coin_swap::TokenEscrow&gt;</code>
+<code>token_escrows: <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="token.md#0x3_token_TokenId">token::TokenId</a>, <a href="token_coin_swap.md#0x3_token_coin_swap_TokenEscrow">token_coin_swap::TokenEscrow</a>&gt;</code>
 </dt>
 <dd>
 
@@ -167,7 +167,7 @@ TokenStoreEscrow holds a map of token id to their tokenEscrow
 
 
 
-<pre><code>struct TokenListingEvent has drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="token_coin_swap.md#0x3_token_coin_swap_TokenListingEvent">TokenListingEvent</a> <b>has</b> drop, store<br /></code></pre>
 
 
 
@@ -177,7 +177,7 @@ TokenStoreEscrow holds a map of token id to their tokenEscrow
 
 <dl>
 <dt>
-<code>token_id: token::TokenId</code>
+<code>token_id: <a href="token.md#0x3_token_TokenId">token::TokenId</a></code>
 </dt>
 <dd>
 
@@ -201,7 +201,7 @@ TokenStoreEscrow holds a map of token id to their tokenEscrow
 
 </dd>
 <dt>
-<code>coin_type_info: type_info::TypeInfo</code>
+<code>coin_type_info: <a href="../../aptos-framework/../aptos-stdlib/doc/type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a></code>
 </dt>
 <dd>
 
@@ -217,7 +217,7 @@ TokenStoreEscrow holds a map of token id to their tokenEscrow
 
 
 
-<pre><code>struct TokenSwapEvent has drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="token_coin_swap.md#0x3_token_coin_swap_TokenSwapEvent">TokenSwapEvent</a> <b>has</b> drop, store<br /></code></pre>
 
 
 
@@ -227,13 +227,13 @@ TokenStoreEscrow holds a map of token id to their tokenEscrow
 
 <dl>
 <dt>
-<code>token_id: token::TokenId</code>
+<code>token_id: <a href="token.md#0x3_token_TokenId">token::TokenId</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>token_buyer: address</code>
+<code>token_buyer: <b>address</b></code>
 </dt>
 <dd>
 
@@ -251,7 +251,7 @@ TokenStoreEscrow holds a map of token id to their tokenEscrow
 
 </dd>
 <dt>
-<code>coin_type_info: type_info::TypeInfo</code>
+<code>coin_type_info: <a href="../../aptos-framework/../aptos-stdlib/doc/type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a></code>
 </dt>
 <dd>
 
@@ -271,7 +271,7 @@ TokenStoreEscrow holds a map of token id to their tokenEscrow
 Deprecated module
 
 
-<pre><code>const EDEPRECATED_MODULE: u64 &#61; 8;<br/></code></pre>
+<pre><code><b>const</b> <a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>: u64 &#61; 8;<br /></code></pre>
 
 
 
@@ -280,7 +280,7 @@ Deprecated module
 Not enough coin to buy token
 
 
-<pre><code>const ENOT_ENOUGH_COIN: u64 &#61; 7;<br/></code></pre>
+<pre><code><b>const</b> <a href="token_coin_swap.md#0x3_token_coin_swap_ENOT_ENOUGH_COIN">ENOT_ENOUGH_COIN</a>: u64 &#61; 7;<br /></code></pre>
 
 
 
@@ -289,7 +289,7 @@ Not enough coin to buy token
 Token already listed
 
 
-<pre><code>const ETOKEN_ALREADY_LISTED: u64 &#61; 1;<br/></code></pre>
+<pre><code><b>const</b> <a href="token_coin_swap.md#0x3_token_coin_swap_ETOKEN_ALREADY_LISTED">ETOKEN_ALREADY_LISTED</a>: u64 &#61; 1;<br /></code></pre>
 
 
 
@@ -298,7 +298,7 @@ Token already listed
 Token buy amount doesn&apos;t match listing amount
 
 
-<pre><code>const ETOKEN_AMOUNT_NOT_MATCH: u64 &#61; 6;<br/></code></pre>
+<pre><code><b>const</b> <a href="token_coin_swap.md#0x3_token_coin_swap_ETOKEN_AMOUNT_NOT_MATCH">ETOKEN_AMOUNT_NOT_MATCH</a>: u64 &#61; 6;<br /></code></pre>
 
 
 
@@ -307,7 +307,7 @@ Token buy amount doesn&apos;t match listing amount
 Token cannot be moved out of escrow before the lockup time
 
 
-<pre><code>const ETOKEN_CANNOT_MOVE_OUT_OF_ESCROW_BEFORE_LOCKUP_TIME: u64 &#61; 4;<br/></code></pre>
+<pre><code><b>const</b> <a href="token_coin_swap.md#0x3_token_coin_swap_ETOKEN_CANNOT_MOVE_OUT_OF_ESCROW_BEFORE_LOCKUP_TIME">ETOKEN_CANNOT_MOVE_OUT_OF_ESCROW_BEFORE_LOCKUP_TIME</a>: u64 &#61; 4;<br /></code></pre>
 
 
 
@@ -316,7 +316,7 @@ Token cannot be moved out of escrow before the lockup time
 Token listing no longer exists
 
 
-<pre><code>const ETOKEN_LISTING_NOT_EXIST: u64 &#61; 2;<br/></code></pre>
+<pre><code><b>const</b> <a href="token_coin_swap.md#0x3_token_coin_swap_ETOKEN_LISTING_NOT_EXIST">ETOKEN_LISTING_NOT_EXIST</a>: u64 &#61; 2;<br /></code></pre>
 
 
 
@@ -325,7 +325,7 @@ Token listing no longer exists
 Token buy price doesn&apos;t match listing price
 
 
-<pre><code>const ETOKEN_MIN_PRICE_NOT_MATCH: u64 &#61; 5;<br/></code></pre>
+<pre><code><b>const</b> <a href="token_coin_swap.md#0x3_token_coin_swap_ETOKEN_MIN_PRICE_NOT_MATCH">ETOKEN_MIN_PRICE_NOT_MATCH</a>: u64 &#61; 5;<br /></code></pre>
 
 
 
@@ -334,7 +334,7 @@ Token buy price doesn&apos;t match listing price
 Token is not in escrow
 
 
-<pre><code>const ETOKEN_NOT_IN_ESCROW: u64 &#61; 3;<br/></code></pre>
+<pre><code><b>const</b> <a href="token_coin_swap.md#0x3_token_coin_swap_ETOKEN_NOT_IN_ESCROW">ETOKEN_NOT_IN_ESCROW</a>: u64 &#61; 3;<br /></code></pre>
 
 
 
@@ -344,7 +344,7 @@ Token is not in escrow
 
 
 
-<pre><code>public fun does_listing_exist&lt;CoinType&gt;(_token_owner: address, _token_id: token::TokenId): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_does_listing_exist">does_listing_exist</a>&lt;CoinType&gt;(_token_owner: <b>address</b>, _token_id: <a href="token.md#0x3_token_TokenId">token::TokenId</a>): bool<br /></code></pre>
 
 
 
@@ -352,7 +352,7 @@ Token is not in escrow
 <summary>Implementation</summary>
 
 
-<pre><code>public fun does_listing_exist&lt;CoinType&gt;(<br/>    _token_owner: address,<br/>    _token_id: TokenId<br/>): bool &#123;<br/>    abort error::invalid_argument(EDEPRECATED_MODULE)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_does_listing_exist">does_listing_exist</a>&lt;CoinType&gt;(<br />    _token_owner: <b>address</b>,<br />    _token_id: TokenId<br />): bool &#123;<br />    <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>)<br />&#125;<br /></code></pre>
 
 
 
@@ -365,7 +365,7 @@ Token is not in escrow
 Coin owner withdraw coin to swap with tokens listed for swapping at the token owner&apos;s address.
 
 
-<pre><code>public fun exchange_coin_for_token&lt;CoinType&gt;(_coin_owner: &amp;signer, _coin_amount: u64, _token_owner: address, _creators_address: address, _collection: string::String, _name: string::String, _property_version: u64, _token_amount: u64)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_exchange_coin_for_token">exchange_coin_for_token</a>&lt;CoinType&gt;(_coin_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _coin_amount: u64, _token_owner: <b>address</b>, _creators_address: <b>address</b>, _collection: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, _name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, _property_version: u64, _token_amount: u64)<br /></code></pre>
 
 
 
@@ -373,7 +373,7 @@ Coin owner withdraw coin to swap with tokens listed for swapping at the token ow
 <summary>Implementation</summary>
 
 
-<pre><code>public fun exchange_coin_for_token&lt;CoinType&gt;(<br/>    _coin_owner: &amp;signer,<br/>    _coin_amount: u64,<br/>    _token_owner: address,<br/>    _creators_address: address,<br/>    _collection: String,<br/>    _name: String,<br/>    _property_version: u64,<br/>    _token_amount: u64,<br/>) &#123;<br/>    abort error::invalid_argument(EDEPRECATED_MODULE)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_exchange_coin_for_token">exchange_coin_for_token</a>&lt;CoinType&gt;(<br />    _coin_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,<br />    _coin_amount: u64,<br />    _token_owner: <b>address</b>,<br />    _creators_address: <b>address</b>,<br />    _collection: String,<br />    _name: String,<br />    _property_version: u64,<br />    _token_amount: u64,<br />) &#123;<br />    <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>)<br />&#125;<br /></code></pre>
 
 
 
@@ -386,7 +386,7 @@ Coin owner withdraw coin to swap with tokens listed for swapping at the token ow
 Token owner lists their token for swapping
 
 
-<pre><code>public entry fun list_token_for_swap&lt;CoinType&gt;(_token_owner: &amp;signer, _creators_address: address, _collection: string::String, _name: string::String, _property_version: u64, _token_amount: u64, _min_coin_per_token: u64, _locked_until_secs: u64)<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_list_token_for_swap">list_token_for_swap</a>&lt;CoinType&gt;(_token_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _creators_address: <b>address</b>, _collection: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, _name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, _property_version: u64, _token_amount: u64, _min_coin_per_token: u64, _locked_until_secs: u64)<br /></code></pre>
 
 
 
@@ -394,7 +394,7 @@ Token owner lists their token for swapping
 <summary>Implementation</summary>
 
 
-<pre><code>public entry fun list_token_for_swap&lt;CoinType&gt;(<br/>    _token_owner: &amp;signer,<br/>    _creators_address: address,<br/>    _collection: String,<br/>    _name: String,<br/>    _property_version: u64,<br/>    _token_amount: u64,<br/>    _min_coin_per_token: u64,<br/>    _locked_until_secs: u64<br/>) &#123;<br/>    abort error::invalid_argument(EDEPRECATED_MODULE)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_list_token_for_swap">list_token_for_swap</a>&lt;CoinType&gt;(<br />    _token_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,<br />    _creators_address: <b>address</b>,<br />    _collection: String,<br />    _name: String,<br />    _property_version: u64,<br />    _token_amount: u64,<br />    _min_coin_per_token: u64,<br />    _locked_until_secs: u64<br />) &#123;<br />    <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>)<br />&#125;<br /></code></pre>
 
 
 
@@ -407,7 +407,7 @@ Token owner lists their token for swapping
 Initalize the token listing for a token owner
 
 
-<pre><code>fun initialize_token_listing&lt;CoinType&gt;(_token_owner: &amp;signer)<br/></code></pre>
+<pre><code><b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_initialize_token_listing">initialize_token_listing</a>&lt;CoinType&gt;(_token_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)<br /></code></pre>
 
 
 
@@ -415,7 +415,7 @@ Initalize the token listing for a token owner
 <summary>Implementation</summary>
 
 
-<pre><code>fun initialize_token_listing&lt;CoinType&gt;(_token_owner: &amp;signer) &#123;<br/>    abort error::invalid_argument(EDEPRECATED_MODULE)<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_initialize_token_listing">initialize_token_listing</a>&lt;CoinType&gt;(_token_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) &#123;<br />    <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>)<br />&#125;<br /></code></pre>
 
 
 
@@ -428,7 +428,7 @@ Initalize the token listing for a token owner
 Intialize the token escrow
 
 
-<pre><code>fun initialize_token_store_escrow(_token_owner: &amp;signer)<br/></code></pre>
+<pre><code><b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_initialize_token_store_escrow">initialize_token_store_escrow</a>(_token_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)<br /></code></pre>
 
 
 
@@ -436,7 +436,7 @@ Intialize the token escrow
 <summary>Implementation</summary>
 
 
-<pre><code>fun initialize_token_store_escrow(_token_owner: &amp;signer) &#123;<br/>    abort error::invalid_argument(EDEPRECATED_MODULE)<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_initialize_token_store_escrow">initialize_token_store_escrow</a>(_token_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) &#123;<br />    <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>)<br />&#125;<br /></code></pre>
 
 
 
@@ -449,7 +449,7 @@ Intialize the token escrow
 Put the token into escrow that cannot be transferred or withdrawed by the owner.
 
 
-<pre><code>public fun deposit_token_to_escrow(_token_owner: &amp;signer, _token_id: token::TokenId, _tokens: token::Token, _locked_until_secs: u64)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_deposit_token_to_escrow">deposit_token_to_escrow</a>(_token_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _token_id: <a href="token.md#0x3_token_TokenId">token::TokenId</a>, _tokens: <a href="token.md#0x3_token_Token">token::Token</a>, _locked_until_secs: u64)<br /></code></pre>
 
 
 
@@ -457,7 +457,7 @@ Put the token into escrow that cannot be transferred or withdrawed by the owner.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun deposit_token_to_escrow(<br/>    _token_owner: &amp;signer,<br/>    _token_id: TokenId,<br/>    _tokens: Token,<br/>    _locked_until_secs: u64<br/>) &#123;<br/>    abort error::invalid_argument(EDEPRECATED_MODULE)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_deposit_token_to_escrow">deposit_token_to_escrow</a>(<br />    _token_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,<br />    _token_id: TokenId,<br />    _tokens: Token,<br />    _locked_until_secs: u64<br />) &#123;<br />    <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>)<br />&#125;<br /></code></pre>
 
 
 
@@ -470,7 +470,7 @@ Put the token into escrow that cannot be transferred or withdrawed by the owner.
 Private function for withdraw tokens from an escrow stored in token owner address
 
 
-<pre><code>fun withdraw_token_from_escrow_internal(_token_owner_addr: address, _token_id: token::TokenId, _amount: u64): token::Token<br/></code></pre>
+<pre><code><b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_withdraw_token_from_escrow_internal">withdraw_token_from_escrow_internal</a>(_token_owner_addr: <b>address</b>, _token_id: <a href="token.md#0x3_token_TokenId">token::TokenId</a>, _amount: u64): <a href="token.md#0x3_token_Token">token::Token</a><br /></code></pre>
 
 
 
@@ -478,7 +478,7 @@ Private function for withdraw tokens from an escrow stored in token owner addres
 <summary>Implementation</summary>
 
 
-<pre><code>fun withdraw_token_from_escrow_internal(<br/>    _token_owner_addr: address,<br/>    _token_id: TokenId,<br/>    _amount: u64<br/>): Token &#123;<br/>    abort error::invalid_argument(EDEPRECATED_MODULE)<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_withdraw_token_from_escrow_internal">withdraw_token_from_escrow_internal</a>(<br />    _token_owner_addr: <b>address</b>,<br />    _token_id: TokenId,<br />    _amount: u64<br />): Token &#123;<br />    <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>)<br />&#125;<br /></code></pre>
 
 
 
@@ -491,7 +491,7 @@ Private function for withdraw tokens from an escrow stored in token owner addres
 Withdraw tokens from the token escrow. It needs a signer to authorize
 
 
-<pre><code>public fun withdraw_token_from_escrow(_token_owner: &amp;signer, _token_id: token::TokenId, _amount: u64): token::Token<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_withdraw_token_from_escrow">withdraw_token_from_escrow</a>(_token_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _token_id: <a href="token.md#0x3_token_TokenId">token::TokenId</a>, _amount: u64): <a href="token.md#0x3_token_Token">token::Token</a><br /></code></pre>
 
 
 
@@ -499,7 +499,7 @@ Withdraw tokens from the token escrow. It needs a signer to authorize
 <summary>Implementation</summary>
 
 
-<pre><code>public fun withdraw_token_from_escrow(<br/>    _token_owner: &amp;signer,<br/>    _token_id: TokenId,<br/>    _amount: u64<br/>): Token &#123;<br/>    abort error::invalid_argument(EDEPRECATED_MODULE)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_withdraw_token_from_escrow">withdraw_token_from_escrow</a>(<br />    _token_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,<br />    _token_id: TokenId,<br />    _amount: u64<br />): Token &#123;<br />    <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>)<br />&#125;<br /></code></pre>
 
 
 
@@ -512,7 +512,7 @@ Withdraw tokens from the token escrow. It needs a signer to authorize
 Cancel token listing for a fixed amount
 
 
-<pre><code>public fun cancel_token_listing&lt;CoinType&gt;(_token_owner: &amp;signer, _token_id: token::TokenId, _token_amount: u64)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_cancel_token_listing">cancel_token_listing</a>&lt;CoinType&gt;(_token_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _token_id: <a href="token.md#0x3_token_TokenId">token::TokenId</a>, _token_amount: u64)<br /></code></pre>
 
 
 
@@ -520,7 +520,7 @@ Cancel token listing for a fixed amount
 <summary>Implementation</summary>
 
 
-<pre><code>public fun cancel_token_listing&lt;CoinType&gt;(<br/>    _token_owner: &amp;signer,<br/>    _token_id: TokenId,<br/>    _token_amount: u64,<br/>) &#123;<br/>    abort error::invalid_argument(EDEPRECATED_MODULE)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_cancel_token_listing">cancel_token_listing</a>&lt;CoinType&gt;(<br />    _token_owner: &amp;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,<br />    _token_id: TokenId,<br />    _token_amount: u64,<br />) &#123;<br />    <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>)<br />&#125;<br /></code></pre>
 
 
 
@@ -532,7 +532,7 @@ Cancel token listing for a fixed amount
 
 
 
-<pre><code>pragma verify &#61; false;<br/></code></pre>
+<pre><code><b>pragma</b> verify &#61; <b>false</b>;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

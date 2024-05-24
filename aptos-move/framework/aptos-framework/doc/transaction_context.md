@@ -58,7 +58,7 @@
     -  [Function `multisig_payload_internal`](#@Specification_1_multisig_payload_internal)
 
 
-<pre><code>use 0x1::error;<br/>use 0x1::features;<br/>use 0x1::option;<br/>use 0x1::string;<br/></code></pre>
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;<br /></code></pre>
 
 
 
@@ -66,10 +66,11 @@
 
 ## Struct `AUID`
 
-A wrapper denoting aptos unique identifer (AUID)<br/> for storing an address
+A wrapper denoting aptos unique identifer (AUID)
+for storing an address
 
 
-<pre><code>struct AUID has drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a> <b>has</b> drop, store<br /></code></pre>
 
 
 
@@ -79,7 +80,7 @@ A wrapper denoting aptos unique identifer (AUID)<br/> for storing an address
 
 <dl>
 <dt>
-<code>unique_address: address</code>
+<code>unique_address: <b>address</b></code>
 </dt>
 <dd>
 
@@ -96,7 +97,7 @@ A wrapper denoting aptos unique identifer (AUID)<br/> for storing an address
 Represents the entry function payload.
 
 
-<pre><code>struct EntryFunctionPayload has copy, drop<br/></code></pre>
+<pre><code><b>struct</b> <a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a> <b>has</b> <b>copy</b>, drop<br /></code></pre>
 
 
 
@@ -106,31 +107,31 @@ Represents the entry function payload.
 
 <dl>
 <dt>
-<code>account_address: address</code>
+<code>account_address: <b>address</b></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>module_name: string::String</code>
+<code>module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>function_name: string::String</code>
+<code>function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>ty_args_names: vector&lt;string::String&gt;</code>
+<code>ty_args_names: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>args: vector&lt;vector&lt;u8&gt;&gt;</code>
+<code>args: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
 
@@ -147,7 +148,7 @@ Represents the entry function payload.
 Represents the multisig payload.
 
 
-<pre><code>struct MultisigPayload has copy, drop<br/></code></pre>
+<pre><code><b>struct</b> <a href="transaction_context.md#0x1_transaction_context_MultisigPayload">MultisigPayload</a> <b>has</b> <b>copy</b>, drop<br /></code></pre>
 
 
 
@@ -157,13 +158,13 @@ Represents the multisig payload.
 
 <dl>
 <dt>
-<code>multisig_address: address</code>
+<code>multisig_address: <b>address</b></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>entry_function_payload: option::Option&lt;transaction_context::EntryFunctionPayload&gt;</code>
+<code>entry_function_payload: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;</code>
 </dt>
 <dd>
 
@@ -183,7 +184,7 @@ Represents the multisig payload.
 The transaction context extension feature is not enabled.
 
 
-<pre><code>const ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED: u64 &#61; 2;<br/></code></pre>
+<pre><code><b>const</b> <a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>: u64 &#61; 2;<br /></code></pre>
 
 
 
@@ -192,7 +193,7 @@ The transaction context extension feature is not enabled.
 Transaction context is only available in the user transaction prologue, execution, or epilogue phases.
 
 
-<pre><code>const ETRANSACTION_CONTEXT_NOT_AVAILABLE: u64 &#61; 1;<br/></code></pre>
+<pre><code><b>const</b> <a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_NOT_AVAILABLE">ETRANSACTION_CONTEXT_NOT_AVAILABLE</a>: u64 &#61; 1;<br /></code></pre>
 
 
 
@@ -203,7 +204,7 @@ Transaction context is only available in the user transaction prologue, executio
 Returns the transaction hash of the current transaction.
 
 
-<pre><code>fun get_txn_hash(): vector&lt;u8&gt;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;<br /></code></pre>
 
 
 
@@ -211,7 +212,7 @@ Returns the transaction hash of the current transaction.
 <summary>Implementation</summary>
 
 
-<pre><code>native fun get_txn_hash(): vector&lt;u8&gt;;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;<br /></code></pre>
 
 
 
@@ -221,10 +222,12 @@ Returns the transaction hash of the current transaction.
 
 ## Function `get_transaction_hash`
 
-Returns the transaction hash of the current transaction.<br/> Internally calls the private function <code>get_txn_hash</code>.<br/> This function is created for to feature gate the <code>get_txn_hash</code> function.
+Returns the transaction hash of the current transaction.
+Internally calls the private function <code>get_txn_hash</code>.
+This function is created for to feature gate the <code>get_txn_hash</code> function.
 
 
-<pre><code>public fun get_transaction_hash(): vector&lt;u8&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">get_transaction_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;<br /></code></pre>
 
 
 
@@ -232,7 +235,7 @@ Returns the transaction hash of the current transaction.<br/> Internally calls t
 <summary>Implementation</summary>
 
 
-<pre><code>public fun get_transaction_hash(): vector&lt;u8&gt; &#123;<br/>    get_txn_hash()<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">get_transaction_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; &#123;<br />    <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>()<br />&#125;<br /></code></pre>
 
 
 
@@ -242,10 +245,16 @@ Returns the transaction hash of the current transaction.<br/> Internally calls t
 
 ## Function `generate_unique_address`
 
-Returns a universally unique identifier (of type address) generated<br/> by hashing the transaction hash of this transaction and a sequence number<br/> specific to this transaction. This function can be called any<br/> number of times inside a single transaction. Each such call increments<br/> the sequence number and generates a new unique address.<br/> Uses Scheme in types/src/transaction/authenticator.rs for domain separation<br/> from other ways of generating unique addresses.
+Returns a universally unique identifier (of type address) generated
+by hashing the transaction hash of this transaction and a sequence number
+specific to this transaction. This function can be called any
+number of times inside a single transaction. Each such call increments
+the sequence number and generates a new unique address.
+Uses Scheme in types/src/transaction/authenticator.rs for domain separation
+from other ways of generating unique addresses.
 
 
-<pre><code>fun generate_unique_address(): address<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>(): <b>address</b><br /></code></pre>
 
 
 
@@ -253,7 +262,7 @@ Returns a universally unique identifier (of type address) generated<br/> by hash
 <summary>Implementation</summary>
 
 
-<pre><code>native fun generate_unique_address(): address;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>(): <b>address</b>;<br /></code></pre>
 
 
 
@@ -263,10 +272,12 @@ Returns a universally unique identifier (of type address) generated<br/> by hash
 
 ## Function `generate_auid_address`
 
-Returns a aptos unique identifier. Internally calls<br/> the private function <code>generate_unique_address</code>. This function is<br/> created for to feature gate the <code>generate_unique_address</code> function.
+Returns a aptos unique identifier. Internally calls
+the private function <code>generate_unique_address</code>. This function is
+created for to feature gate the <code>generate_unique_address</code> function.
 
 
-<pre><code>public fun generate_auid_address(): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">generate_auid_address</a>(): <b>address</b><br /></code></pre>
 
 
 
@@ -274,7 +285,7 @@ Returns a aptos unique identifier. Internally calls<br/> the private function <c
 <summary>Implementation</summary>
 
 
-<pre><code>public fun generate_auid_address(): address &#123;<br/>    generate_unique_address()<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">generate_auid_address</a>(): <b>address</b> &#123;<br />    <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>()<br />&#125;<br /></code></pre>
 
 
 
@@ -287,7 +298,7 @@ Returns a aptos unique identifier. Internally calls<br/> the private function <c
 Returns the script hash of the current entry function.
 
 
-<pre><code>public fun get_script_hash(): vector&lt;u8&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;<br /></code></pre>
 
 
 
@@ -295,7 +306,7 @@ Returns the script hash of the current entry function.
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun get_script_hash(): vector&lt;u8&gt;;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;<br /></code></pre>
 
 
 
@@ -305,10 +316,11 @@ Returns the script hash of the current entry function.
 
 ## Function `generate_auid`
 
-This method runs <code>generate_unique_address</code> native function and returns<br/> the generated unique address wrapped in the AUID class.
+This method runs <code>generate_unique_address</code> native function and returns
+the generated unique address wrapped in the AUID class.
 
 
-<pre><code>public fun generate_auid(): transaction_context::AUID<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_auid">generate_auid</a>(): <a href="transaction_context.md#0x1_transaction_context_AUID">transaction_context::AUID</a><br /></code></pre>
 
 
 
@@ -316,7 +328,7 @@ This method runs <code>generate_unique_address</code> native function and return
 <summary>Implementation</summary>
 
 
-<pre><code>public fun generate_auid(): AUID &#123;<br/>    return AUID &#123;<br/>        unique_address: generate_unique_address()<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_auid">generate_auid</a>(): <a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a> &#123;<br />    <b>return</b> <a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a> &#123;<br />        unique_address: <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>()<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -329,7 +341,7 @@ This method runs <code>generate_unique_address</code> native function and return
 Returns the unique address wrapped in the given AUID struct.
 
 
-<pre><code>public fun auid_address(auid: &amp;transaction_context::AUID): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_auid_address">auid_address</a>(auid: &amp;<a href="transaction_context.md#0x1_transaction_context_AUID">transaction_context::AUID</a>): <b>address</b><br /></code></pre>
 
 
 
@@ -337,7 +349,7 @@ Returns the unique address wrapped in the given AUID struct.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun auid_address(auid: &amp;AUID): address &#123;<br/>    auid.unique_address<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_auid_address">auid_address</a>(auid: &amp;<a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a>): <b>address</b> &#123;<br />    auid.unique_address<br />&#125;<br /></code></pre>
 
 
 
@@ -347,10 +359,11 @@ Returns the unique address wrapped in the given AUID struct.
 
 ## Function `sender`
 
-Returns the sender&apos;s address for the current transaction.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the sender&apos;s address for the current transaction.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
-<pre><code>public fun sender(): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_sender">sender</a>(): <b>address</b><br /></code></pre>
 
 
 
@@ -358,7 +371,7 @@ Returns the sender&apos;s address for the current transaction.<br/> This functio
 <summary>Implementation</summary>
 
 
-<pre><code>public fun sender(): address &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    sender_internal()<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_sender">sender</a>(): <b>address</b> &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    <a href="transaction_context.md#0x1_transaction_context_sender_internal">sender_internal</a>()<br />&#125;<br /></code></pre>
 
 
 
@@ -370,7 +383,7 @@ Returns the sender&apos;s address for the current transaction.<br/> This functio
 
 
 
-<pre><code>fun sender_internal(): address<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_sender_internal">sender_internal</a>(): <b>address</b><br /></code></pre>
 
 
 
@@ -378,7 +391,7 @@ Returns the sender&apos;s address for the current transaction.<br/> This functio
 <summary>Implementation</summary>
 
 
-<pre><code>native fun sender_internal(): address;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_sender_internal">sender_internal</a>(): <b>address</b>;<br /></code></pre>
 
 
 
@@ -388,10 +401,12 @@ Returns the sender&apos;s address for the current transaction.<br/> This functio
 
 ## Function `secondary_signers`
 
-Returns the list of the secondary signers for the current transaction.<br/> If the current transaction has no secondary signers, this function returns an empty vector.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the list of the secondary signers for the current transaction.
+If the current transaction has no secondary signers, this function returns an empty vector.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
-<pre><code>public fun secondary_signers(): vector&lt;address&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers">secondary_signers</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;<br /></code></pre>
 
 
 
@@ -399,7 +414,7 @@ Returns the list of the secondary signers for the current transaction.<br/> If t
 <summary>Implementation</summary>
 
 
-<pre><code>public fun secondary_signers(): vector&lt;address&gt; &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    secondary_signers_internal()<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers">secondary_signers</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>()<br />&#125;<br /></code></pre>
 
 
 
@@ -411,7 +426,7 @@ Returns the list of the secondary signers for the current transaction.<br/> If t
 
 
 
-<pre><code>fun secondary_signers_internal(): vector&lt;address&gt;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;<br /></code></pre>
 
 
 
@@ -419,7 +434,7 @@ Returns the list of the secondary signers for the current transaction.<br/> If t
 <summary>Implementation</summary>
 
 
-<pre><code>native fun secondary_signers_internal(): vector&lt;address&gt;;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;;<br /></code></pre>
 
 
 
@@ -429,10 +444,13 @@ Returns the list of the secondary signers for the current transaction.<br/> If t
 
 ## Function `gas_payer`
 
-Returns the gas payer address for the current transaction.<br/> It is either the sender&apos;s address if no separate gas fee payer is specified for the current transaction,<br/> or the address of the separate gas fee payer if one is specified.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the gas payer address for the current transaction.
+It is either the sender&apos;s address if no separate gas fee payer is specified for the current transaction,
+or the address of the separate gas fee payer if one is specified.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
-<pre><code>public fun gas_payer(): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_payer">gas_payer</a>(): <b>address</b><br /></code></pre>
 
 
 
@@ -440,7 +458,7 @@ Returns the gas payer address for the current transaction.<br/> It is either the
 <summary>Implementation</summary>
 
 
-<pre><code>public fun gas_payer(): address &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    gas_payer_internal()<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_payer">gas_payer</a>(): <b>address</b> &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    <a href="transaction_context.md#0x1_transaction_context_gas_payer_internal">gas_payer_internal</a>()<br />&#125;<br /></code></pre>
 
 
 
@@ -452,7 +470,7 @@ Returns the gas payer address for the current transaction.<br/> It is either the
 
 
 
-<pre><code>fun gas_payer_internal(): address<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_payer_internal">gas_payer_internal</a>(): <b>address</b><br /></code></pre>
 
 
 
@@ -460,7 +478,7 @@ Returns the gas payer address for the current transaction.<br/> It is either the
 <summary>Implementation</summary>
 
 
-<pre><code>native fun gas_payer_internal(): address;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_payer_internal">gas_payer_internal</a>(): <b>address</b>;<br /></code></pre>
 
 
 
@@ -470,10 +488,11 @@ Returns the gas payer address for the current transaction.<br/> It is either the
 
 ## Function `max_gas_amount`
 
-Returns the max gas amount in units which is specified for the current transaction.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the max gas amount in units which is specified for the current transaction.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
-<pre><code>public fun max_gas_amount(): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_max_gas_amount">max_gas_amount</a>(): u64<br /></code></pre>
 
 
 
@@ -481,7 +500,7 @@ Returns the max gas amount in units which is specified for the current transacti
 <summary>Implementation</summary>
 
 
-<pre><code>public fun max_gas_amount(): u64 &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    max_gas_amount_internal()<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_max_gas_amount">max_gas_amount</a>(): u64 &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    <a href="transaction_context.md#0x1_transaction_context_max_gas_amount_internal">max_gas_amount_internal</a>()<br />&#125;<br /></code></pre>
 
 
 
@@ -493,7 +512,7 @@ Returns the max gas amount in units which is specified for the current transacti
 
 
 
-<pre><code>fun max_gas_amount_internal(): u64<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_max_gas_amount_internal">max_gas_amount_internal</a>(): u64<br /></code></pre>
 
 
 
@@ -501,7 +520,7 @@ Returns the max gas amount in units which is specified for the current transacti
 <summary>Implementation</summary>
 
 
-<pre><code>native fun max_gas_amount_internal(): u64;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_max_gas_amount_internal">max_gas_amount_internal</a>(): u64;<br /></code></pre>
 
 
 
@@ -511,10 +530,11 @@ Returns the max gas amount in units which is specified for the current transacti
 
 ## Function `gas_unit_price`
 
-Returns the gas unit price in Octas which is specified for the current transaction.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the gas unit price in Octas which is specified for the current transaction.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
-<pre><code>public fun gas_unit_price(): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_unit_price">gas_unit_price</a>(): u64<br /></code></pre>
 
 
 
@@ -522,7 +542,7 @@ Returns the gas unit price in Octas which is specified for the current transacti
 <summary>Implementation</summary>
 
 
-<pre><code>public fun gas_unit_price(): u64 &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    gas_unit_price_internal()<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_unit_price">gas_unit_price</a>(): u64 &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    <a href="transaction_context.md#0x1_transaction_context_gas_unit_price_internal">gas_unit_price_internal</a>()<br />&#125;<br /></code></pre>
 
 
 
@@ -534,7 +554,7 @@ Returns the gas unit price in Octas which is specified for the current transacti
 
 
 
-<pre><code>fun gas_unit_price_internal(): u64<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_unit_price_internal">gas_unit_price_internal</a>(): u64<br /></code></pre>
 
 
 
@@ -542,7 +562,7 @@ Returns the gas unit price in Octas which is specified for the current transacti
 <summary>Implementation</summary>
 
 
-<pre><code>native fun gas_unit_price_internal(): u64;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_unit_price_internal">gas_unit_price_internal</a>(): u64;<br /></code></pre>
 
 
 
@@ -552,10 +572,11 @@ Returns the gas unit price in Octas which is specified for the current transacti
 
 ## Function `chain_id`
 
-Returns the chain ID specified for the current transaction.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the chain ID specified for the current transaction.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
-<pre><code>public fun chain_id(): u8<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="chain_id.md#0x1_chain_id">chain_id</a>(): u8<br /></code></pre>
 
 
 
@@ -563,7 +584,7 @@ Returns the chain ID specified for the current transaction.<br/> This function a
 <summary>Implementation</summary>
 
 
-<pre><code>public fun chain_id(): u8 &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    chain_id_internal()<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="chain_id.md#0x1_chain_id">chain_id</a>(): u8 &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    <a href="transaction_context.md#0x1_transaction_context_chain_id_internal">chain_id_internal</a>()<br />&#125;<br /></code></pre>
 
 
 
@@ -575,7 +596,7 @@ Returns the chain ID specified for the current transaction.<br/> This function a
 
 
 
-<pre><code>fun chain_id_internal(): u8<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_chain_id_internal">chain_id_internal</a>(): u8<br /></code></pre>
 
 
 
@@ -583,7 +604,7 @@ Returns the chain ID specified for the current transaction.<br/> This function a
 <summary>Implementation</summary>
 
 
-<pre><code>native fun chain_id_internal(): u8;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_chain_id_internal">chain_id_internal</a>(): u8;<br /></code></pre>
 
 
 
@@ -593,10 +614,11 @@ Returns the chain ID specified for the current transaction.<br/> This function a
 
 ## Function `entry_function_payload`
 
-Returns the entry function payload if the current transaction has such a payload. Otherwise, return <code>None</code>.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the entry function payload if the current transaction has such a payload. Otherwise, return <code>None</code>.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
-<pre><code>public fun entry_function_payload(): option::Option&lt;transaction_context::EntryFunctionPayload&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_entry_function_payload">entry_function_payload</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;<br /></code></pre>
 
 
 
@@ -604,7 +626,7 @@ Returns the entry function payload if the current transaction has such a payload
 <summary>Implementation</summary>
 
 
-<pre><code>public fun entry_function_payload(): Option&lt;EntryFunctionPayload&gt; &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    entry_function_payload_internal()<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_entry_function_payload">entry_function_payload</a>(): Option&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>&gt; &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    <a href="transaction_context.md#0x1_transaction_context_entry_function_payload_internal">entry_function_payload_internal</a>()<br />&#125;<br /></code></pre>
 
 
 
@@ -616,7 +638,7 @@ Returns the entry function payload if the current transaction has such a payload
 
 
 
-<pre><code>fun entry_function_payload_internal(): option::Option&lt;transaction_context::EntryFunctionPayload&gt;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_entry_function_payload_internal">entry_function_payload_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;<br /></code></pre>
 
 
 
@@ -624,7 +646,7 @@ Returns the entry function payload if the current transaction has such a payload
 <summary>Implementation</summary>
 
 
-<pre><code>native fun entry_function_payload_internal(): Option&lt;EntryFunctionPayload&gt;;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_entry_function_payload_internal">entry_function_payload_internal</a>(): Option&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>&gt;;<br /></code></pre>
 
 
 
@@ -637,7 +659,7 @@ Returns the entry function payload if the current transaction has such a payload
 Returns the account address of the entry function payload.
 
 
-<pre><code>public fun account_address(payload: &amp;transaction_context::EntryFunctionPayload): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_account_address">account_address</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <b>address</b><br /></code></pre>
 
 
 
@@ -645,7 +667,7 @@ Returns the account address of the entry function payload.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun account_address(payload: &amp;EntryFunctionPayload): address &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    payload.account_address<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_account_address">account_address</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>): <b>address</b> &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    payload.account_address<br />&#125;<br /></code></pre>
 
 
 
@@ -658,7 +680,7 @@ Returns the account address of the entry function payload.
 Returns the module name of the entry function payload.
 
 
-<pre><code>public fun module_name(payload: &amp;transaction_context::EntryFunctionPayload): string::String<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_module_name">module_name</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a><br /></code></pre>
 
 
 
@@ -666,7 +688,7 @@ Returns the module name of the entry function payload.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun module_name(payload: &amp;EntryFunctionPayload): String &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    payload.module_name<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_module_name">module_name</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>): String &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    payload.module_name<br />&#125;<br /></code></pre>
 
 
 
@@ -679,7 +701,7 @@ Returns the module name of the entry function payload.
 Returns the function name of the entry function payload.
 
 
-<pre><code>public fun function_name(payload: &amp;transaction_context::EntryFunctionPayload): string::String<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_function_name">function_name</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a><br /></code></pre>
 
 
 
@@ -687,7 +709,7 @@ Returns the function name of the entry function payload.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun function_name(payload: &amp;EntryFunctionPayload): String &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    payload.function_name<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_function_name">function_name</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>): String &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    payload.function_name<br />&#125;<br /></code></pre>
 
 
 
@@ -700,7 +722,7 @@ Returns the function name of the entry function payload.
 Returns the type arguments names of the entry function payload.
 
 
-<pre><code>public fun type_arg_names(payload: &amp;transaction_context::EntryFunctionPayload): vector&lt;string::String&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_type_arg_names">type_arg_names</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;<br /></code></pre>
 
 
 
@@ -708,7 +730,7 @@ Returns the type arguments names of the entry function payload.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun type_arg_names(payload: &amp;EntryFunctionPayload): vector&lt;String&gt; &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    payload.ty_args_names<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_type_arg_names">type_arg_names</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt; &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    payload.ty_args_names<br />&#125;<br /></code></pre>
 
 
 
@@ -721,7 +743,7 @@ Returns the type arguments names of the entry function payload.
 Returns the arguments of the entry function payload.
 
 
-<pre><code>public fun args(payload: &amp;transaction_context::EntryFunctionPayload): vector&lt;vector&lt;u8&gt;&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_args">args</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;<br /></code></pre>
 
 
 
@@ -729,7 +751,7 @@ Returns the arguments of the entry function payload.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun args(payload: &amp;EntryFunctionPayload): vector&lt;vector&lt;u8&gt;&gt; &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    payload.args<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_args">args</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    payload.args<br />&#125;<br /></code></pre>
 
 
 
@@ -739,10 +761,11 @@ Returns the arguments of the entry function payload.
 
 ## Function `multisig_payload`
 
-Returns the multisig payload if the current transaction has such a payload. Otherwise, return <code>None</code>.<br/> This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+Returns the multisig payload if the current transaction has such a payload. Otherwise, return <code>None</code>.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
-<pre><code>public fun multisig_payload(): option::Option&lt;transaction_context::MultisigPayload&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_payload">multisig_payload</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>&gt;<br /></code></pre>
 
 
 
@@ -750,7 +773,7 @@ Returns the multisig payload if the current transaction has such a payload. Othe
 <summary>Implementation</summary>
 
 
-<pre><code>public fun multisig_payload(): Option&lt;MultisigPayload&gt; &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    multisig_payload_internal()<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_payload">multisig_payload</a>(): Option&lt;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">MultisigPayload</a>&gt; &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    <a href="transaction_context.md#0x1_transaction_context_multisig_payload_internal">multisig_payload_internal</a>()<br />&#125;<br /></code></pre>
 
 
 
@@ -762,7 +785,7 @@ Returns the multisig payload if the current transaction has such a payload. Othe
 
 
 
-<pre><code>fun multisig_payload_internal(): option::Option&lt;transaction_context::MultisigPayload&gt;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_payload_internal">multisig_payload_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>&gt;<br /></code></pre>
 
 
 
@@ -770,7 +793,7 @@ Returns the multisig payload if the current transaction has such a payload. Othe
 <summary>Implementation</summary>
 
 
-<pre><code>native fun multisig_payload_internal(): Option&lt;MultisigPayload&gt;;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_payload_internal">multisig_payload_internal</a>(): Option&lt;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">MultisigPayload</a>&gt;;<br /></code></pre>
 
 
 
@@ -783,7 +806,7 @@ Returns the multisig payload if the current transaction has such a payload. Othe
 Returns the multisig account address of the multisig payload.
 
 
-<pre><code>public fun multisig_address(payload: &amp;transaction_context::MultisigPayload): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_address">multisig_address</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>): <b>address</b><br /></code></pre>
 
 
 
@@ -791,7 +814,7 @@ Returns the multisig account address of the multisig payload.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun multisig_address(payload: &amp;MultisigPayload): address &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    payload.multisig_address<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_address">multisig_address</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">MultisigPayload</a>): <b>address</b> &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    payload.multisig_address<br />&#125;<br /></code></pre>
 
 
 
@@ -804,7 +827,7 @@ Returns the multisig account address of the multisig payload.
 Returns the inner entry function payload of the multisig payload.
 
 
-<pre><code>public fun inner_entry_function_payload(payload: &amp;transaction_context::MultisigPayload): option::Option&lt;transaction_context::EntryFunctionPayload&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_inner_entry_function_payload">inner_entry_function_payload</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;<br /></code></pre>
 
 
 
@@ -812,7 +835,7 @@ Returns the inner entry function payload of the multisig payload.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun inner_entry_function_payload(payload: &amp;MultisigPayload): Option&lt;EntryFunctionPayload&gt; &#123;<br/>    assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));<br/>    payload.entry_function_payload<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_inner_entry_function_payload">inner_entry_function_payload</a>(payload: &amp;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">MultisigPayload</a>): Option&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>&gt; &#123;<br />    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));<br />    payload.entry_function_payload<br />&#125;<br /></code></pre>
 
 
 
@@ -828,12 +851,12 @@ Returns the inner entry function payload of the multisig payload.
 ### Function `get_txn_hash`
 
 
-<pre><code>fun get_txn_hash(): vector&lt;u8&gt;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/>aborts_if [abstract] false;<br/>ensures result &#61;&#61; spec_get_txn_hash();<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /><b>aborts_if</b> [abstract] <b>false</b>;<br /><b>ensures</b> result &#61;&#61; <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">spec_get_txn_hash</a>();<br /></code></pre>
 
 
 
@@ -841,7 +864,7 @@ Returns the inner entry function payload of the multisig payload.
 <a id="0x1_transaction_context_spec_get_txn_hash"></a>
 
 
-<pre><code>fun spec_get_txn_hash(): vector&lt;u8&gt;;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">spec_get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;<br /></code></pre>
 
 
 
@@ -850,13 +873,13 @@ Returns the inner entry function payload of the multisig payload.
 ### Function `get_transaction_hash`
 
 
-<pre><code>public fun get_transaction_hash(): vector&lt;u8&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">get_transaction_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/>aborts_if [abstract] false;<br/>ensures result &#61;&#61; spec_get_txn_hash();<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
-ensures [abstract] len(result) &#61;&#61; 32;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /><b>aborts_if</b> [abstract] <b>false</b>;<br /><b>ensures</b> result &#61;&#61; <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">spec_get_txn_hash</a>();<br />// This enforces <a id="high-level-req-1" href="#high-level-req">high&#45;level requirement 1</a>:
+<b>ensures</b> [abstract] len(result) &#61;&#61; 32;<br /></code></pre>
 
 
 
@@ -865,12 +888,12 @@ ensures [abstract] len(result) &#61;&#61; 32;<br/></code></pre>
 ### Function `generate_unique_address`
 
 
-<pre><code>fun generate_unique_address(): address<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>(): <b>address</b><br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/>ensures [abstract] result &#61;&#61; spec_generate_unique_address();<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /><b>ensures</b> [abstract] result &#61;&#61; <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">spec_generate_unique_address</a>();<br /></code></pre>
 
 
 
@@ -878,7 +901,7 @@ ensures [abstract] len(result) &#61;&#61; 32;<br/></code></pre>
 <a id="0x1_transaction_context_spec_generate_unique_address"></a>
 
 
-<pre><code>fun spec_generate_unique_address(): address;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">spec_generate_unique_address</a>(): <b>address</b>;<br /></code></pre>
 
 
 
@@ -887,13 +910,13 @@ ensures [abstract] len(result) &#61;&#61; 32;<br/></code></pre>
 ### Function `generate_auid_address`
 
 
-<pre><code>public fun generate_auid_address(): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">generate_auid_address</a>(): <b>address</b><br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
-ensures [abstract] result &#61;&#61; spec_generate_unique_address();<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br />// This enforces <a id="high-level-req-3" href="#high-level-req">high&#45;level requirement 3</a>:
+<b>ensures</b> [abstract] result &#61;&#61; <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">spec_generate_unique_address</a>();<br /></code></pre>
 
 
 
@@ -902,7 +925,7 @@ ensures [abstract] result &#61;&#61; spec_generate_unique_address();<br/></code>
 ### Function `get_script_hash`
 
 
-<pre><code>public fun get_script_hash(): vector&lt;u8&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;<br /></code></pre>
 
 
 
@@ -912,17 +935,44 @@ ensures [abstract] result &#61;&#61; spec_generate_unique_address();<br/></code>
 
 ### High-level Requirements
 
-&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Fetching the transaction hash should return a vector with 32 bytes.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The get_transaction_hash function calls the native function get_txn_hash, which fetches the NativeTransactionContext struct and returns the txn_hash field.&lt;/td&gt;<br/>&lt;td&gt;Audited that the native function returns the txn hash, whose size is 32 bytes. This has been modeled as the abstract postcondition that the returned vector is of length 32. Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;get_txn_hash&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>1</td>
+<td>Fetching the transaction hash should return a vector with 32 bytes.</td>
+<td>Medium</td>
+<td>The get_transaction_hash function calls the native function get_txn_hash, which fetches the NativeTransactionContext struct and returns the txn_hash field.</td>
+<td>Audited that the native function returns the txn hash, whose size is 32 bytes. This has been modeled as the abstract postcondition that the returned vector is of length 32. Formally verified via <a href="#high-level-req-1">get_txn_hash</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;Fetching the unique address should never abort.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The function auid_address returns the unique address from a supplied AUID resource.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;auid_address&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>2</td>
+<td>Fetching the unique address should never abort.</td>
+<td>Low</td>
+<td>The function auid_address returns the unique address from a supplied AUID resource.</td>
+<td>Formally verified via <a href="#high-level-req-2">auid_address</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Generating the unique address should return a vector with 32 bytes.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The generate_auid_address function checks calls the native function generate_unique_address which fetches the NativeTransactionContext struct, increments the auid_counter by one, and then creates a new authentication key from a preimage, which is then returned.&lt;/td&gt;<br/>&lt;td&gt;Audited that the native function returns an address, and the length of an address is 32 bytes. This has been modeled as the abstract postcondition that the returned vector is of length 32. Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;generate_auid_address&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>3</td>
+<td>Generating the unique address should return a vector with 32 bytes.</td>
+<td>Medium</td>
+<td>The generate_auid_address function checks calls the native function generate_unique_address which fetches the NativeTransactionContext struct, increments the auid_counter by one, and then creates a new authentication key from a preimage, which is then returned.</td>
+<td>Audited that the native function returns an address, and the length of an address is 32 bytes. This has been modeled as the abstract postcondition that the returned vector is of length 32. Formally verified via <a href="#high-level-req-3">generate_auid_address</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;Fetching the script hash of the current entry function should never fail and should return a vector with 32 bytes if the transaction payload is a script, otherwise an empty vector.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The native function get_script_hash returns the NativeTransactionContext.script_hash field.&lt;/td&gt;<br/>&lt;td&gt;Audited that the native function holds the required property. This has been modeled as the abstract spec. Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;get_script_hash&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>4</td>
+<td>Fetching the script hash of the current entry function should never fail and should return a vector with 32 bytes if the transaction payload is a script, otherwise an empty vector.</td>
+<td>Low</td>
+<td>The native function get_script_hash returns the NativeTransactionContext.script_hash field.</td>
+<td>Audited that the native function holds the required property. This has been modeled as the abstract spec. Formally verified via <a href="#high-level-req-4">get_script_hash</a>.</td>
+</tr>
 
-&lt;/table&gt;<br/>
+</table>
 
 
 
@@ -931,8 +981,8 @@ ensures [abstract] result &#61;&#61; spec_generate_unique_address();<br/></code>
 ### Module-level Specification
 
 
-<pre><code>pragma opaque;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
-aborts_if [abstract] false;<br/>ensures [abstract] result &#61;&#61; spec_get_script_hash();<br/>ensures [abstract] len(result) &#61;&#61; 32;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br />// This enforces <a id="high-level-req-4" href="#high-level-req">high&#45;level requirement 4</a>:
+<b>aborts_if</b> [abstract] <b>false</b>;<br /><b>ensures</b> [abstract] result &#61;&#61; <a href="transaction_context.md#0x1_transaction_context_spec_get_script_hash">spec_get_script_hash</a>();<br /><b>ensures</b> [abstract] len(result) &#61;&#61; 32;<br /></code></pre>
 
 
 
@@ -940,7 +990,7 @@ aborts_if [abstract] false;<br/>ensures [abstract] result &#61;&#61; spec_get_sc
 <a id="0x1_transaction_context_spec_get_script_hash"></a>
 
 
-<pre><code>fun spec_get_script_hash(): vector&lt;u8&gt;;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_script_hash">spec_get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;<br /></code></pre>
 
 
 
@@ -949,13 +999,13 @@ aborts_if [abstract] false;<br/>ensures [abstract] result &#61;&#61; spec_get_sc
 ### Function `auid_address`
 
 
-<pre><code>public fun auid_address(auid: &amp;transaction_context::AUID): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_auid_address">auid_address</a>(auid: &amp;<a href="transaction_context.md#0x1_transaction_context_AUID">transaction_context::AUID</a>): <b>address</b><br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if false;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 
@@ -964,12 +1014,12 @@ aborts_if false;<br/></code></pre>
 ### Function `sender_internal`
 
 
-<pre><code>fun sender_internal(): address<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_sender_internal">sender_internal</a>(): <b>address</b><br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -978,12 +1028,12 @@ aborts_if false;<br/></code></pre>
 ### Function `secondary_signers_internal`
 
 
-<pre><code>fun secondary_signers_internal(): vector&lt;address&gt;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -992,12 +1042,12 @@ aborts_if false;<br/></code></pre>
 ### Function `gas_payer_internal`
 
 
-<pre><code>fun gas_payer_internal(): address<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_payer_internal">gas_payer_internal</a>(): <b>address</b><br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -1006,12 +1056,12 @@ aborts_if false;<br/></code></pre>
 ### Function `max_gas_amount_internal`
 
 
-<pre><code>fun max_gas_amount_internal(): u64<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_max_gas_amount_internal">max_gas_amount_internal</a>(): u64<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -1020,12 +1070,12 @@ aborts_if false;<br/></code></pre>
 ### Function `gas_unit_price_internal`
 
 
-<pre><code>fun gas_unit_price_internal(): u64<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_unit_price_internal">gas_unit_price_internal</a>(): u64<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -1034,12 +1084,12 @@ aborts_if false;<br/></code></pre>
 ### Function `chain_id_internal`
 
 
-<pre><code>fun chain_id_internal(): u8<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_chain_id_internal">chain_id_internal</a>(): u8<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -1048,12 +1098,12 @@ aborts_if false;<br/></code></pre>
 ### Function `entry_function_payload_internal`
 
 
-<pre><code>fun entry_function_payload_internal(): option::Option&lt;transaction_context::EntryFunctionPayload&gt;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_entry_function_payload_internal">entry_function_payload_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -1062,12 +1112,12 @@ aborts_if false;<br/></code></pre>
 ### Function `multisig_payload_internal`
 
 
-<pre><code>fun multisig_payload_internal(): option::Option&lt;transaction_context::MultisigPayload&gt;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_payload_internal">multisig_payload_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>&gt;<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

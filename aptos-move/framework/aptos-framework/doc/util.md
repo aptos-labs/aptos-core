@@ -23,10 +23,14 @@ Utility functions used by the framework modules.
 
 ## Function `from_bytes`
 
-Native function to deserialize a type T.<br/><br/> Note that this function does not put any constraint on <code>T</code>. If code uses this function to<br/> deserialized a linear value, its their responsibility that the data they deserialize is<br/> owned.
+Native function to deserialize a type T.
+
+Note that this function does not put any constraint on <code>T</code>. If code uses this function to
+deserialized a linear value, its their responsibility that the data they deserialize is
+owned.
 
 
-<pre><code>public(friend) fun from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="util.md#0x1_util_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T<br /></code></pre>
 
 
 
@@ -34,7 +38,7 @@ Native function to deserialize a type T.<br/><br/> Note that this function does 
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) native fun from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>native</b> <b>fun</b> <a href="util.md#0x1_util_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;<br /></code></pre>
 
 
 
@@ -46,7 +50,7 @@ Native function to deserialize a type T.<br/><br/> Note that this function does 
 
 
 
-<pre><code>public fun address_from_bytes(bytes: vector&lt;u8&gt;): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="util.md#0x1_util_address_from_bytes">address_from_bytes</a>(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b><br /></code></pre>
 
 
 
@@ -54,7 +58,7 @@ Native function to deserialize a type T.<br/><br/> Note that this function does 
 <summary>Implementation</summary>
 
 
-<pre><code>public fun address_from_bytes(bytes: vector&lt;u8&gt;): address &#123;<br/>    from_bytes(bytes)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="util.md#0x1_util_address_from_bytes">address_from_bytes</a>(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b> &#123;<br />    <a href="util.md#0x1_util_from_bytes">from_bytes</a>(bytes)<br />&#125;<br /></code></pre>
 
 
 
@@ -70,7 +74,7 @@ Native function to deserialize a type T.<br/><br/> Note that this function does 
 ### Function `from_bytes`
 
 
-<pre><code>public(friend) fun from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="util.md#0x1_util_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T<br /></code></pre>
 
 
 
@@ -80,13 +84,22 @@ Native function to deserialize a type T.<br/><br/> Note that this function does 
 
 ### High-level Requirements
 
-&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The address input bytes should be exactly 32 bytes long.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The address_from_bytes function should assert if the length of the input bytes is 32.&lt;/td&gt;<br/>&lt;td&gt;Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;address_from_bytes&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>1</td>
+<td>The address input bytes should be exactly 32 bytes long.</td>
+<td>Low</td>
+<td>The address_from_bytes function should assert if the length of the input bytes is 32.</td>
+<td>Verified via <a href="#high-level-req-1">address_from_bytes</a>.</td>
+</tr>
 
-&lt;/table&gt;<br/>
+</table>
 
-<br/>
+
 
 
 <a id="module-level-spec"></a>
@@ -94,7 +107,7 @@ Native function to deserialize a type T.<br/><br/> Note that this function does 
 ### Module-level Specification
 
 
-<pre><code>pragma opaque;<br/>aborts_if [abstract] false;<br/>ensures [abstract] result &#61;&#61; spec_from_bytes&lt;T&gt;(bytes);<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /><b>aborts_if</b> [abstract] <b>false</b>;<br /><b>ensures</b> [abstract] result &#61;&#61; <a href="util.md#0x1_util_spec_from_bytes">spec_from_bytes</a>&lt;T&gt;(bytes);<br /></code></pre>
 
 
 
@@ -102,7 +115,7 @@ Native function to deserialize a type T.<br/><br/> Note that this function does 
 <a id="0x1_util_spec_from_bytes"></a>
 
 
-<pre><code>fun spec_from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T;<br/></code></pre>
+<pre><code><b>fun</b> <a href="util.md#0x1_util_spec_from_bytes">spec_from_bytes</a>&lt;T&gt;(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;<br /></code></pre>
 
 
 
@@ -111,13 +124,13 @@ Native function to deserialize a type T.<br/><br/> Note that this function does 
 ### Function `address_from_bytes`
 
 
-<pre><code>public fun address_from_bytes(bytes: vector&lt;u8&gt;): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="util.md#0x1_util_address_from_bytes">address_from_bytes</a>(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b><br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
-aborts_if [abstract] len(bytes) !&#61; 32;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high&#45;level requirement 1</a>:
+<b>aborts_if</b> [abstract] len(bytes) !&#61; 32;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

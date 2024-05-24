@@ -3,7 +3,10 @@
 
 # Module `0x1::bcs`
 
-Utility for converting a Move value to its binary representation in BCS (Binary Canonical<br/> Serialization). BCS is the binary encoding for Move resources and other non&#45;module values<br/> published on&#45;chain. See https://github.com/aptos&#45;labs/bcs&#35;binary&#45;canonical&#45;serialization&#45;bcs for more<br/> details on BCS.
+Utility for converting a Move value to its binary representation in BCS (Binary Canonical
+Serialization). BCS is the binary encoding for Move resources and other non&#45;module values
+published on&#45;chain. See https://github.com/aptos&#45;labs/bcs#binary&#45;canonical&#45;serialization&#45;bcs for more
+details on BCS.
 
 
 -  [Function `to_bytes`](#0x1_bcs_to_bytes)
@@ -21,7 +24,7 @@ Utility for converting a Move value to its binary representation in BCS (Binary 
 Return the binary representation of <code>v</code> in BCS (Binary Canonical Serialization) format
 
 
-<pre><code>public fun to_bytes&lt;MoveValue&gt;(v: &amp;MoveValue): vector&lt;u8&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_to_bytes">to_bytes</a>&lt;MoveValue&gt;(v: &amp;MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;<br /></code></pre>
 
 
 
@@ -29,7 +32,7 @@ Return the binary representation of <code>v</code> in BCS (Binary Canonical Seri
 <summary>Implementation</summary>
 
 
-<pre><code>native public fun to_bytes&lt;MoveValue&gt;(v: &amp;MoveValue): vector&lt;u8&gt;;<br/></code></pre>
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_to_bytes">to_bytes</a>&lt;MoveValue&gt;(v: &amp;MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;;<br /></code></pre>
 
 
 
@@ -47,7 +50,7 @@ Native function which is defined in the prover&apos;s prelude.
 <a id="0x1_bcs_serialize"></a>
 
 
-<pre><code>native fun serialize&lt;MoveValue&gt;(v: &amp;MoveValue): vector&lt;u8&gt;;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="bcs.md#0x1_bcs_serialize">serialize</a>&lt;MoveValue&gt;(v: &amp;MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

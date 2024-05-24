@@ -41,7 +41,7 @@ A module for generating globally unique identifiers
 A globally unique identifier derived from the sender&apos;s address and a counter
 
 
-<pre><code>struct GUID has drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="guid.md#0x1_guid_GUID">GUID</a> <b>has</b> drop, store<br /></code></pre>
 
 
 
@@ -51,7 +51,7 @@ A globally unique identifier derived from the sender&apos;s address and a counte
 
 <dl>
 <dt>
-<code>id: guid::ID</code>
+<code>id: <a href="guid.md#0x1_guid_ID">guid::ID</a></code>
 </dt>
 <dd>
 
@@ -68,7 +68,7 @@ A globally unique identifier derived from the sender&apos;s address and a counte
 A non&#45;privileged identifier that can be freely created by anyone. Useful for looking up GUID&apos;s.
 
 
-<pre><code>struct ID has copy, drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="guid.md#0x1_guid_ID">ID</a> <b>has</b> <b>copy</b>, drop, store<br /></code></pre>
 
 
 
@@ -84,7 +84,7 @@ A non&#45;privileged identifier that can be freely created by anyone. Useful for
  If creation_num is <code>i</code>, this is the <code>i&#43;1</code>th GUID created by <code>addr</code>
 </dd>
 <dt>
-<code>addr: address</code>
+<code>addr: <b>address</b></code>
 </dt>
 <dd>
  Address that created the GUID
@@ -104,7 +104,7 @@ A non&#45;privileged identifier that can be freely created by anyone. Useful for
 GUID generator must be published ahead of first usage of <code>create_with_capability</code> function.
 
 
-<pre><code>const EGUID_GENERATOR_NOT_PUBLISHED: u64 &#61; 0;<br/></code></pre>
+<pre><code><b>const</b> <a href="guid.md#0x1_guid_EGUID_GENERATOR_NOT_PUBLISHED">EGUID_GENERATOR_NOT_PUBLISHED</a>: u64 &#61; 0;<br /></code></pre>
 
 
 
@@ -115,7 +115,7 @@ GUID generator must be published ahead of first usage of <code>create_with_capab
 Create and return a new GUID from a trusted module.
 
 
-<pre><code>public(friend) fun create(addr: address, creation_num_ref: &amp;mut u64): guid::GUID<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="guid.md#0x1_guid_create">create</a>(addr: <b>address</b>, creation_num_ref: &amp;<b>mut</b> u64): <a href="guid.md#0x1_guid_GUID">guid::GUID</a><br /></code></pre>
 
 
 
@@ -123,7 +123,7 @@ Create and return a new GUID from a trusted module.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun create(addr: address, creation_num_ref: &amp;mut u64): GUID &#123;<br/>    let creation_num &#61; &#42;creation_num_ref;<br/>    &#42;creation_num_ref &#61; creation_num &#43; 1;<br/>    GUID &#123;<br/>        id: ID &#123;<br/>            creation_num,<br/>            addr,<br/>        &#125;<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="guid.md#0x1_guid_create">create</a>(addr: <b>address</b>, creation_num_ref: &amp;<b>mut</b> u64): <a href="guid.md#0x1_guid_GUID">GUID</a> &#123;<br />    <b>let</b> creation_num &#61; &#42;creation_num_ref;<br />    &#42;creation_num_ref &#61; creation_num &#43; 1;<br />    <a href="guid.md#0x1_guid_GUID">GUID</a> &#123;<br />        id: <a href="guid.md#0x1_guid_ID">ID</a> &#123;<br />            creation_num,<br />            addr,<br />        &#125;<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -136,7 +136,7 @@ Create and return a new GUID from a trusted module.
 Create a non&#45;privileged id from <code>addr</code> and <code>creation_num</code>
 
 
-<pre><code>public fun create_id(addr: address, creation_num: u64): guid::ID<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_create_id">create_id</a>(addr: <b>address</b>, creation_num: u64): <a href="guid.md#0x1_guid_ID">guid::ID</a><br /></code></pre>
 
 
 
@@ -144,7 +144,7 @@ Create a non&#45;privileged id from <code>addr</code> and <code>creation_num</co
 <summary>Implementation</summary>
 
 
-<pre><code>public fun create_id(addr: address, creation_num: u64): ID &#123;<br/>    ID &#123; creation_num, addr &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_create_id">create_id</a>(addr: <b>address</b>, creation_num: u64): <a href="guid.md#0x1_guid_ID">ID</a> &#123;<br />    <a href="guid.md#0x1_guid_ID">ID</a> &#123; creation_num, addr &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -157,7 +157,7 @@ Create a non&#45;privileged id from <code>addr</code> and <code>creation_num</co
 Get the non&#45;privileged ID associated with a GUID
 
 
-<pre><code>public fun id(guid: &amp;guid::GUID): guid::ID<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id">id</a>(<a href="guid.md#0x1_guid">guid</a>: &amp;<a href="guid.md#0x1_guid_GUID">guid::GUID</a>): <a href="guid.md#0x1_guid_ID">guid::ID</a><br /></code></pre>
 
 
 
@@ -165,7 +165,7 @@ Get the non&#45;privileged ID associated with a GUID
 <summary>Implementation</summary>
 
 
-<pre><code>public fun id(guid: &amp;GUID): ID &#123;<br/>    guid.id<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id">id</a>(<a href="guid.md#0x1_guid">guid</a>: &amp;<a href="guid.md#0x1_guid_GUID">GUID</a>): <a href="guid.md#0x1_guid_ID">ID</a> &#123;<br />    <a href="guid.md#0x1_guid">guid</a>.id<br />&#125;<br /></code></pre>
 
 
 
@@ -178,7 +178,7 @@ Get the non&#45;privileged ID associated with a GUID
 Return the account address that created the GUID
 
 
-<pre><code>public fun creator_address(guid: &amp;guid::GUID): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_creator_address">creator_address</a>(<a href="guid.md#0x1_guid">guid</a>: &amp;<a href="guid.md#0x1_guid_GUID">guid::GUID</a>): <b>address</b><br /></code></pre>
 
 
 
@@ -186,7 +186,7 @@ Return the account address that created the GUID
 <summary>Implementation</summary>
 
 
-<pre><code>public fun creator_address(guid: &amp;GUID): address &#123;<br/>    guid.id.addr<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_creator_address">creator_address</a>(<a href="guid.md#0x1_guid">guid</a>: &amp;<a href="guid.md#0x1_guid_GUID">GUID</a>): <b>address</b> &#123;<br />    <a href="guid.md#0x1_guid">guid</a>.id.addr<br />&#125;<br /></code></pre>
 
 
 
@@ -199,7 +199,7 @@ Return the account address that created the GUID
 Return the account address that created the guid::ID
 
 
-<pre><code>public fun id_creator_address(id: &amp;guid::ID): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id_creator_address">id_creator_address</a>(id: &amp;<a href="guid.md#0x1_guid_ID">guid::ID</a>): <b>address</b><br /></code></pre>
 
 
 
@@ -207,7 +207,7 @@ Return the account address that created the guid::ID
 <summary>Implementation</summary>
 
 
-<pre><code>public fun id_creator_address(id: &amp;ID): address &#123;<br/>    id.addr<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id_creator_address">id_creator_address</a>(id: &amp;<a href="guid.md#0x1_guid_ID">ID</a>): <b>address</b> &#123;<br />    id.addr<br />&#125;<br /></code></pre>
 
 
 
@@ -220,7 +220,7 @@ Return the account address that created the guid::ID
 Return the creation number associated with the GUID
 
 
-<pre><code>public fun creation_num(guid: &amp;guid::GUID): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_creation_num">creation_num</a>(<a href="guid.md#0x1_guid">guid</a>: &amp;<a href="guid.md#0x1_guid_GUID">guid::GUID</a>): u64<br /></code></pre>
 
 
 
@@ -228,7 +228,7 @@ Return the creation number associated with the GUID
 <summary>Implementation</summary>
 
 
-<pre><code>public fun creation_num(guid: &amp;GUID): u64 &#123;<br/>    guid.id.creation_num<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_creation_num">creation_num</a>(<a href="guid.md#0x1_guid">guid</a>: &amp;<a href="guid.md#0x1_guid_GUID">GUID</a>): u64 &#123;<br />    <a href="guid.md#0x1_guid">guid</a>.id.creation_num<br />&#125;<br /></code></pre>
 
 
 
@@ -241,7 +241,7 @@ Return the creation number associated with the GUID
 Return the creation number associated with the guid::ID
 
 
-<pre><code>public fun id_creation_num(id: &amp;guid::ID): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id_creation_num">id_creation_num</a>(id: &amp;<a href="guid.md#0x1_guid_ID">guid::ID</a>): u64<br /></code></pre>
 
 
 
@@ -249,7 +249,7 @@ Return the creation number associated with the guid::ID
 <summary>Implementation</summary>
 
 
-<pre><code>public fun id_creation_num(id: &amp;ID): u64 &#123;<br/>    id.creation_num<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id_creation_num">id_creation_num</a>(id: &amp;<a href="guid.md#0x1_guid_ID">ID</a>): u64 &#123;<br />    id.creation_num<br />&#125;<br /></code></pre>
 
 
 
@@ -262,7 +262,7 @@ Return the creation number associated with the guid::ID
 Return true if the GUID&apos;s ID is <code>id</code>
 
 
-<pre><code>public fun eq_id(guid: &amp;guid::GUID, id: &amp;guid::ID): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_eq_id">eq_id</a>(<a href="guid.md#0x1_guid">guid</a>: &amp;<a href="guid.md#0x1_guid_GUID">guid::GUID</a>, id: &amp;<a href="guid.md#0x1_guid_ID">guid::ID</a>): bool<br /></code></pre>
 
 
 
@@ -270,7 +270,7 @@ Return true if the GUID&apos;s ID is <code>id</code>
 <summary>Implementation</summary>
 
 
-<pre><code>public fun eq_id(guid: &amp;GUID, id: &amp;ID): bool &#123;<br/>    &amp;guid.id &#61;&#61; id<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_eq_id">eq_id</a>(<a href="guid.md#0x1_guid">guid</a>: &amp;<a href="guid.md#0x1_guid_GUID">GUID</a>, id: &amp;<a href="guid.md#0x1_guid_ID">ID</a>): bool &#123;<br />    &amp;<a href="guid.md#0x1_guid">guid</a>.id &#61;&#61; id<br />&#125;<br /></code></pre>
 
 
 
@@ -287,17 +287,44 @@ Return true if the GUID&apos;s ID is <code>id</code>
 
 ### High-level Requirements
 
-&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;The creation of GUID constructs a unique GUID by combining an address with an incremented creation number.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The create function generates a new GUID by combining an address with an incremented creation number, effectively creating a unique identifier.&lt;/td&gt;<br/>&lt;td&gt;Enforced via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;create&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>1</td>
+<td>The creation of GUID constructs a unique GUID by combining an address with an incremented creation number.</td>
+<td>Low</td>
+<td>The create function generates a new GUID by combining an address with an incremented creation number, effectively creating a unique identifier.</td>
+<td>Enforced via <a href="#high-level-req-1">create</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The operations on GUID and ID, such as construction, field access, and equality comparison, should not abort.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The following functions will never abort: (1) create_id, (2) id, (3) creator_address, (4) id_creator_address, (5) creation_num, (6) id_creation_num, and (7) eq_id.&lt;/td&gt;<br/>&lt;td&gt;Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.1&quot;&gt;create_id&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.2&quot;&gt;id&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.3&quot;&gt;creator_address&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.4&quot;&gt;id_creator_address&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.5&quot;&gt;creation_num&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.6&quot;&gt;id_creation_num&lt;/a&gt;, and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.7&quot;&gt;eq_id&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>2</td>
+<td>The operations on GUID and ID, such as construction, field access, and equality comparison, should not abort.</td>
+<td>Low</td>
+<td>The following functions will never abort: (1) create_id, (2) id, (3) creator_address, (4) id_creator_address, (5) creation_num, (6) id_creation_num, and (7) eq_id.</td>
+<td>Verified via <a href="#high-level-req-2.1">create_id</a>, <a href="#high-level-req-2.2">id</a>, <a href="#high-level-req-2.3">creator_address</a>, <a href="#high-level-req-2.4">id_creator_address</a>, <a href="#high-level-req-2.5">creation_num</a>, <a href="#high-level-req-2.6">id_creation_num</a>, and <a href="#high-level-req-2.7">eq_id</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;The creation number should increment by 1 with each new creation.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;An account can only own up to MAX_U64 resources. Not incrementing the guid_creation_num constantly could lead to shrinking the space for new resources.&lt;/td&gt;<br/>&lt;td&gt;Enforced via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;create&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>3</td>
+<td>The creation number should increment by 1 with each new creation.</td>
+<td>Low</td>
+<td>An account can only own up to MAX_U64 resources. Not incrementing the guid_creation_num constantly could lead to shrinking the space for new resources.</td>
+<td>Enforced via <a href="#high-level-req-3">create</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The creation number and address of an ID / GUID must be immutable.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The addr and creation_num values are meant to be constant and never updated as they are unique and used for identification.&lt;/td&gt;<br/>&lt;td&gt;Audited: This is enforced through missing functionality to update the creation_num or addr.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>4</td>
+<td>The creation number and address of an ID / GUID must be immutable.</td>
+<td>Medium</td>
+<td>The addr and creation_num values are meant to be constant and never updated as they are unique and used for identification.</td>
+<td>Audited: This is enforced through missing functionality to update the creation_num or addr.</td>
+</tr>
 
-&lt;/table&gt;<br/>
+</table>
 
 
 
@@ -306,7 +333,7 @@ Return true if the GUID&apos;s ID is <code>id</code>
 ### Module-level Specification
 
 
-<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/></code></pre>
+<pre><code><b>pragma</b> verify &#61; <b>true</b>;<br /><b>pragma</b> aborts_if_is_strict;<br /></code></pre>
 
 
 
@@ -315,14 +342,14 @@ Return true if the GUID&apos;s ID is <code>id</code>
 ### Function `create`
 
 
-<pre><code>public(friend) fun create(addr: address, creation_num_ref: &amp;mut u64): guid::GUID<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="guid.md#0x1_guid_create">create</a>(addr: <b>address</b>, creation_num_ref: &amp;<b>mut</b> u64): <a href="guid.md#0x1_guid_GUID">guid::GUID</a><br /></code></pre>
 
 
 
 
-<pre><code>aborts_if creation_num_ref &#43; 1 &gt; MAX_U64;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
-ensures result.id.creation_num &#61;&#61; old(creation_num_ref);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
-ensures creation_num_ref &#61;&#61; old(creation_num_ref) &#43; 1;<br/></code></pre>
+<pre><code><b>aborts_if</b> creation_num_ref &#43; 1 &gt; MAX_U64;<br />// This enforces <a id="high-level-req-1" href="#high-level-req">high&#45;level requirement 1</a>:
+<b>ensures</b> result.id.creation_num &#61;&#61; <b>old</b>(creation_num_ref);<br />// This enforces <a id="high-level-req-3" href="#high-level-req">high&#45;level requirement 3</a>:
+<b>ensures</b> creation_num_ref &#61;&#61; <b>old</b>(creation_num_ref) &#43; 1;<br /></code></pre>
 
 
 
@@ -331,13 +358,13 @@ ensures creation_num_ref &#61;&#61; old(creation_num_ref) &#43; 1;<br/></code></
 ### Function `create_id`
 
 
-<pre><code>public fun create_id(addr: address, creation_num: u64): guid::ID<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_create_id">create_id</a>(addr: <b>address</b>, creation_num: u64): <a href="guid.md#0x1_guid_ID">guid::ID</a><br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if false;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2.1" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 
@@ -346,13 +373,13 @@ aborts_if false;<br/></code></pre>
 ### Function `id`
 
 
-<pre><code>public fun id(guid: &amp;guid::GUID): guid::ID<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id">id</a>(<a href="guid.md#0x1_guid">guid</a>: &amp;<a href="guid.md#0x1_guid_GUID">guid::GUID</a>): <a href="guid.md#0x1_guid_ID">guid::ID</a><br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if false;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2.2" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 
@@ -361,13 +388,13 @@ aborts_if false;<br/></code></pre>
 ### Function `creator_address`
 
 
-<pre><code>public fun creator_address(guid: &amp;guid::GUID): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_creator_address">creator_address</a>(<a href="guid.md#0x1_guid">guid</a>: &amp;<a href="guid.md#0x1_guid_GUID">guid::GUID</a>): <b>address</b><br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if false;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2.3" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 
@@ -376,13 +403,13 @@ aborts_if false;<br/></code></pre>
 ### Function `id_creator_address`
 
 
-<pre><code>public fun id_creator_address(id: &amp;guid::ID): address<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id_creator_address">id_creator_address</a>(id: &amp;<a href="guid.md#0x1_guid_ID">guid::ID</a>): <b>address</b><br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if false;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2.4" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 
@@ -391,13 +418,13 @@ aborts_if false;<br/></code></pre>
 ### Function `creation_num`
 
 
-<pre><code>public fun creation_num(guid: &amp;guid::GUID): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_creation_num">creation_num</a>(<a href="guid.md#0x1_guid">guid</a>: &amp;<a href="guid.md#0x1_guid_GUID">guid::GUID</a>): u64<br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.5&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if false;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2.5" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 
@@ -406,13 +433,13 @@ aborts_if false;<br/></code></pre>
 ### Function `id_creation_num`
 
 
-<pre><code>public fun id_creation_num(id: &amp;guid::ID): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id_creation_num">id_creation_num</a>(id: &amp;<a href="guid.md#0x1_guid_ID">guid::ID</a>): u64<br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.6&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if false;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2.6" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 
@@ -421,13 +448,13 @@ aborts_if false;<br/></code></pre>
 ### Function `eq_id`
 
 
-<pre><code>public fun eq_id(guid: &amp;guid::GUID, id: &amp;guid::ID): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_eq_id">eq_id</a>(<a href="guid.md#0x1_guid">guid</a>: &amp;<a href="guid.md#0x1_guid_GUID">guid::GUID</a>, id: &amp;<a href="guid.md#0x1_guid_ID">guid::ID</a>): bool<br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.7&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if false;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2.7" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

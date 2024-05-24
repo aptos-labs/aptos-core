@@ -21,7 +21,7 @@ Structs and functions related to JWK consensus configurations.
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
 
 
-<pre><code>use 0x1::config_buffer;<br/>use 0x1::copyable_any;<br/>use 0x1::error;<br/>use 0x1::option;<br/>use 0x1::simple_map;<br/>use 0x1::string;<br/>use 0x1::system_addresses;<br/></code></pre>
+<pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;<br /><b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;<br /><b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;<br /><b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;<br /></code></pre>
 
 
 
@@ -32,7 +32,7 @@ Structs and functions related to JWK consensus configurations.
 The configuration of the JWK consensus feature.
 
 
-<pre><code>struct JWKConsensusConfig has drop, store, key<br/></code></pre>
+<pre><code><b>struct</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a> <b>has</b> drop, store, key<br /></code></pre>
 
 
 
@@ -42,10 +42,13 @@ The configuration of the JWK consensus feature.
 
 <dl>
 <dt>
-<code>variant: copyable_any::Any</code>
+<code>variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a></code>
 </dt>
 <dd>
- A config variant packed as an <code>Any</code>.<br/> Currently the variant type is one of the following.<br/> &#45; <code>ConfigOff</code><br/> &#45; <code>ConfigV1</code>
+ A config variant packed as an <code>Any</code>.
+ Currently the variant type is one of the following.
+ &#45; <code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_ConfigOff">ConfigOff</a></code>
+ &#45; <code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_ConfigV1">ConfigV1</a></code>
 </dd>
 </dl>
 
@@ -59,7 +62,7 @@ The configuration of the JWK consensus feature.
 A JWK consensus config variant indicating JWK consensus should not run.
 
 
-<pre><code>struct ConfigOff has copy, drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_ConfigOff">ConfigOff</a> <b>has</b> <b>copy</b>, drop, store<br /></code></pre>
 
 
 
@@ -85,7 +88,7 @@ A JWK consensus config variant indicating JWK consensus should not run.
 
 
 
-<pre><code>struct OIDCProvider has copy, drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_OIDCProvider">OIDCProvider</a> <b>has</b> <b>copy</b>, drop, store<br /></code></pre>
 
 
 
@@ -95,13 +98,13 @@ A JWK consensus config variant indicating JWK consensus should not run.
 
 <dl>
 <dt>
-<code>name: string::String</code>
+<code>name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>config_url: string::String</code>
+<code>config_url: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
 
@@ -118,7 +121,7 @@ A JWK consensus config variant indicating JWK consensus should not run.
 A JWK consensus config variant indicating JWK consensus should run to watch a given list of OIDC providers.
 
 
-<pre><code>struct ConfigV1 has copy, drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_ConfigV1">ConfigV1</a> <b>has</b> <b>copy</b>, drop, store<br /></code></pre>
 
 
 
@@ -128,7 +131,7 @@ A JWK consensus config variant indicating JWK consensus should run to watch a gi
 
 <dl>
 <dt>
-<code>oidc_providers: vector&lt;jwk_consensus_config::OIDCProvider&gt;</code>
+<code>oidc_providers: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_OIDCProvider">jwk_consensus_config::OIDCProvider</a>&gt;</code>
 </dt>
 <dd>
 
@@ -145,10 +148,10 @@ A JWK consensus config variant indicating JWK consensus should run to watch a gi
 
 <a id="0x1_jwk_consensus_config_EDUPLICATE_PROVIDERS"></a>
 
-<code>ConfigV1</code> creation failed with duplicated providers given.
+<code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_ConfigV1">ConfigV1</a></code> creation failed with duplicated providers given.
 
 
-<pre><code>const EDUPLICATE_PROVIDERS: u64 &#61; 1;<br/></code></pre>
+<pre><code><b>const</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_EDUPLICATE_PROVIDERS">EDUPLICATE_PROVIDERS</a>: u64 &#61; 1;<br /></code></pre>
 
 
 
@@ -159,7 +162,7 @@ A JWK consensus config variant indicating JWK consensus should run to watch a gi
 Initialize the configuration. Used in genesis or governance.
 
 
-<pre><code>public fun initialize(framework: &amp;signer, config: jwk_consensus_config::JWKConsensusConfig)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_initialize">initialize</a>(framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">jwk_consensus_config::JWKConsensusConfig</a>)<br /></code></pre>
 
 
 
@@ -167,7 +170,7 @@ Initialize the configuration. Used in genesis or governance.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun initialize(framework: &amp;signer, config: JWKConsensusConfig) &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    if (!exists&lt;JWKConsensusConfig&gt;(@aptos_framework)) &#123;<br/>        move_to(framework, config);<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_initialize">initialize</a>(framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a>) &#123;<br />    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);<br />    <b>if</b> (!<b>exists</b>&lt;<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a>&gt;(@aptos_framework)) &#123;<br />        <b>move_to</b>(framework, config);<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -177,10 +180,19 @@ Initialize the configuration. Used in genesis or governance.
 
 ## Function `set_for_next_epoch`
 
-This can be called by on&#45;chain governance to update JWK consensus configs for the next epoch.<br/> Example usage:<br/> ```<br/> use aptos_framework::jwk_consensus_config;<br/> use aptos_framework::aptos_governance;<br/> // ...<br/> let config &#61; jwk_consensus_config::new_v1(vector[]);<br/> jwk_consensus_config::set_for_next_epoch(&amp;framework_signer, config);<br/> aptos_governance::reconfigure(&amp;framework_signer);<br/> ```
+This can be called by on&#45;chain governance to update JWK consensus configs for the next epoch.
+Example usage:
+```
+use aptos_framework::jwk_consensus_config;
+use aptos_framework::aptos_governance;
+// ...
+let config &#61; jwk_consensus_config::new_v1(vector[]);
+jwk_consensus_config::set_for_next_epoch(&amp;framework_signer, config);
+aptos_governance::reconfigure(&amp;framework_signer);
+```
 
 
-<pre><code>public fun set_for_next_epoch(framework: &amp;signer, config: jwk_consensus_config::JWKConsensusConfig)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_set_for_next_epoch">set_for_next_epoch</a>(framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">jwk_consensus_config::JWKConsensusConfig</a>)<br /></code></pre>
 
 
 
@@ -188,7 +200,7 @@ This can be called by on&#45;chain governance to update JWK consensus configs fo
 <summary>Implementation</summary>
 
 
-<pre><code>public fun set_for_next_epoch(framework: &amp;signer, config: JWKConsensusConfig) &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    config_buffer::upsert(config);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_set_for_next_epoch">set_for_next_epoch</a>(framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a>) &#123;<br />    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);<br />    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(config);<br />&#125;<br /></code></pre>
 
 
 
@@ -198,10 +210,10 @@ This can be called by on&#45;chain governance to update JWK consensus configs fo
 
 ## Function `on_new_epoch`
 
-Only used in reconfigurations to apply the pending <code>JWKConsensusConfig</code>, if there is any.
+Only used in reconfigurations to apply the pending <code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a></code>, if there is any.
 
 
-<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_on_new_epoch">on_new_epoch</a>(framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)<br /></code></pre>
 
 
 
@@ -209,7 +221,7 @@ Only used in reconfigurations to apply the pending <code>JWKConsensusConfig</cod
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer) acquires JWKConsensusConfig &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    if (config_buffer::does_exist&lt;JWKConsensusConfig&gt;()) &#123;<br/>        let new_config &#61; config_buffer::extract&lt;JWKConsensusConfig&gt;();<br/>        if (exists&lt;JWKConsensusConfig&gt;(@aptos_framework)) &#123;<br/>            &#42;borrow_global_mut&lt;JWKConsensusConfig&gt;(@aptos_framework) &#61; new_config;<br/>        &#125; else &#123;<br/>            move_to(framework, new_config);<br/>        &#125;;<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_on_new_epoch">on_new_epoch</a>(framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a> &#123;<br />    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);<br />    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a>&gt;()) &#123;<br />        <b>let</b> new_config &#61; <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a>&gt;();<br />        <b>if</b> (<b>exists</b>&lt;<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a>&gt;(@aptos_framework)) &#123;<br />            &#42;<b>borrow_global_mut</b>&lt;<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a>&gt;(@aptos_framework) &#61; new_config;<br />        &#125; <b>else</b> &#123;<br />            <b>move_to</b>(framework, new_config);<br />        &#125;;<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -219,10 +231,10 @@ Only used in reconfigurations to apply the pending <code>JWKConsensusConfig</cod
 
 ## Function `new_off`
 
-Construct a <code>JWKConsensusConfig</code> of variant <code>ConfigOff</code>.
+Construct a <code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a></code> of variant <code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_ConfigOff">ConfigOff</a></code>.
 
 
-<pre><code>public fun new_off(): jwk_consensus_config::JWKConsensusConfig<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_new_off">new_off</a>(): <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">jwk_consensus_config::JWKConsensusConfig</a><br /></code></pre>
 
 
 
@@ -230,7 +242,7 @@ Construct a <code>JWKConsensusConfig</code> of variant <code>ConfigOff</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun new_off(): JWKConsensusConfig &#123;<br/>    JWKConsensusConfig &#123;<br/>        variant: copyable_any::pack( ConfigOff &#123;&#125; )<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_new_off">new_off</a>(): <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a> &#123;<br />    <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a> &#123;<br />        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>( <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_ConfigOff">ConfigOff</a> &#123;&#125; )<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -240,10 +252,12 @@ Construct a <code>JWKConsensusConfig</code> of variant <code>ConfigOff</code>.
 
 ## Function `new_v1`
 
-Construct a <code>JWKConsensusConfig</code> of variant <code>ConfigV1</code>.<br/><br/> Abort if the given provider list contains duplicated provider names.
+Construct a <code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a></code> of variant <code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_ConfigV1">ConfigV1</a></code>.
+
+Abort if the given provider list contains duplicated provider names.
 
 
-<pre><code>public fun new_v1(oidc_providers: vector&lt;jwk_consensus_config::OIDCProvider&gt;): jwk_consensus_config::JWKConsensusConfig<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_new_v1">new_v1</a>(oidc_providers: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_OIDCProvider">jwk_consensus_config::OIDCProvider</a>&gt;): <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">jwk_consensus_config::JWKConsensusConfig</a><br /></code></pre>
 
 
 
@@ -251,7 +265,7 @@ Construct a <code>JWKConsensusConfig</code> of variant <code>ConfigV1</code>.<br
 <summary>Implementation</summary>
 
 
-<pre><code>public fun new_v1(oidc_providers: vector&lt;OIDCProvider&gt;): JWKConsensusConfig &#123;<br/>    let name_set &#61; simple_map::new&lt;String, u64&gt;();<br/>    vector::for_each_ref(&amp;oidc_providers, &#124;provider&#124; &#123;<br/>        let provider: &amp;OIDCProvider &#61; provider;<br/>        let (_, old_value) &#61; simple_map::upsert(&amp;mut name_set, provider.name, 0);<br/>        if (option::is_some(&amp;old_value)) &#123;<br/>            abort(error::invalid_argument(EDUPLICATE_PROVIDERS))<br/>        &#125;<br/>    &#125;);<br/>    JWKConsensusConfig &#123;<br/>        variant: copyable_any::pack( ConfigV1 &#123; oidc_providers &#125; )<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_new_v1">new_v1</a>(oidc_providers: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_OIDCProvider">OIDCProvider</a>&gt;): <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a> &#123;<br />    <b>let</b> name_set &#61; <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_new">simple_map::new</a>&lt;String, u64&gt;();<br />    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&amp;oidc_providers, &#124;provider&#124; &#123;<br />        <b>let</b> provider: &amp;<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_OIDCProvider">OIDCProvider</a> &#61; provider;<br />        <b>let</b> (_, old_value) &#61; <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_upsert">simple_map::upsert</a>(&amp;<b>mut</b> name_set, provider.name, 0);<br />        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&amp;old_value)) &#123;<br />            <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_EDUPLICATE_PROVIDERS">EDUPLICATE_PROVIDERS</a>))<br />        &#125;<br />    &#125;);<br />    <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a> &#123;<br />        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>( <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_ConfigV1">ConfigV1</a> &#123; oidc_providers &#125; )<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -261,10 +275,10 @@ Construct a <code>JWKConsensusConfig</code> of variant <code>ConfigV1</code>.<br
 
 ## Function `new_oidc_provider`
 
-Construct an <code>OIDCProvider</code> object.
+Construct an <code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_OIDCProvider">OIDCProvider</a></code> object.
 
 
-<pre><code>public fun new_oidc_provider(name: string::String, config_url: string::String): jwk_consensus_config::OIDCProvider<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_new_oidc_provider">new_oidc_provider</a>(name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, config_url: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_OIDCProvider">jwk_consensus_config::OIDCProvider</a><br /></code></pre>
 
 
 
@@ -272,7 +286,7 @@ Construct an <code>OIDCProvider</code> object.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun new_oidc_provider(name: String, config_url: String): OIDCProvider &#123;<br/>    OIDCProvider &#123; name, config_url &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_new_oidc_provider">new_oidc_provider</a>(name: String, config_url: String): <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_OIDCProvider">OIDCProvider</a> &#123;<br />    <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_OIDCProvider">OIDCProvider</a> &#123; name, config_url &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -288,12 +302,12 @@ Construct an <code>OIDCProvider</code> object.
 ### Function `on_new_epoch`
 
 
-<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_on_new_epoch">on_new_epoch</a>(framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)<br /></code></pre>
 
 
 
 
-<pre><code>requires @aptos_framework &#61;&#61; std::signer::address_of(framework);<br/>include config_buffer::OnNewEpochRequirement&lt;JWKConsensusConfig&gt;;<br/>aborts_if false;<br/></code></pre>
+<pre><code><b>requires</b> @aptos_framework &#61;&#61; std::signer::address_of(framework);<br /><b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a>&gt;;<br /><b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

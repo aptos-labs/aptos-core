@@ -45,6 +45,19 @@ static CODE_REX: Lazy<Regex> = Lazy::new(|| {
         .unwrap()
 });
 
+static HTML_ENTITY_REX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        "(?P<lt><)|(?P<gt>>)|(?P<lb>\\{)|(?P<rb>\\})|(?P<amper>\\&)|(?P<squote>')|(?P<dquote>\")|(?P<mul>\\*)|(?P<plus>\\+)|(?P<minus>\\-)|(?P<eq>\\=)|(?P<bar>\\|)|(?P<tilde>\\~)",
+    )
+        .unwrap()
+});
+
+static REX_HTML_ATTRIBUTES_TO_SKIP: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"</?(h[1-6]|p|span|div|a|em|strong|br|hr|pre|blockquote|ul|ol|li|dl|dt|dd|table|tr|th|td|thead|tbody|tfoot|code)(\s*|(\s+\b\w+\b\s*=[^>]*))>"
+    ).unwrap()
+});
+
 /// The output format of the docgen
 /// If the format is MDX, generated doc is mdx compatible
 #[derive(ValueEnum, Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -1754,8 +1767,10 @@ impl<'env> Docgen<'env> {
     /// as code. Code blocks in comments are untouched.
     fn decorate_text(&self, text: &str) -> String {
         let mut decorated_text = String::new();
-        let mut chars = text.chars();
+        let mut chars = text.chars().peekable();
         let non_code_filter = |chr: &char| *chr != '`';
+        let non_code_or_rb_filter = |chr: &char| *chr != '`' && *chr != '>';
+        let non_code_or_lb_filter = |chr: &char| *chr != '`' && *chr != '<';
 
         while let Some(chr) = chars.next() {
             if chr == '`' {
@@ -1777,18 +1792,34 @@ impl<'env> Docgen<'env> {
                     )
                     .unwrap()
                 }
+            } else if self.options.is_mdx_compatible() {
+                if chr == '<' {
+                    let str = chars
+                        .take_while_ref(non_code_or_rb_filter)
+                        .collect::<String>();
+                    if chars.peek().is_some_and(|c| *c == '>') {
+                        let rb = chars.next().unwrap();
+                        let full_str = format!("{}{}{}", chr, str, rb);
+                        if REX_HTML_ATTRIBUTES_TO_SKIP.is_match(&full_str) {
+                            decorated_text.push_str(&full_str);
+                        } else {
+                            decorated_text
+                                .push_str(&self.encode_html_entities(&full_str.to_string()));
+                        }
+                    } else {
+                        decorated_text.push_str(&self.encode_html_entities(&chr.to_string()));
+                        decorated_text.push_str(&self.encode_html_entities(&str.to_string()));
+                    }
+                } else {
+                    decorated_text.push_str(&self.encode_html_entities(&chr.to_string()));
+                    let str = chars
+                        .take_while_ref(non_code_or_lb_filter)
+                        .collect::<String>();
+                    decorated_text.push_str(&self.encode_html_entities(&str));
+                }
             } else {
-                if self.options.is_mdx_compatible() {
-                    decorated_text.push_str(&self.decorate_code(&chr.to_string()));
-                } else {
-                    decorated_text.push(chr);
-                }
-                if self.options.is_mdx_compatible() {
-                    let str = chars.take_while_ref(non_code_filter).collect::<String>();
-                    decorated_text.push_str(&self.decorate_code(&str));
-                } else {
-                    decorated_text.extend(chars.take_while_ref(non_code_filter))
-                }
+                decorated_text.push(chr);
+                decorated_text.extend(chars.take_while_ref(non_code_filter))
             }
         }
         decorated_text
@@ -1813,7 +1844,7 @@ impl<'env> Docgen<'env> {
     /// Outputs decorated code text in context of a module.
     fn code_text(&self, code: &str) {
         if self.options.is_mdx_compatible() {
-            emit!(self.writer, "{}<br/>", &self.decorate_code(code));
+            emit!(self.writer, "{}<br />", &self.decorate_code(code));
         } else {
             emitln!(self.writer, &self.decorate_code(code));
         }
@@ -1837,7 +1868,7 @@ impl<'env> Docgen<'env> {
             map.insert("eq", "&#61;");
             map.insert("bar", "&#124;");
             map.insert("tilde", "&#126;");
-            map.insert("nl", "<br/>");
+            map.insert("nl", "<br />");
             map
         });
         let mut r = "".to_string();
@@ -1858,9 +1889,7 @@ impl<'env> Docgen<'env> {
         let mut at = 0;
         while let Some(cap) = CODE_REX.captures(&code[at..]) {
             let replacement = {
-                if self.options.is_mdx_compatible() {
-                    self.replace_for_mdx(&cap)
-                } else if cap.name("lt").is_some() {
+                if cap.name("lt").is_some() {
                     "&lt;".to_owned()
                 } else if cap.name("gt").is_some() {
                     "&gt;".to_owned()
@@ -1877,6 +1906,8 @@ impl<'env> Docgen<'env> {
                     } else {
                         "".to_owned()
                     }
+                } else if self.options.is_mdx_compatible() {
+                    self.replace_for_mdx(&cap)
                 } else {
                     "".to_owned()
                 }
@@ -1892,6 +1923,23 @@ impl<'env> Docgen<'env> {
                     // replace the `<` as well.
                     r += &m.as_str().replace('<', "&lt;");
                 }
+            }
+            at += cap.get(0).unwrap().end();
+        }
+        r += &code[at..];
+        r
+    }
+
+    fn encode_html_entities(&self, code: &str) -> String {
+        let mut r = String::new();
+        let mut at = 0;
+        while let Some(cap) = HTML_ENTITY_REX.captures(&code[at..]) {
+            let replacement = self.replace_for_mdx(&cap);
+            if replacement.is_empty() {
+                r += &code[at..at + cap.get(0).unwrap().end()];
+            } else {
+                r += &code[at..at + cap.get(0).unwrap().start()];
+                r += &replacement;
             }
             at += cap.get(0).unwrap().end();
         }

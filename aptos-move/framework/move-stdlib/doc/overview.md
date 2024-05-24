@@ -1,4 +1,17 @@
-&#35; Move Stdlib Modules<br/><br/>This is the reference documentation of the Move standard library.<br/>For on overview of the Move language, see the [Move Book][move&#45;book].<br/><br/>&#35;&#35; Index<br/>
+
+<a id="@Move_Stdlib_Modules_0"></a>
+
+# Move Stdlib Modules
+
+
+This is the reference documentation of the Move standard library.
+For on overview of the Move language, see the [Move Book][move&#45;book].
+
+
+<a id="@Index_1"></a>
+
+## Index
+
 
 -  [`0x1::acl`](acl.md#0x1_acl)
 -  [`0x1::bcs`](bcs.md#0x1_bcs)
@@ -11,7 +24,6 @@
 -  [`0x1::signer`](signer.md#0x1_signer)
 -  [`0x1::string`](string.md#0x1_string)
 -  [`0x1::vector`](vector.md#0x1_vector)
-<br/>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

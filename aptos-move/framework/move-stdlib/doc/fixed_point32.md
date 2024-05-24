@@ -3,7 +3,8 @@
 
 # Module `0x1::fixed_point32`
 
-Defines a fixed&#45;point numeric type with a 32&#45;bit integer part and<br/> a 32&#45;bit fractional part.
+Defines a fixed&#45;point numeric type with a 32&#45;bit integer part and
+a 32&#45;bit fractional part.
 
 
 -  [Struct `FixedPoint32`](#0x1_fixed_point32_FixedPoint32)
@@ -41,10 +42,18 @@ Defines a fixed&#45;point numeric type with a 32&#45;bit integer part and<br/> a
 
 ## Struct `FixedPoint32`
 
-Define a fixed&#45;point numeric type with 32 fractional bits.<br/> This is just a u64 integer but it is wrapped in a struct to<br/> make a unique type. This is a binary representation, so decimal<br/> values may not be exactly representable, but it provides more<br/> than 9 decimal digits of precision both before and after the<br/> decimal point (18 digits total). For comparison, double precision<br/> floating&#45;point has less than 16 decimal digits of precision, so<br/> be careful about using floating&#45;point to convert these values to<br/> decimal.
+Define a fixed&#45;point numeric type with 32 fractional bits.
+This is just a u64 integer but it is wrapped in a struct to
+make a unique type. This is a binary representation, so decimal
+values may not be exactly representable, but it provides more
+than 9 decimal digits of precision both before and after the
+decimal point (18 digits total). For comparison, double precision
+floating&#45;point has less than 16 decimal digits of precision, so
+be careful about using floating&#45;point to convert these values to
+decimal.
 
 
-<pre><code>struct FixedPoint32 has copy, drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> <b>has</b> <b>copy</b>, drop, store<br /></code></pre>
 
 
 
@@ -73,7 +82,7 @@ Define a fixed&#45;point numeric type with 32 fractional bits.<br/> This is just
 
 
 
-<pre><code>const MAX_U64: u128 &#61; 18446744073709551615;<br/></code></pre>
+<pre><code><b>const</b> <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>: u128 &#61; 18446744073709551615;<br /></code></pre>
 
 
 
@@ -82,7 +91,7 @@ Define a fixed&#45;point numeric type with 32 fractional bits.<br/> This is just
 The denominator provided was zero
 
 
-<pre><code>const EDENOMINATOR: u64 &#61; 65537;<br/></code></pre>
+<pre><code><b>const</b> <a href="fixed_point32.md#0x1_fixed_point32_EDENOMINATOR">EDENOMINATOR</a>: u64 &#61; 65537;<br /></code></pre>
 
 
 
@@ -91,7 +100,7 @@ The denominator provided was zero
 The quotient value would be too large to be held in a <code>u64</code>
 
 
-<pre><code>const EDIVISION: u64 &#61; 131074;<br/></code></pre>
+<pre><code><b>const</b> <a href="fixed_point32.md#0x1_fixed_point32_EDIVISION">EDIVISION</a>: u64 &#61; 131074;<br /></code></pre>
 
 
 
@@ -100,7 +109,7 @@ The quotient value would be too large to be held in a <code>u64</code>
 A division by zero was encountered
 
 
-<pre><code>const EDIVISION_BY_ZERO: u64 &#61; 65540;<br/></code></pre>
+<pre><code><b>const</b> <a href="fixed_point32.md#0x1_fixed_point32_EDIVISION_BY_ZERO">EDIVISION_BY_ZERO</a>: u64 &#61; 65540;<br /></code></pre>
 
 
 
@@ -109,16 +118,16 @@ A division by zero was encountered
 The multiplied value would be too large to be held in a <code>u64</code>
 
 
-<pre><code>const EMULTIPLICATION: u64 &#61; 131075;<br/></code></pre>
+<pre><code><b>const</b> <a href="fixed_point32.md#0x1_fixed_point32_EMULTIPLICATION">EMULTIPLICATION</a>: u64 &#61; 131075;<br /></code></pre>
 
 
 
 <a id="0x1_fixed_point32_ERATIO_OUT_OF_RANGE"></a>
 
-The computed ratio when converting to a <code>FixedPoint32</code> would be unrepresentable
+The computed ratio when converting to a <code><a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a></code> would be unrepresentable
 
 
-<pre><code>const ERATIO_OUT_OF_RANGE: u64 &#61; 131077;<br/></code></pre>
+<pre><code><b>const</b> <a href="fixed_point32.md#0x1_fixed_point32_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>: u64 &#61; 131077;<br /></code></pre>
 
 
 
@@ -126,10 +135,12 @@ The computed ratio when converting to a <code>FixedPoint32</code> would be unrep
 
 ## Function `multiply_u64`
 
-Multiply a u64 integer by a fixed&#45;point number, truncating any<br/> fractional part of the product. This will abort if the product<br/> overflows.
+Multiply a u64 integer by a fixed&#45;point number, truncating any
+fractional part of the product. This will abort if the product
+overflows.
 
 
-<pre><code>public fun multiply_u64(val: u64, multiplier: fixed_point32::FixedPoint32): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_multiply_u64">multiply_u64</a>(val: u64, multiplier: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64<br /></code></pre>
 
 
 
@@ -137,7 +148,7 @@ Multiply a u64 integer by a fixed&#45;point number, truncating any<br/> fraction
 <summary>Implementation</summary>
 
 
-<pre><code>public fun multiply_u64(val: u64, multiplier: FixedPoint32): u64 &#123;<br/>    // The product of two 64 bit values has 128 bits, so perform the<br/>    // multiplication with u128 types and keep the full 128 bit product<br/>    // to avoid losing accuracy.<br/>    let unscaled_product &#61; (val as u128) &#42; (multiplier.value as u128);<br/>    // The unscaled product has 32 fractional bits (from the multiplier)<br/>    // so rescale it by shifting away the low bits.<br/>    let product &#61; unscaled_product &gt;&gt; 32;<br/>    // Check whether the value is too large.<br/>    assert!(product &lt;&#61; MAX_U64, EMULTIPLICATION);<br/>    (product as u64)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_multiply_u64">multiply_u64</a>(val: u64, multiplier: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 &#123;<br />    // The product of two 64 bit values <b>has</b> 128 bits, so perform the<br />    // multiplication <b>with</b> u128 types and keep the full 128 bit product<br />    // <b>to</b> avoid losing accuracy.<br />    <b>let</b> unscaled_product &#61; (val <b>as</b> u128) &#42; (multiplier.value <b>as</b> u128);<br />    // The unscaled product <b>has</b> 32 fractional bits (from the multiplier)<br />    // so rescale it by shifting away the low bits.<br />    <b>let</b> product &#61; unscaled_product &gt;&gt; 32;<br />    // Check whether the value is too large.<br />    <b>assert</b>!(product &lt;&#61; <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>, <a href="fixed_point32.md#0x1_fixed_point32_EMULTIPLICATION">EMULTIPLICATION</a>);<br />    (product <b>as</b> u64)<br />&#125;<br /></code></pre>
 
 
 
@@ -147,10 +158,12 @@ Multiply a u64 integer by a fixed&#45;point number, truncating any<br/> fraction
 
 ## Function `divide_u64`
 
-Divide a u64 integer by a fixed&#45;point number, truncating any<br/> fractional part of the quotient. This will abort if the divisor<br/> is zero or if the quotient overflows.
+Divide a u64 integer by a fixed&#45;point number, truncating any
+fractional part of the quotient. This will abort if the divisor
+is zero or if the quotient overflows.
 
 
-<pre><code>public fun divide_u64(val: u64, divisor: fixed_point32::FixedPoint32): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_divide_u64">divide_u64</a>(val: u64, divisor: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64<br /></code></pre>
 
 
 
@@ -158,7 +171,7 @@ Divide a u64 integer by a fixed&#45;point number, truncating any<br/> fractional
 <summary>Implementation</summary>
 
 
-<pre><code>public fun divide_u64(val: u64, divisor: FixedPoint32): u64 &#123;<br/>    // Check for division by zero.<br/>    assert!(divisor.value !&#61; 0, EDIVISION_BY_ZERO);<br/>    // First convert to 128 bits and then shift left to<br/>    // add 32 fractional zero bits to the dividend.<br/>    let scaled_value &#61; (val as u128) &lt;&lt; 32;<br/>    let quotient &#61; scaled_value / (divisor.value as u128);<br/>    // Check whether the value is too large.<br/>    assert!(quotient &lt;&#61; MAX_U64, EDIVISION);<br/>    // the value may be too large, which will cause the cast to fail<br/>    // with an arithmetic error.<br/>    (quotient as u64)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_divide_u64">divide_u64</a>(val: u64, divisor: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 &#123;<br />    // Check for division by zero.<br />    <b>assert</b>!(divisor.value !&#61; 0, <a href="fixed_point32.md#0x1_fixed_point32_EDIVISION_BY_ZERO">EDIVISION_BY_ZERO</a>);<br />    // First convert <b>to</b> 128 bits and then shift left <b>to</b><br />    // add 32 fractional zero bits <b>to</b> the dividend.<br />    <b>let</b> scaled_value &#61; (val <b>as</b> u128) &lt;&lt; 32;<br />    <b>let</b> quotient &#61; scaled_value / (divisor.value <b>as</b> u128);<br />    // Check whether the value is too large.<br />    <b>assert</b>!(quotient &lt;&#61; <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>, <a href="fixed_point32.md#0x1_fixed_point32_EDIVISION">EDIVISION</a>);<br />    // the value may be too large, which will cause the cast <b>to</b> fail<br />    // <b>with</b> an arithmetic <a href="error.md#0x1_error">error</a>.<br />    (quotient <b>as</b> u64)<br />&#125;<br /></code></pre>
 
 
 
@@ -168,10 +181,19 @@ Divide a u64 integer by a fixed&#45;point number, truncating any<br/> fractional
 
 ## Function `create_from_rational`
 
-Create a fixed&#45;point value from a rational number specified by its<br/> numerator and denominator. Calling this function should be preferred<br/> for using <code>Self::create_from_raw_value</code> which is also available.<br/> This will abort if the denominator is zero. It will also<br/> abort if the numerator is nonzero and the ratio is not in the range<br/> 2^&#45;32 .. 2^32&#45;1. When specifying decimal fractions, be careful about<br/> rounding errors: if you round to display N digits after the decimal<br/> point, you can use a denominator of 10^N to avoid numbers where the<br/> very small imprecision in the binary representation could change the<br/> rounding, e.g., 0.0125 will round down to 0.012 instead of up to 0.013.
+Create a fixed&#45;point value from a rational number specified by its
+numerator and denominator. Calling this function should be preferred
+for using <code><a href="fixed_point32.md#0x1_fixed_point32_create_from_raw_value">Self::create_from_raw_value</a></code> which is also available.
+This will abort if the denominator is zero. It will also
+abort if the numerator is nonzero and the ratio is not in the range
+2^&#45;32 .. 2^32&#45;1. When specifying decimal fractions, be careful about
+rounding errors: if you round to display N digits after the decimal
+point, you can use a denominator of 10^N to avoid numbers where the
+very small imprecision in the binary representation could change the
+rounding, e.g., 0.0125 will round down to 0.012 instead of up to 0.013.
 
 
-<pre><code>public fun create_from_rational(numerator: u64, denominator: u64): fixed_point32::FixedPoint32<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_create_from_rational">create_from_rational</a>(numerator: u64, denominator: u64): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a><br /></code></pre>
 
 
 
@@ -179,7 +201,7 @@ Create a fixed&#45;point value from a rational number specified by its<br/> nume
 <summary>Implementation</summary>
 
 
-<pre><code>public fun create_from_rational(numerator: u64, denominator: u64): FixedPoint32 &#123;<br/>    // If the denominator is zero, this will abort.<br/>    // Scale the numerator to have 64 fractional bits and the denominator<br/>    // to have 32 fractional bits, so that the quotient will have 32<br/>    // fractional bits.<br/>    let scaled_numerator &#61; (numerator as u128) &lt;&lt; 64;<br/>    let scaled_denominator &#61; (denominator as u128) &lt;&lt; 32;<br/>    assert!(scaled_denominator !&#61; 0, EDENOMINATOR);<br/>    let quotient &#61; scaled_numerator / scaled_denominator;<br/>    assert!(quotient !&#61; 0 &#124;&#124; numerator &#61;&#61; 0, ERATIO_OUT_OF_RANGE);<br/>    // Return the quotient as a fixed&#45;point number. We first need to check whether the cast<br/>    // can succeed.<br/>    assert!(quotient &lt;&#61; MAX_U64, ERATIO_OUT_OF_RANGE);<br/>    FixedPoint32 &#123; value: (quotient as u64) &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_create_from_rational">create_from_rational</a>(numerator: u64, denominator: u64): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123;<br />    // If the denominator is zero, this will <b>abort</b>.<br />    // Scale the numerator <b>to</b> have 64 fractional bits and the denominator<br />    // <b>to</b> have 32 fractional bits, so that the quotient will have 32<br />    // fractional bits.<br />    <b>let</b> scaled_numerator &#61; (numerator <b>as</b> u128) &lt;&lt; 64;<br />    <b>let</b> scaled_denominator &#61; (denominator <b>as</b> u128) &lt;&lt; 32;<br />    <b>assert</b>!(scaled_denominator !&#61; 0, <a href="fixed_point32.md#0x1_fixed_point32_EDENOMINATOR">EDENOMINATOR</a>);<br />    <b>let</b> quotient &#61; scaled_numerator / scaled_denominator;<br />    <b>assert</b>!(quotient !&#61; 0 &#124;&#124; numerator &#61;&#61; 0, <a href="fixed_point32.md#0x1_fixed_point32_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>);<br />    // Return the quotient <b>as</b> a fixed&#45;point number. We first need <b>to</b> check whether the cast<br />    // can succeed.<br />    <b>assert</b>!(quotient &lt;&#61; <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>, <a href="fixed_point32.md#0x1_fixed_point32_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>);<br />    <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123; value: (quotient <b>as</b> u64) &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -192,7 +214,7 @@ Create a fixed&#45;point value from a rational number specified by its<br/> nume
 Create a fixedpoint value from a raw value.
 
 
-<pre><code>public fun create_from_raw_value(value: u64): fixed_point32::FixedPoint32<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_create_from_raw_value">create_from_raw_value</a>(value: u64): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a><br /></code></pre>
 
 
 
@@ -200,7 +222,7 @@ Create a fixedpoint value from a raw value.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun create_from_raw_value(value: u64): FixedPoint32 &#123;<br/>    FixedPoint32 &#123; value &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_create_from_raw_value">create_from_raw_value</a>(value: u64): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123;<br />    <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123; value &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -210,10 +232,12 @@ Create a fixedpoint value from a raw value.
 
 ## Function `get_raw_value`
 
-Accessor for the raw u64 value. Other less common operations, such as<br/> adding or subtracting FixedPoint32 values, can be done using the raw<br/> values directly.
+Accessor for the raw u64 value. Other less common operations, such as
+adding or subtracting FixedPoint32 values, can be done using the raw
+values directly.
 
 
-<pre><code>public fun get_raw_value(num: fixed_point32::FixedPoint32): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_get_raw_value">get_raw_value</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64<br /></code></pre>
 
 
 
@@ -221,7 +245,7 @@ Accessor for the raw u64 value. Other less common operations, such as<br/> addin
 <summary>Implementation</summary>
 
 
-<pre><code>public fun get_raw_value(num: FixedPoint32): u64 &#123;<br/>    num.value<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_get_raw_value">get_raw_value</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 &#123;<br />    num.value<br />&#125;<br /></code></pre>
 
 
 
@@ -234,7 +258,7 @@ Accessor for the raw u64 value. Other less common operations, such as<br/> addin
 Returns true if the ratio is zero.
 
 
-<pre><code>public fun is_zero(num: fixed_point32::FixedPoint32): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_is_zero">is_zero</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): bool<br /></code></pre>
 
 
 
@@ -242,7 +266,7 @@ Returns true if the ratio is zero.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun is_zero(num: FixedPoint32): bool &#123;<br/>    num.value &#61;&#61; 0<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_is_zero">is_zero</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): bool &#123;<br />    num.value &#61;&#61; 0<br />&#125;<br /></code></pre>
 
 
 
@@ -255,7 +279,7 @@ Returns true if the ratio is zero.
 Returns the smaller of the two FixedPoint32 numbers.
 
 
-<pre><code>public fun min(num1: fixed_point32::FixedPoint32, num2: fixed_point32::FixedPoint32): fixed_point32::FixedPoint32<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <b>min</b>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a><br /></code></pre>
 
 
 
@@ -263,7 +287,7 @@ Returns the smaller of the two FixedPoint32 numbers.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun min(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 &#123;<br/>    if (num1.value &lt; num2.value) &#123;<br/>        num1<br/>    &#125; else &#123;<br/>        num2<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <b>min</b>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123;<br />    <b>if</b> (num1.value &lt; num2.value) &#123;<br />        num1<br />    &#125; <b>else</b> &#123;<br />        num2<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -276,7 +300,7 @@ Returns the smaller of the two FixedPoint32 numbers.
 Returns the larger of the two FixedPoint32 numbers.
 
 
-<pre><code>public fun max(num1: fixed_point32::FixedPoint32, num2: fixed_point32::FixedPoint32): fixed_point32::FixedPoint32<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_max">max</a>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a><br /></code></pre>
 
 
 
@@ -284,7 +308,7 @@ Returns the larger of the two FixedPoint32 numbers.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun max(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 &#123;<br/>    if (num1.value &gt; num2.value) &#123;<br/>        num1<br/>    &#125; else &#123;<br/>        num2<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_max">max</a>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123;<br />    <b>if</b> (num1.value &gt; num2.value) &#123;<br />        num1<br />    &#125; <b>else</b> &#123;<br />        num2<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -297,7 +321,7 @@ Returns the larger of the two FixedPoint32 numbers.
 Create a fixedpoint value from a u64 value.
 
 
-<pre><code>public fun create_from_u64(val: u64): fixed_point32::FixedPoint32<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_create_from_u64">create_from_u64</a>(val: u64): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a><br /></code></pre>
 
 
 
@@ -305,7 +329,7 @@ Create a fixedpoint value from a u64 value.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun create_from_u64(val: u64): FixedPoint32 &#123;<br/>    let value &#61; (val as u128) &lt;&lt; 32;<br/>    assert!(value &lt;&#61; MAX_U64, ERATIO_OUT_OF_RANGE);<br/>    FixedPoint32 &#123;value: (value as u64)&#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_create_from_u64">create_from_u64</a>(val: u64): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123;<br />    <b>let</b> value &#61; (val <b>as</b> u128) &lt;&lt; 32;<br />    <b>assert</b>!(value &lt;&#61; <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>, <a href="fixed_point32.md#0x1_fixed_point32_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>);<br />    <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123;value: (value <b>as</b> u64)&#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -318,7 +342,7 @@ Create a fixedpoint value from a u64 value.
 Returns the largest integer less than or equal to a given number.
 
 
-<pre><code>public fun floor(num: fixed_point32::FixedPoint32): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64<br /></code></pre>
 
 
 
@@ -326,7 +350,7 @@ Returns the largest integer less than or equal to a given number.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun floor(num: FixedPoint32): u64 &#123;<br/>    num.value &gt;&gt; 32<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 &#123;<br />    num.value &gt;&gt; 32<br />&#125;<br /></code></pre>
 
 
 
@@ -339,7 +363,7 @@ Returns the largest integer less than or equal to a given number.
 Rounds up the given FixedPoint32 to the next largest integer.
 
 
-<pre><code>public fun ceil(num: fixed_point32::FixedPoint32): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64<br /></code></pre>
 
 
 
@@ -347,7 +371,7 @@ Rounds up the given FixedPoint32 to the next largest integer.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun ceil(num: FixedPoint32): u64 &#123;<br/>    let floored_num &#61; floor(num) &lt;&lt; 32;<br/>    if (num.value &#61;&#61; floored_num) &#123;<br/>        return floored_num &gt;&gt; 32<br/>    &#125;;<br/>    let val &#61; ((floored_num as u128) &#43; (1 &lt;&lt; 32));<br/>    (val &gt;&gt; 32 as u64)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 &#123;<br />    <b>let</b> floored_num &#61; <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(num) &lt;&lt; 32;<br />    <b>if</b> (num.value &#61;&#61; floored_num) &#123;<br />        <b>return</b> floored_num &gt;&gt; 32<br />    &#125;;<br />    <b>let</b> val &#61; ((floored_num <b>as</b> u128) &#43; (1 &lt;&lt; 32));<br />    (val &gt;&gt; 32 <b>as</b> u64)<br />&#125;<br /></code></pre>
 
 
 
@@ -360,7 +384,7 @@ Rounds up the given FixedPoint32 to the next largest integer.
 Returns the value of a FixedPoint32 to the nearest integer.
 
 
-<pre><code>public fun round(num: fixed_point32::FixedPoint32): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_round">round</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64<br /></code></pre>
 
 
 
@@ -368,7 +392,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun round(num: FixedPoint32): u64 &#123;<br/>    let floored_num &#61; floor(num) &lt;&lt; 32;<br/>    let boundary &#61; floored_num &#43; ((1 &lt;&lt; 32) / 2);<br/>    if (num.value &lt; boundary) &#123;<br/>        floored_num &gt;&gt; 32<br/>    &#125; else &#123;<br/>        ceil(num)<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_round">round</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 &#123;<br />    <b>let</b> floored_num &#61; <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(num) &lt;&lt; 32;<br />    <b>let</b> boundary &#61; floored_num &#43; ((1 &lt;&lt; 32) / 2);<br />    <b>if</b> (num.value &lt; boundary) &#123;<br />        floored_num &gt;&gt; 32<br />    &#125; <b>else</b> &#123;<br />        <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(num)<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -381,7 +405,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 
-<pre><code>pragma aborts_if_is_strict;<br/></code></pre>
+<pre><code><b>pragma</b> aborts_if_is_strict;<br /></code></pre>
 
 
 
@@ -390,12 +414,12 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `multiply_u64`
 
 
-<pre><code>public fun multiply_u64(val: u64, multiplier: fixed_point32::FixedPoint32): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_multiply_u64">multiply_u64</a>(val: u64, multiplier: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/>include MultiplyAbortsIf;<br/>ensures result &#61;&#61; spec_multiply_u64(val, multiplier);<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /><b>include</b> <a href="fixed_point32.md#0x1_fixed_point32_MultiplyAbortsIf">MultiplyAbortsIf</a>;<br /><b>ensures</b> result &#61;&#61; <a href="fixed_point32.md#0x1_fixed_point32_spec_multiply_u64">spec_multiply_u64</a>(val, multiplier);<br /></code></pre>
 
 
 
@@ -403,7 +427,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_MultiplyAbortsIf"></a>
 
 
-<pre><code>schema MultiplyAbortsIf &#123;<br/>val: num;<br/>multiplier: FixedPoint32;<br/>aborts_if spec_multiply_u64(val, multiplier) &gt; MAX_U64 with EMULTIPLICATION;<br/>&#125;<br/></code></pre>
+<pre><code><b>schema</b> <a href="fixed_point32.md#0x1_fixed_point32_MultiplyAbortsIf">MultiplyAbortsIf</a> &#123;<br />val: num;<br />multiplier: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>;<br /><b>aborts_if</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_multiply_u64">spec_multiply_u64</a>(val, multiplier) &gt; <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a> <b>with</b> <a href="fixed_point32.md#0x1_fixed_point32_EMULTIPLICATION">EMULTIPLICATION</a>;<br />&#125;<br /></code></pre>
 
 
 
@@ -411,7 +435,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_spec_multiply_u64"></a>
 
 
-<pre><code>fun spec_multiply_u64(val: num, multiplier: FixedPoint32): num &#123;<br/>   (val &#42; multiplier.value) &gt;&gt; 32<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_multiply_u64">spec_multiply_u64</a>(val: num, multiplier: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): num &#123;<br />   (val &#42; multiplier.value) &gt;&gt; 32<br />&#125;<br /></code></pre>
 
 
 
@@ -420,12 +444,12 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `divide_u64`
 
 
-<pre><code>public fun divide_u64(val: u64, divisor: fixed_point32::FixedPoint32): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_divide_u64">divide_u64</a>(val: u64, divisor: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/>include DivideAbortsIf;<br/>ensures result &#61;&#61; spec_divide_u64(val, divisor);<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /><b>include</b> <a href="fixed_point32.md#0x1_fixed_point32_DivideAbortsIf">DivideAbortsIf</a>;<br /><b>ensures</b> result &#61;&#61; <a href="fixed_point32.md#0x1_fixed_point32_spec_divide_u64">spec_divide_u64</a>(val, divisor);<br /></code></pre>
 
 
 
@@ -433,7 +457,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_DivideAbortsIf"></a>
 
 
-<pre><code>schema DivideAbortsIf &#123;<br/>val: num;<br/>divisor: FixedPoint32;<br/>aborts_if divisor.value &#61;&#61; 0 with EDIVISION_BY_ZERO;<br/>aborts_if spec_divide_u64(val, divisor) &gt; MAX_U64 with EDIVISION;<br/>&#125;<br/></code></pre>
+<pre><code><b>schema</b> <a href="fixed_point32.md#0x1_fixed_point32_DivideAbortsIf">DivideAbortsIf</a> &#123;<br />val: num;<br />divisor: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>;<br /><b>aborts_if</b> divisor.value &#61;&#61; 0 <b>with</b> <a href="fixed_point32.md#0x1_fixed_point32_EDIVISION_BY_ZERO">EDIVISION_BY_ZERO</a>;<br /><b>aborts_if</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_divide_u64">spec_divide_u64</a>(val, divisor) &gt; <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a> <b>with</b> <a href="fixed_point32.md#0x1_fixed_point32_EDIVISION">EDIVISION</a>;<br />&#125;<br /></code></pre>
 
 
 
@@ -441,7 +465,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_spec_divide_u64"></a>
 
 
-<pre><code>fun spec_divide_u64(val: num, divisor: FixedPoint32): num &#123;<br/>   (val &lt;&lt; 32) / divisor.value<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_divide_u64">spec_divide_u64</a>(val: num, divisor: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): num &#123;<br />   (val &lt;&lt; 32) / divisor.value<br />&#125;<br /></code></pre>
 
 
 
@@ -450,12 +474,12 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `create_from_rational`
 
 
-<pre><code>public fun create_from_rational(numerator: u64, denominator: u64): fixed_point32::FixedPoint32<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_create_from_rational">create_from_rational</a>(numerator: u64, denominator: u64): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a><br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/>include CreateFromRationalAbortsIf;<br/>ensures result &#61;&#61; spec_create_from_rational(numerator, denominator);<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /><b>include</b> <a href="fixed_point32.md#0x1_fixed_point32_CreateFromRationalAbortsIf">CreateFromRationalAbortsIf</a>;<br /><b>ensures</b> result &#61;&#61; <a href="fixed_point32.md#0x1_fixed_point32_spec_create_from_rational">spec_create_from_rational</a>(numerator, denominator);<br /></code></pre>
 
 
 
@@ -463,7 +487,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_CreateFromRationalAbortsIf"></a>
 
 
-<pre><code>schema CreateFromRationalAbortsIf &#123;<br/>numerator: u64;<br/>denominator: u64;<br/>let scaled_numerator &#61; (numerator as u128)&lt;&lt; 64;<br/>let scaled_denominator &#61; (denominator as u128) &lt;&lt; 32;<br/>let quotient &#61; scaled_numerator / scaled_denominator;<br/>aborts_if scaled_denominator &#61;&#61; 0 with EDENOMINATOR;<br/>aborts_if quotient &#61;&#61; 0 &amp;&amp; scaled_numerator !&#61; 0 with ERATIO_OUT_OF_RANGE;<br/>aborts_if quotient &gt; MAX_U64 with ERATIO_OUT_OF_RANGE;<br/>&#125;<br/></code></pre>
+<pre><code><b>schema</b> <a href="fixed_point32.md#0x1_fixed_point32_CreateFromRationalAbortsIf">CreateFromRationalAbortsIf</a> &#123;<br />numerator: u64;<br />denominator: u64;<br /><b>let</b> scaled_numerator &#61; (numerator <b>as</b> u128)&lt;&lt; 64;<br /><b>let</b> scaled_denominator &#61; (denominator <b>as</b> u128) &lt;&lt; 32;<br /><b>let</b> quotient &#61; scaled_numerator / scaled_denominator;<br /><b>aborts_if</b> scaled_denominator &#61;&#61; 0 <b>with</b> <a href="fixed_point32.md#0x1_fixed_point32_EDENOMINATOR">EDENOMINATOR</a>;<br /><b>aborts_if</b> quotient &#61;&#61; 0 &amp;&amp; scaled_numerator !&#61; 0 <b>with</b> <a href="fixed_point32.md#0x1_fixed_point32_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>;<br /><b>aborts_if</b> quotient &gt; <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a> <b>with</b> <a href="fixed_point32.md#0x1_fixed_point32_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>;<br />&#125;<br /></code></pre>
 
 
 
@@ -471,7 +495,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_spec_create_from_rational"></a>
 
 
-<pre><code>fun spec_create_from_rational(numerator: num, denominator: num): FixedPoint32 &#123;<br/>   FixedPoint32&#123;value: (numerator &lt;&lt; 64) / (denominator &lt;&lt; 32)&#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_create_from_rational">spec_create_from_rational</a>(numerator: num, denominator: num): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123;<br />   <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>&#123;value: (numerator &lt;&lt; 64) / (denominator &lt;&lt; 32)&#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -480,12 +504,12 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `create_from_raw_value`
 
 
-<pre><code>public fun create_from_raw_value(value: u64): fixed_point32::FixedPoint32<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_create_from_raw_value">create_from_raw_value</a>(value: u64): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a><br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/>aborts_if false;<br/>ensures result.value &#61;&#61; value;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /><b>aborts_if</b> <b>false</b>;<br /><b>ensures</b> result.value &#61;&#61; value;<br /></code></pre>
 
 
 
@@ -494,12 +518,12 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `min`
 
 
-<pre><code>public fun min(num1: fixed_point32::FixedPoint32, num2: fixed_point32::FixedPoint32): fixed_point32::FixedPoint32<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <b>min</b>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a><br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/>aborts_if false;<br/>ensures result &#61;&#61; spec_min(num1, num2);<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /><b>aborts_if</b> <b>false</b>;<br /><b>ensures</b> result &#61;&#61; <a href="fixed_point32.md#0x1_fixed_point32_spec_min">spec_min</a>(num1, num2);<br /></code></pre>
 
 
 
@@ -507,7 +531,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_spec_min"></a>
 
 
-<pre><code>fun spec_min(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 &#123;<br/>   if (num1.value &lt; num2.value) &#123;<br/>       num1<br/>   &#125; else &#123;<br/>       num2<br/>   &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_min">spec_min</a>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123;<br />   <b>if</b> (num1.value &lt; num2.value) &#123;<br />       num1<br />   &#125; <b>else</b> &#123;<br />       num2<br />   &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -516,12 +540,12 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `max`
 
 
-<pre><code>public fun max(num1: fixed_point32::FixedPoint32, num2: fixed_point32::FixedPoint32): fixed_point32::FixedPoint32<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_max">max</a>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a><br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/>aborts_if false;<br/>ensures result &#61;&#61; spec_max(num1, num2);<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /><b>aborts_if</b> <b>false</b>;<br /><b>ensures</b> result &#61;&#61; <a href="fixed_point32.md#0x1_fixed_point32_spec_max">spec_max</a>(num1, num2);<br /></code></pre>
 
 
 
@@ -529,7 +553,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_spec_max"></a>
 
 
-<pre><code>fun spec_max(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 &#123;<br/>   if (num1.value &gt; num2.value) &#123;<br/>       num1<br/>   &#125; else &#123;<br/>       num2<br/>   &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_max">spec_max</a>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123;<br />   <b>if</b> (num1.value &gt; num2.value) &#123;<br />       num1<br />   &#125; <b>else</b> &#123;<br />       num2<br />   &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -538,12 +562,12 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `create_from_u64`
 
 
-<pre><code>public fun create_from_u64(val: u64): fixed_point32::FixedPoint32<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_create_from_u64">create_from_u64</a>(val: u64): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a><br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/>include CreateFromU64AbortsIf;<br/>ensures result &#61;&#61; spec_create_from_u64(val);<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /><b>include</b> <a href="fixed_point32.md#0x1_fixed_point32_CreateFromU64AbortsIf">CreateFromU64AbortsIf</a>;<br /><b>ensures</b> result &#61;&#61; <a href="fixed_point32.md#0x1_fixed_point32_spec_create_from_u64">spec_create_from_u64</a>(val);<br /></code></pre>
 
 
 
@@ -551,7 +575,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_CreateFromU64AbortsIf"></a>
 
 
-<pre><code>schema CreateFromU64AbortsIf &#123;<br/>val: num;<br/>let scaled_value &#61; (val as u128) &lt;&lt; 32;<br/>aborts_if scaled_value &gt; MAX_U64;<br/>&#125;<br/></code></pre>
+<pre><code><b>schema</b> <a href="fixed_point32.md#0x1_fixed_point32_CreateFromU64AbortsIf">CreateFromU64AbortsIf</a> &#123;<br />val: num;<br /><b>let</b> scaled_value &#61; (val <b>as</b> u128) &lt;&lt; 32;<br /><b>aborts_if</b> scaled_value &gt; <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>;<br />&#125;<br /></code></pre>
 
 
 
@@ -559,7 +583,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_spec_create_from_u64"></a>
 
 
-<pre><code>fun spec_create_from_u64(val: num): FixedPoint32 &#123;<br/>   FixedPoint32 &#123;value: val &lt;&lt; 32&#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_create_from_u64">spec_create_from_u64</a>(val: num): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123;<br />   <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> &#123;value: val &lt;&lt; 32&#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -568,12 +592,12 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `floor`
 
 
-<pre><code>public fun floor(num: fixed_point32::FixedPoint32): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_floor">floor</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/>aborts_if false;<br/>ensures result &#61;&#61; spec_floor(num);<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /><b>aborts_if</b> <b>false</b>;<br /><b>ensures</b> result &#61;&#61; <a href="fixed_point32.md#0x1_fixed_point32_spec_floor">spec_floor</a>(num);<br /></code></pre>
 
 
 
@@ -581,7 +605,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_spec_floor"></a>
 
 
-<pre><code>fun spec_floor(val: FixedPoint32): u64 &#123;<br/>   let fractional &#61; val.value % (1 &lt;&lt; 32);<br/>   if (fractional &#61;&#61; 0) &#123;<br/>       val.value &gt;&gt; 32<br/>   &#125; else &#123;<br/>       (val.value &#45; fractional) &gt;&gt; 32<br/>   &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_floor">spec_floor</a>(val: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 &#123;<br />   <b>let</b> fractional &#61; val.value % (1 &lt;&lt; 32);<br />   <b>if</b> (fractional &#61;&#61; 0) &#123;<br />       val.value &gt;&gt; 32<br />   &#125; <b>else</b> &#123;<br />       (val.value &#45; fractional) &gt;&gt; 32<br />   &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -590,12 +614,12 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `ceil`
 
 
-<pre><code>public fun ceil(num: fixed_point32::FixedPoint32): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_ceil">ceil</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64<br /></code></pre>
 
 
 
 
-<pre><code>pragma verify_duration_estimate &#61; 120;<br/>pragma opaque;<br/>aborts_if false;<br/>ensures result &#61;&#61; spec_ceil(num);<br/></code></pre>
+<pre><code><b>pragma</b> verify_duration_estimate &#61; 120;<br /><b>pragma</b> opaque;<br /><b>aborts_if</b> <b>false</b>;<br /><b>ensures</b> result &#61;&#61; <a href="fixed_point32.md#0x1_fixed_point32_spec_ceil">spec_ceil</a>(num);<br /></code></pre>
 
 
 
@@ -603,7 +627,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_spec_ceil"></a>
 
 
-<pre><code>fun spec_ceil(val: FixedPoint32): u64 &#123;<br/>   let fractional &#61; val.value % (1 &lt;&lt; 32);<br/>   let one &#61; 1 &lt;&lt; 32;<br/>   if (fractional &#61;&#61; 0) &#123;<br/>       val.value &gt;&gt; 32<br/>   &#125; else &#123;<br/>       (val.value &#45; fractional &#43; one) &gt;&gt; 32<br/>   &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_ceil">spec_ceil</a>(val: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 &#123;<br />   <b>let</b> fractional &#61; val.value % (1 &lt;&lt; 32);<br />   <b>let</b> one &#61; 1 &lt;&lt; 32;<br />   <b>if</b> (fractional &#61;&#61; 0) &#123;<br />       val.value &gt;&gt; 32<br />   &#125; <b>else</b> &#123;<br />       (val.value &#45; fractional &#43; one) &gt;&gt; 32<br />   &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -612,12 +636,12 @@ Returns the value of a FixedPoint32 to the nearest integer.
 ### Function `round`
 
 
-<pre><code>public fun round(num: fixed_point32::FixedPoint32): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_round">round</a>(num: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): u64<br /></code></pre>
 
 
 
 
-<pre><code>pragma verify_duration_estimate &#61; 120;<br/>pragma opaque;<br/>aborts_if false;<br/>ensures result &#61;&#61; spec_round(num);<br/></code></pre>
+<pre><code><b>pragma</b> verify_duration_estimate &#61; 120;<br /><b>pragma</b> opaque;<br /><b>aborts_if</b> <b>false</b>;<br /><b>ensures</b> result &#61;&#61; <a href="fixed_point32.md#0x1_fixed_point32_spec_round">spec_round</a>(num);<br /></code></pre>
 
 
 
@@ -625,7 +649,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <a id="0x1_fixed_point32_spec_round"></a>
 
 
-<pre><code>fun spec_round(val: FixedPoint32): u64 &#123;<br/>   let fractional &#61; val.value % (1 &lt;&lt; 32);<br/>   let boundary &#61; (1 &lt;&lt; 32) / 2;<br/>   let one &#61; 1 &lt;&lt; 32;<br/>   if (fractional &lt; boundary) &#123;<br/>       (val.value &#45; fractional) &gt;&gt; 32<br/>   &#125; else &#123;<br/>       (val.value &#45; fractional &#43; one) &gt;&gt; 32<br/>   &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_round">spec_round</a>(val: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): u64 &#123;<br />   <b>let</b> fractional &#61; val.value % (1 &lt;&lt; 32);<br />   <b>let</b> boundary &#61; (1 &lt;&lt; 32) / 2;<br />   <b>let</b> one &#61; 1 &lt;&lt; 32;<br />   <b>if</b> (fractional &lt; boundary) &#123;<br />       (val.value &#45; fractional) &gt;&gt; 32<br />   &#125; <b>else</b> &#123;<br />       (val.value &#45; fractional &#43; one) &gt;&gt; 32<br />   &#125;<br />&#125;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

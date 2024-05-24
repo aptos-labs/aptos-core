@@ -3,7 +3,9 @@
 
 # Module `0x1::governance_proposal`
 
-Define the GovernanceProposal that will be used as part of on&#45;chain governance by AptosGovernance.<br/><br/> This is separate from the AptosGovernance module to avoid circular dependency between AptosGovernance and Stake.
+Define the GovernanceProposal that will be used as part of on&#45;chain governance by AptosGovernance.
+
+This is separate from the AptosGovernance module to avoid circular dependency between AptosGovernance and Stake.
 
 
 -  [Struct `GovernanceProposal`](#0x1_governance_proposal_GovernanceProposal)
@@ -26,7 +28,7 @@ Define the GovernanceProposal that will be used as part of on&#45;chain governan
 
 
 
-<pre><code>struct GovernanceProposal has drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">GovernanceProposal</a> <b>has</b> drop, store<br /></code></pre>
 
 
 
@@ -53,7 +55,7 @@ Define the GovernanceProposal that will be used as part of on&#45;chain governan
 Create and return a GovernanceProposal resource. Can only be called by AptosGovernance
 
 
-<pre><code>public(friend) fun create_proposal(): governance_proposal::GovernanceProposal<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="governance_proposal.md#0x1_governance_proposal_create_proposal">create_proposal</a>(): <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">governance_proposal::GovernanceProposal</a><br /></code></pre>
 
 
 
@@ -61,7 +63,7 @@ Create and return a GovernanceProposal resource. Can only be called by AptosGove
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun create_proposal(): GovernanceProposal &#123;<br/>    GovernanceProposal &#123;&#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="governance_proposal.md#0x1_governance_proposal_create_proposal">create_proposal</a>(): <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">GovernanceProposal</a> &#123;<br />    <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">GovernanceProposal</a> &#123;&#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -74,7 +76,7 @@ Create and return a GovernanceProposal resource. Can only be called by AptosGove
 Useful for AptosGovernance to create an empty proposal as proof.
 
 
-<pre><code>public(friend) fun create_empty_proposal(): governance_proposal::GovernanceProposal<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="governance_proposal.md#0x1_governance_proposal_create_empty_proposal">create_empty_proposal</a>(): <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">governance_proposal::GovernanceProposal</a><br /></code></pre>
 
 
 
@@ -82,7 +84,7 @@ Useful for AptosGovernance to create an empty proposal as proof.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun create_empty_proposal(): GovernanceProposal &#123;<br/>    create_proposal()<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="governance_proposal.md#0x1_governance_proposal_create_empty_proposal">create_empty_proposal</a>(): <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">GovernanceProposal</a> &#123;<br />    <a href="governance_proposal.md#0x1_governance_proposal_create_proposal">create_proposal</a>()<br />&#125;<br /></code></pre>
 
 
 
@@ -98,7 +100,7 @@ Useful for AptosGovernance to create an empty proposal as proof.
 ### Function `create_proposal`
 
 
-<pre><code>public(friend) fun create_proposal(): governance_proposal::GovernanceProposal<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="governance_proposal.md#0x1_governance_proposal_create_proposal">create_proposal</a>(): <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">governance_proposal::GovernanceProposal</a><br /></code></pre>
 
 
 
@@ -108,15 +110,30 @@ Useful for AptosGovernance to create an empty proposal as proof.
 
 ### High-level Requirements
 
-&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Creating a proposal should never abort but should always return a governance proposal resource.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;Both create_proposal and create_empty_proposal functions return a GovernanceProposal resource.&lt;/td&gt;<br/>&lt;td&gt;Enforced via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1.1&quot;&gt;create_proposal&lt;/a&gt; and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1.2&quot;&gt;create_empty_proposal&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>1</td>
+<td>Creating a proposal should never abort but should always return a governance proposal resource.</td>
+<td>Medium</td>
+<td>Both create_proposal and create_empty_proposal functions return a GovernanceProposal resource.</td>
+<td>Enforced via <a href="#high-level-req-1.1">create_proposal</a> and <a href="#high-level-req-1.2">create_empty_proposal</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The governance proposal module should only be accessible to the aptos governance.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;Both create_proposal and create_empty_proposal functions are only available to the friend module aptos_framework::aptos_governance.&lt;/td&gt;<br/>&lt;td&gt;Enforced via friend module relationship.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>2</td>
+<td>The governance proposal module should only be accessible to the aptos governance.</td>
+<td>Medium</td>
+<td>Both create_proposal and create_empty_proposal functions are only available to the friend module aptos_framework::aptos_governance.</td>
+<td>Enforced via friend module relationship.</td>
+</tr>
 
-&lt;/table&gt;<br/>
+</table>
 
-<br/>
+
 
 
 <a id="module-level-spec"></a>
@@ -124,8 +141,8 @@ Useful for AptosGovernance to create an empty proposal as proof.
 ### Module-level Specification
 
 
-<pre><code>aborts_if false;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
-ensures result &#61;&#61; GovernanceProposal &#123;&#125;;<br/></code></pre>
+<pre><code><b>aborts_if</b> <b>false</b>;<br />// This enforces <a id="high-level-req-1.1" href="#high-level-req">high&#45;level requirement 1</a>:
+<b>ensures</b> result &#61;&#61; <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">GovernanceProposal</a> &#123;&#125;;<br /></code></pre>
 
 
 
@@ -134,13 +151,13 @@ ensures result &#61;&#61; GovernanceProposal &#123;&#125;;<br/></code></pre>
 ### Function `create_empty_proposal`
 
 
-<pre><code>public(friend) fun create_empty_proposal(): governance_proposal::GovernanceProposal<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="governance_proposal.md#0x1_governance_proposal_create_empty_proposal">create_empty_proposal</a>(): <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">governance_proposal::GovernanceProposal</a><br /></code></pre>
 
 
 
 
-<pre><code>aborts_if false;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
-ensures result &#61;&#61; GovernanceProposal &#123;&#125;;<br/></code></pre>
+<pre><code><b>aborts_if</b> <b>false</b>;<br />// This enforces <a id="high-level-req-1.2" href="#high-level-req">high&#45;level requirement 1</a>:
+<b>ensures</b> result &#61;&#61; <a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">GovernanceProposal</a> &#123;&#125;;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

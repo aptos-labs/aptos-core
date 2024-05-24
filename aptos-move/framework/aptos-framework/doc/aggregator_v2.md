@@ -3,7 +3,16 @@
 
 # Module `0x1::aggregator_v2`
 
-This module provides an interface for aggregators (version 2). Aggregators are<br/> similar to unsigned integers and support addition and subtraction (aborting on<br/> underflow or on overflowing a custom upper limit). The difference from integers<br/> is that aggregators allow to perform both additions and subtractions in parallel<br/> across multiple transactions, enabling parallel execution. For example, if the<br/> first transaction is doing <code>try_add(X, 1)</code> for aggregator <code>X</code>, and the second is<br/> doing <code>try_sub(X,3)</code>, they can be executed in parallel avoiding a read&#45;modify&#45;write<br/> dependency.<br/> However, reading the aggregator value (i.e. calling <code>read(X)</code>) is a resource&#45;intensive<br/> operation that also reduced parallelism, and should be avoided as much as possible.
+This module provides an interface for aggregators (version 2). Aggregators are
+similar to unsigned integers and support addition and subtraction (aborting on
+underflow or on overflowing a custom upper limit). The difference from integers
+is that aggregators allow to perform both additions and subtractions in parallel
+across multiple transactions, enabling parallel execution. For example, if the
+first transaction is doing <code><a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>(X, 1)</code> for aggregator <code>X</code>, and the second is
+doing <code><a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>(X,3)</code>, they can be executed in parallel avoiding a read&#45;modify&#45;write
+dependency.
+However, reading the aggregator value (i.e. calling <code><a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>(X)</code>) is a resource&#45;intensive
+operation that also reduced parallelism, and should be avoided as much as possible.
 
 
 -  [Struct `Aggregator`](#0x1_aggregator_v2_Aggregator)
@@ -38,7 +47,7 @@ This module provides an interface for aggregators (version 2). Aggregators are<b
     -  [Function `string_concat`](#@Specification_1_string_concat)
 
 
-<pre><code>use 0x1::error;<br/>use 0x1::string;<br/></code></pre>
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;<br /></code></pre>
 
 
 
@@ -46,10 +55,13 @@ This module provides an interface for aggregators (version 2). Aggregators are<b
 
 ## Struct `Aggregator`
 
-Represents an integer which supports parallel additions and subtractions<br/> across multiple transactions. See the module description for more details.<br/><br/> Currently supported types for IntElement are u64 and u128.
+Represents an integer which supports parallel additions and subtractions
+across multiple transactions. See the module description for more details.
+
+Currently supported types for IntElement are u64 and u128.
 
 
-<pre><code>struct Aggregator&lt;IntElement&gt; has drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt; <b>has</b> drop, store<br /></code></pre>
 
 
 
@@ -79,10 +91,12 @@ Represents an integer which supports parallel additions and subtractions<br/> ac
 
 ## Struct `AggregatorSnapshot`
 
-Represents a constant value, that was derived from an aggregator at given instant in time.<br/> Unlike read() and storing the value directly, this enables parallel execution of transactions,<br/> while storing snapshot of aggregator state elsewhere.
+Represents a constant value, that was derived from an aggregator at given instant in time.
+Unlike read() and storing the value directly, this enables parallel execution of transactions,
+while storing snapshot of aggregator state elsewhere.
 
 
-<pre><code>struct AggregatorSnapshot&lt;IntElement&gt; has drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt; <b>has</b> drop, store<br /></code></pre>
 
 
 
@@ -108,7 +122,7 @@ Represents a constant value, that was derived from an aggregator at given instan
 
 
 
-<pre><code>struct DerivedStringSnapshot has drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">DerivedStringSnapshot</a> <b>has</b> drop, store<br /></code></pre>
 
 
 
@@ -118,13 +132,13 @@ Represents a constant value, that was derived from an aggregator at given instan
 
 <dl>
 <dt>
-<code>value: string::String</code>
+<code>value: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>padding: vector&lt;u8&gt;</code>
+<code>padding: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -144,7 +158,7 @@ Represents a constant value, that was derived from an aggregator at given instan
 The value of aggregator overflows. Raised by uncoditional add() call
 
 
-<pre><code>const EAGGREGATOR_OVERFLOW: u64 &#61; 1;<br/></code></pre>
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_OVERFLOW">EAGGREGATOR_OVERFLOW</a>: u64 &#61; 1;<br /></code></pre>
 
 
 
@@ -153,7 +167,7 @@ The value of aggregator overflows. Raised by uncoditional add() call
 The value of aggregator underflows (goes below zero). Raised by uncoditional sub() call
 
 
-<pre><code>const EAGGREGATOR_UNDERFLOW: u64 &#61; 2;<br/></code></pre>
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>: u64 &#61; 2;<br /></code></pre>
 
 
 
@@ -162,16 +176,17 @@ The value of aggregator underflows (goes below zero). Raised by uncoditional sub
 The aggregator api v2 feature flag is not enabled.
 
 
-<pre><code>const EAGGREGATOR_API_V2_NOT_ENABLED: u64 &#61; 6;<br/></code></pre>
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_API_V2_NOT_ENABLED">EAGGREGATOR_API_V2_NOT_ENABLED</a>: u64 &#61; 6;<br /></code></pre>
 
 
 
 <a id="0x1_aggregator_v2_EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED"></a>
 
-The native aggregator function, that is in the move file, is not yet supported.<br/> and any calls will raise this error.
+The native aggregator function, that is in the move file, is not yet supported.
+and any calls will raise this error.
 
 
-<pre><code>const EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED: u64 &#61; 9;<br/></code></pre>
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED">EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED</a>: u64 &#61; 9;<br /></code></pre>
 
 
 
@@ -180,7 +195,7 @@ The native aggregator function, that is in the move file, is not yet supported.<
 Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix together).
 
 
-<pre><code>const ECONCAT_STRING_LENGTH_TOO_LARGE: u64 &#61; 8;<br/></code></pre>
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_ECONCAT_STRING_LENGTH_TOO_LARGE">ECONCAT_STRING_LENGTH_TOO_LARGE</a>: u64 &#61; 8;<br /></code></pre>
 
 
 
@@ -189,7 +204,7 @@ Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix 
 The generic type supplied to the aggregator snapshot is not supported.
 
 
-<pre><code>const EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE: u64 &#61; 5;<br/></code></pre>
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE">EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE</a>: u64 &#61; 5;<br /></code></pre>
 
 
 
@@ -198,7 +213,7 @@ The generic type supplied to the aggregator snapshot is not supported.
 The generic type supplied to the aggregator is not supported.
 
 
-<pre><code>const EUNSUPPORTED_AGGREGATOR_TYPE: u64 &#61; 7;<br/></code></pre>
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EUNSUPPORTED_AGGREGATOR_TYPE">EUNSUPPORTED_AGGREGATOR_TYPE</a>: u64 &#61; 7;<br /></code></pre>
 
 
 
@@ -209,7 +224,7 @@ The generic type supplied to the aggregator is not supported.
 Returns <code>max_value</code> exceeding which aggregator overflows.
 
 
-<pre><code>public fun max_value&lt;IntElement: copy, drop&gt;(aggregator: &amp;aggregator_v2::Aggregator&lt;IntElement&gt;): IntElement<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_max_value">max_value</a>&lt;IntElement: <b>copy</b>, drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): IntElement<br /></code></pre>
 
 
 
@@ -217,7 +232,7 @@ Returns <code>max_value</code> exceeding which aggregator overflows.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun max_value&lt;IntElement: copy &#43; drop&gt;(aggregator: &amp;Aggregator&lt;IntElement&gt;): IntElement &#123;<br/>    aggregator.max_value<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_max_value">max_value</a>&lt;IntElement: <b>copy</b> &#43; drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;): IntElement &#123;<br />    <a href="aggregator.md#0x1_aggregator">aggregator</a>.max_value<br />&#125;<br /></code></pre>
 
 
 
@@ -227,10 +242,13 @@ Returns <code>max_value</code> exceeding which aggregator overflows.
 
 ## Function `create_aggregator`
 
-Creates new aggregator, with given &apos;max_value&apos;.<br/><br/> Currently supported types for IntElement are u64 and u128.<br/> EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
+Creates new aggregator, with given &apos;max_value&apos;.
+
+Currently supported types for IntElement are u64 and u128.
+EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 
-<pre><code>public fun create_aggregator&lt;IntElement: copy, drop&gt;(max_value: IntElement): aggregator_v2::Aggregator&lt;IntElement&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;IntElement: <b>copy</b>, drop&gt;(max_value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;<br /></code></pre>
 
 
 
@@ -238,7 +256,7 @@ Creates new aggregator, with given &apos;max_value&apos;.<br/><br/> Currently su
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun create_aggregator&lt;IntElement: copy &#43; drop&gt;(max_value: IntElement): Aggregator&lt;IntElement&gt;;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;IntElement: <b>copy</b> &#43; drop&gt;(max_value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;;<br /></code></pre>
 
 
 
@@ -248,10 +266,14 @@ Creates new aggregator, with given &apos;max_value&apos;.<br/><br/> Currently su
 
 ## Function `create_unbounded_aggregator`
 
-Creates new aggregator, without any &apos;max_value&apos; on top of the implicit bound restriction<br/> due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).<br/><br/> Currently supported types for IntElement are u64 and u128.<br/> EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
+Creates new aggregator, without any &apos;max_value&apos; on top of the implicit bound restriction
+due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).
+
+Currently supported types for IntElement are u64 and u128.
+EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 
-<pre><code>public fun create_unbounded_aggregator&lt;IntElement: copy, drop&gt;(): aggregator_v2::Aggregator&lt;IntElement&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;IntElement: <b>copy</b>, drop&gt;(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;<br /></code></pre>
 
 
 
@@ -259,7 +281,7 @@ Creates new aggregator, without any &apos;max_value&apos; on top of the implicit
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun create_unbounded_aggregator&lt;IntElement: copy &#43; drop&gt;(): Aggregator&lt;IntElement&gt;;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;IntElement: <b>copy</b> &#43; drop&gt;(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;;<br /></code></pre>
 
 
 
@@ -269,10 +291,11 @@ Creates new aggregator, without any &apos;max_value&apos; on top of the implicit
 
 ## Function `try_add`
 
-Adds <code>value</code> to aggregator.<br/> If addition would exceed the max_value, <code>false</code> is returned, and aggregator value is left unchanged.
+Adds <code>value</code> to aggregator.
+If addition would exceed the max_value, <code><b>false</b></code> is returned, and aggregator value is left unchanged.
 
 
-<pre><code>public fun try_add&lt;IntElement&gt;(aggregator: &amp;mut aggregator_v2::Aggregator&lt;IntElement&gt;, value: IntElement): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement): bool<br /></code></pre>
 
 
 
@@ -280,7 +303,7 @@ Adds <code>value</code> to aggregator.<br/> If addition would exceed the max_val
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun try_add&lt;IntElement&gt;(aggregator: &amp;mut Aggregator&lt;IntElement&gt;, value: IntElement): bool;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;, value: IntElement): bool;<br /></code></pre>
 
 
 
@@ -292,7 +315,7 @@ Adds <code>value</code> to aggregator.<br/> If addition would exceed the max_val
 
 
 
-<pre><code>public fun add&lt;IntElement&gt;(aggregator: &amp;mut aggregator_v2::Aggregator&lt;IntElement&gt;, value: IntElement)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement)<br /></code></pre>
 
 
 
@@ -300,7 +323,7 @@ Adds <code>value</code> to aggregator.<br/> If addition would exceed the max_val
 <summary>Implementation</summary>
 
 
-<pre><code>public fun add&lt;IntElement&gt;(aggregator: &amp;mut Aggregator&lt;IntElement&gt;, value: IntElement) &#123;<br/>    assert!(try_add(aggregator, value), error::out_of_range(EAGGREGATOR_OVERFLOW));<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;, value: IntElement) &#123;<br />    <b>assert</b>!(<a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_OVERFLOW">EAGGREGATOR_OVERFLOW</a>));<br />&#125;<br /></code></pre>
 
 
 
@@ -310,10 +333,11 @@ Adds <code>value</code> to aggregator.<br/> If addition would exceed the max_val
 
 ## Function `try_sub`
 
-Subtracts <code>value</code> from aggregator.<br/> If subtraction would result in a negative value, <code>false</code> is returned, and aggregator value is left unchanged.
+Subtracts <code>value</code> from aggregator.
+If subtraction would result in a negative value, <code><b>false</b></code> is returned, and aggregator value is left unchanged.
 
 
-<pre><code>public fun try_sub&lt;IntElement&gt;(aggregator: &amp;mut aggregator_v2::Aggregator&lt;IntElement&gt;, value: IntElement): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement): bool<br /></code></pre>
 
 
 
@@ -321,7 +345,7 @@ Subtracts <code>value</code> from aggregator.<br/> If subtraction would result i
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun try_sub&lt;IntElement&gt;(aggregator: &amp;mut Aggregator&lt;IntElement&gt;, value: IntElement): bool;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;, value: IntElement): bool;<br /></code></pre>
 
 
 
@@ -333,7 +357,7 @@ Subtracts <code>value</code> from aggregator.<br/> If subtraction would result i
 
 
 
-<pre><code>public fun sub&lt;IntElement&gt;(aggregator: &amp;mut aggregator_v2::Aggregator&lt;IntElement&gt;, value: IntElement)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_sub">sub</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement)<br /></code></pre>
 
 
 
@@ -341,7 +365,7 @@ Subtracts <code>value</code> from aggregator.<br/> If subtraction would result i
 <summary>Implementation</summary>
 
 
-<pre><code>public fun sub&lt;IntElement&gt;(aggregator: &amp;mut Aggregator&lt;IntElement&gt;, value: IntElement) &#123;<br/>    assert!(try_sub(aggregator, value), error::out_of_range(EAGGREGATOR_UNDERFLOW));<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_sub">sub</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;, value: IntElement) &#123;<br />    <b>assert</b>!(<a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>));<br />&#125;<br /></code></pre>
 
 
 
@@ -351,10 +375,13 @@ Subtracts <code>value</code> from aggregator.<br/> If subtraction would result i
 
 ## Function `read`
 
-Returns a value stored in this aggregator.<br/> Note: This operation is resource&#45;intensive, and reduces parallelism.<br/> (Especially if called in a transaction that also modifies the aggregator,<br/> or has other read/write conflicts)
+Returns a value stored in this aggregator.
+Note: This operation is resource&#45;intensive, and reduces parallelism.
+(Especially if called in a transaction that also modifies the aggregator,
+or has other read/write conflicts)
 
 
-<pre><code>public fun read&lt;IntElement&gt;(aggregator: &amp;aggregator_v2::Aggregator&lt;IntElement&gt;): IntElement<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): IntElement<br /></code></pre>
 
 
 
@@ -362,7 +389,7 @@ Returns a value stored in this aggregator.<br/> Note: This operation is resource
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun read&lt;IntElement&gt;(aggregator: &amp;Aggregator&lt;IntElement&gt;): IntElement;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;): IntElement;<br /></code></pre>
 
 
 
@@ -372,10 +399,11 @@ Returns a value stored in this aggregator.<br/> Note: This operation is resource
 
 ## Function `snapshot`
 
-Returns a wrapper of a current value of an aggregator<br/> Unlike read(), it is fast and avoids sequential dependencies.
+Returns a wrapper of a current value of an aggregator
+Unlike read(), it is fast and avoids sequential dependencies.
 
 
-<pre><code>public fun snapshot&lt;IntElement&gt;(aggregator: &amp;aggregator_v2::Aggregator&lt;IntElement&gt;): aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">snapshot</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;<br /></code></pre>
 
 
 
@@ -383,7 +411,7 @@ Returns a wrapper of a current value of an aggregator<br/> Unlike read(), it is 
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun snapshot&lt;IntElement&gt;(aggregator: &amp;Aggregator&lt;IntElement&gt;): AggregatorSnapshot&lt;IntElement&gt;;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">snapshot</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;;<br /></code></pre>
 
 
 
@@ -393,10 +421,11 @@ Returns a wrapper of a current value of an aggregator<br/> Unlike read(), it is 
 
 ## Function `create_snapshot`
 
-Creates a snapshot of a given value.<br/> Useful for when object is sometimes created via snapshot() or string_concat(), and sometimes directly.
+Creates a snapshot of a given value.
+Useful for when object is sometimes created via snapshot() or string_concat(), and sometimes directly.
 
 
-<pre><code>public fun create_snapshot&lt;IntElement: copy, drop&gt;(value: IntElement): aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_snapshot">create_snapshot</a>&lt;IntElement: <b>copy</b>, drop&gt;(value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;<br /></code></pre>
 
 
 
@@ -404,7 +433,7 @@ Creates a snapshot of a given value.<br/> Useful for when object is sometimes cr
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun create_snapshot&lt;IntElement: copy &#43; drop&gt;(value: IntElement): AggregatorSnapshot&lt;IntElement&gt;;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_snapshot">create_snapshot</a>&lt;IntElement: <b>copy</b> &#43; drop&gt;(value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;;<br /></code></pre>
 
 
 
@@ -414,10 +443,13 @@ Creates a snapshot of a given value.<br/> Useful for when object is sometimes cr
 
 ## Function `read_snapshot`
 
-Returns a value stored in this snapshot.<br/> Note: This operation is resource&#45;intensive, and reduces parallelism.<br/> (Especially if called in a transaction that also modifies the aggregator,<br/> or has other read/write conflicts)
+Returns a value stored in this snapshot.
+Note: This operation is resource&#45;intensive, and reduces parallelism.
+(Especially if called in a transaction that also modifies the aggregator,
+or has other read/write conflicts)
 
 
-<pre><code>public fun read_snapshot&lt;IntElement&gt;(snapshot: &amp;aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;): IntElement<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read_snapshot">read_snapshot</a>&lt;IntElement&gt;(snapshot: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;): IntElement<br /></code></pre>
 
 
 
@@ -425,7 +457,7 @@ Returns a value stored in this snapshot.<br/> Note: This operation is resource&#
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun read_snapshot&lt;IntElement&gt;(snapshot: &amp;AggregatorSnapshot&lt;IntElement&gt;): IntElement;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read_snapshot">read_snapshot</a>&lt;IntElement&gt;(snapshot: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;): IntElement;<br /></code></pre>
 
 
 
@@ -435,10 +467,13 @@ Returns a value stored in this snapshot.<br/> Note: This operation is resource&#
 
 ## Function `read_derived_string`
 
-Returns a value stored in this DerivedStringSnapshot.<br/> Note: This operation is resource&#45;intensive, and reduces parallelism.<br/> (Especially if called in a transaction that also modifies the aggregator,<br/> or has other read/write conflicts)
+Returns a value stored in this DerivedStringSnapshot.
+Note: This operation is resource&#45;intensive, and reduces parallelism.
+(Especially if called in a transaction that also modifies the aggregator,
+or has other read/write conflicts)
 
 
-<pre><code>public fun read_derived_string(snapshot: &amp;aggregator_v2::DerivedStringSnapshot): string::String<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read_derived_string">read_derived_string</a>(snapshot: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">aggregator_v2::DerivedStringSnapshot</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a><br /></code></pre>
 
 
 
@@ -446,7 +481,7 @@ Returns a value stored in this DerivedStringSnapshot.<br/> Note: This operation 
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun read_derived_string(snapshot: &amp;DerivedStringSnapshot): String;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read_derived_string">read_derived_string</a>(snapshot: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">DerivedStringSnapshot</a>): String;<br /></code></pre>
 
 
 
@@ -456,10 +491,11 @@ Returns a value stored in this DerivedStringSnapshot.<br/> Note: This operation 
 
 ## Function `create_derived_string`
 
-Creates a DerivedStringSnapshot of a given value.<br/> Useful for when object is sometimes created via string_concat(), and sometimes directly.
+Creates a DerivedStringSnapshot of a given value.
+Useful for when object is sometimes created via string_concat(), and sometimes directly.
 
 
-<pre><code>public fun create_derived_string(value: string::String): aggregator_v2::DerivedStringSnapshot<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_derived_string">create_derived_string</a>(value: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">aggregator_v2::DerivedStringSnapshot</a><br /></code></pre>
 
 
 
@@ -467,7 +503,7 @@ Creates a DerivedStringSnapshot of a given value.<br/> Useful for when object is
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun create_derived_string(value: String): DerivedStringSnapshot;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_derived_string">create_derived_string</a>(value: String): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">DerivedStringSnapshot</a>;<br /></code></pre>
 
 
 
@@ -477,10 +513,13 @@ Creates a DerivedStringSnapshot of a given value.<br/> Useful for when object is
 
 ## Function `derive_string_concat`
 
-Concatenates <code>before</code>, <code>snapshot</code> and <code>after</code> into a single string.<br/> snapshot passed needs to have integer type &#45; currently supported types are u64 and u128.<br/> Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.<br/> If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
+Concatenates <code>before</code>, <code>snapshot</code> and <code>after</code> into a single string.
+snapshot passed needs to have integer type &#45; currently supported types are u64 and u128.
+Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
+If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
 
 
-<pre><code>public fun derive_string_concat&lt;IntElement&gt;(before: string::String, snapshot: &amp;aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;, after: string::String): aggregator_v2::DerivedStringSnapshot<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_derive_string_concat">derive_string_concat</a>&lt;IntElement&gt;(before: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, snapshot: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;, after: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">aggregator_v2::DerivedStringSnapshot</a><br /></code></pre>
 
 
 
@@ -488,7 +527,7 @@ Concatenates <code>before</code>, <code>snapshot</code> and <code>after</code> i
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun derive_string_concat&lt;IntElement&gt;(before: String, snapshot: &amp;AggregatorSnapshot&lt;IntElement&gt;, after: String): DerivedStringSnapshot;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_derive_string_concat">derive_string_concat</a>&lt;IntElement&gt;(before: String, snapshot: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;, after: String): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">DerivedStringSnapshot</a>;<br /></code></pre>
 
 
 
@@ -501,7 +540,7 @@ Concatenates <code>before</code>, <code>snapshot</code> and <code>after</code> i
 NOT YET IMPLEMENTED, always raises EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED.
 
 
-<pre><code>&#35;[deprecated]<br/>public fun copy_snapshot&lt;IntElement: copy, drop&gt;(snapshot: &amp;aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;): aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;<br/></code></pre>
+<pre><code>&#35;[deprecated]<br /><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_copy_snapshot">copy_snapshot</a>&lt;IntElement: <b>copy</b>, drop&gt;(snapshot: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;<br /></code></pre>
 
 
 
@@ -509,7 +548,7 @@ NOT YET IMPLEMENTED, always raises EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED.
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun copy_snapshot&lt;IntElement: copy &#43; drop&gt;(snapshot: &amp;AggregatorSnapshot&lt;IntElement&gt;): AggregatorSnapshot&lt;IntElement&gt;;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_copy_snapshot">copy_snapshot</a>&lt;IntElement: <b>copy</b> &#43; drop&gt;(snapshot: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;;<br /></code></pre>
 
 
 
@@ -522,7 +561,7 @@ NOT YET IMPLEMENTED, always raises EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED.
 DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED.
 
 
-<pre><code>&#35;[deprecated]<br/>public fun string_concat&lt;IntElement&gt;(before: string::String, snapshot: &amp;aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;, after: string::String): aggregator_v2::AggregatorSnapshot&lt;string::String&gt;<br/></code></pre>
+<pre><code>&#35;[deprecated]<br /><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_string_concat">string_concat</a>&lt;IntElement&gt;(before: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, snapshot: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;, after: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;<br /></code></pre>
 
 
 
@@ -530,7 +569,7 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun string_concat&lt;IntElement&gt;(before: String, snapshot: &amp;AggregatorSnapshot&lt;IntElement&gt;, after: String): AggregatorSnapshot&lt;String&gt;;<br/></code></pre>
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_string_concat">string_concat</a>&lt;IntElement&gt;(before: String, snapshot: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;, after: String): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;String&gt;;<br /></code></pre>
 
 
 
@@ -546,12 +585,12 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 ### Function `create_aggregator`
 
 
-<pre><code>public fun create_aggregator&lt;IntElement: copy, drop&gt;(max_value: IntElement): aggregator_v2::Aggregator&lt;IntElement&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;IntElement: <b>copy</b>, drop&gt;(max_value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -560,12 +599,12 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 ### Function `create_unbounded_aggregator`
 
 
-<pre><code>public fun create_unbounded_aggregator&lt;IntElement: copy, drop&gt;(): aggregator_v2::Aggregator&lt;IntElement&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;IntElement: <b>copy</b>, drop&gt;(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -574,12 +613,12 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 ### Function `try_add`
 
 
-<pre><code>public fun try_add&lt;IntElement&gt;(aggregator: &amp;mut aggregator_v2::Aggregator&lt;IntElement&gt;, value: IntElement): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement): bool<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -588,12 +627,12 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 ### Function `try_sub`
 
 
-<pre><code>public fun try_sub&lt;IntElement&gt;(aggregator: &amp;mut aggregator_v2::Aggregator&lt;IntElement&gt;, value: IntElement): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement): bool<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -602,12 +641,12 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 ### Function `read`
 
 
-<pre><code>public fun read&lt;IntElement&gt;(aggregator: &amp;aggregator_v2::Aggregator&lt;IntElement&gt;): IntElement<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): IntElement<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -616,12 +655,12 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 ### Function `snapshot`
 
 
-<pre><code>public fun snapshot&lt;IntElement&gt;(aggregator: &amp;aggregator_v2::Aggregator&lt;IntElement&gt;): aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">snapshot</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -630,12 +669,12 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 ### Function `create_snapshot`
 
 
-<pre><code>public fun create_snapshot&lt;IntElement: copy, drop&gt;(value: IntElement): aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_snapshot">create_snapshot</a>&lt;IntElement: <b>copy</b>, drop&gt;(value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -644,12 +683,12 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 ### Function `copy_snapshot`
 
 
-<pre><code>&#35;[deprecated]<br/>public fun copy_snapshot&lt;IntElement: copy, drop&gt;(snapshot: &amp;aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;): aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;<br/></code></pre>
+<pre><code>&#35;[deprecated]<br /><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_copy_snapshot">copy_snapshot</a>&lt;IntElement: <b>copy</b>, drop&gt;(snapshot: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 
@@ -658,12 +697,12 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 ### Function `string_concat`
 
 
-<pre><code>&#35;[deprecated]<br/>public fun string_concat&lt;IntElement&gt;(before: string::String, snapshot: &amp;aggregator_v2::AggregatorSnapshot&lt;IntElement&gt;, after: string::String): aggregator_v2::AggregatorSnapshot&lt;string::String&gt;<br/></code></pre>
+<pre><code>&#35;[deprecated]<br /><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_string_concat">string_concat</a>&lt;IntElement&gt;(before: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, snapshot: &amp;<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;, after: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;<br /></code></pre>
 
 
 
 
-<pre><code>pragma opaque;<br/></code></pre>
+<pre><code><b>pragma</b> opaque;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

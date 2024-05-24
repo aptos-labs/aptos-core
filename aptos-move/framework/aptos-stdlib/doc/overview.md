@@ -1,4 +1,16 @@
-&#35; Aptos Standard Library<br/><br/>This is the reference documentation of the Aptos standard library.<br/><br/>&#35;&#35; Index<br/>
+
+<a id="@Aptos_Standard_Library_0"></a>
+
+# Aptos Standard Library
+
+
+This is the reference documentation of the Aptos standard library.
+
+
+<a id="@Index_1"></a>
+
+## Index
+
 
 -  [`0x1::any`](any.md#0x1_any)
 -  [`0x1::aptos_hash`](hash.md#0x1_aptos_hash)
@@ -33,7 +45,6 @@
 -  [`0x1::table`](table.md#0x1_table)
 -  [`0x1::table_with_length`](table_with_length.md#0x1_table_with_length)
 -  [`0x1::type_info`](type_info.md#0x1_type_info)
-<br/>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

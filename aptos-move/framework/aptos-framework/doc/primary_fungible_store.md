@@ -3,7 +3,19 @@
 
 # Module `0x1::primary_fungible_store`
 
-This module provides a way for creators of fungible assets to enable support for creating primary (deterministic)<br/> stores for their users. This is useful for assets that are meant to be used as a currency, as it allows users to<br/> easily create a store for their account and deposit/withdraw/transfer fungible assets to/from it.<br/><br/> The transfer flow works as below:<br/> 1. The sender calls <code>transfer</code> on the fungible asset metadata object to transfer <code>amount</code> of fungible asset to<br/>   <code>recipient</code>.<br/> 2. The fungible asset metadata object calls <code>ensure_primary_store_exists</code> to ensure that both the sender&apos;s and the<br/> recipient&apos;s primary stores exist. If either doesn&apos;t, it will be created.<br/> 3. The fungible asset metadata object calls <code>withdraw</code> on the sender&apos;s primary store to withdraw <code>amount</code> of<br/> fungible asset from it. This emits a withdraw event.<br/> 4. The fungible asset metadata object calls <code>deposit</code> on the recipient&apos;s primary store to deposit <code>amount</code> of<br/> fungible asset to it. This emits an deposit event.
+This module provides a way for creators of fungible assets to enable support for creating primary (deterministic)
+stores for their users. This is useful for assets that are meant to be used as a currency, as it allows users to
+easily create a store for their account and deposit/withdraw/transfer fungible assets to/from it.
+
+The transfer flow works as below:
+1. The sender calls <code>transfer</code> on the fungible asset metadata object to transfer <code>amount</code> of fungible asset to
+<code>recipient</code>.
+2. The fungible asset metadata object calls <code>ensure_primary_store_exists</code> to ensure that both the sender&apos;s and the
+recipient&apos;s primary stores exist. If either doesn&apos;t, it will be created.
+3. The fungible asset metadata object calls <code>withdraw</code> on the sender&apos;s primary store to withdraw <code>amount</code> of
+fungible asset from it. This emits a withdraw event.
+4. The fungible asset metadata object calls <code>deposit</code> on the recipient&apos;s primary store to deposit <code>amount</code> of
+fungible asset to it. This emits an deposit event.
 
 
 -  [Resource `DeriveRefPod`](#0x1_primary_fungible_store_DeriveRefPod)
@@ -33,7 +45,7 @@ This module provides a way for creators of fungible assets to enable support for
     -  [Module-level Specification](#module-level-spec)
 
 
-<pre><code>use 0x1::dispatchable_fungible_asset;<br/>use 0x1::features;<br/>use 0x1::fungible_asset;<br/>use 0x1::object;<br/>use 0x1::option;<br/>use 0x1::signer;<br/>use 0x1::string;<br/></code></pre>
+<pre><code><b>use</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset">0x1::dispatchable_fungible_asset</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;<br /><b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;<br /><b>use</b> <a href="object.md#0x1_object">0x1::object</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;<br /></code></pre>
 
 
 
@@ -41,10 +53,12 @@ This module provides a way for creators of fungible assets to enable support for
 
 ## Resource `DeriveRefPod`
 
-A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary<br/> stores for users with deterministic addresses so that users can easily deposit/withdraw/transfer fungible<br/> assets.
+A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
+stores for users with deterministic addresses so that users can easily deposit/withdraw/transfer fungible
+assets.
 
 
-<pre><code>&#35;[resource_group_member(&#35;[group &#61; 0x1::object::ObjectGroup])]<br/>struct DeriveRefPod has key<br/></code></pre>
+<pre><code>&#35;[resource_group_member(&#35;[group &#61; <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]<br /><b>struct</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> <b>has</b> key<br /></code></pre>
 
 
 
@@ -54,7 +68,7 @@ A resource that holds the derive ref for the fungible asset metadata object. Thi
 
 <dl>
 <dt>
-<code>metadata_derive_ref: object::DeriveRef</code>
+<code>metadata_derive_ref: <a href="object.md#0x1_object_DeriveRef">object::DeriveRef</a></code>
 </dt>
 <dd>
 
@@ -68,10 +82,12 @@ A resource that holds the derive ref for the fungible asset metadata object. Thi
 
 ## Function `create_primary_store_enabled_fungible_asset`
 
-Create a fungible asset with primary store support. When users transfer fungible assets to each other, their<br/> primary stores will be created automatically if they don&apos;t exist. Primary stores have deterministic addresses<br/> so that users can easily deposit/withdraw/transfer fungible assets.
+Create a fungible asset with primary store support. When users transfer fungible assets to each other, their
+primary stores will be created automatically if they don&apos;t exist. Primary stores have deterministic addresses
+so that users can easily deposit/withdraw/transfer fungible assets.
 
 
-<pre><code>public fun create_primary_store_enabled_fungible_asset(constructor_ref: &amp;object::ConstructorRef, maximum_supply: option::Option&lt;u128&gt;, name: string::String, symbol: string::String, decimals: u8, icon_uri: string::String, project_uri: string::String)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store_enabled_fungible_asset">create_primary_store_enabled_fungible_asset</a>(constructor_ref: &amp;<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, maximum_supply: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;, name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, decimals: u8, icon_uri: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, project_uri: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)<br /></code></pre>
 
 
 
@@ -79,7 +95,7 @@ Create a fungible asset with primary store support. When users transfer fungible
 <summary>Implementation</summary>
 
 
-<pre><code>public fun create_primary_store_enabled_fungible_asset(<br/>    constructor_ref: &amp;ConstructorRef,<br/>    maximum_supply: Option&lt;u128&gt;,<br/>    name: String,<br/>    symbol: String,<br/>    decimals: u8,<br/>    icon_uri: String,<br/>    project_uri: String,<br/>) &#123;<br/>    fungible_asset::add_fungibility(<br/>        constructor_ref,<br/>        maximum_supply,<br/>        name,<br/>        symbol,<br/>        decimals,<br/>        icon_uri,<br/>        project_uri,<br/>    );<br/>    let metadata_obj &#61; &amp;object::generate_signer(constructor_ref);<br/>    move_to(metadata_obj, DeriveRefPod &#123;<br/>        metadata_derive_ref: object::generate_derive_ref(constructor_ref),<br/>    &#125;);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store_enabled_fungible_asset">create_primary_store_enabled_fungible_asset</a>(<br />    constructor_ref: &amp;ConstructorRef,<br />    maximum_supply: Option&lt;u128&gt;,<br />    name: String,<br />    symbol: String,<br />    decimals: u8,<br />    icon_uri: String,<br />    project_uri: String,<br />) &#123;<br />    <a href="fungible_asset.md#0x1_fungible_asset_add_fungibility">fungible_asset::add_fungibility</a>(<br />        constructor_ref,<br />        maximum_supply,<br />        name,<br />        symbol,<br />        decimals,<br />        icon_uri,<br />        project_uri,<br />    );<br />    <b>let</b> metadata_obj &#61; &amp;<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);<br />    <b>move_to</b>(metadata_obj, <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> &#123;<br />        metadata_derive_ref: <a href="object.md#0x1_object_generate_derive_ref">object::generate_derive_ref</a>(constructor_ref),<br />    &#125;);<br />&#125;<br /></code></pre>
 
 
 
@@ -92,7 +108,7 @@ Create a fungible asset with primary store support. When users transfer fungible
 Ensure that the primary store object for the given address exists. If it doesn&apos;t, create it.
 
 
-<pre><code>public fun ensure_primary_store_exists&lt;T: key&gt;(owner: address, metadata: object::Object&lt;T&gt;): object::Object&lt;fungible_asset::FungibleStore&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;<br /></code></pre>
 
 
 
@@ -100,7 +116,7 @@ Ensure that the primary store object for the given address exists. If it doesn&a
 <summary>Implementation</summary>
 
 
-<pre><code>public fun ensure_primary_store_exists&lt;T: key&gt;(<br/>    owner: address,<br/>    metadata: Object&lt;T&gt;,<br/>): Object&lt;FungibleStore&gt; acquires DeriveRefPod &#123;<br/>    if (!primary_store_exists(owner, metadata)) &#123;<br/>        create_primary_store(owner, metadata)<br/>    &#125; else &#123;<br/>        primary_store(owner, metadata)<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>&lt;T: key&gt;(<br />    owner: <b>address</b>,<br />    metadata: Object&lt;T&gt;,<br />): Object&lt;FungibleStore&gt; <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> &#123;<br />    <b>if</b> (!<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_store_exists</a>(owner, metadata)) &#123;<br />        <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store">create_primary_store</a>(owner, metadata)<br />    &#125; <b>else</b> &#123;<br />        <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(owner, metadata)<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -113,7 +129,7 @@ Ensure that the primary store object for the given address exists. If it doesn&a
 Create a primary store object to hold fungible asset for the given address.
 
 
-<pre><code>public fun create_primary_store&lt;T: key&gt;(owner_addr: address, metadata: object::Object&lt;T&gt;): object::Object&lt;fungible_asset::FungibleStore&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store">create_primary_store</a>&lt;T: key&gt;(owner_addr: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;<br /></code></pre>
 
 
 
@@ -121,7 +137,7 @@ Create a primary store object to hold fungible asset for the given address.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun create_primary_store&lt;T: key&gt;(<br/>    owner_addr: address,<br/>    metadata: Object&lt;T&gt;,<br/>): Object&lt;FungibleStore&gt; acquires DeriveRefPod &#123;<br/>    let metadata_addr &#61; object::object_address(&amp;metadata);<br/>    object::address_to_object&lt;Metadata&gt;(metadata_addr);<br/>    let derive_ref &#61; &amp;borrow_global&lt;DeriveRefPod&gt;(metadata_addr).metadata_derive_ref;<br/>    let constructor_ref &#61; if (metadata_addr &#61;&#61; @aptos_fungible_asset &amp;&amp; features::primary_apt_fungible_store_at_user_address_enabled(<br/>    )) &#123;<br/>        &amp;object::create_sticky_object_at_address(owner_addr, owner_addr)<br/>    &#125; else &#123;<br/>        &amp;object::create_user_derived_object(owner_addr, derive_ref)<br/>    &#125;;<br/>    // Disable ungated transfer as deterministic stores shouldn&apos;t be transferrable.<br/>    let transfer_ref &#61; &amp;object::generate_transfer_ref(constructor_ref);<br/>    object::disable_ungated_transfer(transfer_ref);<br/><br/>    fungible_asset::create_store(constructor_ref, metadata)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store">create_primary_store</a>&lt;T: key&gt;(<br />    owner_addr: <b>address</b>,<br />    metadata: Object&lt;T&gt;,<br />): Object&lt;FungibleStore&gt; <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> &#123;<br />    <b>let</b> metadata_addr &#61; <a href="object.md#0x1_object_object_address">object::object_address</a>(&amp;metadata);<br />    <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Metadata&gt;(metadata_addr);<br />    <b>let</b> derive_ref &#61; &amp;<b>borrow_global</b>&lt;<a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a>&gt;(metadata_addr).metadata_derive_ref;<br />    <b>let</b> constructor_ref &#61; <b>if</b> (metadata_addr &#61;&#61; @aptos_fungible_asset &amp;&amp; <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_primary_apt_fungible_store_at_user_address_enabled">features::primary_apt_fungible_store_at_user_address_enabled</a>(<br />    )) &#123;<br />        &amp;<a href="object.md#0x1_object_create_sticky_object_at_address">object::create_sticky_object_at_address</a>(owner_addr, owner_addr)<br />    &#125; <b>else</b> &#123;<br />        &amp;<a href="object.md#0x1_object_create_user_derived_object">object::create_user_derived_object</a>(owner_addr, derive_ref)<br />    &#125;;<br />    // Disable ungated transfer <b>as</b> deterministic stores shouldn&apos;t be transferrable.<br />    <b>let</b> transfer_ref &#61; &amp;<a href="object.md#0x1_object_generate_transfer_ref">object::generate_transfer_ref</a>(constructor_ref);<br />    <a href="object.md#0x1_object_disable_ungated_transfer">object::disable_ungated_transfer</a>(transfer_ref);<br /><br />    <a href="fungible_asset.md#0x1_fungible_asset_create_store">fungible_asset::create_store</a>(constructor_ref, metadata)<br />&#125;<br /></code></pre>
 
 
 
@@ -134,7 +150,7 @@ Create a primary store object to hold fungible asset for the given address.
 Get the address of the primary store for the given account.
 
 
-<pre><code>&#35;[view]<br/>public fun primary_store_address&lt;T: key&gt;(owner: address, metadata: object::Object&lt;T&gt;): address<br/></code></pre>
+<pre><code>&#35;[view]<br /><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_store_address</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b><br /></code></pre>
 
 
 
@@ -142,7 +158,7 @@ Get the address of the primary store for the given account.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun primary_store_address&lt;T: key&gt;(owner: address, metadata: Object&lt;T&gt;): address &#123;<br/>    let metadata_addr &#61; object::object_address(&amp;metadata);<br/>    if (metadata_addr &#61;&#61; @aptos_fungible_asset &amp;&amp; features::primary_apt_fungible_store_at_user_address_enabled()) &#123;<br/>        owner<br/>    &#125; else &#123;<br/>        object::create_user_derived_object_address(owner, metadata_addr)<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_store_address</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): <b>address</b> &#123;<br />    <b>let</b> metadata_addr &#61; <a href="object.md#0x1_object_object_address">object::object_address</a>(&amp;metadata);<br />    <b>if</b> (metadata_addr &#61;&#61; @aptos_fungible_asset &amp;&amp; <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_primary_apt_fungible_store_at_user_address_enabled">features::primary_apt_fungible_store_at_user_address_enabled</a>()) &#123;<br />        owner<br />    &#125; <b>else</b> &#123;<br />        <a href="object.md#0x1_object_create_user_derived_object_address">object::create_user_derived_object_address</a>(owner, metadata_addr)<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -155,7 +171,7 @@ Get the address of the primary store for the given account.
 Get the primary store object for the given account.
 
 
-<pre><code>&#35;[view]<br/>public fun primary_store&lt;T: key&gt;(owner: address, metadata: object::Object&lt;T&gt;): object::Object&lt;fungible_asset::FungibleStore&gt;<br/></code></pre>
+<pre><code>&#35;[view]<br /><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;<br /></code></pre>
 
 
 
@@ -163,7 +179,7 @@ Get the primary store object for the given account.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun primary_store&lt;T: key&gt;(owner: address, metadata: Object&lt;T&gt;): Object&lt;FungibleStore&gt; &#123;<br/>    let store &#61; primary_store_address(owner, metadata);<br/>    object::address_to_object&lt;FungibleStore&gt;(store)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): Object&lt;FungibleStore&gt; &#123;<br />    <b>let</b> store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_store_address</a>(owner, metadata);<br />    <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;FungibleStore&gt;(store)<br />&#125;<br /></code></pre>
 
 
 
@@ -176,7 +192,7 @@ Get the primary store object for the given account.
 Return whether the given account&apos;s primary store exists.
 
 
-<pre><code>&#35;[view]<br/>public fun primary_store_exists&lt;T: key&gt;(account: address, metadata: object::Object&lt;T&gt;): bool<br/></code></pre>
+<pre><code>&#35;[view]<br /><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_store_exists</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool<br /></code></pre>
 
 
 
@@ -184,7 +200,7 @@ Return whether the given account&apos;s primary store exists.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun primary_store_exists&lt;T: key&gt;(account: address, metadata: Object&lt;T&gt;): bool &#123;<br/>    fungible_asset::store_exists(primary_store_address(account, metadata))<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_store_exists</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): bool &#123;<br />    <a href="fungible_asset.md#0x1_fungible_asset_store_exists">fungible_asset::store_exists</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_store_address</a>(<a href="account.md#0x1_account">account</a>, metadata))<br />&#125;<br /></code></pre>
 
 
 
@@ -194,10 +210,10 @@ Return whether the given account&apos;s primary store exists.
 
 ## Function `balance`
 
-Get the balance of <code>account</code>&apos;s primary store.
+Get the balance of <code><a href="account.md#0x1_account">account</a></code>&apos;s primary store.
 
 
-<pre><code>&#35;[view]<br/>public fun balance&lt;T: key&gt;(account: address, metadata: object::Object&lt;T&gt;): u64<br/></code></pre>
+<pre><code>&#35;[view]<br /><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_balance">balance</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): u64<br /></code></pre>
 
 
 
@@ -205,7 +221,7 @@ Get the balance of <code>account</code>&apos;s primary store.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun balance&lt;T: key&gt;(account: address, metadata: Object&lt;T&gt;): u64 &#123;<br/>    if (primary_store_exists(account, metadata)) &#123;<br/>        fungible_asset::balance(primary_store(account, metadata))<br/>    &#125; else &#123;<br/>        0<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_balance">balance</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): u64 &#123;<br />    <b>if</b> (<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_store_exists</a>(<a href="account.md#0x1_account">account</a>, metadata)) &#123;<br />        <a href="fungible_asset.md#0x1_fungible_asset_balance">fungible_asset::balance</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata))<br />    &#125; <b>else</b> &#123;<br />        0<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -217,7 +233,7 @@ Get the balance of <code>account</code>&apos;s primary store.
 
 
 
-<pre><code>&#35;[view]<br/>public fun is_balance_at_least&lt;T: key&gt;(account: address, metadata: object::Object&lt;T&gt;, amount: u64): bool<br/></code></pre>
+<pre><code>&#35;[view]<br /><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_balance_at_least">is_balance_at_least</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): bool<br /></code></pre>
 
 
 
@@ -225,7 +241,7 @@ Get the balance of <code>account</code>&apos;s primary store.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun is_balance_at_least&lt;T: key&gt;(account: address, metadata: Object&lt;T&gt;, amount: u64): bool &#123;<br/>    if (primary_store_exists(account, metadata)) &#123;<br/>        fungible_asset::is_balance_at_least(primary_store(account, metadata), amount)<br/>    &#125; else &#123;<br/>        amount &#61;&#61; 0<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_balance_at_least">is_balance_at_least</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;, amount: u64): bool &#123;<br />    <b>if</b> (<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_store_exists</a>(<a href="account.md#0x1_account">account</a>, metadata)) &#123;<br />        <a href="fungible_asset.md#0x1_fungible_asset_is_balance_at_least">fungible_asset::is_balance_at_least</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata), amount)<br />    &#125; <b>else</b> &#123;<br />        amount &#61;&#61; 0<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -238,7 +254,7 @@ Get the balance of <code>account</code>&apos;s primary store.
 Return whether the given account&apos;s primary store is frozen.
 
 
-<pre><code>&#35;[view]<br/>public fun is_frozen&lt;T: key&gt;(account: address, metadata: object::Object&lt;T&gt;): bool<br/></code></pre>
+<pre><code>&#35;[view]<br /><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_frozen">is_frozen</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool<br /></code></pre>
 
 
 
@@ -246,7 +262,7 @@ Return whether the given account&apos;s primary store is frozen.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun is_frozen&lt;T: key&gt;(account: address, metadata: Object&lt;T&gt;): bool &#123;<br/>    if (primary_store_exists(account, metadata)) &#123;<br/>        fungible_asset::is_frozen(primary_store(account, metadata))<br/>    &#125; else &#123;<br/>        false<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_frozen">is_frozen</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): bool &#123;<br />    <b>if</b> (<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_store_exists</a>(<a href="account.md#0x1_account">account</a>, metadata)) &#123;<br />        <a href="fungible_asset.md#0x1_fungible_asset_is_frozen">fungible_asset::is_frozen</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata))<br />    &#125; <b>else</b> &#123;<br />        <b>false</b><br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -259,7 +275,7 @@ Return whether the given account&apos;s primary store is frozen.
 Withdraw <code>amount</code> of fungible asset from the given account&apos;s primary store.
 
 
-<pre><code>public fun withdraw&lt;T: key&gt;(owner: &amp;signer, metadata: object::Object&lt;T&gt;, amount: u64): fungible_asset::FungibleAsset<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_withdraw">withdraw</a>&lt;T: key&gt;(owner: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a><br /></code></pre>
 
 
 
@@ -267,7 +283,7 @@ Withdraw <code>amount</code> of fungible asset from the given account&apos;s pri
 <summary>Implementation</summary>
 
 
-<pre><code>public fun withdraw&lt;T: key&gt;(owner: &amp;signer, metadata: Object&lt;T&gt;, amount: u64): FungibleAsset acquires DeriveRefPod &#123;<br/>    let store &#61; ensure_primary_store_exists(signer::address_of(owner), metadata);<br/>    // Check if the store object has been burnt or not. If so, unburn it first.<br/>    may_be_unburn(owner, store);<br/>    dispatchable_fungible_asset::withdraw(owner, store, amount)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_withdraw">withdraw</a>&lt;T: key&gt;(owner: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: Object&lt;T&gt;, amount: u64): FungibleAsset <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> &#123;<br />    <b>let</b> store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), metadata);<br />    // Check <b>if</b> the store <a href="object.md#0x1_object">object</a> <b>has</b> been burnt or not. If so, unburn it first.<br />    <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(owner, store);<br />    <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_withdraw">dispatchable_fungible_asset::withdraw</a>(owner, store, amount)<br />&#125;<br /></code></pre>
 
 
 
@@ -280,7 +296,7 @@ Withdraw <code>amount</code> of fungible asset from the given account&apos;s pri
 Deposit fungible asset <code>fa</code> to the given account&apos;s primary store.
 
 
-<pre><code>public fun deposit(owner: address, fa: fungible_asset::FungibleAsset)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_deposit">deposit</a>(owner: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)<br /></code></pre>
 
 
 
@@ -288,7 +304,7 @@ Deposit fungible asset <code>fa</code> to the given account&apos;s primary store
 <summary>Implementation</summary>
 
 
-<pre><code>public fun deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod &#123;<br/>    let metadata &#61; fungible_asset::asset_metadata(&amp;fa);<br/>    let store &#61; ensure_primary_store_exists(owner, metadata);<br/>    dispatchable_fungible_asset::deposit(store, fa);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_deposit">deposit</a>(owner: <b>address</b>, fa: FungibleAsset) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> &#123;<br />    <b>let</b> metadata &#61; <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">fungible_asset::asset_metadata</a>(&amp;fa);<br />    <b>let</b> store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(owner, metadata);<br />    <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_deposit">dispatchable_fungible_asset::deposit</a>(store, fa);<br />&#125;<br /></code></pre>
 
 
 
@@ -301,7 +317,7 @@ Deposit fungible asset <code>fa</code> to the given account&apos;s primary store
 Deposit fungible asset <code>fa</code> to the given account&apos;s primary store.
 
 
-<pre><code>public(friend) fun force_deposit(owner: address, fa: fungible_asset::FungibleAsset)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_force_deposit">force_deposit</a>(owner: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)<br /></code></pre>
 
 
 
@@ -309,7 +325,7 @@ Deposit fungible asset <code>fa</code> to the given account&apos;s primary store
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun force_deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod &#123;<br/>    let metadata &#61; fungible_asset::asset_metadata(&amp;fa);<br/>    let store &#61; ensure_primary_store_exists(owner, metadata);<br/>    fungible_asset::deposit_internal(store, fa);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_force_deposit">force_deposit</a>(owner: <b>address</b>, fa: FungibleAsset) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> &#123;<br />    <b>let</b> metadata &#61; <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">fungible_asset::asset_metadata</a>(&amp;fa);<br />    <b>let</b> store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(owner, metadata);<br />    <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(store, fa);<br />&#125;<br /></code></pre>
 
 
 
@@ -322,7 +338,7 @@ Deposit fungible asset <code>fa</code> to the given account&apos;s primary store
 Transfer <code>amount</code> of fungible asset from sender&apos;s primary store to receiver&apos;s primary store.
 
 
-<pre><code>public entry fun transfer&lt;T: key&gt;(sender: &amp;signer, metadata: object::Object&lt;T&gt;, recipient: address, amount: u64)<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_transfer">transfer</a>&lt;T: key&gt;(sender: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, recipient: <b>address</b>, amount: u64)<br /></code></pre>
 
 
 
@@ -330,7 +346,7 @@ Transfer <code>amount</code> of fungible asset from sender&apos;s primary store 
 <summary>Implementation</summary>
 
 
-<pre><code>public entry fun transfer&lt;T: key&gt;(<br/>    sender: &amp;signer,<br/>    metadata: Object&lt;T&gt;,<br/>    recipient: address,<br/>    amount: u64,<br/>) acquires DeriveRefPod &#123;<br/>    let sender_store &#61; ensure_primary_store_exists(signer::address_of(sender), metadata);<br/>    // Check if the sender store object has been burnt or not. If so, unburn it first.<br/>    may_be_unburn(sender, sender_store);<br/>    let recipient_store &#61; ensure_primary_store_exists(recipient, metadata);<br/>    dispatchable_fungible_asset::transfer(sender, sender_store, recipient_store, amount);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_transfer">transfer</a>&lt;T: key&gt;(<br />    sender: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,<br />    metadata: Object&lt;T&gt;,<br />    recipient: <b>address</b>,<br />    amount: u64,<br />) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> &#123;<br />    <b>let</b> sender_store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), metadata);<br />    // Check <b>if</b> the sender store <a href="object.md#0x1_object">object</a> <b>has</b> been burnt or not. If so, unburn it first.<br />    <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(sender, sender_store);<br />    <b>let</b> recipient_store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(recipient, metadata);<br />    <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer">dispatchable_fungible_asset::transfer</a>(sender, sender_store, recipient_store, amount);<br />&#125;<br /></code></pre>
 
 
 
@@ -340,10 +356,11 @@ Transfer <code>amount</code> of fungible asset from sender&apos;s primary store 
 
 ## Function `transfer_assert_minimum_deposit`
 
-Transfer <code>amount</code> of fungible asset from sender&apos;s primary store to receiver&apos;s primary store.<br/> Use the minimum deposit assertion api to make sure receipient will receive a minimum amount of fund.
+Transfer <code>amount</code> of fungible asset from sender&apos;s primary store to receiver&apos;s primary store.
+Use the minimum deposit assertion api to make sure receipient will receive a minimum amount of fund.
 
 
-<pre><code>public entry fun transfer_assert_minimum_deposit&lt;T: key&gt;(sender: &amp;signer, metadata: object::Object&lt;T&gt;, recipient: address, amount: u64, expected: u64)<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_transfer_assert_minimum_deposit">transfer_assert_minimum_deposit</a>&lt;T: key&gt;(sender: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, recipient: <b>address</b>, amount: u64, expected: u64)<br /></code></pre>
 
 
 
@@ -351,7 +368,7 @@ Transfer <code>amount</code> of fungible asset from sender&apos;s primary store 
 <summary>Implementation</summary>
 
 
-<pre><code>public entry fun transfer_assert_minimum_deposit&lt;T: key&gt;(<br/>    sender: &amp;signer,<br/>    metadata: Object&lt;T&gt;,<br/>    recipient: address,<br/>    amount: u64,<br/>    expected: u64,<br/>) acquires DeriveRefPod &#123;<br/>    let sender_store &#61; ensure_primary_store_exists(signer::address_of(sender), metadata);<br/>    // Check if the sender store object has been burnt or not. If so, unburn it first.<br/>    may_be_unburn(sender, sender_store);<br/>    let recipient_store &#61; ensure_primary_store_exists(recipient, metadata);<br/>    dispatchable_fungible_asset::transfer_assert_minimum_deposit(<br/>        sender,<br/>        sender_store,<br/>        recipient_store,<br/>        amount,<br/>        expected<br/>    );<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_transfer_assert_minimum_deposit">transfer_assert_minimum_deposit</a>&lt;T: key&gt;(<br />    sender: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,<br />    metadata: Object&lt;T&gt;,<br />    recipient: <b>address</b>,<br />    amount: u64,<br />    expected: u64,<br />) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> &#123;<br />    <b>let</b> sender_store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), metadata);<br />    // Check <b>if</b> the sender store <a href="object.md#0x1_object">object</a> <b>has</b> been burnt or not. If so, unburn it first.<br />    <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(sender, sender_store);<br />    <b>let</b> recipient_store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(recipient, metadata);<br />    <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer_assert_minimum_deposit">dispatchable_fungible_asset::transfer_assert_minimum_deposit</a>(<br />        sender,<br />        sender_store,<br />        recipient_store,<br />        amount,<br />        expected<br />    );<br />&#125;<br /></code></pre>
 
 
 
@@ -364,7 +381,7 @@ Transfer <code>amount</code> of fungible asset from sender&apos;s primary store 
 Mint to the primary store of <code>owner</code>.
 
 
-<pre><code>public fun mint(mint_ref: &amp;fungible_asset::MintRef, owner: address, amount: u64)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_mint">mint</a>(mint_ref: &amp;<a href="fungible_asset.md#0x1_fungible_asset_MintRef">fungible_asset::MintRef</a>, owner: <b>address</b>, amount: u64)<br /></code></pre>
 
 
 
@@ -372,7 +389,7 @@ Mint to the primary store of <code>owner</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun mint(mint_ref: &amp;MintRef, owner: address, amount: u64) acquires DeriveRefPod &#123;<br/>    let primary_store &#61; ensure_primary_store_exists(owner, fungible_asset::mint_ref_metadata(mint_ref));<br/>    fungible_asset::mint_to(mint_ref, primary_store, amount);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_mint">mint</a>(mint_ref: &amp;MintRef, owner: <b>address</b>, amount: u64) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> &#123;<br />    <b>let</b> primary_store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(owner, <a href="fungible_asset.md#0x1_fungible_asset_mint_ref_metadata">fungible_asset::mint_ref_metadata</a>(mint_ref));<br />    <a href="fungible_asset.md#0x1_fungible_asset_mint_to">fungible_asset::mint_to</a>(mint_ref, primary_store, amount);<br />&#125;<br /></code></pre>
 
 
 
@@ -385,7 +402,7 @@ Mint to the primary store of <code>owner</code>.
 Burn from the primary store of <code>owner</code>.
 
 
-<pre><code>public fun burn(burn_ref: &amp;fungible_asset::BurnRef, owner: address, amount: u64)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_burn">burn</a>(burn_ref: &amp;<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, owner: <b>address</b>, amount: u64)<br /></code></pre>
 
 
 
@@ -393,7 +410,7 @@ Burn from the primary store of <code>owner</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun burn(burn_ref: &amp;BurnRef, owner: address, amount: u64) &#123;<br/>    let primary_store &#61; primary_store(owner, fungible_asset::burn_ref_metadata(burn_ref));<br/>    fungible_asset::burn_from(burn_ref, primary_store, amount);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_burn">burn</a>(burn_ref: &amp;BurnRef, owner: <b>address</b>, amount: u64) &#123;<br />    <b>let</b> primary_store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(owner, <a href="fungible_asset.md#0x1_fungible_asset_burn_ref_metadata">fungible_asset::burn_ref_metadata</a>(burn_ref));<br />    <a href="fungible_asset.md#0x1_fungible_asset_burn_from">fungible_asset::burn_from</a>(burn_ref, primary_store, amount);<br />&#125;<br /></code></pre>
 
 
 
@@ -406,7 +423,7 @@ Burn from the primary store of <code>owner</code>.
 Freeze/Unfreeze the primary store of <code>owner</code>.
 
 
-<pre><code>public fun set_frozen_flag(transfer_ref: &amp;fungible_asset::TransferRef, owner: address, frozen: bool)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_set_frozen_flag">set_frozen_flag</a>(transfer_ref: &amp;<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, owner: <b>address</b>, frozen: bool)<br /></code></pre>
 
 
 
@@ -414,7 +431,7 @@ Freeze/Unfreeze the primary store of <code>owner</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun set_frozen_flag(transfer_ref: &amp;TransferRef, owner: address, frozen: bool) acquires DeriveRefPod &#123;<br/>    let primary_store &#61; ensure_primary_store_exists(owner, fungible_asset::transfer_ref_metadata(transfer_ref));<br/>    fungible_asset::set_frozen_flag(transfer_ref, primary_store, frozen);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_set_frozen_flag">set_frozen_flag</a>(transfer_ref: &amp;TransferRef, owner: <b>address</b>, frozen: bool) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> &#123;<br />    <b>let</b> primary_store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(owner, <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">fungible_asset::transfer_ref_metadata</a>(transfer_ref));<br />    <a href="fungible_asset.md#0x1_fungible_asset_set_frozen_flag">fungible_asset::set_frozen_flag</a>(transfer_ref, primary_store, frozen);<br />&#125;<br /></code></pre>
 
 
 
@@ -427,7 +444,7 @@ Freeze/Unfreeze the primary store of <code>owner</code>.
 Withdraw from the primary store of <code>owner</code> ignoring frozen flag.
 
 
-<pre><code>public fun withdraw_with_ref(transfer_ref: &amp;fungible_asset::TransferRef, owner: address, amount: u64): fungible_asset::FungibleAsset<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_withdraw_with_ref">withdraw_with_ref</a>(transfer_ref: &amp;<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, owner: <b>address</b>, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a><br /></code></pre>
 
 
 
@@ -435,7 +452,7 @@ Withdraw from the primary store of <code>owner</code> ignoring frozen flag.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun withdraw_with_ref(transfer_ref: &amp;TransferRef, owner: address, amount: u64): FungibleAsset &#123;<br/>    let from_primary_store &#61; primary_store(owner, fungible_asset::transfer_ref_metadata(transfer_ref));<br/>    fungible_asset::withdraw_with_ref(transfer_ref, from_primary_store, amount)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_withdraw_with_ref">withdraw_with_ref</a>(transfer_ref: &amp;TransferRef, owner: <b>address</b>, amount: u64): FungibleAsset &#123;<br />    <b>let</b> from_primary_store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(owner, <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">fungible_asset::transfer_ref_metadata</a>(transfer_ref));<br />    <a href="fungible_asset.md#0x1_fungible_asset_withdraw_with_ref">fungible_asset::withdraw_with_ref</a>(transfer_ref, from_primary_store, amount)<br />&#125;<br /></code></pre>
 
 
 
@@ -448,7 +465,7 @@ Withdraw from the primary store of <code>owner</code> ignoring frozen flag.
 Deposit from the primary store of <code>owner</code> ignoring frozen flag.
 
 
-<pre><code>public fun deposit_with_ref(transfer_ref: &amp;fungible_asset::TransferRef, owner: address, fa: fungible_asset::FungibleAsset)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_deposit_with_ref">deposit_with_ref</a>(transfer_ref: &amp;<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, owner: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)<br /></code></pre>
 
 
 
@@ -456,7 +473,7 @@ Deposit from the primary store of <code>owner</code> ignoring frozen flag.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun deposit_with_ref(transfer_ref: &amp;TransferRef, owner: address, fa: FungibleAsset) acquires DeriveRefPod &#123;<br/>    let from_primary_store &#61; ensure_primary_store_exists(<br/>        owner,<br/>        fungible_asset::transfer_ref_metadata(transfer_ref)<br/>    );<br/>    fungible_asset::deposit_with_ref(transfer_ref, from_primary_store, fa);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_deposit_with_ref">deposit_with_ref</a>(transfer_ref: &amp;TransferRef, owner: <b>address</b>, fa: FungibleAsset) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> &#123;<br />    <b>let</b> from_primary_store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<br />        owner,<br />        <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">fungible_asset::transfer_ref_metadata</a>(transfer_ref)<br />    );<br />    <a href="fungible_asset.md#0x1_fungible_asset_deposit_with_ref">fungible_asset::deposit_with_ref</a>(transfer_ref, from_primary_store, fa);<br />&#125;<br /></code></pre>
 
 
 
@@ -466,10 +483,10 @@ Deposit from the primary store of <code>owner</code> ignoring frozen flag.
 
 ## Function `transfer_with_ref`
 
-Transfer <code>amount</code> of FA from the primary store of <code>from</code> to that of <code>to</code> ignoring frozen flag.
+Transfer <code>amount</code> of FA from the primary store of <code>from</code> to that of <code><b>to</b></code> ignoring frozen flag.
 
 
-<pre><code>public fun transfer_with_ref(transfer_ref: &amp;fungible_asset::TransferRef, from: address, to: address, amount: u64)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_transfer_with_ref">transfer_with_ref</a>(transfer_ref: &amp;<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, from: <b>address</b>, <b>to</b>: <b>address</b>, amount: u64)<br /></code></pre>
 
 
 
@@ -477,7 +494,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <summary>Implementation</summary>
 
 
-<pre><code>public fun transfer_with_ref(<br/>    transfer_ref: &amp;TransferRef,<br/>    from: address,<br/>    to: address,<br/>    amount: u64<br/>) acquires DeriveRefPod &#123;<br/>    let from_primary_store &#61; primary_store(from, fungible_asset::transfer_ref_metadata(transfer_ref));<br/>    let to_primary_store &#61; ensure_primary_store_exists(to, fungible_asset::transfer_ref_metadata(transfer_ref));<br/>    fungible_asset::transfer_with_ref(transfer_ref, from_primary_store, to_primary_store, amount);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_transfer_with_ref">transfer_with_ref</a>(<br />    transfer_ref: &amp;TransferRef,<br />    from: <b>address</b>,<br />    <b>to</b>: <b>address</b>,<br />    amount: u64<br />) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> &#123;<br />    <b>let</b> from_primary_store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(from, <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">fungible_asset::transfer_ref_metadata</a>(transfer_ref));<br />    <b>let</b> to_primary_store &#61; <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<b>to</b>, <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">fungible_asset::transfer_ref_metadata</a>(transfer_ref));<br />    <a href="fungible_asset.md#0x1_fungible_asset_transfer_with_ref">fungible_asset::transfer_with_ref</a>(transfer_ref, from_primary_store, to_primary_store, amount);<br />&#125;<br /></code></pre>
 
 
 
@@ -489,7 +506,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 
 
 
-<pre><code>fun may_be_unburn(owner: &amp;signer, store: object::Object&lt;fungible_asset::FungibleStore&gt;)<br/></code></pre>
+<pre><code><b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(owner: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;)<br /></code></pre>
 
 
 
@@ -497,7 +514,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <summary>Implementation</summary>
 
 
-<pre><code>fun may_be_unburn(owner: &amp;signer, store: Object&lt;FungibleStore&gt;) &#123;<br/>    if (object::is_burnt(store)) &#123;<br/>        object::unburn(owner, store);<br/>    &#125;;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(owner: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, store: Object&lt;FungibleStore&gt;) &#123;<br />    <b>if</b> (<a href="object.md#0x1_object_is_burnt">object::is_burnt</a>(store)) &#123;<br />        <a href="object.md#0x1_object_unburn">object::unburn</a>(owner, store);<br />    &#125;;<br />&#125;<br /></code></pre>
 
 
 
@@ -514,35 +531,110 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 
 ### High-level Requirements
 
-&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Creating a fungible asset with primary store support should initiate a derived reference and store it under the metadata object.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The function create_primary_store_enabled_fungible_asset makes an existing object, fungible, via the fungible_asset::add_fungibility function and initializes the DeriveRefPod resource by generating a DeriveRef for the object and then stores it under the object address.&lt;/td&gt;<br/>&lt;td&gt;Audited that the DeriveRefPod has been properly initialized and stored under the metadata object.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>1</td>
+<td>Creating a fungible asset with primary store support should initiate a derived reference and store it under the metadata object.</td>
+<td>Medium</td>
+<td>The function create_primary_store_enabled_fungible_asset makes an existing object, fungible, via the fungible_asset::add_fungibility function and initializes the DeriveRefPod resource by generating a DeriveRef for the object and then stores it under the object address.</td>
+<td>Audited that the DeriveRefPod has been properly initialized and stored under the metadata object.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;Fetching and creating a primary fungible store of an asset should only succeed if the object supports primary store.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The function create_primary_store is used to create a primary store by borrowing the DeriveRef resource from the object. In case the resource does not exist, creation will fail. The function ensure_primary_store_exists is used to fetch the primary store if it exists, otherwise it will create one via the create_primary function.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the DeriveRefPod doesn&apos;t exist. Audited that it aborts if the FungibleStore resource exists already under the object address.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>2</td>
+<td>Fetching and creating a primary fungible store of an asset should only succeed if the object supports primary store.</td>
+<td>Low</td>
+<td>The function create_primary_store is used to create a primary store by borrowing the DeriveRef resource from the object. In case the resource does not exist, creation will fail. The function ensure_primary_store_exists is used to fetch the primary store if it exists, otherwise it will create one via the create_primary function.</td>
+<td>Audited that it aborts if the DeriveRefPod doesn&apos;t exist. Audited that it aborts if the FungibleStore resource exists already under the object address.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;It should be possible to create a primary store to hold a fungible asset.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The function create_primary_store borrows the DeriveRef resource from DeriveRefPod and then creates the store which is returned.&lt;/td&gt;<br/>&lt;td&gt;Audited that it returns the newly created FungibleStore.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>3</td>
+<td>It should be possible to create a primary store to hold a fungible asset.</td>
+<td>Medium</td>
+<td>The function create_primary_store borrows the DeriveRef resource from DeriveRefPod and then creates the store which is returned.</td>
+<td>Audited that it returns the newly created FungibleStore.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;Fetching the balance or the frozen status of a primary store should never abort.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The function balance returns the balance of the store, if the store exists, otherwise it returns 0. The function is_frozen returns the frozen flag of the fungible store, if the store exists, otherwise it returns false.&lt;/td&gt;<br/>&lt;td&gt;Audited that the balance function returns the balance of the FungibleStore. Audited that the is_frozen function returns the frozen status of the FungibleStore resource. Audited that it never aborts.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>4</td>
+<td>Fetching the balance or the frozen status of a primary store should never abort.</td>
+<td>Low</td>
+<td>The function balance returns the balance of the store, if the store exists, otherwise it returns 0. The function is_frozen returns the frozen flag of the fungible store, if the store exists, otherwise it returns false.</td>
+<td>Audited that the balance function returns the balance of the FungibleStore. Audited that the is_frozen function returns the frozen status of the FungibleStore resource. Audited that it never aborts.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;The ability to withdraw, deposit, transfer, mint and burn should only be available for assets with primary store support.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The primary store is fetched before performing either of withdraw, deposit, transfer, mint, burn operation. If the FungibleStore resource doesn&apos;t exist the operation will fail.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the primary store FungibleStore doesn&apos;t exist.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>5</td>
+<td>The ability to withdraw, deposit, transfer, mint and burn should only be available for assets with primary store support.</td>
+<td>Medium</td>
+<td>The primary store is fetched before performing either of withdraw, deposit, transfer, mint, burn operation. If the FungibleStore resource doesn&apos;t exist the operation will fail.</td>
+<td>Audited that it aborts if the primary store FungibleStore doesn&apos;t exist.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;6&lt;/td&gt;<br/>&lt;td&gt;The action of depositing a fungible asset of the same type as the store should never fail if the store is not frozen.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The function deposit fetches the owner&apos;s store, if it doesn&apos;t exist it will be created, and then deposits the fungible asset to it. The function deposit_with_ref fetches the owner&apos;s store, if it doesn&apos;t exist it will be created, and then deposit the fungible asset via the fungible_asset::deposit_with_ref function. Depositing fails if the metadata of the FungibleStore and FungibleAsset differs.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the store is frozen (deposit). Audited that the balance of the store is increased by the deposit amount (deposit, deposit_with_ref). Audited that it aborts if the metadata of the store and the asset differs (deposit, deposit_with_ref).&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>6</td>
+<td>The action of depositing a fungible asset of the same type as the store should never fail if the store is not frozen.</td>
+<td>Medium</td>
+<td>The function deposit fetches the owner&apos;s store, if it doesn&apos;t exist it will be created, and then deposits the fungible asset to it. The function deposit_with_ref fetches the owner&apos;s store, if it doesn&apos;t exist it will be created, and then deposit the fungible asset via the fungible_asset::deposit_with_ref function. Depositing fails if the metadata of the FungibleStore and FungibleAsset differs.</td>
+<td>Audited that it aborts if the store is frozen (deposit). Audited that the balance of the store is increased by the deposit amount (deposit, deposit_with_ref). Audited that it aborts if the metadata of the store and the asset differs (deposit, deposit_with_ref).</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;7&lt;/td&gt;<br/>&lt;td&gt;Withdrawing should only be allowed to the owner of an existing store with sufficient balance.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The withdraw function fetches the owner&apos;s store via the primary_store function and then calls fungible_asset::withdraw which validates the owner of the store, checks the frozen status and the balance of the store. The withdraw_with_ref function fetches the store of the owner via primary_store function and calls the fungible_asset::withdraw_with_ref which validates transfer_ref&apos;s metadata with the withdrawing stores metadata, and the balance of the store.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the owner doesn&apos;t own the store (withdraw). Audited that it aborts if the store is frozen (withdraw). Audited that it aborts if the transfer ref&apos;s metadata doesn&apos;t match the withdrawing store&apos;s metadata (withdraw_with_ref). Audited that it aborts if the store doesn&apos;t have sufficient balance. Audited that the store is not burned. Audited that the balance of the store is decreased by the amount withdrawn.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>7</td>
+<td>Withdrawing should only be allowed to the owner of an existing store with sufficient balance.</td>
+<td>Critical</td>
+<td>The withdraw function fetches the owner&apos;s store via the primary_store function and then calls fungible_asset::withdraw which validates the owner of the store, checks the frozen status and the balance of the store. The withdraw_with_ref function fetches the store of the owner via primary_store function and calls the fungible_asset::withdraw_with_ref which validates transfer_ref&apos;s metadata with the withdrawing stores metadata, and the balance of the store.</td>
+<td>Audited that it aborts if the owner doesn&apos;t own the store (withdraw). Audited that it aborts if the store is frozen (withdraw). Audited that it aborts if the transfer ref&apos;s metadata doesn&apos;t match the withdrawing store&apos;s metadata (withdraw_with_ref). Audited that it aborts if the store doesn&apos;t have sufficient balance. Audited that the store is not burned. Audited that the balance of the store is decreased by the amount withdrawn.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;8&lt;/td&gt;<br/>&lt;td&gt;Only the fungible store owner is allowed to unburn a burned store.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The function may_be_unburn checks if the store is burned and then proceeds to call object::unburn which ensures that the owner of the object matches the address of the signer.&lt;/td&gt;<br/>&lt;td&gt;Audited that the store is unburned successfully.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>8</td>
+<td>Only the fungible store owner is allowed to unburn a burned store.</td>
+<td>High</td>
+<td>The function may_be_unburn checks if the store is burned and then proceeds to call object::unburn which ensures that the owner of the object matches the address of the signer.</td>
+<td>Audited that the store is unburned successfully.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;9&lt;/td&gt;<br/>&lt;td&gt;Only the owner of a primary store can transfer its balance to any recipient&apos;s primary store.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The function transfer fetches sender and recipient&apos;s primary stores, if the sender&apos;s store is burned it unburns the store and calls the fungile_asset::transfer to proceed with the transfer, which first withdraws the assets from the sender&apos;s store and then deposits to the recipient&apos;s store. The function transfer_with_ref fetches the sender&apos;s and recipient&apos;s stores and calls the fungible_asset::transfer_with_ref function which withdraws the asset with the ref from the sender and deposits the asset to the recipient with the ref.&lt;/td&gt;<br/>&lt;td&gt;Audited the deposit and withdraw (transfer). Audited the deposit_with_ref and withdraw_with_ref (transfer_with_ref). Audited that the store balance of the sender is decreased by the specified amount and its added to the recipients store. (transfer, transfer_with_ref) Audited that the sender&apos;s store is not burned (transfer).&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>9</td>
+<td>Only the owner of a primary store can transfer its balance to any recipient&apos;s primary store.</td>
+<td>High</td>
+<td>The function transfer fetches sender and recipient&apos;s primary stores, if the sender&apos;s store is burned it unburns the store and calls the fungile_asset::transfer to proceed with the transfer, which first withdraws the assets from the sender&apos;s store and then deposits to the recipient&apos;s store. The function transfer_with_ref fetches the sender&apos;s and recipient&apos;s stores and calls the fungible_asset::transfer_with_ref function which withdraws the asset with the ref from the sender and deposits the asset to the recipient with the ref.</td>
+<td>Audited the deposit and withdraw (transfer). Audited the deposit_with_ref and withdraw_with_ref (transfer_with_ref). Audited that the store balance of the sender is decreased by the specified amount and its added to the recipients store. (transfer, transfer_with_ref) Audited that the sender&apos;s store is not burned (transfer).</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;10&lt;/td&gt;<br/>&lt;td&gt;Minting an amount of assets to an unfrozen store is only allowed with a valid mint reference.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The mint function fetches the primary store and calls the fungible_asset::mint_to, which mints with MintRef&apos;s metadata which internally validates the amount and the increases the total supply of the asset. And the minted asset is deposited to the provided store by validating that the store is unfrozen and the store&apos;s metadata is the same as the depositing asset&apos;s metadata.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the amount is equal to 0. Audited that it aborts if the store is frozen. Audited that it aborts if the mint_ref&apos;s metadata is not the same as the store&apos;s metadata. Audited that the asset&apos;s total supply is increased by the amount minted. Audited that the balance of the store is increased by the minted amount.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>10</td>
+<td>Minting an amount of assets to an unfrozen store is only allowed with a valid mint reference.</td>
+<td>High</td>
+<td>The mint function fetches the primary store and calls the fungible_asset::mint_to, which mints with MintRef&apos;s metadata which internally validates the amount and the increases the total supply of the asset. And the minted asset is deposited to the provided store by validating that the store is unfrozen and the store&apos;s metadata is the same as the depositing asset&apos;s metadata.</td>
+<td>Audited that it aborts if the amount is equal to 0. Audited that it aborts if the store is frozen. Audited that it aborts if the mint_ref&apos;s metadata is not the same as the store&apos;s metadata. Audited that the asset&apos;s total supply is increased by the amount minted. Audited that the balance of the store is increased by the minted amount.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;11&lt;/td&gt;<br/>&lt;td&gt;Burning an amount of assets from an existing unfrozen store is only allowed with a valid burn reference.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The burn function fetches the primary store and calls the fungible_asset::burn_from function which withdraws the amount from the store while enforcing that the store has enough balance and burns the withdrawn asset after validating the asset&apos;s metadata and the BurnRef&apos;s metadata followed by decreasing the supply of the asset.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the metadata of the store is not same as the BurnRef&apos;s metadata. Audited that it aborts if the burning amount is 0. Audited that it aborts if the store doesn&apos;t have enough balance. Audited that it aborts if the asset&apos;s metadata is not same as the BurnRef&apos;s metadata. Audited that the total supply of the asset is decreased. Audited that the store&apos;s balance is reduced by the amount burned.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>11</td>
+<td>Burning an amount of assets from an existing unfrozen store is only allowed with a valid burn reference.</td>
+<td>High</td>
+<td>The burn function fetches the primary store and calls the fungible_asset::burn_from function which withdraws the amount from the store while enforcing that the store has enough balance and burns the withdrawn asset after validating the asset&apos;s metadata and the BurnRef&apos;s metadata followed by decreasing the supply of the asset.</td>
+<td>Audited that it aborts if the metadata of the store is not same as the BurnRef&apos;s metadata. Audited that it aborts if the burning amount is 0. Audited that it aborts if the store doesn&apos;t have enough balance. Audited that it aborts if the asset&apos;s metadata is not same as the BurnRef&apos;s metadata. Audited that the total supply of the asset is decreased. Audited that the store&apos;s balance is reduced by the amount burned.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;12&lt;/td&gt;<br/>&lt;td&gt;Setting the frozen flag of a store is only allowed with a valid reference.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The function set_frozen_flag fetches the primary store and calls fungible_asset::set_frozen_flag which validates the TransferRef&apos;s metadata with the store&apos;s metadata and then updates the frozen flag.&lt;/td&gt;<br/>&lt;td&gt;Audited that it aborts if the store&apos;s metadata is not same as the TransferRef&apos;s metadata. Audited that the status of the frozen flag is updated correctly.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>12</td>
+<td>Setting the frozen flag of a store is only allowed with a valid reference.</td>
+<td>High</td>
+<td>The function set_frozen_flag fetches the primary store and calls fungible_asset::set_frozen_flag which validates the TransferRef&apos;s metadata with the store&apos;s metadata and then updates the frozen flag.</td>
+<td>Audited that it aborts if the store&apos;s metadata is not same as the TransferRef&apos;s metadata. Audited that the status of the frozen flag is updated correctly.</td>
+</tr>
 
-&lt;/table&gt;<br/>
+</table>
 
-<br/>
+
 
 
 <a id="module-level-spec"></a>
@@ -550,7 +642,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 ### Module-level Specification
 
 
-<pre><code>pragma verify &#61; false;<br/></code></pre>
+<pre><code><b>pragma</b> verify &#61; <b>false</b>;<br /></code></pre>
 
 
 
@@ -558,7 +650,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <a id="0x1_primary_fungible_store_spec_primary_store_exists"></a>
 
 
-<pre><code>fun spec_primary_store_exists&lt;T: key&gt;(account: address, metadata: Object&lt;T&gt;): bool &#123;<br/>   fungible_asset::store_exists(spec_primary_store_address(account, metadata))<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_spec_primary_store_exists">spec_primary_store_exists</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): bool &#123;<br />   <a href="fungible_asset.md#0x1_fungible_asset_store_exists">fungible_asset::store_exists</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_spec_primary_store_address">spec_primary_store_address</a>(<a href="account.md#0x1_account">account</a>, metadata))<br />&#125;<br /></code></pre>
 
 
 
@@ -566,7 +658,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <a id="0x1_primary_fungible_store_spec_primary_store_address"></a>
 
 
-<pre><code>fun spec_primary_store_address&lt;T: key&gt;(owner: address, metadata: Object&lt;T&gt;): address &#123;<br/>   let metadata_addr &#61; object::object_address(metadata);<br/>   if (metadata_addr &#61;&#61; @aptos_fungible_asset &amp;&amp; features::spec_is_enabled(<br/>       features::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS<br/>   )) &#123;<br/>       owner<br/>   &#125; else &#123;<br/>       object::spec_create_user_derived_object_address(owner, metadata_addr)<br/>   &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_spec_primary_store_address">spec_primary_store_address</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): <b>address</b> &#123;<br />   <b>let</b> metadata_addr &#61; <a href="object.md#0x1_object_object_address">object::object_address</a>(metadata);<br />   <b>if</b> (metadata_addr &#61;&#61; @aptos_fungible_asset &amp;&amp; <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<br />       <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS">features::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS</a><br />   )) &#123;<br />       owner<br />   &#125; <b>else</b> &#123;<br />       <a href="object.md#0x1_object_spec_create_user_derived_object_address">object::spec_create_user_derived_object_address</a>(owner, metadata_addr)<br />   &#125;<br />&#125;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -3,7 +3,10 @@
 
 # Module `0x1::hash`
 
-Module which defines SHA hashes for byte vectors.<br/><br/> The functions in this module are natively declared both in the Move runtime<br/> as in the Move prover&apos;s prelude.
+Module which defines SHA hashes for byte vectors.
+
+The functions in this module are natively declared both in the Move runtime
+as in the Move prover&apos;s prelude.
 
 
 -  [Function `sha2_256`](#0x1_hash_sha2_256)
@@ -20,7 +23,7 @@ Module which defines SHA hashes for byte vectors.<br/><br/> The functions in thi
 
 
 
-<pre><code>public fun sha2_256(data: vector&lt;u8&gt;): vector&lt;u8&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_hash_sha2_256">sha2_256</a>(data: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;<br /></code></pre>
 
 
 
@@ -28,7 +31,7 @@ Module which defines SHA hashes for byte vectors.<br/><br/> The functions in thi
 <summary>Implementation</summary>
 
 
-<pre><code>native public fun sha2_256(data: vector&lt;u8&gt;): vector&lt;u8&gt;;<br/></code></pre>
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="hash.md#0x1_hash_sha2_256">sha2_256</a>(data: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;;<br /></code></pre>
 
 
 
@@ -40,7 +43,7 @@ Module which defines SHA hashes for byte vectors.<br/><br/> The functions in thi
 
 
 
-<pre><code>public fun sha3_256(data: vector&lt;u8&gt;): vector&lt;u8&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_hash_sha3_256">sha3_256</a>(data: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;<br /></code></pre>
 
 
 
@@ -48,7 +51,7 @@ Module which defines SHA hashes for byte vectors.<br/><br/> The functions in thi
 <summary>Implementation</summary>
 
 
-<pre><code>native public fun sha3_256(data: vector&lt;u8&gt;): vector&lt;u8&gt;;<br/></code></pre>
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="hash.md#0x1_hash_sha3_256">sha3_256</a>(data: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;;<br /></code></pre>
 
 
 

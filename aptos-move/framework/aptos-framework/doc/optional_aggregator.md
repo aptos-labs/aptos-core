@@ -3,7 +3,8 @@
 
 # Module `0x1::optional_aggregator`
 
-This module provides an interface to aggregate integers either via<br/> aggregator (parallelizable) or via normal integers.
+This module provides an interface to aggregate integers either via
+aggregator (parallelizable) or via normal integers.
 
 
 -  [Struct `Integer`](#0x1_optional_aggregator_Integer)
@@ -50,7 +51,7 @@ This module provides an interface to aggregate integers either via<br/> aggregat
     -  [Function `read`](#@Specification_1_read)
 
 
-<pre><code>use 0x1::aggregator;<br/>use 0x1::aggregator_factory;<br/>use 0x1::error;<br/>use 0x1::option;<br/></code></pre>
+<pre><code><b>use</b> <a href="aggregator.md#0x1_aggregator">0x1::aggregator</a>;<br /><b>use</b> <a href="aggregator_factory.md#0x1_aggregator_factory">0x1::aggregator_factory</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;<br /></code></pre>
 
 
 
@@ -61,7 +62,7 @@ This module provides an interface to aggregate integers either via<br/> aggregat
 Wrapper around integer with a custom overflow limit. Supports add, subtract and read just like <code>Aggregator</code>.
 
 
-<pre><code>struct Integer has store<br/></code></pre>
+<pre><code><b>struct</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a> <b>has</b> store<br /></code></pre>
 
 
 
@@ -94,7 +95,7 @@ Wrapper around integer with a custom overflow limit. Supports add, subtract and 
 Contains either an aggregator or a normal integer, both overflowing on limit.
 
 
-<pre><code>struct OptionalAggregator has store<br/></code></pre>
+<pre><code><b>struct</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a> <b>has</b> store<br /></code></pre>
 
 
 
@@ -104,13 +105,13 @@ Contains either an aggregator or a normal integer, both overflowing on limit.
 
 <dl>
 <dt>
-<code>aggregator: option::Option&lt;aggregator::Aggregator&gt;</code>
+<code><a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>integer: option::Option&lt;optional_aggregator::Integer&gt;</code>
+<code>integer: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>&gt;</code>
 </dt>
 <dd>
 
@@ -130,7 +131,7 @@ Contains either an aggregator or a normal integer, both overflowing on limit.
 The value of aggregator underflows (goes below zero). Raised by native code.
 
 
-<pre><code>const EAGGREGATOR_OVERFLOW: u64 &#61; 1;<br/></code></pre>
+<pre><code><b>const</b> <a href="optional_aggregator.md#0x1_optional_aggregator_EAGGREGATOR_OVERFLOW">EAGGREGATOR_OVERFLOW</a>: u64 &#61; 1;<br /></code></pre>
 
 
 
@@ -139,7 +140,7 @@ The value of aggregator underflows (goes below zero). Raised by native code.
 Aggregator feature is not supported. Raised by native code.
 
 
-<pre><code>const EAGGREGATOR_UNDERFLOW: u64 &#61; 2;<br/></code></pre>
+<pre><code><b>const</b> <a href="optional_aggregator.md#0x1_optional_aggregator_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>: u64 &#61; 2;<br /></code></pre>
 
 
 
@@ -150,7 +151,7 @@ Aggregator feature is not supported. Raised by native code.
 Creates a new integer which overflows on exceeding a <code>limit</code>.
 
 
-<pre><code>fun new_integer(limit: u128): optional_aggregator::Integer<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_new_integer">new_integer</a>(limit: u128): <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a><br /></code></pre>
 
 
 
@@ -158,7 +159,7 @@ Creates a new integer which overflows on exceeding a <code>limit</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>fun new_integer(limit: u128): Integer &#123;<br/>    Integer &#123;<br/>        value: 0,<br/>        limit,<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_new_integer">new_integer</a>(limit: u128): <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a> &#123;<br />    <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a> &#123;<br />        value: 0,<br />        limit,<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -171,7 +172,7 @@ Creates a new integer which overflows on exceeding a <code>limit</code>.
 Adds <code>value</code> to integer. Aborts on overflowing the limit.
 
 
-<pre><code>fun add_integer(integer: &amp;mut optional_aggregator::Integer, value: u128)<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_add_integer">add_integer</a>(integer: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>, value: u128)<br /></code></pre>
 
 
 
@@ -179,7 +180,7 @@ Adds <code>value</code> to integer. Aborts on overflowing the limit.
 <summary>Implementation</summary>
 
 
-<pre><code>fun add_integer(integer: &amp;mut Integer, value: u128) &#123;<br/>    assert!(<br/>        value &lt;&#61; (integer.limit &#45; integer.value),<br/>        error::out_of_range(EAGGREGATOR_OVERFLOW)<br/>    );<br/>    integer.value &#61; integer.value &#43; value;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_add_integer">add_integer</a>(integer: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a>, value: u128) &#123;<br />    <b>assert</b>!(<br />        value &lt;&#61; (integer.limit &#45; integer.value),<br />        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="optional_aggregator.md#0x1_optional_aggregator_EAGGREGATOR_OVERFLOW">EAGGREGATOR_OVERFLOW</a>)<br />    );<br />    integer.value &#61; integer.value &#43; value;<br />&#125;<br /></code></pre>
 
 
 
@@ -192,7 +193,7 @@ Adds <code>value</code> to integer. Aborts on overflowing the limit.
 Subtracts <code>value</code> from integer. Aborts on going below zero.
 
 
-<pre><code>fun sub_integer(integer: &amp;mut optional_aggregator::Integer, value: u128)<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_sub_integer">sub_integer</a>(integer: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>, value: u128)<br /></code></pre>
 
 
 
@@ -200,7 +201,7 @@ Subtracts <code>value</code> from integer. Aborts on going below zero.
 <summary>Implementation</summary>
 
 
-<pre><code>fun sub_integer(integer: &amp;mut Integer, value: u128) &#123;<br/>    assert!(value &lt;&#61; integer.value, error::out_of_range(EAGGREGATOR_UNDERFLOW));<br/>    integer.value &#61; integer.value &#45; value;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_sub_integer">sub_integer</a>(integer: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a>, value: u128) &#123;<br />    <b>assert</b>!(value &lt;&#61; integer.value, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="optional_aggregator.md#0x1_optional_aggregator_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>));<br />    integer.value &#61; integer.value &#45; value;<br />&#125;<br /></code></pre>
 
 
 
@@ -213,7 +214,7 @@ Subtracts <code>value</code> from integer. Aborts on going below zero.
 Returns an overflow limit of integer.
 
 
-<pre><code>fun limit(integer: &amp;optional_aggregator::Integer): u128<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_limit">limit</a>(integer: &amp;<a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>): u128<br /></code></pre>
 
 
 
@@ -221,7 +222,7 @@ Returns an overflow limit of integer.
 <summary>Implementation</summary>
 
 
-<pre><code>fun limit(integer: &amp;Integer): u128 &#123;<br/>    integer.limit<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_limit">limit</a>(integer: &amp;<a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a>): u128 &#123;<br />    integer.limit<br />&#125;<br /></code></pre>
 
 
 
@@ -234,7 +235,7 @@ Returns an overflow limit of integer.
 Returns a value stored in this integer.
 
 
-<pre><code>fun read_integer(integer: &amp;optional_aggregator::Integer): u128<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_read_integer">read_integer</a>(integer: &amp;<a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>): u128<br /></code></pre>
 
 
 
@@ -242,7 +243,7 @@ Returns a value stored in this integer.
 <summary>Implementation</summary>
 
 
-<pre><code>fun read_integer(integer: &amp;Integer): u128 &#123;<br/>    integer.value<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_read_integer">read_integer</a>(integer: &amp;<a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a>): u128 &#123;<br />    integer.value<br />&#125;<br /></code></pre>
 
 
 
@@ -255,7 +256,7 @@ Returns a value stored in this integer.
 Destroys an integer.
 
 
-<pre><code>fun destroy_integer(integer: optional_aggregator::Integer)<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_integer">destroy_integer</a>(integer: <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>)<br /></code></pre>
 
 
 
@@ -263,7 +264,7 @@ Destroys an integer.
 <summary>Implementation</summary>
 
 
-<pre><code>fun destroy_integer(integer: Integer) &#123;<br/>    let Integer &#123; value: _, limit: _ &#125; &#61; integer;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_integer">destroy_integer</a>(integer: <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a>) &#123;<br />    <b>let</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a> &#123; value: _, limit: _ &#125; &#61; integer;<br />&#125;<br /></code></pre>
 
 
 
@@ -276,7 +277,7 @@ Destroys an integer.
 Creates a new optional aggregator.
 
 
-<pre><code>public(friend) fun new(limit: u128, parallelizable: bool): optional_aggregator::OptionalAggregator<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_new">new</a>(limit: u128, parallelizable: bool): <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a><br /></code></pre>
 
 
 
@@ -284,7 +285,7 @@ Creates a new optional aggregator.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun new(limit: u128, parallelizable: bool): OptionalAggregator &#123;<br/>    if (parallelizable) &#123;<br/>        OptionalAggregator &#123;<br/>            aggregator: option::some(aggregator_factory::create_aggregator_internal(limit)),<br/>            integer: option::none(),<br/>        &#125;<br/>    &#125; else &#123;<br/>        OptionalAggregator &#123;<br/>            aggregator: option::none(),<br/>            integer: option::some(new_integer(limit)),<br/>        &#125;<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_new">new</a>(limit: u128, parallelizable: bool): <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a> &#123;<br />    <b>if</b> (parallelizable) &#123;<br />        <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a> &#123;<br />            <a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator_internal">aggregator_factory::create_aggregator_internal</a>(limit)),<br />            integer: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),<br />        &#125;<br />    &#125; <b>else</b> &#123;<br />        <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a> &#123;<br />            <a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),<br />            integer: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="optional_aggregator.md#0x1_optional_aggregator_new_integer">new_integer</a>(limit)),<br />        &#125;<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -297,7 +298,7 @@ Creates a new optional aggregator.
 Switches between parallelizable and non&#45;parallelizable implementations.
 
 
-<pre><code>public fun switch(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_switch">switch</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>)<br /></code></pre>
 
 
 
@@ -305,7 +306,7 @@ Switches between parallelizable and non&#45;parallelizable implementations.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun switch(optional_aggregator: &amp;mut OptionalAggregator) &#123;<br/>    let value &#61; read(optional_aggregator);<br/>    switch_and_zero_out(optional_aggregator);<br/>    add(optional_aggregator, value);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_switch">switch</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>) &#123;<br />    <b>let</b> value &#61; <a href="optional_aggregator.md#0x1_optional_aggregator_read">read</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);<br />    <a href="optional_aggregator.md#0x1_optional_aggregator_switch_and_zero_out">switch_and_zero_out</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);<br />    <a href="optional_aggregator.md#0x1_optional_aggregator_add">add</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>, value);<br />&#125;<br /></code></pre>
 
 
 
@@ -315,10 +316,11 @@ Switches between parallelizable and non&#45;parallelizable implementations.
 
 ## Function `switch_and_zero_out`
 
-Switches between parallelizable and non&#45;parallelizable implementations, setting<br/> the value of the new optional aggregator to zero.
+Switches between parallelizable and non&#45;parallelizable implementations, setting
+the value of the new optional aggregator to zero.
 
 
-<pre><code>fun switch_and_zero_out(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator)<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_switch_and_zero_out">switch_and_zero_out</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>)<br /></code></pre>
 
 
 
@@ -326,7 +328,7 @@ Switches between parallelizable and non&#45;parallelizable implementations, sett
 <summary>Implementation</summary>
 
 
-<pre><code>fun switch_and_zero_out(optional_aggregator: &amp;mut OptionalAggregator) &#123;<br/>    if (is_parallelizable(optional_aggregator)) &#123;<br/>        switch_to_integer_and_zero_out(optional_aggregator);<br/>    &#125; else &#123;<br/>        switch_to_aggregator_and_zero_out(optional_aggregator);<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_switch_and_zero_out">switch_and_zero_out</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>) &#123;<br />    <b>if</b> (<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>)) &#123;<br />        <a href="optional_aggregator.md#0x1_optional_aggregator_switch_to_integer_and_zero_out">switch_to_integer_and_zero_out</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);<br />    &#125; <b>else</b> &#123;<br />        <a href="optional_aggregator.md#0x1_optional_aggregator_switch_to_aggregator_and_zero_out">switch_to_aggregator_and_zero_out</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -336,10 +338,11 @@ Switches between parallelizable and non&#45;parallelizable implementations, sett
 
 ## Function `switch_to_integer_and_zero_out`
 
-Switches from parallelizable to non&#45;parallelizable implementation, zero&#45;initializing<br/> the value.
+Switches from parallelizable to non&#45;parallelizable implementation, zero&#45;initializing
+the value.
 
 
-<pre><code>fun switch_to_integer_and_zero_out(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator): u128<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_switch_to_integer_and_zero_out">switch_to_integer_and_zero_out</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>): u128<br /></code></pre>
 
 
 
@@ -347,7 +350,7 @@ Switches from parallelizable to non&#45;parallelizable implementation, zero&#45;
 <summary>Implementation</summary>
 
 
-<pre><code>fun switch_to_integer_and_zero_out(<br/>    optional_aggregator: &amp;mut OptionalAggregator<br/>): u128 &#123;<br/>    let aggregator &#61; option::extract(&amp;mut optional_aggregator.aggregator);<br/>    let limit &#61; aggregator::limit(&amp;aggregator);<br/>    aggregator::destroy(aggregator);<br/>    let integer &#61; new_integer(limit);<br/>    option::fill(&amp;mut optional_aggregator.integer, integer);<br/>    limit<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_switch_to_integer_and_zero_out">switch_to_integer_and_zero_out</a>(<br />    <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a><br />): u128 &#123;<br />    <b>let</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>);<br />    <b>let</b> limit &#61; <a href="aggregator.md#0x1_aggregator_limit">aggregator::limit</a>(&amp;<a href="aggregator.md#0x1_aggregator">aggregator</a>);<br />    <a href="aggregator.md#0x1_aggregator_destroy">aggregator::destroy</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);<br />    <b>let</b> integer &#61; <a href="optional_aggregator.md#0x1_optional_aggregator_new_integer">new_integer</a>(limit);<br />    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_fill">option::fill</a>(&amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer, integer);<br />    limit<br />&#125;<br /></code></pre>
 
 
 
@@ -357,10 +360,11 @@ Switches from parallelizable to non&#45;parallelizable implementation, zero&#45;
 
 ## Function `switch_to_aggregator_and_zero_out`
 
-Switches from non&#45;parallelizable to parallelizable implementation, zero&#45;initializing<br/> the value.
+Switches from non&#45;parallelizable to parallelizable implementation, zero&#45;initializing
+the value.
 
 
-<pre><code>fun switch_to_aggregator_and_zero_out(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator): u128<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_switch_to_aggregator_and_zero_out">switch_to_aggregator_and_zero_out</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>): u128<br /></code></pre>
 
 
 
@@ -368,7 +372,7 @@ Switches from non&#45;parallelizable to parallelizable implementation, zero&#45;
 <summary>Implementation</summary>
 
 
-<pre><code>fun switch_to_aggregator_and_zero_out(<br/>    optional_aggregator: &amp;mut OptionalAggregator<br/>): u128 &#123;<br/>    let integer &#61; option::extract(&amp;mut optional_aggregator.integer);<br/>    let limit &#61; limit(&amp;integer);<br/>    destroy_integer(integer);<br/>    let aggregator &#61; aggregator_factory::create_aggregator_internal(limit);<br/>    option::fill(&amp;mut optional_aggregator.aggregator, aggregator);<br/>    limit<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_switch_to_aggregator_and_zero_out">switch_to_aggregator_and_zero_out</a>(<br />    <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a><br />): u128 &#123;<br />    <b>let</b> integer &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer);<br />    <b>let</b> limit &#61; <a href="optional_aggregator.md#0x1_optional_aggregator_limit">limit</a>(&amp;integer);<br />    <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_integer">destroy_integer</a>(integer);<br />    <b>let</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> &#61; <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator_internal">aggregator_factory::create_aggregator_internal</a>(limit);<br />    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_fill">option::fill</a>(&amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>, <a href="aggregator.md#0x1_aggregator">aggregator</a>);<br />    limit<br />&#125;<br /></code></pre>
 
 
 
@@ -381,7 +385,7 @@ Switches from non&#45;parallelizable to parallelizable implementation, zero&#45;
 Destroys optional aggregator.
 
 
-<pre><code>public fun destroy(optional_aggregator: optional_aggregator::OptionalAggregator)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy">destroy</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>)<br /></code></pre>
 
 
 
@@ -389,7 +393,7 @@ Destroys optional aggregator.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun destroy(optional_aggregator: OptionalAggregator) &#123;<br/>    if (is_parallelizable(&amp;optional_aggregator)) &#123;<br/>        destroy_optional_aggregator(optional_aggregator);<br/>    &#125; else &#123;<br/>        destroy_optional_integer(optional_aggregator);<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy">destroy</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>) &#123;<br />    <b>if</b> (<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(&amp;<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>)) &#123;<br />        <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_optional_aggregator">destroy_optional_aggregator</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);<br />    &#125; <b>else</b> &#123;<br />        <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_optional_integer">destroy_optional_integer</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -402,7 +406,7 @@ Destroys optional aggregator.
 Destroys parallelizable optional aggregator and returns its limit.
 
 
-<pre><code>fun destroy_optional_aggregator(optional_aggregator: optional_aggregator::OptionalAggregator): u128<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_optional_aggregator">destroy_optional_aggregator</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>): u128<br /></code></pre>
 
 
 
@@ -410,7 +414,7 @@ Destroys parallelizable optional aggregator and returns its limit.
 <summary>Implementation</summary>
 
 
-<pre><code>fun destroy_optional_aggregator(optional_aggregator: OptionalAggregator): u128 &#123;<br/>    let OptionalAggregator &#123; aggregator, integer &#125; &#61; optional_aggregator;<br/>    let limit &#61; aggregator::limit(option::borrow(&amp;aggregator));<br/>    aggregator::destroy(option::destroy_some(aggregator));<br/>    option::destroy_none(integer);<br/>    limit<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_optional_aggregator">destroy_optional_aggregator</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>): u128 &#123;<br />    <b>let</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a> &#123; <a href="aggregator.md#0x1_aggregator">aggregator</a>, integer &#125; &#61; <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>;<br />    <b>let</b> limit &#61; <a href="aggregator.md#0x1_aggregator_limit">aggregator::limit</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&amp;<a href="aggregator.md#0x1_aggregator">aggregator</a>));<br />    <a href="aggregator.md#0x1_aggregator_destroy">aggregator::destroy</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>));<br />    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_none">option::destroy_none</a>(integer);<br />    limit<br />&#125;<br /></code></pre>
 
 
 
@@ -423,7 +427,7 @@ Destroys parallelizable optional aggregator and returns its limit.
 Destroys non&#45;parallelizable optional aggregator and returns its limit.
 
 
-<pre><code>fun destroy_optional_integer(optional_aggregator: optional_aggregator::OptionalAggregator): u128<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_optional_integer">destroy_optional_integer</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>): u128<br /></code></pre>
 
 
 
@@ -431,7 +435,7 @@ Destroys non&#45;parallelizable optional aggregator and returns its limit.
 <summary>Implementation</summary>
 
 
-<pre><code>fun destroy_optional_integer(optional_aggregator: OptionalAggregator): u128 &#123;<br/>    let OptionalAggregator &#123; aggregator, integer &#125; &#61; optional_aggregator;<br/>    let limit &#61; limit(option::borrow(&amp;integer));<br/>    destroy_integer(option::destroy_some(integer));<br/>    option::destroy_none(aggregator);<br/>    limit<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_optional_integer">destroy_optional_integer</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>): u128 &#123;<br />    <b>let</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a> &#123; <a href="aggregator.md#0x1_aggregator">aggregator</a>, integer &#125; &#61; <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>;<br />    <b>let</b> limit &#61; <a href="optional_aggregator.md#0x1_optional_aggregator_limit">limit</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&amp;integer));<br />    <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_integer">destroy_integer</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(integer));<br />    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_none">option::destroy_none</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);<br />    limit<br />&#125;<br /></code></pre>
 
 
 
@@ -444,7 +448,7 @@ Destroys non&#45;parallelizable optional aggregator and returns its limit.
 Adds <code>value</code> to optional aggregator, aborting on exceeding the <code>limit</code>.
 
 
-<pre><code>public fun add(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator, value: u128)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_add">add</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>, value: u128)<br /></code></pre>
 
 
 
@@ -452,7 +456,7 @@ Adds <code>value</code> to optional aggregator, aborting on exceeding the <code>
 <summary>Implementation</summary>
 
 
-<pre><code>public fun add(optional_aggregator: &amp;mut OptionalAggregator, value: u128) &#123;<br/>    if (option::is_some(&amp;optional_aggregator.aggregator)) &#123;<br/>        let aggregator &#61; option::borrow_mut(&amp;mut optional_aggregator.aggregator);<br/>        aggregator::add(aggregator, value);<br/>    &#125; else &#123;<br/>        let integer &#61; option::borrow_mut(&amp;mut optional_aggregator.integer);<br/>        add_integer(integer, value);<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_add">add</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>, value: u128) &#123;<br />    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&amp;<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>)) &#123;<br />        <b>let</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(&amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>);<br />        <a href="aggregator.md#0x1_aggregator_add">aggregator::add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value);<br />    &#125; <b>else</b> &#123;<br />        <b>let</b> integer &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(&amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer);<br />        <a href="optional_aggregator.md#0x1_optional_aggregator_add_integer">add_integer</a>(integer, value);<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -465,7 +469,7 @@ Adds <code>value</code> to optional aggregator, aborting on exceeding the <code>
 Subtracts <code>value</code> from optional aggregator, aborting on going below zero.
 
 
-<pre><code>public fun sub(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator, value: u128)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_sub">sub</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>, value: u128)<br /></code></pre>
 
 
 
@@ -473,7 +477,7 @@ Subtracts <code>value</code> from optional aggregator, aborting on going below z
 <summary>Implementation</summary>
 
 
-<pre><code>public fun sub(optional_aggregator: &amp;mut OptionalAggregator, value: u128) &#123;<br/>    if (option::is_some(&amp;optional_aggregator.aggregator)) &#123;<br/>        let aggregator &#61; option::borrow_mut(&amp;mut optional_aggregator.aggregator);<br/>        aggregator::sub(aggregator, value);<br/>    &#125; else &#123;<br/>        let integer &#61; option::borrow_mut(&amp;mut optional_aggregator.integer);<br/>        sub_integer(integer, value);<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_sub">sub</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>, value: u128) &#123;<br />    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&amp;<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>)) &#123;<br />        <b>let</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(&amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>);<br />        <a href="aggregator.md#0x1_aggregator_sub">aggregator::sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value);<br />    &#125; <b>else</b> &#123;<br />        <b>let</b> integer &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(&amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer);<br />        <a href="optional_aggregator.md#0x1_optional_aggregator_sub_integer">sub_integer</a>(integer, value);<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -486,7 +490,7 @@ Subtracts <code>value</code> from optional aggregator, aborting on going below z
 Returns the value stored in optional aggregator.
 
 
-<pre><code>public fun read(optional_aggregator: &amp;optional_aggregator::OptionalAggregator): u128<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_read">read</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>): u128<br /></code></pre>
 
 
 
@@ -494,7 +498,7 @@ Returns the value stored in optional aggregator.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun read(optional_aggregator: &amp;OptionalAggregator): u128 &#123;<br/>    if (option::is_some(&amp;optional_aggregator.aggregator)) &#123;<br/>        let aggregator &#61; option::borrow(&amp;optional_aggregator.aggregator);<br/>        aggregator::read(aggregator)<br/>    &#125; else &#123;<br/>        let integer &#61; option::borrow(&amp;optional_aggregator.integer);<br/>        read_integer(integer)<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_read">read</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>): u128 &#123;<br />    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&amp;<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>)) &#123;<br />        <b>let</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&amp;<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>);<br />        <a href="aggregator.md#0x1_aggregator_read">aggregator::read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>)<br />    &#125; <b>else</b> &#123;<br />        <b>let</b> integer &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&amp;<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer);<br />        <a href="optional_aggregator.md#0x1_optional_aggregator_read_integer">read_integer</a>(integer)<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -507,7 +511,7 @@ Returns the value stored in optional aggregator.
 Returns true if optional aggregator uses parallelizable implementation.
 
 
-<pre><code>public fun is_parallelizable(optional_aggregator: &amp;optional_aggregator::OptionalAggregator): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>): bool<br /></code></pre>
 
 
 
@@ -515,7 +519,7 @@ Returns true if optional aggregator uses parallelizable implementation.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun is_parallelizable(optional_aggregator: &amp;OptionalAggregator): bool &#123;<br/>    option::is_some(&amp;optional_aggregator.aggregator)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>): bool &#123;<br />    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&amp;<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>)<br />&#125;<br /></code></pre>
 
 
 
@@ -532,15 +536,36 @@ Returns true if optional aggregator uses parallelizable implementation.
 
 ### High-level Requirements
 
-&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;When creating a new integer instance, it guarantees that the limit assigned is a value passed into the function as an argument, and the value field becomes zero.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The new_integer function sets the limit field to the argument passed in, and the value field is set to zero.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;new_integer&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>1</td>
+<td>When creating a new integer instance, it guarantees that the limit assigned is a value passed into the function as an argument, and the value field becomes zero.</td>
+<td>High</td>
+<td>The new_integer function sets the limit field to the argument passed in, and the value field is set to zero.</td>
+<td>Formally verified via <a href="#high-level-req-1">new_integer</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;For a given integer instance it should always be possible to: (1) return the limit value of the integer resource, (2) return the current value stored in that particular instance, and (3) destroy the integer instance.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The following functions should not abort if the Integer instance exists: limit(), read_integer(), destroy_integer().&lt;/td&gt;<br/>&lt;td&gt;Formally verified via: &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.1&quot;&gt;read_integer&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.2&quot;&gt;limit&lt;/a&gt;, and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2.3&quot;&gt;destroy_integer&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>2</td>
+<td>For a given integer instance it should always be possible to: (1) return the limit value of the integer resource, (2) return the current value stored in that particular instance, and (3) destroy the integer instance.</td>
+<td>Low</td>
+<td>The following functions should not abort if the Integer instance exists: limit(), read_integer(), destroy_integer().</td>
+<td>Formally verified via: <a href="#high-level-req-2.1">read_integer</a>, <a href="#high-level-req-2.2">limit</a>, and <a href="#high-level-req-2.3">destroy_integer</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Every successful switch must end with the aggregator type changed from non&#45;parallelizable to parallelizable or vice versa.&lt;/td&gt;<br/>&lt;td&gt;High&lt;/td&gt;<br/>&lt;td&gt;The switch function run, if successful, should always change the aggregator type.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;switch_and_zero_out&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>3</td>
+<td>Every successful switch must end with the aggregator type changed from non&#45;parallelizable to parallelizable or vice versa.</td>
+<td>High</td>
+<td>The switch function run, if successful, should always change the aggregator type.</td>
+<td>Formally verified via <a href="#high-level-req-3">switch_and_zero_out</a>.</td>
+</tr>
 
-&lt;/table&gt;<br/>
+</table>
 
 
 
@@ -549,7 +574,7 @@ Returns true if optional aggregator uses parallelizable implementation.
 ### Module-level Specification
 
 
-<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/></code></pre>
+<pre><code><b>pragma</b> verify &#61; <b>true</b>;<br /><b>pragma</b> aborts_if_is_strict;<br /></code></pre>
 
 
 
@@ -558,19 +583,19 @@ Returns true if optional aggregator uses parallelizable implementation.
 ### Struct `OptionalAggregator`
 
 
-<pre><code>struct OptionalAggregator has store<br/></code></pre>
+<pre><code><b>struct</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a> <b>has</b> store<br /></code></pre>
 
 
 
 <dl>
 <dt>
-<code>aggregator: option::Option&lt;aggregator::Aggregator&gt;</code>
+<code><a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>integer: option::Option&lt;optional_aggregator::Integer&gt;</code>
+<code>integer: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>&gt;</code>
 </dt>
 <dd>
 
@@ -579,7 +604,7 @@ Returns true if optional aggregator uses parallelizable implementation.
 
 
 
-<pre><code>invariant option::is_some(aggregator) &lt;&#61;&#61;&gt; option::is_none(integer);<br/>invariant option::is_some(integer) &lt;&#61;&#61;&gt; option::is_none(aggregator);<br/>invariant option::is_some(integer) &#61;&#61;&gt; option::borrow(integer).value &lt;&#61; option::borrow(integer).limit;<br/>invariant option::is_some(aggregator) &#61;&#61;&gt; aggregator::spec_aggregator_get_val(option::borrow(aggregator)) &lt;&#61;<br/>    aggregator::spec_get_limit(option::borrow(aggregator));<br/></code></pre>
+<pre><code><b>invariant</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) &lt;&#61;&#61;&gt; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(integer);<br /><b>invariant</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(integer) &lt;&#61;&#61;&gt; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);<br /><b>invariant</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(integer) &#61;&#61;&gt; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(integer).value &lt;&#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(integer).limit;<br /><b>invariant</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) &#61;&#61;&gt; <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>)) &lt;&#61;<br />    <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>));<br /></code></pre>
 
 
 
@@ -588,13 +613,13 @@ Returns true if optional aggregator uses parallelizable implementation.
 ### Function `new_integer`
 
 
-<pre><code>fun new_integer(limit: u128): optional_aggregator::Integer<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_new_integer">new_integer</a>(limit: u128): <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a><br /></code></pre>
 
 
 
 
-<pre><code>aborts_if false;<br/>ensures result.limit &#61;&#61; limit;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
-ensures result.value &#61;&#61; 0;<br/></code></pre>
+<pre><code><b>aborts_if</b> <b>false</b>;<br /><b>ensures</b> result.limit &#61;&#61; limit;<br />// This enforces <a id="high-level-req-1" href="#high-level-req">high&#45;level requirement 1</a>:
+<b>ensures</b> result.value &#61;&#61; 0;<br /></code></pre>
 
 
 
@@ -603,13 +628,13 @@ ensures result.value &#61;&#61; 0;<br/></code></pre>
 ### Function `add_integer`
 
 
-<pre><code>fun add_integer(integer: &amp;mut optional_aggregator::Integer, value: u128)<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_add_integer">add_integer</a>(integer: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>, value: u128)<br /></code></pre>
 
 
 Check for overflow.
 
 
-<pre><code>aborts_if value &gt; (integer.limit &#45; integer.value);<br/>aborts_if integer.value &#43; value &gt; MAX_U128;<br/>ensures integer.value &lt;&#61; integer.limit;<br/>ensures integer.value &#61;&#61; old(integer.value) &#43; value;<br/></code></pre>
+<pre><code><b>aborts_if</b> value &gt; (integer.limit &#45; integer.value);<br /><b>aborts_if</b> integer.value &#43; value &gt; MAX_U128;<br /><b>ensures</b> integer.value &lt;&#61; integer.limit;<br /><b>ensures</b> integer.value &#61;&#61; <b>old</b>(integer.value) &#43; value;<br /></code></pre>
 
 
 
@@ -618,12 +643,12 @@ Check for overflow.
 ### Function `sub_integer`
 
 
-<pre><code>fun sub_integer(integer: &amp;mut optional_aggregator::Integer, value: u128)<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_sub_integer">sub_integer</a>(integer: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>, value: u128)<br /></code></pre>
 
 
 
 
-<pre><code>aborts_if value &gt; integer.value;<br/>ensures integer.value &#61;&#61; old(integer.value) &#45; value;<br/></code></pre>
+<pre><code><b>aborts_if</b> value &gt; integer.value;<br /><b>ensures</b> integer.value &#61;&#61; <b>old</b>(integer.value) &#45; value;<br /></code></pre>
 
 
 
@@ -632,13 +657,13 @@ Check for overflow.
 ### Function `limit`
 
 
-<pre><code>fun limit(integer: &amp;optional_aggregator::Integer): u128<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_limit">limit</a>(integer: &amp;<a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>): u128<br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if false;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2.2" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 
@@ -647,13 +672,13 @@ aborts_if false;<br/></code></pre>
 ### Function `read_integer`
 
 
-<pre><code>fun read_integer(integer: &amp;optional_aggregator::Integer): u128<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_read_integer">read_integer</a>(integer: &amp;<a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>): u128<br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if false;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2.1" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 
@@ -662,13 +687,13 @@ aborts_if false;<br/></code></pre>
 ### Function `destroy_integer`
 
 
-<pre><code>fun destroy_integer(integer: optional_aggregator::Integer)<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_integer">destroy_integer</a>(integer: <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>)<br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if false;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2.3" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;<br /></code></pre>
 
 
 
@@ -677,12 +702,12 @@ aborts_if false;<br/></code></pre>
 ### Function `new`
 
 
-<pre><code>public(friend) fun new(limit: u128, parallelizable: bool): optional_aggregator::OptionalAggregator<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_new">new</a>(limit: u128, parallelizable: bool): <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a><br /></code></pre>
 
 
 
 
-<pre><code>aborts_if parallelizable &amp;&amp; !exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>ensures parallelizable &#61;&#61;&gt; is_parallelizable(result);<br/>ensures !parallelizable &#61;&#61;&gt; !is_parallelizable(result);<br/>ensures optional_aggregator_value(result) &#61;&#61; 0;<br/>ensures optional_aggregator_value(result) &lt;&#61; optional_aggregator_limit(result);<br/></code></pre>
+<pre><code><b>aborts_if</b> parallelizable &amp;&amp; !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>&gt;(@aptos_framework);<br /><b>ensures</b> parallelizable &#61;&#61;&gt; <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(result);<br /><b>ensures</b> !parallelizable &#61;&#61;&gt; !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(result);<br /><b>ensures</b> <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(result) &#61;&#61; 0;<br /><b>ensures</b> <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(result) &lt;&#61; <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_limit">optional_aggregator_limit</a>(result);<br /></code></pre>
 
 
 
@@ -691,12 +716,12 @@ aborts_if false;<br/></code></pre>
 ### Function `switch`
 
 
-<pre><code>public fun switch(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_switch">switch</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>)<br /></code></pre>
 
 
 
 
-<pre><code>let vec_ref &#61; optional_aggregator.integer.vec;<br/>aborts_if is_parallelizable(optional_aggregator) &amp;&amp; len(vec_ref) !&#61; 0;<br/>aborts_if !is_parallelizable(optional_aggregator) &amp;&amp; len(vec_ref) &#61;&#61; 0;<br/>aborts_if !is_parallelizable(optional_aggregator) &amp;&amp; !exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>ensures optional_aggregator_value(optional_aggregator) &#61;&#61; optional_aggregator_value(old(optional_aggregator));<br/></code></pre>
+<pre><code><b>let</b> vec_ref &#61; <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer.vec;<br /><b>aborts_if</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp; len(vec_ref) !&#61; 0;<br /><b>aborts_if</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp; len(vec_ref) &#61;&#61; 0;<br /><b>aborts_if</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp; !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>&gt;(@aptos_framework);<br /><b>ensures</b> <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &#61;&#61; <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(<b>old</b>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>));<br /></code></pre>
 
 
 
@@ -705,14 +730,16 @@ aborts_if false;<br/></code></pre>
 ### Function `switch_and_zero_out`
 
 
-<pre><code>fun switch_and_zero_out(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator)<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_switch_and_zero_out">switch_and_zero_out</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>)<br /></code></pre>
 
 
-Option&lt;Integer&gt; does not exist When Option&lt;Aggregator&gt; exists.<br/> Option&lt;Integer&gt; exists when Option&lt;Aggregator&gt; does not exist.<br/> The AggregatorFactory is under the @aptos_framework when Option&lt;Aggregator&gt; does not exist.
+Option&lt;Integer&gt; does not exist When Option&lt;Aggregator&gt; exists.
+Option&lt;Integer&gt; exists when Option&lt;Aggregator&gt; does not exist.
+The AggregatorFactory is under the @aptos_framework when Option&lt;Aggregator&gt; does not exist.
 
 
-<pre><code>let vec_ref &#61; optional_aggregator.integer.vec;<br/>aborts_if is_parallelizable(optional_aggregator) &amp;&amp; len(vec_ref) !&#61; 0;<br/>aborts_if !is_parallelizable(optional_aggregator) &amp;&amp; len(vec_ref) &#61;&#61; 0;<br/>aborts_if !is_parallelizable(optional_aggregator) &amp;&amp; !exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
-ensures is_parallelizable(old(optional_aggregator)) &#61;&#61;&gt; !is_parallelizable(optional_aggregator);<br/>ensures !is_parallelizable(old(optional_aggregator)) &#61;&#61;&gt; is_parallelizable(optional_aggregator);<br/>ensures optional_aggregator_value(optional_aggregator) &#61;&#61; 0;<br/></code></pre>
+<pre><code><b>let</b> vec_ref &#61; <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer.vec;<br /><b>aborts_if</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp; len(vec_ref) !&#61; 0;<br /><b>aborts_if</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp; len(vec_ref) &#61;&#61; 0;<br /><b>aborts_if</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp; !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>&gt;(@aptos_framework);<br />// This enforces <a id="high-level-req-3" href="#high-level-req">high&#45;level requirement 3</a>:
+<b>ensures</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<b>old</b>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>)) &#61;&#61;&gt; !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);<br /><b>ensures</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<b>old</b>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>)) &#61;&#61;&gt; <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);<br /><b>ensures</b> <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &#61;&#61; 0;<br /></code></pre>
 
 
 
@@ -721,13 +748,13 @@ ensures is_parallelizable(old(optional_aggregator)) &#61;&#61;&gt; !is_paralleli
 ### Function `switch_to_integer_and_zero_out`
 
 
-<pre><code>fun switch_to_integer_and_zero_out(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator): u128<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_switch_to_integer_and_zero_out">switch_to_integer_and_zero_out</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>): u128<br /></code></pre>
 
 
 The aggregator exists and the integer dosex not exist when Switches from parallelizable to non&#45;parallelizable implementation.
 
 
-<pre><code>let limit &#61; aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator));<br/>aborts_if len(optional_aggregator.aggregator.vec) &#61;&#61; 0;<br/>aborts_if len(optional_aggregator.integer.vec) !&#61; 0;<br/>ensures !is_parallelizable(optional_aggregator);<br/>ensures option::borrow(optional_aggregator.integer).limit &#61;&#61; limit;<br/>ensures option::borrow(optional_aggregator.integer).value &#61;&#61; 0;<br/></code></pre>
+<pre><code><b>let</b> limit &#61; <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>));<br /><b>aborts_if</b> len(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>.vec) &#61;&#61; 0;<br /><b>aborts_if</b> len(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer.vec) !&#61; 0;<br /><b>ensures</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);<br /><b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer).limit &#61;&#61; limit;<br /><b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer).value &#61;&#61; 0;<br /></code></pre>
 
 
 
@@ -736,13 +763,14 @@ The aggregator exists and the integer dosex not exist when Switches from paralle
 ### Function `switch_to_aggregator_and_zero_out`
 
 
-<pre><code>fun switch_to_aggregator_and_zero_out(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator): u128<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_switch_to_aggregator_and_zero_out">switch_to_aggregator_and_zero_out</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>): u128<br /></code></pre>
 
 
-The integer exists and the aggregator does not exist when Switches from non&#45;parallelizable to parallelizable implementation.<br/> The AggregatorFactory is under the @aptos_framework.
+The integer exists and the aggregator does not exist when Switches from non&#45;parallelizable to parallelizable implementation.
+The AggregatorFactory is under the @aptos_framework.
 
 
-<pre><code>let limit &#61; option::borrow(optional_aggregator.integer).limit;<br/>aborts_if len(optional_aggregator.integer.vec) &#61;&#61; 0;<br/>aborts_if !exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>aborts_if len(optional_aggregator.aggregator.vec) !&#61; 0;<br/>ensures is_parallelizable(optional_aggregator);<br/>ensures aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator)) &#61;&#61; limit;<br/>ensures aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator)) &#61;&#61; 0;<br/></code></pre>
+<pre><code><b>let</b> limit &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer).limit;<br /><b>aborts_if</b> len(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer.vec) &#61;&#61; 0;<br /><b>aborts_if</b> !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>&gt;(@aptos_framework);<br /><b>aborts_if</b> len(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>.vec) !&#61; 0;<br /><b>ensures</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);<br /><b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>)) &#61;&#61; limit;<br /><b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>)) &#61;&#61; 0;<br /></code></pre>
 
 
 
@@ -751,12 +779,12 @@ The integer exists and the aggregator does not exist when Switches from non&#45;
 ### Function `destroy`
 
 
-<pre><code>public fun destroy(optional_aggregator: optional_aggregator::OptionalAggregator)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy">destroy</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>)<br /></code></pre>
 
 
 
 
-<pre><code>aborts_if is_parallelizable(optional_aggregator) &amp;&amp; len(optional_aggregator.integer.vec) !&#61; 0;<br/>aborts_if !is_parallelizable(optional_aggregator) &amp;&amp; len(optional_aggregator.integer.vec) &#61;&#61; 0;<br/></code></pre>
+<pre><code><b>aborts_if</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp; len(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer.vec) !&#61; 0;<br /><b>aborts_if</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp; len(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer.vec) &#61;&#61; 0;<br /></code></pre>
 
 
 
@@ -765,13 +793,13 @@ The integer exists and the aggregator does not exist when Switches from non&#45;
 ### Function `destroy_optional_aggregator`
 
 
-<pre><code>fun destroy_optional_aggregator(optional_aggregator: optional_aggregator::OptionalAggregator): u128<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_optional_aggregator">destroy_optional_aggregator</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>): u128<br /></code></pre>
 
 
 The aggregator exists and the integer does not exist when destroy the aggregator.
 
 
-<pre><code>aborts_if len(optional_aggregator.aggregator.vec) &#61;&#61; 0;<br/>aborts_if len(optional_aggregator.integer.vec) !&#61; 0;<br/>ensures result &#61;&#61; aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator));<br/></code></pre>
+<pre><code><b>aborts_if</b> len(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>.vec) &#61;&#61; 0;<br /><b>aborts_if</b> len(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer.vec) !&#61; 0;<br /><b>ensures</b> result &#61;&#61; <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>));<br /></code></pre>
 
 
 
@@ -780,13 +808,13 @@ The aggregator exists and the integer does not exist when destroy the aggregator
 ### Function `destroy_optional_integer`
 
 
-<pre><code>fun destroy_optional_integer(optional_aggregator: optional_aggregator::OptionalAggregator): u128<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_optional_integer">destroy_optional_integer</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>): u128<br /></code></pre>
 
 
 The integer exists and the aggregator does not exist when destroy the integer.
 
 
-<pre><code>aborts_if len(optional_aggregator.integer.vec) &#61;&#61; 0;<br/>aborts_if len(optional_aggregator.aggregator.vec) !&#61; 0;<br/>ensures result &#61;&#61; option::borrow(optional_aggregator.integer).limit;<br/></code></pre>
+<pre><code><b>aborts_if</b> len(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer.vec) &#61;&#61; 0;<br /><b>aborts_if</b> len(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>.vec) !&#61; 0;<br /><b>ensures</b> result &#61;&#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer).limit;<br /></code></pre>
 
 
 
@@ -794,7 +822,7 @@ The integer exists and the aggregator does not exist when destroy the integer.
 <a id="0x1_optional_aggregator_optional_aggregator_value"></a>
 
 
-<pre><code>fun optional_aggregator_value(optional_aggregator: OptionalAggregator): u128 &#123;<br/>   if (is_parallelizable(optional_aggregator)) &#123;<br/>       aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))<br/>   &#125; else &#123;<br/>       option::borrow(optional_aggregator.integer).value<br/>   &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>): u128 &#123;<br />   <b>if</b> (<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>)) &#123;<br />       <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>))<br />   &#125; <b>else</b> &#123;<br />       <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer).value<br />   &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -802,7 +830,7 @@ The integer exists and the aggregator does not exist when destroy the integer.
 <a id="0x1_optional_aggregator_optional_aggregator_limit"></a>
 
 
-<pre><code>fun optional_aggregator_limit(optional_aggregator: OptionalAggregator): u128 &#123;<br/>   if (is_parallelizable(optional_aggregator)) &#123;<br/>       aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator))<br/>   &#125; else &#123;<br/>       option::borrow(optional_aggregator.integer).limit<br/>   &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_limit">optional_aggregator_limit</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>): u128 &#123;<br />   <b>if</b> (<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>)) &#123;<br />       <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>))<br />   &#125; <b>else</b> &#123;<br />       <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer).limit<br />   &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -811,12 +839,12 @@ The integer exists and the aggregator does not exist when destroy the integer.
 ### Function `add`
 
 
-<pre><code>public fun add(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator, value: u128)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_add">add</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>, value: u128)<br /></code></pre>
 
 
 
 
-<pre><code>include AddAbortsIf;<br/>ensures ((optional_aggregator_value(optional_aggregator) &#61;&#61; optional_aggregator_value(old(optional_aggregator)) &#43; value));<br/></code></pre>
+<pre><code><b>include</b> <a href="optional_aggregator.md#0x1_optional_aggregator_AddAbortsIf">AddAbortsIf</a>;<br /><b>ensures</b> ((<a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &#61;&#61; <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(<b>old</b>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>)) &#43; value));<br /></code></pre>
 
 
 
@@ -824,7 +852,7 @@ The integer exists and the aggregator does not exist when destroy the integer.
 <a id="0x1_optional_aggregator_AddAbortsIf"></a>
 
 
-<pre><code>schema AddAbortsIf &#123;<br/>optional_aggregator: OptionalAggregator;<br/>value: u128;<br/>aborts_if is_parallelizable(optional_aggregator) &amp;&amp; (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))<br/>    &#43; value &gt; aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator)));<br/>aborts_if is_parallelizable(optional_aggregator) &amp;&amp; (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))<br/>    &#43; value &gt; MAX_U128);<br/>aborts_if !is_parallelizable(optional_aggregator) &amp;&amp;<br/>    (option::borrow(optional_aggregator.integer).value &#43; value &gt; MAX_U128);<br/>aborts_if !is_parallelizable(optional_aggregator) &amp;&amp;<br/>    (value &gt; (option::borrow(optional_aggregator.integer).limit &#45; option::borrow(optional_aggregator.integer).value));<br/>&#125;<br/></code></pre>
+<pre><code><b>schema</b> <a href="optional_aggregator.md#0x1_optional_aggregator_AddAbortsIf">AddAbortsIf</a> &#123;<br /><a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>;<br />value: u128;<br /><b>aborts_if</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp; (<a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>))<br />    &#43; value &gt; <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>)));<br /><b>aborts_if</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp; (<a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>))<br />    &#43; value &gt; MAX_U128);<br /><b>aborts_if</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp;<br />    (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer).value &#43; value &gt; MAX_U128);<br /><b>aborts_if</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp;<br />    (value &gt; (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer).limit &#45; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer).value));<br />&#125;<br /></code></pre>
 
 
 
@@ -833,12 +861,12 @@ The integer exists and the aggregator does not exist when destroy the integer.
 ### Function `sub`
 
 
-<pre><code>public fun sub(optional_aggregator: &amp;mut optional_aggregator::OptionalAggregator, value: u128)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_sub">sub</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>, value: u128)<br /></code></pre>
 
 
 
 
-<pre><code>include SubAbortsIf;<br/>ensures ((optional_aggregator_value(optional_aggregator) &#61;&#61; optional_aggregator_value(old(optional_aggregator)) &#45; value));<br/></code></pre>
+<pre><code><b>include</b> <a href="optional_aggregator.md#0x1_optional_aggregator_SubAbortsIf">SubAbortsIf</a>;<br /><b>ensures</b> ((<a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &#61;&#61; <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(<b>old</b>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>)) &#45; value));<br /></code></pre>
 
 
 
@@ -846,7 +874,7 @@ The integer exists and the aggregator does not exist when destroy the integer.
 <a id="0x1_optional_aggregator_SubAbortsIf"></a>
 
 
-<pre><code>schema SubAbortsIf &#123;<br/>optional_aggregator: OptionalAggregator;<br/>value: u128;<br/>aborts_if is_parallelizable(optional_aggregator) &amp;&amp; (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))<br/>    &lt; value);<br/>aborts_if !is_parallelizable(optional_aggregator) &amp;&amp;<br/>    (option::borrow(optional_aggregator.integer).value &lt; value);<br/>&#125;<br/></code></pre>
+<pre><code><b>schema</b> <a href="optional_aggregator.md#0x1_optional_aggregator_SubAbortsIf">SubAbortsIf</a> &#123;<br /><a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>;<br />value: u128;<br /><b>aborts_if</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp; (<a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>))<br />    &lt; value);<br /><b>aborts_if</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &amp;&amp;<br />    (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer).value &lt; value);<br />&#125;<br /></code></pre>
 
 
 
@@ -855,12 +883,12 @@ The integer exists and the aggregator does not exist when destroy the integer.
 ### Function `read`
 
 
-<pre><code>public fun read(optional_aggregator: &amp;optional_aggregator::OptionalAggregator): u128<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_read">read</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: &amp;<a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">optional_aggregator::OptionalAggregator</a>): u128<br /></code></pre>
 
 
 
 
-<pre><code>ensures !is_parallelizable(optional_aggregator) &#61;&#61;&gt; result &#61;&#61; option::borrow(optional_aggregator.integer).value;<br/>ensures is_parallelizable(optional_aggregator) &#61;&#61;&gt;<br/>    result &#61;&#61; aggregator::spec_read(option::borrow(optional_aggregator.aggregator));<br/></code></pre>
+<pre><code><b>ensures</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &#61;&#61;&gt; result &#61;&#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer).value;<br /><b>ensures</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) &#61;&#61;&gt;<br />    result &#61;&#61; <a href="aggregator.md#0x1_aggregator_spec_read">aggregator::spec_read</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.<a href="aggregator.md#0x1_aggregator">aggregator</a>));<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

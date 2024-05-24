@@ -3,7 +3,9 @@
 
 # Module `0x1::chain_id`
 
-The chain id distinguishes between different chains (e.g., testnet and the main network).<br/> One important role is to prevent transactions intended for one chain from being executed on another.<br/> This code provides a container for storing a chain id and functions to initialize and get it.
+The chain id distinguishes between different chains (e.g., testnet and the main network).
+One important role is to prevent transactions intended for one chain from being executed on another.
+This code provides a container for storing a chain id and functions to initialize and get it.
 
 
 -  [Resource `ChainId`](#0x1_chain_id_ChainId)
@@ -16,7 +18,7 @@ The chain id distinguishes between different chains (e.g., testnet and the main 
     -  [Function `get`](#@Specification_0_get)
 
 
-<pre><code>use 0x1::system_addresses;<br/></code></pre>
+<pre><code><b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;<br /></code></pre>
 
 
 
@@ -26,7 +28,7 @@ The chain id distinguishes between different chains (e.g., testnet and the main 
 
 
 
-<pre><code>struct ChainId has key<br/></code></pre>
+<pre><code><b>struct</b> <a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a> <b>has</b> key<br /></code></pre>
 
 
 
@@ -50,10 +52,11 @@ The chain id distinguishes between different chains (e.g., testnet and the main 
 
 ## Function `initialize`
 
-Only called during genesis.<br/> Publish the chain ID <code>id</code> of this instance under the SystemAddresses address
+Only called during genesis.
+Publish the chain ID <code>id</code> of this instance under the SystemAddresses address
 
 
-<pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, id: u8)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="chain_id.md#0x1_chain_id_initialize">initialize</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, id: u8)<br /></code></pre>
 
 
 
@@ -61,7 +64,7 @@ Only called during genesis.<br/> Publish the chain ID <code>id</code> of this in
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, id: u8) &#123;<br/>    system_addresses::assert_aptos_framework(aptos_framework);<br/>    move_to(aptos_framework, ChainId &#123; id &#125;)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="chain_id.md#0x1_chain_id_initialize">initialize</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, id: u8) &#123;<br />    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);<br />    <b>move_to</b>(aptos_framework, <a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a> &#123; id &#125;)<br />&#125;<br /></code></pre>
 
 
 
@@ -74,7 +77,7 @@ Only called during genesis.<br/> Publish the chain ID <code>id</code> of this in
 Return the chain ID of this instance.
 
 
-<pre><code>&#35;[view]<br/>public fun get(): u8<br/></code></pre>
+<pre><code>&#35;[view]<br /><b>public</b> <b>fun</b> <a href="chain_id.md#0x1_chain_id_get">get</a>(): u8<br /></code></pre>
 
 
 
@@ -82,7 +85,7 @@ Return the chain ID of this instance.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun get(): u8 acquires ChainId &#123;<br/>    borrow_global&lt;ChainId&gt;(@aptos_framework).id<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="chain_id.md#0x1_chain_id_get">get</a>(): u8 <b>acquires</b> <a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a> &#123;<br />    <b>borrow_global</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(@aptos_framework).id<br />&#125;<br /></code></pre>
 
 
 
@@ -99,15 +102,30 @@ Return the chain ID of this instance.
 
 ### High-level Requirements
 
-&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;During genesis, the ChainId resource should be created and moved under the Aptos framework account with the specified chain id.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The chain_id::initialize function is responsible for generating the ChainId resource and then storing it under the aptos_framework account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;initialize&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>1</td>
+<td>During genesis, the ChainId resource should be created and moved under the Aptos framework account with the specified chain id.</td>
+<td>Medium</td>
+<td>The chain_id::initialize function is responsible for generating the ChainId resource and then storing it under the aptos_framework account.</td>
+<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The chain id can only be fetched if the chain id resource exists under the Aptos framework account.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The chain_id::get function fetches the chain id by borrowing the ChainId resource from the aptos_framework account.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;get&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>2</td>
+<td>The chain id can only be fetched if the chain id resource exists under the Aptos framework account.</td>
+<td>Low</td>
+<td>The chain_id::get function fetches the chain id by borrowing the ChainId resource from the aptos_framework account.</td>
+<td>Formally verified via <a href="#high-level-req-2">get</a>.</td>
+</tr>
 
-&lt;/table&gt;<br/>
+</table>
 
-<br/>
+
 
 
 <a id="module-level-spec"></a>
@@ -115,7 +133,7 @@ Return the chain ID of this instance.
 ### Module-level Specification
 
 
-<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/></code></pre>
+<pre><code><b>pragma</b> verify &#61; <b>true</b>;<br /><b>pragma</b> aborts_if_is_strict;<br /></code></pre>
 
 
 
@@ -124,13 +142,13 @@ Return the chain ID of this instance.
 ### Function `initialize`
 
 
-<pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, id: u8)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="chain_id.md#0x1_chain_id_initialize">initialize</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, id: u8)<br /></code></pre>
 
 
 
 
-<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if exists&lt;ChainId&gt;(@aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
-ensures exists&lt;ChainId&gt;(addr);<br/>ensures global&lt;ChainId&gt;(addr).id &#61;&#61; id;<br/></code></pre>
+<pre><code><b>let</b> addr &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);<br /><b>aborts_if</b> addr !&#61; @aptos_framework;<br /><b>aborts_if</b> <b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(@aptos_framework);<br />// This enforces <a id="high-level-req-1" href="#high-level-req">high&#45;level requirement 1</a>:
+<b>ensures</b> <b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(addr);<br /><b>ensures</b> <b>global</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(addr).id &#61;&#61; id;<br /></code></pre>
 
 
 
@@ -139,13 +157,13 @@ ensures exists&lt;ChainId&gt;(addr);<br/>ensures global&lt;ChainId&gt;(addr).id 
 ### Function `get`
 
 
-<pre><code>&#35;[view]<br/>public fun get(): u8<br/></code></pre>
+<pre><code>&#35;[view]<br /><b>public</b> <b>fun</b> <a href="chain_id.md#0x1_chain_id_get">get</a>(): u8<br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if !exists&lt;ChainId&gt;(@aptos_framework);<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(@aptos_framework);<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

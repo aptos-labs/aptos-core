@@ -16,7 +16,7 @@
     -  [Function `type_name`](#@Specification_1_type_name)
 
 
-<pre><code>use 0x1::bcs;<br/>use 0x1::error;<br/>use 0x1::from_bcs;<br/>use 0x1::string;<br/>use 0x1::type_info;<br/></code></pre>
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;<br /><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;<br /><b>use</b> <a href="from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;<br /><b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;<br /><b>use</b> <a href="type_info.md#0x1_type_info">0x1::type_info</a>;<br /></code></pre>
 
 
 
@@ -24,10 +24,20 @@
 
 ## Struct `Any`
 
-A type which can represent a value of any type. This allows for representation of &apos;unknown&apos; future<br/> values. For example, to define a resource such that it can be later be extended without breaking<br/> changes one can do<br/><br/> ```move<br/>   struct Resource &#123;<br/>      field: Type,<br/>      ...<br/>      extension: Option&lt;Any&gt;<br/>   &#125;<br/> ```
+A type which can represent a value of any type. This allows for representation of &apos;unknown&apos; future
+values. For example, to define a resource such that it can be later be extended without breaking
+changes one can do
+
+```move
+struct Resource &#123;
+field: Type,
+...
+extension: Option&lt;Any&gt;
+&#125;
+```
 
 
-<pre><code>struct Any has drop, store<br/></code></pre>
+<pre><code><b>struct</b> <a href="any.md#0x1_any_Any">Any</a> <b>has</b> drop, store<br /></code></pre>
 
 
 
@@ -37,13 +47,13 @@ A type which can represent a value of any type. This allows for representation o
 
 <dl>
 <dt>
-<code>type_name: string::String</code>
+<code>type_name: <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>data: vector&lt;u8&gt;</code>
+<code>data: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -63,7 +73,7 @@ A type which can represent a value of any type. This allows for representation o
 The type provided for <code>unpack</code> is not the same as was given for <code>pack</code>.
 
 
-<pre><code>const ETYPE_MISMATCH: u64 &#61; 1;<br/></code></pre>
+<pre><code><b>const</b> <a href="any.md#0x1_any_ETYPE_MISMATCH">ETYPE_MISMATCH</a>: u64 &#61; 1;<br /></code></pre>
 
 
 
@@ -71,10 +81,11 @@ The type provided for <code>unpack</code> is not the same as was given for <code
 
 ## Function `pack`
 
-Pack a value into the <code>Any</code> representation. Because Any can be stored and dropped, this is<br/> also required from <code>T</code>.
+Pack a value into the <code><a href="any.md#0x1_any_Any">Any</a></code> representation. Because Any can be stored and dropped, this is
+also required from <code>T</code>.
 
 
-<pre><code>public fun pack&lt;T: drop, store&gt;(x: T): any::Any<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_pack">pack</a>&lt;T: drop, store&gt;(x: T): <a href="any.md#0x1_any_Any">any::Any</a><br /></code></pre>
 
 
 
@@ -82,7 +93,7 @@ Pack a value into the <code>Any</code> representation. Because Any can be stored
 <summary>Implementation</summary>
 
 
-<pre><code>public fun pack&lt;T: drop &#43; store&gt;(x: T): Any &#123;<br/>    Any &#123;<br/>        type_name: type_info::type_name&lt;T&gt;(),<br/>        data: to_bytes(&amp;x)<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_pack">pack</a>&lt;T: drop &#43; store&gt;(x: T): <a href="any.md#0x1_any_Any">Any</a> &#123;<br />    <a href="any.md#0x1_any_Any">Any</a> &#123;<br />        type_name: <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;(),<br />        data: to_bytes(&amp;x)<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -92,10 +103,10 @@ Pack a value into the <code>Any</code> representation. Because Any can be stored
 
 ## Function `unpack`
 
-Unpack a value from the <code>Any</code> representation. This aborts if the value has not the expected type <code>T</code>.
+Unpack a value from the <code><a href="any.md#0x1_any_Any">Any</a></code> representation. This aborts if the value has not the expected type <code>T</code>.
 
 
-<pre><code>public fun unpack&lt;T&gt;(x: any::Any): T<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_unpack">unpack</a>&lt;T&gt;(x: <a href="any.md#0x1_any_Any">any::Any</a>): T<br /></code></pre>
 
 
 
@@ -103,7 +114,7 @@ Unpack a value from the <code>Any</code> representation. This aborts if the valu
 <summary>Implementation</summary>
 
 
-<pre><code>public fun unpack&lt;T&gt;(x: Any): T &#123;<br/>    assert!(type_info::type_name&lt;T&gt;() &#61;&#61; x.type_name, error::invalid_argument(ETYPE_MISMATCH));<br/>    from_bytes&lt;T&gt;(x.data)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_unpack">unpack</a>&lt;T&gt;(x: <a href="any.md#0x1_any_Any">Any</a>): T &#123;<br />    <b>assert</b>!(<a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() &#61;&#61; x.type_name, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="any.md#0x1_any_ETYPE_MISMATCH">ETYPE_MISMATCH</a>));<br />    from_bytes&lt;T&gt;(x.data)<br />&#125;<br /></code></pre>
 
 
 
@@ -116,7 +127,7 @@ Unpack a value from the <code>Any</code> representation. This aborts if the valu
 Returns the type name of this Any
 
 
-<pre><code>public fun type_name(x: &amp;any::Any): &amp;string::String<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_type_name">type_name</a>(x: &amp;<a href="any.md#0x1_any_Any">any::Any</a>): &amp;<a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a><br /></code></pre>
 
 
 
@@ -124,7 +135,7 @@ Returns the type name of this Any
 <summary>Implementation</summary>
 
 
-<pre><code>public fun type_name(x: &amp;Any): &amp;String &#123;<br/>    &amp;x.type_name<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_type_name">type_name</a>(x: &amp;<a href="any.md#0x1_any_Any">Any</a>): &amp;String &#123;<br />    &amp;x.type_name<br />&#125;<br /></code></pre>
 
 
 
@@ -140,12 +151,12 @@ Returns the type name of this Any
 ### Function `pack`
 
 
-<pre><code>public fun pack&lt;T: drop, store&gt;(x: T): any::Any<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_pack">pack</a>&lt;T: drop, store&gt;(x: T): <a href="any.md#0x1_any_Any">any::Any</a><br /></code></pre>
 
 
 
 
-<pre><code>aborts_if false;<br/>ensures result &#61;&#61; Any &#123;<br/>    type_name: type_info::type_name&lt;T&gt;(),<br/>    data: bcs::serialize&lt;T&gt;(x)<br/>&#125;;<br/>ensures [abstract] from_bcs::deserializable&lt;T&gt;(result.data);<br/></code></pre>
+<pre><code><b>aborts_if</b> <b>false</b>;<br /><b>ensures</b> result &#61;&#61; <a href="any.md#0x1_any_Any">Any</a> &#123;<br />    type_name: <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;(),<br />    data: <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>&lt;T&gt;(x)<br />&#125;;<br /><b>ensures</b> [abstract] <a href="from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;T&gt;(result.data);<br /></code></pre>
 
 
 
@@ -154,12 +165,12 @@ Returns the type name of this Any
 ### Function `unpack`
 
 
-<pre><code>public fun unpack&lt;T&gt;(x: any::Any): T<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_unpack">unpack</a>&lt;T&gt;(x: <a href="any.md#0x1_any_Any">any::Any</a>): T<br /></code></pre>
 
 
 
 
-<pre><code>include UnpackAbortsIf&lt;T&gt;;<br/>ensures result &#61;&#61; from_bcs::deserialize&lt;T&gt;(x.data);<br/></code></pre>
+<pre><code><b>include</b> <a href="any.md#0x1_any_UnpackAbortsIf">UnpackAbortsIf</a>&lt;T&gt;;<br /><b>ensures</b> result &#61;&#61; <a href="from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;T&gt;(x.data);<br /></code></pre>
 
 
 
@@ -167,7 +178,7 @@ Returns the type name of this Any
 <a id="0x1_any_UnpackAbortsIf"></a>
 
 
-<pre><code>schema UnpackAbortsIf&lt;T&gt; &#123;<br/>x: Any;<br/>aborts_if type_info::type_name&lt;T&gt;() !&#61; x.type_name;<br/>aborts_if !from_bcs::deserializable&lt;T&gt;(x.data);<br/>&#125;<br/></code></pre>
+<pre><code><b>schema</b> <a href="any.md#0x1_any_UnpackAbortsIf">UnpackAbortsIf</a>&lt;T&gt; &#123;<br />x: <a href="any.md#0x1_any_Any">Any</a>;<br /><b>aborts_if</b> <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() !&#61; x.type_name;<br /><b>aborts_if</b> !<a href="from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;T&gt;(x.data);<br />&#125;<br /></code></pre>
 
 
 
@@ -175,7 +186,7 @@ Returns the type name of this Any
 <a id="0x1_any_UnpackRequirement"></a>
 
 
-<pre><code>schema UnpackRequirement&lt;T&gt; &#123;<br/>x: Any;<br/>requires type_info::type_name&lt;T&gt;() &#61;&#61; x.type_name;<br/>requires from_bcs::deserializable&lt;T&gt;(x.data);<br/>&#125;<br/></code></pre>
+<pre><code><b>schema</b> <a href="any.md#0x1_any_UnpackRequirement">UnpackRequirement</a>&lt;T&gt; &#123;<br />x: <a href="any.md#0x1_any_Any">Any</a>;<br /><b>requires</b> <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() &#61;&#61; x.type_name;<br /><b>requires</b> <a href="from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;T&gt;(x.data);<br />&#125;<br /></code></pre>
 
 
 
@@ -184,12 +195,12 @@ Returns the type name of this Any
 ### Function `type_name`
 
 
-<pre><code>public fun type_name(x: &amp;any::Any): &amp;string::String<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_type_name">type_name</a>(x: &amp;<a href="any.md#0x1_any_Any">any::Any</a>): &amp;<a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a><br /></code></pre>
 
 
 
 
-<pre><code>aborts_if false;<br/>ensures result &#61;&#61; x.type_name;<br/></code></pre>
+<pre><code><b>aborts_if</b> <b>false</b>;<br /><b>ensures</b> result &#61;&#61; x.type_name;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

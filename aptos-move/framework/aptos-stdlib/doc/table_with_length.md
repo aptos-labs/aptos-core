@@ -34,7 +34,7 @@ Extends Table and provides functions such as length and the ability to be destro
     -  [Function `contains`](#@Specification_1_contains)
 
 
-<pre><code>use 0x1::error;<br/>use 0x1::table;<br/></code></pre>
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;<br /><b>use</b> <a href="table.md#0x1_table">0x1::table</a>;<br /></code></pre>
 
 
 
@@ -45,7 +45,7 @@ Extends Table and provides functions such as length and the ability to be destro
 Type of tables
 
 
-<pre><code>struct TableWithLength&lt;K: copy, drop, V&gt; has store<br/></code></pre>
+<pre><code><b>struct</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K: <b>copy</b>, drop, V&gt; <b>has</b> store<br /></code></pre>
 
 
 
@@ -55,7 +55,7 @@ Type of tables
 
 <dl>
 <dt>
-<code>inner: table::Table&lt;K, V&gt;</code>
+<code>inner: <a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;</code>
 </dt>
 <dd>
 
@@ -80,7 +80,7 @@ Type of tables
 
 
 
-<pre><code>const EALREADY_EXISTS: u64 &#61; 100;<br/></code></pre>
+<pre><code><b>const</b> <a href="table_with_length.md#0x1_table_with_length_EALREADY_EXISTS">EALREADY_EXISTS</a>: u64 &#61; 100;<br /></code></pre>
 
 
 
@@ -88,7 +88,7 @@ Type of tables
 
 
 
-<pre><code>const ENOT_EMPTY: u64 &#61; 102;<br/></code></pre>
+<pre><code><b>const</b> <a href="table_with_length.md#0x1_table_with_length_ENOT_EMPTY">ENOT_EMPTY</a>: u64 &#61; 102;<br /></code></pre>
 
 
 
@@ -96,7 +96,7 @@ Type of tables
 
 
 
-<pre><code>const ENOT_FOUND: u64 &#61; 101;<br/></code></pre>
+<pre><code><b>const</b> <a href="table_with_length.md#0x1_table_with_length_ENOT_FOUND">ENOT_FOUND</a>: u64 &#61; 101;<br /></code></pre>
 
 
 
@@ -107,7 +107,7 @@ Type of tables
 Create a new Table.
 
 
-<pre><code>public fun new&lt;K: copy, drop, V: store&gt;(): table_with_length::TableWithLength&lt;K, V&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_new">new</a>&lt;K: <b>copy</b>, drop, V: store&gt;(): <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;<br /></code></pre>
 
 
 
@@ -115,7 +115,7 @@ Create a new Table.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun new&lt;K: copy &#43; drop, V: store&gt;(): TableWithLength&lt;K, V&gt; &#123;<br/>    TableWithLength &#123;<br/>        inner: table::new&lt;K, V&gt;(),<br/>        length: 0,<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_new">new</a>&lt;K: <b>copy</b> &#43; drop, V: store&gt;(): <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt; &#123;<br />    <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a> &#123;<br />        inner: <a href="table.md#0x1_table_new">table::new</a>&lt;K, V&gt;(),<br />        length: 0,<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -128,7 +128,7 @@ Create a new Table.
 Destroy a table. The table must be empty to succeed.
 
 
-<pre><code>public fun destroy_empty&lt;K: copy, drop, V&gt;(table: table_with_length::TableWithLength&lt;K, V&gt;)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_destroy_empty">destroy_empty</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;)<br /></code></pre>
 
 
 
@@ -136,7 +136,7 @@ Destroy a table. The table must be empty to succeed.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun destroy_empty&lt;K: copy &#43; drop, V&gt;(table: TableWithLength&lt;K, V&gt;) &#123;<br/>    assert!(table.length &#61;&#61; 0, error::invalid_state(ENOT_EMPTY));<br/>    let TableWithLength &#123; inner, length: _ &#125; &#61; table;<br/>    table::destroy(inner)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_destroy_empty">destroy_empty</a>&lt;K: <b>copy</b> &#43; drop, V&gt;(<a href="table.md#0x1_table">table</a>: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;) &#123;<br />    <b>assert</b>!(<a href="table.md#0x1_table">table</a>.length &#61;&#61; 0, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="table_with_length.md#0x1_table_with_length_ENOT_EMPTY">ENOT_EMPTY</a>));<br />    <b>let</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a> &#123; inner, length: _ &#125; &#61; <a href="table.md#0x1_table">table</a>;<br />    <a href="table.md#0x1_table_destroy">table::destroy</a>(inner)<br />&#125;<br /></code></pre>
 
 
 
@@ -146,10 +146,12 @@ Destroy a table. The table must be empty to succeed.
 
 ## Function `add`
 
-Add a new entry to the table. Aborts if an entry for this<br/> key already exists. The entry itself is not stored in the<br/> table, and cannot be discovered from it.
+Add a new entry to the table. Aborts if an entry for this
+key already exists. The entry itself is not stored in the
+table, and cannot be discovered from it.
 
 
-<pre><code>public fun add&lt;K: copy, drop, V&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K, val: V)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_add">add</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K, val: V)<br /></code></pre>
 
 
 
@@ -157,7 +159,7 @@ Add a new entry to the table. Aborts if an entry for this<br/> key already exist
 <summary>Implementation</summary>
 
 
-<pre><code>public fun add&lt;K: copy &#43; drop, V&gt;(table: &amp;mut TableWithLength&lt;K, V&gt;, key: K, val: V) &#123;<br/>    table::add(&amp;mut table.inner, key, val);<br/>    table.length &#61; table.length &#43; 1;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_add">add</a>&lt;K: <b>copy</b> &#43; drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, key: K, val: V) &#123;<br />    <a href="table.md#0x1_table_add">table::add</a>(&amp;<b>mut</b> <a href="table.md#0x1_table">table</a>.inner, key, val);<br />    <a href="table.md#0x1_table">table</a>.length &#61; <a href="table.md#0x1_table">table</a>.length &#43; 1;<br />&#125;<br /></code></pre>
 
 
 
@@ -167,10 +169,11 @@ Add a new entry to the table. Aborts if an entry for this<br/> key already exist
 
 ## Function `borrow`
 
-Acquire an immutable reference to the value which <code>key</code> maps to.<br/> Aborts if there is no entry for <code>key</code>.
+Acquire an immutable reference to the value which <code>key</code> maps to.
+Aborts if there is no entry for <code>key</code>.
 
 
-<pre><code>public fun borrow&lt;K: copy, drop, V&gt;(table: &amp;table_with_length::TableWithLength&lt;K, V&gt;, key: K): &amp;V<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_borrow">borrow</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K): &amp;V<br /></code></pre>
 
 
 
@@ -178,7 +181,7 @@ Acquire an immutable reference to the value which <code>key</code> maps to.<br/>
 <summary>Implementation</summary>
 
 
-<pre><code>public fun borrow&lt;K: copy &#43; drop, V&gt;(table: &amp;TableWithLength&lt;K, V&gt;, key: K): &amp;V &#123;<br/>    table::borrow(&amp;table.inner, key)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_borrow">borrow</a>&lt;K: <b>copy</b> &#43; drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, key: K): &amp;V &#123;<br />    <a href="table.md#0x1_table_borrow">table::borrow</a>(&amp;<a href="table.md#0x1_table">table</a>.inner, key)<br />&#125;<br /></code></pre>
 
 
 
@@ -188,10 +191,11 @@ Acquire an immutable reference to the value which <code>key</code> maps to.<br/>
 
 ## Function `borrow_mut`
 
-Acquire a mutable reference to the value which <code>key</code> maps to.<br/> Aborts if there is no entry for <code>key</code>.
+Acquire a mutable reference to the value which <code>key</code> maps to.
+Aborts if there is no entry for <code>key</code>.
 
 
-<pre><code>public fun borrow_mut&lt;K: copy, drop, V&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K): &amp;mut V<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K): &amp;<b>mut</b> V<br /></code></pre>
 
 
 
@@ -199,7 +203,7 @@ Acquire a mutable reference to the value which <code>key</code> maps to.<br/> Ab
 <summary>Implementation</summary>
 
 
-<pre><code>public fun borrow_mut&lt;K: copy &#43; drop, V&gt;(table: &amp;mut TableWithLength&lt;K, V&gt;, key: K): &amp;mut V &#123;<br/>    table::borrow_mut(&amp;mut table.inner, key)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b> &#43; drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, key: K): &amp;<b>mut</b> V &#123;<br />    <a href="table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&amp;<b>mut</b> <a href="table.md#0x1_table">table</a>.inner, key)<br />&#125;<br /></code></pre>
 
 
 
@@ -212,7 +216,7 @@ Acquire a mutable reference to the value which <code>key</code> maps to.<br/> Ab
 Returns the length of the table, i.e. the number of entries.
 
 
-<pre><code>public fun length&lt;K: copy, drop, V&gt;(table: &amp;table_with_length::TableWithLength&lt;K, V&gt;): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_length">length</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;): u64<br /></code></pre>
 
 
 
@@ -220,7 +224,7 @@ Returns the length of the table, i.e. the number of entries.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun length&lt;K: copy &#43; drop, V&gt;(table: &amp;TableWithLength&lt;K, V&gt;): u64 &#123;<br/>    table.length<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_length">length</a>&lt;K: <b>copy</b> &#43; drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;): u64 &#123;<br />    <a href="table.md#0x1_table">table</a>.length<br />&#125;<br /></code></pre>
 
 
 
@@ -233,7 +237,7 @@ Returns the length of the table, i.e. the number of entries.
 Returns true if this table is empty.
 
 
-<pre><code>public fun empty&lt;K: copy, drop, V&gt;(table: &amp;table_with_length::TableWithLength&lt;K, V&gt;): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_empty">empty</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;): bool<br /></code></pre>
 
 
 
@@ -241,7 +245,7 @@ Returns true if this table is empty.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun empty&lt;K: copy &#43; drop, V&gt;(table: &amp;TableWithLength&lt;K, V&gt;): bool &#123;<br/>    table.length &#61;&#61; 0<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_empty">empty</a>&lt;K: <b>copy</b> &#43; drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;): bool &#123;<br />    <a href="table.md#0x1_table">table</a>.length &#61;&#61; 0<br />&#125;<br /></code></pre>
 
 
 
@@ -251,10 +255,11 @@ Returns true if this table is empty.
 
 ## Function `borrow_mut_with_default`
 
-Acquire a mutable reference to the value which <code>key</code> maps to.<br/> Insert the pair (<code>key</code>, <code>default</code>) first if there is no entry for <code>key</code>.
+Acquire a mutable reference to the value which <code>key</code> maps to.
+Insert the pair (<code>key</code>, <code>default</code>) first if there is no entry for <code>key</code>.
 
 
-<pre><code>public fun borrow_mut_with_default&lt;K: copy, drop, V: drop&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K, default: V): &amp;mut V<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_borrow_mut_with_default">borrow_mut_with_default</a>&lt;K: <b>copy</b>, drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K, default: V): &amp;<b>mut</b> V<br /></code></pre>
 
 
 
@@ -262,7 +267,7 @@ Acquire a mutable reference to the value which <code>key</code> maps to.<br/> In
 <summary>Implementation</summary>
 
 
-<pre><code>public fun borrow_mut_with_default&lt;K: copy &#43; drop, V: drop&gt;(table: &amp;mut TableWithLength&lt;K, V&gt;, key: K, default: V): &amp;mut V &#123;<br/>    if (table::contains(&amp;table.inner, key)) &#123;<br/>        table::borrow_mut(&amp;mut table.inner, key)<br/>    &#125; else &#123;<br/>        table::add(&amp;mut table.inner, key, default);<br/>        table.length &#61; table.length &#43; 1;<br/>        table::borrow_mut(&amp;mut table.inner, key)<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_borrow_mut_with_default">borrow_mut_with_default</a>&lt;K: <b>copy</b> &#43; drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, key: K, default: V): &amp;<b>mut</b> V &#123;<br />    <b>if</b> (<a href="table.md#0x1_table_contains">table::contains</a>(&amp;<a href="table.md#0x1_table">table</a>.inner, key)) &#123;<br />        <a href="table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&amp;<b>mut</b> <a href="table.md#0x1_table">table</a>.inner, key)<br />    &#125; <b>else</b> &#123;<br />        <a href="table.md#0x1_table_add">table::add</a>(&amp;<b>mut</b> <a href="table.md#0x1_table">table</a>.inner, key, default);<br />        <a href="table.md#0x1_table">table</a>.length &#61; <a href="table.md#0x1_table">table</a>.length &#43; 1;<br />        <a href="table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&amp;<b>mut</b> <a href="table.md#0x1_table">table</a>.inner, key)<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -272,10 +277,11 @@ Acquire a mutable reference to the value which <code>key</code> maps to.<br/> In
 
 ## Function `upsert`
 
-Insert the pair (<code>key</code>, <code>value</code>) if there is no entry for <code>key</code>.<br/> update the value of the entry for <code>key</code> to <code>value</code> otherwise
+Insert the pair (<code>key</code>, <code>value</code>) if there is no entry for <code>key</code>.
+update the value of the entry for <code>key</code> to <code>value</code> otherwise
 
 
-<pre><code>public fun upsert&lt;K: copy, drop, V: drop&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K, value: V)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_upsert">upsert</a>&lt;K: <b>copy</b>, drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K, value: V)<br /></code></pre>
 
 
 
@@ -283,7 +289,7 @@ Insert the pair (<code>key</code>, <code>value</code>) if there is no entry for 
 <summary>Implementation</summary>
 
 
-<pre><code>public fun upsert&lt;K: copy &#43; drop, V: drop&gt;(table: &amp;mut TableWithLength&lt;K, V&gt;, key: K, value: V) &#123;<br/>    if (!table::contains(&amp;table.inner, key)) &#123;<br/>        add(table, copy key, value)<br/>    &#125; else &#123;<br/>        let ref &#61; table::borrow_mut(&amp;mut table.inner, key);<br/>        &#42;ref &#61; value;<br/>    &#125;;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_upsert">upsert</a>&lt;K: <b>copy</b> &#43; drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, key: K, value: V) &#123;<br />    <b>if</b> (!<a href="table.md#0x1_table_contains">table::contains</a>(&amp;<a href="table.md#0x1_table">table</a>.inner, key)) &#123;<br />        <a href="table_with_length.md#0x1_table_with_length_add">add</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key, value)<br />    &#125; <b>else</b> &#123;<br />        <b>let</b> ref &#61; <a href="table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&amp;<b>mut</b> <a href="table.md#0x1_table">table</a>.inner, key);<br />        &#42;ref &#61; value;<br />    &#125;;<br />&#125;<br /></code></pre>
 
 
 
@@ -293,10 +299,11 @@ Insert the pair (<code>key</code>, <code>value</code>) if there is no entry for 
 
 ## Function `remove`
 
-Remove from <code>table</code> and return the value which <code>key</code> maps to.<br/> Aborts if there is no entry for <code>key</code>.
+Remove from <code><a href="table.md#0x1_table">table</a></code> and return the value which <code>key</code> maps to.
+Aborts if there is no entry for <code>key</code>.
 
 
-<pre><code>public fun remove&lt;K: copy, drop, V&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K): V<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_remove">remove</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K): V<br /></code></pre>
 
 
 
@@ -304,7 +311,7 @@ Remove from <code>table</code> and return the value which <code>key</code> maps 
 <summary>Implementation</summary>
 
 
-<pre><code>public fun remove&lt;K: copy &#43; drop, V&gt;(table: &amp;mut TableWithLength&lt;K, V&gt;, key: K): V &#123;<br/>    let val &#61; table::remove(&amp;mut table.inner, key);<br/>    table.length &#61; table.length &#45; 1;<br/>    val<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_remove">remove</a>&lt;K: <b>copy</b> &#43; drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, key: K): V &#123;<br />    <b>let</b> val &#61; <a href="table.md#0x1_table_remove">table::remove</a>(&amp;<b>mut</b> <a href="table.md#0x1_table">table</a>.inner, key);<br />    <a href="table.md#0x1_table">table</a>.length &#61; <a href="table.md#0x1_table">table</a>.length &#45; 1;<br />    val<br />&#125;<br /></code></pre>
 
 
 
@@ -314,10 +321,10 @@ Remove from <code>table</code> and return the value which <code>key</code> maps 
 
 ## Function `contains`
 
-Returns true iff <code>table</code> contains an entry for <code>key</code>.
+Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an entry for <code>key</code>.
 
 
-<pre><code>public fun contains&lt;K: copy, drop, V&gt;(table: &amp;table_with_length::TableWithLength&lt;K, V&gt;, key: K): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_contains">contains</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K): bool<br /></code></pre>
 
 
 
@@ -325,7 +332,7 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun contains&lt;K: copy &#43; drop, V&gt;(table: &amp;TableWithLength&lt;K, V&gt;, key: K): bool &#123;<br/>    table::contains(&amp;table.inner, key)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_contains">contains</a>&lt;K: <b>copy</b> &#43; drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, key: K): bool &#123;<br />    <a href="table.md#0x1_table_contains">table::contains</a>(&amp;<a href="table.md#0x1_table">table</a>.inner, key)<br />&#125;<br /></code></pre>
 
 
 
@@ -341,13 +348,13 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 ### Struct `TableWithLength`
 
 
-<pre><code>struct TableWithLength&lt;K: copy, drop, V&gt; has store<br/></code></pre>
+<pre><code><b>struct</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K: <b>copy</b>, drop, V&gt; <b>has</b> store<br /></code></pre>
 
 
 
 <dl>
 <dt>
-<code>inner: table::Table&lt;K, V&gt;</code>
+<code>inner: <a href="table.md#0x1_table_Table">table::Table</a>&lt;K, V&gt;</code>
 </dt>
 <dd>
 
@@ -362,7 +369,7 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 
 
 
-<pre><code>pragma intrinsic &#61; map,<br/>    map_new &#61; new,<br/>    map_destroy_empty &#61; destroy_empty,<br/>    map_len &#61; length,<br/>    map_is_empty &#61; empty,<br/>    map_has_key &#61; contains,<br/>    map_add_no_override &#61; add,<br/>    map_add_override_if_exists &#61; upsert,<br/>    map_del_must_exist &#61; remove,<br/>    map_borrow &#61; borrow,<br/>    map_borrow_mut &#61; borrow_mut,<br/>    map_borrow_mut_with_default &#61; borrow_mut_with_default,<br/>    map_spec_get &#61; spec_get,<br/>    map_spec_set &#61; spec_set,<br/>    map_spec_del &#61; spec_remove,<br/>    map_spec_len &#61; spec_len,<br/>    map_spec_has_key &#61; spec_contains;<br/></code></pre>
+<pre><code><b>pragma</b> intrinsic &#61; map,<br />    map_new &#61; new,<br />    map_destroy_empty &#61; destroy_empty,<br />    map_len &#61; length,<br />    map_is_empty &#61; empty,<br />    map_has_key &#61; contains,<br />    map_add_no_override &#61; add,<br />    map_add_override_if_exists &#61; upsert,<br />    map_del_must_exist &#61; remove,<br />    map_borrow &#61; borrow,<br />    map_borrow_mut &#61; borrow_mut,<br />    map_borrow_mut_with_default &#61; borrow_mut_with_default,<br />    map_spec_get &#61; spec_get,<br />    map_spec_set &#61; spec_set,<br />    map_spec_del &#61; spec_remove,<br />    map_spec_len &#61; spec_len,<br />    map_spec_has_key &#61; spec_contains;<br /></code></pre>
 
 
 
@@ -371,12 +378,12 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 ### Function `new`
 
 
-<pre><code>public fun new&lt;K: copy, drop, V: store&gt;(): table_with_length::TableWithLength&lt;K, V&gt;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_new">new</a>&lt;K: <b>copy</b>, drop, V: store&gt;(): <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;<br /></code></pre>
 
 
 
 
-<pre><code>pragma intrinsic;<br/></code></pre>
+<pre><code><b>pragma</b> intrinsic;<br /></code></pre>
 
 
 
@@ -385,12 +392,12 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 ### Function `destroy_empty`
 
 
-<pre><code>public fun destroy_empty&lt;K: copy, drop, V&gt;(table: table_with_length::TableWithLength&lt;K, V&gt;)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_destroy_empty">destroy_empty</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;)<br /></code></pre>
 
 
 
 
-<pre><code>pragma intrinsic;<br/></code></pre>
+<pre><code><b>pragma</b> intrinsic;<br /></code></pre>
 
 
 
@@ -399,12 +406,12 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 ### Function `add`
 
 
-<pre><code>public fun add&lt;K: copy, drop, V&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K, val: V)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_add">add</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K, val: V)<br /></code></pre>
 
 
 
 
-<pre><code>pragma intrinsic;<br/></code></pre>
+<pre><code><b>pragma</b> intrinsic;<br /></code></pre>
 
 
 
@@ -413,12 +420,12 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 ### Function `borrow`
 
 
-<pre><code>public fun borrow&lt;K: copy, drop, V&gt;(table: &amp;table_with_length::TableWithLength&lt;K, V&gt;, key: K): &amp;V<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_borrow">borrow</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K): &amp;V<br /></code></pre>
 
 
 
 
-<pre><code>pragma intrinsic;<br/></code></pre>
+<pre><code><b>pragma</b> intrinsic;<br /></code></pre>
 
 
 
@@ -427,12 +434,12 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 ### Function `borrow_mut`
 
 
-<pre><code>public fun borrow_mut&lt;K: copy, drop, V&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K): &amp;mut V<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_borrow_mut">borrow_mut</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K): &amp;<b>mut</b> V<br /></code></pre>
 
 
 
 
-<pre><code>pragma intrinsic;<br/></code></pre>
+<pre><code><b>pragma</b> intrinsic;<br /></code></pre>
 
 
 
@@ -441,12 +448,12 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 ### Function `length`
 
 
-<pre><code>public fun length&lt;K: copy, drop, V&gt;(table: &amp;table_with_length::TableWithLength&lt;K, V&gt;): u64<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_length">length</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;): u64<br /></code></pre>
 
 
 
 
-<pre><code>pragma intrinsic;<br/></code></pre>
+<pre><code><b>pragma</b> intrinsic;<br /></code></pre>
 
 
 
@@ -455,12 +462,12 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 ### Function `empty`
 
 
-<pre><code>public fun empty&lt;K: copy, drop, V&gt;(table: &amp;table_with_length::TableWithLength&lt;K, V&gt;): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_empty">empty</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;): bool<br /></code></pre>
 
 
 
 
-<pre><code>pragma intrinsic;<br/></code></pre>
+<pre><code><b>pragma</b> intrinsic;<br /></code></pre>
 
 
 
@@ -469,12 +476,12 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 ### Function `borrow_mut_with_default`
 
 
-<pre><code>public fun borrow_mut_with_default&lt;K: copy, drop, V: drop&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K, default: V): &amp;mut V<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_borrow_mut_with_default">borrow_mut_with_default</a>&lt;K: <b>copy</b>, drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K, default: V): &amp;<b>mut</b> V<br /></code></pre>
 
 
 
 
-<pre><code>aborts_if false;<br/>pragma intrinsic;<br/></code></pre>
+<pre><code><b>aborts_if</b> <b>false</b>;<br /><b>pragma</b> intrinsic;<br /></code></pre>
 
 
 
@@ -483,12 +490,12 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 ### Function `upsert`
 
 
-<pre><code>public fun upsert&lt;K: copy, drop, V: drop&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K, value: V)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_upsert">upsert</a>&lt;K: <b>copy</b>, drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K, value: V)<br /></code></pre>
 
 
 
 
-<pre><code>pragma intrinsic;<br/></code></pre>
+<pre><code><b>pragma</b> intrinsic;<br /></code></pre>
 
 
 
@@ -497,12 +504,12 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 ### Function `remove`
 
 
-<pre><code>public fun remove&lt;K: copy, drop, V&gt;(table: &amp;mut table_with_length::TableWithLength&lt;K, V&gt;, key: K): V<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_remove">remove</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<b>mut</b> <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K): V<br /></code></pre>
 
 
 
 
-<pre><code>pragma intrinsic;<br/></code></pre>
+<pre><code><b>pragma</b> intrinsic;<br /></code></pre>
 
 
 
@@ -511,12 +518,12 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 ### Function `contains`
 
 
-<pre><code>public fun contains&lt;K: copy, drop, V&gt;(table: &amp;table_with_length::TableWithLength&lt;K, V&gt;, key: K): bool<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_contains">contains</a>&lt;K: <b>copy</b>, drop, V&gt;(<a href="table.md#0x1_table">table</a>: &amp;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;K, V&gt;, key: K): bool<br /></code></pre>
 
 
 
 
-<pre><code>pragma intrinsic;<br/></code></pre>
+<pre><code><b>pragma</b> intrinsic;<br /></code></pre>
 
 
 
@@ -524,7 +531,7 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 <a id="0x1_table_with_length_spec_len"></a>
 
 
-<pre><code>native fun spec_len&lt;K, V&gt;(t: TableWithLength&lt;K, V&gt;): num;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_spec_len">spec_len</a>&lt;K, V&gt;(t: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;): num;<br /></code></pre>
 
 
 
@@ -532,7 +539,7 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 <a id="0x1_table_with_length_spec_contains"></a>
 
 
-<pre><code>native fun spec_contains&lt;K, V&gt;(t: TableWithLength&lt;K, V&gt;, k: K): bool;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_spec_contains">spec_contains</a>&lt;K, V&gt;(t: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, k: K): bool;<br /></code></pre>
 
 
 
@@ -540,7 +547,7 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 <a id="0x1_table_with_length_spec_set"></a>
 
 
-<pre><code>native fun spec_set&lt;K, V&gt;(t: TableWithLength&lt;K, V&gt;, k: K, v: V): TableWithLength&lt;K, V&gt;;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_spec_set">spec_set</a>&lt;K, V&gt;(t: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, k: K, v: V): <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;;<br /></code></pre>
 
 
 
@@ -548,7 +555,7 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 <a id="0x1_table_with_length_spec_remove"></a>
 
 
-<pre><code>native fun spec_remove&lt;K, V&gt;(t: TableWithLength&lt;K, V&gt;, k: K): TableWithLength&lt;K, V&gt;;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_spec_remove">spec_remove</a>&lt;K, V&gt;(t: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, k: K): <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;;<br /></code></pre>
 
 
 
@@ -556,7 +563,7 @@ Returns true iff <code>table</code> contains an entry for <code>key</code>.
 <a id="0x1_table_with_length_spec_get"></a>
 
 
-<pre><code>native fun spec_get&lt;K, V&gt;(t: TableWithLength&lt;K, V&gt;, k: K): V;<br/></code></pre>
+<pre><code><b>native</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, k: K): V;<br /></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

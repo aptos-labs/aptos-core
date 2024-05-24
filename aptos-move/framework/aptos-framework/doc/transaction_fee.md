@@ -42,7 +42,7 @@ This module provides an interface to burn or collect and redistribute transactio
     -  [Function `emit_fee_statement`](#@Specification_1_emit_fee_statement)
 
 
-<pre><code>use 0x1::aptos_coin;<br/>use 0x1::coin;<br/>use 0x1::error;<br/>use 0x1::event;<br/>use 0x1::option;<br/>use 0x1::stake;<br/>use 0x1::system_addresses;<br/></code></pre>
+<pre><code><b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;<br /><b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;<br /><b>use</b> <a href="event.md#0x1_event">0x1::event</a>;<br /><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;<br /><b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;<br /><b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;<br /></code></pre>
 
 
 
@@ -53,7 +53,7 @@ This module provides an interface to burn or collect and redistribute transactio
 Stores burn capability to burn the gas fees.
 
 
-<pre><code>struct AptosCoinCapabilities has key<br/></code></pre>
+<pre><code><b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> <b>has</b> key<br /></code></pre>
 
 
 
@@ -63,7 +63,7 @@ Stores burn capability to burn the gas fees.
 
 <dl>
 <dt>
-<code>burn_cap: coin::BurnCapability&lt;aptos_coin::AptosCoin&gt;</code>
+<code>burn_cap: <a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;</code>
 </dt>
 <dd>
 
@@ -80,7 +80,7 @@ Stores burn capability to burn the gas fees.
 Stores mint capability to mint the refunds.
 
 
-<pre><code>struct AptosCoinMintCapability has key<br/></code></pre>
+<pre><code><b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a> <b>has</b> key<br /></code></pre>
 
 
 
@@ -90,7 +90,7 @@ Stores mint capability to mint the refunds.
 
 <dl>
 <dt>
-<code>mint_cap: coin::MintCapability&lt;aptos_coin::AptosCoin&gt;</code>
+<code>mint_cap: <a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;</code>
 </dt>
 <dd>
 
@@ -104,10 +104,11 @@ Stores mint capability to mint the refunds.
 
 ## Resource `CollectedFeesPerBlock`
 
-Stores information about the block proposer and the amount of fees<br/> collected when executing the block.
+Stores information about the block proposer and the amount of fees
+collected when executing the block.
 
 
-<pre><code>struct CollectedFeesPerBlock has key<br/></code></pre>
+<pre><code><b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> <b>has</b> key<br /></code></pre>
 
 
 
@@ -117,13 +118,13 @@ Stores information about the block proposer and the amount of fees<br/> collecte
 
 <dl>
 <dt>
-<code>amount: coin::AggregatableCoin&lt;aptos_coin::AptosCoin&gt;</code>
+<code>amount: <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>proposer: option::Option&lt;address&gt;</code>
+<code>proposer: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<b>address</b>&gt;</code>
 </dt>
 <dd>
 
@@ -143,10 +144,28 @@ Stores information about the block proposer and the amount of fees<br/> collecte
 
 ## Struct `FeeStatement`
 
-Breakdown of fee charge and refund for a transaction.<br/> The structure is:<br/><br/> &#45; Net charge or refund (not in the statement)<br/>    &#45; total charge: total_charge_gas_units, matches <code>gas_used</code> in the on&#45;chain <code>TransactionInfo</code>.<br/>      This is the sum of the sub&#45;items below. Notice that there&apos;s potential precision loss when<br/>      the conversion between internal and external gas units and between native token and gas<br/>      units, so it&apos;s possible that the numbers don&apos;t add up exactly. &#45;&#45; This number is the final<br/>      charge, while the break down is merely informational.<br/>        &#45; gas charge for execution (CPU time): <code>execution_gas_units</code><br/>        &#45; gas charge for IO (storage random access): <code>io_gas_units</code><br/>        &#45; storage fee charge (storage space): <code>storage_fee_octas</code>, to be included in<br/>          <code>total_charge_gas_unit</code>, this number is converted to gas units according to the user<br/>          specified <code>gas_unit_price</code> on the transaction.<br/>    &#45; storage deletion refund: <code>storage_fee_refund_octas</code>, this is not included in <code>gas_used</code> or<br/>      <code>total_charge_gas_units</code>, the net charge / refund is calculated by<br/>      <code>total_charge_gas_units</code> &#42; <code>gas_unit_price</code> &#45; <code>storage_fee_refund_octas</code>.<br/><br/> This is meant to emitted as a module event.
+Breakdown of fee charge and refund for a transaction.
+The structure is:
+
+&#45; Net charge or refund (not in the statement)
+&#45; total charge: total_charge_gas_units, matches <code>gas_used</code> in the on&#45;chain <code>TransactionInfo</code>.
+This is the sum of the sub&#45;items below. Notice that there&apos;s potential precision loss when
+the conversion between internal and external gas units and between native token and gas
+units, so it&apos;s possible that the numbers don&apos;t add up exactly. &#45;&#45; This number is the final
+charge, while the break down is merely informational.
+&#45; gas charge for execution (CPU time): <code>execution_gas_units</code>
+&#45; gas charge for IO (storage random access): <code>io_gas_units</code>
+&#45; storage fee charge (storage space): <code>storage_fee_octas</code>, to be included in
+<code>total_charge_gas_unit</code>, this number is converted to gas units according to the user
+specified <code>gas_unit_price</code> on the transaction.
+&#45; storage deletion refund: <code>storage_fee_refund_octas</code>, this is not included in <code>gas_used</code> or
+<code>total_charge_gas_units</code>, the net charge / refund is calculated by
+<code>total_charge_gas_units</code> &#42; <code>gas_unit_price</code> &#45; <code>storage_fee_refund_octas</code>.
+
+This is meant to emitted as a module event.
 
 
-<pre><code>&#35;[event]<br/>struct FeeStatement has drop, store<br/></code></pre>
+<pre><code>&#35;[<a href="event.md#0x1_event">event</a>]<br /><b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">FeeStatement</a> <b>has</b> drop, store<br /></code></pre>
 
 
 
@@ -197,10 +216,11 @@ Breakdown of fee charge and refund for a transaction.<br/> The structure is:<br/
 
 <a id="0x1_transaction_fee_EALREADY_COLLECTING_FEES"></a>
 
-Gas fees are already being collected and the struct holding<br/> information about collected amounts is already published.
+Gas fees are already being collected and the struct holding
+information about collected amounts is already published.
 
 
-<pre><code>const EALREADY_COLLECTING_FEES: u64 &#61; 1;<br/></code></pre>
+<pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_EALREADY_COLLECTING_FEES">EALREADY_COLLECTING_FEES</a>: u64 &#61; 1;<br /></code></pre>
 
 
 
@@ -209,7 +229,7 @@ Gas fees are already being collected and the struct holding<br/> information abo
 The burn percentage is out of range [0, 100].
 
 
-<pre><code>const EINVALID_BURN_PERCENTAGE: u64 &#61; 3;<br/></code></pre>
+<pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_EINVALID_BURN_PERCENTAGE">EINVALID_BURN_PERCENTAGE</a>: u64 &#61; 3;<br /></code></pre>
 
 
 
@@ -218,7 +238,7 @@ The burn percentage is out of range [0, 100].
 No longer supported.
 
 
-<pre><code>const ENO_LONGER_SUPPORTED: u64 &#61; 4;<br/></code></pre>
+<pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>: u64 &#61; 4;<br /></code></pre>
 
 
 
@@ -226,10 +246,11 @@ No longer supported.
 
 ## Function `initialize_fee_collection_and_distribution`
 
-Initializes the resource storing information about gas fees collection and<br/> distribution. Should be called by on&#45;chain governance.
+Initializes the resource storing information about gas fees collection and
+distribution. Should be called by on&#45;chain governance.
 
 
-<pre><code>public fun initialize_fee_collection_and_distribution(aptos_framework: &amp;signer, burn_percentage: u8)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, burn_percentage: u8)<br /></code></pre>
 
 
 
@@ -237,7 +258,7 @@ Initializes the resource storing information about gas fees collection and<br/> 
 <summary>Implementation</summary>
 
 
-<pre><code>public fun initialize_fee_collection_and_distribution(aptos_framework: &amp;signer, burn_percentage: u8) &#123;<br/>    system_addresses::assert_aptos_framework(aptos_framework);<br/>    assert!(<br/>        !exists&lt;CollectedFeesPerBlock&gt;(@aptos_framework),<br/>        error::already_exists(EALREADY_COLLECTING_FEES)<br/>    );<br/>    assert!(burn_percentage &lt;&#61; 100, error::out_of_range(EINVALID_BURN_PERCENTAGE));<br/><br/>    // Make sure stakng module is aware of transaction fees collection.<br/>    stake::initialize_validator_fees(aptos_framework);<br/><br/>    // Initially, no fees are collected and the block proposer is not set.<br/>    let collected_fees &#61; CollectedFeesPerBlock &#123;<br/>        amount: coin::initialize_aggregatable_coin(aptos_framework),<br/>        proposer: option::none(),<br/>        burn_percentage,<br/>    &#125;;<br/>    move_to(aptos_framework, collected_fees);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, burn_percentage: u8) &#123;<br />    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);<br />    <b>assert</b>!(<br />        !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework),<br />        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="transaction_fee.md#0x1_transaction_fee_EALREADY_COLLECTING_FEES">EALREADY_COLLECTING_FEES</a>)<br />    );<br />    <b>assert</b>!(burn_percentage &lt;&#61; 100, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_fee.md#0x1_transaction_fee_EINVALID_BURN_PERCENTAGE">EINVALID_BURN_PERCENTAGE</a>));<br /><br />    // Make sure stakng <b>module</b> is aware of transaction fees collection.<br />    <a href="stake.md#0x1_stake_initialize_validator_fees">stake::initialize_validator_fees</a>(aptos_framework);<br /><br />    // Initially, no fees are collected and the <a href="block.md#0x1_block">block</a> proposer is not set.<br />    <b>let</b> collected_fees &#61; <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> &#123;<br />        amount: <a href="coin.md#0x1_coin_initialize_aggregatable_coin">coin::initialize_aggregatable_coin</a>(aptos_framework),<br />        proposer: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),<br />        burn_percentage,<br />    &#125;;<br />    <b>move_to</b>(aptos_framework, collected_fees);<br />&#125;<br /></code></pre>
 
 
 
@@ -249,7 +270,7 @@ Initializes the resource storing information about gas fees collection and<br/> 
 
 
 
-<pre><code>fun is_fees_collection_enabled(): bool<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>(): bool<br /></code></pre>
 
 
 
@@ -257,7 +278,7 @@ Initializes the resource storing information about gas fees collection and<br/> 
 <summary>Implementation</summary>
 
 
-<pre><code>fun is_fees_collection_enabled(): bool &#123;<br/>    exists&lt;CollectedFeesPerBlock&gt;(@aptos_framework)<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>(): bool &#123;<br />    <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework)<br />&#125;<br /></code></pre>
 
 
 
@@ -270,7 +291,7 @@ Initializes the resource storing information about gas fees collection and<br/> 
 Sets the burn percentage for collected fees to a new value. Should be called by on&#45;chain governance.
 
 
-<pre><code>public fun upgrade_burn_percentage(aptos_framework: &amp;signer, new_burn_percentage: u8)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_burn_percentage: u8)<br /></code></pre>
 
 
 
@@ -278,7 +299,7 @@ Sets the burn percentage for collected fees to a new value. Should be called by 
 <summary>Implementation</summary>
 
 
-<pre><code>public fun upgrade_burn_percentage(<br/>    aptos_framework: &amp;signer,<br/>    new_burn_percentage: u8<br/>) acquires AptosCoinCapabilities, CollectedFeesPerBlock &#123;<br/>    system_addresses::assert_aptos_framework(aptos_framework);<br/>    assert!(new_burn_percentage &lt;&#61; 100, error::out_of_range(EINVALID_BURN_PERCENTAGE));<br/><br/>    // Prior to upgrading the burn percentage, make sure to process collected<br/>    // fees. Otherwise we would use the new (incorrect) burn_percentage when<br/>    // processing fees later!<br/>    process_collected_fees();<br/><br/>    if (is_fees_collection_enabled()) &#123;<br/>        // Upgrade has no effect unless fees are being collected.<br/>        let burn_percentage &#61; &amp;mut borrow_global_mut&lt;CollectedFeesPerBlock&gt;(@aptos_framework).burn_percentage;<br/>        &#42;burn_percentage &#61; new_burn_percentage<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(<br />    aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,<br />    new_burn_percentage: u8<br />) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> &#123;<br />    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);<br />    <b>assert</b>!(new_burn_percentage &lt;&#61; 100, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_fee.md#0x1_transaction_fee_EINVALID_BURN_PERCENTAGE">EINVALID_BURN_PERCENTAGE</a>));<br /><br />    // Prior <b>to</b> upgrading the burn percentage, make sure <b>to</b> process collected<br />    // fees. Otherwise we would <b>use</b> the new (incorrect) burn_percentage when<br />    // processing fees later!<br />    <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">process_collected_fees</a>();<br /><br />    <b>if</b> (<a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>()) &#123;<br />        // Upgrade <b>has</b> no effect unless fees are being collected.<br />        <b>let</b> burn_percentage &#61; &amp;<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).burn_percentage;<br />        &#42;burn_percentage &#61; new_burn_percentage<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -288,10 +309,11 @@ Sets the burn percentage for collected fees to a new value. Should be called by 
 
 ## Function `register_proposer_for_fee_collection`
 
-Registers the proposer of the block for gas fees collection. This function<br/> can only be called at the beginning of the block.
+Registers the proposer of the block for gas fees collection. This function
+can only be called at the beginning of the block.
 
 
-<pre><code>public(friend) fun register_proposer_for_fee_collection(proposer_addr: address)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">register_proposer_for_fee_collection</a>(proposer_addr: <b>address</b>)<br /></code></pre>
 
 
 
@@ -299,7 +321,7 @@ Registers the proposer of the block for gas fees collection. This function<br/> 
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun register_proposer_for_fee_collection(proposer_addr: address) acquires CollectedFeesPerBlock &#123;<br/>    if (is_fees_collection_enabled()) &#123;<br/>        let collected_fees &#61; borrow_global_mut&lt;CollectedFeesPerBlock&gt;(@aptos_framework);<br/>        let _ &#61; option::swap_or_fill(&amp;mut collected_fees.proposer, proposer_addr);<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">register_proposer_for_fee_collection</a>(proposer_addr: <b>address</b>) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> &#123;<br />    <b>if</b> (<a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>()) &#123;<br />        <b>let</b> collected_fees &#61; <b>borrow_global_mut</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);<br />        <b>let</b> _ &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_swap_or_fill">option::swap_or_fill</a>(&amp;<b>mut</b> collected_fees.proposer, proposer_addr);<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -312,7 +334,7 @@ Registers the proposer of the block for gas fees collection. This function<br/> 
 Burns a specified fraction of the coin.
 
 
-<pre><code>fun burn_coin_fraction(coin: &amp;mut coin::Coin&lt;aptos_coin::AptosCoin&gt;, burn_percentage: u8)<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(<a href="coin.md#0x1_coin">coin</a>: &amp;<b>mut</b> <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;, burn_percentage: u8)<br /></code></pre>
 
 
 
@@ -320,7 +342,7 @@ Burns a specified fraction of the coin.
 <summary>Implementation</summary>
 
 
-<pre><code>fun burn_coin_fraction(coin: &amp;mut Coin&lt;AptosCoin&gt;, burn_percentage: u8) acquires AptosCoinCapabilities &#123;<br/>    assert!(burn_percentage &lt;&#61; 100, error::out_of_range(EINVALID_BURN_PERCENTAGE));<br/><br/>    let collected_amount &#61; coin::value(coin);<br/>    spec &#123;<br/>        // We assume that `burn_percentage &#42; collected_amount` does not overflow.<br/>        assume burn_percentage &#42; collected_amount &lt;&#61; MAX_U64;<br/>    &#125;;<br/>    let amount_to_burn &#61; (burn_percentage as u64) &#42; collected_amount / 100;<br/>    if (amount_to_burn &gt; 0) &#123;<br/>        let coin_to_burn &#61; coin::extract(coin, amount_to_burn);<br/>        coin::burn(<br/>            coin_to_burn,<br/>            &amp;borrow_global&lt;AptosCoinCapabilities&gt;(@aptos_framework).burn_cap,<br/>        );<br/>    &#125;<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(<a href="coin.md#0x1_coin">coin</a>: &amp;<b>mut</b> Coin&lt;AptosCoin&gt;, burn_percentage: u8) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> &#123;<br />    <b>assert</b>!(burn_percentage &lt;&#61; 100, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_fee.md#0x1_transaction_fee_EINVALID_BURN_PERCENTAGE">EINVALID_BURN_PERCENTAGE</a>));<br /><br />    <b>let</b> collected_amount &#61; <a href="coin.md#0x1_coin_value">coin::value</a>(<a href="coin.md#0x1_coin">coin</a>);<br />    <b>spec</b> &#123;<br />        // We <b>assume</b> that `burn_percentage &#42; collected_amount` does not overflow.<br />        <b>assume</b> burn_percentage &#42; collected_amount &lt;&#61; MAX_U64;<br />    &#125;;<br />    <b>let</b> amount_to_burn &#61; (burn_percentage <b>as</b> u64) &#42; collected_amount / 100;<br />    <b>if</b> (amount_to_burn &gt; 0) &#123;<br />        <b>let</b> coin_to_burn &#61; <a href="coin.md#0x1_coin_extract">coin::extract</a>(<a href="coin.md#0x1_coin">coin</a>, amount_to_burn);<br />        <a href="coin.md#0x1_coin_burn">coin::burn</a>(<br />            coin_to_burn,<br />            &amp;<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,<br />        );<br />    &#125;<br />&#125;<br /></code></pre>
 
 
 
@@ -330,10 +352,12 @@ Burns a specified fraction of the coin.
 
 ## Function `process_collected_fees`
 
-Calculates the fee which should be distributed to the block proposer at the<br/> end of an epoch, and records it in the system. This function can only be called<br/> at the beginning of the block or during reconfiguration.
+Calculates the fee which should be distributed to the block proposer at the
+end of an epoch, and records it in the system. This function can only be called
+at the beginning of the block or during reconfiguration.
 
 
-<pre><code>public(friend) fun process_collected_fees()<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">process_collected_fees</a>()<br /></code></pre>
 
 
 
@@ -341,7 +365,7 @@ Calculates the fee which should be distributed to the block proposer at the<br/>
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun process_collected_fees() acquires AptosCoinCapabilities, CollectedFeesPerBlock &#123;<br/>    if (!is_fees_collection_enabled()) &#123;<br/>        return<br/>    &#125;;<br/>    let collected_fees &#61; borrow_global_mut&lt;CollectedFeesPerBlock&gt;(@aptos_framework);<br/><br/>    // If there are no collected fees, only unset the proposer. See the rationale for<br/>    // setting proposer to option::none() below.<br/>    if (coin::is_aggregatable_coin_zero(&amp;collected_fees.amount)) &#123;<br/>        if (option::is_some(&amp;collected_fees.proposer)) &#123;<br/>            let _ &#61; option::extract(&amp;mut collected_fees.proposer);<br/>        &#125;;<br/>        return<br/>    &#125;;<br/><br/>    // Otherwise get the collected fee, and check if it can distributed later.<br/>    let coin &#61; coin::drain_aggregatable_coin(&amp;mut collected_fees.amount);<br/>    if (option::is_some(&amp;collected_fees.proposer)) &#123;<br/>        // Extract the address of proposer here and reset it to option::none(). This<br/>        // is particularly useful to avoid any undesired side&#45;effects where coins are<br/>        // collected but never distributed or distributed to the wrong account.<br/>        // With this design, processing collected fees enforces that all fees will be burnt<br/>        // unless the proposer is specified in the block prologue. When we have a governance<br/>        // proposal that triggers reconfiguration, we distribute pending fees and burn the<br/>        // fee for the proposal. Otherwise, that fee would be leaked to the next block.<br/>        let proposer &#61; option::extract(&amp;mut collected_fees.proposer);<br/><br/>        // Since the block can be produced by the VM itself, we have to make sure we catch<br/>        // this case.<br/>        if (proposer &#61;&#61; @vm_reserved) &#123;<br/>            burn_coin_fraction(&amp;mut coin, 100);<br/>            coin::destroy_zero(coin);<br/>            return<br/>        &#125;;<br/><br/>        burn_coin_fraction(&amp;mut coin, collected_fees.burn_percentage);<br/>        stake::add_transaction_fee(proposer, coin);<br/>        return<br/>    &#125;;<br/><br/>    // If checks did not pass, simply burn all collected coins and return none.<br/>    burn_coin_fraction(&amp;mut coin, 100);<br/>    coin::destroy_zero(coin)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">process_collected_fees</a>() <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> &#123;<br />    <b>if</b> (!<a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>()) &#123;<br />        <b>return</b><br />    &#125;;<br />    <b>let</b> collected_fees &#61; <b>borrow_global_mut</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);<br /><br />    // If there are no collected fees, only unset the proposer. See the rationale for<br />    // setting proposer <b>to</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>() below.<br />    <b>if</b> (<a href="coin.md#0x1_coin_is_aggregatable_coin_zero">coin::is_aggregatable_coin_zero</a>(&amp;collected_fees.amount)) &#123;<br />        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&amp;collected_fees.proposer)) &#123;<br />            <b>let</b> _ &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&amp;<b>mut</b> collected_fees.proposer);<br />        &#125;;<br />        <b>return</b><br />    &#125;;<br /><br />    // Otherwise get the collected fee, and check <b>if</b> it can distributed later.<br />    <b>let</b> <a href="coin.md#0x1_coin">coin</a> &#61; <a href="coin.md#0x1_coin_drain_aggregatable_coin">coin::drain_aggregatable_coin</a>(&amp;<b>mut</b> collected_fees.amount);<br />    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&amp;collected_fees.proposer)) &#123;<br />        // Extract the <b>address</b> of proposer here and reset it <b>to</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(). This<br />        // is particularly useful <b>to</b> avoid <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> undesired side&#45;effects <b>where</b> coins are<br />        // collected but never distributed or distributed <b>to</b> the wrong <a href="account.md#0x1_account">account</a>.<br />        // With this design, processing collected fees enforces that all fees will be burnt<br />        // unless the proposer is specified in the <a href="block.md#0x1_block">block</a> prologue. When we have a governance<br />        // proposal that triggers <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a>, we distribute pending fees and burn the<br />        // fee for the proposal. Otherwise, that fee would be leaked <b>to</b> the next <a href="block.md#0x1_block">block</a>.<br />        <b>let</b> proposer &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&amp;<b>mut</b> collected_fees.proposer);<br /><br />        // Since the <a href="block.md#0x1_block">block</a> can be produced by the VM itself, we have <b>to</b> make sure we catch<br />        // this case.<br />        <b>if</b> (proposer &#61;&#61; @vm_reserved) &#123;<br />            <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(&amp;<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, 100);<br />            <a href="coin.md#0x1_coin_destroy_zero">coin::destroy_zero</a>(<a href="coin.md#0x1_coin">coin</a>);<br />            <b>return</b><br />        &#125;;<br /><br />        <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(&amp;<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, collected_fees.burn_percentage);<br />        <a href="stake.md#0x1_stake_add_transaction_fee">stake::add_transaction_fee</a>(proposer, <a href="coin.md#0x1_coin">coin</a>);<br />        <b>return</b><br />    &#125;;<br /><br />    // If checks did not pass, simply burn all collected coins and <b>return</b> none.<br />    <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(&amp;<b>mut</b> <a href="coin.md#0x1_coin">coin</a>, 100);<br />    <a href="coin.md#0x1_coin_destroy_zero">coin::destroy_zero</a>(<a href="coin.md#0x1_coin">coin</a>)<br />&#125;<br /></code></pre>
 
 
 
@@ -354,7 +378,7 @@ Calculates the fee which should be distributed to the block proposer at the<br/>
 Burn transaction fees in epilogue.
 
 
-<pre><code>public(friend) fun burn_fee(account: address, fee: u64)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">burn_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64)<br /></code></pre>
 
 
 
@@ -362,7 +386,7 @@ Burn transaction fees in epilogue.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun burn_fee(account: address, fee: u64) acquires AptosCoinCapabilities &#123;<br/>    coin::burn_from&lt;AptosCoin&gt;(<br/>        account,<br/>        fee,<br/>        &amp;borrow_global&lt;AptosCoinCapabilities&gt;(@aptos_framework).burn_cap,<br/>    );<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">burn_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> &#123;<br />    <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>&lt;AptosCoin&gt;(<br />        <a href="account.md#0x1_account">account</a>,<br />        fee,<br />        &amp;<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,<br />    );<br />&#125;<br /></code></pre>
 
 
 
@@ -375,7 +399,7 @@ Burn transaction fees in epilogue.
 Mint refund in epilogue.
 
 
-<pre><code>public(friend) fun mint_and_refund(account: address, refund: u64)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">mint_and_refund</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, refund: u64)<br /></code></pre>
 
 
 
@@ -383,7 +407,7 @@ Mint refund in epilogue.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun mint_and_refund(account: address, refund: u64) acquires AptosCoinMintCapability &#123;<br/>    let mint_cap &#61; &amp;borrow_global&lt;AptosCoinMintCapability&gt;(@aptos_framework).mint_cap;<br/>    let refund_coin &#61; coin::mint(refund, mint_cap);<br/>    coin::force_deposit(account, refund_coin);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">mint_and_refund</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, refund: u64) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a> &#123;<br />    <b>let</b> mint_cap &#61; &amp;<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a>&gt;(@aptos_framework).mint_cap;<br />    <b>let</b> refund_coin &#61; <a href="coin.md#0x1_coin_mint">coin::mint</a>(refund, mint_cap);<br />    <a href="coin.md#0x1_coin_force_deposit">coin::force_deposit</a>(<a href="account.md#0x1_account">account</a>, refund_coin);<br />&#125;<br /></code></pre>
 
 
 
@@ -396,7 +420,7 @@ Mint refund in epilogue.
 Collect transaction fees in epilogue.
 
 
-<pre><code>public(friend) fun collect_fee(account: address, fee: u64)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_collect_fee">collect_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64)<br /></code></pre>
 
 
 
@@ -404,7 +428,7 @@ Collect transaction fees in epilogue.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun collect_fee(account: address, fee: u64) acquires CollectedFeesPerBlock &#123;<br/>    let collected_fees &#61; borrow_global_mut&lt;CollectedFeesPerBlock&gt;(@aptos_framework);<br/><br/>    // Here, we are always optimistic and always collect fees. If the proposer is not set,<br/>    // or we cannot redistribute fees later for some reason (e.g. account cannot receive AptoCoin)<br/>    // we burn them all at once. This way we avoid having a check for every transaction epilogue.<br/>    let collected_amount &#61; &amp;mut collected_fees.amount;<br/>    coin::collect_into_aggregatable_coin&lt;AptosCoin&gt;(account, fee, collected_amount);<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_collect_fee">collect_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> &#123;<br />    <b>let</b> collected_fees &#61; <b>borrow_global_mut</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);<br /><br />    // Here, we are always optimistic and always collect fees. If the proposer is not set,<br />    // or we cannot redistribute fees later for some reason (e.g. <a href="account.md#0x1_account">account</a> cannot receive AptoCoin)<br />    // we burn them all at once. This way we avoid having a check for every transaction epilogue.<br />    <b>let</b> collected_amount &#61; &amp;<b>mut</b> collected_fees.amount;<br />    <a href="coin.md#0x1_coin_collect_into_aggregatable_coin">coin::collect_into_aggregatable_coin</a>&lt;AptosCoin&gt;(<a href="account.md#0x1_account">account</a>, fee, collected_amount);<br />&#125;<br /></code></pre>
 
 
 
@@ -417,7 +441,7 @@ Collect transaction fees in epilogue.
 Only called during genesis.
 
 
-<pre><code>public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &amp;signer, burn_cap: coin::BurnCapability&lt;aptos_coin::AptosCoin&gt;)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">store_aptos_coin_burn_cap</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, burn_cap: <a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;)<br /></code></pre>
 
 
 
@@ -425,7 +449,7 @@ Only called during genesis.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &amp;signer, burn_cap: BurnCapability&lt;AptosCoin&gt;) &#123;<br/>    system_addresses::assert_aptos_framework(aptos_framework);<br/>    move_to(aptos_framework, AptosCoinCapabilities &#123; burn_cap &#125;)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">store_aptos_coin_burn_cap</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, burn_cap: BurnCapability&lt;AptosCoin&gt;) &#123;<br />    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);<br />    <b>move_to</b>(aptos_framework, <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> &#123; burn_cap &#125;)<br />&#125;<br /></code></pre>
 
 
 
@@ -438,7 +462,7 @@ Only called during genesis.
 Only called during genesis.
 
 
-<pre><code>public(friend) fun store_aptos_coin_mint_cap(aptos_framework: &amp;signer, mint_cap: coin::MintCapability&lt;aptos_coin::AptosCoin&gt;)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">store_aptos_coin_mint_cap</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, mint_cap: <a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;)<br /></code></pre>
 
 
 
@@ -446,7 +470,7 @@ Only called during genesis.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun store_aptos_coin_mint_cap(aptos_framework: &amp;signer, mint_cap: MintCapability&lt;AptosCoin&gt;) &#123;<br/>    system_addresses::assert_aptos_framework(aptos_framework);<br/>    move_to(aptos_framework, AptosCoinMintCapability &#123; mint_cap &#125;)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">store_aptos_coin_mint_cap</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, mint_cap: MintCapability&lt;AptosCoin&gt;) &#123;<br />    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);<br />    <b>move_to</b>(aptos_framework, <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a> &#123; mint_cap &#125;)<br />&#125;<br /></code></pre>
 
 
 
@@ -458,7 +482,7 @@ Only called during genesis.
 
 
 
-<pre><code>&#35;[deprecated]<br/>public fun initialize_storage_refund(_: &amp;signer)<br/></code></pre>
+<pre><code>&#35;[deprecated]<br /><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_storage_refund">initialize_storage_refund</a>(_: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)<br /></code></pre>
 
 
 
@@ -466,7 +490,7 @@ Only called during genesis.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun initialize_storage_refund(_: &amp;signer) &#123;<br/>    abort error::not_implemented(ENO_LONGER_SUPPORTED)<br/>&#125;<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_storage_refund">initialize_storage_refund</a>(_: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) &#123;<br />    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_implemented">error::not_implemented</a>(<a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>)<br />&#125;<br /></code></pre>
 
 
 
@@ -478,7 +502,7 @@ Only called during genesis.
 
 
 
-<pre><code>fun emit_fee_statement(fee_statement: transaction_fee::FeeStatement)<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_fee_statement">emit_fee_statement</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">transaction_fee::FeeStatement</a>)<br /></code></pre>
 
 
 
@@ -486,7 +510,7 @@ Only called during genesis.
 <summary>Implementation</summary>
 
 
-<pre><code>fun emit_fee_statement(fee_statement: FeeStatement) &#123;<br/>    event::emit(fee_statement)<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_fee_statement">emit_fee_statement</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">FeeStatement</a>) &#123;<br />    <a href="event.md#0x1_event_emit">event::emit</a>(fee_statement)<br />&#125;<br /></code></pre>
 
 
 
@@ -503,23 +527,62 @@ Only called during genesis.
 
 ### High-level Requirements
 
-&lt;table&gt;<br/>&lt;tr&gt;<br/>&lt;th&gt;No.&lt;/th&gt;&lt;th&gt;Requirement&lt;/th&gt;&lt;th&gt;Criticality&lt;/th&gt;&lt;th&gt;Implementation&lt;/th&gt;&lt;th&gt;Enforcement&lt;/th&gt;<br/>&lt;/tr&gt;<br/>
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;1&lt;/td&gt;<br/>&lt;td&gt;Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn Aptos coins.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The AptosCoinCapabilities structure is defined in this module and it stores burn capability to burn the gas fees.&lt;/td&gt;<br/>&lt;td&gt;Formally Verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;1&quot;&gt;module&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>1</td>
+<td>Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn Aptos coins.</td>
+<td>Critical</td>
+<td>The AptosCoinCapabilities structure is defined in this module and it stores burn capability to burn the gas fees.</td>
+<td>Formally Verified via <a href="#high-level-req-1">module</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;2&lt;/td&gt;<br/>&lt;td&gt;The initialization function may only be called once.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;The initialize_fee_collection_and_distribution function ensures CollectedFeesPerBlock does not already exist.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;2&quot;&gt;initialize_fee_collection_and_distribution&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>2</td>
+<td>The initialization function may only be called once.</td>
+<td>Medium</td>
+<td>The initialize_fee_collection_and_distribution function ensures CollectedFeesPerBlock does not already exist.</td>
+<td>Formally verified via <a href="#high-level-req-2">initialize_fee_collection_and_distribution</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;3&lt;/td&gt;<br/>&lt;td&gt;Only the admin address is authorized to call the initialization function.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The initialize_fee_collection_and_distribution function ensures only the Aptos framework address calls it.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;3&quot;&gt;initialize_fee_collection_and_distribution&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>3</td>
+<td>Only the admin address is authorized to call the initialization function.</td>
+<td>Critical</td>
+<td>The initialize_fee_collection_and_distribution function ensures only the Aptos framework address calls it.</td>
+<td>Formally verified via <a href="#high-level-req-3">initialize_fee_collection_and_distribution</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;4&lt;/td&gt;<br/>&lt;td&gt;The percentage of the burnt collected fee is always a value from 0 to 100.&lt;/td&gt;<br/>&lt;td&gt;Medium&lt;/td&gt;<br/>&lt;td&gt;During the initialization of CollectedFeesPerBlock in Initialize_fee_collection_and_distribution, and while upgrading burn percentage, it asserts that burn_percentage is within the specified limits.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;4&quot;&gt;CollectedFeesPerBlock&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>4</td>
+<td>The percentage of the burnt collected fee is always a value from 0 to 100.</td>
+<td>Medium</td>
+<td>During the initialization of CollectedFeesPerBlock in Initialize_fee_collection_and_distribution, and while upgrading burn percentage, it asserts that burn_percentage is within the specified limits.</td>
+<td>Formally verified via <a href="#high-level-req-4">CollectedFeesPerBlock</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;5&lt;/td&gt;<br/>&lt;td&gt;Prior to upgrading the burn percentage, it must process all the fees collected up to that point.&lt;/td&gt;<br/>&lt;td&gt;Critical&lt;/td&gt;<br/>&lt;td&gt;The upgrade_burn_percentage function ensures process_collected_fees function is called before updating the burn percentage.&lt;/td&gt;<br/>&lt;td&gt;Formally verified in &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;5&quot;&gt;ProcessCollectedFeesRequiresAndEnsures&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>5</td>
+<td>Prior to upgrading the burn percentage, it must process all the fees collected up to that point.</td>
+<td>Critical</td>
+<td>The upgrade_burn_percentage function ensures process_collected_fees function is called before updating the burn percentage.</td>
+<td>Formally verified in <a href="#high-level-req-5">ProcessCollectedFeesRequiresAndEnsures</a>.</td>
+</tr>
 
-&lt;tr&gt;<br/>&lt;td&gt;6&lt;/td&gt;<br/>&lt;td&gt;The presence of the resource, indicating collected fees per block under the Aptos framework account, is a prerequisite for the successful execution of the following functionalities: Upgrading burn percentage. Registering a block proposer. Processing collected fees.&lt;/td&gt;<br/>&lt;td&gt;Low&lt;/td&gt;<br/>&lt;td&gt;The functions: upgrade_burn_percentage, register_proposer_for_fee_collection, and process_collected_fees all ensure that the CollectedFeesPerBlock resource exists under aptos_framework by calling the is_fees_collection_enabled method, which returns a boolean value confirming if the resource exists or not.&lt;/td&gt;<br/>&lt;td&gt;Formally verified via &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.1&quot;&gt;register_proposer_for_fee_collection&lt;/a&gt;, &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.2&quot;&gt;process_collected_fees&lt;/a&gt;, and &lt;a href&#61;&quot;&#35;high&#45;level&#45;req&#45;6.3&quot;&gt;upgrade_burn_percentage&lt;/a&gt;.&lt;/td&gt;<br/>&lt;/tr&gt;<br/>
+<tr>
+<td>6</td>
+<td>The presence of the resource, indicating collected fees per block under the Aptos framework account, is a prerequisite for the successful execution of the following functionalities: Upgrading burn percentage. Registering a block proposer. Processing collected fees.</td>
+<td>Low</td>
+<td>The functions: upgrade_burn_percentage, register_proposer_for_fee_collection, and process_collected_fees all ensure that the CollectedFeesPerBlock resource exists under aptos_framework by calling the is_fees_collection_enabled method, which returns a boolean value confirming if the resource exists or not.</td>
+<td>Formally verified via <a href="#high-level-req-6.1">register_proposer_for_fee_collection</a>, <a href="#high-level-req-6.2">process_collected_fees</a>, and <a href="#high-level-req-6.3">upgrade_burn_percentage</a>.</td>
+</tr>
 
-&lt;/table&gt;<br/>
+</table>
 
-<br/>
+
 
 
 <a id="module-level-spec"></a>
@@ -527,8 +590,8 @@ Only called during genesis.
 ### Module-level Specification
 
 
-<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 1&lt;/a&gt;:
-invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;AptosCoinCapabilities&gt;(@aptos_framework);<br/></code></pre>
+<pre><code><b>pragma</b> verify &#61; <b>true</b>;<br /><b>pragma</b> aborts_if_is_strict;<br />// This enforces <a id="high-level-req-1" href="#high-level-req">high&#45;level requirement 1</a>:
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() &#61;&#61;&gt; <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);<br /></code></pre>
 
 
 
@@ -537,19 +600,19 @@ invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;Ap
 ### Resource `CollectedFeesPerBlock`
 
 
-<pre><code>struct CollectedFeesPerBlock has key<br/></code></pre>
+<pre><code><b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> <b>has</b> key<br /></code></pre>
 
 
 
 <dl>
 <dt>
-<code>amount: coin::AggregatableCoin&lt;aptos_coin::AptosCoin&gt;</code>
+<code>amount: <a href="coin.md#0x1_coin_AggregatableCoin">coin::AggregatableCoin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>proposer: option::Option&lt;address&gt;</code>
+<code>proposer: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<b>address</b>&gt;</code>
 </dt>
 <dd>
 
@@ -564,8 +627,8 @@ invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;Ap
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;4&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 4&lt;/a&gt;:
-invariant burn_percentage &lt;&#61; 100;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-4" href="#high-level-req">high&#45;level requirement 4</a>:
+<b>invariant</b> burn_percentage &lt;&#61; 100;<br /></code></pre>
 
 
 
@@ -574,14 +637,14 @@ invariant burn_percentage &lt;&#61; 100;<br/></code></pre>
 ### Function `initialize_fee_collection_and_distribution`
 
 
-<pre><code>public fun initialize_fee_collection_and_distribution(aptos_framework: &amp;signer, burn_percentage: u8)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_fee_collection_and_distribution">initialize_fee_collection_and_distribution</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, burn_percentage: u8)<br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 2&lt;/a&gt;:
-aborts_if exists&lt;CollectedFeesPerBlock&gt;(@aptos_framework);<br/>aborts_if burn_percentage &gt; 100;<br/>let aptos_addr &#61; signer::address_of(aptos_framework);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 3&lt;/a&gt;:
-aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);<br/>aborts_if exists&lt;ValidatorFees&gt;(aptos_addr);<br/>include system_addresses::AbortsIfNotAptosFramework &#123; account: aptos_framework &#125;;<br/>include aggregator_factory::CreateAggregatorInternalAbortsIf;<br/>aborts_if exists&lt;CollectedFeesPerBlock&gt;(aptos_addr);<br/>ensures exists&lt;ValidatorFees&gt;(aptos_addr);<br/>ensures exists&lt;CollectedFeesPerBlock&gt;(aptos_addr);<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high&#45;level requirement 2</a>:
+<b>aborts_if</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);<br /><b>aborts_if</b> burn_percentage &gt; 100;<br /><b>let</b> aptos_addr &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);<br />// This enforces <a id="high-level-req-3" href="#high-level-req">high&#45;level requirement 3</a>:
+<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(aptos_addr);<br /><b>aborts_if</b> <b>exists</b>&lt;ValidatorFees&gt;(aptos_addr);<br /><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a> &#123; <a href="account.md#0x1_account">account</a>: aptos_framework &#125;;<br /><b>include</b> <a href="aggregator_factory.md#0x1_aggregator_factory_CreateAggregatorInternalAbortsIf">aggregator_factory::CreateAggregatorInternalAbortsIf</a>;<br /><b>aborts_if</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(aptos_addr);<br /><b>ensures</b> <b>exists</b>&lt;ValidatorFees&gt;(aptos_addr);<br /><b>ensures</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(aptos_addr);<br /></code></pre>
 
 
 
@@ -590,13 +653,13 @@ aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);<br/>aborts_
 ### Function `upgrade_burn_percentage`
 
 
-<pre><code>public fun upgrade_burn_percentage(aptos_framework: &amp;signer, new_burn_percentage: u8)<br/></code></pre>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_upgrade_burn_percentage">upgrade_burn_percentage</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_burn_percentage: u8)<br /></code></pre>
 
 
 
 
-<pre><code>aborts_if new_burn_percentage &gt; 100;<br/>let aptos_addr &#61; signer::address_of(aptos_framework);<br/>aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;5&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 5&lt;/a&gt; and &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.3&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
-include ProcessCollectedFeesRequiresAndEnsures;<br/>ensures exists&lt;CollectedFeesPerBlock&gt;(@aptos_framework) &#61;&#61;&gt;<br/>    global&lt;CollectedFeesPerBlock&gt;(@aptos_framework).burn_percentage &#61;&#61; new_burn_percentage;<br/></code></pre>
+<pre><code><b>aborts_if</b> new_burn_percentage &gt; 100;<br /><b>let</b> aptos_addr &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);<br /><b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(aptos_addr);<br />// This enforces <a id="high-level-req-5" href="#high-level-req">high&#45;level requirement 5</a> and <a id="high-level-req-6.3" href="#high-level-req">high&#45;level requirement 6</a>:
+<b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures">ProcessCollectedFeesRequiresAndEnsures</a>;<br /><b>ensures</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework) &#61;&#61;&gt;<br />    <b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).burn_percentage &#61;&#61; new_burn_percentage;<br /></code></pre>
 
 
 
@@ -605,13 +668,13 @@ include ProcessCollectedFeesRequiresAndEnsures;<br/>ensures exists&lt;CollectedF
 ### Function `register_proposer_for_fee_collection`
 
 
-<pre><code>public(friend) fun register_proposer_for_fee_collection(proposer_addr: address)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">register_proposer_for_fee_collection</a>(proposer_addr: <b>address</b>)<br /></code></pre>
 
 
 
 
-<pre><code>aborts_if false;<br/>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.1&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
-ensures is_fees_collection_enabled() &#61;&#61;&gt;<br/>    option::spec_borrow(global&lt;CollectedFeesPerBlock&gt;(@aptos_framework).proposer) &#61;&#61; proposer_addr;<br/></code></pre>
+<pre><code><b>aborts_if</b> <b>false</b>;<br />// This enforces <a id="high-level-req-6.1" href="#high-level-req">high&#45;level requirement 6</a>:
+<b>ensures</b> <a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>() &#61;&#61;&gt;<br />    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(<b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).proposer) &#61;&#61; proposer_addr;<br /></code></pre>
 
 
 
@@ -620,12 +683,12 @@ ensures is_fees_collection_enabled() &#61;&#61;&gt;<br/>    option::spec_borrow(
 ### Function `burn_coin_fraction`
 
 
-<pre><code>fun burn_coin_fraction(coin: &amp;mut coin::Coin&lt;aptos_coin::AptosCoin&gt;, burn_percentage: u8)<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_coin_fraction">burn_coin_fraction</a>(<a href="coin.md#0x1_coin">coin</a>: &amp;<b>mut</b> <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;, burn_percentage: u8)<br /></code></pre>
 
 
 
 
-<pre><code>requires burn_percentage &lt;&#61; 100;<br/>requires exists&lt;AptosCoinCapabilities&gt;(@aptos_framework);<br/>requires exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br/>let amount_to_burn &#61; (burn_percentage &#42; coin::value(coin)) / 100;<br/>include amount_to_burn &gt; 0 &#61;&#61;&gt; coin::CoinSubAbortsIf&lt;AptosCoin&gt; &#123; amount: amount_to_burn &#125;;<br/>ensures coin.value &#61;&#61; old(coin).value &#45; amount_to_burn;<br/></code></pre>
+<pre><code><b>requires</b> burn_percentage &lt;&#61; 100;<br /><b>requires</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);<br /><b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br /><b>let</b> amount_to_burn &#61; (burn_percentage &#42; <a href="coin.md#0x1_coin_value">coin::value</a>(<a href="coin.md#0x1_coin">coin</a>)) / 100;<br /><b>include</b> amount_to_burn &gt; 0 &#61;&#61;&gt; <a href="coin.md#0x1_coin_CoinSubAbortsIf">coin::CoinSubAbortsIf</a>&lt;AptosCoin&gt; &#123; amount: amount_to_burn &#125;;<br /><b>ensures</b> <a href="coin.md#0x1_coin">coin</a>.value &#61;&#61; <b>old</b>(<a href="coin.md#0x1_coin">coin</a>).value &#45; amount_to_burn;<br /></code></pre>
 
 
 
@@ -633,7 +696,7 @@ ensures is_fees_collection_enabled() &#61;&#61;&gt;<br/>    option::spec_borrow(
 <a id="0x1_transaction_fee_collectedFeesAggregator"></a>
 
 
-<pre><code>fun collectedFeesAggregator(): AggregatableCoin&lt;AptosCoin&gt; &#123;<br/>   global&lt;CollectedFeesPerBlock&gt;(@aptos_framework).amount<br/>&#125;<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_collectedFeesAggregator">collectedFeesAggregator</a>(): AggregatableCoin&lt;AptosCoin&gt; &#123;<br />   <b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).amount<br />&#125;<br /></code></pre>
 
 
 
@@ -641,8 +704,8 @@ ensures is_fees_collection_enabled() &#61;&#61;&gt;<br/>    option::spec_borrow(
 <a id="0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply"></a>
 
 
-<pre><code>schema RequiresCollectedFeesPerValueLeqBlockAptosSupply &#123;<br/>let maybe_supply &#61; coin::get_coin_supply_opt&lt;AptosCoin&gt;();<br/>requires
-        (is_fees_collection_enabled() &amp;&amp; option::is_some(maybe_supply)) &#61;&#61;&gt;<br/>        (aggregator::spec_aggregator_get_val(global&lt;CollectedFeesPerBlock&gt;(@aptos_framework).amount.value) &lt;&#61;<br/>            optional_aggregator::optional_aggregator_value(<br/>                option::spec_borrow(coin::get_coin_supply_opt&lt;AptosCoin&gt;())<br/>            ));<br/>&#125;<br/></code></pre>
+<pre><code><b>schema</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">RequiresCollectedFeesPerValueLeqBlockAptosSupply</a> &#123;<br /><b>let</b> maybe_supply &#61; <a href="coin.md#0x1_coin_get_coin_supply_opt">coin::get_coin_supply_opt</a>&lt;AptosCoin&gt;();<br /><b>requires</b>
+        (<a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>() &amp;&amp; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply)) &#61;&#61;&gt;<br />        (<a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).amount.value) &lt;&#61;<br />            <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(<br />                <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(<a href="coin.md#0x1_coin_get_coin_supply_opt">coin::get_coin_supply_opt</a>&lt;AptosCoin&gt;())<br />            ));<br />&#125;<br /></code></pre>
 
 
 
@@ -650,7 +713,7 @@ ensures is_fees_collection_enabled() &#61;&#61;&gt;<br/>    option::spec_borrow(
 <a id="0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures"></a>
 
 
-<pre><code>schema ProcessCollectedFeesRequiresAndEnsures &#123;<br/>requires exists&lt;AptosCoinCapabilities&gt;(@aptos_framework);<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br/>include RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>aborts_if false;<br/>let collected_fees &#61; global&lt;CollectedFeesPerBlock&gt;(@aptos_framework);<br/>let post post_collected_fees &#61; global&lt;CollectedFeesPerBlock&gt;(@aptos_framework);<br/>let pre_amount &#61; aggregator::spec_aggregator_get_val(collected_fees.amount.value);<br/>let post post_amount &#61; aggregator::spec_aggregator_get_val(post_collected_fees.amount.value);<br/>let fees_table &#61; global&lt;stake::ValidatorFees&gt;(@aptos_framework).fees_table;<br/>let post post_fees_table &#61; global&lt;stake::ValidatorFees&gt;(@aptos_framework).fees_table;<br/>let proposer &#61; option::spec_borrow(collected_fees.proposer);<br/>let fee_to_add &#61; pre_amount &#45; pre_amount &#42; collected_fees.burn_percentage / 100;<br/>ensures is_fees_collection_enabled() &#61;&#61;&gt; option::spec_is_none(post_collected_fees.proposer) &amp;&amp; post_amount &#61;&#61; 0;<br/>ensures is_fees_collection_enabled() &amp;&amp; aggregator::spec_read(collected_fees.amount.value) &gt; 0 &amp;&amp;<br/>    option::spec_is_some(collected_fees.proposer) &#61;&#61;&gt;<br/>    if (proposer !&#61; @vm_reserved) &#123;<br/>        if (table::spec_contains(fees_table, proposer)) &#123;<br/>            table::spec_get(post_fees_table, proposer).value &#61;&#61; table::spec_get(<br/>                fees_table,<br/>                proposer<br/>            ).value &#43; fee_to_add<br/>        &#125; else &#123;<br/>            table::spec_get(post_fees_table, proposer).value &#61;&#61; fee_to_add<br/>        &#125;<br/>    &#125; else &#123;<br/>        option::spec_is_none(post_collected_fees.proposer) &amp;&amp; post_amount &#61;&#61; 0<br/>    &#125;;<br/>&#125;<br/></code></pre>
+<pre><code><b>schema</b> <a href="transaction_fee.md#0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures">ProcessCollectedFeesRequiresAndEnsures</a> &#123;<br /><b>requires</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);<br /><b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);<br /><b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br /><b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;<br /><b>aborts_if</b> <b>false</b>;<br /><b>let</b> collected_fees &#61; <b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);<br /><b>let</b> <b>post</b> post_collected_fees &#61; <b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);<br /><b>let</b> pre_amount &#61; <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(collected_fees.amount.value);<br /><b>let</b> <b>post</b> post_amount &#61; <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(post_collected_fees.amount.value);<br /><b>let</b> fees_table &#61; <b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework).fees_table;<br /><b>let</b> <b>post</b> post_fees_table &#61; <b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework).fees_table;<br /><b>let</b> proposer &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(collected_fees.proposer);<br /><b>let</b> fee_to_add &#61; pre_amount &#45; pre_amount &#42; collected_fees.burn_percentage / 100;<br /><b>ensures</b> <a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>() &#61;&#61;&gt; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(post_collected_fees.proposer) &amp;&amp; post_amount &#61;&#61; 0;<br /><b>ensures</b> <a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>() &amp;&amp; <a href="aggregator.md#0x1_aggregator_spec_read">aggregator::spec_read</a>(collected_fees.amount.value) &gt; 0 &amp;&amp;<br />    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(collected_fees.proposer) &#61;&#61;&gt;<br />    <b>if</b> (proposer !&#61; @vm_reserved) &#123;<br />        <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(fees_table, proposer)) &#123;<br />            <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_fees_table, proposer).value &#61;&#61; <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(<br />                fees_table,<br />                proposer<br />            ).value &#43; fee_to_add<br />        &#125; <b>else</b> &#123;<br />            <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_fees_table, proposer).value &#61;&#61; fee_to_add<br />        &#125;<br />    &#125; <b>else</b> &#123;<br />        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(post_collected_fees.proposer) &amp;&amp; post_amount &#61;&#61; 0<br />    &#125;;<br />&#125;<br /></code></pre>
 
 
 
@@ -659,13 +722,13 @@ ensures is_fees_collection_enabled() &#61;&#61;&gt;<br/>    option::spec_borrow(
 ### Function `process_collected_fees`
 
 
-<pre><code>public(friend) fun process_collected_fees()<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">process_collected_fees</a>()<br /></code></pre>
 
 
 
 
-<pre><code>// This enforces &lt;a id&#61;&quot;high&#45;level&#45;req&#45;6.2&quot; href&#61;&quot;&#35;high&#45;level&#45;req&quot;&gt;high&#45;level requirement 6&lt;/a&gt;:
-include ProcessCollectedFeesRequiresAndEnsures;<br/></code></pre>
+<pre><code>// This enforces <a id="high-level-req-6.2" href="#high-level-req">high&#45;level requirement 6</a>:
+<b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures">ProcessCollectedFeesRequiresAndEnsures</a>;<br /></code></pre>
 
 
 
@@ -674,13 +737,13 @@ include ProcessCollectedFeesRequiresAndEnsures;<br/></code></pre>
 ### Function `burn_fee`
 
 
-<pre><code>public(friend) fun burn_fee(account: address, fee: u64)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">burn_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64)<br /></code></pre>
 
 
-<code>AptosCoinCapabilities</code> should be exists.
+<code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a></code> should be exists.
 
 
-<pre><code>pragma verify &#61; false;<br/>aborts_if !exists&lt;AptosCoinCapabilities&gt;(@aptos_framework);<br/>let account_addr &#61; account;<br/>let amount &#61; fee;<br/>let aptos_addr &#61; type_info::type_of&lt;AptosCoin&gt;().account_address;<br/>let coin_store &#61; global&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr);<br/>let post post_coin_store &#61; global&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr);<br/>aborts_if amount !&#61; 0 &amp;&amp; !(exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr)<br/>    &amp;&amp; exists&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr));<br/>aborts_if coin_store.coin.value &lt; amount;<br/>let maybe_supply &#61; global&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr).supply;<br/>let supply_aggr &#61; option::spec_borrow(maybe_supply);<br/>let value &#61; optional_aggregator::optional_aggregator_value(supply_aggr);<br/>let post post_maybe_supply &#61; global&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr).supply;<br/>let post post_supply &#61; option::spec_borrow(post_maybe_supply);<br/>let post post_value &#61; optional_aggregator::optional_aggregator_value(post_supply);<br/>aborts_if option::spec_is_some(maybe_supply) &amp;&amp; value &lt; amount;<br/>ensures post_coin_store.coin.value &#61;&#61; coin_store.coin.value &#45; amount;<br/>ensures if (option::spec_is_some(maybe_supply)) &#123;<br/>    post_value &#61;&#61; value &#45; amount<br/>&#125; else &#123;<br/>    option::spec_is_none(post_maybe_supply)<br/>&#125;;<br/>ensures coin::supply&lt;AptosCoin&gt; &#61;&#61; old(coin::supply&lt;AptosCoin&gt;) &#45; amount;<br/></code></pre>
+<pre><code><b>pragma</b> verify &#61; <b>false</b>;<br /><b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);<br /><b>let</b> account_addr &#61; <a href="account.md#0x1_account">account</a>;<br /><b>let</b> amount &#61; fee;<br /><b>let</b> aptos_addr &#61; <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;<br /><b>let</b> coin_store &#61; <b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr);<br /><b>let</b> <b>post</b> post_coin_store &#61; <b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr);<br /><b>aborts_if</b> amount !&#61; 0 &amp;&amp; !(<b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr)<br />    &amp;&amp; <b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr));<br /><b>aborts_if</b> coin_store.<a href="coin.md#0x1_coin">coin</a>.value &lt; amount;<br /><b>let</b> maybe_supply &#61; <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr).supply;<br /><b>let</b> supply_aggr &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(maybe_supply);<br /><b>let</b> value &#61; <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(supply_aggr);<br /><b>let</b> <b>post</b> post_maybe_supply &#61; <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr).supply;<br /><b>let</b> <b>post</b> post_supply &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(post_maybe_supply);<br /><b>let</b> <b>post</b> post_value &#61; <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(post_supply);<br /><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(maybe_supply) &amp;&amp; value &lt; amount;<br /><b>ensures</b> post_coin_store.<a href="coin.md#0x1_coin">coin</a>.value &#61;&#61; coin_store.<a href="coin.md#0x1_coin">coin</a>.value &#45; amount;<br /><b>ensures</b> <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(maybe_supply)) &#123;<br />    post_value &#61;&#61; value &#45; amount<br />&#125; <b>else</b> &#123;<br />    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(post_maybe_supply)<br />&#125;;<br /><b>ensures</b> <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;AptosCoin&gt; &#61;&#61; <b>old</b>(<a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;AptosCoin&gt;) &#45; amount;<br /></code></pre>
 
 
 
@@ -689,12 +752,12 @@ include ProcessCollectedFeesRequiresAndEnsures;<br/></code></pre>
 ### Function `mint_and_refund`
 
 
-<pre><code>public(friend) fun mint_and_refund(account: address, refund: u64)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">mint_and_refund</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, refund: u64)<br /></code></pre>
 
 
 
 
-<pre><code>pragma verify &#61; false;<br/>let aptos_addr &#61; type_info::type_of&lt;AptosCoin&gt;().account_address;<br/>aborts_if (refund !&#61; 0) &amp;&amp; !exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr);<br/>include coin::CoinAddAbortsIf&lt;AptosCoin&gt; &#123; amount: refund &#125;;<br/>aborts_if !exists&lt;CoinStore&lt;AptosCoin&gt;&gt;(account);<br/>aborts_if !exists&lt;AptosCoinMintCapability&gt;(@aptos_framework);<br/>let supply &#61; coin::supply&lt;AptosCoin&gt;;<br/>let post post_supply &#61; coin::supply&lt;AptosCoin&gt;;<br/>aborts_if [abstract] supply &#43; refund &gt; MAX_U128;<br/>ensures post_supply &#61;&#61; supply &#43; refund;<br/></code></pre>
+<pre><code><b>pragma</b> verify &#61; <b>false</b>;<br /><b>let</b> aptos_addr &#61; <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;<br /><b>aborts_if</b> (refund !&#61; 0) &amp;&amp; !<b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr);<br /><b>include</b> <a href="coin.md#0x1_coin_CoinAddAbortsIf">coin::CoinAddAbortsIf</a>&lt;AptosCoin&gt; &#123; amount: refund &#125;;<br /><b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);<br /><b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a>&gt;(@aptos_framework);<br /><b>let</b> supply &#61; <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;AptosCoin&gt;;<br /><b>let</b> <b>post</b> post_supply &#61; <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;AptosCoin&gt;;<br /><b>aborts_if</b> [abstract] supply &#43; refund &gt; MAX_U128;<br /><b>ensures</b> post_supply &#61;&#61; supply &#43; refund;<br /></code></pre>
 
 
 
@@ -703,12 +766,12 @@ include ProcessCollectedFeesRequiresAndEnsures;<br/></code></pre>
 ### Function `collect_fee`
 
 
-<pre><code>public(friend) fun collect_fee(account: address, fee: u64)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_collect_fee">collect_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64)<br /></code></pre>
 
 
 
 
-<pre><code>pragma verify &#61; false;<br/>let collected_fees &#61; global&lt;CollectedFeesPerBlock&gt;(@aptos_framework).amount;<br/>let aggr &#61; collected_fees.value;<br/>let coin_store &#61; global&lt;coin::CoinStore&lt;AptosCoin&gt;&gt;(account);<br/>aborts_if !exists&lt;CollectedFeesPerBlock&gt;(@aptos_framework);<br/>aborts_if fee &gt; 0 &amp;&amp; !exists&lt;coin::CoinStore&lt;AptosCoin&gt;&gt;(account);<br/>aborts_if fee &gt; 0 &amp;&amp; coin_store.coin.value &lt; fee;<br/>aborts_if fee &gt; 0 &amp;&amp; aggregator::spec_aggregator_get_val(aggr)<br/>    &#43; fee &gt; aggregator::spec_get_limit(aggr);<br/>aborts_if fee &gt; 0 &amp;&amp; aggregator::spec_aggregator_get_val(aggr)<br/>    &#43; fee &gt; MAX_U128;<br/>let post post_coin_store &#61; global&lt;coin::CoinStore&lt;AptosCoin&gt;&gt;(account);<br/>let post post_collected_fees &#61; global&lt;CollectedFeesPerBlock&gt;(@aptos_framework).amount;<br/>ensures post_coin_store.coin.value &#61;&#61; coin_store.coin.value &#45; fee;<br/>ensures aggregator::spec_aggregator_get_val(post_collected_fees.value) &#61;&#61; aggregator::spec_aggregator_get_val(<br/>    aggr<br/>) &#43; fee;<br/></code></pre>
+<pre><code><b>pragma</b> verify &#61; <b>false</b>;<br /><b>let</b> collected_fees &#61; <b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).amount;<br /><b>let</b> aggr &#61; collected_fees.value;<br /><b>let</b> coin_store &#61; <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);<br /><b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);<br /><b>aborts_if</b> fee &gt; 0 &amp;&amp; !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);<br /><b>aborts_if</b> fee &gt; 0 &amp;&amp; coin_store.<a href="coin.md#0x1_coin">coin</a>.value &lt; fee;<br /><b>aborts_if</b> fee &gt; 0 &amp;&amp; <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)<br />    &#43; fee &gt; <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(aggr);<br /><b>aborts_if</b> fee &gt; 0 &amp;&amp; <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)<br />    &#43; fee &gt; MAX_U128;<br /><b>let</b> <b>post</b> post_coin_store &#61; <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);<br /><b>let</b> <b>post</b> post_collected_fees &#61; <b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).amount;<br /><b>ensures</b> post_coin_store.<a href="coin.md#0x1_coin">coin</a>.value &#61;&#61; coin_store.<a href="coin.md#0x1_coin">coin</a>.value &#45; fee;<br /><b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(post_collected_fees.value) &#61;&#61; <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<br />    aggr<br />) &#43; fee;<br /></code></pre>
 
 
 
@@ -717,13 +780,14 @@ include ProcessCollectedFeesRequiresAndEnsures;<br/></code></pre>
 ### Function `store_aptos_coin_burn_cap`
 
 
-<pre><code>public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &amp;signer, burn_cap: coin::BurnCapability&lt;aptos_coin::AptosCoin&gt;)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">store_aptos_coin_burn_cap</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, burn_cap: <a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;)<br /></code></pre>
 
 
-Ensure caller is admin.<br/> Aborts if <code>AptosCoinCapabilities</code> already exists.
+Ensure caller is admin.
+Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a></code> already exists.
 
 
-<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if !system_addresses::is_aptos_framework_address(addr);<br/>aborts_if exists&lt;AptosCoinCapabilities&gt;(addr);<br/>ensures exists&lt;AptosCoinCapabilities&gt;(addr);<br/></code></pre>
+<pre><code><b>let</b> addr &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);<br /><b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);<br /><b>aborts_if</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(addr);<br /><b>ensures</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(addr);<br /></code></pre>
 
 
 
@@ -732,13 +796,14 @@ Ensure caller is admin.<br/> Aborts if <code>AptosCoinCapabilities</code> alread
 ### Function `store_aptos_coin_mint_cap`
 
 
-<pre><code>public(friend) fun store_aptos_coin_mint_cap(aptos_framework: &amp;signer, mint_cap: coin::MintCapability&lt;aptos_coin::AptosCoin&gt;)<br/></code></pre>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">store_aptos_coin_mint_cap</a>(aptos_framework: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, mint_cap: <a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;)<br /></code></pre>
 
 
-Ensure caller is admin.<br/> Aborts if <code>AptosCoinMintCapability</code> already exists.
+Ensure caller is admin.
+Aborts if <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a></code> already exists.
 
 
-<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if !system_addresses::is_aptos_framework_address(addr);<br/>aborts_if exists&lt;AptosCoinMintCapability&gt;(addr);<br/>ensures exists&lt;AptosCoinMintCapability&gt;(addr);<br/></code></pre>
+<pre><code><b>let</b> addr &#61; <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);<br /><b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);<br /><b>aborts_if</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a>&gt;(addr);<br /><b>ensures</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a>&gt;(addr);<br /></code></pre>
 
 
 
@@ -747,13 +812,13 @@ Ensure caller is admin.<br/> Aborts if <code>AptosCoinMintCapability</code> alre
 ### Function `initialize_storage_refund`
 
 
-<pre><code>&#35;[deprecated]<br/>public fun initialize_storage_refund(_: &amp;signer)<br/></code></pre>
+<pre><code>&#35;[deprecated]<br /><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_storage_refund">initialize_storage_refund</a>(_: &amp;<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)<br /></code></pre>
 
 
 Historical. Aborts.
 
 
-<pre><code>aborts_if true;<br/></code></pre>
+<pre><code><b>aborts_if</b> <b>true</b>;<br /></code></pre>
 
 
 
@@ -762,7 +827,7 @@ Historical. Aborts.
 ### Function `emit_fee_statement`
 
 
-<pre><code>fun emit_fee_statement(fee_statement: transaction_fee::FeeStatement)<br/></code></pre>
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_fee_statement">emit_fee_statement</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">transaction_fee::FeeStatement</a>)<br /></code></pre>
 
 
 Aborts if module event feature is not enabled.
