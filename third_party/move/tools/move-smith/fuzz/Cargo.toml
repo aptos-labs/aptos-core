@@ -1,0 +1,20 @@
+[package]
+name = "move-smith-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { workspace = true }
+arbitrary = { workspace = true }
+move-smith = { path = ".." }
+
+[[bin]]
+name = "module_only"
+path = "fuzz_targets/module_only.rs"
+test = false
+doc = false
+bench = false

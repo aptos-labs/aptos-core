@@ -1,0 +1,23 @@
+[package]
+name = "move-smith"
+version = "0.1.0"
+description = "A Move source code level fuzzer."
+license = "Apache-2.0"
+edition = "2021"
+
+[dependencies]
+arbitrary = { workspace = true }
+rand = { workspace = true }
+tempfile = { workspace = true }
+num-bigint = { workspace = true }
+
+move-compiler = { path = "../../move-compiler" }
+move-stdlib = { path = "../../move-stdlib" }
+
+[lib]
+name = "move_smith"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raw2move"
+path = "src/raw2move.rs"
