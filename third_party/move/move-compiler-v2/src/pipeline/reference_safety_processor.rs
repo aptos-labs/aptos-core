@@ -109,7 +109,10 @@
 //!    states that the same mutable reference in `temps` cannot be used twice.
 
 use crate::{
-    pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
+    pipeline::{
+        livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
+        reference_safety_processor::BorrowEdgeKind::Freeze,
+    },
     Experiment, Options,
 };
 use abstract_domain_derive::AbstractDomain;
@@ -1110,6 +1113,19 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             for mut perm in hyper_edges.iter().combinations(2) {
                 let (kind1, edges1) = perm.pop().unwrap();
                 let (kind2, edges2) = perm.pop().unwrap();
+                eprintln!(
+                    "{} vs {}",
+                    kind1.display(self.target()),
+                    kind2.display(self.target())
+                );
+                /*
+                for e in edges1 {
+                    eprintln!("1: {}", e.display(self.target(), true))
+                }
+                for e in edges2 {
+                    eprintln!("2: {}", e.display(self.target(), true))
+                }
+                 */
                 if (kind1.is_mut() || kind2.is_mut()) && kind1.overlaps(kind2) {
                     for (e1, e2) in edges1.iter().cartesian_product(edges2.iter()) {
                         if e1 == e2 || !edges_reported.insert([*e1, *e2].into_iter().collect()) {
@@ -1834,17 +1850,32 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
         #[allow(clippy::single_match)]
         match instr {
             // Call operations which can take references
-            Call(_, _, oper, srcs, ..) => match oper {
+            Call(_, dests, oper, srcs, ..) => match oper {
                 Operation::ReadRef
                 | Operation::WriteRef
                 | Operation::Function(..)
                 | Operation::Eq
                 | Operation::Neq => {
-                    let exclusive_refs = srcs
+                    let mut exclusive_refs = srcs
                         .iter()
                         .filter(|t| step.is_ref(**t))
                         .cloned()
                         .collect_vec();
+                    /*
+                    for t in step.state.temp_to_label_map.keys() {
+                        if step.ty(*t).is_mutable_reference()
+                            && step.alive.after.contains_key(t)
+                            && !exclusive_refs.contains(t)
+                        {
+                            exclusive_refs.push(*t)
+                        }
+                    }
+                     */
+                    eprintln!(
+                        "{} : {:?}",
+                        instr.display(&self.target, &BTreeMap::new()),
+                        exclusive_refs
+                    );
                     step.check_borrow_safety(&exclusive_refs)
                 },
                 _ => {},
@@ -2031,15 +2062,8 @@ struct BorrowEdgeDisplay<'a>(&'a FunctionTarget<'a>, &'a BorrowEdge, bool);
 impl<'a> Display for BorrowEdgeDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let edge = &self.1;
+        write!(f, "{}", edge.kind.display(self.0))?;
         let display_child = self.2;
-        use BorrowEdgeKind::*;
-        (match &edge.kind {
-            BorrowLocal(is_mut) => write!(f, "borrow({})", is_mut),
-            BorrowGlobal(is_mut, offs) => write!(f, "borrow_global({}, {})", is_mut, offs),
-            BorrowField(is_mut, _) => write!(f, "borrow_field({})", is_mut),
-            Call(is_mut, _, offs) => write!(f, "call({}, {})", is_mut, offs),
-            Freeze => write!(f, "freeze"),
-        })?;
         if display_child {
             write!(f, " -> {}", edge.target)
         } else {
@@ -2055,6 +2079,32 @@ impl BorrowEdge {
         display_child: bool,
     ) -> BorrowEdgeDisplay<'a> {
         BorrowEdgeDisplay(target, self, display_child)
+    }
+}
+
+struct BorrowEdgeKindDisplay<'a>(&'a FunctionTarget<'a>, &'a BorrowEdgeKind);
+impl<'a> Display for BorrowEdgeKindDisplay<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use BorrowEdgeKind::*;
+        let mut_str = if self.1.is_mut() { "mut" } else { "imm" };
+        match &self.1 {
+            BorrowLocal(_) => write!(f, "borrow_{}", mut_str),
+            BorrowGlobal(_, offs) => write!(f, "borrow_global_{}@{}", mut_str, offs),
+            BorrowField(_, field_id) => write!(
+                f,
+                "borrow_{}.{}",
+                mut_str,
+                field_id.symbol().display(self.0.symbol_pool()),
+            ),
+            Call(_, _, offs) => write!(f, "call_{}@{}", mut_str, offs),
+            Freeze => write!(f, "freeze"),
+        }
+    }
+}
+
+impl BorrowEdgeKind {
+    fn display<'a>(&'a self, target: &'a FunctionTarget) -> BorrowEdgeKindDisplay<'a> {
+        BorrowEdgeKindDisplay(target, self)
     }
 }
 
