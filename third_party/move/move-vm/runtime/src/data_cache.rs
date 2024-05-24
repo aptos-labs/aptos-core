@@ -8,10 +8,7 @@ use crate::{
 };
 use bytes::Bytes;
 use move_binary_format::{
-    access::ModuleAccess,
-    deserializer::DeserializerConfig,
-    errors::*,
-    file_format::{CompiledModule, CompiledScript},
+    deserializer::DeserializerConfig, errors::*, file_format::CompiledScript,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -35,29 +32,29 @@ use std::{
     sync::Arc,
 };
 
-pub struct AccountDataCache {
-    // The bool flag in the `data_map` indicates whether the resource contains
+struct AccountDataCache<M> {
+    // The bool flag in the `resources` indicates whether the resource contains
     // an aggregator or snapshot.
-    data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
-    module_map: BTreeMap<Identifier, ((Arc<CompiledModule>, Bytes), bool)>,
+    resources: BTreeMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
+    modules: BTreeMap<Identifier, ((M, Bytes), bool)>,
 }
 
-impl AccountDataCache {
+impl<M: Clone> AccountDataCache<M> {
     fn new() -> Self {
         Self {
-            data_map: BTreeMap::new(),
-            module_map: BTreeMap::new(),
+            resources: BTreeMap::new(),
+            modules: BTreeMap::new(),
         }
     }
 }
 
-fn load_module_impl(
-    remote: &dyn MoveResolver<Arc<CompiledModule>, PartialVMError>,
-    account_map: &BTreeMap<AccountAddress, AccountDataCache>,
+fn load_module_impl<M: Clone>(
+    remote: &dyn MoveResolver<M, PartialVMError>,
+    account_map: &BTreeMap<AccountAddress, AccountDataCache<M>>,
     module_id: &ModuleId,
-) -> PartialVMResult<(Arc<CompiledModule>, usize, [u8; 32])> {
+) -> PartialVMResult<(M, usize, [u8; 32])> {
     if let Some(account_cache) = account_map.get(module_id.address()) {
-        if let Some(((m, b), _is_republishing)) = account_cache.module_map.get(module_id.name()) {
+        if let Some(((m, b), _is_republishing)) = account_cache.modules.get(module_id.name()) {
             // TODO: Remove this once we kill this local cache.
             let mut sha3_256 = Sha3_256::new();
             sha3_256.update(b);
@@ -85,30 +82,25 @@ fn load_module_impl(
 /// The Move VM takes a `DataStore` in input and this is the default and correct implementation
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
-pub(crate) struct TransactionDataCache<'r> {
-    remote: &'r dyn MoveResolver<Arc<CompiledModule>, PartialVMError>,
-    account_map: BTreeMap<AccountAddress, AccountDataCache>,
+pub(crate) struct TransactionDataCache<'r, M> {
+    remote: &'r dyn MoveResolver<M, PartialVMError>,
+    account_map: BTreeMap<AccountAddress, AccountDataCache<M>>,
 
+    // TODO: Remove all!
     deserializer_config: DeserializerConfig,
-
-    // Caches to help avoid duplicate deserialization calls.
     compiled_scripts: BTreeMap<[u8; 32], Arc<CompiledScript>>,
-    compiled_modules: BTreeMap<ModuleId, (Arc<CompiledModule>, usize, [u8; 32])>,
 }
 
-impl<'r> TransactionDataCache<'r> {
-    /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
-    /// not updated in the transaction.
-    pub(crate) fn new(
+impl<'r, M: Clone> TransactionDataCache<'r, M> {
+    pub(crate) fn empty(
         deserializer_config: DeserializerConfig,
-        remote: &'r impl MoveResolver<Arc<CompiledModule>, PartialVMError>,
+        remote: &'r impl MoveResolver<M, PartialVMError>,
     ) -> Self {
         TransactionDataCache {
             remote,
             account_map: BTreeMap::new(),
             deserializer_config,
             compiled_scripts: BTreeMap::new(),
-            compiled_modules: BTreeMap::new(),
         }
     }
 
@@ -119,7 +111,7 @@ impl<'r> TransactionDataCache<'r> {
     pub(crate) fn into_effects(
         self,
         loader: &Loader,
-    ) -> PartialVMResult<ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>> {
+    ) -> PartialVMResult<ChangeSet<(M, Bytes), Bytes>> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
                 value
@@ -139,11 +131,11 @@ impl<'r> TransactionDataCache<'r> {
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         loader: &Loader,
-    ) -> PartialVMResult<ChangeSet<(Arc<CompiledModule>, Bytes), Resource>> {
-        let mut change_set = ChangeSet::<(Arc<CompiledModule>, Bytes), Resource>::empty();
+    ) -> PartialVMResult<ChangeSet<(M, Bytes), Resource>> {
+        let mut change_set = ChangeSet::<(M, Bytes), Resource>::empty();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
-            for (module_name, (module_blob, is_republishing)) in account_data_cache.module_map {
+            for (module_name, (module_blob, is_republishing)) in account_data_cache.modules {
                 let op = if is_republishing {
                     Op::Modify(module_blob)
                 } else {
@@ -153,7 +145,7 @@ impl<'r> TransactionDataCache<'r> {
             }
 
             let mut resources = BTreeMap::new();
-            for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map {
+            for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.resources {
                 if let Some(op) = gv.into_effect_with_layout(layout) {
                     let struct_tag = match loader.type_to_type_tag(&ty)? {
                         TypeTag::Struct(struct_tag) => *struct_tag,
@@ -181,7 +173,7 @@ impl<'r> TransactionDataCache<'r> {
         // The sender's account will always be mutated.
         let mut total_mutated_accounts: u64 = 1;
         for (addr, entry) in self.account_map.iter() {
-            if addr != sender && entry.data_map.values().any(|(_, v, _)| v.is_mutated()) {
+            if addr != sender && entry.resources.values().any(|(_, v, _)| v.is_mutated()) {
                 total_mutated_accounts += 1;
             }
         }
@@ -215,7 +207,7 @@ impl<'r> TransactionDataCache<'r> {
         });
 
         let mut load_res = None;
-        if !account_cache.data_map.contains_key(ty) {
+        if !account_cache.resources.contains_key(ty) {
             let ty_tag = match loader.type_to_type_tag(ty)? {
                 TypeTag::Struct(s_tag) => s_tag,
                 _ =>
@@ -269,13 +261,13 @@ impl<'r> TransactionDataCache<'r> {
             };
 
             account_cache
-                .data_map
+                .resources
                 .insert(ty.clone(), (ty_layout, gv, has_aggregator_lifting));
         }
 
         Ok((
             account_cache
-                .data_map
+                .resources
                 .get_mut(ty)
                 .map(|(_ty_layout, gv, _has_aggregator_lifting)| gv)
                 .expect("global value must exist"),
@@ -283,7 +275,7 @@ impl<'r> TransactionDataCache<'r> {
         ))
     }
 
-    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<Arc<CompiledModule>> {
+    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<M> {
         Ok(load_module_impl(self.remote, &self.account_map, module_id)?.0)
     }
 
@@ -315,44 +307,33 @@ impl<'r> TransactionDataCache<'r> {
 
     pub(crate) fn load_compiled_module_to_cache(
         &mut self,
-        id: ModuleId,
+        module_id: &ModuleId,
         allow_loading_failure: bool,
-    ) -> VMResult<(Arc<CompiledModule>, usize, [u8; 32])> {
-        let cache = &mut self.compiled_modules;
-        match cache.entry(id) {
-            btree_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
-            btree_map::Entry::Vacant(entry) => {
-                // bytes fetching, allow loading to fail if the flag is set
-                let (module, size, h) =
-                    match load_module_impl(self.remote, &self.account_map, entry.key())
-                        .map_err(|err| err.finish(Location::Undefined))
-                    {
-                        Ok(module) => module,
-                        Err(err) if allow_loading_failure => return Err(err),
-                        Err(err) => {
-                            return Err(expect_no_verification_errors(err));
-                        },
-                    };
-
-                Ok(entry.insert((module, size, h)).clone())
-            },
+    ) -> VMResult<(M, usize, [u8; 32])> {
+        match load_module_impl(self.remote, &self.account_map, module_id)
+            .map_err(|err| err.finish(Location::Undefined))
+        {
+            Ok(data) => Ok(data),
+            Err(err) if allow_loading_failure => Err(err),
+            Err(err) => Err(expect_no_verification_errors(err)),
         }
     }
 
     pub(crate) fn publish_module(
         &mut self,
-        module: CompiledModule,
+        module_id: ModuleId,
+        module: M,
         blob: Bytes,
         is_republishing: bool,
     ) -> VMResult<()> {
         let account_cache =
-            Self::get_mut_or_insert_with(&mut self.account_map, module.address(), || {
-                (*module.address(), AccountDataCache::new())
+            Self::get_mut_or_insert_with(&mut self.account_map, module_id.address(), || {
+                (*module_id.address(), AccountDataCache::new())
             });
 
-        account_cache.module_map.insert(
-            module.name().to_owned(),
-            ((Arc::new(module), blob), is_republishing),
+        account_cache.modules.insert(
+            module_id.name().to_owned(),
+            ((module, blob), is_republishing),
         );
 
         Ok(())
@@ -360,7 +341,7 @@ impl<'r> TransactionDataCache<'r> {
 
     pub(crate) fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
         if let Some(account_cache) = self.account_map.get(module_id.address()) {
-            if account_cache.module_map.contains_key(module_id.name()) {
+            if account_cache.modules.contains_key(module_id.name()) {
                 return Ok(true);
             }
         }
