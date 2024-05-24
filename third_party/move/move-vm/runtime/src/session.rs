@@ -51,6 +51,13 @@ pub struct SerializedReturnValues {
 }
 
 impl<'r, 'l> Session<'r, 'l> {
+    /// Execute a Move entry function.
+    ///
+    /// NOTE: There are NO checks on the `args` except that they can deserialize
+    /// into the provided types. The ability to deserialize `args` into arbitrary
+    /// types is *very* powerful, e.g., it can be used to manufacture `signer`s
+    /// or `Coin`s from raw bytes. It is the responsibility of the caller to ensure
+    /// that this power is used responsibly/securely for its use-case.
     pub fn execute_entry_function(
         &mut self,
         func: LoadedFunction,
@@ -79,7 +86,7 @@ impl<'r, 'l> Session<'r, 'l> {
         Ok(())
     }
 
-    ///
+    /// Execute a Move function ignoring its visibility and whether it is entry or not.
     pub fn execute_function_bypass_visibility(
         &mut self,
         module: &ModuleId,
