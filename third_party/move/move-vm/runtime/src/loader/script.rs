@@ -128,8 +128,9 @@ impl Script {
             code,
             ty_param_abilities,
             native,
-            def_is_native,
-            def_is_friend_or_private: false,
+            is_native: def_is_native,
+            is_friend_or_private: false,
+            is_entry: false,
             scope,
             name,
             // Script must not return values.

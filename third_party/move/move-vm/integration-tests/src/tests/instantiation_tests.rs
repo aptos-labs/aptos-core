@@ -15,7 +15,10 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    move_vm::MoveVM,
+};
 use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
 
 #[test]
@@ -123,10 +126,13 @@ fn instantiation_err() {
         }));
     }
 
+    let res = session.load_function(&cm.self_id(), ident_str!("f"), &[ty_arg]);
+    assert!(res.is_ok());
+    let (function, instantiation) = res.unwrap();
+
     let err = session.execute_entry_function(
-        &cm.self_id(),
-        ident_str!("f"),
-        vec![ty_arg],
+        function,
+        instantiation,
         Vec::<Vec<u8>>::new(),
         &mut GasStatus::new_unmetered(),
         &mut TraversalContext::new(&traversal_storage),

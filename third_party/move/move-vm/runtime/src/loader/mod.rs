@@ -569,7 +569,6 @@ impl Loader {
         ))
     }
 
-    // Entry point for function execution (`MoveVM::execute_function`).
     // Loading verifies the module if it was never loaded.
     // Type parameters are checked as well after every type is loaded.
     pub(crate) fn load_function(
@@ -579,8 +578,8 @@ impl Loader {
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-    ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
-        let (module, func, param_tys, return_tys) = self.load_function_without_type_args(
+    ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
+        let (module, function, param_tys, return_tys) = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
@@ -599,7 +598,7 @@ impl Loader {
                 err
             })?;
 
-        self.verify_ty_arg_abilities(func.ty_arg_abilities(), &ty_args)
+        self.verify_ty_arg_abilities(function.ty_arg_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
         let loaded = LoadedFunctionInstantiation {
@@ -607,7 +606,7 @@ impl Loader {
             param_tys,
             return_tys,
         };
-        Ok((module, func, loaded))
+        Ok((LoadedFunction { module, function }, loaded))
     }
 
     // Entry point for module publishing (`MoveVM::publish_module_bundle`).

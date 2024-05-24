@@ -813,14 +813,12 @@ impl AptosVM {
             )])?;
         }
 
-        let (function, is_friend_or_private) = session.load_function_and_is_friend_or_private_def(
-            entry_fn.module(),
-            entry_fn.function(),
-            entry_fn.ty_args(),
-        )?;
+        let (function, instantiation) =
+            session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
 
         // The `has_randomness_attribute()` should have been feature-gated in 1.11...
-        if is_friend_or_private && get_randomness_annotation(resolver, session, entry_fn)?.is_some()
+        if function.is_friend_or_private()
+            && get_randomness_annotation(resolver, session, entry_fn)?.is_some()
         {
             let txn_context = session
                 .get_native_extensions()
@@ -834,13 +832,12 @@ impl AptosVM {
             session,
             senders,
             entry_fn.args().to_vec(),
-            &function,
+            &instantiation,
             struct_constructors_enabled,
         )?;
         session.execute_entry_function(
-            entry_fn.module(),
-            entry_fn.function(),
-            entry_fn.ty_args().to_vec(),
+            function,
+            instantiation,
             args,
             gas_meter,
             traversal_context,
@@ -2258,13 +2255,13 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         gas_meter: &mut impl AptosGasMeter,
     ) -> anyhow::Result<Vec<Vec<u8>>> {
-        let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
+        let (_, instantiation) = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.extract_module_metadata(&module_id);
         let arguments = verifier::view_function::validate_view_function(
             session,
             arguments,
             func_name.as_ident_str(),
-            &func_inst,
+            &instantiation,
             metadata.as_ref().map(Arc::as_ref),
             vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
