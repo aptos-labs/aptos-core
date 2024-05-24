@@ -175,6 +175,8 @@ impl PayloadManager {
         &self,
         block: &Block,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<usize>)> {
+        info!("PayloadManager: get_transactions for block {}", block.id());
+
         let payload = match block.payload() {
             Some(p) => p,
             None => return Ok((Vec::new(), None)),

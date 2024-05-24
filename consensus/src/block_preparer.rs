@@ -41,6 +41,16 @@ impl BlockPreparer {
         block: &Block,
         block_window: &OrderedBlockWindow,
     ) -> ExecutorResult<Vec<SignedTransaction>> {
+        info!(
+            "BlockPreparer: Preparing for block {} and window {:?}",
+            block.id(),
+            block_window
+                .blocks()
+                .iter()
+                .map(|b| b.id())
+                .collect::<Vec<_>>()
+        );
+
         let mut txns = vec![];
         for block in block_window.blocks() {
             let (block_txns, _) = self.payload_manager.get_transactions(block).await?;
@@ -61,6 +71,7 @@ impl BlockPreparer {
                 .map(|b| b.id())
                 .collect::<Vec<_>>()
         );
+
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
