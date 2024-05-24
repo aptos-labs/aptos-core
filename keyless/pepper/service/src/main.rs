@@ -7,7 +7,7 @@ use aptos_keyless_pepper_service::{
     account_managers::ACCOUNT_MANAGERS,
     jwk,
     metrics::start_metric_server,
-    process_v0, process_v1,
+    process_v0,
     vuf_keys::{PEPPER_VUF_VERIFICATION_KEY_JSON, VUF_SK},
     ProcessingFailure,
     ProcessingFailure::{BadRequest, InternalError},
@@ -41,7 +41,6 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
             PEPPER_VUF_VERIFICATION_KEY_JSON.deref().clone(),
         ),
         (&Method::POST, "/v0/fetch") => handle_fetch_common(origin, req, process_v0).await,
-        (&Method::POST, "/v1/fetch") => handle_fetch_common(origin, req, process_v1).await,
         (&Method::OPTIONS, _) => hyper::Response::builder()
             .status(StatusCode::OK)
             .header(ACCESS_CONTROL_ALLOW_ORIGIN, origin)
