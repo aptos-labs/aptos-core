@@ -1,0 +1,13 @@
+[package]
+name = "stablecoin"
+version = "0.0.0"
+
+[addresses]
+stablecoin = "_"
+master_minter = "_"
+minter = "_" 
+pauser = "_"
+denylister = "_"
+
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }
