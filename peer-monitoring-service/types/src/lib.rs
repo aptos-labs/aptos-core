@@ -44,6 +44,7 @@ pub enum PeerMonitoringServiceMessage {
 #[derive(Clone, Default, Deserialize, PartialEq, Serialize)]
 pub struct PeerMonitoringMetadata {
     pub average_ping_latency_secs: Option<f64>, // The average latency ping for the peer
+    pub latest_ping_latency_secs: Option<f64>,  // The latest latency ping for the peer
     pub latest_network_info_response: Option<NetworkInformationResponse>, // The latest network info response
     pub latest_node_info_response: Option<NodeInformationResponse>, // The latest node info response
     pub internal_client_state: Option<String>, // A detailed client state string for debugging and logging
@@ -56,12 +57,14 @@ impl Eq for PeerMonitoringMetadata {}
 impl PeerMonitoringMetadata {
     pub fn new(
         average_ping_latency_secs: Option<f64>,
+        latest_ping_latency_secs: Option<f64>,
         latest_network_info_response: Option<NetworkInformationResponse>,
         latest_node_info_response: Option<NodeInformationResponse>,
         internal_client_state: Option<String>,
     ) -> Self {
         PeerMonitoringMetadata {
             average_ping_latency_secs,
+            latest_ping_latency_secs,
             latest_network_info_response,
             latest_node_info_response,
             internal_client_state,
@@ -74,8 +77,9 @@ impl Display for PeerMonitoringMetadata {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{{ average_ping_latency_secs: {}, latest_network_info_response: {}, latest_node_info_response: {} }}",
+            "{{ average_ping_latency_secs: {}, latest_ping_latency_secs: {}, latest_network_info_response: {}, latest_node_info_response: {} }}",
             display_format_option(&self.average_ping_latency_secs),
+            display_format_option(&self.latest_ping_latency_secs),
             display_format_option(&self.latest_network_info_response),
             display_format_option(&self.latest_node_info_response),
         )
@@ -88,8 +92,9 @@ impl Debug for PeerMonitoringMetadata {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{{ average_ping_latency_secs: {}, latest_network_info_response: {}, latest_node_info_response: {} }}",
+            "{{ average_ping_latency_secs: {}, latest_ping_latency_secs: {}, latest_network_info_response: {}, latest_node_info_response: {} }}",
             debug_format_option(&self.average_ping_latency_secs),
+            debug_format_option(&self.latest_ping_latency_secs),
             debug_format_option(&self.latest_network_info_response),
             debug_format_option(&self.latest_node_info_response),
         )
