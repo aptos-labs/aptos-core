@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 pub struct Config {
     pub max_num_modules: usize,
     pub max_members_in_module: usize,
