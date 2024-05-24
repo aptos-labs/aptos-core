@@ -7,8 +7,8 @@ pub struct Config {
     pub max_stmt_in_func: usize,
 }
 
-impl Config {
-    pub fn default() -> Self {
+impl Default for Config {
+    fn default() -> Self {
         Self {
             max_num_modules: 5,
             max_members_in_module: 5,

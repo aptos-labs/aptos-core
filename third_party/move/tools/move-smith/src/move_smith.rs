@@ -15,6 +15,12 @@ pub struct MoveSmith {
     pub id_pool: IdentifierPool,
 }
 
+impl Default for MoveSmith {
+    fn default() -> Self {
+        Self::new(Config::default())
+    }
+}
+
 impl MoveSmith {
     pub fn new(config: Config) -> Self {
         Self {
@@ -22,10 +28,6 @@ impl MoveSmith {
             config,
             id_pool: IdentifierPool::new(),
         }
-    }
-
-    pub fn default() -> Self {
-        Self::new(Config::default())
     }
 
     pub fn generate_module(&mut self, u: &mut Unstructured) -> Result<Module> {

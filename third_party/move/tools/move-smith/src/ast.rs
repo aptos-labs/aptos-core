@@ -27,6 +27,12 @@ pub enum IdentifierType {
     Constant,
 }
 
+impl Default for IdentifierPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IdentifierPool {
     pub fn new() -> Self {
         Self {
