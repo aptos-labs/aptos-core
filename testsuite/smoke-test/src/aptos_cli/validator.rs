@@ -1290,7 +1290,6 @@ async fn test_owner_create_and_delegate_flow() {
             genesis_config.recurring_lockup_duration_secs = 10;
             genesis_config.voting_duration_secs = 5;
             genesis_config.min_stake = 500000;
-            genesis_config.randomness_config_override = Some(OnChainRandomnessConfig::Off);
         }))
         .build_with_cli(0)
         .await;
