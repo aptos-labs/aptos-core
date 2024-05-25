@@ -1282,7 +1282,7 @@ async fn test_owner_create_and_delegate_flow() {
         }))
         .with_init_genesis_stake(Arc::new(|_i, genesis_stake_amount| {
             // enough for quorum
-            *genesis_stake_amount = 5000000;
+            *genesis_stake_amount = 50000000;
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
