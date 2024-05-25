@@ -43,10 +43,12 @@ fn run(
 
     let mut units = compile_units(&code).unwrap();
     let m = as_module(units.pop().unwrap());
+    let mut blob = vec![];
+    m.serialize(&mut blob).unwrap();
 
     let mut storage = InMemoryStorage::new();
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
-    storage.publish_or_overwrite_module(m);
+    storage.publish_or_overwrite_module(module_id.clone(), blob);
 
     let vm = MoveVM::new(vec![]);
     let mut sess = vm.new_session(&storage);

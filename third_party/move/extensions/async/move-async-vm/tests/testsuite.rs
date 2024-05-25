@@ -28,6 +28,7 @@ use move_core_types::{
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_vm_test_utils::gas_schedule::GasStatus;
+use sha3::{Digest, Sha3_256};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -179,15 +180,15 @@ impl Harness {
                     ))
                 }
                 mailbox.extend(success.messages);
-                self.commit_changeset(success.change_set)
+                self.commit_change_set(success.change_set)
             },
             Err(error) => self.log(format!("  FAIL  {:}", error)),
         }
     }
 
-    fn commit_changeset(&self, changeset: ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>) {
-        for (addr, change) in changeset.into_inner() {
-            for (struct_tag, op) in change.into_inner().1 {
+    fn commit_change_set(&self, change_set: ChangeSet<Bytes, Bytes>) {
+        for (addr, account_change_set) in change_set.into_inner() {
+            for (struct_tag, op) in account_change_set.into_resources() {
                 self.log(format!(
                     "  commit 0x{}::{}::{}[0x{}] := {:?}",
                     struct_tag.address.short_str_lossless(),
@@ -390,19 +391,25 @@ impl<'a> ModuleResolver for HarnessProxy<'a> {
         vec![]
     }
 
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Self::Module>, Self::Error> {
-        Ok(self.harness.module_cache.get(id.name()).map(|c| {
-            let bytes = c.serialize(None);
-            let module = CompiledModule::deserialize(&bytes).unwrap();
-            Arc::new(module)
-        }))
-    }
-
-    fn get_module_info(
+    fn get_module(
         &self,
-        _module_id: &ModuleId,
+        module_id: &ModuleId,
     ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error> {
-        todo!()
+        match self.harness.module_cache.get(module_id.name()) {
+            Some(cu) => {
+                let bytes = cu.serialize(None);
+                let module = Arc::new(CompiledModule::deserialize(&bytes)?);
+
+                let num_bytes = bytes.len();
+
+                let mut hash = Sha3_256::new();
+                hash.update(bytes);
+                let hash: [u8; 32] = hash.finalize().into();
+
+                Ok(Some((module, num_bytes, hash)))
+            },
+            None => Ok(None),
+        }
     }
 }
 

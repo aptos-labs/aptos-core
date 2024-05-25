@@ -15,16 +15,10 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
-    CompiledModule,
-};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashMap};
 
 /// Allows to query resources from the state.
 pub trait TResourceView {
@@ -160,14 +154,6 @@ pub trait TModuleView {
         state_key: &Self::Key,
     ) -> PartialVMResult<Option<OnChainUnverifiedModule>>;
 
-    fn get_compiled_module(
-        &self,
-        state_key: &Self::Key,
-    ) -> PartialVMResult<Option<Arc<CompiledModule>>> {
-        let module = self.get_onchain_module(state_key)?;
-        Ok(module.map(|m| m.module))
-    }
-
     fn get_module_state_value_metadata(
         &self,
         state_key: &Self::Key,
@@ -179,15 +165,6 @@ pub trait TModuleView {
     fn get_module_size_in_bytes(&self, state_key: &Self::Key) -> PartialVMResult<Option<usize>> {
         let module = self.get_onchain_module(state_key)?;
         Ok(module.map(|m| m.num_bytes))
-    }
-
-    fn get_module_hash(&self, state_key: &Self::Key) -> PartialVMResult<Option<[u8; 32]>> {
-        let module = self.get_onchain_module(state_key)?;
-        Ok(module.map(|m| m.hash))
-    }
-
-    fn module_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
-        self.get_onchain_module(state_key).map(|m| m.is_some())
     }
 }
 

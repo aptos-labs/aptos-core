@@ -146,7 +146,7 @@ pub type Message = (AccountAddress, u64, Vec<Vec<u8>>);
 
 /// A structure to represent success for the execution of an async session operation.
 pub struct AsyncSuccess<'r> {
-    pub change_set: ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>,
+    pub change_set: ChangeSet<Bytes, Bytes>,
     pub messages: Vec<Message>,
     pub gas_used: Gas,
     pub ext: NativeContextExtensions<'r>,
@@ -219,15 +219,16 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
 
         // Process the result, moving the return value of the initializer function into the
-        // changeset.
+        // change set.
         match result {
             Ok((
                 SerializedReturnValues {
                     mutable_reference_outputs: _,
                     mut return_values,
                 },
-                (mut change_set, mut native_extensions),
+                (change_set, mut native_extensions),
             )) => {
+                let mut change_set = change_set.map_modules(|entry| entry.1);
                 if return_values.len() != 1 {
                     Err(async_extension_error(format!(
                         "inconsistent initializer `{}`",
@@ -325,8 +326,9 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                     mut mutable_reference_outputs,
                     return_values: _,
                 },
-                (mut change_set, mut native_extensions),
+                (change_set, mut native_extensions),
             )) => {
+                let mut change_set = change_set.map_modules(|entry| entry.1);
                 if mutable_reference_outputs.len() > 1 {
                     Err(async_extension_error(format!(
                         "inconsistent handler `{}`",
@@ -384,7 +386,7 @@ fn make_extensions(
 }
 
 fn publish_actor_state(
-    change_set: &mut ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>,
+    change_set: &mut ChangeSet<Bytes, Bytes>,
     actor_addr: AccountAddress,
     state_tag: StructTag,
     state: Vec<u8>,

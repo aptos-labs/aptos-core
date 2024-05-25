@@ -15,6 +15,7 @@ anyhow = { workspace = true }
 bytes = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
+sha3 = { workspace = true }
 
 move-binary-format = { path = "../../move-binary-format" }
 move-bytecode-utils = { path = "../../tools/move-bytecode-utils" }

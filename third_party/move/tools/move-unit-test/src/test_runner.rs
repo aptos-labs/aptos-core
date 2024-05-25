@@ -33,12 +33,7 @@ use move_vm_test_utils::{
     InMemoryStorage,
 };
 use rayon::prelude::*;
-use std::{
-    io::Write,
-    marker::Send,
-    sync::{Arc, Mutex},
-    time::Instant,
-};
+use std::{io::Write, marker::Send, sync::Mutex, time::Instant};
 #[cfg(feature = "evm-backend")]
 use {
     evm::{backend::MemoryVicinity, ExitReason},
@@ -91,7 +86,10 @@ fn setup_test_storage<'a>(
         .compute_dependency_graph()
         .compute_topological_order()?
     {
-        storage.publish_or_overwrite_module(module.clone());
+        let module_id = module.self_id();
+        let mut module_bytes = Vec::new();
+        module.serialize(&mut module_bytes)?;
+        storage.publish_or_overwrite_module(module_id, module_bytes);
     }
 
     Ok(storage)
@@ -100,7 +98,7 @@ fn setup_test_storage<'a>(
 /// Print the updates to storage represented by `cs` in the context of the starting storage state
 /// `storage`.
 fn print_resources_and_extensions(
-    cs: &ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>,
+    cs: &ChangeSet<Bytes, Bytes>,
     extensions: NativeContextExtensions,
     storage: &InMemoryStorage,
 ) -> Result<String> {
@@ -135,7 +133,7 @@ impl TestRunner {
         // TODO: maybe we should require the clients to always pass in a list of native functions so
         // we don't have to make assumptions about their gas parameters.
         native_function_table: Option<NativeFunctionTable>,
-        genesis_state: Option<ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>>,
+        genesis_state: Option<ChangeSet<Bytes, Bytes>>,
         cost_table: Option<CostTable>,
         record_writeset: bool,
         #[cfg(feature = "evm-backend")] evm: bool,
@@ -146,10 +144,9 @@ impl TestRunner {
             .map(|(filepath, _)| filepath.to_string())
             .collect();
         let modules = tests.module_info.values().map(|info| &info.module);
-        let starting_storage_state = setup_test_storage(modules)?;
-        if let Some(_genesis_state) = genesis_state {
-            todo!()
-            // starting_storage_state.apply(genesis_state)?;
+        let mut starting_storage_state = setup_test_storage(modules)?;
+        if let Some(genesis_state) = genesis_state {
+            starting_storage_state.apply(genesis_state)?;
         }
         let native_function_table = native_function_table.unwrap_or_else(|| {
             move_stdlib::natives::all_natives(
@@ -265,7 +262,7 @@ impl SharedTestingConfig {
         function_name: &str,
         test_info: &TestCase,
     ) -> (
-        VMResult<ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>>,
+        VMResult<ChangeSet<Bytes, Bytes>>,
         VMResult<NativeContextExtensions>,
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
@@ -309,7 +306,12 @@ impl SharedTestingConfig {
                 .into(),
         );
         match session.finish_with_extensions() {
-            Ok((cs, extensions)) => (Ok(cs), Ok(extensions), return_result, test_run_info),
+            Ok((cs, extensions)) => (
+                Ok(cs.map_modules(|entry| entry.1)),
+                Ok(extensions),
+                return_result,
+                test_run_info,
+            ),
             Err(err) => (Err(err.clone()), Err(err), return_result, test_run_info),
         }
     }
@@ -335,10 +337,10 @@ impl SharedTestingConfig {
 
             let save_session_state = || {
                 if self.save_storage_state_on_failure {
-                    cs_result.ok().and_then(|changeset| {
+                    cs_result.ok().and_then(|change_set| {
                         ext_result.ok().and_then(|extensions| {
                             print_resources_and_extensions(
-                                &changeset,
+                                &change_set,
                                 extensions,
                                 &self.starting_storage_state,
                             )

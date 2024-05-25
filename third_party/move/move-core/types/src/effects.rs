@@ -294,4 +294,20 @@ impl<M, R> ChangeSet<M, R> {
                 .map(move |(struct_tag, op)| (addr, struct_tag, op.as_ref()))
         })
     }
+
+    pub fn map_modules<F, N>(self, f: F) -> ChangeSet<N, R>
+    where
+        F: Fn(M) -> N + Copy,
+    {
+        let accounts = BTreeMap::from_iter(self.accounts.into_iter().map(
+            |(address, account_change_set)| {
+                let (modules, resources) = account_change_set.into_inner();
+                let modules =
+                    BTreeMap::from_iter(modules.into_iter().map(|(i, op)| (i, op.map(f))));
+                let account_change_set = AccountChangeSet::new(modules, resources);
+                (address, account_change_set)
+            },
+        ));
+        ChangeSet { accounts }
+    }
 }

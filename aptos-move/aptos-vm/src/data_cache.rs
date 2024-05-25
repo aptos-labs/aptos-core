@@ -186,18 +186,13 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
 
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
         let state_key = StateKey::module_id(module_id);
-        match self.executor_view.get_compiled_module(&state_key) {
-            Ok(Some(cm)) => cm.metadata.clone(),
+        match self.executor_view.get_onchain_module(&state_key) {
+            Ok(Some(cm)) => cm.module.metadata.clone(),
             _ => vec![],
         }
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Self::Module>, Self::Error> {
-        let state_key = StateKey::module_id(module_id);
-        self.executor_view.get_compiled_module(&state_key)
-    }
-
-    fn get_module_info(
+    fn get_module(
         &self,
         module_id: &ModuleId,
     ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error> {

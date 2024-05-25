@@ -7,6 +7,7 @@ pub mod extensions;
 pub mod test_reporter;
 pub mod test_runner;
 
+use crate::test_runner::TestRunner;
 use bytes::Bytes;
 use clap::*;
 use move_command_line_common::files::verify_and_create_named_address_mapping;
@@ -214,9 +215,9 @@ impl UnitTestingConfig {
     pub fn run_and_report_unit_tests<W: Write + Send>(
         &self,
         test_plan: TestPlan,
-        _native_function_table: Option<NativeFunctionTable>,
-        _genesis_state: Option<ChangeSet<Bytes, Bytes>>,
-        _cost_table: Option<CostTable>,
+        native_function_table: Option<NativeFunctionTable>,
+        genesis_state: Option<ChangeSet<Bytes, Bytes>>,
+        cost_table: Option<CostTable>,
         writer: W,
     ) -> Result<(W, bool)> {
         let shared_writer = Mutex::new(writer);
@@ -236,41 +237,38 @@ impl UnitTestingConfig {
         }
 
         writeln!(shared_writer.lock().unwrap(), "Running Move unit tests")?;
+        let mut test_runner = TestRunner::new(
+            self.gas_limit.unwrap_or(DEFAULT_EXECUTION_BOUND),
+            self.num_threads,
+            self.report_storage_on_error,
+            self.report_stacktrace_on_abort,
+            test_plan,
+            native_function_table,
+            genesis_state,
+            cost_table,
+            self.verbose,
+            #[cfg(feature = "evm-backend")]
+            self.evm,
+        )
+        .unwrap();
 
-        todo!()
-        // TODO: Fix CLI or use bytes for testing?
-        // let mut test_runner = TestRunner::new(
-        //     self.gas_limit.unwrap_or(DEFAULT_EXECUTION_BOUND),
-        //     self.num_threads,
-        //     self.report_storage_on_error,
-        //     self.report_stacktrace_on_abort,
-        //     test_plan,
-        //     native_function_table,
-        //     genesis_state,
-        //     cost_table,
-        //     self.verbose,
-        //     #[cfg(feature = "evm-backend")]
-        //     self.evm,
-        // )
-        // .unwrap();
-        //
-        // if let Some(filter_str) = &self.filter {
-        //     test_runner.filter(filter_str)
-        // }
-        //
-        // let test_results = test_runner.run(&shared_writer).unwrap();
-        // if self.report_statistics {
-        //     test_results.report_statistics(&shared_writer)?;
-        // }
-        //
-        // if self.verbose {
-        //     test_results.report_goldens(&shared_writer)?;
-        // }
-        //
-        // let ok = test_results.summarize(&shared_writer)?;
-        //
-        // let writer = shared_writer.into_inner().unwrap();
-        // Ok((writer, ok))
+        if let Some(filter_str) = &self.filter {
+            test_runner.filter(filter_str)
+        }
+
+        let test_results = test_runner.run(&shared_writer).unwrap();
+        if self.report_statistics {
+            test_results.report_statistics(&shared_writer)?;
+        }
+
+        if self.verbose {
+            test_results.report_goldens(&shared_writer)?;
+        }
+
+        let ok = test_results.summarize(&shared_writer)?;
+
+        let writer = shared_writer.into_inner().unwrap();
+        Ok((writer, ok))
     }
 }
 

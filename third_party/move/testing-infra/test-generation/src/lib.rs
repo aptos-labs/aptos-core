@@ -20,7 +20,6 @@ use getrandom::getrandom;
 use module_generation::generate_module;
 use move_binary_format::{
     access::ModuleAccess,
-    errors::PartialVMError,
     file_format::{
         AbilitySet, CompiledModule, FunctionDefinitionIndex, SignatureToken, StructHandleIndex,
     },
@@ -33,18 +32,15 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Op},
-    language_storage::TypeTag,
-    resolver::MoveResolver,
+    language_storage::{ModuleId, TypeTag},
     value::MoveValue,
     vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
-use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
+use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
-use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::{fs, io::Write, panic, sync::Arc, thread};
+use std::{fs, io::Write, panic, thread};
 use tracing::{debug, error, info};
 
 /// This function calls the Bytecode verifier to test it
@@ -58,8 +54,15 @@ fn run_verifier(module: CompiledModule) -> Result<CompiledModule, String> {
     }
 }
 
-static STORAGE_WITH_MOVE_STDLIB: Lazy<InMemoryStorage> = Lazy::new(|| {
+// Creates a storage with Move standard library as well as a single
+// additional module.
+fn storage_with_stdlib_and_module(
+    additional_module_id: ModuleId,
+    additional_blob: Vec<u8>,
+) -> InMemoryStorage {
     let mut storage = InMemoryStorage::new();
+
+    // First, compile and add standard library.
     let (_, compiled_units) = Compiler::from_files(
         move_stdlib::move_stdlib_files(),
         vec![],
@@ -74,10 +77,15 @@ static STORAGE_WITH_MOVE_STDLIB: Lazy<InMemoryStorage> = Lazy::new(|| {
         AnnotatedCompiledUnit::Script(_) => panic!("Unexpected Script in stdlib"),
     });
     for module in compiled_modules {
-        storage.publish_or_overwrite_module(module);
+        let mut blob = vec![];
+        module.serialize(&mut blob).unwrap();
+        storage.publish_or_overwrite_module(module.self_id(), blob);
     }
+
+    // Now add the additional module.
+    storage.publish_or_overwrite_module(additional_module_id, additional_blob);
     storage
-});
+}
 
 /// This function runs a verified module in the VM runtime
 fn run_vm(module: CompiledModule) -> Result<(), VMStatus> {
@@ -116,13 +124,7 @@ fn run_vm(module: CompiledModule) -> Result<(), VMStatus> {
         })
         .collect();
 
-    execute_function_in_module(
-        module,
-        entry_idx,
-        vec![],
-        main_args,
-        &*STORAGE_WITH_MOVE_STDLIB,
-    )
+    execute_function_in_module(module, entry_idx, vec![], main_args)
 }
 
 /// Execute the first function in a module
@@ -131,13 +133,12 @@ fn execute_function_in_module(
     idx: FunctionDefinitionIndex,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
-    storage: &impl MoveResolver<Arc<CompiledModule>, PartialVMError>,
 ) -> Result<(), VMStatus> {
     let module_id = module.self_id();
     let entry_name = {
         let entry_func_idx = module.function_def_at(idx).function;
         let entry_name_idx = module.function_handle_at(entry_func_idx).name;
-        module.identifier_at(entry_name_idx).to_owned()
+        module.identifier_at(entry_name_idx)
     };
     {
         let vm = MoveVM::new(move_stdlib::natives::all_natives(
@@ -145,17 +146,15 @@ fn execute_function_in_module(
             move_stdlib::natives::GasParameters::zeros(),
         ));
 
-        let mut changeset = ChangeSet::empty();
-        changeset
-            .add_module_op(module_id.clone(), Op::New(Arc::new(module)))
-            .unwrap();
-        let delta_storage = DeltaStorage::new(storage, &changeset);
-        let mut sess = vm.new_session(&delta_storage);
+        let mut blob = vec![];
+        module.serialize(&mut blob).unwrap();
+        let storage = storage_with_stdlib_and_module(module_id.clone(), blob);
+        let mut sess = vm.new_session(&storage);
         let traversal_storage = TraversalStorage::new();
 
         sess.execute_function_bypass_visibility(
             &module_id,
-            &entry_name,
+            entry_name,
             ty_args,
             args,
             &mut UnmeteredGasMeter,

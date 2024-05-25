@@ -55,7 +55,9 @@ fn load_module_impl<M: Clone>(
 ) -> PartialVMResult<(M, usize, [u8; 32])> {
     if let Some(account_cache) = account_map.get(module_id.address()) {
         if let Some(((m, b), _is_republishing)) = account_cache.modules.get(module_id.name()) {
-            // TODO: Remove this once we kill this local cache.
+            // FIXME(George): Is it better to cache this information on publish?
+            //  In any case, once we move verification to deploy-time (and on storage
+            //  load in adapter), this can be removed.
             let mut sha3_256 = Sha3_256::new();
             sha3_256.update(b);
             let hash_value: [u8; 32] = sha3_256.finalize().into();
@@ -63,7 +65,7 @@ fn load_module_impl<M: Clone>(
             return Ok((m.clone(), b.len(), hash_value));
         }
     }
-    remote.get_module_info(module_id)?.ok_or_else(|| {
+    remote.get_module(module_id)?.ok_or_else(|| {
         PartialVMError::new(StatusCode::LINKER_ERROR)
             .with_message(format!("Linker Error: Module {} doesn't exist", module_id))
     })
@@ -86,7 +88,6 @@ pub(crate) struct TransactionDataCache<'r, M> {
     remote: &'r dyn MoveResolver<M, PartialVMError>,
     account_map: BTreeMap<AccountAddress, AccountDataCache<M>>,
 
-    // TODO: Remove all!
     deserializer_config: DeserializerConfig,
     compiled_scripts: BTreeMap<[u8; 32], Arc<CompiledScript>>,
 }

@@ -205,7 +205,12 @@ impl VMRuntime {
                 // old module.
                 self.loader.mark_as_invalid();
             }
-            data_store.publish_module(module.self_id(), Arc::new(module), blob.into(), is_republishing)?;
+            data_store.publish_module(
+                module.self_id(),
+                Arc::new(module),
+                blob.into(),
+                is_republishing,
+            )?;
         }
         Ok(())
     }

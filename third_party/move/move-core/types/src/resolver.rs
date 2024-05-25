@@ -28,9 +28,7 @@ pub trait ModuleResolver {
 
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata>;
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Self::Module>, Self::Error>;
-
-    fn get_module_info(
+    fn get_module(
         &self,
         module_id: &ModuleId,
     ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error>;

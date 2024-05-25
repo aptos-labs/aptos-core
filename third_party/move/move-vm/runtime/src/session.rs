@@ -281,7 +281,6 @@ impl<'r, 'l> Session<'r, 'l> {
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    /// Same like `finish`, but also extracts the native context extensions from the session.
     pub fn finish_with_extensions(
         self,
     ) -> VMResult<(

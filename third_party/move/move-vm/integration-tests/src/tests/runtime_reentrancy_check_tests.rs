@@ -62,7 +62,9 @@ fn make_dispatch_d_native() -> NativeFunction {
 fn compile_and_publish(storage: &mut InMemoryStorage, code: String) {
     let mut units = compile_units(&code).unwrap();
     let m = as_module(units.pop().unwrap());
-    storage.publish_or_overwrite_module(m);
+    let mut blob = vec![];
+    m.serialize(&mut blob).unwrap();
+    storage.publish_or_overwrite_module(m.self_id(), blob);
 }
 
 #[test]
