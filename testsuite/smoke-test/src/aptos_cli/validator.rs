@@ -586,9 +586,17 @@ async fn test_large_total_stake() {
     .await
     .unwrap();
 
-    let last_seen_epoch = rest_client.get_index().await.unwrap().into_inner().epoch.0;
-    println!("last_seen_epoch={:?}", last_seen_epoch);
-    swarm.wait_for_all_nodes_to_catchup_to_epoch(last_seen_epoch + 2, Duration::from_secs((epoch_duration_secs + dkg_secs) * 2)).await.unwrap();
+    // Wait for an epoch switch.
+    let mut last_seen = None;
+    loop {
+        let latest_epoch = rest_client.get_index().await.unwrap().into_inner().epoch.0;
+        if last_seen == Some(latest_epoch - 1) {
+            break;
+        }
+        last_seen = Some(latest_epoch);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
     let result = cli.join_validator_set(validator_cli_index, None)
         .await
         .unwrap();
