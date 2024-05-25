@@ -584,23 +584,23 @@ async fn test_large_total_stake() {
     .await
     .unwrap();
 
-    // Wait for an epoch switch.
-    let mut last_seen = None;
-    let mut attempts_remaining = 100;
-    while attempts_remaining > 0 {
-        let latest_epoch = rest_client.get_index().await.ok().map(|r|r.into_inner().epoch.0);
-        match (latest_epoch, last_seen) {
-            (Some(x), Some(y)) if x == y + 1 => {
-                break;
-            },
-            _ => {
-            },
-        }
-        attempts_remaining -= 1;
-        last_seen = latest_epoch;
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    println!("attempts_remaining={}, last_seen={:?}", attempts_remaining, last_seen);
+    // // Wait for an epoch switch.
+    // let mut last_seen = None;
+    // let mut attempts_remaining = 100;
+    // while attempts_remaining > 0 {
+    //     let latest_epoch = rest_client.get_index().await.ok().map(|r|r.into_inner().epoch.0);
+    //     match (latest_epoch, last_seen) {
+    //         (Some(x), Some(y)) if x == y + 1 => {
+    //             break;
+    //         },
+    //         _ => {
+    //         },
+    //     }
+    //     attempts_remaining -= 1;
+    //     last_seen = latest_epoch;
+    //     tokio::time::sleep(Duration::from_millis(100)).await;
+    // }
+    // println!("attempts_remaining={}, last_seen={:?}", attempts_remaining, last_seen);
 
     let result = cli.join_validator_set(validator_cli_index, None)
         .await;
