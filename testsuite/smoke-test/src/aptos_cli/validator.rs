@@ -1339,7 +1339,6 @@ async fn test_owner_create_and_delegate_flow() {
         .unwrap(),
     );
 
-    println!("before4");
     cli.assert_account_balance_now(
         owner_cli_index,
         owner_initial_coins
@@ -1349,7 +1348,6 @@ async fn test_owner_create_and_delegate_flow() {
             - owner_gas,
     )
     .await;
-    println!("after4");
 
     assert_validator_set_sizes(&cli, 1, 0, 0).await;
     assert_eq!(
@@ -1406,10 +1404,8 @@ async fn test_owner_create_and_delegate_flow() {
     };
     operator_gas += get_gas(y);
 
-    println!("before5");
     cli.assert_account_balance_now(operator_cli_index, operator_initial_coins - operator_gas)
         .await;
-    println!("after5");
 
     let mut attempts = 100;
     let mut result = Err(CliError::AbortedError);
@@ -1423,6 +1419,8 @@ async fn test_owner_create_and_delegate_flow() {
     }
 
     result.unwrap();
+
+    println!("checkpoint 1423");
 
     let owner_state = get_validator_state(&cli, owner_cli_index).await;
     if owner_state == ValidatorState::JOINING {
@@ -1440,6 +1438,8 @@ async fn test_owner_create_and_delegate_flow() {
     } else {
         assert_eq!(owner_state, ValidatorState::ACTIVE);
     }
+
+    println!("checkpoint 1442");
 
     let new_operator_keys = ValidatorNodeKeys::new(&mut keygen);
     let new_voter_cli_index = cli.add_account_to_cli(keygen.generate_ed25519_private_key());
@@ -1467,9 +1467,18 @@ async fn test_owner_create_and_delegate_flow() {
     .await
     .unwrap();
 
-    cli.leave_validator_set(new_operator_cli_index, Some(owner_cli_index))
-        .await
-        .unwrap();
+    let mut attempts = 100;
+    let mut result = Err(CliError::AbortedError);
+    while attempts > 0 {
+        result = cli.leave_validator_set(new_operator_cli_index, Some(owner_cli_index)).await;
+        if result.is_ok() {
+            break;
+        }
+        attempts -= 1;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    result.unwrap();
 
     let owner_state = get_validator_state(&cli, owner_cli_index).await;
     if owner_state == ValidatorState::LEAVING {
