@@ -555,8 +555,6 @@ async fn test_large_total_stake() {
             genesis_config.epoch_duration_secs = 4;
             genesis_config.recurring_lockup_duration_secs = 4;
             genesis_config.voting_duration_secs = 3;
-            genesis_config.randomness_config_override =
-                Some(OnChainRandomnessConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;
