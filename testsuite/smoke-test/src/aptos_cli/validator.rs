@@ -554,7 +554,7 @@ async fn test_large_total_stake() {
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
-            genesis_config.epoch_duration_secs = epoch_duration_secs;
+            genesis_config.epoch_duration_secs = 4;
             genesis_config.recurring_lockup_duration_secs = 4;
             genesis_config.voting_duration_secs = 3;
         }))
