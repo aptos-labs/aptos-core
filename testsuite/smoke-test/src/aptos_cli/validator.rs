@@ -544,7 +544,7 @@ pub(crate) fn generate_blob(data: &[u8]) -> String {
 #[tokio::test]
 async fn test_large_total_stake() {
     // just barelly below u64::MAX
-    const BASE: u64 = 10_000_000_000_000_000_000;
+    const BASE: u64 = 10_000_000_000_000_000;
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_init_genesis_stake(Arc::new(|_, genesis_stake_amount| {
             // make sure we have quorum
