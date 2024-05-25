@@ -545,6 +545,8 @@ pub(crate) fn generate_blob(data: &[u8]) -> String {
 async fn test_large_total_stake() {
     // just barelly below u64::MAX
     const BASE: u64 = 10_000_000_000_000_000_000;
+    let epoch_duration_secs = 4;
+    let dkg_secs: u64 = 5;
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_init_genesis_stake(Arc::new(|_, genesis_stake_amount| {
             // make sure we have quorum
@@ -552,7 +554,7 @@ async fn test_large_total_stake() {
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
-            genesis_config.epoch_duration_secs = 4;
+            genesis_config.epoch_duration_secs = epoch_duration_secs;
             genesis_config.recurring_lockup_duration_secs = 4;
             genesis_config.voting_duration_secs = 3;
         }))
@@ -584,9 +586,13 @@ async fn test_large_total_stake() {
     .await
     .unwrap();
 
-    cli.join_validator_set(validator_cli_index, None)
+    let last_seen_epoch = rest_client.get_index().await.unwrap().into_inner().epoch;
+    println!("last_seen_epoch={:?}", last_seen_epoch);
+    swarm.wait_for_all_nodes_to_catchup_to_epoch(last_seen_epoch + 2, Duration::from_secs((epoch_duration_secs + dkg_secs) * 2)).await.unwrap();
+    let result = cli.join_validator_set(validator_cli_index, None)
         .await
         .unwrap();
+    println!("result={:?}", result);
 
     reconfig(
         &rest_client,
