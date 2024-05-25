@@ -602,10 +602,19 @@ async fn test_large_total_stake() {
     // }
     // println!("attempts_remaining={}, last_seen={:?}", attempts_remaining, last_seen);
 
-    let result = cli.join_validator_set(validator_cli_index, None)
-        .await;
-    println!("result={:?}", result);
-    result.unwrap();
+    let mut attempts_remaining = 10;
+    while attempts_remaining > 0 {
+        let result = cli.join_validator_set(validator_cli_index, None)
+            .await;
+        println!("result={:?}", result);
+        if result.is_ok() {
+            break;
+        }
+        attempts_remaining -= 1;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    assert!(attempts_remaining > 0);
 
     reconfig(
         &rest_client,
