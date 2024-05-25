@@ -157,11 +157,11 @@ impl FeatureFlag {
 }
 
 static ENABLED_FEATURES: OnceCell<Vec<FeatureFlag>> = OnceCell::new();
-pub fn enable_features(enable_features: Vec<FeatureFlag>) {
+pub fn hack_enable_default_features_for_genesis(enable_features: Vec<FeatureFlag>) {
     ENABLED_FEATURES.set(enable_features).ok();
 }
 static DISABLED_FEATURES: OnceCell<Vec<FeatureFlag>> = OnceCell::new();
-pub fn disable_features(disable_features: Vec<FeatureFlag>) {
+pub fn hack_disable_default_features_for_genesis(disable_features: Vec<FeatureFlag>) {
     DISABLED_FEATURES.set(disable_features).ok();
 }
 

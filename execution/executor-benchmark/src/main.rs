@@ -331,14 +331,16 @@ enum Command {
             long,
             num_args=1..,
             value_delimiter = ' ',
-            help = "Custom enabling/disabling of the feature flags in the Move source. Disabling is stronger than enabling")]
+            help = "Optional custom enabling/disabling of the feature flags in the Move source. Enable / disable flags cannot overlap.\
+            Sample usage: --enable-feature=V1 --disable-feature=V2 V3 where V1, V2, V3 are FeatureFlag enum variants.")]
         enable_feature: Vec<FeatureFlag>,
 
         #[clap(
             long,
             num_args=1..,
             value_delimiter = ' ',
-            help = "Custom enabling/disabling of the feature flags in the Move source. Disabling is stronger than enabling")]
+            help = "Optional custom enabling/disabling of the feature flags in the Move source. Enable / disable flags cannot overlap.\
+            Sample usage: --enable-feature=V1 --disable-feature=V2 V3 where V1, V2, V3 are FeatureFlag enum variants.")]
         disable_feature: Vec<FeatureFlag>,
     },
     AddAccounts {
@@ -391,8 +393,13 @@ where
             disable_feature,
         } => {
             // setting custom feature flags
-            aptos_types::on_chain_config::enable_features(enable_feature);
-            aptos_types::on_chain_config::disable_features(disable_feature);
+            // this check is O(|enable_feature| * |disable_feature|)
+            assert!(
+                enable_feature.iter().all(|f| !disable_feature.contains(f)),
+                "Enable and disable feature flags cannot overlap."
+            );
+            aptos_types::on_chain_config::hack_enable_default_features_for_genesis(enable_feature);
+            aptos_types::on_chain_config::hack_disable_default_features_for_genesis(disable_feature);
 
             let transaction_mix = if transaction_type.is_empty() {
                 None
