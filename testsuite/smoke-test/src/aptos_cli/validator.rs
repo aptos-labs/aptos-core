@@ -600,7 +600,7 @@ async fn test_large_total_stake() {
         last_seen = latest_epoch;
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
-    println!("attempts_remaining={}, last_seen={}", attempts_remaining, last_seen);
+    println!("attempts_remaining={}, last_seen={:?}", attempts_remaining, last_seen);
 
     let result = cli.join_validator_set(validator_cli_index, None)
         .await;
