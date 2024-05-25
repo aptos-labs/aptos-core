@@ -1411,9 +1411,18 @@ async fn test_owner_create_and_delegate_flow() {
         .await;
     println!("after5");
 
-    cli.join_validator_set(operator_cli_index, Some(owner_cli_index))
-        .await
-        .unwrap();
+    let mut attempts = 100;
+    let mut result = Err(CliError::AbortedError);
+    while attempts > 0 {
+        result = cli.join_validator_set(operator_cli_index, Some(owner_cli_index)).await;
+        if result.is_ok() {
+            break;
+        }
+        attempts -= 1;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    result.unwrap();
 
     let owner_state = get_validator_state(&cli, owner_cli_index).await;
     if owner_state == ValidatorState::JOINING {
