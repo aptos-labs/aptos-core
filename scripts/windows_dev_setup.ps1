@@ -149,17 +149,17 @@ function check_os {
 }
 
 function install_winget {
-  $xaml_url = "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.7.1"
-  $xaml_downloadpath = "Microsoft.UI.Xaml.2.7.1.nupkg.zip"
-  $xaml_filepath = "Microsoft.UI.Xaml.2.7.1.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.7.appx"
+  $xaml_url = "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.8.6"
+  $xaml_downloadpath = "Microsoft.UI.Xaml.2.8.6.nupkg.zip"
+  $xaml_filepath = "Microsoft.UI.Xaml.2.8.6.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.8.appx"
 
   $vclib_url = "https://aka.ms/Microsoft.VCLibs.x$global:architecture.14.00.Desktop.appx"
   $vclib_downloadpath = "Microsoft.VCLibs.x$global:architecture.14.00.Desktop.appx"
 
-  $installer_url = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+  $installer_url = "https://github.com/microsoft/winget-cli/releases/download/v1.7.11132/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
   $installer_downloadpath = "msftwinget.msixbundle"
 
-  $license_url = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/3463fe9ad25e44f28630526aa9ad5648_License1.xml"  
+  $license_url = "https://github.com/microsoft/winget-cli/releases/download/v1.7.11132/ccfd1d114c9641fc8491f3c7c179829e_License1.xml"
   $license_downloadpath = "license.xml"
 
   # Download and extract XAML (dependency)

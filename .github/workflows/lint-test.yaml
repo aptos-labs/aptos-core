@@ -106,21 +106,36 @@ jobs:
       - run: echo "Skipping rust smoke tests! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
-  # Run all rust unit tests. This is a PR required job.
-  rust-unit-tests:
+  # Run only the targeted rust unit tests. This is a PR required job.
+  rust-targeted-unit-tests:
     needs: file_change_determinator
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v4
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0 # Fetch all git history for accurate target determination
+      - name: Run targeted rust unit tests
+        uses: ./.github/actions/rust-targeted-unit-tests
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+  # Run all rust unit tests. This is not a PR required job.
+  rust-unit-tests:
+    if: | # Only run when an appropriate event occurs
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-unit-tests')
+      )
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v4
       - name: Run rust unit tests
         uses: ./.github/actions/rust-unit-tests
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
           BUILDKITE_ANALYTICS_TOKEN: ${{ secrets.BUILDKITE_ANALYTICS_TOKEN }}
-      - run: echo "Skipping rust unit tests! Unrelated changes detected."
-        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
   # Run the cached packages build. This is a PR required job.
   rust-build-cached-packages:

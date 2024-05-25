@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: missing acquires annotation for `T1`
+  ┌─ tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_missing_annotation.move:5:16
+  │
+5 │     public fun test(account: &signer) {
+  │                ^^^^
+6 │         borrow_global_mut<T1>(signer::address_of(account));
+  │         -------------------------------------------------- acquired here

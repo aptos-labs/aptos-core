@@ -87,3 +87,6 @@ fun m::will_autoref(): address {
   3: $t0 := read_ref($t3)
   4: return $t0
 }
+
+
+============ bytecode verification succeeded ========

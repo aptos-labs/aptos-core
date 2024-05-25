@@ -3,8 +3,13 @@
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_types::account_address::{self, AccountAddress};
-use move_core_types::{identifier::Identifier, language_storage::StructTag};
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+};
+use once_cell::sync::Lazy;
 use serde::Deserialize;
+use std::str::FromStr;
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct FungibleStore {
@@ -13,12 +18,26 @@ struct FungibleStore {
     allow_ungated_balance_transfer: bool,
 }
 
+pub static FUNGIBLE_STORE_TAG: Lazy<StructTag> = Lazy::new(|| StructTag {
+    address: AccountAddress::from_hex_literal("0x1").unwrap(),
+    module: Identifier::new("fungible_asset").unwrap(),
+    name: Identifier::new("FungibleStore").unwrap(),
+    type_args: vec![],
+});
+
+pub static OBJ_GROUP_TAG: Lazy<StructTag> = Lazy::new(|| StructTag {
+    address: AccountAddress::from_hex_literal("0x1").unwrap(),
+    module: Identifier::new("object").unwrap(),
+    name: Identifier::new("ObjectGroup").unwrap(),
+    type_args: vec![],
+});
 #[test]
 fn test_basic_fungible_token() {
     let mut h = MoveHarness::new();
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap());
+    let root = h.aptos_framework_account();
 
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
@@ -38,6 +57,17 @@ fn test_basic_fungible_token() {
         build_options,
     );
     assert_success!(result);
+
+    assert_success!(h.run_entry_function(
+        &root,
+        str::parse(&format!(
+            "0x{}::coin::create_coin_conversion_map",
+            (*root.address()).to_hex()
+        ))
+        .unwrap(),
+        vec![],
+        vec![],
+    ));
 
     let metadata = h
         .execute_view_function(
@@ -114,33 +144,20 @@ fn test_basic_fungible_token() {
     let bob_primary_store_addr =
         account_address::create_derived_object_address(*bob.address(), token_addr);
 
-    let fungible_store_tag = StructTag {
-        address: AccountAddress::from_hex_literal("0x1").unwrap(),
-        module: Identifier::new("fungible_asset").unwrap(),
-        name: Identifier::new("FungibleStore").unwrap(),
-        type_params: vec![],
-    };
-    let obj_group_tag = StructTag {
-        address: AccountAddress::from_hex_literal("0x1").unwrap(),
-        module: Identifier::new("object").unwrap(),
-        name: Identifier::new("ObjectGroup").unwrap(),
-        type_params: vec![],
-    };
-
     // Ensure that the group data can be read
     let mut alice_store: FungibleStore = h
         .read_resource_from_resource_group(
             &alice_primary_store_addr,
-            obj_group_tag.clone(),
-            fungible_store_tag.clone(),
+            OBJ_GROUP_TAG.clone(),
+            FUNGIBLE_STORE_TAG.clone(),
         )
         .unwrap();
 
     let bob_store: FungibleStore = h
         .read_resource_from_resource_group(
             &bob_primary_store_addr,
-            obj_group_tag,
-            fungible_store_tag,
+            OBJ_GROUP_TAG.clone(),
+            FUNGIBLE_STORE_TAG.clone(),
         )
         .unwrap();
 
@@ -149,4 +166,60 @@ fn test_basic_fungible_token() {
     assert_eq!(alice_store.balance, 70);
     alice_store.balance = 10;
     assert_eq!(alice_store, bob_store);
+}
+
+// A simple test to verify gas paying still work for prologue and epilogue.
+#[test]
+fn test_coin_to_fungible_asset_migration() {
+    let mut h = MoveHarness::new();
+
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let alice_primary_store_addr =
+        account_address::create_derived_object_address(*alice.address(), AccountAddress::TEN);
+    let root = h.aptos_framework_account();
+
+    assert_success!(h.run_entry_function(
+        &root,
+        str::parse(&format!(
+            "0x{}::coin::create_coin_conversion_map",
+            (*root.address()).to_hex()
+        ))
+        .unwrap(),
+        vec![],
+        vec![],
+    ));
+
+    assert_success!(h.run_entry_function(
+        &root,
+        str::parse(&format!(
+            "0x{}::coin::create_pairing",
+            (*root.address()).to_hex()
+        ))
+        .unwrap(),
+        vec![TypeTag::from_str("0x1::aptos_coin::AptosCoin").unwrap()],
+        vec![],
+    ));
+    assert!(h
+        .read_resource_from_resource_group::<FungibleStore>(
+            &alice_primary_store_addr,
+            OBJ_GROUP_TAG.clone(),
+            FUNGIBLE_STORE_TAG.clone()
+        )
+        .is_none());
+
+    let result = h.run_entry_function(
+        &alice,
+        str::parse("0x1::coin::migrate_to_fungible_store").unwrap(),
+        vec![TypeTag::from_str("0x1::aptos_coin::AptosCoin").unwrap()],
+        vec![],
+    );
+    assert_success!(result);
+
+    assert!(h
+        .read_resource_from_resource_group::<FungibleStore>(
+            &alice_primary_store_addr,
+            OBJ_GROUP_TAG.clone(),
+            FUNGIBLE_STORE_TAG.clone()
+        )
+        .is_some());
 }

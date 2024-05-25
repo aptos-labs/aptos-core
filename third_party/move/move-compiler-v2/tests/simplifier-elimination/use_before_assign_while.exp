@@ -80,6 +80,32 @@ module 0x8675309::M {
 
 
 Diagnostics:
+error: use of possibly unassigned local `x`
+  ┌─ tests/simplifier-elimination/use_before_assign_while.move:4:32
+  │
+4 │         while (cond) { let y = move x + 1; x = 0; y; }
+  │                                ^^^^^^
+
+error: use of possibly unassigned local `x`
+  ┌─ tests/simplifier-elimination/use_before_assign_while.move:9:32
+  │
+9 │         while (cond) { let y = move x + 1; if (cond) { continue }; x = 0; y; }
+  │                                ^^^^^^
+
+error: use of possibly unassigned local `x`
+   ┌─ tests/simplifier-elimination/use_before_assign_while.move:14:32
+   │
+14 │         while (cond) { let y = &x; _ = move y; x = 0 }
+   │                                ^^
+
+error: use of unassigned local `x`
+   ┌─ tests/simplifier-elimination/use_before_assign_while.move:19:32
+   │
+19 │         while (cond) { let y = &x; _ = move y; if (cond) { x = 0 }; break }
+   │                                ^^
+
+
+Diagnostics:
 error: cannot move local `x` since it is still in use
   ┌─ tests/simplifier-elimination/use_before_assign_while.move:9:32
   │

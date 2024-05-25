@@ -85,6 +85,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
+            name: Experiment::SEQS_IN_BINOPS_CHECK.to_string(),
+            description: "Turns on or off checks for sequences within binary operations"
+                .to_string(),
+            default: Inherited(Experiment::CHECKS.to_string()),
+        },
+        Experiment {
             name: Experiment::INLINING.to_string(),
             description: "Turns on or off inlining".to_string(),
             default: Given(true),
@@ -118,7 +124,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::OPTIMIZE.to_string(),
             description: "Turns on or off a group of optimizations".to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::COPY_PROPAGATION.to_string(),
@@ -129,6 +135,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             name: Experiment::DEAD_CODE_ELIMINATION.to_string(),
             description: "Whether to run dead store and unreachable code elimination".to_string(),
             default: Inherited(Experiment::OPTIMIZE.to_string()),
+        },
+        Experiment {
+            name: Experiment::UNUSED_STRUCT_PARAMS_CHECK.to_string(),
+            description: "Whether to check for unused struct type parameters".to_string(),
+            default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
             name: Experiment::VARIABLE_COALESCING.to_string(),
@@ -146,7 +157,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Whether to keep functions after inlining \
             or remove them from the model"
                 .to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::AST_SIMPLIFY.to_string(),
@@ -166,6 +177,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::ATTACH_COMPILED_MODULE.to_string(),
+            description: "Whether to attach the compiled module to the global env.".to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -180,9 +196,11 @@ impl Experiment {
     pub const ACQUIRES_CHECK: &'static str = "acquires-check";
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
+    pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
     pub const CHECKS: &'static str = "checks";
     pub const COPY_PROPAGATION: &'static str = "copy-propagation";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
+    pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
     pub const GEN_ACCESS_SPECIFIERS: &'static str = "gen-access-specifiers";
     pub const INLINING: &'static str = "inlining";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
@@ -191,10 +209,12 @@ impl Experiment {
     pub const OPTIMIZE: &'static str = "optimize";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";
+    pub const SEQS_IN_BINOPS_CHECK: &'static str = "seqs-in-binops-check";
     pub const SPEC_CHECK: &'static str = "spec-check";
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";
     pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
     pub const UNINITIALIZED_CHECK: &'static str = "uninitialized-check";
+    pub const UNUSED_STRUCT_PARAMS_CHECK: &'static str = "unused-struct-params-check";
     pub const USAGE_CHECK: &'static str = "usage-check";
     pub const VARIABLE_COALESCING: &'static str = "variable-coalescing";
     pub const VARIABLE_COALESCING_ANNOTATE: &'static str = "variable-coalescing-annotate";

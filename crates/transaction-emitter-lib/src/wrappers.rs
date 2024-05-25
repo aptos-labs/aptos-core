@@ -5,8 +5,8 @@ use crate::{
     args::{ClusterArgs, EmitArgs},
     cluster::Cluster,
     emitter::{
-        create_accounts, parse_seed, stats::TxnStats, EmitJobMode, EmitJobRequest, NumAccountsMode,
-        TxnEmitter,
+        create_accounts, local_account_generator::PrivateKeyAccountGenerator, parse_seed,
+        stats::TxnStats, EmitJobMode, EmitJobRequest, NumAccountsMode, TxnEmitter,
     },
     instance::Instance,
     CreateAccountsArgs,
@@ -196,6 +196,7 @@ pub async fn create_accounts_command(
     create_accounts(
         &coin_source_account,
         &txn_factory,
+        Box::new(PrivateKeyAccountGenerator),
         &emit_job_request,
         DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
         false,

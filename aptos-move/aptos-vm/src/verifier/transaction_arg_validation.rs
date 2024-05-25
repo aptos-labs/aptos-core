@@ -20,7 +20,10 @@ use move_core_types::{
     value::MoveValue,
     vm_status::StatusCode,
 };
-use move_vm_runtime::session::LoadedFunctionInstantiation;
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    session::LoadedFunctionInstantiation,
+};
 use move_vm_types::{
     gas::{GasMeter, UnmeteredGasMeter},
     loaded_data::runtime_types::Type,
@@ -106,7 +109,7 @@ pub fn validate_combine_signer_and_txn_args(
     are_struct_constructors_enabled: bool,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
     // entry function should not return
-    if !func.return_.is_empty() {
+    if !func.return_tys.is_empty() {
         return Err(VMStatus::error(
             StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
             None,
@@ -114,7 +117,7 @@ pub fn validate_combine_signer_and_txn_args(
     }
     let mut signer_param_cnt = 0;
     // find all signer params at the beginning
-    for ty in func.parameters.iter() {
+    for ty in func.param_tys.iter() {
         match ty {
             Type::Signer => signer_param_cnt += 1,
             Type::Reference(inner_type) => {
@@ -128,12 +131,8 @@ pub fn validate_combine_signer_and_txn_args(
 
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
     // Need to keep this here to ensure we return the historic correct error code for replay
-    for ty in func.parameters[signer_param_cnt..].iter() {
-        let valid = is_valid_txn_arg(
-            session,
-            &ty.subst(&func.type_arguments).unwrap(),
-            allowed_structs,
-        );
+    for ty in func.param_tys[signer_param_cnt..].iter() {
+        let valid = is_valid_txn_arg(session, &ty.subst(&func.ty_args).unwrap(), allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -142,7 +141,7 @@ pub fn validate_combine_signer_and_txn_args(
         }
     }
 
-    if (signer_param_cnt + args.len()) != func.parameters.len() {
+    if (signer_param_cnt + args.len()) != func.param_tys.len() {
         return Err(VMStatus::error(
             StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
             None,
@@ -165,9 +164,9 @@ pub fn validate_combine_signer_and_txn_args(
     // FAILED_TO_DESERIALIZE_ARGUMENT error.
     let args = construct_args(
         session,
-        &func.parameters[signer_param_cnt..],
+        &func.param_tys[signer_param_cnt..],
         args,
-        &func.type_arguments,
+        &func.ty_args,
         allowed_structs,
         false,
     )?;
@@ -427,11 +426,11 @@ fn validate_and_construct(
         expected_type,
     )?;
     let mut args = vec![];
-    for param_type in &instantiation.parameters {
+    for param_type in &instantiation.param_tys {
         let mut arg = vec![];
         recursively_construct_arg(
             session,
-            &param_type.subst(&instantiation.type_arguments).unwrap(),
+            &param_type.subst(&instantiation.ty_args).unwrap(),
             allowed_structs,
             cursor,
             initial_cursor_len,
@@ -441,8 +440,14 @@ fn validate_and_construct(
         )?;
         args.push(arg);
     }
-    let serialized_result =
-        session.execute_instantiated_function(function, instantiation, args, gas_meter)?;
+    let storage = TraversalStorage::new();
+    let serialized_result = session.execute_instantiated_function(
+        function,
+        instantiation,
+        args,
+        gas_meter,
+        &mut TraversalContext::new(&storage),
+    )?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
     let deserialize_error = VMStatus::error(

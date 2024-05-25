@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{KnownAttribute, RuntimeModuleMetadataV1};
+use crate::{KnownAttribute, RandomnessAnnotation, RuntimeModuleMetadataV1};
 use move_binary_format::file_format::{Ability, AbilitySet, Visibility};
 use move_cli::base::test_validation;
 use move_compiler::shared::known_attributes;
@@ -25,6 +25,7 @@ use move_stackless_bytecode::{
     stackless_bytecode::{AttrId, Bytecode, Operation},
     stackless_bytecode_generator::StacklessBytecodeGenerator,
 };
+use num_traits::Signed;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -38,6 +39,7 @@ const LEGACY_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
 const ERROR_PREFIX: &str = "E";
 const EVENT_STRUCT_ATTRIBUTE: &str = "event";
 const RANDOMNESS_ATTRIBUTE: &str = "randomness";
+const RANDOMNESS_MAX_GAS_CLAIM: &str = "max_gas";
 const RESOURCE_GROUP: &str = "resource_group";
 const RESOURCE_GROUP_MEMBER: &str = "resource_group_member";
 const RESOURCE_GROUP_NAME: &str = "group";
@@ -111,7 +113,7 @@ impl<'a> ExtendedChecker<'a> {
 
     fn run(&mut self) {
         for ref module in self.env.get_modules() {
-            if module.is_target() {
+            if module.is_primary_target() {
                 self.check_and_record_resource_groups(module);
                 self.check_and_record_resource_group_members(module);
                 self.check_and_record_view_functions(module);
@@ -460,9 +462,17 @@ impl<'a> ExtendedChecker<'a> {
 impl<'a> ExtendedChecker<'a> {
     fn check_and_record_unbiasabale_entry_functions(&mut self, module: &ModuleEnv) {
         for ref fun in module.get_functions() {
-            if !self.has_attribute(fun, RANDOMNESS_ATTRIBUTE) {
+            let maybe_randomness_annotation = match self.get_randomness_max_gas_declaration(fun) {
+                Ok(x) => x,
+                Err(msg) => {
+                    self.env.error(&fun.get_loc(), msg.as_str());
+                    continue;
+                },
+            };
+
+            let Some(randomness_annotation) = maybe_randomness_annotation else {
                 continue;
-            }
+            };
 
             if !fun.is_entry() || fun.visibility().is_public() {
                 self.env.error(
@@ -479,8 +489,65 @@ impl<'a> ExtendedChecker<'a> {
                 .fun_attributes
                 .entry(fun.get_simple_name_string().to_string())
                 .or_default()
-                .push(KnownAttribute::randomness());
+                .push(KnownAttribute::randomness(randomness_annotation.max_gas));
         }
+    }
+
+    fn get_randomness_max_gas_declaration(
+        &self,
+        fun: &FunctionEnv,
+    ) -> Result<Option<RandomnessAnnotation>, String> {
+        for attr in fun.get_attributes() {
+            let Attribute::Apply(_, name, sub_attrs) = attr else {
+                continue;
+            };
+            if self.env.symbol_pool().string(*name).as_str() != RANDOMNESS_ATTRIBUTE {
+                continue;
+            }
+            if sub_attrs.len() >= 2 {
+                return Err(
+                    "Randomness attribute should only have one `max_gas` property.".to_string(),
+                );
+            }
+            if let Some(sub_attr) = sub_attrs.first() {
+                let Attribute::Assign(_, key_symbol, attr_val) = sub_attr else {
+                    return Err(
+                        "Randomness attribute should only have one `max_gas` property.".to_string(),
+                    );
+                };
+                let key = self.env.symbol_pool().string(*key_symbol);
+                if key.as_str() != RANDOMNESS_MAX_GAS_CLAIM {
+                    return Err(format!(
+                        "Unknown key for randomness attribute: {}",
+                        key.as_str()
+                    ));
+                }
+
+                let msg =
+                    "Property `max_gas` should be a positive integer less than 2^64".to_string();
+                let AttributeValue::Value(_, Value::Number(val)) = attr_val else {
+                    return Err(msg);
+                };
+
+                // Ensure the value is non-negative.
+                if val.abs() != *val {
+                    return Err(msg);
+                }
+
+                let (_, digits) = val.to_u64_digits();
+
+                if digits.len() >= 2 {
+                    return Err(msg);
+                }
+
+                let max_gas_declaration_seen = Some(digits.first().copied().unwrap_or(0)); // If no digits, assuming the value is 0.
+
+                return Ok(Some(RandomnessAnnotation::new(max_gas_declaration_seen)));
+            } else {
+                return Ok(Some(RandomnessAnnotation::default()));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -498,6 +565,31 @@ impl<'a> ExtendedChecker<'a> {
                 self.env
                     .error(&fun.get_id_loc(), "view function must return values")
             }
+
+            fun.get_parameter_types()
+                .iter()
+                .for_each(|parameter_type| match parameter_type {
+                    Type::Primitive(inner) => {
+                        if inner == &PrimitiveType::Signer {
+                            self.env.error(
+                                &fun.get_id_loc(),
+                                "view function cannot use the signer paremter",
+                            )
+                        }
+                    },
+                    Type::Reference(_, inner) => {
+                        if let Type::Primitive(inner) = inner.as_ref() {
+                            if inner == &PrimitiveType::Signer {
+                                self.env.error(
+                                    &fun.get_id_loc(),
+                                    "view function cannot use the & signer paremter",
+                                )
+                            }
+                        }
+                    },
+                    _ => (),
+                });
+
             // Remember the runtime info that this is a view function
             let module_id = self.get_runtime_module_id(module);
             self.output

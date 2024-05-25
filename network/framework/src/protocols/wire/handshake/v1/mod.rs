@@ -71,6 +71,7 @@ pub enum ProtocolId {
     JWKConsensusRpcCompressed = 24,
     JWKConsensusRpcBcs = 25,
     JWKConsensusRpcJson = 26,
+    ConsensusObserver = 27,
 }
 
 /// The encoding types for Protocols
@@ -111,6 +112,7 @@ impl ProtocolId {
             JWKConsensusRpcCompressed => "JWKConsensusRpcCompressed",
             JWKConsensusRpcBcs => "JWKConsensusRpcBcs",
             JWKConsensusRpcJson => "JWKConsensusRpcJson",
+            ConsensusObserver => "ConsensusObserver",
         }
     }
 
@@ -144,6 +146,7 @@ impl ProtocolId {
             ProtocolId::JWKConsensusRpcCompressed,
             ProtocolId::JWKConsensusRpcBcs,
             ProtocolId::JWKConsensusRpcJson,
+            ProtocolId::ConsensusObserver,
         ]
     }
 

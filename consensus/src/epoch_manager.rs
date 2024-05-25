@@ -7,6 +7,7 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockStore,
     },
+    consensus_observer::{network::ObserverMessage, publisher::Publisher},
     counters,
     dag::{DagBootstrapper, DagCommitSigner, StorageAdapter},
     error::{error_kind, DbError},
@@ -86,7 +87,8 @@ use aptos_types::{
     on_chain_config::{
         Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
         OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
-        OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct, ValidatorSet,
+        OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct,
+        RandomnessConfigSeqNum, ValidatorSet,
     },
     randomness::{RandKeys, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
@@ -133,6 +135,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     config: ConsensusConfig,
     #[allow(unused)]
     execution_config: ExecutionConfig,
+    randomness_override_seq_num: u64,
     time_service: Arc<dyn TimeService>,
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
@@ -171,9 +174,11 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     payload_manager: Arc<PayloadManager>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
     proof_cache: ProofCache,
+    observer_network: Option<NetworkClient<ObserverMessage>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         node_config: &NodeConfig,
         time_service: Arc<dyn TimeService>,
@@ -189,6 +194,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         aptos_time_service: aptos_time_service::TimeService,
         vtxn_pool: VTxnPoolState,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+        observer_network: Option<NetworkClient<ObserverMessage>>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -200,6 +206,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             author,
             config,
             execution_config,
+            randomness_override_seq_num: node_config.randomness_override_seq_num,
             time_service,
             self_sender,
             network_sender,
@@ -235,6 +242,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .initial_capacity(1_000)
                 .time_to_live(Duration::from_secs(20))
                 .build(),
+            observer_network,
         }
     }
 
@@ -634,7 +642,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let (recovery_manager_tx, recovery_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
-            1,
+            10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(recovery_manager_tx);
@@ -696,7 +704,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ))
         };
 
-        let (payload_manager, quorum_store_msg_tx) = quorum_store_builder.init_payload_manager();
+        let (payload_manager, quorum_store_msg_tx) = quorum_store_builder
+            .init_payload_manager(self.observer_network.clone().map(Publisher::new));
         self.quorum_store_msg_tx = quorum_store_msg_tx;
         self.payload_manager = payload_manager.clone();
 
@@ -795,6 +804,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config.clone(),
                 rand_msg_rx,
+                recovery_data.root_block().round(),
             )
             .await;
 
@@ -835,13 +845,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
-            1,
+            10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
 
         let (buffered_proposal_tx, buffered_proposal_rx) = aptos_channel::new(
             QueueStyle::KLAST,
-            5,
+            10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(round_manager_tx.clone());
@@ -1047,7 +1057,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
-        let onchain_randomness_config: anyhow::Result<RandomnessConfigMoveStruct> = payload.get();
+        let onchain_randomness_config_seq_num: anyhow::Result<RandomnessConfigSeqNum> =
+            payload.get();
+        let randomness_config_move_struct: anyhow::Result<RandomnessConfigMoveStruct> =
+            payload.get();
         let onchain_jwk_consensus_config: anyhow::Result<OnChainJWKConsensusConfig> = payload.get();
         let dkg_state = payload.get::<DKGState>();
 
@@ -1059,7 +1072,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             error!("Failed to read on-chain execution config {}", error);
         }
 
-        if let Err(error) = &onchain_randomness_config {
+        if let Err(error) = &randomness_config_move_struct {
             error!("Failed to read on-chain randomness config {}", error);
         }
 
@@ -1068,9 +1081,25 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let consensus_config = onchain_consensus_config.unwrap_or_default();
         let execution_config = onchain_execution_config
             .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
-        let onchain_randomness_config = onchain_randomness_config
-            .and_then(OnChainRandomnessConfig::try_from)
-            .unwrap_or_else(|_| OnChainRandomnessConfig::default_if_missing());
+        let onchain_randomness_config_seq_num = onchain_randomness_config_seq_num
+            .unwrap_or_else(|_| RandomnessConfigSeqNum::default_if_missing());
+
+        info!(
+            epoch = epoch_state.epoch,
+            local = self.randomness_override_seq_num,
+            onchain = onchain_randomness_config_seq_num.seq_num,
+            "Checking randomness config override."
+        );
+        if self.randomness_override_seq_num > onchain_randomness_config_seq_num.seq_num {
+            warn!("Randomness will be force-disabled by local config!");
+        }
+
+        let onchain_randomness_config = OnChainRandomnessConfig::from_configs(
+            self.randomness_override_seq_num,
+            onchain_randomness_config_seq_num.seq_num,
+            randomness_config_move_struct.ok(),
+        );
+
         let jwk_consensus_config = onchain_jwk_consensus_config.unwrap_or_else(|_| {
             // `jwk_consensus_config` not yet initialized, falling back to the old configs.
             Self::equivalent_jwk_consensus_config_from_deprecated_resources(&payload)
@@ -1248,6 +1277,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.decoupled_execution(),
             "decoupled execution must be enabled"
         );
+        let highest_committed_round = self
+            .storage
+            .aptos_db()
+            .get_latest_ledger_info()
+            .unwrap()
+            .commit_info()
+            .round();
 
         self.execution_client
             .start_epoch(
@@ -1260,6 +1296,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                highest_committed_round,
             )
             .await;
 

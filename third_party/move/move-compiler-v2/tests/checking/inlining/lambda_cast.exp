@@ -58,3 +58,6 @@ module 0x12391283::M {
         }
     }
 } // end 0x12391283::M
+
+
+============ bytecode verification succeeded ========

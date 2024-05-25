@@ -18,9 +18,9 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{
-        ExecutionConfigV1, FeatureFlag as AptosFeatureFlag, GasScheduleV2, OnChainConfig,
-        OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
-        OnChainRandomnessConfig, RandomnessConfigMoveStruct, TransactionShufflerType, Version,
+        AptosVersion, ExecutionConfigV1, FeatureFlag as AptosFeatureFlag, GasScheduleV2,
+        OnChainConfig, OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, TransactionShufflerType,
     },
 };
 use futures::executor::block_on;
@@ -136,7 +136,7 @@ pub enum ReleaseEntry {
     DefaultGasWithOverride(GasOverrideConfig),
     /// Only used before randomness framework upgrade.
     DefaultGasWithOverrideOld(GasOverrideConfig),
-    Version(Version),
+    Version(AptosVersion),
     FeatureFlag(Features),
     Consensus(OnChainConsensusConfig),
     Execution(OnChainExecutionConfig),
@@ -254,7 +254,7 @@ impl ReleaseEntry {
                 }
             },
             ReleaseEntry::Version(version) => {
-                if !fetch_and_equals::<Version>(client, version)? {
+                if !fetch_and_equals::<AptosVersion>(client, version)? {
                     result.append(&mut version::generate_version_upgrade_proposal(
                         version,
                         is_testnet,

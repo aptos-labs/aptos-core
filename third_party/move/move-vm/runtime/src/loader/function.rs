@@ -29,24 +29,22 @@ pub(crate) enum Scope {
     Script(ScriptHash),
 }
 
-// A runtime function
-// #[derive(Debug)]
-// https://github.com/rust-lang/rust/issues/70263
-pub(crate) struct Function {
+// A runtime function representation.
+pub struct Function {
     #[allow(unused)]
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
-    pub(crate) type_parameters: Vec<AbilitySet>,
+    pub ty_param_abilities: Vec<AbilitySet>,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
     pub(crate) def_is_native: bool,
-    pub(crate) def_is_friend_or_private: bool,
+    pub def_is_friend_or_private: bool,
     pub(crate) scope: Scope,
     pub(crate) name: Identifier,
-    pub(crate) return_types: Vec<Type>,
-    pub(crate) local_types: Vec<Type>,
-    pub(crate) parameter_types: Vec<Type>,
+    pub return_tys: Vec<Type>,
+    pub(crate) local_tys: Vec<Type>,
+    pub param_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
 }
 
@@ -100,15 +98,16 @@ impl Function {
             Some(code) => code.code.clone(),
             None => vec![],
         };
-        let type_parameters = handle.type_parameters.clone();
-        let return_types = signature_table[handle.return_.0 as usize].clone();
-        let local_types = if let Some(code) = &def.code {
-            let mut locals = signature_table[handle.parameters.0 as usize].clone();
-            locals.append(&mut signature_table[code.locals.0 as usize].clone());
-            locals
+        let ty_param_abilities = handle.type_parameters.clone();
+        let return_tys = signature_table[handle.return_.0 as usize].clone();
+        let local_tys = if let Some(code) = &def.code {
+            let mut local_tys = signature_table[handle.parameters.0 as usize].clone();
+            local_tys.append(&mut signature_table[code.locals.0 as usize].clone());
+            local_tys
         } else {
             vec![]
         };
+        let param_tys = signature_table[handle.parameters.0 as usize].clone();
 
         let access_specifier = load_access_specifier(
             BinaryIndexedView::Module(module),
@@ -117,21 +116,19 @@ impl Function {
             &handle.access_specifiers,
         )?;
 
-        let parameter_types = signature_table[handle.parameters.0 as usize].clone();
-
         Ok(Self {
             file_format_version: module.version(),
             index,
             code,
-            type_parameters,
+            ty_param_abilities,
             native,
             def_is_native,
             def_is_friend_or_private,
             scope,
             name,
-            local_types,
-            return_types,
-            parameter_types,
+            local_tys,
+            return_tys,
+            param_tys,
             access_specifier,
         })
     }
@@ -172,15 +169,11 @@ impl Function {
     }
 
     pub(crate) fn local_count(&self) -> usize {
-        self.local_types.len()
+        self.local_tys.len()
     }
 
-    pub(crate) fn arg_count(&self) -> usize {
-        self.parameter_types.len()
-    }
-
-    pub(crate) fn return_type_count(&self) -> usize {
-        self.return_types.len()
+    pub(crate) fn param_count(&self) -> usize {
+        self.param_tys.len()
     }
 
     pub(crate) fn name(&self) -> &str {
@@ -191,20 +184,20 @@ impl Function {
         &self.code
     }
 
-    pub(crate) fn type_parameters(&self) -> &[AbilitySet] {
-        &self.type_parameters
+    pub(crate) fn ty_arg_abilities(&self) -> &[AbilitySet] {
+        &self.ty_param_abilities
     }
 
-    pub(crate) fn local_types(&self) -> &[Type] {
-        &self.local_types
+    pub(crate) fn local_tys(&self) -> &[Type] {
+        &self.local_tys
     }
 
-    pub(crate) fn return_types(&self) -> &[Type] {
-        &self.return_types
+    pub(crate) fn return_tys(&self) -> &[Type] {
+        &self.return_tys
     }
 
-    pub(crate) fn parameter_types(&self) -> &[Type] {
-        &self.parameter_types
+    pub(crate) fn param_tys(&self) -> &[Type] {
+        &self.param_tys
     }
 
     pub(crate) fn pretty_string(&self) -> String {

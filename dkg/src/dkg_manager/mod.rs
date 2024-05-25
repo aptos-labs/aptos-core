@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    agg_trx_producer::TAggTranscriptProducer, counters::DKG_STAGE_SECONDS,
-    network::IncomingRpcRequest, DKGMessage,
+    agg_trx_producer::TAggTranscriptProducer,
+    counters::{DKG_STAGE_SECONDS, ROUNDING_SECONDS},
+    network::IncomingRpcRequest,
+    DKGMessage,
 };
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -13,7 +15,7 @@ use aptos_logger::{debug, error, info, warn};
 use aptos_types::{
     dkg::{
         DKGSessionMetadata, DKGSessionState, DKGStartEvent, DKGTrait, DKGTranscript,
-        DKGTranscriptMetadata,
+        DKGTranscriptMetadata, MayHaveRoundingSummary,
     },
     epoch_state::EpochState,
     validator_txn::{Topic, ValidatorTransaction},
@@ -307,6 +309,16 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             "[DKG] Deal transcript started.",
         );
         let public_params = DKG::new_public_params(dkg_session_metadata);
+        if let Some(summary) = public_params.rounding_summary() {
+            info!(
+                epoch = self.epoch_state.epoch,
+                "Rounding summary: {:?}", summary
+            );
+            ROUNDING_SECONDS
+                .with_label_values(&[summary.method.as_str()])
+                .observe(summary.exec_time.as_secs_f64());
+        }
+
         let mut rng = if cfg!(feature = "smoke-test") {
             StdRng::from_seed(self.my_addr.into_bytes())
         } else {

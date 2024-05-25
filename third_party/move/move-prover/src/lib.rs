@@ -53,6 +53,7 @@ pub fn run_move_prover<W: WriteColor>(
             paths: options.move_sources.clone(),
             named_address_map: addrs.clone(),
         }],
+        vec![],
         vec![PackagePaths {
             name: None,
             paths: options.move_deps.clone(),
@@ -82,6 +83,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
         experiments: vec![],
         experiment_cache: Default::default(),
         sources: cloned_options.move_sources,
+        sources_deps: vec![],
         warn_unused: false,
         whole_program: false,
         compile_test_code: false,
@@ -136,8 +138,6 @@ pub fn run_move_prover_with_model_v2<W: WriteColor>(
     options: Options,
     start_time: Instant,
 ) -> anyhow::Result<()> {
-    debug!("global env before prover run:\n{}", env.dump_env_all());
-
     let build_duration = start_time.elapsed();
     check_errors(
         env,

@@ -35,6 +35,7 @@ use aptos_db_indexer::Indexer;
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
+use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
@@ -57,8 +58,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
-        state_key::StateKey,
-        state_key_prefix::StateKeyPrefix,
+        state_key::{prefix::StateKeyPrefix, StateKey},
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
@@ -71,8 +71,6 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::data_cache::AsMoveResolver;
-use move_resource_viewer::MoveValueAnnotator;
 use rayon::prelude::*;
 use std::{
     cell::Cell,
@@ -110,8 +108,11 @@ include!("include/aptosdb_writer.rs");
 // Other private methods.
 include!("include/aptosdb_internal.rs");
 // Testonly methods.
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
 include!("include/aptosdb_testonly.rs");
+
+#[cfg(feature = "consensus-only-perf-test")]
+pub mod fake_aptosdb;
 
 impl AptosDB {
     pub fn open(

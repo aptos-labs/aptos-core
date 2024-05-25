@@ -25,13 +25,11 @@ aptos-vm = { workspace = true }
 bcs = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
-move-core-types = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rayon = { workspace = true }
-rocksdb = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 threadpool = { workspace = true }

@@ -29,3 +29,6 @@ module 0x1::Test {
         }
     }
 } // end 0x1::Test
+
+
+============ bytecode verification succeeded ========

@@ -71,3 +71,6 @@ module <SELF>_0 {
         Tuple()
     }
 } // end <SELF>_0
+
+
+============ bytecode verification succeeded ========

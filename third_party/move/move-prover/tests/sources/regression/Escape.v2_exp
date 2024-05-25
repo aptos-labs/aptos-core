@@ -9,7 +9,7 @@ error: global memory invariant does not hold
    =         account = <redacted>
    =         thing = <redacted>
    =     at tests/sources/regression/Escape.move:25: install
-   =         account = <redacted>
+   =         <redacted> = <redacted>
    =     at tests/sources/regression/Escape.move:36
 
 error: global memory invariant does not hold
@@ -22,6 +22,6 @@ error: global memory invariant does not hold
    =         account = <redacted>
    =         thing = <redacted>
    =     at tests/sources/regression/Escape.move:25: install
-   =         account = <redacted>
+   =         <redacted> = <redacted>
    =     at tests/sources/regression/Escape.move:36
    =     at tests/sources/regression/Escape.move:37

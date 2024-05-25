@@ -10,7 +10,7 @@ use aptos_rest_client::Client;
 use aptos_types::{
     dkg::{DKGSessionState, DKGState, DKGTrait, DefaultDKG},
     on_chain_config::{OnChainConfig, OnChainConsensusConfig},
-    randomness::{PerBlockRandomness, RandMetadataToSign, WVUF},
+    randomness::{PerBlockRandomness, RandMetadata, WVUF},
     validator_verifier::ValidatorConsensusInfo,
 };
 use digest::Digest;
@@ -28,6 +28,8 @@ mod e2e_correctness;
 mod enable_feature_0;
 mod enable_feature_1;
 mod enable_feature_2;
+mod entry_func_attrs;
+mod randomness_stall_recovery;
 mod validator_restart_during_dkg;
 
 #[allow(dead_code)]
@@ -244,7 +246,7 @@ async fn verify_randomness(
     );
 
     // Compare the outputs from 2 paths.
-    let rand_metadata = RandMetadataToSign {
+    let rand_metadata = RandMetadata {
         epoch: on_chain_block_randomness.epoch,
         round: on_chain_block_randomness.round,
     };

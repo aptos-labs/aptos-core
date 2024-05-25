@@ -11,11 +11,14 @@ use clap::{builder::PossibleValuesParser, Arg, ArgAction, ArgAction::SetTrue, Co
 use codespan_reporting::diagnostic::Severity;
 use log::LevelFilter;
 use move_abigen::AbigenOptions;
+use move_command_line_common::env::{bool_to_str, get_move_compiler_v2_from_env};
 use move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddress};
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
 use move_model::{
-    metadata::LanguageVersion, model::VerificationScope, options::ModelBuilderOptions,
+    metadata::{CompilerVersion, LanguageVersion},
+    model::VerificationScope,
+    options::ModelBuilderOptions,
 };
 use move_prover_boogie_backend::options::{BoogieOptions, CustomNativeOptions, VectorTheory};
 use move_prover_bytecode_pipeline::options::{AutoTraceLevel, ProverOptions};
@@ -57,9 +60,16 @@ pub struct Options {
     /// Whether to run the read write set analysis instead of the prover
     pub run_read_write_set: bool,
     /// The paths to the Move sources.
+    /// Each source path should refer to either (1) a Move file or (2) a directory containing Move
+    /// files, all to be compiled (e.g., not the root directory of a package---which contains
+    /// Move.toml---but a specific subdirectorysuch as `sources`, `scripts`, and/or `tests`,
+    /// depending on compilation mode).
     pub move_sources: Vec<String>,
     /// The paths to any dependencies for the Move sources. Those will not be verified but
     /// can be used by `move_sources`.
+    /// Each move_dep path should refer to either (1) a Move file or (2) a directory containing
+    /// Move files, all to be compiled (e.g., not the root directory of a package---which contains
+    /// Move.toml---but a specific subdirectorysuch as `sources`).
     pub move_deps: Vec<String>,
     /// The values assigned to named addresses in the Move code being verified.
     pub move_named_address_values: Vec<String>,
@@ -108,7 +118,10 @@ impl Default for Options {
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
             skip_attribute_checks: false,
-            compiler_v2: false,
+            compiler_v2: match CompilerVersion::default() {
+                CompilerVersion::V1 => false,
+                CompilerVersion::V2_0 => true,
+            },
             language_version: None,
         }
     }
@@ -173,7 +186,7 @@ impl Options {
             .arg(
                 Arg::new("compiler-v2")
                     .long("compiler-v2")
-                    .env("MOVE_COMPILER_V2")
+                    .default_value(bool_to_str(get_move_compiler_v2_from_env()))
                     .action(SetTrue)
                     .help("whether to use Move compiler v2 to compile to bytecode")
             )

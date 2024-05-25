@@ -71,17 +71,37 @@ impl AptosVM {
         state_view: &impl StateView,
         gas_meter_balance: u64,
     ) -> (VMStatus, VMOutput) {
+        use crate::gas::make_prod_gas_meter;
+        use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+
         let txn_data = TransactionMetadata::new(txn);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-        let mut gas_meter = self
-            .make_standard_gas_meter(gas_meter_balance.into(), &log_context)
-            .expect("Should be able to create a gas meter for tests");
+        let vm_gas_params = self
+            .gas_params()
+            .expect("should be able to get gas params")
+            .vm
+            .clone();
+        let storage_gas_params = self
+            .storage_gas_params
+            .as_ref()
+            .expect("should be able to get storage gas params")
+            .clone();
+
+        let mut gas_meter = make_prod_gas_meter(
+            self.gas_feature_version,
+            vm_gas_params,
+            storage_gas_params,
+            false,
+            gas_meter_balance.into(),
+        );
+
         let change_set_configs = &get_or_vm_startup_failure(&self.storage_gas_params, &log_context)
             .expect("Storage gas parameters should exist for tests")
             .change_set_configs;
 
         let resolver = state_view.as_move_resolver();
+        let storage = TraversalStorage::new();
         self.failed_transaction_cleanup(
             VMChangeSet::empty(),
             error_vm_status,
@@ -90,6 +110,7 @@ impl AptosVM {
             &resolver,
             &log_context,
             change_set_configs,
+            &mut TraversalContext::new(&storage),
         )
     }
 }

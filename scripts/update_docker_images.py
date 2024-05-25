@@ -38,10 +38,10 @@ def update() -> int:
                 "inspect",
                 image_name,
                 "--format",
-                " {{.Manifest.Digest}}",
+                "{{json .Manifest.Digest}}",
             ]
         )
-        digest = digest.strip().decode("utf-8")
+        digest = digest.decode("utf-8").strip(' "')
 
         if digest == None:
             print(f"Unable to find digest for {image_name}")

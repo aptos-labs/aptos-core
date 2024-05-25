@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: Invalid operation: access of the field `addr` on type `objects::ReaderRef` can only be done within the defining module `0x42::objects`
+   ┌─ tests/visibility-checker/resources_invalid.move:17:16
+   │
+ 8 │         borrow_global<T>(ref.addr)
+   │                          -------- accessed here
+   ·
+17 │     public fun get_value(ref: &obj::ReaderRef<Token>): u64 {
+   │                ^^^^^^^^^
+18 │         obj::reader(ref).val
+   │         ---------------- from a call inlined at this callsite

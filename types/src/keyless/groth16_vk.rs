@@ -5,6 +5,7 @@ use crate::{
     keyless::KEYLESS_ACCOUNT_MODULE_NAME, move_utils::as_move_value::AsMoveValue, serialize,
 };
 use aptos_crypto::CryptoMaterialError;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::{Bn254, G1Affine, G2Affine};
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -18,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 /// Reflection of aptos_framework::keyless_account::Groth16VerificationKey
-#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug, BCSCryptoHash, CryptoHasher)]
 pub struct Groth16VerificationKey {
     pub alpha_g1: Vec<u8>,
     pub beta_g2: Vec<u8>,
@@ -50,10 +51,22 @@ impl TryFrom<Groth16VerificationKey> for PreparedVerifyingKey<Bn254> {
     type Error = CryptoMaterialError;
 
     fn try_from(vk: Groth16VerificationKey) -> Result<Self, Self::Error> {
+        (&vk).try_into()
+    }
+}
+
+impl TryFrom<&Groth16VerificationKey> for PreparedVerifyingKey<Bn254> {
+    type Error = CryptoMaterialError;
+
+    fn try_from(vk: &Groth16VerificationKey) -> Result<Self, Self::Error> {
         if vk.gamma_abc_g1.len() != 2 {
             return Err(CryptoMaterialError::DeserializationError);
         }
 
+        // NOTE: Technically, we already validate the points when we set the VK in Move, so we could
+        // make this 2x faster by avoiding the point validation checks  via
+        // `deserialize_with_mode(..., Compress::Yes, Validate::No)`. Due to paranoia, will not
+        // optimize this for now.
         Ok(Self::from(VerifyingKey {
             alpha_g1: G1Affine::deserialize_compressed(vk.alpha_g1.as_slice())
                 .map_err(|_| CryptoMaterialError::DeserializationError)?,
@@ -75,6 +88,12 @@ impl TryFrom<Groth16VerificationKey> for PreparedVerifyingKey<Bn254> {
 
 impl From<PreparedVerifyingKey<Bn254>> for Groth16VerificationKey {
     fn from(pvk: PreparedVerifyingKey<Bn254>) -> Self {
+        (&pvk).into()
+    }
+}
+
+impl From<&PreparedVerifyingKey<Bn254>> for Groth16VerificationKey {
+    fn from(pvk: &PreparedVerifyingKey<Bn254>) -> Self {
         let PreparedVerifyingKey {
             vk:
                 VerifyingKey {
@@ -101,6 +120,13 @@ impl From<PreparedVerifyingKey<Bn254>> for Groth16VerificationKey {
             delta_g2: serialize!(delta_g2),
             gamma_abc_g1: gamma_abc_g1_bytes,
         }
+    }
+}
+
+impl PartialEq<PreparedVerifyingKey<Bn254>> for Groth16VerificationKey {
+    fn eq(&self, other: &PreparedVerifyingKey<Bn254>) -> bool {
+        let other_vk: Groth16VerificationKey = other.into();
+        self == &other_vk
     }
 }
 

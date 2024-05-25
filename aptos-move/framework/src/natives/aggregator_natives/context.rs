@@ -124,7 +124,7 @@ impl<'a> NativeAggregatorContext<'a> {
             delayed_field_changes,
             // is_empty check covers both whether delayed fields are enabled or not, as well as whether there
             // are any changes that would require computing reads needing exchange.
-            // TODO[agg_v2](optimize) we only later compute the the write set, so cannot pass the correct skip values here.
+            // TODO[agg_v2](optimize) we only later compute the write set, so cannot pass the correct skip values here.
             reads_needing_exchange: if delayed_write_set_ids.is_empty() {
                 BTreeMap::new()
             } else {

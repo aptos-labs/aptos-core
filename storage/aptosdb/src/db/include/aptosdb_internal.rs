@@ -117,11 +117,10 @@ impl AptosDB {
 
         if indexer.next_version() < ledger_next_version {
             use aptos_storage_interface::state_view::DbStateViewAtVersion;
-            let db : Arc<dyn DbReader> = self.state_store.clone();
+            let db: Arc<dyn DbReader> = self.state_store.clone();
 
             let state_view = db.state_view_at_version(Some(ledger_next_version - 1))?;
-            let resolver = state_view.as_move_resolver();
-            let annotator = MoveValueAnnotator::new(&resolver);
+            let annotator = AptosValueAnnotator::new(&state_view);
 
             const BATCH_SIZE: Version = 10000;
             let mut next_version = indexer.next_version();
@@ -144,7 +143,7 @@ impl AptosDB {
         Ok(())
     }
 
-    #[cfg(any(test, feature = "fuzzing"))]
+    #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
     fn new_without_pruner<P: AsRef<Path> + Clone>(
         db_root_path: P,
         readonly: bool,
@@ -239,7 +238,7 @@ fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
 where
     F: FnOnce() -> Result<T>,
 {
-    let nested =  ENTERED_GAUGED_API.with(|entered| {
+    let nested = ENTERED_GAUGED_API.with(|entered| {
         if entered.get() {
             true
         } else {
@@ -273,7 +272,6 @@ where
 
         res
     }
-
 }
 
 // Convert requested range and order to a range in ascending order.

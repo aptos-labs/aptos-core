@@ -50,19 +50,19 @@ fn test_basic_token() {
         address: AccountAddress::from_hex_literal("0x1").unwrap(),
         module: Identifier::new("object").unwrap(),
         name: Identifier::new("ObjectCore").unwrap(),
-        type_params: vec![],
+        type_args: vec![],
     };
     let token_obj_tag = StructTag {
         address: AccountAddress::from_hex_literal("0x4").unwrap(),
         module: Identifier::new("token").unwrap(),
         name: Identifier::new("Token").unwrap(),
-        type_params: vec![],
+        type_args: vec![],
     };
     let obj_group_tag = StructTag {
         address: AccountAddress::from_hex_literal("0x1").unwrap(),
         module: Identifier::new("object").unwrap(),
         name: Identifier::new("ObjectGroup").unwrap(),
-        type_params: vec![],
+        type_args: vec![],
     };
 
     // Ensure that the group data can be read
