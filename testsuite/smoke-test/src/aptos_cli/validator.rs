@@ -1057,7 +1057,6 @@ async fn test_join_and_leave_validator() {
             genesis_config.epoch_duration_secs = 5;
             genesis_config.recurring_lockup_duration_secs = 10;
             genesis_config.voting_duration_secs = 5;
-            genesis_config.randomness_config_override = Some(OnChainRandomnessConfig::Off);
         }))
         .build_with_cli(0)
         .await;
