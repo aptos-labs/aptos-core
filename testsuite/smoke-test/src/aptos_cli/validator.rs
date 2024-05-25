@@ -1459,7 +1459,7 @@ async fn test_owner_create_and_delegate_flow() {
 
     result.unwrap();
 
-    info!("checkpoint 1423");
+    info!("checkpoint");
 
     let owner_state = get_validator_state(&cli, owner_cli_index).await;
     if owner_state == ValidatorState::JOINING {
@@ -1478,7 +1478,7 @@ async fn test_owner_create_and_delegate_flow() {
         assert_eq!(owner_state, ValidatorState::ACTIVE);
     }
 
-    info!("checkpoint 1442");
+    info!("checkpoint");
 
     let new_operator_keys = ValidatorNodeKeys::new(&mut keygen);
     let new_voter_cli_index = cli.add_account_to_cli(keygen.generate_ed25519_private_key());
@@ -1490,19 +1490,31 @@ async fn test_owner_create_and_delegate_flow() {
         .await
         .unwrap();
 
-    info!("checkpoint 1454");
+    info!("checkpoint");
+
+    for _ in 0..10 {
+        let x = rest_client.get_index().await.unwrap().into_inner();
+        println!("index={:?}", x);
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 
     cli.set_delegated_voter(owner_cli_index, new_voter_cli_index)
         .await
         .unwrap();
 
-    info!("checkpoint 1460");
+    for _ in 0..10 {
+        let x = rest_client.get_index().await.unwrap().into_inner();
+        println!("index={:?}", x);
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+
+    info!("checkpoint");
 
     cli.set_operator(owner_cli_index, new_operator_cli_index)
         .await
         .unwrap();
 
-    info!("checkpoint 1466");
+    info!("checkpoint");
 
     cli.transfer_coins(
         owner_cli_index,
