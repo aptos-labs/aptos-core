@@ -602,9 +602,9 @@ async fn test_large_total_stake() {
     }
 
     let result = cli.join_validator_set(validator_cli_index, None)
-        .await
-        .unwrap();
+        .await;
     println!("result={:?}", result);
+    result.unwrap();
 
     reconfig(
         &rest_client,
