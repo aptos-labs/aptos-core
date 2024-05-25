@@ -1451,14 +1451,19 @@ async fn test_owner_create_and_delegate_flow() {
         .await
         .unwrap();
 
+    info!("checkpoint 1454");
+
     cli.set_delegated_voter(owner_cli_index, new_voter_cli_index)
         .await
         .unwrap();
+
+    info!("checkpoint 1460");
+
     cli.set_operator(owner_cli_index, new_operator_cli_index)
         .await
         .unwrap();
 
-    info!("checkpoint 1461");
+    info!("checkpoint 1466");
 
     cli.transfer_coins(
         owner_cli_index,
