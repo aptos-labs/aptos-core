@@ -108,7 +108,6 @@ pub fn run_benchmark<V>(
     pruner_config: PrunerConfig,
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
-
 ) where
     V: TransactionBlockExecutor + 'static,
 {

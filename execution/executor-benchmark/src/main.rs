@@ -23,6 +23,7 @@ use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
+use aptos_types::on_chain_config::FeatureFlag;
 use aptos_vm::AptosVM;
 use clap::{ArgGroup, Parser, Subcommand};
 use once_cell::sync::Lazy;
@@ -31,8 +32,6 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
-
-use aptos_types::on_chain_config::FeatureFlag;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -399,7 +398,9 @@ where
                 "Enable and disable feature flags cannot overlap."
             );
             aptos_types::on_chain_config::hack_enable_default_features_for_genesis(enable_feature);
-            aptos_types::on_chain_config::hack_disable_default_features_for_genesis(disable_feature);
+            aptos_types::on_chain_config::hack_disable_default_features_for_genesis(
+                disable_feature,
+            );
 
             let transaction_mix = if transaction_type.is_empty() {
                 None
@@ -418,7 +419,9 @@ where
 
             if let Some(hotspot_probability) = opt.hotspot_probability {
                 if !(0.5..1.0).contains(&hotspot_probability) {
-                    panic!("Parameter hotspot-probability has to be a decimal number in [0.5, 1.0).");
+                    panic!(
+                        "Parameter hotspot-probability has to be a decimal number in [0.5, 1.0)."
+                    );
                 }
             }
 
