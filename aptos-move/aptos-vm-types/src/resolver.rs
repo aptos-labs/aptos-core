@@ -15,7 +15,11 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    errors::{PartialVMError, PartialVMResult},
+    file_format_common::{LEGACY_IDENTIFIER_SIZE_MAX, VERSION_MAX},
+};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, HashMap};
@@ -268,8 +272,17 @@ where
                 state_key, e
             ))
         })?;
+
+        // FIXME(George): This function should also fetch deserializer config!
+        //  Use default for now.
+        let dummy_deserializer_config =
+            DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX);
+
         Ok(match maybe_state_value {
-            Some(state_value) => Some(OnChainUnverifiedModule::from_state_value(state_value)?),
+            Some(state_value) => Some(OnChainUnverifiedModule::from_state_value(
+                state_value,
+                &dummy_deserializer_config,
+            )?),
             None => None,
         })
     }

@@ -21,13 +21,12 @@ use aptos_types::{
     executable::ModulePath,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::ChangeSet as StorageChangeSet,
-    vm::modules::{ModuleWriteOp, OnChainUnverifiedModule},
+    vm::modules::ModuleWriteOp,
     write_set::{TransactionWrite, WriteOp, WriteOpSize, WriteSetMut},
 };
 use move_binary_format::{
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -244,7 +243,7 @@ impl VMChangeSet {
         deserializer_config: &DeserializerConfig,
         change_set: StorageChangeSet,
         checker: &dyn CheckChangeSet,
-    ) -> VMResult<Self> {
+    ) -> PartialVMResult<Self> {
         let (write_set, events) = change_set.into_inner();
 
         // There should be no aggregator writes if we have a change set from
@@ -254,18 +253,7 @@ impl VMChangeSet {
 
         for (state_key, write_op) in write_set {
             if state_key.is_module_path() {
-                let module = match write_op.bytes() {
-                    Some(bytes) => {
-                        let module =
-                            CompiledModule::deserialize_with_config(bytes, deserializer_config)
-                                .map_err(|e| e.finish(Location::Undefined))?;
-                        Arc::new(module)
-                    },
-                    // In practice, this should never be the case, as modules cannot be deleted.
-                    // TODO: We should probably throw an invariant violation here?
-                    None => unreachable!("Modules cannot be deleted"),
-                };
-                let write_op = ModuleWriteOp { write_op, module };
+                let write_op = ModuleWriteOp::from_write_op(write_op, deserializer_config)?;
                 module_write_set.insert(state_key, write_op);
             } else {
                 // TODO[agg_v1](fix) While everything else must be a resource, first
@@ -287,9 +275,7 @@ impl VMChangeSet {
             aggregator_v1_delta_set: BTreeMap::new(),
             events,
         };
-        checker
-            .check_change_set(&change_set)
-            .map_err(|e| e.finish(Location::Undefined))?;
+        checker.check_change_set(&change_set)?;
         Ok(change_set)
     }
 
@@ -340,7 +326,11 @@ impl VMChangeSet {
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         );
-        write_set_mut.extend(module_write_set.into_iter().map(|(k, m)| (k, m.write_op)));
+        write_set_mut.extend(
+            module_write_set
+                .into_iter()
+                .map(|(k, m)| (k, m.into_write_op())),
+        );
         write_set_mut.extend(aggregator_v1_write_set);
 
         let events = events.into_iter().map(|(e, _)| e).collect();
@@ -350,20 +340,30 @@ impl VMChangeSet {
         Ok(StorageChangeSet::new(write_set, events))
     }
 
-    pub fn concrete_write_set_iter(&self) -> impl Iterator<Item = (&StateKey, Option<&WriteOp>)> {
+    /// Returns storage writes, and panics if abstract writes cannot be
+    /// converted into storage representation. Use with caution.
+    pub fn concrete_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
         self.resource_write_set()
             .iter()
-            .map(|(k, v)| (k, v.try_as_concrete_write()))
+            .map(|(k, w)| {
+                (
+                    k.clone(),
+                    w.clone()
+                        .try_into_concrete_write()
+                        .expect("expect only concrete write ops"),
+                )
+            })
             .chain(
                 self.module_write_set()
                     .iter()
-                    .map(|(k, m)| (k, Some(&m.write_op)))
+                    .map(|(k, w)| (k.clone(), w.clone().into_write_op()))
                     .chain(
                         self.aggregator_v1_write_set()
                             .iter()
-                            .map(|(k, v)| (k, Some(v))),
+                            .map(|(k, w)| (k.clone(), w.clone())),
                     ),
             )
+            .collect()
     }
 
     pub fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
@@ -407,7 +407,7 @@ impl VMChangeSet {
                 key,
                 op_size: op.write_op_size(),
                 prev_size: executor_view.get_module_size_in_bytes(key)?.unwrap_or(0) as u64,
-                metadata_mut: op.write_op.get_metadata_mut(),
+                metadata_mut: op.get_metadata_mut(),
             })
         });
         let v1_aggregators = self.aggregator_v1_write_set.iter_mut().map(|(key, op)| {
@@ -430,14 +430,6 @@ impl VMChangeSet {
 
     pub fn module_write_set(&self) -> &BTreeMap<StateKey, ModuleWriteOp> {
         &self.module_write_set
-    }
-
-    pub fn onchain_modules(&self) -> BTreeMap<StateKey, OnChainUnverifiedModule> {
-        self.module_write_set
-            .clone()
-            .into_iter()
-            .map(|(k, w)| (k, OnChainUnverifiedModule::from_module_write(w)))
-            .collect()
     }
 
     // Called by `into_transaction_output_with_materialized_writes` only.
@@ -683,19 +675,10 @@ impl VMChangeSet {
         for (key, additional_write_op) in additional_write_set.into_iter() {
             match write_set.entry(key) {
                 Occupied(mut entry) => {
-                    let noop = !WriteOp::squash(
-                        &mut entry.get_mut().write_op,
-                        additional_write_op.write_op,
-                    )
-                    .map_err(|e| {
+                    ModuleWriteOp::squash(entry.get_mut(), additional_write_op).map_err(|e| {
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .with_message(format!("Error while squashing two write ops: {}.", e))
                     })?;
-                    if noop {
-                        entry.remove();
-                    } else {
-                        entry.get_mut().module = additional_write_op.module;
-                    }
                 },
                 Vacant(entry) => {
                     entry.insert(additional_write_op);

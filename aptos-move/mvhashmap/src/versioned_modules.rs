@@ -165,7 +165,7 @@ impl<K: Hash + Clone + Eq, X: Executable> VersionedModules<K, X> {
                 .read(txn_idx)
                 .map(|(module, hash)| match v.executables.get(&hash) {
                     Some(x) => Executable((x.clone(), ExecutableDescriptor::Published(hash))),
-                    None => Module((module, hash)),
+                    None => Module(module),
                 }),
             None => Err(NotFound),
         }

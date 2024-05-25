@@ -34,7 +34,7 @@ use std::{borrow::Borrow, sync::Arc};
 
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,
-    pub(crate) data_cache: TransactionDataCache<'r, Arc<CompiledModule>>,
+    pub(crate) data_cache: TransactionDataCache<'r>,
     pub(crate) module_store: ModuleStorageAdapter,
     pub(crate) native_extensions: NativeContextExtensions<'r>,
 }
@@ -327,7 +327,6 @@ impl<'r, 'l> Session<'r, 'l> {
             .load_resource(self.move_vm.runtime.loader(), addr, ty, &self.module_store)
     }
 
-    // TODO: This is only needed for metadata, rename!
     pub fn load_module(&self, module_id: &ModuleId) -> VMResult<Arc<CompiledModule>> {
         self.data_cache
             .load_module(module_id)

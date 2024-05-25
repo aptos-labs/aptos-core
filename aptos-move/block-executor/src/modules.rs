@@ -9,10 +9,14 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::OnChainUnverifiedModule,
 };
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    errors::PartialVMResult,
+    file_format_common::{LEGACY_IDENTIFIER_SIZE_MAX, VERSION_MAX},
+};
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
-    pub(crate) fn get_module_state_value_impl(
+    pub(crate) fn get_onchain_module_impl(
         &self,
         key: &T::Key,
     ) -> PartialVMResult<Option<OnChainUnverifiedModule>> {
@@ -36,7 +40,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 let modules = state.versioned_map.modules();
                 match modules.fetch_module(key, self.txn_idx) {
                     Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
-                    Ok(Module((v, _))) => Ok(Some(v)),
+                    Ok(Module(v)) => Ok(Some(v)),
                     Err(Dependency(_)) => {
                         // Return anything (e.g. module does not exist) to avoid waiting,
                         // because parallel execution will fall back to sequential anyway.
@@ -56,7 +60,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             },
             ViewState::Unsync(state) => {
                 state.read_set.borrow_mut().module_reads.insert(key.clone());
-                match state.unsync_map.fetch_module_data(key) {
+                match state.unsync_map.fetch_module(key) {
                     Some(m) => Ok(Some(m)),
                     None => match self.get_base_on_chain_module(key)? {
                         Some(m) => {
@@ -75,7 +79,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         key: &T::Key,
     ) -> PartialVMResult<Option<OnChainUnverifiedModule>> {
         Ok(match self.get_raw_base_value(key)? {
-            Some(state_value) => Some(OnChainUnverifiedModule::from_state_value(state_value)?),
+            Some(state_value) => {
+                // FIXME(George): This function should also take deserializer config.
+                //  Use default for now.
+                let dummy_deserializer_config =
+                    DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX);
+
+                Some(OnChainUnverifiedModule::from_state_value(
+                    state_value,
+                    &dummy_deserializer_config,
+                )?)
+            },
             None => None,
         })
     }

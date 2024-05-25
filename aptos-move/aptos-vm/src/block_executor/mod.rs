@@ -185,7 +185,15 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .as_ref()
             .expect("Output must be set to get module writes")
             .change_set()
-            .onchain_modules()
+            .module_write_set()
+            .iter()
+            .map(|(k, w)| {
+                (
+                    k.clone(),
+                    OnChainUnverifiedModule::from_module_write(w.clone()),
+                )
+            })
+            .collect()
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.

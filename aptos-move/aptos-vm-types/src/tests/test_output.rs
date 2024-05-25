@@ -3,34 +3,27 @@
 
 use crate::{
     output::VMOutput,
-    tests::utils::{as_state_key, build_vm_output, mock_add, mock_create_with_layout, mock_modify},
+    tests::utils::{
+        as_state_key, build_vm_output, mock_add, mock_create_with_layout, mock_modify,
+        mock_module_modify,
+    },
 };
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_language_e2e_tests::data_store::FakeDataStore;
-use aptos_types::{
-    state_store::state_key::StateKey, transaction::TransactionOutput, write_set::WriteOp,
-};
+use aptos_types::{state_store::state_key::StateKey, transaction::TransactionOutput};
 use claims::{assert_err, assert_matches, assert_ok};
+use move_binary_format::file_format::basic_test_module;
 use move_core_types::vm_status::{AbortLocation, VMStatus};
 use std::collections::BTreeMap;
 
 fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
-    let vm_output_writes = &vm_output
-        .change_set()
-        .concrete_write_set_iter()
-        .map(|(k, v)| {
-            (
-                k.clone(),
-                v.expect("expect only concrete write ops").clone(),
-            )
-        })
-        .collect::<BTreeMap<StateKey, WriteOp>>();
+    let vm_output_writes = vm_output.change_set().concrete_write_set();
 
     // A way to obtain a reference to the map inside a WriteSet.
     let mut write_set_mut = txn_output.write_set().clone().into_mut();
     let txn_output_writes = write_set_mut.as_inner_mut();
 
-    assert_eq!(vm_output_writes, txn_output_writes);
+    assert_eq!(&vm_output_writes, txn_output_writes);
     assert_eq!(vm_output.gas_used(), txn_output.gas_used());
     assert_eq!(vm_output.status(), txn_output.status());
 }
@@ -40,7 +33,7 @@ fn test_ok_output_equality_no_deltas() {
     let state_view = FakeDataStore::default();
     let vm_output = build_vm_output(
         vec![mock_create_with_layout("0", 0, None)],
-        vec![], // TODO: vec![mock_modify("1", 1)],
+        vec![mock_module_modify("1", basic_test_module())],
         vec![],
         vec![mock_modify("2", 2)],
         vec![],
@@ -75,7 +68,7 @@ fn test_ok_output_equality_with_deltas() {
 
     let vm_output = build_vm_output(
         vec![mock_create_with_layout("0", 0, None)],
-        vec![], // TODO: vec![mock_modify("1", 1)],
+        vec![mock_module_modify("1", basic_test_module())],
         vec![],
         vec![mock_modify("2", 2)],
         vec![mock_add(delta_key, 300)],

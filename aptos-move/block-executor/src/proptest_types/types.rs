@@ -428,7 +428,6 @@ impl<
         E: Debug + Clone + Send + Sync + TransactionEvent + 'static,
     > Transaction for MockTransaction<K, E>
 {
-    type Code = ValueType;
     type Event = E;
     type Identifier = DelayedFieldID;
     type Key = K;
@@ -844,13 +843,7 @@ where
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     // TODO: test aggregator reads.
                     if k.is_module_path() {
-                        match view.get_onchain_module(k) {
-                            Ok(_v) => {
-                                unimplemented!()
-                                // read_results.push(v.map(Into::into))
-                            },
-                            Err(_) => read_results.push(None),
-                        }
+                        // TODO: Add module tests
                     } else {
                         match view.get_resource_bytes(k, None) {
                             Ok(v) => read_results.push(v.map(Into::into)),
@@ -1004,12 +997,8 @@ where
     }
 
     fn module_write_set(&self) -> BTreeMap<K, OnChainUnverifiedModule> {
-        todo!()
-        // self.writes
-        //     .iter()
-        //     .filter(|(k, _)| k.is_module_path())
-        //     .cloned()
-        //     .collect()
+        // TODO: Support module writes
+        BTreeMap::new()
     }
 
     // Aggregator v1 writes are included in resource_write_set for tests (writes are produced

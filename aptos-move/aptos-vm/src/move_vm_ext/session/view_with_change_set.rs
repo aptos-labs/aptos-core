@@ -349,8 +349,16 @@ mod test {
     };
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
+    use aptos_types::{
+        account_address::AccountAddress, vm::modules::ModuleWriteOp, write_set::WriteOp,
+    };
     use aptos_vm_types::{abstract_write_op::GroupWrite, check_change_set::CheckChangeSet};
+    use move_binary_format::{
+        deserializer::DeserializerConfig,
+        file_format::{basic_test_module, empty_module},
+        file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_DEFAULT},
+        CompiledModule,
+    };
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
@@ -372,13 +380,22 @@ mod test {
         WriteOp::legacy_modification(serialize(&v).into())
     }
 
+    fn module_write(bytes: Vec<u8>) -> ModuleWriteOp {
+        let deserializer_config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+        ModuleWriteOp::from_write_op(
+            WriteOp::legacy_modification(bytes.into()),
+            &deserializer_config,
+        )
+        .unwrap()
+    }
+
     fn read_resource(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
         bcs::from_bytes(&view.get_resource_bytes(&key(s), None).unwrap().unwrap()).unwrap()
     }
 
-    fn read_module(_view: &ExecutorViewWithChangeSet, _s: impl ToString) -> u128 {
-        todo!()
-        // bcs::from_bytes(&view.get_module_bytes(&key(s)).unwrap().unwrap()).unwrap()
+    fn read_module(view: &ExecutorViewWithChangeSet, s: impl ToString) -> Arc<CompiledModule> {
+        let m = view.get_onchain_module(&key(s)).unwrap().unwrap();
+        m.module
     }
 
     fn read_aggregator(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
@@ -429,8 +446,23 @@ mod test {
     #[test]
     fn test_change_set_state_view() {
         let mut state_view = FakeDataStore::default();
-        state_view.set_legacy(key("module_base"), serialize(&10));
-        state_view.set_legacy(key("module_both"), serialize(&20));
+
+        let mut module_1 = empty_module();
+        module_1.version = VERSION_DEFAULT;
+        let mut module_bytes_1 = vec![];
+        module_1
+            .serialize_for_version(Some(VERSION_DEFAULT), &mut module_bytes_1)
+            .unwrap();
+
+        let mut module_2 = basic_test_module();
+        module_2.version = VERSION_DEFAULT;
+        let mut module_bytes_2 = vec![];
+        module_2
+            .serialize_for_version(Some(VERSION_DEFAULT), &mut module_bytes_2)
+            .unwrap();
+
+        state_view.set_legacy(key("module_base"), module_bytes_1.clone());
+        state_view.set_legacy(key("module_both"), module_bytes_2.clone());
 
         state_view.set_legacy(key("resource_base"), serialize(&30));
         state_view.set_legacy(key("resource_both"), serialize(&40));
@@ -452,8 +484,12 @@ mod test {
         ]);
 
         let module_write_set = BTreeMap::from([
-            // (key("module_both"), write(100)),
-            // (key("module_write_set"), write(110)),
+            // Overwrite different module.
+            (key("module_both"), module_write(module_bytes_1.clone())),
+            (
+                key("module_write_set"),
+                module_write(module_bytes_2.clone()),
+            ),
         ]);
 
         let aggregator_v1_write_set = BTreeMap::from([
@@ -519,9 +555,9 @@ mod test {
             change_set,
         );
 
-        assert_eq!(read_module(&view, "module_base"), 10);
-        assert_eq!(read_module(&view, "module_both"), 100);
-        assert_eq!(read_module(&view, "module_write_set"), 110);
+        assert_eq!(read_module(&view, "module_base").as_ref(), &module_1);
+        assert_eq!(read_module(&view, "module_both").as_ref(), &module_1);
+        assert_eq!(read_module(&view, "module_write_set").as_ref(), &module_2);
 
         assert_eq!(read_resource(&view, "resource_base"), 30);
         assert_eq!(read_resource(&view, "resource_both"), 80);

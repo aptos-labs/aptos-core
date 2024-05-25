@@ -935,7 +935,6 @@ mod test {
     struct TestTransactionType {}
 
     impl Transaction for TestTransactionType {
-        type Code = ValueType;
         type Event = MockEvent;
         type Identifier = DelayedFieldID;
         type Key = KeyType<u32>;

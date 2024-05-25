@@ -143,6 +143,9 @@ impl<M, R> AccountChangeSet<M, R> {
 
     pub fn add_module_op(&mut self, name: Identifier, op: Op<M>) -> anyhow::Result<()> {
         use btree_map::Entry::*;
+        if matches!(op, Op::Delete) {
+            bail!("Modules cannot be deleted")
+        }
 
         match self.modules.entry(name) {
             Occupied(entry) => bail!("Module {} already exists", entry.key()),
@@ -295,6 +298,7 @@ impl<M, R> ChangeSet<M, R> {
         })
     }
 
+    /// Remaps changes to modules into an alternative representation.
     pub fn map_modules<F, N>(self, f: F) -> ChangeSet<N, R>
     where
         F: Fn(M) -> N + Copy,

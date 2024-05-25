@@ -9,9 +9,8 @@ use crate::{
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
 };
-use move_binary_format::{
-    errors::{ExecutionState, Location, PartialVMError, PartialVMResult, VMResult},
-    CompiledModule,
+use move_binary_format::errors::{
+    ExecutionState, Location, PartialVMError, PartialVMResult, VMResult,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -99,7 +98,7 @@ impl NativeFunctions {
 
 pub struct NativeContext<'a, 'b, 'c> {
     interpreter: &'a mut Interpreter,
-    data_store: &'a mut TransactionDataCache<'c, Arc<CompiledModule>>,
+    data_store: &'a mut TransactionDataCache<'c>,
     resolver: &'a Resolver<'a>,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
@@ -109,7 +108,7 @@ pub struct NativeContext<'a, 'b, 'c> {
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub(crate) fn new(
         interpreter: &'a mut Interpreter,
-        data_store: &'a mut TransactionDataCache<'c, Arc<CompiledModule>>,
+        data_store: &'a mut TransactionDataCache<'c>,
         resolver: &'a Resolver<'a>,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_balance: InternalGas,

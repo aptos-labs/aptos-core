@@ -48,11 +48,7 @@ fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
             .status_code(),
         status_code
     );
-    let write_set: Vec<(&StateKey, &WriteOp)> = output
-        .change_set()
-        .concrete_write_set_iter()
-        .map(|(k, v)| (k, assert_some!(v)))
-        .collect();
+    let write_set = output.change_set().concrete_write_set();
     assert!(!write_set.is_empty());
     assert_eq!(output.gas_used(), max_gas_amount - balance);
     assert!(!output.status().is_discarded());

@@ -21,7 +21,12 @@ use aptos_types::{
     vm::modules::ModuleWriteOp,
     write_set::WriteOp,
 };
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    errors::PartialVMResult,
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_DEFAULT},
+    CompiledModule,
+};
 use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
@@ -74,6 +79,41 @@ pub(crate) fn mock_modify(k: impl ToString, v: u128) -> (StateKey, WriteOp) {
         as_state_key!(k),
         WriteOp::legacy_modification(as_bytes!(v).into()),
     )
+}
+
+pub(crate) fn mock_module_modify(
+    k: impl ToString,
+    module: CompiledModule,
+) -> (StateKey, ModuleWriteOp) {
+    mock_module_write_op(k, module, false)
+}
+
+pub(crate) fn mock_module_create(
+    k: impl ToString,
+    module: CompiledModule,
+) -> (StateKey, ModuleWriteOp) {
+    mock_module_write_op(k, module, true)
+}
+
+pub(crate) fn mock_module_write_op(
+    k: impl ToString,
+    mut module: CompiledModule,
+    is_creation: bool,
+) -> (StateKey, ModuleWriteOp) {
+    module.version = VERSION_DEFAULT;
+    let mut module_bytes = vec![];
+    module
+        .serialize_for_version(Some(VERSION_DEFAULT), &mut module_bytes)
+        .unwrap();
+
+    let write_op = if is_creation {
+        WriteOp::legacy_creation(module_bytes.into())
+    } else {
+        WriteOp::legacy_modification(module_bytes.into())
+    };
+    let deserializer_config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+    let module_write_op = ModuleWriteOp::from_write_op(write_op, &deserializer_config).unwrap();
+    (as_state_key!(k), module_write_op)
 }
 
 pub(crate) fn mock_delete(k: impl ToString) -> (StateKey, WriteOp) {
@@ -180,14 +220,14 @@ impl VMChangeSetBuilder {
         self
     }
 
-    // pub(crate) fn with_module_write_set(
-    //     mut self,
-    //     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    // ) -> Self {
-    //     assert!(self.module_write_set.is_empty());
-    //     self.module_write_set.extend(module_write_set);
-    //     self
-    // }
+    pub(crate) fn with_module_write_set(
+        mut self,
+        module_write_set: impl IntoIterator<Item = (StateKey, ModuleWriteOp)>,
+    ) -> Self {
+        assert!(self.module_write_set.is_empty());
+        self.module_write_set.extend(module_write_set);
+        self
+    }
 
     #[allow(dead_code)]
     pub(crate) fn with_events(
@@ -246,7 +286,7 @@ impl VMChangeSetBuilder {
 // For testing, output has always a success execution status and uses 100 gas units.
 pub(crate) fn build_vm_output(
     resource_write_set: impl IntoIterator<Item = (StateKey, AbstractResourceWriteOp)>,
-    _module_write_set: impl IntoIterator<Item = (StateKey, ModuleWriteOp)>,
+    module_write_set: impl IntoIterator<Item = (StateKey, ModuleWriteOp)>,
     delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
@@ -256,8 +296,7 @@ pub(crate) fn build_vm_output(
     VMOutput::new(
         VMChangeSetBuilder::new()
             .with_resource_write_set(resource_write_set)
-            // TODO
-            // .with_module_write_set(module_write_set)
+            .with_module_write_set(module_write_set)
             .with_delayed_field_change_set(delayed_field_change_set)
             .with_aggregator_v1_write_set(aggregator_v1_write_set)
             .with_aggregator_v1_delta_set(aggregator_v1_delta_set)
@@ -316,14 +355,14 @@ impl ExpandedVMChangeSetBuilder {
         self
     }
 
-    // pub(crate) fn with_module_write_set(
-    //     mut self,
-    //     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    // ) -> Self {
-    //     assert!(self.module_write_set.is_empty());
-    //     self.module_write_set.extend(module_write_set);
-    //     self
-    // }
+    pub(crate) fn with_module_write_set(
+        mut self,
+        module_write_set: impl IntoIterator<Item = (StateKey, ModuleWriteOp)>,
+    ) -> Self {
+        assert!(self.module_write_set.is_empty());
+        self.module_write_set.extend(module_write_set);
+        self
+    }
 
     pub(crate) fn with_aggregator_v1_write_set(
         mut self,

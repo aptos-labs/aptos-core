@@ -33,8 +33,7 @@ fn match_unresolved(
 
 #[test]
 fn unsync_map_data_basic() {
-    let map: UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()> =
-        UnsyncMap::new();
+    let map: UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ()> = UnsyncMap::new();
 
     let ap = KeyType(b"/foo/b".to_vec());
 

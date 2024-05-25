@@ -177,14 +177,27 @@ impl<'r> WriteOpConverter<'r> {
         let (move_storage_op, module) = match move_storage_op {
             MoveStorageOp::New((m, bytes)) => (MoveStorageOp::New(bytes), m),
             MoveStorageOp::Modify((m, bytes)) => (MoveStorageOp::Modify(bytes), m),
-            MoveStorageOp::Delete => unreachable!("Modules cannot be deleted"),
+            MoveStorageOp::Delete => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Module write cannot be a deletion".to_string()),
+                )
+            },
         };
         let write_op = self.convert(
             state_value_metadata,
             move_storage_op,
             legacy_creation_as_modification,
         )?;
-        Ok(ModuleWriteOp { write_op, module })
+        Ok(match write_op {
+            WriteOp::Creation { data, metadata } => {
+                ModuleWriteOp::new(true, metadata, module, data)
+            },
+            WriteOp::Modification { data, metadata } => {
+                ModuleWriteOp::new(false, metadata, module, data)
+            },
+            WriteOp::Deletion { .. } => unreachable!("Move storage op is not deletion"),
+        })
     }
 
     pub(crate) fn convert_resource(

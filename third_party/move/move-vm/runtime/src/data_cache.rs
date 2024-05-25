@@ -8,7 +8,7 @@ use crate::{
 };
 use bytes::Bytes;
 use move_binary_format::{
-    deserializer::DeserializerConfig, errors::*, file_format::CompiledScript,
+    deserializer::DeserializerConfig, errors::*, file_format::CompiledScript, CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -32,14 +32,14 @@ use std::{
     sync::Arc,
 };
 
-struct AccountDataCache<M> {
+struct AccountDataCache {
     // The bool flag in the `resources` indicates whether the resource contains
     // an aggregator or snapshot.
     resources: BTreeMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
-    modules: BTreeMap<Identifier, ((M, Bytes), bool)>,
+    modules: BTreeMap<Identifier, ((Arc<CompiledModule>, Bytes), bool)>,
 }
 
-impl<M: Clone> AccountDataCache<M> {
+impl AccountDataCache {
     fn new() -> Self {
         Self {
             resources: BTreeMap::new(),
@@ -48,11 +48,11 @@ impl<M: Clone> AccountDataCache<M> {
     }
 }
 
-fn load_module_impl<M: Clone>(
-    remote: &dyn MoveResolver<M, PartialVMError>,
-    account_map: &BTreeMap<AccountAddress, AccountDataCache<M>>,
+fn load_module_impl(
+    remote: &dyn MoveResolver<Arc<CompiledModule>, PartialVMError>,
+    account_map: &BTreeMap<AccountAddress, AccountDataCache>,
     module_id: &ModuleId,
-) -> PartialVMResult<(M, usize, [u8; 32])> {
+) -> PartialVMResult<(Arc<CompiledModule>, usize, [u8; 32])> {
     if let Some(account_cache) = account_map.get(module_id.address()) {
         if let Some(((m, b), _is_republishing)) = account_cache.modules.get(module_id.name()) {
             // FIXME(George): Is it better to cache this information on publish?
@@ -84,18 +84,18 @@ fn load_module_impl<M: Clone>(
 /// The Move VM takes a `DataStore` in input and this is the default and correct implementation
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
-pub(crate) struct TransactionDataCache<'r, M> {
-    remote: &'r dyn MoveResolver<M, PartialVMError>,
-    account_map: BTreeMap<AccountAddress, AccountDataCache<M>>,
+pub(crate) struct TransactionDataCache<'r> {
+    remote: &'r dyn MoveResolver<Arc<CompiledModule>, PartialVMError>,
+    account_map: BTreeMap<AccountAddress, AccountDataCache>,
 
     deserializer_config: DeserializerConfig,
     compiled_scripts: BTreeMap<[u8; 32], Arc<CompiledScript>>,
 }
 
-impl<'r, M: Clone> TransactionDataCache<'r, M> {
+impl<'r> TransactionDataCache<'r> {
     pub(crate) fn empty(
         deserializer_config: DeserializerConfig,
-        remote: &'r impl MoveResolver<M, PartialVMError>,
+        remote: &'r impl MoveResolver<Arc<CompiledModule>, PartialVMError>,
     ) -> Self {
         TransactionDataCache {
             remote,
@@ -112,7 +112,7 @@ impl<'r, M: Clone> TransactionDataCache<'r, M> {
     pub(crate) fn into_effects(
         self,
         loader: &Loader,
-    ) -> PartialVMResult<ChangeSet<(M, Bytes), Bytes>> {
+    ) -> PartialVMResult<ChangeSet<(Arc<CompiledModule>, Bytes), Bytes>> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
                 value
@@ -128,12 +128,12 @@ impl<'r, M: Clone> TransactionDataCache<'r, M> {
 
     /// Same like `into_effects`, but also allows clients to select the format of
     /// produced effects for resources.
-    pub(crate) fn into_custom_effects<Resource>(
+    pub(crate) fn into_custom_effects<R>(
         self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+        resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<R>,
         loader: &Loader,
-    ) -> PartialVMResult<ChangeSet<(M, Bytes), Resource>> {
-        let mut change_set = ChangeSet::<(M, Bytes), Resource>::empty();
+    ) -> PartialVMResult<ChangeSet<(Arc<CompiledModule>, Bytes), R>> {
+        let mut change_set = ChangeSet::<(Arc<CompiledModule>, Bytes), R>::empty();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
             for (module_name, (module_blob, is_republishing)) in account_data_cache.modules {
@@ -276,7 +276,7 @@ impl<'r, M: Clone> TransactionDataCache<'r, M> {
         ))
     }
 
-    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<M> {
+    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<Arc<CompiledModule>> {
         Ok(load_module_impl(self.remote, &self.account_map, module_id)?.0)
     }
 
@@ -310,7 +310,7 @@ impl<'r, M: Clone> TransactionDataCache<'r, M> {
         &mut self,
         module_id: &ModuleId,
         allow_loading_failure: bool,
-    ) -> VMResult<(M, usize, [u8; 32])> {
+    ) -> VMResult<(Arc<CompiledModule>, usize, [u8; 32])> {
         match load_module_impl(self.remote, &self.account_map, module_id)
             .map_err(|err| err.finish(Location::Undefined))
         {
@@ -323,7 +323,7 @@ impl<'r, M: Clone> TransactionDataCache<'r, M> {
     pub(crate) fn publish_module(
         &mut self,
         module_id: ModuleId,
-        module: M,
+        module: Arc<CompiledModule>,
         blob: Bytes,
         is_republishing: bool,
     ) -> VMResult<()> {

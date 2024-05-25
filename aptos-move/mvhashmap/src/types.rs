@@ -5,7 +5,6 @@ use aptos_aggregator::{
     delta_change_set::DeltaOp,
     types::{DelayedFieldsSpeculativeError, PanicOr},
 };
-use aptos_crypto::hash::HashValue;
 use aptos_types::{
     executable::ExecutableDescriptor,
     vm::modules::OnChainUnverifiedModule,
@@ -112,11 +111,7 @@ pub enum MVModulesOutput<X> {
     /// Arc to the executable corresponding to the latest module, and a descriptor
     /// with either the module hash or indicator that the module is from storage.
     Executable((Arc<X>, ExecutableDescriptor)),
-    /// Arc to the latest module, together with its (cryptographic) hash. Note that
-    /// this can't be a storage-level module, as it's from multi-versioned modules map.
-    /// The Option can be None if HashValue can't be computed, currently may happen
-    /// if the latest entry corresponded to the module deletion.
-    Module((OnChainUnverifiedModule, HashValue)),
+    Module(OnChainUnverifiedModule),
 }
 
 // TODO[agg_v2](cleanup): once VersionedAggregators is separated from the MVHashMap,

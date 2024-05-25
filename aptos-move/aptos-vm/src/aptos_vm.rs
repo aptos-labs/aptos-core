@@ -1892,7 +1892,7 @@ impl AptosVM {
                     change_set.clone(),
                     &change_set_configs,
                 )
-                .map_err(|e| e.into_vm_status())?;
+                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
 
                 // validate_waypoint_change_set checks that this is true, so we only log here.
                 if !Self::should_restart_execution(&change) {
