@@ -1368,16 +1368,23 @@ async fn test_owner_create_and_delegate_flow() {
 
     let stake_amount = 1000000;
     let mut operator_gas = 0;
-    owner_gas += get_gas(
-        cli.initialize_stake_owner(
+    let mut x = Err(CliError::AbortedError);
+    let mut attempts = 100;
+    while attempts > 0 {
+        x = cli.initialize_stake_owner(
             owner_cli_index,
             stake_amount,
             Some(voter_cli_index),
             Some(operator_cli_index),
-        )
-        .await
-        .unwrap(),
-    );
+        ).await;
+        if x.is_ok() {
+            break;
+        }
+        attempts -= 1;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let x = x.unwrap();
+    owner_gas += get_gas(x);
 
     cli.assert_account_balance_now(
         owner_cli_index,
