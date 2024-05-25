@@ -1382,7 +1382,7 @@ async fn test_owner_create_and_delegate_flow() {
     operator_gas += get_gas(x);
 
     let y = {
-        let mut attempts_remaining = 100;
+        let mut attempts = 100;
         let mut result = Err(CliError::AbortedError);
         while attempts > 0 {
             result = cli.update_validator_network_addresses(
