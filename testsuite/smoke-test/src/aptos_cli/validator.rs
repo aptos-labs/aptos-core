@@ -27,7 +27,7 @@ use aptos_types::{
     network_address::DnsName,
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, ExecutionConfigV1, LeaderReputationType,
-        OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
+        OnChainConsensusConfig, OnChainExecutionConfig,
         ProposerAndVoterConfig, ProposerElectionType, TransactionShufflerType, ValidatorSet,
     },
     PeerId,
@@ -39,6 +39,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use aptos::common::types::{CliError, CliTypedResult};
 
 #[tokio::test]
 async fn test_analyze_validators() {
@@ -1358,30 +1359,52 @@ async fn test_owner_create_and_delegate_flow() {
 
     let port = 6543;
 
-    operator_gas += get_gas(
-        cli.update_consensus_key(
-            operator_cli_index,
-            Some(owner_cli_index),
-            operator_keys.consensus_public_key(),
-            operator_keys.consensus_proof_of_possession(),
-        )
-        .await
-        .unwrap(),
-    );
+    let x = {
+        let mut attempts = 100;
+        let mut result = Err(CliError::AbortedError);
+        while attempts > 0 {
+            result = cli.update_consensus_key(
+                operator_cli_index,
+                Some(owner_cli_index),
+                operator_keys.consensus_public_key(),
+                operator_keys.consensus_proof_of_possession(),
+            )
+                .await;
 
-    operator_gas += get_gas(
-        cli.update_validator_network_addresses(
-            operator_cli_index,
-            Some(owner_cli_index),
-            HostAndPort {
-                host: dns_name("0.0.0.0"),
-                port,
-            },
-            operator_keys.network_public_key(),
-        )
-        .await
-        .unwrap(),
-    );
+            if result.is_ok() {
+                break;
+            }
+            attempts -= 1;
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        result.unwrap()
+    };
+    operator_gas += get_gas(x);
+
+    let y = {
+        let mut attempts_remaining = 100;
+        let mut result = Err(CliError::AbortedError);
+        while attempts > 0 {
+            result = cli.update_validator_network_addresses(
+                operator_cli_index,
+                Some(owner_cli_index),
+                HostAndPort {
+                    host: dns_name("0.0.0.0"),
+                    port,
+                },
+                operator_keys.network_public_key(),
+            )
+                .await;
+
+            if result.is_ok() {
+                break;
+            }
+            attempts -= 1;
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        result.unwrap()
+    };
+    operator_gas += get_gas(y);
 
     println!("before5");
     cli.assert_account_balance_now(operator_cli_index, operator_initial_coins - operator_gas)
