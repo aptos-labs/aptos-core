@@ -94,6 +94,10 @@ module stablecoin::usdk {
     }
 
     /// Called as part of deployment to initialize the stablecoin.
+    /// Create a stablecoin token (a new Fungible Asset)
+    /// Ensure any stores for the stablecoin are untransferable. 
+    /// Store Roles, Management and State resources in the Metadata object. 
+    /// Override deposit and withdraw functions of the newly created asset/token to add custom denylist logic.
     fun init_module(usdk_signer: &signer) {
         // Create the stablecoin with primary store support.
         let constructor_ref = &object::create_named_object(usdk_signer, ASSET_SYMBOL);
@@ -114,7 +118,7 @@ module stablecoin::usdk {
         let metadata_object_signer = &object::generate_signer(constructor_ref);
         move_to(metadata_object_signer, Roles {
             master_minter: @master_minter,
-            minters: vector::empty(),
+            minters: vector[],
             pauser: @pauser,
             denylister: @denylister,
         });
