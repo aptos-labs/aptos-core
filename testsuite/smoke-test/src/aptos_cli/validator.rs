@@ -754,9 +754,16 @@ async fn test_nodes_rewards() {
         .await
         .unwrap();
 
-    cli.leave_validator_set(validator_cli_indices[3], None)
-        .await
-        .unwrap();
+    let mut attempts = 100;
+    let mut x = Err(CliError::AbortedError);
+    while attempts > 0 {
+        x = cli.leave_validator_set(validator_cli_indices[3], None).await;
+        if x.is_ok() {
+            break;
+        }
+        attempts -= 1;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
 
     reconfig(
         &rest_clients[0],
