@@ -545,8 +545,6 @@ pub(crate) fn generate_blob(data: &[u8]) -> String {
 async fn test_large_total_stake() {
     // just barelly below u64::MAX
     const BASE: u64 = 10_000_000_000_000_000_000;
-    let epoch_duration_secs = 4;
-    let dkg_secs: u64 = 5;
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_init_genesis_stake(Arc::new(|_, genesis_stake_amount| {
             // make sure we have quorum
@@ -588,12 +586,18 @@ async fn test_large_total_stake() {
 
     // Wait for an epoch switch.
     let mut last_seen = None;
-    loop {
-        let latest_epoch = rest_client.get_index().await.unwrap().into_inner().epoch.0;
-        if last_seen == Some(latest_epoch - 1) {
-            break;
+    let mut attempts_remaining = 100;
+    while attempts_remaining > 0 {
+        let latest_epoch = rest_client.get_index().await.ok().map(|r|r.into_inner().epoch.0);
+        match (latest_epoch, last_seen) {
+            (Some(x), Some(y)) if x == y + 1 => {
+                break;
+            },
+            _ => {
+            },
         }
-        last_seen = Some(latest_epoch);
+        attempts_remaining -= 1;
+        last_seen = latest_epoch;
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
 
