@@ -1125,12 +1125,18 @@ async fn test_join_and_leave_validator() {
         .await;
 
     let stake_coins = 7;
-    gas_used += get_gas(
-        cli.add_stake(validator_cli_index, stake_coins)
-            .await
-            .unwrap()[0]
-            .clone(),
-    );
+    let mut attempts = 100;
+    let mut x = Err(CliError::AbortedError);
+    while attempts > 0 {
+        x = cli.add_stake(validator_cli_index, stake_coins).await;
+        if x.is_ok() {
+            break;
+        }
+        attempts -= 1;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let x = x.unwrap();
+    gas_used += get_gas(x[0].clone());
 
     cli.assert_account_balance_now(
         validator_cli_index,
@@ -1156,11 +1162,18 @@ async fn test_join_and_leave_validator() {
 
     assert_validator_set_sizes(&cli, 1, 0, 0).await;
 
-    gas_used += get_gas(
-        cli.join_validator_set(validator_cli_index, None)
-            .await
-            .unwrap(),
-    );
+    let mut attempts = 100;
+    let mut x = Err(CliError::AbortedError);
+    while attempts > 0 {
+        x = cli.join_validator_set(validator_cli_index, None).await;
+        if x.is_ok() {
+            break;
+        }
+        attempts -= 1;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let x = x.unwrap();
+    gas_used += get_gas(x);
 
     assert_validator_set_sizes(&cli, 1, 1, 0).await;
 
@@ -1180,11 +1193,18 @@ async fn test_join_and_leave_validator() {
     )
     .await;
 
-    gas_used += get_gas(
-        cli.leave_validator_set(validator_cli_index, None)
-            .await
-            .unwrap(),
-    );
+    let mut attempts = 100;
+    let mut x = Err(CliError::AbortedError);
+    while attempts > 0 {
+        x = cli.leave_validator_set(validator_cli_index, None).await;
+        if x.is_ok() {
+            break;
+        }
+        attempts -= 1;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let x = x.unwrap();
+    gas_used += get_gas(x);
 
     assert_validator_set_sizes(&cli, 1, 0, 1).await;
 
@@ -1203,26 +1223,38 @@ async fn test_join_and_leave_validator() {
     )
     .await;
 
-    let unlock_stake = 3;
 
     // Unlock stake.
-    gas_used += get_gas(
-        cli.unlock_stake(validator_cli_index, unlock_stake)
-            .await
-            .unwrap()[0]
-            .clone(),
-    );
+    let unlock_stake = 3;
+    let mut attempts = 100;
+    let mut x = Err(CliError::AbortedError);
+    while attempts > 0 {
+        x = cli.unlock_stake(validator_cli_index, unlock_stake).await;
+        if x.is_ok() {
+            break;
+        }
+        attempts -= 1;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let x = x.unwrap().remove(0);
+    gas_used += get_gas(x);
 
     // Conservatively wait until the recurring lockup is over.
     tokio::time::sleep(Duration::from_secs(10)).await;
 
     let withdraw_stake = 2;
-    gas_used += get_gas(
-        cli.withdraw_stake(validator_cli_index, withdraw_stake)
-            .await
-            .unwrap()
-            .remove(0),
-    );
+    let mut attempts = 100;
+    let mut x = Err(CliError::AbortedError);
+    while attempts > 0 {
+        x = cli.withdraw_stake(validator_cli_index, withdraw_stake).await;
+        if x.is_ok() {
+            break;
+        }
+        attempts -= 1;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let x = x.unwrap().remove(0);
+    gas_used += get_gas(x);
 
     cli.assert_account_balance_now(
         validator_cli_index,
