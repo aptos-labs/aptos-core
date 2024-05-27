@@ -109,10 +109,7 @@
 //!    states that the same mutable reference in `temps` cannot be used twice.
 
 use crate::{
-    pipeline::{
-        livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
-        reference_safety_processor::BorrowEdgeKind::Freeze,
-    },
+    pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
     Experiment, Options,
 };
 use abstract_domain_derive::AbstractDomain;
@@ -243,6 +240,26 @@ impl BorrowEdgeKind {
             Freeze => false,
         }
     }
+
+    /// Returns true if any of the edge kinds in the set is mut
+    fn any_is_mut(kinds: &BTreeSet<BorrowEdgeKind>) -> bool {
+        kinds.iter().any(|k| k.is_mut())
+    }
+
+    /// Determines whether the region derived from this edge has overlap with the region
+    /// of the other edge. Overlap can only be excluded for field edges.
+    fn overlaps(&self, other: &BorrowEdgeKind) -> bool {
+        use BorrowEdgeKind::*;
+        match (self, other) {
+            (BorrowField(_, field1), BorrowField(_, field2)) => field1 == field2,
+            _ => true,
+        }
+    }
+
+    /// Returns true if there is any overlap between the edges in the two sets.
+    fn any_overlap(set1: &BTreeSet<BorrowEdgeKind>, set2: &BTreeSet<BorrowEdgeKind>) -> bool {
+        set1.iter().any(|k1| set2.iter().any(|k2| k1.overlaps(k2)))
+    }
 }
 
 impl LifetimeLabel {
@@ -269,17 +286,7 @@ impl BorrowEdge {
     }
 }
 
-impl BorrowEdgeKind {
-    /// Determines whether the region derived from this edge has overlap with the region
-    /// of the other edge. Overlap can only be excluded for field edges.
-    fn overlaps(&self, other: &BorrowEdgeKind) -> bool {
-        use BorrowEdgeKind::*;
-        match (self, other) {
-            (BorrowField(_, field1), BorrowField(_, field2)) => field1 == field2,
-            _ => true,
-        }
-    }
-}
+impl BorrowEdgeKind {}
 
 impl AbstractDomain for LifetimeState {
     /// The join operator of the dataflow analysis domain.
@@ -521,15 +528,63 @@ impl LifetimeState {
         self.parent_edges(label).any(|(_, e)| e.kind.is_mut())
     }
 
-    /// Returns the children grouped by their edge kind.
-    fn grouped_children(
+    /// Returns the children of the given nodes, grouped into hyper edges. A hyper edge
+    /// is constituted by a set of edge kinds and associated list of edges. Each hyper edge
+    /// represents an abstract borrow operation.
+    ///
+    /// 1) All edges which lead into the same node are considered to be part of the same hyper
+    /// edge. Consider:
+    ///
+    /// ```text
+    ///           \     /
+    ///         e1 \   / e2
+    ///             \ /
+    ///              n
+    /// ```
+    /// This forms a hyper edge `{e1.kind, e2.kind} -> [e1, e2]`. Both edges have to be in the same
+    /// group because `n` has a 'weak' borrow history, it can either stem from `e1` or `e2`.
+    ///
+    /// 2) For all other edges not leading into the same node, they are grouped according
+    /// their kind. Consider:
+    ///
+    /// ```text
+    ///            |    |
+    ///         e1 |    | e2
+    ///            |    |
+    ///           n1   n2
+    /// ```
+    /// If `e1.kind == e2.kind`, this forms a hyper edge `{e1.kind} -> [e1, e2]`, otherwise it will
+    /// be two independent hyper edges `{e1.kind} -> [e1]` and `{e2.kind} -> [e2]`. The former
+    /// reflects that the edges of the same kind are the same abstract borrow operation, independent
+    /// of the number of edges involved.
+    fn group_children_into_hyper_edges(
         &self,
         labels: &BTreeSet<LifetimeLabel>,
-    ) -> BTreeMap<BorrowEdgeKind, Vec<&BorrowEdge>> {
-        let mut result: BTreeMap<BorrowEdgeKind, Vec<&BorrowEdge>> = BTreeMap::new();
-        for label in labels {
-            for edge in self.children(label) {
-                result.entry(edge.kind.clone()).or_default().push(edge)
+    ) -> BTreeMap<BTreeSet<BorrowEdgeKind>, Vec<&BorrowEdge>> {
+        // First compute map from target nodes to edges, allowing to identify weak edges.
+        let mut target_to_incoming: BTreeMap<LifetimeLabel, Vec<&BorrowEdge>> = BTreeMap::new();
+        for edge in labels.iter().flat_map(|l| self.children(l)) {
+            target_to_incoming
+                .entry(edge.target)
+                .or_default()
+                .push(edge)
+        }
+        // Now compute the result.
+        let mut result: BTreeMap<BTreeSet<BorrowEdgeKind>, Vec<&BorrowEdge>> = BTreeMap::new();
+        for (_, mut edges) in target_to_incoming {
+            if edges.len() > 1 {
+                // Weak set of edges need to be grouped together
+                let key = edges
+                    .iter()
+                    .map(|e| e.kind.clone())
+                    .collect::<BTreeSet<_>>();
+                result.entry(key).or_default().append(&mut edges);
+            } else {
+                let edge = edges.pop().unwrap();
+                result
+                    .entry([edge.kind.clone()].into_iter().collect())
+                    .or_default()
+                    .push(edge)
             }
         }
         result
@@ -1107,26 +1162,36 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         let mut edges_reported: BTreeSet<BTreeSet<&BorrowEdge>> = BTreeSet::new();
         // Continue to process hyper nodes
         while let Some(hyper) = hyper_nodes.pop_first() {
-            let hyper_edges = self.state.grouped_children(&hyper);
+            let hyper_edges = self.state.group_children_into_hyper_edges(&hyper);
             // Check 2-wise combinations of hyper edges for issues. This discovers cases where edges
             // conflict because of mutability.
             for mut perm in hyper_edges.iter().combinations(2) {
-                let (kind1, edges1) = perm.pop().unwrap();
-                let (kind2, edges2) = perm.pop().unwrap();
-                eprintln!(
-                    "{} vs {}",
-                    kind1.display(self.target()),
-                    kind2.display(self.target())
-                );
-                /*
-                for e in edges1 {
-                    eprintln!("1: {}", e.display(self.target(), true))
+                let (kinds1, edges1) = perm.pop().unwrap();
+                let (kinds2, edges2) = perm.pop().unwrap();
+                if DEBUG {
+                    debug!(
+                        "{}[{}] vs {}[{}]",
+                        kinds1
+                            .iter()
+                            .map(|k| k.display(self.target()).to_string())
+                            .join("|"),
+                        edges1
+                            .iter()
+                            .map(|e| e.display(self.target(), true).to_string())
+                            .join(","),
+                        kinds2
+                            .iter()
+                            .map(|k| k.display(self.target()).to_string())
+                            .join("|"),
+                        edges2
+                            .iter()
+                            .map(|e| e.display(self.target(), true).to_string())
+                            .join(","),
+                    );
                 }
-                for e in edges2 {
-                    eprintln!("2: {}", e.display(self.target(), true))
-                }
-                 */
-                if (kind1.is_mut() || kind2.is_mut()) && kind1.overlaps(kind2) {
+                if (BorrowEdgeKind::any_is_mut(kinds1) || BorrowEdgeKind::any_is_mut(kinds2))
+                    && BorrowEdgeKind::any_overlap(kinds1, kinds2)
+                {
                     for (e1, e2) in edges1.iter().cartesian_product(edges2.iter()) {
                         if e1 == e2 || !edges_reported.insert([*e1, *e2].into_iter().collect()) {
                             continue;
@@ -1850,32 +1915,17 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
         #[allow(clippy::single_match)]
         match instr {
             // Call operations which can take references
-            Call(_, dests, oper, srcs, ..) => match oper {
+            Call(_, _, oper, srcs, ..) => match oper {
                 Operation::ReadRef
                 | Operation::WriteRef
                 | Operation::Function(..)
                 | Operation::Eq
                 | Operation::Neq => {
-                    let mut exclusive_refs = srcs
+                    let exclusive_refs = srcs
                         .iter()
                         .filter(|t| step.is_ref(**t))
                         .cloned()
                         .collect_vec();
-                    /*
-                    for t in step.state.temp_to_label_map.keys() {
-                        if step.ty(*t).is_mutable_reference()
-                            && step.alive.after.contains_key(t)
-                            && !exclusive_refs.contains(t)
-                        {
-                            exclusive_refs.push(*t)
-                        }
-                    }
-                     */
-                    eprintln!(
-                        "{} : {:?}",
-                        instr.display(&self.target, &BTreeMap::new()),
-                        exclusive_refs
-                    );
                     step.check_borrow_safety(&exclusive_refs)
                 },
                 _ => {},

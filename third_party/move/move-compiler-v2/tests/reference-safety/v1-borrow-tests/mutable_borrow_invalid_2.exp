@@ -1,34 +1,17 @@
 
-============ bytecode verification failed ========
-
 Diagnostics:
-bug: BYTECODE VERIFICATION FAILED
-  ┌─ tests/reference-safety/v1-borrow-tests/mutable_borrow_invalid_2.move:9:9
-  │
-9 │         root.f = 1;
-  │         ^^^^^^^^^^ ICE failed bytecode verifier: VMError {
-    major_status: WRITEREF_EXISTS_BORROW_ERROR,
-    sub_status: None,
-    message: None,
-    exec_state: None,
-    location: Module(
-        ModuleId {
-            address: 0000000000000000000000000000000000000000000000000000000008675309,
-            name: Identifier(
-                "M",
-            ),
-        },
-    ),
-    indices: [
-        (
-            FunctionDefinition,
-            0,
-        ),
-    ],
-    offsets: [
-        (
-            FunctionDefinitionIndex(0),
-            14,
-        ),
-    ],
-}
+error: cannot mutably borrow since mutable references exist
+   ┌─ tests/reference-safety/v1-borrow-tests/mutable_borrow_invalid_2.move:9:9
+   │
+ 6 │         let x = if (cond) &mut root.f else &mut root.g;
+   │                           -----------      ----------- previous mutable field borrow
+   │                           │
+   │                           previous mutable field borrow
+   ·
+ 9 │         root.f = 1;
+   │         ^^^^^^----
+   │         │
+   │         requirement enforced here
+   │         mutable borrow attempted here
+10 │         *x;
+   │         -- conflicting reference `x` used here
