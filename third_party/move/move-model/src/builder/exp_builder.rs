@@ -3099,7 +3099,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     ///     (None, None, [], X) => (None, None, [new_unit_exp()], X), // expected_type = unit
     ///     (None, Seq(exp1), [], X) => (Seq(exp1), items.next(), [], X),
     ///     (None, Bind(det), [], X) => (Bind(det), items.next(), [], X),
-    ///     (None, Some(x), seq1, X) => XXX can't happen,
+    ///     (None, Some(x), seq1, X) => XXX cannot happen,
     ///
     ///     // Steady states
     ///     (Some(Seq(exp1)), Some(tok2) seq1, X) => (Some(tok2), items.next(), seq1 + translate(exp1, Type::unit), X),
