@@ -3120,10 +3120,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     ///     (None, None, [expr1], []) => return expr1,
     ///     (None, None, seq1, []) => return new_seq_expr(seq1),
     /// ```
-    fn translate_seq_iteratively<'a>(
+    fn translate_seq_iteratively(
         &mut self,
         loc: &Loc,
-        items: &'a [&EA::SequenceItem],
+        items: &[&EA::SequenceItem],
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {

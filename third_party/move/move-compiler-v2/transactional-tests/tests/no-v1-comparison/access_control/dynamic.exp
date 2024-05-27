@@ -14,7 +14,7 @@ Error: Function execution failed with VMError: {
     location: 0x42::test,
     indices: [],
     offsets: [(FunctionDefinitionIndex(1), 1)],
-    exec_state: None,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 
 task 5 'run'. lines 36-36:
@@ -25,5 +25,5 @@ Error: Function execution failed with VMError: {
     location: 0x42::test,
     indices: [],
     offsets: [(FunctionDefinitionIndex(2), 3)],
-    exec_state: None,
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }
