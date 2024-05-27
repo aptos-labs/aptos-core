@@ -15,9 +15,9 @@ Once the APT threshold is met within the liquidity pair, the reserves are moved 
 
 ## This resource contains:
 * (Dispatchable) Fungible Assets.
-* Stored signer vars (w/ [resource accounts](https://aptos.dev/tutorials/programmatic-upgradeable-module/#how-to-publish-modules-to-a-resource-account)).
+* Reusing stored signer vars (w/ [objects](https://aptos.dev/move/move-on-aptos/objects/)).
 * External third party dependencies.
-* E2E testing (w/ resource accounts, APT creation).
+* E2E testing (w/ object deployments, APT creation).
 * Using `rev` to specify feature branches ([Dispatchable FA](https://github.com/aptos-labs/aptos-core/commit/bbf569abd260d94bc30fe96da297d2aecb193644)).
 * and more.
 
@@ -51,7 +51,7 @@ be forced to only use their FAs within the context of `bonding_curve_launchpad`,
 is toggled to `true` during **graduation**.
 
 ### Trading function
-Constant product formula is used within `liquidity_pair` for calculating `get_amount_out`, similar to 
+Constant product formula is used within `liquidity_pairs` for calculating `get_amount_out`, similar to 
 [UniswapV2 on Ethereum](https://docs.uniswap.org/contracts/v2/concepts/protocol-overview/how-uniswap-works). 
 Although chosen for familiarity and simplicity's sake, in a production environment, one may look towards other 
 trading functions.
@@ -63,14 +63,12 @@ One style could encompass sublinear functions to reward early adopters more heav
 ### `bonding_curve_launchpad.move`
 * Contains public methods (both entry and normal), for the end user.
 * Creates and holds references (transfer, burn, mint) to the launched Fungible Asset, through a `SmartTable`.
-* Dispatches to `liquidity_pair` to create a new pair between the launched FA and APT.
+* Dispatches to `liquidity_pairs` to create a new pair between the launched FA and APT.
 * Facilitates swaps between any enabled FA and APT.
-### `liquidity_pair.move`
+### `liquidity_pairs.move`
 * Creates and holds references to each liquidity pair, through a `SmartTable`.
 * Contains business logic for performing swaps on each pair.
 * Performs graduation ceremony to disable liquidity pair, and move all reserves to an external, third party DEX.
-### `resource_signer_holder.move`
-* Holds reference to a signer reference. This signer ref is used during FA creation by `bonding_curve_launchpad.move`.
 ### `test_bonding_curve_launchpad.move`
 * E2E tests.
 ### `move-examples/swap`
@@ -80,20 +78,21 @@ One style could encompass sublinear functions to reward early adopters more heav
 ### Lifecycle of launched FA
 #### Launching the FA and liquidity pair
 1. User initiates FA creation on the `bonding_curve_launchpad` through `create_fa_pair(...)`.
-   1. `bonding_curve_launchpad` creates a new dispatchable FA and assigns the object constructor's owner as itself using the resource account's cached signer. Importantly, the user initiating the FA does not have any permissions (mint, transfer, burn), preventing their ability to pre-mint. FA capabilities are stored within `SmartTable`, using the given name and symbol as a unique key, for future transfers.
-   2. The dispatchable `withdraw` function is defined to disallow all transfers between FA owners, until **graduation** is met. It does this through a state value associated with the FA's soon-to-be generated liquidity pair, called `is_frozen`, which is initially set to `true`. This prevents the FA from being traded on external DEXs or through external means. Transfers are only available through the limited `transfer_ref` stored on `bonding_curve_launchpad`, and restricted to swaps on the `liquidity_pair`'s liquidity pair. 
+   1. `bonding_curve_launchpad` creates a new dispatchable FA and assigns the `"FA Generator" Object` as the creator, by retrieving it's `signer` using a stored `extend_ref`. Importantly, the user initiating the FA does not have any permissions (mint, transfer, burn), preventing their ability to pre-mint. FA capabilities (`transfer_ref`) are stored within `SmartTable`, using the given name and symbol as a unique key, for future transfers.
+   2. The dispatchable `withdraw` function is defined to disallow all transfers between FA owners, until **graduation** is met. It does this through a state value associated with the FA's soon-to-be generated liquidity pair, called `is_frozen`, which is initially set to `true`. This prevents the FA from being traded on external DEXs or through external means. Transfers are only available through the limited `transfer_ref` stored on `bonding_curve_launchpad`, and restricted to swaps on the `liquidity_pairs`'s liquidity pair. 
    3. A pre-defined number of the FA is minted, and kept on `bonding_curve_launchpad`.
-2. `bonding_curve_launchpad` creates a liquidity pair on the `liquidity_pair` module, which follows the constant product formula.
-   1. The entirety of minted FA + a pre-defined number of **virtual liquidity** for APT is deposited into the liquidity pair. 
-   2. Trading against the liquidity pair is enabled, but restricted to `public entry` functions found in `bonding_curve_launchpad`.
+2. `bonding_curve_launchpad` creates a liquidity pair on the `liquidity_pairs` module, which follows the constant product formula.
+   1. Liquidity pair is represented and stored as an Object. This allows for the reserves to be held directly on the object, rather than the `bonding_curve_launchpad` account.
+   2. The entirety of minted FA + a pre-defined number of **virtual liquidity** for APT is deposited into the liquidity pair object. 
+   3. Trading against the liquidity pair is enabled, but restricted to `public entry` functions found in `bonding_curve_launchpad`.
 3. Optionally, the creator can immediately initiate a swap from APT to the FA.
 #### Trading against the FA's associated liquidity pair
 1. External users can swap APT to FA, or vice versa, through `public entry` methods available on `bonding_curve_launchpad`. 
    1. Although the normal `transfer` functionality of the FA is disabled by the custom dispatchable `withdraw` function, `bonding_curve_launchpad` can assist with swaps using it's stored `transfer_ref` from the FA `SmartTable`. `transfer_ref` is not impeded by the custom dispatchable function.
    2. The logic for calculating the `amountOut` of a swap is based on the constant product formula for reader familiarity. In a production scenario, a sub-linear trading function can assist in incentivizing general early adoption.
-#### Graduating from `liquidity_pair` to a public FA DEX
+#### Graduating from `liquidity_pairs` to a public FA DEX
 1. After each swap from APT to FA, when the APT reserves are increasing, a threshold is checked for whether the liquidity pair can **graduate** or not. The threshold is a pre-defined minimum amount of APT that must exist in the reserves. Once this threshold is met during a swap, **graduation** begins.
-   1. The associated liquidity pair on the `liquidity_pair` module is disabled by toggling `is_enabled`, preventing any more swaps against the pair. Additionally, the liquidity pair's `is_frozen` is disabled to allow owners to transfer freely. 
+   1. The associated liquidity pair on the `liquidity_pairs` module is disabled by toggling `is_enabled`, preventing any more swaps against the pair. Additionally, the liquidity pair's `is_frozen` is disabled to allow owners to transfer freely. 
    2. The reserves from the liquidity pair, both APT and FA, are moved to an external, public third-party DEX as a new liquidity pair. In this case, the `aptos-move` FA DEX example, called swap. 
    3. To prevent any wrongdoing from the `bonding_curve_launchpad` owner, any liquidity tokens received during the creation of the new liquidity pair on the third-party DEX will be sent to a dead address. Otherwise, the tokens could be used to drain the liquidity pair, at any time.
 
@@ -107,28 +106,4 @@ One style could encompass sublinear functions to reward early adopters more heav
     * Deploy the `swap` module on-chain.
     * Rely on a different DEX for the token graduation.
 
-
-1. Initialize a profile, and make note of the address:
-`aptos init`
-```
-Aptos CLI is now set up for account {PROFILE_ADDRESS} as profile default! ...
-```
-
-2. Derive the resource-account-address to be used:
-```
-aptos account derive-resource-account-address --address {PROFILE_ADDRESS} --seed {RANDOM_STRING_SEED}
-```
-```
-{ "Result": {RESOURCE_ACCOUNT_ADDRESS} }
-```
-
-> Examples of `{RANDOM_STRING_SEED}` are: `random3`, `big_string_big_thoughts`, ... 
-
-3. In `Move.toml`, replace `owner_addr` and `memecoin_creator_addr` with `{PROFILE_ADDRESS}`.
-
-4. in `Move.toml`, replace `resource_account` with `0x{RESOURCE_ACCOUNT_ADDRESS}`.
-
-5. Create and publish the package:
-```
-aptos move create-resource-account-and-publish-package --address-name {PROFILE_ADDRESS} --seed {RANDOM_STRING_SEED}
-```
+From there, you can follow the [object code deployment](https://preview.aptos.dev/en/build/smart-contracts/learn-move/advanced-guides/object-code-deployment) steps to deploy and setup the smart contract.
