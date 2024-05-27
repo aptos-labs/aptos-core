@@ -1169,10 +1169,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 if is_wildcard(resource) {
                     ResourceSpecifier::DeclaredInModule(module_id)
                 } else {
-                    let mident = sp(specifier.loc, EA::ModuleIdent_ {
-                        address: *address,
-                        module: *module,
-                    });
+                    let mident = sp(
+                        specifier.loc,
+                        EA::ModuleIdent_ {
+                            address: *address,
+                            module: *module,
+                        },
+                    );
                     let maccess = sp(
                         specifier.loc,
                         EA::ModuleAccess_::ModuleAccess(mident, *resource, None),
@@ -1333,6 +1336,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 }
 
 /// # Expression Translation
+
+enum SequenceContinuation {
+    SeqCont(Vec<Exp>),
+    BindCont(Pattern, Option<Exp>),
+}
 
 impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
     /// Translates an expression representing a modify target
@@ -1858,11 +1866,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(&rt, &loc);
                 if self.mode == ExpTranslationMode::Impl {
                     // Remember information about this spec block for deferred checking.
-                    self.placeholder_map
-                        .insert(id, ExpPlaceholder::SpecBlockInfo {
+                    self.placeholder_map.insert(
+                        id,
+                        ExpPlaceholder::SpecBlockInfo {
                             spec_id: *spec_id,
                             locals: self.get_locals(),
-                        });
+                        },
+                    );
                 }
                 ExpData::Call(id, Operation::NoOp, vec![])
             },
@@ -2945,7 +2955,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         context: &ErrorMessageContext,
     ) -> ExpData {
         let items = seq.iter().collect_vec();
-        let seq_exp = self.translate_seq_recursively(loc, &items, expected_type, context);
+        let seq_exp = self.translate_seq_iteratively(loc, &items, expected_type, context);
         if seq_exp.is_directly_borrowable() {
             // Avoid unwrapping a borrowable item, in case context is a `Borrow`.
             let node_id = self.new_node_id_with_type_loc(expected_type, loc);
@@ -2960,7 +2970,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         ExpData::Sequence(node_id, vec![])
     }
 
-    fn translate_seq_recursively(
+    fn _translate_seq_recursively(
         &mut self,
         loc: &Loc,
         items: &[&EA::SequenceItem],
@@ -3015,7 +3025,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         self.check_type(loc, expected_type, &Type::unit(), context);
                         self.new_unit_exp(loc)
                     } else {
-                        self.translate_seq_recursively(loc, &items[1..], expected_type, context)
+                        self._translate_seq_recursively(loc, &items[1..], expected_type, context)
                     };
                     // Return result
                     self.exit_scope();
@@ -3075,6 +3085,254 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         exps.push(rest.into_exp());
         let id = self.new_node_id_with_type_loc(expected_type, loc);
         ExpData::Sequence(id, exps)
+    }
+
+    /// Slightly abstract pseudo-Rust for iterative algorithm follows.
+    /// The Rust code is only a bit more complicated.  Helper functions are below th main routine.
+    /// ```
+    /// State = (prev, next, seq, stack) : (Option<InputToken>, Option<InputToken>, Vec<expr>, Vec<InputToken>)
+    ///    = (current SequenceItem, next SequenceItem, translated exprs since last bind, stack)
+    /// let mut state = (Some((None, items.next()), [], [])
+    /// while (true) {
+    ///   state = match state {
+    ///     // Starting states
+    ///     (None, None, [], X) => (None, None, [new_unit_exp()], X), // expected_type = unit
+    ///     (None, Seq(exp1), [], X) => (Seq(exp1), items.next(), [], X),
+    ///     (None, Bind(det), [], X) => (Bind(det), items.next(), [], X),
+    ///     (None, Some(x), seq1, X) => XXX can't happen,
+    ///
+    ///     // Steady states
+    ///     (Some(Seq(exp1)), Some(tok2) seq1, X) => (Some(tok2), items.next(), seq1 + translate(exp1, Type::unit), X),
+    ///     (Some(Bind(det1)), Some(Bind(det2)), seq1, X) => (Some(Bind(det2)), items.next(), seq1, X + Bind(det1)),
+    ///     (Some(Bind(det1)), Some(Seq(exp1)), seq1, X) => (Some(Seq(exp1)), items.next(), [], X + Seq(seq1) + Bind(det1)),
+    ///
+    ///     // Reaching end
+    ///     (Some(Seq(exp1)), None, seq1, X) => (None, None, seq1 + translate(exp1, expected_type), X),
+    ///     (Some(Bind(det)), None, seq1, X) => (None, None, seq1 + new_bind_exp(det, new_unit_exp()), X), // expected_type == unit
+    ///
+    ///     // Consuming stack
+    ///     (None, None, [expr1], X + Bind(det1)) => (None, None, [new_bind_exp(det1, expr1)], X),
+    ///     (None, None, [expr1], X + Seq(seq1)) => (None, None, seq1 + expr1, X),
+    ///     (None, None, seq1, X + Bind(det1)) => (None, None, [new_bind_exp(det1, new_seq_expr(seq1))], X),
+    ///     (None, None, seq1, X + Seq(seq2)) => (None, None, seq2 + seq1, X),
+    ///
+    ///     // Finishing states
+    ///     (None, None, [expr1], []) => return expr1,
+    ///     (None, None, seq1, []) => return new_seq_expr(seq1),
+    /// ```
+    fn translate_seq_iteratively<'a>(
+        &mut self,
+        loc: &Loc,
+        items: &'a [&EA::SequenceItem],
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        if items.is_empty() {
+            self.require_impl_language(loc);
+            self.check_type(loc, &Type::unit(), expected_type, context);
+            self.new_unit_exp(loc)
+        } else {
+            use SequenceContinuation::{BindCont, SeqCont};
+            use EA::SequenceItem_::{Bind, Declare, Seq};
+            let mut it = items.iter();
+            fn deref_opt_spanned<'a, T>(elt: Option<&'a &Spanned<T>>) -> Option<&'a T> {
+                elt.map(|opt_ref| &opt_ref.value)
+            }
+
+            // (current_expr, next_expr, seq_since_last_bind, stack)
+            let mut state: (
+                Option<&EA::SequenceItem_>,
+                Option<&EA::SequenceItem_>,
+                Vec<Exp>,
+                Vec<SequenceContinuation>,
+            ) = (None, deref_opt_spanned(it.next()), vec![], vec![]);
+
+            loop {
+                state = match state {
+                    // Starting states (except empty case)
+                    (None, Some(expr), empty_vec, stack) => {
+                        assert!(empty_vec.is_empty());
+                        (Some(expr), deref_opt_spanned(it.next()), empty_vec, stack)
+                    },
+
+                    // Steady states
+                    (Some(Seq(exp1)), Some(tok2), seq1, stack) => (
+                        Some(tok2),
+                        deref_opt_spanned(it.next()),
+                        self.process_seq(exp1, seq1),
+                        stack,
+                    ),
+                    (
+                        Some(bind_exp @ Bind(..) | bind_exp @ Declare(..)),
+                        Some(tok2),
+                        seq1,
+                        mut stack,
+                    ) => (Some(tok2), deref_opt_spanned(it.next()), vec![], {
+                        stack.push(SeqCont(seq1));
+                        stack.push(self.process_bind(bind_exp));
+                        stack
+                    }),
+
+                    // Reaching end
+                    (Some(Seq(exp1)), None, mut seq1, stack) => (
+                        None,
+                        None,
+                        {
+                            seq1.push(
+                                self.translate_exp_in_context(exp1, expected_type, context)
+                                    .into(),
+                            );
+                            seq1
+                        },
+                        stack,
+                    ),
+                    (Some(bind_exp @ Bind(..) | bind_exp @ Declare(..)), None, mut seq1, stack) => {
+                        if let BindCont(pat, binding) = self.process_bind(bind_exp) {
+                            let exp =
+                                self.finish_bind(loc, pat, binding, vec![], expected_type, context);
+                            seq1.push(exp.into());
+                            (None, None, seq1, stack)
+                        } else {
+                            unreachable!()
+                        }
+                    },
+
+                    // Done processing exprs, now consume stack
+                    (None, None, mut seq1, mut stack) => match stack.pop() {
+                        Some(SeqCont(mut seq2)) => {
+                            seq2.append(&mut seq1);
+                            (None, None, seq2, stack)
+                        },
+                        Some(BindCont(pat, binding)) => {
+                            let exp =
+                                self.finish_bind(loc, pat, binding, seq1, expected_type, context);
+                            (None, None, vec![exp.into()], stack)
+                        },
+                        None => {
+                            return self.finish_seq(loc, seq1, expected_type, context).into();
+                        },
+                    },
+                }
+            }
+        }
+    }
+
+    /// Add exp to end of items after translating it.
+    fn process_seq(&mut self, exp: &EA::Exp, mut items: Vec<Exp>) -> Vec<Exp> {
+        // There is an item after this one, so the value can be dropped. The default
+        // type of the expression is `()`.
+        let exp_loc = self.to_loc(&exp.loc);
+        let var = self.fresh_type_var_idx();
+
+        let item_type = Type::Var(var);
+        let exp = self.translate_exp(exp, &item_type);
+        let item_type = self.subs.specialize(&item_type);
+        if self.subs.is_free_var_without_constraints(&item_type) {
+            // If this is a totally unbound item, assign default unit type.
+            self.add_constraint(
+                &exp_loc,
+                &Type::Var(var),
+                WideningOrder::LeftToRight,
+                Constraint::WithDefault(Type::unit()),
+                Some(ConstraintContext::inferred()),
+            )
+            .expect("success on fresh var");
+        }
+        if let ExpData::Sequence(_, mut exps) = exp {
+            items.append(&mut exps);
+        } else {
+            items.push(exp.into_exp());
+        };
+        items
+    }
+
+    /// Turn a list of translated exps into an `ExpdData::Sequence`
+    fn finish_seq(
+        &mut self,
+        loc: &Loc,
+        items: Vec<Exp>,
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> Exp {
+        match items.len() {
+            0 => {
+                self.require_impl_language(loc);
+                self.check_type(loc, expected_type, &Type::unit(), context);
+                self.new_unit_exp(loc).into()
+            },
+            1 => {
+                // flatten the body
+                items.into_iter().next().expect("Vector is nonempty!")
+            },
+            _ => {
+                self.require_impl_language(loc);
+                let id = self.new_node_id_with_type_loc(expected_type, loc);
+                ExpData::Sequence(id, items).into()
+            },
+        }
+    }
+
+    /// Pre-process `Bind` or `Declare` `SequenceItem`, entering a new scope and returning the
+    /// corresponding `SequenceContinuation::BindCont`
+    fn process_bind(&mut self, item: &EA::SequenceItem_) -> SequenceContinuation {
+        use EA::SequenceItem_::*;
+        // Determine type and binding for this declaration
+        let (lvlist, ty, order, binding) = match item {
+            Bind(lvlist, exp) => {
+                let (ty, exp) = self.translate_exp_free(exp);
+                // expression type is widened to pattern type
+                (lvlist, ty, WideningOrder::RightToLeft, Some(exp.into_exp()))
+            },
+            Declare(lvlist, Some(ty)) => {
+                // pattern type is widened to declared type
+                (
+                    lvlist,
+                    self.translate_type(ty),
+                    WideningOrder::LeftToRight,
+                    None,
+                )
+            },
+            Declare(lvlist, None) => (
+                lvlist,
+                self.fresh_type_var(),
+                WideningOrder::LeftToRight,
+                None,
+            ),
+            _ => unreachable!(),
+        };
+        // Translate the lhs lvalue list into a pattern
+        let pat = self.translate_lvalue_list(
+            lvlist,
+            &ty,
+            order,
+            false, /*match_locals*/
+            if binding.is_some() {
+                &ErrorMessageContext::Binding
+            } else {
+                // this is like `let x: T;` and better goes along with the annotation context
+                &ErrorMessageContext::TypeAnnotation
+            },
+        );
+        // Declare the variables in the pattern
+        self.enter_scope();
+        self.define_locals_of_pat(&pat);
+
+        SequenceContinuation::BindCont(pat, binding)
+    }
+
+    /// Helper for `translate_seq_iteratively`
+    fn finish_bind(
+        &mut self,
+        loc: &Loc,
+        pat: Pattern,
+        binding: Option<Exp>,
+        rest: Vec<Exp>,
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        let rest = self.finish_seq(loc, rest, expected_type, context);
+        self.exit_scope();
+        self.new_bind_exp(loc, pat, binding, rest)
     }
 
     /// Create binding expression.
@@ -3169,9 +3427,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             );
             let global_id = self.new_node_id_with_type_loc(&ghost_mem_ty, loc);
             self.set_node_instantiation(global_id, vec![ghost_mem_ty]);
-            let global_access = ExpData::Call(global_id, Operation::Global(None), vec![
-                zero_addr.into_exp()
-            ]);
+            let global_access = ExpData::Call(
+                global_id,
+                Operation::Global(None),
+                vec![zero_addr.into_exp()],
+            );
             let select_id = self.new_node_id_with_type_loc(&ty, loc);
             self.set_node_instantiation(select_id, instantiation);
             return ExpData::Call(
@@ -3563,11 +3823,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     Operation::Select(mid, sid, FieldId::new(field_name))
                 } else {
                     // Create a placeholder for later resolution.
-                    self.placeholder_map
-                        .insert(id, ExpPlaceholder::FieldSelectInfo {
+                    self.placeholder_map.insert(
+                        id,
+                        ExpPlaceholder::FieldSelectInfo {
                             struct_ty: ty,
                             field_name,
-                        });
+                        },
+                    );
                     Operation::NoOp
                 };
                 ExpData::Call(id, oper, vec![exp.into_exp()])
@@ -4068,13 +4330,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             None,
         );
         let id = self.new_node_id_with_type_loc(expected_type, loc);
-        self.placeholder_map
-            .insert(id, ExpPlaceholder::ReceiverCallInfo {
+        self.placeholder_map.insert(
+            id,
+            ExpPlaceholder::ReceiverCallInfo {
                 name,
                 generics: generics.map(|g| g.1.clone()),
                 arg_types,
                 result_type: expected_type.clone(),
-            });
+            },
+        );
         ExpData::Call(id, Operation::NoOp, args)
     }
 
