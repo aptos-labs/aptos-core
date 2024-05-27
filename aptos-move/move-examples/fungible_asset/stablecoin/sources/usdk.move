@@ -93,7 +93,8 @@ module stablecoin::usdk {
         object::address_to_object(usdk_address())
     }
 
-    /// Called as part of deployment to initialize the stablecoin.
+    /// Called as part of deployment to initialize the stablecoin. 
+    /// Note: The signer has to be the account where the module is published. 
     /// Create a stablecoin token (a new Fungible Asset)
     /// Ensure any stores for the stablecoin are untransferable. 
     /// Store Roles, Management and State resources in the Metadata object. 
@@ -182,6 +183,7 @@ module stablecoin::usdk {
         account::verify_signed_message(from, from_account_scheme, from_public_key, proof, expected_message);
 
         let transfer_ref = &borrow_global<Management>(usdk_address()).transfer_ref;
+        // Only use with_ref API for primary_fungible_store (PFS) transfers in this module.
         primary_fungible_store::transfer_with_ref(transfer_ref, from, to, amount);
     }
 
@@ -217,7 +219,8 @@ module stablecoin::usdk {
 
         let management = borrow_global<Management>(usdk_address());
         let tokens = fungible_asset::mint(&management.mint_ref, amount);
-        deposit(primary_fungible_store::ensure_primary_store_exists(to, metadata()), tokens, &management.transfer_ref);
+        // Ensure not to call pfs::deposit or dfa::deposit directly in the module.
+        deposit(primary_fungible_store::ensure_primary_store_exists(to, metadata()), tokens, &management.transfer_ref); 
 
         event::emit(Mint {
             minter: signer::address_of(minter),
