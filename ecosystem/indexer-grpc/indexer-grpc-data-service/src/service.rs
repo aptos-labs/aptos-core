@@ -14,7 +14,8 @@ use aptos_indexer_grpc_utils::{
     config::IndexerGrpcFileStoreConfig,
     constants::{
         IndexerGrpcRequestMetadata, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER,
-        MESSAGE_SIZE_LIMIT,
+        MESSAGE_SIZE_LIMIT, REQUEST_HEADER_APTOS_APPLICATION_NAME, REQUEST_HEADER_APTOS_EMAIL,
+        REQUEST_HEADER_APTOS_IDENTIFIER, REQUEST_HEADER_APTOS_IDENTIFIER_TYPE,
     },
     counters::{log_grpc_step, IndexerGrpcStep, NUM_MULTI_FETCH_OVERLAPPED_VERSIONS},
     file_store_operator::FileStoreOperator,
@@ -61,9 +62,6 @@ const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
 
 const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
 
-/// This comes from API Gateway. The identifier uniquely identifies the requester, which
-/// in the case of indexer-grpc is always an application.
-const REQUEST_HEADER_APTOS_IDENTIFIER: &str = "x-aptos-identifier";
 const RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER: &str = "x-aptos-connection-id";
 const SERVICE_TYPE: &str = "data_service";
 
@@ -158,10 +156,7 @@ impl RawData for RawDataServerWrapper {
             _ => return Result::Err(Status::aborted("Invalid request token")),
         };
         CONNECTION_COUNT
-            .with_label_values(&[
-                &request_metadata.request_identifier,
-                &request_metadata.processor_name,
-            ])
+            .with_label_values(&request_metadata.get_label_values())
             .inc();
         let request = req.into_inner();
 
@@ -529,10 +524,7 @@ async fn data_fetcher_task(
             .map(|t| t.encoded_len())
             .sum::<usize>();
         BYTES_READY_TO_TRANSFER_FROM_SERVER
-            .with_label_values(&[
-                &request_metadata.request_identifier,
-                &request_metadata.processor_name,
-            ])
+            .with_label_values(&request_metadata.get_label_values())
             .inc_by(bytes_ready_to_transfer as u64);
         // 2. Push the data to the response channel, i.e. stream the data to the client.
         let current_batch_size = transaction_data.as_slice().len();
@@ -558,23 +550,14 @@ async fn data_fetcher_task(
             Ok(_) => {
                 // TODO: Reasses whether this metric useful
                 LATEST_PROCESSED_VERSION_PER_PROCESSOR
-                    .with_label_values(&[
-                        request_metadata.request_identifier.as_str(),
-                        request_metadata.processor_name.as_str(),
-                    ])
+                    .with_label_values(&request_metadata.get_label_values())
                     .set(end_of_batch_version as i64);
                 PROCESSED_VERSIONS_COUNT_PER_PROCESSOR
-                    .with_label_values(&[
-                        request_metadata.request_identifier.as_str(),
-                        request_metadata.processor_name.as_str(),
-                    ])
+                    .with_label_values(&request_metadata.get_label_values())
                     .inc_by(current_batch_size as u64);
                 if let Some(data_latency_in_secs) = data_latency_in_secs {
                     PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR
-                        .with_label_values(&[
-                            request_metadata.request_identifier.as_str(),
-                            request_metadata.processor_name.as_str(),
-                        ])
+                        .with_label_values(&request_metadata.get_label_values())
                         .set(data_latency_in_secs);
                 }
             },
@@ -601,10 +584,7 @@ async fn data_fetcher_task(
     if let Some(start_time) = connection_start_time {
         if start_time.elapsed().as_secs() < SHORT_CONNECTION_DURATION_IN_SECS {
             SHORT_CONNECTION_COUNT
-                .with_label_values(&[
-                    request_metadata.request_identifier.as_str(),
-                    request_metadata.processor_name.as_str(),
-                ])
+                .with_label_values(&request_metadata.get_label_values())
                 .inc();
         }
     }
@@ -867,7 +847,16 @@ fn get_request_metadata(
     req: &Request<GetTransactionsRequest>,
 ) -> tonic::Result<IndexerGrpcRequestMetadata> {
     let request_metadata_pairs = vec![
+        (
+            "request_identifier_type",
+            REQUEST_HEADER_APTOS_IDENTIFIER_TYPE,
+        ),
         ("request_identifier", REQUEST_HEADER_APTOS_IDENTIFIER),
+        ("request_email", REQUEST_HEADER_APTOS_EMAIL),
+        (
+            "request_application_name",
+            REQUEST_HEADER_APTOS_APPLICATION_NAME,
+        ),
         ("request_token", GRPC_AUTH_TOKEN_HEADER),
         ("processor_name", GRPC_REQUEST_NAME_HEADER),
     ];
