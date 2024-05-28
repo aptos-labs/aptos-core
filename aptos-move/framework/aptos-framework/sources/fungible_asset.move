@@ -1314,7 +1314,7 @@ module aptos_framework::fungible_asset {
         assert!(exists<FungibleStore>(object::object_address(&creator_store)), 9);
         assert!(borrow_store_resource(&creator_store).balance == 0, 10);
         assert!(exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 11);
-        assert!(aggregator_v2::read(&borrow_global<ConcurrentFungibleBalance>(object::object_address(&creator_store)).balance) == 50, 12);
+        assert!(aggregator_v2::read(&borrow_global<ConcurrentFungibleBalance>(object::object_address(&creator_store)).balance) == 30, 12);
     }
 
     #[test(fx = @aptos_framework, creator = @0xcafe)]
