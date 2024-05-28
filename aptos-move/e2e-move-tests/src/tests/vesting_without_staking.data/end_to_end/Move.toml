@@ -1,0 +1,6 @@
+[package]
+name = 'EnableRewardsRateDecrease'
+version = "0.0.0"
+
+[dependencies]
+SupraFramework = { local = "../../../../../framework/supra-framework" }
