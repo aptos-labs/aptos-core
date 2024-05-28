@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::Round;
-use anyhow::Context;
+use anyhow::{ensure, Context};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
@@ -48,6 +48,10 @@ impl CommitDecision {
     /// Verifies that the signatures carried in the message forms a valid quorum,
     /// and then verifies the signature.
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(
+            !self.ledger_info.commit_info().is_ordered_only(),
+            "Unexpected ordered only commit info"
+        );
         // We do not need to check the author because as long as the signature tree
         // is valid, the message should be valid.
         self.ledger_info

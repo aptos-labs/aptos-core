@@ -200,12 +200,9 @@ impl BlockStore {
         };
 
         for block in blocks {
-            block_store
-                .insert_ordered_block(block)
-                .await
-                .unwrap_or_else(|e| {
-                    panic!("[BlockStore] failed to insert block during build {:?}", e)
-                });
+            block_store.insert_block(block).await.unwrap_or_else(|e| {
+                panic!("[BlockStore] failed to insert block during build {:?}", e)
+            });
         }
         for qc in quorum_certs {
             block_store
@@ -309,7 +306,7 @@ impl BlockStore {
     /// Duplicate inserts will return the previously inserted block (
     /// note that it is considered a valid non-error case, for example, it can happen if a validator
     /// receives a certificate for a block that is currently being added).
-    pub async fn insert_ordered_block(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
+    pub async fn insert_block(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
         if let Some(existing_block) = self.get_block(block.id()) {
             return Ok(existing_block);
         }
@@ -612,6 +609,6 @@ impl BlockStore {
         if self.ordered_root().round() < block.quorum_cert().commit_info().round() {
             self.send_for_execution(block.quorum_cert().clone()).await?;
         }
-        self.insert_ordered_block(block).await
+        self.insert_block(block).await
     }
 }

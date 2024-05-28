@@ -730,7 +730,7 @@ fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut 
                 // Convert the script into a module.
                 let address = E::Address::Numerical(
                     None,
-                    sp(expanded_script.loc, NumericalAddress::DEFAULT_ERROR_ADDRESS),
+                    sp(expanded_script.loc, NumericalAddress::MAX_ADDRESS),
                 );
                 let ident = sp(
                     expanded_script.loc,

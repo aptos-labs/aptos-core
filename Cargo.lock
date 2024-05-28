@@ -939,6 +939,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-types",
  "bcs 0.1.4",
+ "fail",
  "futures",
  "itertools 0.12.1",
  "mini-moka",
