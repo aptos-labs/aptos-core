@@ -128,30 +128,31 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> {
         pk.vk.clone()))
     }
 
-    pub fn prove_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>(
+    pub fn prove_with_trapdoor<R: RngCore>(
         pk: &ProvingKeyWithTrapdoor<E>,
-        circuit: C,
+        //circuit: C,
+        public_inputs: &[E::ScalarField],
         rng: &mut R,
     ) -> Result<Proof<E>, SynthesisError> {
-        Self::create_random_proof_with_trapdoor(circuit, pk, rng)
+        Self::create_random_proof_with_trapdoor(public_inputs, pk, rng)
     }
 
     /// Create a Groth16 proof that is zero-knowledge using the provided
     /// R1CS-to-QAP reduction.
     /// This method samples randomness for zero knowledges via `rng`.
     #[inline]
-    pub fn create_random_proof_with_trapdoor<C>(
-        circuit: C,
+    pub fn create_random_proof_with_trapdoor(
+        //circuit: C,
+        public_inputs: &[E::ScalarField],
         pk: &ProvingKeyWithTrapdoor<E>,
         rng: &mut impl Rng,
     ) -> R1CSResult<Proof<E>>
     where
-        C: ConstraintSynthesizer<E::ScalarField>,
     {
         let a = E::ScalarField::rand(rng);
         let b = E::ScalarField::rand(rng);
 
-        let cs = ConstraintSystem::new_ref();
+        /*let cs = ConstraintSystem::new_ref();
 
         // Set the optimization goal
         cs.set_optimization_goal(OptimizationGoal::Constraints);
@@ -160,9 +161,9 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> {
         circuit.generate_constraints(cs.clone())?;
         cs.finalize();
 
-        let prover = cs.borrow().unwrap();
+        let prover = cs.borrow().unwrap();*/
 
-        Self::create_proof_with_trapdoor(pk, a, b, &prover.instance_assignment[1..])
+        Self::create_proof_with_trapdoor(pk, a, b, public_inputs)
     }
 
     /// Creates proof using the trapdoor
@@ -211,7 +212,7 @@ use ark_bn254::FrConfig;
 use crate::keyless::bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine};
 
 
-/// Generates a proving and verifiying key pair, in addition to a vector of public inputs, from
+/// Generates a trapdoor proving and verifiying key pair intended for proof simulation, in addition to a vector of public inputs, from
 /// circom-generated .r1cs and .wasm files, and a .json file containing the public inputs. To be
 /// used to update `test_prove_and_verify` after circuit changes occur
 #[allow(dead_code)]
@@ -248,10 +249,9 @@ fn test_prove_and_verify<E>(n_iters: usize)
 where
     E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>, G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>, G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>, <E as Pairing>::ScalarField: From<i32>
 {
-        let input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998]; 
-    //let inputs = input_values.iter().map(|i| ark_ff::BigInt::new([*i])).collect::<Vec<_>>();//BigInt::from_str(&input_values[..]).map_err(|_| ()).unwrap(); 
-    let input = ark_ff::BigInt::new(input_values);
-    let input = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(input).unwrap();
+        let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998]; 
+    let public_input = ark_ff::BigInt::new(public_input_values);
+    let public_input = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(public_input).unwrap();
 
     let gamma_abc_g1_0 = g1_projective_str_to_affine("10890983729299535957423468711833583987663214856519593250327338307275052520378", "14825528083605787384494675905346505429633386239381351287094949056284905008336").unwrap();
     let gamma_abc_g1_1 = g1_projective_str_to_affine("6701484920320830429728101779419714521238246657648220634336419105800782345479", "15142509597605507689258403703394950610511337146392408727160892424844922997703").unwrap();
@@ -292,12 +292,12 @@ where
 
         let proof = Groth16Simulator::<E>::prove_with_trapdoor(
             &pk,
-            circom.clone(),
+            &[public_input],
             &mut rng,
         )
         .unwrap();
 
-        assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[input], &proof).unwrap());
+        assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
 }
