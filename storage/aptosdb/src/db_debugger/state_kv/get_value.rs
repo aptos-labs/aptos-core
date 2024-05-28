@@ -1,8 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{db_debugger::common::DbDir, schema::state_value::StateValueSchema};
-use aptos_schemadb::ReadOptions;
+use crate::{
+    db_debugger::common::DbDir,
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema},
+        state_value::StateValueSchema,
+    },
+};
+use aptos_schemadb::{schema::KeyCodec, ReadOptions};
 use aptos_storage_interface::Result;
 use aptos_types::{state_store::state_key::StateKey, transaction::Version};
 use clap::Parser;
@@ -49,9 +55,22 @@ impl Cmd {
             );
         }
 
+        let pruner_progress = db
+            .metadata_db()
+            .get::<DbMetadataSchema>(&DbMetadataKey::StateKvPrunerProgress)?
+            .map(|v| v.expect_version())
+            .unwrap_or(0);
+        println!("pruner progress: {pruner_progress}");
+
         let mut read_opts = ReadOptions::default();
         // We want `None` if the state_key changes in iteration.
         read_opts.set_prefix_same_as_start(true);
+        if pruner_progress > 0 {
+            read_opts.set_iterate_upper_bound(KeyCodec::<StateValueSchema>::encode_key(&(
+                key.clone(),
+                pruner_progress - 1,
+            ))?);
+        }
         let mut iter = db
             .db_shard(key.get_shard_id())
             .iter::<StateValueSchema>(read_opts)?;

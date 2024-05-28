@@ -8,7 +8,7 @@ use crate::{
     common::NUM_STATE_SHARDS,
     ledger_db::LedgerDb,
     metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
-    pruner::{StateKvPrunerManager, StateMerklePrunerManager},
+    pruner::{PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         stale_node_index::StaleNodeIndexSchema,
@@ -41,7 +41,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
-use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_schemadb::{schema::KeyCodec, ReadOptions, SchemaBatch};
 use aptos_scratchpad::{SmtAncestors, SparseMerkleTree};
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher,
@@ -149,6 +149,16 @@ impl DbReader for StateDb {
         let mut read_opts = ReadOptions::default();
         // We want `None` if the state_key changes in iteration.
         read_opts.set_prefix_same_as_start(true);
+        let min_readable_version = self.state_kv_pruner.get_min_readable_version();
+        if min_readable_version > 0 {
+            // We don't need to look beyond the prune window. And it's a potential performance issue
+            // if we do -- beyond the edge of the pruning window we will see only deletions.
+            //     note: this is exclusive, so we can't set if min_readable_version == 0
+            read_opts.set_iterate_upper_bound(KeyCodec::<StateValueSchema>::encode_key(&(
+                state_key.clone(),
+                min_readable_version - 1,
+            ))?);
+        }
         let mut iter = self
             .state_kv_db
             .db_shard(state_key.get_shard_id())
