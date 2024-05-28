@@ -43,7 +43,7 @@ where
     if !s.starts_with("0x") {
         return Err(D::Error::custom("String is not prefixed by '0x'"));
     }
-    hex::decode(s[2..].to_string()).map_err(D::Error::custom)
+    hex::decode(&s[2..]).map_err(D::Error::custom)
 }
 
 /// Custom serialization function to convert `EphemeralPublicKey` into a hex string.
