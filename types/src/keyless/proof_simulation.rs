@@ -210,16 +210,16 @@ use ark_ff::MontBackend;
 use ark_bn254::FrConfig;
 use crate::keyless::bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine};
 
-#[cfg(test)]
-fn test_prove_and_verify<E>(n_iters: usize)
-where
-    E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>, G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>, G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>, <E as Pairing>::ScalarField: From<i32>
-{
-    /*let cfg = CircomConfig::<Bn254>::new(
-    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
-    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
-).unwrap();
 
+/// Generates a proving and verifiying key pair, in addition to a vector of public inputs, from
+/// circom-generated .r1cs and .wasm files, and a .json file containing the public inputs. To be
+/// used to update `test_prove_and_verify` after circuit changes occur
+#[allow(dead_code)]
+fn generate_keys_and_inputs<E: Pairing>() {
+    let cfg = CircomConfig::<E>::new(
+        "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
+        "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
+    ).unwrap();
     let mut builder = CircomBuilder::new(cfg);
     let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_input.json").unwrap();
     let mut input_json = String::new();
@@ -239,9 +239,16 @@ where
     let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(circom.clone(), &mut rng).unwrap();
     println!("generated pk: {:?}", pk.clone());
     println!("generated vk: {:?}", vk.clone());
-    println!("public inputs: {:?}", inputs);*/
+    println!("public inputs: {:?}", inputs);
+}
 
-    let input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998]; 
+
+#[cfg(test)]
+fn test_prove_and_verify<E>(n_iters: usize)
+where
+    E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>, G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>, G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>, <E as Pairing>::ScalarField: From<i32>
+{
+        let input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998]; 
     //let inputs = input_values.iter().map(|i| ark_ff::BigInt::new([*i])).collect::<Vec<_>>();//BigInt::from_str(&input_values[..]).map_err(|_| ()).unwrap(); 
     let input = ark_ff::BigInt::new(input_values);
     let input = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(input).unwrap();
