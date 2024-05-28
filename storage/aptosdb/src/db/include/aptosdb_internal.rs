@@ -259,7 +259,7 @@ impl AptosDB {
     fn to_api_block_info(&self, block_height: u64, block_info: BlockInfo) -> Result<(Version, Version, NewBlockEvent)> {
         // N.b. Must use committed_version because if synced version is used, we won't be able
         // to tell the end of the latest block.
-        let committed_version = self.get_committed_version()?;
+        let committed_version = self.get_latest_ledger_info_version()?;
         ensure!(
             block_info.first_version() <= committed_version,
             "block first version {} > committed version {committed_version}",

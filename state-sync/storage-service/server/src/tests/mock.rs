@@ -289,7 +289,7 @@ mock! {
 
         fn get_synced_version(&self) -> aptos_storage_interface::Result<Version>;
 
-        fn get_committed_version(&self) -> aptos_storage_interface::Result<Version>;
+        fn get_latest_ledger_info_version(&self) -> aptos_storage_interface::Result<Version>;
 
         fn get_latest_commit_metadata(&self) -> aptos_storage_interface::Result<(Version, u64)>;
 
