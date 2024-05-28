@@ -237,7 +237,7 @@ mock! {
 
         fn get_synced_version(&self) -> Result<Version>;
 
-        fn get_committed_version(&self) -> Result<Version>;
+        fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
         fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
 

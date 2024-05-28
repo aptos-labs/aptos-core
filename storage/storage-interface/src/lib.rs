@@ -466,7 +466,7 @@ pub trait DbReader: Send + Sync {
 
     /// Returns the latest committed version, error on on non-bootstrapped/empty DB.
     /// N.b. different from `get_synced_version()`.
-    fn get_committed_version(&self) -> Result<Version> {
+    fn get_latest_ledger_info_version(&self) -> Result<Version> {
         self.get_latest_ledger_info()
             .map(|li| li.ledger_info().version())
     }

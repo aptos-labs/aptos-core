@@ -341,7 +341,7 @@ fn add_accounts_impl<V>(
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
     let (db, executor) = init_db_and_executor::<V>(&config);
 
-    let start_version = db.reader.get_committed_version().unwrap();
+    let start_version = db.reader.get_latest_ledger_info_version().unwrap();
 
     let (pipeline, block_sender) = Pipeline::new(
         executor,
@@ -372,7 +372,7 @@ fn add_accounts_impl<V>(
     pipeline.join();
 
     let elapsed = start_time.elapsed().as_secs_f32();
-    let now_version = db.reader.get_committed_version().unwrap();
+    let now_version = db.reader.get_latest_ledger_info_version().unwrap();
     let delta_v = now_version - start_version;
     info!(
         "Overall TPS: create_db: account creation: {} txn/s",

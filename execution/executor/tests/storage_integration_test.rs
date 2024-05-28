@@ -46,7 +46,7 @@ fn test_genesis() {
         .reader
         .get_state_value_with_proof_by_version(&account_resource_path, 0)
         .unwrap();
-    let latest_version = db.reader.get_committed_version().unwrap();
+    let latest_version = db.reader.get_latest_ledger_info_version().unwrap();
     assert_eq!(latest_version, 0);
     let txn_info = db
         .reader

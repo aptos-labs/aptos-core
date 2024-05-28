@@ -73,7 +73,7 @@ pub trait AptosValidatorInterface: Sync {
         )>,
     >;
 
-    async fn get_committed_version(&self) -> Result<Version>;
+    async fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
     async fn get_version_by_account_sequence(
         &self,
