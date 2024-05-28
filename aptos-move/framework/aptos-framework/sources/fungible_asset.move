@@ -212,11 +212,7 @@ module aptos_framework::fungible_asset {
     }
 
     inline fun default_to_concurrent_fungible_balance(): bool {
-        features::migrate_to_concurrent_fungible_balance_enabled()
-    }
-
-    inline fun auto_upgrade_to_concurrent_fungible_balance(): bool {
-        features::migrate_to_concurrent_fungible_balance_enabled()
+        features::default_to_concurrent_fungible_balance_enabled()
     }
 
     /// Make an existing object fungible by adding the Metadata resource.
@@ -887,10 +883,6 @@ module aptos_framework::fungible_asset {
         let FungibleAsset { metadata, amount } = fa;
         if (amount == 0) return;
 
-        if (auto_upgrade_to_concurrent_fungible_balance()) {
-            ensure_store_upgraded_to_concurrent_internal(store_addr);
-        };
-
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
         let store = borrow_global_mut<FungibleStore>(store_addr);
         assert!(metadata == store.metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
@@ -911,9 +903,6 @@ module aptos_framework::fungible_asset {
         amount: u64,
     ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
-        if (auto_upgrade_to_concurrent_fungible_balance()) {
-            ensure_store_upgraded_to_concurrent_internal(store_addr);
-        };
 
         let store = borrow_global_mut<FungibleStore>(store_addr);
         let metadata = store.metadata;
@@ -1284,7 +1273,7 @@ module aptos_framework::fungible_asset {
     fun test_fungible_asset_upgrade(fx: &signer, creator: &signer) acquires Supply, ConcurrentSupply, FungibleStore, ConcurrentFungibleBalance {
         let supply_feature = features::get_concurrent_fungible_assets_feature();
         let balance_feature = features::get_concurrent_fungible_balance_feature();
-        let default_balance_feature = features::get_migrate_to_concurrent_fungible_balance_feature();
+        let default_balance_feature = features::get_default_to_concurrent_fungible_balance_feature();
 
         features::change_feature_flags(fx, vector[], vector[supply_feature, balance_feature, default_balance_feature]);
 
@@ -1301,6 +1290,9 @@ module aptos_framework::fungible_asset {
         assert!(supply(test_token) == option::some(30), 5);
 
         deposit_with_ref(&transfer_ref, creator_store, fa);
+        assert!(exists<FungibleStore>(object::object_address(&creator_store)), 13);
+        assert!(borrow_store_resource(&creator_store).balance == 30, 14);
+        assert!(!exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 15);
 
         features::change_feature_flags(fx, vector[supply_feature, balance_feature], vector[default_balance_feature]);
 
@@ -1310,12 +1302,38 @@ module aptos_framework::fungible_asset {
         assert!(!exists<Supply>(object::object_address(&test_token)), 6);
         assert!(exists<ConcurrentSupply>(object::object_address(&test_token)), 7);
 
-        let fb = mint(&mint_ref, 20);
-        assert!(supply(test_token) == option::some(50), 8);
-
-        // automatic conversion of balance
-        deposit_with_ref(&transfer_ref, creator_store, fb);
+        // assert conversion of balance
+        upgrade_store_to_concurrent(creator, creator_store);
+        withdraw_with_ref(&transfer_ref, creator_store, fb);
         // both store and new balance need to exist. Old balance should be 0.
+        assert!(exists<FungibleStore>(object::object_address(&creator_store)), 9);
+        assert!(borrow_store_resource(&creator_store).balance == 0, 10);
+        assert!(exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 11);
+        assert!(aggregator_v2::read(&borrow_global<ConcurrentFungibleBalance>(object::object_address(&creator_store)).balance) == 50, 12);
+    }
+
+    #[test(fx = @aptos_framework, creator = @0xcafe)]
+    fun test_fungible_asset_default_concurrent(fx: &signer, creator: &signer) acquires Supply, ConcurrentSupply, FungibleStore, ConcurrentFungibleBalance {
+        let supply_feature = features::get_concurrent_fungible_assets_feature();
+        let balance_feature = features::get_concurrent_fungible_balance_feature();
+        let default_balance_feature = features::get_default_to_concurrent_fungible_balance_feature();
+
+        features::change_feature_flags(fx, vector[supply_feature, balance_feature, default_balance_feature], vector[]);
+
+        let (creator_ref, token_object) = create_test_token(creator);
+        let (mint_ref, transfer_ref, _burn) = init_test_metadata(&creator_ref);
+        let test_token = object::convert<TestToken, Metadata>(token_object);
+        assert!(exists<Supply>(object::object_address(&test_token)), 1);
+        assert!(!exists<ConcurrentSupply>(object::object_address(&test_token)), 2);
+        let creator_store = create_test_store(creator, test_token);
+        assert!(!exists<FungibleStore>(object::object_address(&creator_store)), 3);
+        assert!(exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 4);
+
+        let fa = mint(&mint_ref, 30);
+        assert!(supply(test_token) == option::some(30), 5);
+
+        deposit_with_ref(&transfer_ref, creator_store, fa);
+
         assert!(exists<FungibleStore>(object::object_address(&creator_store)), 9);
         assert!(borrow_store_resource(&creator_store).balance == 0, 10);
         assert!(exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 11);

@@ -569,15 +569,14 @@ module std::features {
         is_enabled(CONCURRENT_FUNGIBLE_BALANCE)
     }
 
-    /// Whether to default new Fungible Stores and migrate existing ones
-    /// to the concurrent variant.
+    /// Whether to default new Fungible Store to the concurrent variant.
     /// Lifetime: transient
-    const MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE: u64 = 68;
+    const DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE: u64 = 68;
 
-    public fun get_migrate_to_concurrent_fungible_balance_feature(): u64 { MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE }
+    public fun get_default_to_concurrent_fungible_balance_feature(): u64 { DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE }
 
-    public fun migrate_to_concurrent_fungible_balance_enabled(): bool acquires Features {
-        is_enabled(MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE)
+    public fun default_to_concurrent_fungible_balance_enabled(): bool acquires Features {
+        is_enabled(DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE)
     }
 
     // ============================================================================================
