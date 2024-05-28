@@ -162,14 +162,16 @@ use crate::keyless::bn254_circom::{g1_projective_str_to_affine, g2_projective_st
 /// Generates a trapdoor proving and verifiying key pair intended for proof simulation, in addition to a vector of public inputs, from
 /// circom-generated .r1cs and .wasm files, and a .json file containing the public inputs. To be
 /// used to update `test_prove_and_verify` after circuit changes occur
+/// WARNING: The files referenced in this function are not present in this repo and msut be added
+/// manually
 #[allow(dead_code)]
 fn generate_keys_and_inputs<E: Pairing>() {
     let cfg = CircomConfig::<E>::new(
-        "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
-        "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
+        "./circuit-files/keyless_main.wasm",
+        "./circuit-files/keyless_main.r1cs",
     ).unwrap();
     let mut builder = CircomBuilder::new(cfg);
-    let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_input.json").unwrap();
+    let mut input_file = File::open("./circuit-files/keyless_input.json").unwrap();
     let mut input_json = String::new();
     input_file.read_to_string(&mut input_json).unwrap();
     let input_map: HashMap<String, Vec<String>> = serde_json::from_str(&input_json).unwrap();
