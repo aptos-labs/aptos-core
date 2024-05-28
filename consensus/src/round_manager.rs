@@ -1136,9 +1136,9 @@ impl RoundManager {
                         "[RoundManager] Unable to process the created QC {:?}",
                         qc
                     ))?;
-                // Question: Should we broadcast order vote or fast share first?
-                self.broadcast_fast_shares(qc.certified_block()).await;
                 if self.onchain_config.order_vote_enabled() {
+                    // Question: Should we broadcast order vote or fast share first?
+                    self.broadcast_fast_shares(qc.certified_block()).await;
                     // Broadcast order vote if the QC is successfully aggregated
                     // Even if broadcast order vote fails, the function will return Ok
                     if let Err(e) = self.broadcast_order_vote(vote, qc.clone()).await {
