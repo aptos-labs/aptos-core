@@ -62,6 +62,4 @@ module stablecoin::usdk_tests {
 
         object::transfer(receiver, store, @0xdeadbeef);
     }
-
-
 }
