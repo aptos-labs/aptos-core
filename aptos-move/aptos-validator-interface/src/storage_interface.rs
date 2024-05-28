@@ -94,8 +94,8 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         unimplemented!();
     }
 
-    async fn get_latest_version(&self) -> Result<Version> {
-        self.0.get_latest_version().map_err(Into::into)
+    async fn get_committed_version(&self) -> Result<Version> {
+        self.0.get_committed_version().map_err(Into::into)
     }
 
     async fn get_version_by_account_sequence(
@@ -103,7 +103,7 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         account: AccountAddress,
         seq: u64,
     ) -> Result<Option<Version>> {
-        let ledger_version = self.get_latest_version().await?;
+        let ledger_version = self.get_committed_version().await?;
         self.0
             .get_account_transaction(account, seq, false, ledger_version)
             .map_or_else(
