@@ -191,6 +191,9 @@ fn generate_keys_and_inputs<E: Pairing>() {
 }
 
 
+/// Generates and verifies a simulated proof using a hardcoded simulation prover and verifier key
+/// pair and a hardcoded public input. These values were generated with the Keyless circuit at commit
+/// `b715e935effe282bb998bb06c826b33d290d94ed` of `aptos-core`
 #[cfg(test)]
 fn test_prove_and_verify<E>(n_iters: usize)
 where
