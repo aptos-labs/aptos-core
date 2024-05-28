@@ -36,6 +36,7 @@ module FACoin::fa_coin {
             utf8(b"http://example.com/favicon.ico"), /* icon */
             utf8(b"http://example.com"), /* project */
         );
+        fungible_asset::upgrade_store_to_concurrent(admin, object::object_from_constructor_ref<object::ObjectCore>(constructor_ref));
 
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
         let mint_ref = fungible_asset::generate_mint_ref(constructor_ref);
