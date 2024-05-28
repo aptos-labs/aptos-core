@@ -2,7 +2,7 @@
 name = "stablecoin"
 version = "0.0.0"
 
-[addresses]
+[dev-addresses]
 stablecoin = "_"
 master_minter = "_"
 minter = "_" 

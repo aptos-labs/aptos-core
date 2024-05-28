@@ -17,4 +17,4 @@ Replace 0x8115e523937721388acbd77027da45b1c88a6313f99615c4da4c6a32ab161b1a with 
 Make sure to replace 0x75f3f12f2f634ba33aefda0f2cd29119fdf9caa4fa288ac6e369f54e0611289a with your devnet account address.
 
 # Running tests
-aptos move test --named-addresses stablecoin=0xcafe,master_minter=0xbab,minter=0xface,pauser=0xdafe,denylister=0xcade
+aptos move test
