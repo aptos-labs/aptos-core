@@ -9,7 +9,11 @@ use aptos_release_builder::{
     initialize_aptos_core_path,
     validate::{DEFAULT_RESOLUTION_TIME, FAST_RESOLUTION_TIME},
 };
-use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
+use aptos_types::{
+    account_address::AccountAddress,
+    chain_id::ChainId,
+    jwks::{ObservedJWKs, SupportedOIDCProviders},
+};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -84,7 +88,7 @@ pub enum Commands {
 #[derive(Subcommand, Debug)]
 pub enum InputOptions {
     FromDirectory {
-        /// Path to the local testnet folder. If you are running local testnet via cli, it should be `.aptos/testnet`.
+        /// Path to the localnet folder. If you are running localnet via cli, it should be `.aptos/testnet`.
         #[clap(short, long)]
         test_dir: PathBuf,
     },
@@ -214,7 +218,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
 
-            print_configs!(OnChainConsensusConfig, OnChainExecutionConfig, Version);
+            print_configs!(OnChainConsensusConfig, OnChainExecutionConfig, AptosVersion);
 
             if print_gas_schedule {
                 print_configs!(GasScheduleV2, StorageGasSchedule);
@@ -228,6 +232,24 @@ async fn main() -> anyhow::Result<()> {
                     &aptos_release_builder::components::feature_flags::Features::from(&features)
                 )?
             );
+
+            let oidc_providers = fetch_config::<SupportedOIDCProviders>(&client);
+            let observed_jwks = fetch_config::<ObservedJWKs>(&client);
+            let jwk_consensus_config = fetch_config::<OnChainJWKConsensusConfig>(&client);
+            let randomness_config = fetch_config::<RandomnessConfigMoveStruct>(&client)
+                .and_then(OnChainRandomnessConfig::try_from);
+            println!();
+            println!("SupportedOIDCProviders");
+            println!("{:?}", oidc_providers);
+            println!();
+            println!("ObservedJWKs");
+            println!("{:?}", observed_jwks);
+            println!();
+            println!("JWKConsensusConfig");
+            println!("{:?}", jwk_consensus_config);
+            println!();
+            println!("RandomnessConfig");
+            println!("{:?}", randomness_config);
             Ok(())
         },
         Commands::PrintPackageMetadata {

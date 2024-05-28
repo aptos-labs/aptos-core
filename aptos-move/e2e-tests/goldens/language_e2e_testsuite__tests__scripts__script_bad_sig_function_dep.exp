@@ -5,32 +5,31 @@ Ok(
                 WriteSetV0(
                     WriteSetMut {
                         write_set: {
-                            StateKey {
-                                inner: AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
-                                hash: OnceCell(Uninit),
-                            }: Modification(3d420f00000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, metadata:StateValueMetadata { inner: None }),
-                            StateKey {
-                                inner: AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" },
-                                hash: OnceCell(Uninit),
-                            }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10b00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
-                            StateKey {
-                                inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
-                                hash: OnceCell(Uninit),
-                            }: Modification(fce0f505000000000100000000000000, metadata:StateValueMetadata { inner: None }),
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" }: Modification(3d420f00000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, metadata:StateValueMetadata { inner: None }),
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10b00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
+                            StateKey::TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 }: Modification(3c230506000000000100000000000000, metadata:StateValueMetadata { inner: None }),
                         },
                     },
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "03000000000000000300000000000000000000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "03000000000000000300000000000000000000000000000000000000000000000000000000000000" },
             ],
             gas_used: 3,
             status: Keep(
                 MiscellaneousError(
-                    Some(
-                        TYPE_MISMATCH,
-                    ),
+                    None,
                 ),
+            ),
+            auxiliary_data: V1(
+                TransactionAuxiliaryDataV1 {
+                    detail_error_message: Some(
+                        VMErrorDetail {
+                            status_code: TYPE_MISMATCH,
+                            message: None,
+                        },
+                    ),
+                },
             ),
         },
     ],

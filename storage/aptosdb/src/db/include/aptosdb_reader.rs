@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_types::block_info::BlockHeight;
+
 impl DbReader for AptosDB {
     fn get_epoch_ending_ledger_infos(
         &self,
@@ -28,6 +30,17 @@ impl DbReader for AptosDB {
                     .get_prefixed_state_value_iterator(key_prefix, cursor, version)?,
             )
                 as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>>>)
+        })
+    }
+
+    fn get_transaction_auxiliary_data_by_version(
+        &self,
+        version: Version,
+    ) -> Result<TransactionAuxiliaryData> {
+        gauged_api("get_transaction_auxiliary_data_by_version", || {
+            self.error_if_ledger_pruned("Transaction", version)?;
+            self.ledger_db
+                .transaction_auxiliary_data_db().get_transaction_auxiliary_data(version)
         })
     }
 
@@ -184,10 +197,23 @@ impl DbReader for AptosDB {
         })
     }
 
-    /// Get the first version that will likely not be pruned soon
-    fn get_first_viable_txn_version(&self) -> Result<Version> {
-        gauged_api("get_first_viable_txn_version", || {
-            Ok(self.ledger_pruner.get_min_viable_version())
+    /// Get the first block version / height that will likely not be pruned soon.
+    fn get_first_viable_block(&self) -> Result<(Version, BlockHeight)> {
+        gauged_api("get_first_viable_block", || {
+            let min_version = self.ledger_pruner.get_min_viable_version();
+            if !self.skip_index_and_usage {
+                let (block_version, index, _seq_num) = self
+                    .event_store
+                    .lookup_event_at_or_after_version(&new_block_event_key(), min_version)?
+                    .ok_or_else(|| AptosDbError::NotFound(format!("NewBlockEvent at or after version {}", min_version)))?;
+                let event = self.event_store.get_event_by_version_and_index(block_version, index)?;
+                return Ok((block_version, event.expect_new_block_event()?.height()));
+            }
+
+            self
+                .ledger_db
+                .metadata_db()
+                .get_block_height_at_or_after_version(min_version)
         })
     }
 
@@ -230,11 +256,13 @@ impl DbReader for AptosDB {
                     let events = self.ledger_db.event_db().get_events_by_version(version)?;
                     let write_set = self.ledger_db.write_set_db().get_write_set(version)?;
                     let txn = self.ledger_db.transaction_db().get_transaction(version)?;
+                    let auxiliary_data = self.ledger_db.transaction_auxiliary_data_db().get_transaction_auxiliary_data(version).unwrap_or_default();
                     let txn_output = TransactionOutput::new(
                         write_set,
                         events,
                         txn_info.gas_used(),
                         txn_info.status().clone().into(),
+                        auxiliary_data,
                     );
                     Ok((txn_info, (txn, txn_output)))
                 })
@@ -429,12 +457,13 @@ impl DbReader for AptosDB {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         gauged_api("get_state_proof_by_version_ext", || {
             self.error_if_state_merkle_pruned("State merkle", version)?;
 
             self.state_store
-                .get_state_proof_by_version_ext(state_key, version)
+                .get_state_proof_by_version_ext(state_key, version, root_depth)
         })
     }
 
@@ -442,12 +471,13 @@ impl DbReader for AptosDB {
         &self,
         state_store_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         gauged_api("get_state_value_with_proof_by_version_ext", || {
             self.error_if_state_merkle_pruned("State merkle", version)?;
 
             self.state_store
-                .get_state_value_with_proof_by_version_ext(state_store_key, version)
+                .get_state_value_with_proof_by_version_ext(state_store_key, version, root_depth)
         })
     }
 
@@ -500,41 +530,8 @@ impl DbReader for AptosDB {
                 "version older than latest version"
             );
 
-            match self.event_store.get_block_metadata(version) {
-                Ok((_first_version, new_block_event)) => Ok(new_block_event.proposed_time()),
-                Err(err) => {
-                    // when event index is disabled, we won't be able to search the NewBlock event stream.
-                    // TODO(grao): evaluate adding dedicated block_height_by_version index
-                    warn!(
-                        error = ?err,
-                        "Failed to fetch block timestamp, falling back to on-chain config.",
-                    );
-                    let ts = self
-                        .get_state_value_by_version(
-                            &StateKey::access_path(CurrentTimeMicroseconds::access_path()?),
-                            version,
-                        )?
-                        .ok_or_else(|| anyhow!("Timestamp not found at version {}", version))?;
-                    Ok(bcs::from_bytes::<CurrentTimeMicroseconds>(ts.bytes())?.microseconds)
-                },
-            }
-        })
-    }
-
-    fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
-        gauged_api("get_next_block_event", || {
-            self.error_if_ledger_pruned("NewBlockEvent", version)?;
-            if let Some((block_version, _, _)) = self
-                .event_store
-                .lookup_event_at_or_after_version(&new_block_event_key(), version)?
-            {
-                self.event_store.get_block_metadata(block_version)
-            } else {
-                bail!(
-                    "Failed to find a block event at or after version {}",
-                    version
-                )
-            }
+            let (_first_version, _last_version, new_block_event) = self.get_block_info_by_version(version)?;
+            Ok(new_block_event.proposed_time())
         })
     }
 
@@ -558,22 +555,9 @@ impl DbReader for AptosDB {
 
             let mut events = Vec::with_capacity(num_events);
             for item in iter.take(num_events) {
-                let (block_height, block_info) = item?;
+                let (_block_height, block_info) = item?;
                 let first_version = block_info.first_version();
-                let event = self
-                    .ledger_db
-                    .event_db()
-                    .get_events_by_version(first_version)?
-                    .into_iter()
-                    .find(|event| {
-                        if let Some(key) = event.event_key() {
-                            if *key == new_block_event_key() {
-                                return true;
-                            }
-                        }
-                        false
-                    })
-                    .ok_or_else(|| anyhow!("Event for block_height {block_height} at version {first_version} is not found."))?;
+                let event = self.ledger_db.event_db().expect_new_block_event(first_version)?;
                 events.push(EventWithVersion::new(first_version, event));
             }
 
@@ -904,7 +888,7 @@ impl AptosDB {
     ) -> Result<TransactionWithProof> {
         self.error_if_ledger_pruned("Transaction", version)?;
 
-        let proof = self
+        let mut proof = self
             .ledger_db
             .transaction_info_db()
             .get_transaction_info_with_proof(
@@ -912,6 +896,11 @@ impl AptosDB {
                 ledger_version,
                 self.ledger_db.transaction_accumulator_db(),
             )?;
+
+        let aux_data_opt = self.get_transaction_auxiliary_data_by_version(version).ok();
+        proof.inject_auxiliary_error_data(aux_data_opt);
+
+
         let transaction = self.ledger_db.transaction_db().get_transaction(version)?;
 
         // If events were requested, also fetch those.

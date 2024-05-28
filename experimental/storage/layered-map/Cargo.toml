@@ -1,0 +1,24 @@
+[package]
+name = "aptos-experimental-layered-map"
+description = "Aptos LayeredMap"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-crypto = { workspace = true }
+aptos-drop-helper = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-metrics-core = { workspace = true }
+bitvec = "1.0.1"
+once_cell = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

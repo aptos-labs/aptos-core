@@ -99,7 +99,7 @@ fn type_tag_strategy() -> impl Strategy<Value = TypeTag> {
                     address: addr,
                     module: Identifier::new(module).unwrap(),
                     name: Identifier::new(name).unwrap(),
-                    type_params: t_vec,
+                    type_args: t_vec,
                 }))}),
         ]
     })

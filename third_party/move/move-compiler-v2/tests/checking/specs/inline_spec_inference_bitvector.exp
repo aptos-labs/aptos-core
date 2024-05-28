@@ -1,15 +1,7 @@
-
-Diagnostics:
-warning: Unused parameter `length`. Consider removing or prefixing with an underscore: `_length`
-  ┌─ tests/checking/specs/inline_spec_inference_bitvector.move:3:18
-  │
-3 │   public fun new(length: u64) {
-  │                  ^^^^^^
-
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::bit_vector_infer {
     use std::vector;
-    public fun new(length: u64) {
+    public fun new(_length: u64) {
         {
           let counter: u64 = 1;
           if Gt<u64>(counter, 0) {
@@ -29,5 +21,4 @@ module 0x42::bit_vector_infer {
           }
         }
     }
-    spec fun $new(length: u64);
 } // end 0x42::bit_vector_infer

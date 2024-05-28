@@ -30,8 +30,11 @@ fun m::test(): u32 {
 
 [variant baseline]
 fun m::test(): u32 {
-     var $t0: u32
+     var $t0: u32 [unused]
      var $t1: u64
   0: $t1 := 0
   1: abort($t1)
 }
+
+
+============ bytecode verification succeeded ========

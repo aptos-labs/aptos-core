@@ -82,7 +82,6 @@ impl DbWriter for AptosDB {
         })
     }
 
-    // TODO(bowu): populate the flag indicating the fast_sync is done.
     fn finalize_state_snapshot(
         &self,
         version: Version,
@@ -319,6 +318,10 @@ impl AptosDB {
                     .commit_transaction_accumulator(txns_to_commit, first_version)
                     .unwrap()
             });
+            s.spawn(|_| {
+                self.commit_transaction_auxiliary_data(txns_to_commit, first_version)
+                    .unwrap()
+            });
         });
 
         Ok(new_root_hash)
@@ -473,6 +476,38 @@ impl AptosDB {
             .write_schemas(batch)?;
 
         Ok(root_hash)
+    }
+
+    fn commit_transaction_auxiliary_data(
+        &self,
+        txns_to_commit: &[TransactionToCommit],
+        first_version: u64,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_auxiliary_data"])
+            .start_timer();
+
+        let batch = SchemaBatch::new();
+        txns_to_commit
+            .iter()
+            .enumerate()
+            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
+                TransactionAuxiliaryDataDb::put_transaction_auxiliary_data(
+                    first_version + i as u64,
+                    txn_to_commit.transaction_auxiliary_data(),
+                    &batch,
+                )?;
+
+
+            Ok(())
+        })?;
+
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_auxiliary_data___commit"])
+            .start_timer();
+        self.ledger_db
+            .transaction_auxiliary_data_db()
+            .write_schemas(batch)
     }
 
     fn commit_transaction_infos(

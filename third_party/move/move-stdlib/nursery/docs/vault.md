@@ -1,5 +1,5 @@
 
-<a name="0x1_vault"></a>
+<a id="0x1_vault"></a>
 
 # Module `0x1::vault`
 
@@ -9,13 +9,13 @@ on if authorized by a signer. Authorization is managed by
 of capabilities to other signers (including revocation) as well as transfer of ownership.
 
 
-<a name="@Overview_0"></a>
+<a id="@Overview_0"></a>
 
 ## Overview
 
 
 
-<a name="@Capabilities_1"></a>
+<a id="@Capabilities_1"></a>
 
 ### Capabilities
 
@@ -52,7 +52,7 @@ vault::release_read_accessor(accessor);
 ```
 
 
-<a name="@Delegation_2"></a>
+<a id="@Delegation_2"></a>
 
 ### Delegation
 
@@ -88,7 +88,7 @@ vault::revoke_read_cap(&delegate_cap, signer::address_of(other_signer));
 ```
 
 
-<a name="@Abilities_3"></a>
+<a id="@Abilities_3"></a>
 
 ### Abilities
 
@@ -156,7 +156,7 @@ language to have 'phantom type parameters' or similar features added, which will
 
 
 
-<a name="0x1_vault_ReadCap"></a>
+<a id="0x1_vault_ReadCap"></a>
 
 ## Struct `ReadCap`
 
@@ -192,7 +192,7 @@ TODO: remove <code>drop</code> on <code>Content</code> here and elsewhere once w
 
 </details>
 
-<a name="0x1_vault_ModifyCap"></a>
+<a id="0x1_vault_ModifyCap"></a>
 
 ## Struct `ModifyCap`
 
@@ -226,7 +226,7 @@ A capability to modify the content of the vault.
 
 </details>
 
-<a name="0x1_vault_DelegateCap"></a>
+<a id="0x1_vault_DelegateCap"></a>
 
 ## Struct `DelegateCap`
 
@@ -260,7 +260,7 @@ A capability to delegate access to the vault.
 
 </details>
 
-<a name="0x1_vault_TransferCap"></a>
+<a id="0x1_vault_TransferCap"></a>
 
 ## Struct `TransferCap`
 
@@ -294,7 +294,7 @@ A capability to transfer ownership of the vault.
 
 </details>
 
-<a name="0x1_vault_CapType"></a>
+<a id="0x1_vault_CapType"></a>
 
 ## Struct `CapType`
 
@@ -323,7 +323,7 @@ specify capability types.
 
 </details>
 
-<a name="0x1_vault_VaultDelegateEvent"></a>
+<a id="0x1_vault_VaultDelegateEvent"></a>
 
 ## Struct `VaultDelegateEvent`
 
@@ -381,7 +381,7 @@ An event which we generate on vault access delegation or revocation if event gen
 
 </details>
 
-<a name="0x1_vault_VaultTransferEvent"></a>
+<a id="0x1_vault_VaultTransferEvent"></a>
 
 ## Struct `VaultTransferEvent`
 
@@ -427,7 +427,7 @@ An event which we generate on vault transfer if event generation is enabled.
 
 </details>
 
-<a name="0x1_vault_Vault"></a>
+<a id="0x1_vault_Vault"></a>
 
 ## Resource `Vault`
 
@@ -456,7 +456,7 @@ Private. The vault representation.
 
 </details>
 
-<a name="0x1_vault_VaultDelegates"></a>
+<a id="0x1_vault_VaultDelegates"></a>
 
 ## Resource `VaultDelegates`
 
@@ -484,7 +484,7 @@ Private. If the vault supports delegation, information about the delegates.
 
 </details>
 
-<a name="0x1_vault_VaultEvents"></a>
+<a id="0x1_vault_VaultEvents"></a>
 
 ## Resource `VaultEvents`
 
@@ -525,7 +525,7 @@ Private. If event generation is enabled, contains the event generators.
 
 </details>
 
-<a name="0x1_vault_VaultDelegate"></a>
+<a id="0x1_vault_VaultDelegate"></a>
 
 ## Resource `VaultDelegate`
 
@@ -560,7 +560,7 @@ describes the capabilities granted to this delegate.
 
 </details>
 
-<a name="0x1_vault_ReadAccessor"></a>
+<a id="0x1_vault_ReadAccessor"></a>
 
 ## Struct `ReadAccessor`
 
@@ -594,7 +594,7 @@ A read accessor for the content of the vault.
 
 </details>
 
-<a name="0x1_vault_ModifyAccessor"></a>
+<a id="0x1_vault_ModifyAccessor"></a>
 
 ## Struct `ModifyAccessor`
 
@@ -628,12 +628,12 @@ A modify accessor for the content of the vault.
 
 </details>
 
-<a name="@Constants_4"></a>
+<a id="@Constants_4"></a>
 
 ## Constants
 
 
-<a name="0x1_vault_EDELEGATE"></a>
+<a id="0x1_vault_EDELEGATE"></a>
 
 
 
@@ -642,7 +642,7 @@ A modify accessor for the content of the vault.
 
 
 
-<a name="0x1_vault_EACCESSOR_INCONSISTENCY"></a>
+<a id="0x1_vault_EACCESSOR_INCONSISTENCY"></a>
 
 
 
@@ -651,7 +651,7 @@ A modify accessor for the content of the vault.
 
 
 
-<a name="0x1_vault_EACCESSOR_IN_USE"></a>
+<a id="0x1_vault_EACCESSOR_IN_USE"></a>
 
 
 
@@ -660,7 +660,7 @@ A modify accessor for the content of the vault.
 
 
 
-<a name="0x1_vault_EDELEGATE_TO_SELF"></a>
+<a id="0x1_vault_EDELEGATE_TO_SELF"></a>
 
 
 
@@ -669,7 +669,7 @@ A modify accessor for the content of the vault.
 
 
 
-<a name="0x1_vault_EDELEGATION_NOT_ENABLED"></a>
+<a id="0x1_vault_EDELEGATION_NOT_ENABLED"></a>
 
 
 
@@ -678,7 +678,7 @@ A modify accessor for the content of the vault.
 
 
 
-<a name="0x1_vault_EEVENT"></a>
+<a id="0x1_vault_EEVENT"></a>
 
 
 
@@ -687,7 +687,7 @@ A modify accessor for the content of the vault.
 
 
 
-<a name="0x1_vault_EVAULT"></a>
+<a id="0x1_vault_EVAULT"></a>
 
 
 
@@ -696,7 +696,7 @@ A modify accessor for the content of the vault.
 
 
 
-<a name="0x1_vault_read_cap_type"></a>
+<a id="0x1_vault_read_cap_type"></a>
 
 ## Function `read_cap_type`
 
@@ -719,7 +719,7 @@ Creates a read capability type.
 
 </details>
 
-<a name="0x1_vault_modify_cap_type"></a>
+<a id="0x1_vault_modify_cap_type"></a>
 
 ## Function `modify_cap_type`
 
@@ -742,7 +742,7 @@ Creates a modify  capability type.
 
 </details>
 
-<a name="0x1_vault_delegate_cap_type"></a>
+<a id="0x1_vault_delegate_cap_type"></a>
 
 ## Function `delegate_cap_type`
 
@@ -765,7 +765,7 @@ Creates a delegate  capability type.
 
 </details>
 
-<a name="0x1_vault_transfer_cap_type"></a>
+<a id="0x1_vault_transfer_cap_type"></a>
 
 ## Function `transfer_cap_type`
 
@@ -788,7 +788,7 @@ Creates a transfer  capability type.
 
 </details>
 
-<a name="0x1_vault_new"></a>
+<a id="0x1_vault_new"></a>
 
 ## Function `new`
 
@@ -820,7 +820,7 @@ Creates new vault for the given signer. The vault is populated with the <code>in
 
 </details>
 
-<a name="0x1_vault_is_delegation_enabled"></a>
+<a id="0x1_vault_is_delegation_enabled"></a>
 
 ## Function `is_delegation_enabled`
 
@@ -848,7 +848,7 @@ Returns <code><b>false</b></code> otherwise.
 
 </details>
 
-<a name="0x1_vault_enable_delegation"></a>
+<a id="0x1_vault_enable_delegation"></a>
 
 ## Function `enable_delegation`
 
@@ -874,7 +874,7 @@ Enables delegation functionality for this vault. By default, vaults to not suppo
 
 </details>
 
-<a name="0x1_vault_enable_events"></a>
+<a id="0x1_vault_enable_events"></a>
 
 ## Function `enable_events`
 
@@ -910,7 +910,7 @@ the vault in events.
 
 </details>
 
-<a name="0x1_vault_remove_vault"></a>
+<a id="0x1_vault_remove_vault"></a>
 
 ## Function `remove_vault`
 
@@ -953,7 +953,7 @@ this to succeed, there must be no active accessor for the vault.
 
 </details>
 
-<a name="0x1_vault_acquire_read_cap"></a>
+<a id="0x1_vault_acquire_read_cap"></a>
 
 ## Function `acquire_read_cap`
 
@@ -981,7 +981,7 @@ of the vault or a delegate with appropriate access.
 
 </details>
 
-<a name="0x1_vault_acquire_modify_cap"></a>
+<a id="0x1_vault_acquire_modify_cap"></a>
 
 ## Function `acquire_modify_cap`
 
@@ -1009,7 +1009,7 @@ of the vault or a delegate with appropriate access.
 
 </details>
 
-<a name="0x1_vault_acquire_delegate_cap"></a>
+<a id="0x1_vault_acquire_delegate_cap"></a>
 
 ## Function `acquire_delegate_cap`
 
@@ -1037,7 +1037,7 @@ of the vault or a delegate with appropriate access.
 
 </details>
 
-<a name="0x1_vault_acquire_transfer_cap"></a>
+<a id="0x1_vault_acquire_transfer_cap"></a>
 
 ## Function `acquire_transfer_cap`
 
@@ -1065,7 +1065,7 @@ of the vault or a delegate with appropriate access.
 
 </details>
 
-<a name="0x1_vault_validate_cap"></a>
+<a id="0x1_vault_validate_cap"></a>
 
 ## Function `validate_cap`
 
@@ -1102,7 +1102,7 @@ pair of the vault address and the used authority.
 
 </details>
 
-<a name="0x1_vault_read_accessor"></a>
+<a id="0x1_vault_read_accessor"></a>
 
 ## Function `read_accessor`
 
@@ -1134,7 +1134,7 @@ function will abort if one is in use. An accessor must be explicitly released us
 
 </details>
 
-<a name="0x1_vault_borrow"></a>
+<a id="0x1_vault_borrow"></a>
 
 ## Function `borrow`
 
@@ -1159,7 +1159,7 @@ Returns a reference to the content represented by a read accessor.
 
 </details>
 
-<a name="0x1_vault_release_read_accessor"></a>
+<a id="0x1_vault_release_read_accessor"></a>
 
 ## Function `release_read_accessor`
 
@@ -1190,7 +1190,7 @@ Releases read accessor.
 
 </details>
 
-<a name="0x1_vault_modify_accessor"></a>
+<a id="0x1_vault_modify_accessor"></a>
 
 ## Function `modify_accessor`
 
@@ -1220,7 +1220,7 @@ the content.
 
 </details>
 
-<a name="0x1_vault_borrow_mut"></a>
+<a id="0x1_vault_borrow_mut"></a>
 
 ## Function `borrow_mut`
 
@@ -1245,7 +1245,7 @@ Returns a mutable reference to the content represented by a modify accessor.
 
 </details>
 
-<a name="0x1_vault_release_modify_accessor"></a>
+<a id="0x1_vault_release_modify_accessor"></a>
 
 ## Function `release_modify_accessor`
 
@@ -1277,7 +1277,7 @@ to the vault.
 
 </details>
 
-<a name="0x1_vault_delegate"></a>
+<a id="0x1_vault_delegate"></a>
 
 ## Function `delegate`
 
@@ -1310,7 +1310,7 @@ during vault creation for this to succeed.
             to_signer,
             <a href="vault.md#0x1_vault_VaultDelegate">VaultDelegate</a>{vault_address: cap.vault_address, granted_caps: <a href="_empty">vector::empty</a>()}
         );
-        // Add the the delegate <b>to</b> <a href="vault.md#0x1_vault_VaultDelegates">VaultDelegates</a>.
+        // Add the delegate <b>to</b> <a href="vault.md#0x1_vault_VaultDelegates">VaultDelegates</a>.
         <b>let</b> vault_delegates = <b>borrow_global_mut</b>&lt;<a href="vault.md#0x1_vault_VaultDelegates">VaultDelegates</a>&lt;Content&gt;&gt;(cap.vault_address);
         <a href="vault.md#0x1_vault_add_element">add_element</a>(&<b>mut</b> vault_delegates.delegates, addr);
     };
@@ -1328,7 +1328,7 @@ during vault creation for this to succeed.
 
 </details>
 
-<a name="0x1_vault_revoke"></a>
+<a id="0x1_vault_revoke"></a>
 
 ## Function `revoke`
 
@@ -1372,7 +1372,7 @@ Revokes the delegated right to acquire a capability of given type.
 
 </details>
 
-<a name="0x1_vault_revoke_all"></a>
+<a id="0x1_vault_revoke_all"></a>
 
 ## Function `revoke_all`
 
@@ -1411,7 +1411,7 @@ Revokes all delegate rights for this vault.
 
 </details>
 
-<a name="0x1_vault_remove_element"></a>
+<a id="0x1_vault_remove_element"></a>
 
 ## Function `remove_element`
 
@@ -1439,7 +1439,7 @@ Helper to remove an element from a vector.
 
 </details>
 
-<a name="0x1_vault_add_element"></a>
+<a id="0x1_vault_add_element"></a>
 
 ## Function `add_element`
 
@@ -1466,7 +1466,7 @@ Helper to add an element to a vector.
 
 </details>
 
-<a name="0x1_vault_emit_delegate_event"></a>
+<a id="0x1_vault_emit_delegate_event"></a>
 
 ## Function `emit_delegate_event`
 
@@ -1506,7 +1506,7 @@ Emits a delegation or revocation event if event generation is enabled.
 
 </details>
 
-<a name="0x1_vault_transfer"></a>
+<a id="0x1_vault_transfer"></a>
 
 ## Function `transfer`
 

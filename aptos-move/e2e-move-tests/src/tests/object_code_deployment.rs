@@ -5,7 +5,7 @@ use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveH
 use aptos_framework::{
     natives::{
         code::{PackageRegistry, UpgradePolicy},
-        object_code_deployment::PublisherRef,
+        object_code_deployment::ManagingRefs,
     },
     BuildOptions,
 };
@@ -150,16 +150,16 @@ fn object_code_deployment_publish_package(enabled: Vec<FeatureFlag>, disabled: V
         assert_eq!(registry.packages[0].modules.len(), 1);
         assert_eq!(registry.packages[0].modules[0].name, "test");
 
-        let publisher_ref: PublisherRef = context
+        let code_object: ManagingRefs = context
             .harness
             .read_resource_from_resource_group(
                 &context.object_address,
                 parse_struct_tag("0x1::object::ObjectGroup").unwrap(),
-                parse_struct_tag("0x1::object_code_deployment::PublisherRef").unwrap(),
+                parse_struct_tag("0x1::object_code_deployment::ManagingRefs").unwrap(),
             )
             .unwrap();
-        // Verify the object created owns the `PublisherRef`
-        assert_eq!(publisher_ref, PublisherRef::new(context.object_address));
+        // Verify the object created owns the `ManagingRefs`
+        assert_eq!(code_object, ManagingRefs::new(context.object_address));
 
         let module_address = context.object_address.to_string();
         assert_success!(context.harness.run_entry_function(
@@ -244,8 +244,8 @@ fn object_code_deployment_upgrade_fail_when_publisher_ref_does_not_exist() {
     let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
-    // We should not be able to `upgrade` as `PublisherRef` does not exist.
-    // `PublisherRef` is only created when calling `publish` first, i.e. deploying a package.
+    // We should not be able to `upgrade` as `ManagingRefs` does not exist.
+    // `ManagingRefs` is only created when calling `publish` first, i.e. deploying a package.
     let status = context.execute_object_code_action(
         &acc,
         "object_code_deployment.data/pack_initial",

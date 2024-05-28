@@ -16,8 +16,9 @@ use crate::{
     network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
     payload_manager::PayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
+    pipeline::execution_client::DummyExecutionClient,
     round_manager::RoundManager,
-    test_utils::{EmptyStateComputer, MockPayloadManager, MockStorage},
+    test_utils::{MockPayloadManager, MockStorage},
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -38,7 +39,10 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::{Features, OnChainConsensusConfig, ValidatorSet, ValidatorTxnConfig},
+    on_chain_config::{
+        OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorSet,
+        ValidatorTxnConfig,
+    },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -82,7 +86,7 @@ fn build_empty_store(
     Arc::new(BlockStore::new(
         storage,
         initial_data,
-        Arc::new(EmptyStateComputer),
+        Arc::new(DummyExecutionClient),
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
@@ -149,18 +153,18 @@ fn create_node_for_fuzzing() -> RoundManager {
     );
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
 
-    let (self_sender, _self_receiver) = aptos_channels::new_test(8);
+    let (self_sender, _self_receiver) = aptos_channels::new_unbounded_test();
 
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
         verifier: storage.get_validator_set().into(),
     });
-    let network = NetworkSender::new(
+    let network = Arc::new(NetworkSender::new(
         signer.author(),
         consensus_network_client,
         self_sender,
         epoch_state.verifier.clone(),
-    );
+    ));
 
     // TODO: mock
     let block_store = build_empty_store(storage.clone(), initial_data);
@@ -178,11 +182,14 @@ fn create_node_for_fuzzing() -> RoundManager {
         Duration::ZERO,
         1,
         1024,
+        1,
+        1024,
         10,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
+        true,
     );
 
     //
@@ -209,7 +216,9 @@ fn create_node_for_fuzzing() -> RoundManager {
         OnChainConsensusConfig::default(),
         round_manager_tx,
         ConsensusConfig::default(),
-        Features::default(),
+        OnChainRandomnessConfig::default_enabled(),
+        OnChainJWKConsensusConfig::default_enabled(),
+        None,
     )
 }
 

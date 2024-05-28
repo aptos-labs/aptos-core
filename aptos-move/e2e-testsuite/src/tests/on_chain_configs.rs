@@ -6,7 +6,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    on_chain_config::{OnChainConfig, Version},
+    on_chain_config::{AptosVersion, OnChainConfig},
     transaction::TransactionStatus,
 };
 use aptos_vm::data_cache::AsMoveResolver;
@@ -17,21 +17,30 @@ fn initial_aptos_version() {
     let resolver = executor.get_state_view().as_move_resolver();
     let version = aptos_types::on_chain_config::APTOS_MAX_KNOWN_VERSION;
 
-    assert_eq!(Version::fetch_config(&resolver).unwrap(), version);
-
-    let txn = executor
-        .new_account_at(CORE_CODE_ADDRESS)
+    assert_eq!(AptosVersion::fetch_config(&resolver).unwrap(), version);
+    let account = executor.new_account_at(CORE_CODE_ADDRESS);
+    let txn_0 = account
         .transaction()
-        .payload(aptos_stdlib::version_set_version(version.major + 1))
+        .payload(aptos_stdlib::version_set_for_next_epoch(version.major + 1))
         .sequence_number(0)
         .sign();
+    let txn_1 = account
+        .transaction()
+        .payload(aptos_stdlib::aptos_governance_force_end_epoch())
+        .sequence_number(1)
+        .sign();
     executor.new_block();
-    executor.execute_and_apply(txn);
+    executor.execute_and_apply(txn_0);
+    executor.new_block();
+    executor.execute_and_apply(txn_1);
 
     let resolver = executor.get_state_view().as_move_resolver();
-    assert_eq!(Version::fetch_config(&resolver).unwrap(), Version {
-        major: version.major + 1
-    });
+    assert_eq!(
+        AptosVersion::fetch_config(&resolver).unwrap(),
+        AptosVersion {
+            major: version.major + 1
+        }
+    );
 }
 
 #[test]
@@ -39,12 +48,12 @@ fn drop_txn_after_reconfiguration() {
     let mut executor = FakeExecutor::from_head_genesis();
     let resolver = executor.get_state_view().as_move_resolver();
     let version = aptos_types::on_chain_config::APTOS_MAX_KNOWN_VERSION;
-    assert_eq!(Version::fetch_config(&resolver).unwrap(), version);
+    assert_eq!(AptosVersion::fetch_config(&resolver).unwrap(), version);
 
     let txn = executor
         .new_account_at(CORE_CODE_ADDRESS)
         .transaction()
-        .payload(aptos_stdlib::version_set_version(version.major + 1))
+        .payload(aptos_stdlib::aptos_governance_force_end_epoch())
         .sequence_number(0)
         .sign();
     executor.new_block();

@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{
-    resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::DelayedFieldID,
-};
+use aptos_aggregator::resolver::{TAggregatorV1View, TDelayedFieldView};
 use aptos_types::{
     serde_helper::bcs_utils::size_u32_as_uleb128,
     state_store::{
@@ -19,6 +16,7 @@ use aptos_types::{
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, HashMap};
 
 /// Allows to query resources from the state.

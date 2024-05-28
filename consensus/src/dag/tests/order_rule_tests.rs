@@ -146,7 +146,7 @@ proptest! {
             for seq in sequences {
                 s.spawn(|_| {
                     let dag = Arc::new(DagStore::new_for_test(dag.clone(),Arc::new(MockStorage::new()), Arc::new(MockPayloadManager {})));
-                    let (order_rule, mut receiver) = create_order_rule(epoch_state.clone(), dag);
+                    let (mut order_rule, mut receiver) = create_order_rule(epoch_state.clone(), dag);
                     for idx in seq {
                         order_rule.process_new_node(flatten_nodes[idx].metadata());
                     }
@@ -233,7 +233,7 @@ fn test_order_rule_basic() {
         Arc::new(MockStorage::new()),
         Arc::new(MockPayloadManager {}),
     ));
-    let (order_rule, mut receiver): (OrderRule, UnboundedReceiver<Vec<Arc<CertifiedNode>>>) =
+    let (mut order_rule, mut receiver): (OrderRule, UnboundedReceiver<Vec<Arc<CertifiedNode>>>) =
         create_order_rule(epoch_state, dag);
     for node in nodes.iter().flatten().flatten() {
         order_rule.process_new_node(node.metadata());

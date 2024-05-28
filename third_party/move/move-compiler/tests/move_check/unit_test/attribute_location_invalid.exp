@@ -10,6 +10,6 @@ error[E02015]: invalid attribute
 10 │     #[expected_failure(abort_code = 0)]
    │       ^^^^^^^^^^^^^^^^
    │       │
-   │       Known attribute 'expected_failure' is not expected with a struct
+   │       Attribute 'expected_failure' is not expected with a struct
    │       Expected to be used with one of the following: function
 

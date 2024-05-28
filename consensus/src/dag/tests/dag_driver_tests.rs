@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     dag::{
@@ -25,6 +26,7 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
+use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -120,7 +122,10 @@ fn setup(
 
     let mock_ledger_info = LedgerInfo::mock_genesis(None);
     let mock_ledger_info = generate_ledger_info_with_sig(signers, mock_ledger_info);
-    let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info.clone()));
+    let storage = Arc::new(MockStorage::new_with_ledger_info(
+        mock_ledger_info.clone(),
+        epoch_state.clone(),
+    ));
     let dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         storage.clone(),
@@ -140,7 +145,7 @@ fn setup(
     let time_service = TimeService::mock();
     let validators = signers.iter().map(|vs| vs.author()).collect();
     let (tx, _) = unbounded();
-    let order_rule = OrderRule::new(
+    let order_rule = Arc::new(Mutex::new(OrderRule::new(
         epoch_state.clone(),
         1,
         dag.clone(),
@@ -148,7 +153,7 @@ fn setup(
         Arc::new(TestNotifier { tx }),
         TEST_DAG_WINDOW as Round,
         None,
-    );
+    )));
 
     let fetch_requester = Arc::new(MockFetchRequester {});
 
@@ -181,6 +186,7 @@ fn setup(
             NoPipelineBackpressure::new(),
         ),
         false,
+        true,
     )
 }
 

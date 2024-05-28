@@ -130,7 +130,7 @@ proptest! {
                 let known_parent = block_store.block_exists(block.parent_id());
                 let certified_parent = block.quorum_cert().certified_block().id() == block.parent_id();
                 let verify_res = block.verify_well_formed();
-                let res = timed_block_on(&runtime, block_store.execute_and_insert_block(block.clone()));
+                let res = timed_block_on(&runtime, block_store.insert_block(block.clone()));
                 if !certified_parent {
                     prop_assert!(verify_res.is_err());
                 } else if !known_parent {
@@ -357,7 +357,7 @@ async fn test_illegal_timestamp() {
     let block_store = build_empty_tree();
     let genesis = block_store.ordered_root();
     let block_with_illegal_timestamp = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         0,
         // This timestamp is illegal, it is the same as genesis
         genesis.timestamp_usecs(),
@@ -366,9 +366,7 @@ async fn test_illegal_timestamp() {
         Vec::new(),
     )
     .unwrap();
-    let result = block_store
-        .execute_and_insert_block(block_with_illegal_timestamp)
-        .await;
+    let result = block_store.insert_block(block_with_illegal_timestamp).await;
     assert!(result.is_err());
 }
 
@@ -462,7 +460,7 @@ async fn test_need_sync_for_ledger_info() {
             certificate_for_genesis(),
             1,
             round,
-            Payload::empty(false),
+            Payload::empty(false, true),
             vec![],
         );
         gen_test_certificate(

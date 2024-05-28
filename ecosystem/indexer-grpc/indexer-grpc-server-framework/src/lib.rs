@@ -1,10 +1,15 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Context, Ok, Result};
+use anyhow::{Context, Result};
+#[cfg(target_os = "linux")]
+use aptos_system_utils::profiling::start_cpu_profiling;
 use backtrace::Backtrace;
 use clap::Parser;
 use prometheus::{Encoder, TextEncoder};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+#[cfg(target_os = "linux")]
+use std::convert::Infallible;
 use std::{fs::File, io::Read, panic::PanicInfo, path::PathBuf, process};
 use tracing::error;
 use tracing_subscriber::EnvFilter;
@@ -42,7 +47,7 @@ where
     // Start liveness and readiness probes.
     let task_handler = tokio::spawn(async move {
         register_probes_and_metrics_handler(health_port).await;
-        Ok(())
+        anyhow::Ok(())
     });
     let main_task_handler =
         tokio::spawn(async move { config.run().await.expect("task should exit with Ok.") });
@@ -161,6 +166,7 @@ pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write>
 
     let subscriber = tracing_subscriber::fmt()
         .json()
+        .flatten_event(true)
         .with_file(true)
         .with_line_number(true)
         .with_thread_ids(true)
@@ -178,6 +184,7 @@ pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write>
 async fn register_probes_and_metrics_handler(port: u16) {
     let readiness = warp::path("readiness")
         .map(move || warp::reply::with_status("ready", warp::http::StatusCode::OK));
+
     let metrics_endpoint = warp::path("metrics").map(|| {
         // Metrics encoding.
         let metrics = aptos_metrics_core::gather();
@@ -193,9 +200,42 @@ async fn register_probes_and_metrics_handler(port: u16) {
             .header("Content-Type", "text/plain")
             .body(encode_buffer)
     });
-    warp::serve(readiness.or(metrics_endpoint))
-        .run(([0, 0, 0, 0], port))
-        .await;
+
+    if cfg!(target_os = "linux") {
+        #[cfg(target_os = "linux")]
+        let profilez = warp::path("profilez").and_then(|| async move {
+            // TODO(grao): Consider make the parameters configurable.
+            Ok::<_, Infallible>(match start_cpu_profiling(10, 99, false).await {
+                Ok(body) => {
+                    let response = Response::builder()
+                        .header("Content-Length", body.len())
+                        .header("Content-Disposition", "inline")
+                        .header("Content-Type", "image/svg+xml")
+                        .body(body);
+
+                    match response {
+                        Ok(res) => warp::reply::with_status(res, warp::http::StatusCode::OK),
+                        Err(e) => warp::reply::with_status(
+                            Response::new(format!("Profiling failed: {e:?}.").as_bytes().to_vec()),
+                            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        ),
+                    }
+                },
+                Err(e) => warp::reply::with_status(
+                    Response::new(format!("Profiling failed: {e:?}.").as_bytes().to_vec()),
+                    warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                ),
+            })
+        });
+        #[cfg(target_os = "linux")]
+        warp::serve(readiness.or(metrics_endpoint).or(profilez))
+            .run(([0, 0, 0, 0], port))
+            .await;
+    } else {
+        warp::serve(readiness.or(metrics_endpoint))
+            .run(([0, 0, 0, 0], port))
+            .await;
+    }
 }
 
 #[cfg(test)]

@@ -8,27 +8,13 @@ inputs:
 runs:
   using: composite
   steps:
-    # Checkout the repository
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+    # The source code must be checkout out by the workflow that invokes this action.
 
     # Install shellcheck and run it on the dev_setup.sh script
     - name: Run shell lints
       run: |
         sudo apt-get install shellcheck --assume-yes --no-install-recommends
         shellcheck scripts/dev_setup.sh
-      shell: bash
-
-    # Run the python setup and run the python SDK linters
-    - name: Run python setup
-      uses: ./.github/actions/python-setup
-      with:
-        pyproject_directory: ecosystem/python/sdk
-
-    # Run the python SDK linters
-    - name: Run ecosystem python lint
-      run: make -C ecosystem/python/sdk fmt && ./scripts/fail_if_modified_files.sh
       shell: bash
 
     # Run the python lints and tests

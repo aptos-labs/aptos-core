@@ -10,7 +10,10 @@ use crate::{
     BlockSplit, SUCCESS,
 };
 use aptos_language_e2e_tests::executor::ExecutorMode;
+use aptos_types::{transaction::ExecutionStatus, vm_status::StatusCode};
+use claims::assert_ok_eq;
 use proptest::prelude::*;
+use test_case::test_case;
 
 const STRESSTEST_MODE: bool = false;
 
@@ -50,7 +53,7 @@ fn _setup(
     }
 }
 
-fn setup(
+pub(crate) fn setup(
     executor_mode: ExecutorMode,
     aggregator_execution_mode: AggregatorMode,
     txns: usize,
@@ -237,6 +240,15 @@ fn arb_use_type() -> BoxedStrategy<UseType> {
     .boxed()
 }
 
+fn arb_droppable_use_type() -> BoxedStrategy<UseType> {
+    prop_oneof![
+        Just(UseType::UseResourceType),
+        // Just(UseType::UseTableType),
+        Just(UseType::UseResourceGroupType),
+    ]
+    .boxed()
+}
+
 proptest! {
     #![proptest_config(ProptestConfig {
         // Cases are expensive, few cases is enough.
@@ -285,7 +297,7 @@ proptest! {
         is_3_collocated in any::<bool>(),
     ) {
         println!("Testing test_multiple_aggregators_and_collocation {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, if use_type == UseType::UseResourceGroupType { AggregatorMode::EnabledOnly } else { test_env.aggregator_execution_mode}, 24);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 24);
         let acc_2 = h.new_account_with_key_pair();
         let acc_3 = h.new_account_with_key_pair();
 
@@ -415,8 +427,31 @@ proptest! {
     }
 
     #[test]
+    fn test_aggregator_materialize_overflow(test_env in arb_test_env(3)) {
+        println!("Testing test_aggregator_materialize_overflow {:?}", test_env);
+        let element_type = ElementType::U64;
+        let use_type = UseType::UseResourceType;
+
+        let mut h= setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+
+        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+
+        let txns = vec![
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new(&agg_loc, 399)),
+            // Overflow on materialized value leads to abort with EAGGREGATOR_OVERFLOW.
+            (EAGGREGATOR_OVERFLOW, h.materialize_and_add(&agg_loc, 400)),
+        ];
+
+        h.run_block_in_parts_and_check(
+            test_env.block_split,
+            txns,
+        );
+    }
+
+    #[test]
     fn test_aggregator_with_republish(test_env in arb_test_env(6), element_type in arb_agg_type(), use_type in arb_use_type()) {
-        println!("Testing test_aggregator_overflow {:?}", test_env);
+        println!("Testing test_aggregator_with_republish {:?}", test_env);
         let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
@@ -437,20 +472,26 @@ proptest! {
     }
 
     #[test]
-    fn test_aggregator_materialize_overflow(test_env in arb_test_env(3)) {
-        println!("Testing test_aggregator_materialize_overflow {:?}", test_env);
-        let element_type = ElementType::U64;
-        let use_type = UseType::UseResourceType;
-
-        let mut h= setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+    fn test_aggregator_recreate(test_env in arb_test_env(13), element_type in arb_agg_type(), use_type in arb_droppable_use_type()) {
+        println!("Testing test_aggregator_recreate {:?}", test_env);
+        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 13);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
             (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.new(&agg_loc, 399)),
-            // Overflow on materialized value leads to abort with EAGGREGATOR_OVERFLOW.
-            (EAGGREGATOR_OVERFLOW, h.materialize_and_add(&agg_loc, 400)),
+            (SUCCESS, h.new_add(&agg_loc, 10, 3)),
+            (SUCCESS, h.add(&agg_loc, 4)),
+            (SUCCESS, h.new_add(&agg_loc, 10, 3)),
+            (SUCCESS, h.add(&agg_loc, 4)),
+            (SUCCESS, h.delete(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new_add(&agg_loc, 10, 3)),
+            (SUCCESS, h.add_delete(&agg_loc, 4)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new_add(&agg_loc, 10, 5)),
+            (EAGGREGATOR_OVERFLOW, h.add_delete(&agg_loc, 7)),
+            (SUCCESS, h.add_delete(&agg_loc, 3)),
         ];
 
         h.run_block_in_parts_and_check(
@@ -547,4 +588,48 @@ fn test_aggregator_snapshot_equivalent_gas() {
     ];
 
     h.run_block_in_parts_and_check(test_env.block_split, txns);
+}
+
+// Table splits into multiple resources, so test is not as straightforward
+#[test_case(UseType::UseResourceGroupType)]
+#[test_case(UseType::UseResourceType)]
+fn test_too_many_aggregators_in_a_resource(use_type: UseType) {
+    let test_env = TestEnvConfig {
+        executor_mode: ExecutorMode::BothComparison,
+        aggregator_execution_mode: AggregatorMode::EnabledOnly,
+        block_split: BlockSplit::Whole,
+    };
+    println!(
+        "Testing test_too_many_aggregators_in_a_resource {:?}",
+        test_env
+    );
+
+    let element_type = ElementType::U64;
+
+    let mut h = setup(
+        test_env.executor_mode,
+        test_env.aggregator_execution_mode,
+        12,
+    );
+
+    let agg_locs = (0..15)
+        .map(|i| AggregatorLocation::new(*h.account.address(), element_type, use_type, i))
+        .collect::<Vec<_>>();
+
+    let mut txns = vec![(
+        SUCCESS,
+        h.init(None, use_type, element_type, StructType::Aggregator),
+    )];
+    for i in 0..10 {
+        txns.push((SUCCESS, h.new(agg_locs.get(i).unwrap(), 10)));
+    }
+    h.run_block_in_parts_and_check(test_env.block_split, txns);
+
+    let failed_txns = vec![h.new(agg_locs.get(10).unwrap(), 10)];
+    let output = h.run_block(failed_txns);
+    assert_eq!(output.len(), 1);
+    assert_ok_eq!(
+        output[0].status().status(),
+        ExecutionStatus::MiscellaneousError(Some(StatusCode::TOO_MANY_DELAYED_FIELDS))
+    );
 }

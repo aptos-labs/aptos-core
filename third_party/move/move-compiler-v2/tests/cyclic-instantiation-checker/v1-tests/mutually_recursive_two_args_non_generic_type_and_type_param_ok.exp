@@ -1,0 +1,9 @@
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    private fun f<T1,T2>() {
+        M::g<u64, T1>()
+    }
+    private fun g<T1,T2>() {
+        M::f<bool, T1>()
+    }
+} // end 0x8675309::M

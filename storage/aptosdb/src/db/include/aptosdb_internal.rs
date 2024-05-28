@@ -117,11 +117,10 @@ impl AptosDB {
 
         if indexer.next_version() < ledger_next_version {
             use aptos_storage_interface::state_view::DbStateViewAtVersion;
-            let db : Arc<dyn DbReader> = self.state_store.clone();
+            let db: Arc<dyn DbReader> = self.state_store.clone();
 
             let state_view = db.state_view_at_version(Some(ledger_next_version - 1))?;
-            let resolver = state_view.as_move_resolver();
-            let annotator = MoveValueAnnotator::new(&resolver);
+            let annotator = AptosValueAnnotator::new(&state_view);
 
             const BATCH_SIZE: Version = 10000;
             let mut next_version = indexer.next_version();
@@ -144,7 +143,7 @@ impl AptosDB {
         Ok(())
     }
 
-    #[cfg(any(test, feature = "fuzzing"))]
+    #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
     fn new_without_pruner<P: AsRef<Path> + Clone>(
         db_root_path: P,
         readonly: bool,
@@ -231,30 +230,48 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
     }
 }
 
+thread_local! {
+    static ENTERED_GAUGED_API: Cell<bool> = Cell::new(false);
+}
+
 fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
 where
     F: FnOnce() -> Result<T>,
 {
-    let timer = Instant::now();
+    let nested = ENTERED_GAUGED_API.with(|entered| {
+        if entered.get() {
+            true
+        } else {
+            entered.set(true);
+            false
+        }
+    });
 
-    let res = api_impl();
+    if nested {
+        api_impl()
+    } else {
+        let timer = Instant::now();
 
-    let res_type = match &res {
-        Ok(_) => "Ok",
-        Err(e) => {
-            warn!(
-                api_name = api_name,
-                error = ?e,
-                "AptosDB API returned error."
-            );
-            "Err"
-        },
-    };
-    API_LATENCY_SECONDS
-        .with_label_values(&[api_name, res_type])
-        .observe(timer.elapsed().as_secs_f64());
+        let res = api_impl();
 
-    res
+        let res_type = match &res {
+            Ok(_) => "Ok",
+            Err(e) => {
+                warn!(
+                    api_name = api_name,
+                    error = ?e,
+                    "AptosDB API returned error."
+                );
+                "Err"
+            },
+        };
+        API_LATENCY_SECONDS
+            .with_label_values(&[api_name, res_type])
+            .observe(timer.elapsed().as_secs_f64());
+        ENTERED_GAUGED_API.with(|entered| entered.set(false));
+
+        res
+    }
 }
 
 // Convert requested range and order to a range in ascending order.

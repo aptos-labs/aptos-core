@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::{
     adapter::TLedgerInfoProvider,
@@ -10,9 +11,9 @@ use super::{
 };
 use crate::{
     dag::DAGMessage, network::IncomingDAGRequest, payload_manager::TPayloadManager,
-    state_replication::StateComputer,
+    pipeline::execution_client::TExecutionClient,
 };
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_logger::{debug, error};
@@ -82,14 +83,14 @@ impl StateSyncTrigger {
     pub(super) async fn check(&self, node: CertifiedNodeMessage) -> anyhow::Result<SyncOutcome> {
         let ledger_info_with_sigs = node.ledger_info();
 
+        self.notify_commit_proof(ledger_info_with_sigs).await;
+
         if !self.need_sync_for_ledger_info(ledger_info_with_sigs) {
             return Ok(SyncOutcome::Synced(Some(node)));
         }
 
         // Only verify the certificate if we need to sync
         self.verify_ledger_info(ledger_info_with_sigs)?;
-
-        self.notify_commit_proof(ledger_info_with_sigs).await;
 
         if ledger_info_with_sigs.ledger_info().ends_epoch() {
             self.proof_notifier
@@ -157,7 +158,7 @@ impl StateSyncTrigger {
 pub(super) struct DagStateSynchronizer {
     epoch_state: Arc<EpochState>,
     time_service: TimeService,
-    state_computer: Arc<dyn StateComputer>,
+    execution_client: Arc<dyn TExecutionClient>,
     storage: Arc<dyn DAGStorage>,
     payload_manager: Arc<dyn TPayloadManager>,
     dag_window_size_config: Round,
@@ -167,7 +168,7 @@ impl DagStateSynchronizer {
     pub fn new(
         epoch_state: Arc<EpochState>,
         time_service: TimeService,
-        state_computer: Arc<dyn StateComputer>,
+        execution_client: Arc<dyn TExecutionClient>,
         storage: Arc<dyn DAGStorage>,
         payload_manager: Arc<dyn TPayloadManager>,
         dag_window_size_config: Round,
@@ -175,7 +176,7 @@ impl DagStateSynchronizer {
         Self {
             epoch_state,
             time_service,
-            state_computer,
+            execution_client,
             storage,
             payload_manager,
             dag_window_size_config,
@@ -249,11 +250,11 @@ impl DagStateSynchronizer {
             Ok(_) => {},
             Err(err) => {
                 error!("error fetching nodes {}", err);
-                return Err(err);
+                bail!(err)
             },
         }
 
-        self.state_computer.sync_to(commit_li).await?;
+        self.execution_client.sync_to(commit_li).await?;
 
         Ok(Arc::into_inner(sync_dag_store).unwrap())
     }

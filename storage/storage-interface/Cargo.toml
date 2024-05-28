@@ -22,19 +22,14 @@ aptos-scratchpad = { workspace = true }
 aptos-secure-net = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-arr_macro = { workspace = true }
 bcs = { workspace = true }
-bytes = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
-itertools = { workspace = true }
-move-core-types = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rayon = { workspace = true }
-rocksdb = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 threadpool = { workspace = true }
@@ -46,3 +41,6 @@ assert_unordered = { workspace = true }
 [features]
 default = []
 fuzzing = ["aptos-types/fuzzing"]
+
+[package.metadata.cargo-machete]
+ignored = ["proptest"]

@@ -237,8 +237,8 @@ async fn test_get_account_resources_with_pagination() {
     {
         println!("0x1::{}::{}", r.module, r.name);
     }
-    assert_eq!(resources.len(), 5);
-    assert_eq!(resources, all_resources[0..5].to_vec());
+    assert_eq!(resources.len(), 4);
+    assert_eq!(resources, all_resources[0..4].to_vec());
 
     // Make a request using the cursor. Assert the 5 results we get back are the next 5.
     let req = warp::test::request().method("GET").path(&format!(
@@ -255,7 +255,7 @@ async fn test_get_account_resources_with_pagination() {
     let cursor_header = StateKeyWrapper::from_str(cursor_header.to_str().unwrap()).unwrap();
     let resources: Vec<MoveResource> = serde_json::from_slice(resp.body()).unwrap();
     assert_eq!(resources.len(), 5);
-    assert_eq!(resources, all_resources[5..10].to_vec());
+    assert_eq!(resources, all_resources[4..9].to_vec());
 
     // Get the rest of the resources, assert there is no cursor now.
     let req = warp::test::request().method("GET").path(&format!(
@@ -267,8 +267,8 @@ async fn test_get_account_resources_with_pagination() {
     assert_eq!(resp.status(), 200);
     assert!(!resp.headers().contains_key("X-Aptos-Cursor"));
     let resources: Vec<MoveResource> = serde_json::from_slice(resp.body()).unwrap();
-    assert_eq!(resources.len(), all_resources.len() - 10);
-    assert_eq!(resources, all_resources[10..].to_vec());
+    assert_eq!(resources.len(), all_resources.len() - 9);
+    assert_eq!(resources, all_resources[9..].to_vec());
 }
 
 // Same as the above test but for modules.

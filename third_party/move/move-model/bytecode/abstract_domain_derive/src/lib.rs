@@ -5,7 +5,7 @@
 //!
 //! Currently we can only derive for structs.
 //! For tuple structs, the derived join pair-wise joins each field;
-//! for structs with named fields, the derived join pair-wise joins each field without #[no_join] attribute.
+//! for structs with named fields, the derived join pair-wise joins each field without `#[no_join]` attribute.
 
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
@@ -96,11 +96,7 @@ pub fn abstract_domain_derive(input: TokenStream) -> TokenStream {
                 .named
                 .iter()
                 .filter_map(|field| {
-                    if field
-                        .attrs
-                        .iter()
-                        .any(|attr| attr.path().is_ident("no_join"))
-                    {
+                    if field.attrs.iter().any(|attr| attr.path.is_ident("no_join")) {
                         None
                     } else {
                         let field_name =

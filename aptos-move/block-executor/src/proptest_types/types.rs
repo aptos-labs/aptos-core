@@ -10,7 +10,6 @@ use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
     resolver::TAggregatorV1View,
-    types::DelayedFieldID,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
@@ -34,6 +33,7 @@ use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
 use move_core_types::value::MoveTypeLayout;
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -718,7 +718,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 .enumerate()
                 .filter_map(|(idx, size_query_pct)| match size_query_pct {
                     Some(size_query_pct) => {
-                        assert_le!(*size_query_pct, 100, "Must be percetange point (0..100]");
+                        assert_le!(*size_query_pct, 100, "Must be percentage point (0..100]");
                         let indicator = match idx {
                             0 => group_size_query_indicators[behavior_idx].0,
                             1 => group_size_query_indicators[behavior_idx].1,

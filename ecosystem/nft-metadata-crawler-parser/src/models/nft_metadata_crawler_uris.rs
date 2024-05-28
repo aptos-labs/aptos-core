@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     models::nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
@@ -132,6 +133,10 @@ impl NFTMetadataCrawlerURIs {
 
     pub fn increment_json_parser_retry_count(&mut self) {
         self.json_parser_retry_count += 1;
+    }
+
+    pub fn reset_json_parser_retry_count(&mut self) {
+        self.json_parser_retry_count = 0;
     }
 
     pub fn get_image_optimizer_retry_count(&self) -> i32 {

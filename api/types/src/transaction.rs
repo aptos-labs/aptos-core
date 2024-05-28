@@ -20,6 +20,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     block_metadata_ext::BlockMetadataExt,
     contract_event::{ContractEvent, EventWithVersion},
+    keyless,
     transaction::{
         authenticator::{
             AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
@@ -28,7 +29,6 @@ use aptos_types::{
         webauthn::{PartialAuthenticatorAssertionResponse, MAX_WEBAUTHN_SIGNATURE_BYTES},
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
-    zkid,
 };
 use once_cell::sync::Lazy;
 use poem_openapi::{Object, Union};
@@ -740,6 +740,8 @@ impl TryFrom<Script> for ScriptPayload {
 // We use an enum here for extensibility so we can add Script payload support
 // in the future for example.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Union)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum MultisigTransactionPayload {
     EntryFunctionPayload(EntryFunctionPayload),
 }
@@ -751,6 +753,8 @@ pub struct MultisigPayload {
     pub multisig_address: Address,
 
     // Transaction payload is optional if already stored on chain.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub transaction_payload: Option<MultisigTransactionPayload>,
 }
 
@@ -1198,24 +1202,24 @@ impl VerifyInput for WebAuthnSignature {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct ZkIdSignature {
+pub struct KeylessSignature {
     pub public_key: HexEncodedBytes,
     pub signature: HexEncodedBytes,
 }
 
-impl VerifyInput for ZkIdSignature {
+impl VerifyInput for KeylessSignature {
     fn verify(&self) -> anyhow::Result<()> {
         let public_key_len = self.public_key.inner().len();
         let signature_len = self.signature.inner().len();
-        if public_key_len > zkid::ZkIdPublicKey::MAX_LEN {
+        if public_key_len > keyless::KeylessPublicKey::MAX_LEN {
             bail!(
-                "zkID public key length is greater than the maximum number of {} bytes: found {} bytes",
-                zkid::ZkIdPublicKey::MAX_LEN, public_key_len
+                "Keyless public key length is greater than the maximum number of {} bytes: found {} bytes",
+                keyless::KeylessPublicKey::MAX_LEN, public_key_len
             )
-        } else if signature_len > zkid::ZkIdSignature::MAX_LEN {
+        } else if signature_len > keyless::KeylessSignature::MAX_LEN {
             bail!(
-                "zkID signature length is greater than the maximum number of {} bytes: found {} bytes",
-                zkid::ZkIdSignature::MAX_LEN, signature_len
+                "Keyless signature length is greater than the maximum number of {} bytes: found {} bytes",
+                keyless::KeylessSignature::MAX_LEN, signature_len
             )
         } else {
             Ok(())
@@ -1230,7 +1234,7 @@ pub enum Signature {
     Ed25519(HexEncodedBytes),
     Secp256k1Ecdsa(HexEncodedBytes),
     WebAuthn(HexEncodedBytes),
-    ZkId(HexEncodedBytes),
+    Keyless(HexEncodedBytes),
 }
 
 impl TryFrom<Signature> for AnySignature {
@@ -1241,7 +1245,7 @@ impl TryFrom<Signature> for AnySignature {
             Signature::Ed25519(s) => AnySignature::ed25519(s.inner().try_into()?),
             Signature::Secp256k1Ecdsa(s) => AnySignature::secp256k1_ecdsa(s.inner().try_into()?),
             Signature::WebAuthn(s) => AnySignature::webauthn(s.inner().try_into()?),
-            Signature::ZkId(s) => AnySignature::zkid(s.inner().try_into()?),
+            Signature::Keyless(s) => AnySignature::keyless(s.inner().try_into()?),
         })
     }
 }
@@ -1258,7 +1262,7 @@ impl From<AnySignature> for Signature {
             AnySignature::WebAuthn { signature } => {
                 Signature::WebAuthn(signature.to_bytes().to_vec().into())
             },
-            AnySignature::ZkId { signature } => Signature::ZkId(signature.to_bytes().into()),
+            AnySignature::Keyless { signature } => Signature::Keyless(signature.to_bytes().into()),
         }
     }
 }
@@ -1270,7 +1274,7 @@ pub enum PublicKey {
     Ed25519(HexEncodedBytes),
     Secp256k1Ecdsa(HexEncodedBytes),
     Secp256r1Ecdsa(HexEncodedBytes),
-    ZkId(HexEncodedBytes),
+    Keyless(HexEncodedBytes),
 }
 
 impl TryFrom<PublicKey> for AnyPublicKey {
@@ -1281,7 +1285,7 @@ impl TryFrom<PublicKey> for AnyPublicKey {
             PublicKey::Ed25519(p) => AnyPublicKey::ed25519(p.inner().try_into()?),
             PublicKey::Secp256k1Ecdsa(p) => AnyPublicKey::secp256k1_ecdsa(p.inner().try_into()?),
             PublicKey::Secp256r1Ecdsa(p) => AnyPublicKey::secp256r1_ecdsa(p.inner().try_into()?),
-            PublicKey::ZkId(p) => AnyPublicKey::zkid(p.inner().try_into()?),
+            PublicKey::Keyless(p) => AnyPublicKey::keyless(p.inner().try_into()?),
         })
     }
 }
@@ -1298,7 +1302,9 @@ impl From<AnyPublicKey> for PublicKey {
             AnyPublicKey::Secp256r1Ecdsa { public_key } => {
                 PublicKey::Secp256r1Ecdsa(public_key.to_bytes().to_vec().into())
             },
-            AnyPublicKey::ZkId { public_key } => PublicKey::ZkId(public_key.to_bytes().into()),
+            AnyPublicKey::Keyless { public_key } => {
+                PublicKey::Keyless(public_key.to_bytes().into())
+            },
         }
     }
 }
@@ -1330,7 +1336,7 @@ impl VerifyInput for SingleKeySignature {
                 signature: s.clone(),
             }
             .verify(),
-            (PublicKey::ZkId(p), Signature::ZkId(s)) => ZkIdSignature {
+            (PublicKey::Keyless(p), Signature::Keyless(s)) => KeylessSignature {
                 public_key: p.clone(),
                 signature: s.clone(),
             }
@@ -1374,12 +1380,11 @@ impl TryFrom<SingleKeySignature> for AccountAuthenticator {
                     )?;
                     AnyPublicKey::secp256r1_ecdsa(key)
                 },
-                PublicKey::ZkId(p) => {
-                    let key = p
-                        .inner()
-                        .try_into()
-                        .context("Failed to parse given public_key bytes as ZkIdPublicKey")?;
-                    AnyPublicKey::zkid(key)
+                PublicKey::Keyless(p) => {
+                    let key = p.inner().try_into().context(
+                        "Failed to parse given public_key bytes as AnyPublicKey::Keyless",
+                    )?;
+                    AnyPublicKey::keyless(key)
                 },
             };
 
@@ -1405,12 +1410,12 @@ impl TryFrom<SingleKeySignature> for AccountAuthenticator {
                     .context( "Failed to parse given signature bytes as PartialAuthenticatorAssertionResponse")?;
                 AnySignature::webauthn(signature)
             },
-            Signature::ZkId(s) => {
+            Signature::Keyless(s) => {
                 let signature = s
                     .inner()
                     .try_into()
-                    .context("Failed to parse given signature bytes as ZkIdSignature")?;
-                AnySignature::zkid(signature)
+                    .context("Failed to parse given signature bytes as AnySignature::Keyless")?;
+                AnySignature::keyless(signature)
             },
         };
 
@@ -1475,12 +1480,11 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
                     )?;
                     AnyPublicKey::secp256r1_ecdsa(key)
                 },
-                PublicKey::ZkId(p) => {
-                    let key = p
-                        .inner()
-                        .try_into()
-                        .context("Failed to parse given public_key bytes as ZkIdPublicKey")?;
-                    AnyPublicKey::zkid(key)
+                PublicKey::Keyless(p) => {
+                    let key = p.inner().try_into().context(
+                        "Failed to parse given public_key bytes as AnyPublicKey::Keyless",
+                    )?;
+                    AnyPublicKey::keyless(key)
                 },
             };
             public_keys.push(key);
@@ -1508,12 +1512,12 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
                     )?;
                         AnySignature::webauthn(paar)
                     },
-                    Signature::ZkId(s) => {
+                    Signature::Keyless(s) => {
                         let signature = s
                             .inner()
                             .try_into()
-                            .context("Failed to parse given signature as ZkIdSignature")?;
-                        AnySignature::zkid(signature)
+                            .context("Failed to parse given signature as AnySignature::Keyless")?;
+                        AnySignature::keyless(signature)
                     },
                 };
             signatures.push((indexed_signature.index, signature));

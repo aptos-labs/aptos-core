@@ -28,7 +28,13 @@ fn make_proposal_with_qc_and_proof(
     qc: QuorumCert,
     signer: &ValidatorSigner,
 ) -> VoteProposal {
-    test_utils::make_proposal_with_qc_and_proof(Payload::empty(false), round, proof, qc, signer)
+    test_utils::make_proposal_with_qc_and_proof(
+        Payload::empty(false, true),
+        round,
+        proof,
+        qc,
+        signer,
+    )
 }
 
 fn make_proposal_with_parent(
@@ -37,7 +43,13 @@ fn make_proposal_with_parent(
     committed: Option<&VoteProposal>,
     signer: &ValidatorSigner,
 ) -> VoteProposal {
-    test_utils::make_proposal_with_parent(Payload::empty(false), round, parent, committed, signer)
+    test_utils::make_proposal_with_parent(
+        Payload::empty(false, true),
+        round,
+        parent,
+        committed,
+        signer,
+    )
 }
 
 pub type Callback = Box<dyn Fn() -> (Box<dyn TSafetyRules + Send + Sync>, ValidatorSigner)>;
@@ -185,7 +197,7 @@ fn test_voting_bad_epoch(safety_rules: &Callback) {
 
     let a1 = test_utils::make_proposal_with_qc(round + 1, genesis_qc, &signer);
     let a2 = test_utils::make_proposal_with_parent_and_overrides(
-        Payload::empty(false),
+        Payload::empty(false, true),
         round + 3,
         &a1,
         None,
@@ -353,7 +365,7 @@ fn test_validator_not_in_set(safety_rules: &Callback) {
     next_epoch_state.verifier =
         ValidatorVerifier::new_single(rand_signer.author(), rand_signer.public_key());
     let a2 = test_utils::make_proposal_with_parent_and_overrides(
-        Payload::empty(false),
+        Payload::empty(false, true),
         round + 2,
         &a1,
         Some(&a1),
@@ -391,7 +403,7 @@ fn test_key_not_in_store(safety_rules: &Callback) {
     next_epoch_state.verifier =
         ValidatorVerifier::new_single(signer.author(), rand_signer.public_key());
     let a2 = test_utils::make_proposal_with_parent_and_overrides(
-        Payload::empty(false),
+        Payload::empty(false, true),
         round + 2,
         &a1,
         Some(&a1),

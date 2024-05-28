@@ -7,7 +7,9 @@ use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress, gas_algebra::InternalGas, identifier::Identifier,
 };
-use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, native_functions::NativeFunction};
+use move_vm_runtime::{
+    config::VMConfig, module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, natives::function::NativeResult};
 use std::sync::Arc;
@@ -50,6 +52,7 @@ fn test_publish_module_with_nested_loops() {
     let m = as_module(units.pop().unwrap());
     let mut m_blob = vec![];
     m.serialize(&mut m_blob).unwrap();
+    let traversal_storage = TraversalStorage::new();
 
     // Should succeed with max_loop_depth = 2
     {
@@ -62,7 +65,7 @@ fn test_publish_module_with_nested_loops() {
             make_failed_native(),
         )];
         let vm = MoveVM::new_with_config(natives, VMConfig {
-            verifier: VerifierConfig {
+            verifier_config: VerifierConfig {
                 max_loop_depth: Some(2),
                 ..Default::default()
             },
@@ -81,6 +84,7 @@ fn test_publish_module_with_nested_loops() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
 
@@ -93,6 +97,7 @@ fn test_publish_module_with_nested_loops() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
+                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
 

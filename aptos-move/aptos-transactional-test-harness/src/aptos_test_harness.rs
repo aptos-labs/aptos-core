@@ -11,8 +11,8 @@ use aptos_crypto::{
 };
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
+use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_types::{
-    access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
     block_executor::config::BlockExecutorConfigFromOnchain,
     block_metadata::BlockMetadata,
@@ -26,29 +26,38 @@ use aptos_types::{
         Script as TransactionScript, Transaction, TransactionOutput, TransactionStatus,
     },
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM, VMExecutor};
+use aptos_vm::{AptosVM, VMExecutor};
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use clap::Parser;
+use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_bytecode_verifier::verify_module;
 use move_command_line_common::{
-    address::ParsedAddress, files::verify_and_create_named_address_mapping,
+    address::ParsedAddress,
+    env::{get_move_compiler_block_v1_from_env, get_move_compiler_v2_from_env},
+    files::verify_and_create_named_address_mapping,
+    testing::{EXP_EXT, EXP_EXT_V2},
 };
-use move_compiler::{self, shared::PackagePaths, FullyCompiledProgram};
+use move_compiler::{
+    self,
+    shared::{string_packagepath_to_symbol_packagepath, NumericalAddress, PackagePaths},
+    FullyCompiledProgram,
+};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     move_resource::MoveStructType,
     parser::parse_type_tag,
     transaction_argument::{convert_txn_args, TransactionArgument},
     value::{MoveTypeLayout, MoveValue},
 };
-use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
+use move_model::metadata::LanguageVersion;
+use move_symbol_pool::Symbol as MoveSymbol;
 use move_transactional_test_runner::{
     framework::{run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{InitCommand, SyntaxChoice, TaskInput},
-    vm_test_harness::{view_resource_in_move_storage, TestRunConfig},
+    vm_test_harness::{PrecompiledFilesModules, TestRunConfig},
 };
 use move_vm_runtime::session::SerializedReturnValues;
 use once_cell::sync::Lazy;
@@ -60,6 +69,7 @@ use std::{
     string::String,
     sync::Arc,
 };
+use tempfile::NamedTempFile;
 
 /**
  * Definitions
@@ -287,28 +297,63 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
     )
 }
 
-static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
-    let deps = vec![PackagePaths {
-        name: None,
-        paths: aptos_cached_packages::head_release_bundle()
+// PackagePaths here contains .move files only
+static PRECOMPILED_APTOS_FRAMEWORK_V1: Lazy<Option<(FullyCompiledProgram, Vec<PackagePaths>)>> =
+    Lazy::new(|| {
+        if get_move_compiler_block_v1_from_env() {
+            return None;
+        }
+        let lib_paths = PackagePaths {
+            name: None,
+            paths: aptos_cached_packages::head_release_bundle()
+                .files()
+                .unwrap(),
+            named_address_map: aptos_framework::named_addresses().clone(),
+        };
+        let lib_paths_movesym =
+            string_packagepath_to_symbol_packagepath::<NumericalAddress>(&lib_paths);
+        let program_res = move_compiler::construct_pre_compiled_lib(
+            vec![lib_paths],
+            None,
+            move_compiler::Flags::empty().set_sources_shadow_deps(false),
+            aptos_framework::extended_checks::get_all_attribute_names(),
+        )
+        .unwrap();
+        match program_res {
+            Ok(af) => Some((af, vec![lib_paths_movesym])),
+            Err((files, errors)) => {
+                eprintln!("!!!Aptos Framework failed to compile!!!");
+                move_compiler::diagnostics::report_diagnostics(&files, errors)
+            },
+        }
+    });
+
+static APTOS_FRAMEWORK_FILES: Lazy<Vec<String>> = Lazy::new(|| {
+    aptos_cached_packages::head_release_bundle()
+        .files()
+        .unwrap()
+});
+
+static PRECOMPILED_APTOS_FRAMEWORK_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| {
+    let named_address_mapping_strings: Vec<String> = aptos_framework::named_addresses()
+        .iter()
+        .map(|(string, num_addr)| format!("{}={}", string, num_addr))
+        .collect();
+
+    let options = move_compiler_v2::Options {
+        sources: aptos_cached_packages::head_release_bundle()
             .files()
             .unwrap(),
-        named_address_map: aptos_framework::named_addresses().clone(),
-    }];
-    let program_res = move_compiler::construct_pre_compiled_lib(
-        deps,
-        None,
-        move_compiler::Flags::empty().set_sources_shadow_deps(false),
-        aptos_framework::extended_checks::get_all_attribute_names(),
-    )
-    .unwrap();
-    match program_res {
-        Ok(af) => af,
-        Err((files, errors)) => {
-            eprintln!("!!!Aptos Framework failed to compile!!!");
-            move_compiler::diagnostics::report_diagnostics(&files, errors)
-        },
-    }
+        dependencies: vec![],
+        named_address_mapping: named_address_mapping_strings,
+        known_attributes: aptos_framework::extended_checks::get_all_attribute_names().clone(),
+        language_version: None,
+        ..move_compiler_v2::Options::default()
+    };
+
+    let (_global_env, modules) = move_compiler_v2::run_move_compiler_to_stderr(options)
+        .expect("stdlib compilation succeeds");
+    PrecompiledFilesModules::new(APTOS_FRAMEWORK_FILES.clone(), modules)
 });
 
 /**
@@ -372,12 +417,9 @@ impl<'a> AptosTestAdapter<'a> {
     /// Obtain a Rust representation of the account resource from storage, which is used to derive
     /// a few default transaction parameters.
     fn fetch_account_resource(&self, signer_addr: &AccountAddress) -> Result<AccountResource> {
-        let account_access_path =
-            AccessPath::resource_access_path(*signer_addr, AccountResource::struct_tag())
-                .expect("access path in test");
         let account_blob = self
             .storage
-            .get_state_value_bytes(&StateKey::access_path(account_access_path))
+            .get_state_value_bytes(&StateKey::resource_typed::<AccountResource>(signer_addr)?)
             .unwrap()
             .ok_or_else(|| {
                 format_err!(
@@ -392,13 +434,9 @@ impl<'a> AptosTestAdapter<'a> {
     fn fetch_account_balance(&self, signer_addr: &AccountAddress) -> Result<u64> {
         let aptos_coin_tag = CoinStoreResource::struct_tag();
 
-        let coin_access_path =
-            AccessPath::resource_access_path(*signer_addr, aptos_coin_tag.clone())
-                .expect("access path in test");
-
         let balance_blob = self
             .storage
-            .get_state_value_bytes(&StateKey::access_path(coin_access_path))
+            .get_state_value_bytes(&StateKey::resource(signer_addr, &aptos_coin_tag)?)
             .unwrap()
             .ok_or_else(|| {
                 format_err!(
@@ -407,7 +445,7 @@ impl<'a> AptosTestAdapter<'a> {
                 )
             })?;
 
-        let annotated = MoveValueAnnotator::new(&self.storage.as_move_resolver())
+        let annotated = AptosValueAnnotator::new(&self.storage)
             .view_resource(&aptos_coin_tag, &balance_blob)?;
 
         // Filter the Coin resource and return the resouce value
@@ -567,16 +605,18 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
     }
 
     fn run_config(&self) -> TestRunConfig {
-        self.run_config
+        self.run_config.clone()
     }
 
     fn init(
         default_syntax: SyntaxChoice,
         comparison_mode: bool,
         run_config: TestRunConfig,
-        pre_compiled_deps: Option<&'a FullyCompiledProgram>,
+        pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
+        pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
         task_opt: Option<TaskInput<(InitCommand, Self::ExtraInitArgs)>>,
     ) -> (Self, Option<String>) {
+        AptosVM::set_paranoid_type_checks(true);
         // Named address mapping
         let additional_named_address_mapping = match task_opt.as_ref().map(|t| &t.command) {
             Some((InitCommand { named_addresses }, _)) => {
@@ -631,7 +671,12 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         }
 
         let mut adapter = Self {
-            compiled_state: CompiledState::new(named_address_mapping, pre_compiled_deps, None),
+            compiled_state: CompiledState::new(
+                named_address_mapping,
+                pre_compiled_deps_v1,
+                pre_compiled_deps_v2,
+                None,
+            ),
             default_syntax,
             storage,
             private_key_mapping,
@@ -644,6 +689,93 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         }
 
         (adapter, None)
+    }
+
+    fn compile_module(
+        &mut self,
+        syntax: SyntaxChoice,
+        data: Option<NamedTempFile>,
+        start_line: usize,
+        command_lines_stop: usize,
+    ) -> Result<(
+        NamedTempFile,
+        Option<MoveSymbol>,
+        CompiledModule,
+        Option<String>,
+    )> {
+        let (data, named_addr_opt, module, opt_model, warnings_opt) =
+            self.compile_module_default(syntax, data, start_line, command_lines_stop, true)?;
+        let warnings_opt = match (syntax, opt_model) {
+            (SyntaxChoice::IR, _) => warnings_opt,
+            (_, Some(model)) => {
+                let _runtime_metadata =
+                    aptos_framework::extended_checks::run_extended_checks(&model);
+                // TODO(#13327): call inject_runtime_metadata in built_package.rs?  what file?
+                if model.diag_count(Severity::Warning) > 0 {
+                    let mut error_writer = Buffer::no_color();
+                    model.report_diag(&mut error_writer, Severity::Warning);
+                    let extended_warnings =
+                        String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+                    if model.has_errors() {
+                        bail!("extended checks failed:\n\n{}", extended_warnings);
+                    };
+                    match warnings_opt {
+                        Some(warnings) => Some(warnings + &extended_warnings),
+                        None => Some(extended_warnings),
+                    }
+                } else {
+                    warnings_opt
+                }
+            },
+            (_, None) => {
+                bail!(
+                    "Cannot run extended checks, no model:\n\n{}",
+                    warnings_opt.unwrap_or_else(|| "No compiler warnings".to_string())
+                );
+            },
+        };
+        Ok((data, named_addr_opt, module, warnings_opt))
+    }
+
+    fn compile_script(
+        &mut self,
+        syntax: SyntaxChoice,
+        data: Option<NamedTempFile>,
+        start_line: usize,
+        command_lines_stop: usize,
+    ) -> Result<(CompiledScript, Option<String>)> {
+        let (compiled_script, opt_model, warnings_opt) =
+            self.compile_script_default(syntax, data, start_line, command_lines_stop, true)?;
+        let warnings_opt = match (syntax, opt_model) {
+            (SyntaxChoice::IR, _) => warnings_opt,
+            (_, Some(model)) => {
+                let _runtime_metadata =
+                    aptos_framework::extended_checks::run_extended_checks(&model);
+                // TODO(#13327): call inject_runtime_metadata in built_package.rs?  what file?
+                if model.diag_count(Severity::Warning) > 0 {
+                    let mut error_writer = Buffer::no_color();
+                    model.report_diag(&mut error_writer, Severity::Warning);
+                    let extended_warnings =
+                        String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+                    if model.has_errors() {
+                        bail!("extended checks failed:\n\n{}", extended_warnings);
+                    };
+                    match warnings_opt {
+                        Some(warnings) => Some(warnings + &extended_warnings),
+                        None => Some(extended_warnings),
+                    }
+                } else {
+                    warnings_opt
+                }
+            },
+            (_, None) => {
+                bail!(
+                    "Cannot run extended checks, no model:\n\n{}",
+                    warnings_opt.unwrap_or_else(|| "No compiler warnings".to_string())
+                );
+            },
+        };
+        Ok((compiled_script, warnings_opt))
     }
 
     fn publish_module(
@@ -698,7 +830,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         txn_args: Vec<MoveValue>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<(Option<String>, SerializedReturnValues)> {
+    ) -> Result<Option<String>> {
         let signer0 = self.compiled_state().resolve_address(&signers[0]);
 
         if gas_budget.is_some() {
@@ -763,14 +895,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         } else {
             None
         };
-
-        //TODO: replace this dummy value with actual txn return value
-        let a = SerializedReturnValues {
-            mutable_reference_outputs: vec![(0, vec![0], MoveTypeLayout::U8)],
-            return_values: vec![(vec![0], MoveTypeLayout::U8)],
-        };
-
-        Ok((output, a))
+        Ok(output)
     }
 
     fn call_function(
@@ -870,13 +995,21 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         resource: &IdentStr,
         type_args: Vec<TypeTag>,
     ) -> Result<String> {
-        view_resource_in_move_storage(
-            &self.storage.as_move_resolver(),
-            address,
-            module,
-            resource,
+        let struct_tag = StructTag {
+            address: *module.address(),
+            module: module.name().to_owned(),
+            name: resource.to_owned(),
             type_args,
-        )
+        };
+        let state_key = StateKey::resource(&address, &struct_tag)?;
+        match self.storage.get_state_value_bytes(&state_key).unwrap() {
+            None => Ok("[No Resource Exists]".to_owned()),
+            Some(data) => {
+                let annotated =
+                    AptosValueAnnotator::new(&self.storage).view_resource(&struct_tag, &data)?;
+                Ok(format!("{}", annotated))
+            },
+        }
     }
 
     fn handle_subcommand(&mut self, input: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
@@ -898,8 +1031,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                 Ok(render_events(output.events()))
             },
             AptosSubCommand::ViewTableCommand(view_table_cmd) => {
-                let resolver = self.storage.as_move_resolver();
-                let converter = resolver.as_converter(Arc::new(FakeDbReader {}), None);
+                let converter = self.storage.as_converter(Arc::new(FakeDbReader {}), None);
 
                 let vm_key = converter
                     .try_into_vm_value(&view_table_cmd.key_type, view_table_cmd.key_value)
@@ -907,7 +1039,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                 let raw_key = vm_key.undecorate().simple_serialize().unwrap();
 
                 let state_key =
-                    StateKey::table_item(TableHandle(view_table_cmd.table_handle), raw_key);
+                    StateKey::table_item(&TableHandle(view_table_cmd.table_handle), &raw_key);
 
                 let bytes = self
                     .storage
@@ -967,6 +1099,26 @@ fn render_events(events: &[ContractEvent]) -> Option<String> {
     }
 }
 
+fn precompiled_v1_stdlib_if_needed(
+    config: &TestRunConfig,
+) -> Option<&'static (FullyCompiledProgram, Vec<PackagePaths>)> {
+    match config {
+        TestRunConfig::CompilerV1 { .. } => PRECOMPILED_APTOS_FRAMEWORK_V1.as_ref(),
+        TestRunConfig::ComparisonV1V2 { .. } => PRECOMPILED_APTOS_FRAMEWORK_V1.as_ref(),
+        TestRunConfig::CompilerV2 { .. } => None,
+    }
+}
+
+fn precompiled_v2_stdlib_if_needed(
+    config: &TestRunConfig,
+) -> Option<&'static PrecompiledFilesModules> {
+    match config {
+        TestRunConfig::CompilerV1 { .. } => None,
+        TestRunConfig::ComparisonV1V2 { .. } => Some(&*PRECOMPILED_APTOS_FRAMEWORK_V2),
+        TestRunConfig::CompilerV2 { .. } => Some(&*PRECOMPILED_APTOS_FRAMEWORK_V2),
+    }
+}
+
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     run_aptos_test_with_config(path, TestRunConfig::CompilerV1)
 }
@@ -975,5 +1127,17 @@ pub fn run_aptos_test_with_config(
     path: &Path,
     config: TestRunConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_impl::<AptosTestAdapter>(config, path, Some(&*PRECOMPILED_APTOS_FRAMEWORK))
+    let (suffix, config) =
+        if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
+            (Some(EXP_EXT_V2.to_owned()), TestRunConfig::CompilerV2 {
+                language_version: LanguageVersion::default(),
+                v2_experiments: vec![("attach-compiled-module".to_owned(), true)],
+            })
+        } else {
+            (Some(EXP_EXT.to_owned()), config)
+        };
+    let v1_lib = precompiled_v1_stdlib_if_needed(&config);
+    let v2_lib = precompiled_v2_stdlib_if_needed(&config);
+    AptosVM::set_paranoid_type_checks(true);
+    run_test_impl::<AptosTestAdapter>(config, path, v1_lib, v2_lib, &suffix)
 }

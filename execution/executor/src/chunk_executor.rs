@@ -37,9 +37,9 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, TransactionInfo,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionStatus, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
+        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -418,12 +418,18 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         } = chunk;
 
         let first_version = parent_accumulator.num_leaves();
-        let num_overlap = txn_infos_with_proof.verify_extends_ledger(
-            first_version,
-            parent_accumulator.root_hash(),
-            Some(first_version),
-        )?;
-        assert_eq!(num_overlap, 0, "overlapped chunks");
+
+        // In consensus-only mode, we cannot verify the proof against the executed output,
+        // because the proof returned by the remote peer is an empty one.
+        #[cfg(not(feature = "consensus-only-perf-test"))]
+        {
+            let num_overlap = txn_infos_with_proof.verify_extends_ledger(
+                first_version,
+                parent_accumulator.root_hash(),
+                Some(first_version),
+            )?;
+            assert_eq!(num_overlap, 0, "overlapped chunks");
+        }
 
         let (ledger_update_output, to_discard, to_retry) = {
             let _timer =
@@ -739,6 +745,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                     events,
                     txn_info.gas_used(),
                     TransactionStatus::Keep(txn_info.status().clone()),
+                    TransactionAuxiliaryData::default(), // No auxiliary data if transaction is not executed through VM
                 ),
             )
         })

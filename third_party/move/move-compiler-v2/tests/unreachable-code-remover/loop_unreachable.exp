@@ -31,7 +31,10 @@ fun m::test(): u64 {
 
 [variant baseline]
 fun m::test(): u64 {
-     var $t0: u64
+     var $t0: u64 [unused]
   0: label L0
   1: goto 0
 }
+
+
+============ bytecode verification succeeded ========

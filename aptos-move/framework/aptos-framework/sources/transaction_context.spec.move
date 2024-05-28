@@ -50,6 +50,8 @@ spec aptos_framework::transaction_context {
     spec fun spec_get_txn_hash(): vector<u8>;
     spec get_transaction_hash(): vector<u8> {
         pragma opaque;
+        aborts_if [abstract] false;
+        ensures result == spec_get_txn_hash();
         // property 1: Fetching the transaction hash should return a vector with 32 bytes, if the auid feature flag is enabled.
         /// [high-level-req-1]
         ensures [abstract] len(result) == 32;
@@ -69,5 +71,39 @@ spec aptos_framework::transaction_context {
         // property 2: Fetching the unique address should never abort.
         /// [high-level-req-2]
         aborts_if false;
+    }
+
+    spec sender_internal(): address {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec secondary_signers_internal(): vector<address> {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec gas_payer_internal(): address {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec max_gas_amount_internal(): u64 {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec gas_unit_price_internal(): u64 {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec chain_id_internal(): u8 {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+    spec entry_function_payload_internal(): Option<EntryFunctionPayload> {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
+
+    spec multisig_payload_internal(): Option<MultisigPayload> {
+        //TODO: temporary mockup
+        pragma opaque;
     }
 }

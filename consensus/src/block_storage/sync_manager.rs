@@ -11,7 +11,7 @@ use crate::{
     network_interface::ConsensusMsg,
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    state_replication::StateComputer,
+    pipeline::execution_client::TExecutionClient,
 };
 use anyhow::{bail, Context};
 use aptos_consensus_types::{
@@ -118,7 +118,7 @@ impl BlockStore {
             _ => (),
         }
         if self.ordered_root().round() < qc.commit_info().round() {
-            self.commit(qc.clone()).await?;
+            self.send_for_execution(qc.clone()).await?;
             if qc.ends_epoch() {
                 retriever
                     .network
@@ -159,7 +159,7 @@ impl BlockStore {
         while let Some(block) = pending.pop() {
             let block_qc = block.quorum_cert().clone();
             self.insert_single_quorum_cert(block_qc)?;
-            self.execute_and_insert_block(block).await?;
+            self.insert_block(block).await?;
         }
         self.insert_single_quorum_cert(qc)
     }
@@ -185,7 +185,7 @@ impl BlockStore {
             &highest_commit_cert,
             retriever,
             self.storage.clone(),
-            self.state_computer.clone(),
+            self.execution_client.clone(),
             self.payload_manager.clone(),
         )
         .await?
@@ -215,7 +215,7 @@ impl BlockStore {
         highest_commit_cert: &'a QuorumCert,
         retriever: &'a mut BlockRetriever,
         storage: Arc<dyn PersistentLivenessStorage>,
-        state_computer: Arc<dyn StateComputer>,
+        execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<PayloadManager>,
     ) -> anyhow::Result<RecoveryData> {
         info!(
@@ -327,7 +327,7 @@ impl BlockStore {
 
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
 
-        state_computer
+        execution_client
             .sync_to(highest_commit_cert.ledger_info().clone())
             .await?;
 
@@ -346,7 +346,7 @@ impl BlockStore {
     async fn sync_to_highest_commit_cert(
         &self,
         ledger_info: &LedgerInfoWithSignatures,
-        network: &NetworkSender,
+        network: &Arc<NetworkSender>,
     ) {
         // if the block exists between commit root and ordered root
         if self.commit_root().round() < ledger_info.commit_info().round()
@@ -404,7 +404,7 @@ impl BlockStore {
 
 /// BlockRetriever is used internally to retrieve blocks
 pub struct BlockRetriever {
-    network: NetworkSender,
+    network: Arc<NetworkSender>,
     preferred_peer: Author,
     validator_addresses: Vec<AccountAddress>,
     max_blocks_to_request: u64,
@@ -412,7 +412,7 @@ pub struct BlockRetriever {
 
 impl BlockRetriever {
     pub fn new(
-        network: NetworkSender,
+        network: Arc<NetworkSender>,
         preferred_peer: Author,
         validator_addresses: Vec<AccountAddress>,
         max_blocks_to_request: u64,

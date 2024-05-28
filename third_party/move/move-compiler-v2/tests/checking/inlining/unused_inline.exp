@@ -1,18 +1,4 @@
-
-Diagnostics:
-warning: Function `0xc0ffee::m::foo` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/inlining/unused_inline.move:2:5
-   │
- 2 │ ╭     inline fun foo(): u64 {
- 3 │ │         let i = 0;
- 4 │ │         while (i < 10) {
- 5 │ │             i = i + 1;
-   · │
-10 │ │         i
-11 │ │     }
-   │ ╰─────^
-
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0xc0ffee::m {
     public fun bar(): u64 {
         {
@@ -33,6 +19,26 @@ module 0xc0ffee::m {
           i
         }
     }
-    spec fun $bar(): u64;
-    spec fun $foo(): u64;
+    private inline fun foo(): u64 {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, 10) {
+              i: u64 = Add<u64>(i, 1);
+              if Eq<u64>(i, 5) {
+                break;
+                Tuple()
+              } else {
+                Tuple()
+              }
+            } else {
+              break
+            }
+          };
+          i
+        }
+    }
 } // end 0xc0ffee::m
+
+
+============ bytecode verification succeeded ========

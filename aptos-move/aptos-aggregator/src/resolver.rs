@@ -6,7 +6,7 @@ use crate::{
     bounded_math::SignedU128,
     delta_change_set::{serialize, DeltaOp},
     types::{
-        code_invariant_error, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError,
+        code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError,
         DeltaApplicationFailureReason, PanicOr,
     },
 };
@@ -21,6 +21,7 @@ use aptos_types::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -202,7 +203,7 @@ pub trait TDelayedFieldView {
         &self,
         delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError>;
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>>;
 }
 
 pub trait DelayedFieldResolver:
@@ -259,6 +260,12 @@ where
         unimplemented!()
     }
 
+    // get_reads_needing_exchange is local (looks at in-MVHashMap information only)
+    // and all failures are code invariant failures - so we return PanicError.
+    // get_group_reads_needing_exchange needs to additionally get the metadata of the
+    // whole group, which can additionally fail with speculative / storage errors,
+    // so we return PartialVMResult, to be able to distinguish/propagate those errors.
+
     fn get_reads_needing_exchange(
         &self,
         _delayed_write_set_ids: &HashSet<Self::Identifier>,
@@ -274,7 +281,7 @@ where
         &self,
         _delayed_write_set_ids: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         unimplemented!("get_group_reads_needing_exchange not implemented")
     }
 }

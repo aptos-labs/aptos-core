@@ -139,7 +139,7 @@ pub enum SerializedOption {
     SOME                    = 0x2,
 }
 
-/// A marker for an boolean in the serialized output.
+/// A marker for a boolean in the serialized output.
 #[rustfmt::skip]
 #[allow(non_camel_case_types)]
 #[repr(u8)]
@@ -537,8 +537,11 @@ pub(crate) mod versioned_data {
                 },
             };
             if version == 0 || version > u32::min(max_version, VERSION_MAX) {
-                return Err(PartialVMError::new(StatusCode::UNKNOWN_VERSION));
-            } else if version == VERSION_NEXT && !cfg!(test) && !cfg!(feature = "fuzzing") {
+                return Err(PartialVMError::new(StatusCode::UNKNOWN_VERSION)
+                    .with_message(format!("bytecode version {} unsupported", version)));
+            } else if version == VERSION_NEXT
+                && !cfg!(any(test, feature = "testing", feature = "fuzzing"))
+            {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_VERSION).with_message(format!(
                         "bytecode version {} only allowed in test code",

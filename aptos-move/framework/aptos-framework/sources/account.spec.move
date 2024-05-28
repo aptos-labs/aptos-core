@@ -203,35 +203,14 @@ spec aptos_framework::account {
         ensures account_resource.authentication_key == new_auth_key;
     }
 
-    /// The Account existed under the signer before the call.
-    /// The length of new_auth_key is 32.
     spec rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) {
         let addr = signer::address_of(account);
+        /// [high-level-req-10]
+        let post account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
         aborts_if vector::length(new_auth_key) != 32;
-        let account_resource = global<Account>(addr);
-        let curr_auth_key = from_bcs::deserialize<address>(account_resource.authentication_key);
-
-        // Verify all properties in update_auth_key_and_originating_address_table
-        let originating_addr = addr;
-
-        let address_map = global<OriginatingAddress>(@aptos_framework).address_map;
-        let new_auth_key_addr = from_bcs::deserialize<address>(new_auth_key);
-
-        aborts_if !exists<OriginatingAddress>(@aptos_framework);
-        aborts_if !from_bcs::deserializable<address>(account_resource.authentication_key);
-        aborts_if table::spec_contains(address_map, curr_auth_key) &&
-            table::spec_get(address_map, curr_auth_key) != originating_addr;
-
-        aborts_if curr_auth_key != new_auth_key_addr && table::spec_contains(address_map, new_auth_key_addr);
-
-        include UpdateAuthKeyAndOriginatingAddressTableAbortsIf {
-            originating_addr: addr,
-            new_auth_key_vector: new_auth_key,
-        };
-
-        let post auth_key = global<Account>(addr).authentication_key;
-        ensures auth_key == new_auth_key;
+        modifies global<Account>(addr);
+        ensures account_resource.authentication_key == new_auth_key;
     }
 
     spec fun spec_assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: RotationProofChallenge): vector<u8>;

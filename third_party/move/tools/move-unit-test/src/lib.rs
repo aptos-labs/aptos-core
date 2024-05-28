@@ -17,7 +17,7 @@ use move_compiler::{
     unit_test::{self, TestPlan},
     Compiler, Flags, PASS_CFGIR,
 };
-use move_core_types::language_storage::ModuleId;
+use move_core_types::{effects::ChangeSet, language_storage::ModuleId};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use move_vm_test_utils::gas_schedule::CostTable;
 use std::{
@@ -215,6 +215,7 @@ impl UnitTestingConfig {
         &self,
         test_plan: TestPlan,
         native_function_table: Option<NativeFunctionTable>,
+        genesis_state: Option<ChangeSet>,
         cost_table: Option<CostTable>,
         writer: W,
     ) -> Result<(W, bool)> {
@@ -242,6 +243,7 @@ impl UnitTestingConfig {
             self.report_stacktrace_on_abort,
             test_plan,
             native_function_table,
+            genesis_state,
             cost_table,
             self.verbose,
             #[cfg(feature = "evm-backend")]

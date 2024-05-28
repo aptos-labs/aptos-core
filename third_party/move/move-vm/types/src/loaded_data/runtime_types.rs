@@ -5,6 +5,7 @@
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
 use derivative::Derivative;
+use itertools::Itertools;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
@@ -21,6 +22,7 @@ use std::{
     cell::RefCell,
     cmp::max,
     collections::{btree_map, BTreeMap},
+    fmt,
     fmt::Debug,
 };
 use triomphe::Arc as TriompheArc;
@@ -123,18 +125,18 @@ impl DepthFormula {
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct StructType {
     pub idx: StructNameIndex,
-    pub fields: Vec<Type>,
+    pub field_tys: Vec<Type>,
     pub field_names: Vec<Identifier>,
-    pub phantom_ty_args_mask: SmallBitVec,
+    pub phantom_ty_params_mask: SmallBitVec,
     pub abilities: AbilitySet,
-    pub type_parameters: Vec<StructTypeParameter>,
+    pub ty_params: Vec<StructTypeParameter>,
     pub name: Identifier,
     pub module: ModuleId,
 }
 
 impl StructType {
-    pub fn type_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
-        self.type_parameters.iter().map(|param| &param.constraints)
+    pub fn ty_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
+        self.ty_params.iter().map(|param| &param.constraints)
     }
 
     // Check if the local struct handle is compatible with the defined struct type.
@@ -146,9 +148,9 @@ impl StructType {
             );
         }
 
-        if self.phantom_ty_args_mask.len() != struct_handle.type_parameters.len()
+        if self.phantom_ty_params_mask.len() != struct_handle.type_parameters.len()
             || !self
-                .phantom_ty_args_mask
+                .phantom_ty_params_mask
                 .iter()
                 .zip(struct_handle.type_parameters.iter())
                 .all(|(defined_is_phantom, local_type_parameter)| {
@@ -576,6 +578,49 @@ impl Type {
 
             Ok(n)
         })
+    }
+}
+
+impl fmt::Display for StructIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}::{}",
+            self.module.short_str_lossless(),
+            self.name.as_str()
+        )
+    }
+}
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Type::*;
+        match self {
+            Bool => f.write_str("bool"),
+            U8 => f.write_str("u8"),
+            U16 => f.write_str("u16"),
+            U32 => f.write_str("u32"),
+            U64 => f.write_str("u64"),
+            U128 => f.write_str("u128"),
+            U256 => f.write_str("u256"),
+            Address => f.write_str("address"),
+            Signer => f.write_str("signer"),
+            Vector(et) => write!(f, "vector<{}>", et),
+            Struct { idx, ability: _ } => write!(f, "s#{}", idx.0),
+            StructInstantiation {
+                idx,
+                ty_args,
+                ability: _,
+            } => write!(
+                f,
+                "s#{}<{}>",
+                idx.0,
+                ty_args.iter().map(|t| t.to_string()).join(",")
+            ),
+            Reference(t) => write!(f, "&{}", t),
+            MutableReference(t) => write!(f, "&mut {}", t),
+            TyParam(no) => write!(f, "_{}", no),
+        }
     }
 }
 

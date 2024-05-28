@@ -25,7 +25,7 @@ use aptos_aggregator::{
     types::{code_invariant_error, expect_ok, PanicOr},
 };
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
@@ -106,7 +106,7 @@ where
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, X>,
-    ) -> Result<bool, PanicOr<ModulePathReadWriteError>> {
+    ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
@@ -293,7 +293,9 @@ where
             // Module R/W is an expected fallback behavior, no alert is required.
             debug!("[Execution] At txn {}, Module read & write", idx_to_execute);
 
-            return Err(PanicOr::Or(ModulePathReadWriteError));
+            return Err(PanicOr::Or(
+                ParallelBlockExecutionError::ModulePathReadWriteError,
+            ));
         }
         Ok(updates_outside)
     }
@@ -368,7 +370,7 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         scheduler: &Scheduler,
-    ) -> SchedulerTask {
+    ) -> Result<SchedulerTask, PanicError> {
         let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
 
         if aborted {
@@ -381,7 +383,7 @@ where
                 scheduler.queueing_commits_arm();
             }
 
-            SchedulerTask::NoTask
+            Ok(SchedulerTask::Retry)
         }
     }
 
@@ -438,7 +440,7 @@ where
         shared_counter: &AtomicU32,
         executor: &E,
         block: &[T],
-    ) -> Result<(), PanicOr<ModulePathReadWriteError>> {
+    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
@@ -466,7 +468,7 @@ where
                     ),
                 )?;
 
-                scheduler.finish_execution_during_commit(txn_idx);
+                scheduler.finish_execution_during_commit(txn_idx)?;
 
                 let validation_result =
                     Self::validate(txn_idx, last_input_output, versioned_cache)?;
@@ -482,11 +484,9 @@ where
                 }
             }
 
-            defer! {
-                scheduler.add_to_commit_queue(txn_idx);
-            }
-
-            last_input_output.check_fatal_vm_error(txn_idx)?;
+            last_input_output
+                .check_fatal_vm_error(txn_idx)
+                .map_err(PanicOr::Or)?;
             // Handle a potential vm error, then check invariants on the recorded outputs.
             last_input_output.check_execution_status_during_commit(txn_idx)?;
 
@@ -545,6 +545,9 @@ where
                 .collect::<Result<Vec<_>, _>>()?;
 
             last_input_output.record_finalized_group(txn_idx, finalized_groups);
+            defer! {
+                scheduler.add_to_commit_queue(txn_idx);
+            }
 
             // While the above propagate errors and lead to eventually halting parallel execution,
             // below we may halt the execution without an error in cases when:
@@ -729,14 +732,14 @@ where
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) -> Result<(), PanicOr<ModulePathReadWriteError>> {
+    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
-        let mut scheduler_task = SchedulerTask::NoTask;
+        let mut scheduler_task = SchedulerTask::Retry;
 
         let drain_commit_queue = || -> Result<(), PanicError> {
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
@@ -755,7 +758,6 @@ where
         };
 
         loop {
-            // Prioritize committing validated transactions
             while scheduler.should_coordinate_commits() {
                 self.prepare_and_queue_commit_ready_txns(
                     &self.config.onchain.block_gas_limit_type,
@@ -786,7 +788,7 @@ where
                         last_input_output,
                         versioned_cache,
                         scheduler,
-                    )
+                    )?
                 },
                 SchedulerTask::ExecutionTask(
                     txn_idx,
@@ -808,19 +810,22 @@ where
                             shared_counter,
                         ),
                     )?;
-                    scheduler.finish_execution(txn_idx, incarnation, updates_outside)
+                    scheduler.finish_execution(txn_idx, incarnation, updates_outside)?
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
-                    let (lock, cvar) = &*condvar;
-                    // Mark dependency resolved.
-                    let mut lock = lock.lock();
-                    *lock = DependencyStatus::Resolved;
-                    // Wake up the process waiting for dependency.
-                    cvar.notify_one();
+                    {
+                        let (lock, cvar) = &*condvar;
+
+                        // Mark dependency resolved.
+                        let mut lock = lock.lock();
+                        *lock = DependencyStatus::Resolved;
+                        // Wake up the process waiting for dependency.
+                        cvar.notify_one();
+                    }
 
                     scheduler.next_task()
                 },
-                SchedulerTask::NoTask => scheduler.next_task(),
+                SchedulerTask::Retry => scheduler.next_task(),
                 SchedulerTask::Done => {
                     drain_commit_queue()?;
                     break Ok(());
@@ -891,7 +896,7 @@ where
                         &final_results,
                     ) {
                         // If there are multiple errors, they all get logged:
-                        // ModulePathReadWriteError variant is logged at construction,
+                        // ModulePathReadWriteError and FatalVMErrorvariant is logged at construction,
                         // and below we log CodeInvariantErrors.
                         if let PanicOr::CodeInvariantError(err_msg) = err {
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
@@ -905,6 +910,9 @@ where
             }
         });
         drop(timer);
+
+        counters::update_state_counters(versioned_cache.stats(), true);
+
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
@@ -1027,7 +1035,10 @@ where
                     if let Some(commit_hook) = &self.transaction_commit_hook {
                         commit_hook.on_execution_aborted(idx as TxnIndex);
                     }
-                    alert!("Fatal VM error by transaction {}", idx as TxnIndex);
+                    error!(
+                        "Sequential execution FatalVMError by transaction {}",
+                        idx as TxnIndex
+                    );
                     // Record the status indicating the unrecoverable VM failure.
                     return Err(SequentialBlockExecutionError::ErrorToReturn(
                         BlockExecutionError::FatalVMError(err),
@@ -1264,6 +1275,8 @@ where
 
         ret.resize_with(num_txns, E::Output::skip_output);
 
+        counters::update_state_counters(unsync_map.stats(), false);
+
         // TODO add block end info to output.
         // block_limit_processor.is_block_limit_reached();
 
@@ -1296,7 +1309,7 @@ where
             // Clear by re-initializing the speculative logs.
             init_speculative_logs(signature_verified_block.len());
 
-            debug!("parallel execution requiring fallback");
+            info!("parallel execution requiring fallback");
         }
 
         // If we didn't run parallel or it didn't finish successfully - run sequential

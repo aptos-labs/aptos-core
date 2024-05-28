@@ -7,8 +7,7 @@ use crate::{
     delta_change_set::serialize,
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{
-        code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
-        DelayedFieldsSpeculativeError, PanicOr,
+        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
     },
 };
 use aptos_types::{
@@ -20,7 +19,7 @@ use aptos_types::{
 };
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
-use move_vm_types::delayed_values::delayed_field_id::ExtractUniqueIndex;
+use move_vm_types::delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
@@ -32,7 +31,7 @@ pub fn aggregator_v1_id_for_test(key: u128) -> AggregatorID {
 }
 
 pub fn aggregator_v1_state_key_for_test(key: u128) -> StateKey {
-    StateKey::raw(key.to_le_bytes().to_vec())
+    StateKey::raw(&key.to_le_bytes())
 }
 
 pub const FAKE_AGGREGATOR_VIEW_GEN_ID_START: u32 = 87654321;
@@ -149,7 +148,7 @@ impl TDelayedFieldView for FakeAggregatorView {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         unimplemented!();
     }
 }

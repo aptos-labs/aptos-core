@@ -7,7 +7,7 @@ use move_binary_format::{
 use move_vm_types::loaded_data::runtime_types::{AbilityInfo, StructNameIndex, Type};
 use triomphe::Arc as TriompheArc;
 
-// `intern_type` converts a signature token into the in memory type representation used by the MoveVM.
+/// Converts a signature token into the in memory type representation used by the MoveVM.
 pub fn intern_type(
     module: BinaryIndexedView,
     tok: &SignatureToken,

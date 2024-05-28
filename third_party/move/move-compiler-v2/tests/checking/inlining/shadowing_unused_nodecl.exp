@@ -6,71 +6,46 @@ warning: Unused parameter `z`. Consider removing or prefixing with an underscore
 6 │     public inline fun quux(f:|u64, u64|, z: u64) {
   │                                          ^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::Test {
+    public inline fun foo(f: |(u64, u64)|,z: u64) {
+        {
+          let (z: u64): (u64) = Tuple(z);
+          (f)(3, 5);
+          Tuple()
+        };
+        Tuple()
+    }
+    public inline fun quux(f: |(u64, u64)|,z: u64) {
+        (f)(3, 5);
+        Tuple()
+    }
     public fun test_shadowing() {
         {
           let _x: u64 = 1;
-          {
-            let z: u64 = 4;
-            {
-              let (z: u64) = Tuple(z);
-              {
-                let (z: u64) = Tuple(z);
-                {
-                  let x: u64 = 3;
-                  {
-                    let q: u64 = 5;
-                    {
-                      let (a: u64, b: u64) = Tuple(x, q);
-                      {
-                        let (y: u64, _q: u64) = Tuple(a, b);
-                        _x: u64 = y
-                      }
-                    };
-                    Tuple()
-                  }
-                }
-              };
-              Tuple()
-            };
-            if Eq<u64>(_x, 3) {
-              Tuple()
-            } else {
-              Abort(0)
-            }
+          _x: u64 = 3;
+          Tuple();
+          Tuple();
+          if Eq<u64>(_x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
           }
         }
     }
     public fun test_shadowing2() {
         {
           let _x: u64 = 1;
-          {
-            let z: u64 = 4;
-            {
-              let (z: u64) = Tuple(z);
-              {
-                let x: u64 = 3;
-                {
-                  let q: u64 = 5;
-                  {
-                    let (y: u64, _q: u64) = Tuple(x, q);
-                    _x: u64 = y
-                  };
-                  Tuple()
-                }
-              }
-            };
-            if Eq<u64>(_x, 3) {
-              Tuple()
-            } else {
-              Abort(0)
-            }
+          _x: u64 = 3;
+          Tuple();
+          if Eq<u64>(_x, 3) {
+            Tuple()
+          } else {
+            Abort(0)
           }
         }
     }
-    spec fun $foo(f: |(u64, u64)|(),z: u64);
-    spec fun $quux(f: |(u64, u64)|(),z: u64);
-    spec fun $test_shadowing();
-    spec fun $test_shadowing2();
 } // end 0x42::Test
+
+
+============ bytecode verification succeeded ========

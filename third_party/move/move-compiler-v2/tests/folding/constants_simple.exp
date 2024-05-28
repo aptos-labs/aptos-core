@@ -8,23 +8,11 @@ error: Not a valid constant expression.
   │                     │
   │                     Invalid call or operation in constant
 
-error: Invalid expression in `const`. Operator sub (-) result value out of range for u64
+error: Invalid expression in `const`. Operator `-` result value out of range for `u64`
   ┌─ tests/folding/constants_simple.move:6:21
   │
 6 │     const C2: u64 = 0 + 1 * 2 % 3 / 4 - 5 >> 6 << 7;
   │                     ^^^^^^^^^^^^^^^^^^^^^
-
-error: Invalid expression in `const`. Binary expression arguments not both foldable to constant
-  ┌─ tests/folding/constants_simple.move:6:21
-  │
-6 │     const C2: u64 = 0 + 1 * 2 % 3 / 4 - 5 >> 6 << 7;
-  │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Invalid expression in `const`. Binary expression arguments not both foldable to constant
-  ┌─ tests/folding/constants_simple.move:6:21
-  │
-6 │     const C2: u64 = 0 + 1 * 2 % 3 / 4 - 5 >> 6 << 7;
-  │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Not a valid constant expression.
   ┌─ tests/folding/constants_simple.move:7:22
@@ -34,7 +22,7 @@ error: Not a valid constant expression.
   │                      │
   │                      Invalid statement or expression in constant
 
-error: undeclared `M::cond`
+error: undeclared `cond`
   ┌─ tests/folding/constants_simple.move:8:24
   │
 8 │     const C4: u8 = if (cond) 0 else 1;

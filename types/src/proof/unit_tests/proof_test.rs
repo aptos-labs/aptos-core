@@ -17,8 +17,9 @@ use crate::{
     },
     state_store::state_value::StateValue,
     transaction::{
-        ExecutionStatus, Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionStatus,
+        ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionStatus,
     },
     write_set::WriteSet,
 };
@@ -225,8 +226,8 @@ fn test_verify_three_element_sparse_merkle() {
     {
         // Construct a proof of key1.
         let proof = SparseMerkleProof::new(Some(leaf1), vec![
-            internal_b_hash,
             *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            internal_b_hash,
         ]);
 
         // The exact key value exists.
@@ -489,6 +490,7 @@ fn test_transaction_and_output_list_with_proof() {
         vec![event],
         0,
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
+        TransactionAuxiliaryData::default(),
     );
 
     // Create transaction output list with proof

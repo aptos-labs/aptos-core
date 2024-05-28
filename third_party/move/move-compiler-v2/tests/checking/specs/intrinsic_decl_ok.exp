@@ -1,27 +1,25 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::M {
     struct MyTable1 {
         dummy_field: bool,
     }
+    spec {
+    }
+
     struct MyTable2 {
         dummy_field: bool,
     }
+    spec {
+    }
+
     private native fun contains<K,V>(t: &M::MyTable2<#0, #1>,k: #0): bool;
     private native fun borrow<K,V>(t: &M::MyTable2<#0, #1>,k: #0): &#1;
     private native fun borrow_mut<K,V>(t: &mut M::MyTable1<#0, #1>,k: #0): &mut #1;
     private native fun destroy_empty<K,V>(t: M::MyTable1<#0, #1>);
     private native fun length<K,V>(t: &M::MyTable1<#0, #1>): u64;
+    private native fun remove<K,V>(t: &mut M::MyTable2<#0, #1>,k: #0): #1;
     private native fun new<K,V>(): M::MyTable1<#0, #1>;
     private native fun new2<K,V>(): M::MyTable2<#0, #1>;
-    private native fun remove<K,V>(t: &mut M::MyTable2<#0, #1>,k: #0): #1;
-    spec fun $borrow<K,V>(t: M::MyTable2<#0, #1>,k: #0): #1;
-    spec fun $borrow_mut<K,V>(t: &mut M::MyTable1<#0, #1>,k: #0): &mut #1;
-    spec fun $contains<K,V>(t: M::MyTable2<#0, #1>,k: #0): bool;
-    spec fun $destroy_empty<K,V>(t: M::MyTable1<#0, #1>);
-    spec fun $length<K,V>(t: M::MyTable1<#0, #1>): u64;
-    spec fun $new<K,V>(): M::MyTable1<#0, #1>;
-    spec fun $new2<K,V>(): M::MyTable2<#0, #1>;
-    spec fun $remove<K,V>(t: &mut M::MyTable2<#0, #1>,k: #0): #1;
     spec fun spec_len<K,V>(t: M::MyTable1<#0, #1>): num;
     spec fun spec_set<K,V>(t: M::MyTable1<#0, #1>,k: #0,v: #1): M::MyTable1<#0, #1>;
     spec fun spec_get<K,V>(t: M::MyTable1<#0, #1>,k: #0): #1;

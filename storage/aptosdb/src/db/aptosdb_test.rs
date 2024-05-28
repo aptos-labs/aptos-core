@@ -4,7 +4,10 @@
 use crate::{
     db::{
         get_first_seq_num_and_limit, test_helper,
-        test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_infos},
+        test_helper::{
+            arb_blocks_to_commit, put_as_state_root, put_transaction_auxiliary_data,
+            put_transaction_infos,
+        },
         AptosDB,
     },
     pruner::{LedgerPrunerManager, PrunerManager, StateMerklePrunerManager},
@@ -24,7 +27,11 @@ use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    transaction::{ExecutionStatus, TransactionInfo, TransactionToCommit, Version},
+    transaction::{
+        ExecutionStatus, TransactionAuxiliaryData, TransactionAuxiliaryDataV1, TransactionInfo,
+        TransactionToCommit, VMErrorDetail, Version,
+    },
+    vm_status::StatusCode,
 };
 use proptest::prelude::*;
 use std::{collections::HashSet, sync::Arc};
@@ -141,6 +148,31 @@ fn test_error_if_version_pruned() {
 }
 
 #[test]
+fn test_get_transaction_auxiliary_data() {
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp_dir);
+    let aux_1 = TransactionAuxiliaryData::V1(TransactionAuxiliaryDataV1 {
+        detail_error_message: Some(VMErrorDetail::new(StatusCode::TYPE_MISMATCH, None)),
+    });
+    let aux_2 = TransactionAuxiliaryData::V1(TransactionAuxiliaryDataV1 {
+        detail_error_message: Some(VMErrorDetail::new(
+            StatusCode::ARITHMETIC_ERROR,
+            Some("divided by 0".to_string()),
+        )),
+    });
+    let txns = vec![aux_1.clone(), aux_2.clone()];
+    put_transaction_auxiliary_data(&db, 0, &txns);
+    assert_eq!(
+        db.get_transaction_auxiliary_data_by_version(0).unwrap(),
+        aux_1
+    );
+    assert_eq!(
+        db.get_transaction_auxiliary_data_by_version(1).unwrap(),
+        aux_2
+    );
+}
+
+#[test]
 fn test_get_latest_executed_trees() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
@@ -150,8 +182,8 @@ fn test_get_latest_executed_trees() {
     assert!(empty.is_same_view(&ExecutedTrees::new_empty()));
 
     // bootstrapped db (any transaction info is in)
-    let key = StateKey::raw(String::from("test_key").into_bytes());
-    let value = StateValue::from(String::from("test_val").into_bytes());
+    let key = StateKey::raw(b"test_key");
+    let value = StateValue::from(b"test_val".to_vec());
     let hash = SparseMerkleLeafNode::new(key.hash(), value.hash()).hash();
     put_as_state_root(&db, 0, key, value);
     let txn_info = TransactionInfo::new(

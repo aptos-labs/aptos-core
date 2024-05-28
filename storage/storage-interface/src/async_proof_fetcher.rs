@@ -55,22 +55,32 @@ impl AsyncProofFetcher {
         }
     }
 
-    pub fn fetch_state_value_with_version_and_schedule_proof_read(
+    pub fn fetch_state_value(
         &self,
         state_key: &StateKey,
         version: Version,
-        root_hash: Option<HashValue>,
     ) -> Result<Option<(Version, StateValue)>> {
         let _timer = TIMER
             .with_label_values(&["async_proof_fetcher_fetch"])
             .start_timer();
-        let version_and_value_opt = self
+        Ok(self
             .reader
-            .get_state_value_with_version_by_version(state_key, version)?;
+            .get_state_value_with_version_by_version(state_key, version)?)
+    }
+
+    pub fn fetch_state_value_with_version_and_schedule_proof_read(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+        subtree_root_depth: usize,
+        subtree_root_hash: Option<HashValue>,
+    ) -> Result<Option<(Version, StateValue)>> {
+        let version_and_value_opt = self.fetch_state_value(state_key, version)?;
         self.schedule_proof_read(
             state_key.clone(),
             version,
-            root_hash,
+            subtree_root_depth,
+            subtree_root_hash,
             version_and_value_opt.as_ref().map(|v| {
                 let state_value = &v.1;
                 state_value.hash()
@@ -110,7 +120,8 @@ impl AsyncProofFetcher {
         &self,
         state_key: StateKey,
         version: Version,
-        root_hash: Option<HashValue>,
+        subtree_root_depth: usize,
+        subtree_root_hash: Option<HashValue>,
         value_hash: Option<HashValue>,
     ) {
         let _timer = TIMER
@@ -121,19 +132,20 @@ impl AsyncProofFetcher {
         let data_sender = self.data_sender.clone();
         IO_POOL.execute(move || {
             let proof = reader
-                .get_state_proof_by_version_ext(&state_key, version)
+                .get_state_proof_by_version_ext(&state_key, version, subtree_root_depth)
                 .expect("Proof reading should succeed.");
             // NOTE: Drop the reader here to make sure reader has shorter lifetime than the async
             // proof fetcher.
             drop(reader);
-            if let Some(root_hash) = root_hash {
+            if let Some(subtree_root_hash) = subtree_root_hash {
                 proof
-                    .verify_by_hash(root_hash, state_key.hash(), value_hash)
+                    .verify_by_hash(subtree_root_hash, state_key.hash(), value_hash)
                     .map_err(|err| {
                         anyhow!(
-                            "Proof is invalid for key {:?} with state root hash {:?}, at version {}: {}.",
+                            "Proof is invalid for key {:?} with subtree root hash {:?}, depth {}, at version {}: {}.",
                             state_key,
-                            root_hash,
+                            subtree_root_hash,
+                            subtree_root_depth,
                             version,
                             err
                         )
@@ -160,7 +172,7 @@ impl AsyncProofFetcher {
 mod tests {
     use super::*;
     use crate::mock::MockDbReaderWriter;
-    use aptos_types::state_store::state_key::StateKeyInner;
+    use aptos_types::state_store::state_key::inner::StateKeyInner;
     use assert_unordered::assert_eq_unordered;
 
     #[test]
@@ -168,13 +180,13 @@ mod tests {
         let fetcher = AsyncProofFetcher::new(Arc::new(MockDbReaderWriter));
         let mut expected_key_hashes = vec![];
         for i in 0..10 {
-            let state_key: StateKey = StateKey::raw(format!("test_key_{}", i).into_bytes());
+            let state_key: StateKey = StateKey::raw(format!("test_key_{}", i).as_bytes());
             expected_key_hashes.push(state_key.hash());
             let result = fetcher
-                .fetch_state_value_with_version_and_schedule_proof_read(&state_key, 0, None)
+                .fetch_state_value_with_version_and_schedule_proof_read(&state_key, 0, 0, None)
                 .expect("Should not fail.");
-            let expected_value = StateValue::from(match state_key.into_inner() {
-                StateKeyInner::Raw(key) => key,
+            let expected_value = StateValue::from(match state_key.inner() {
+                StateKeyInner::Raw(key) => key.to_owned(),
                 _ => unreachable!(),
             });
             assert_eq!(result, Some((0, expected_value)));

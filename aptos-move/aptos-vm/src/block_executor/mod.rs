@@ -10,7 +10,6 @@ use crate::{
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
-    types::DelayedFieldID,
 };
 use aptos_block_executor::{
     errors::BlockExecutionError, executor::BlockExecutor,
@@ -38,6 +37,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
 use std::{

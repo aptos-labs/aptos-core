@@ -13,17 +13,16 @@ use crate::{
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
-    state_computer::PipelineExecutionResult,
-    state_replication::StateComputer,
+    pipeline::execution_client::TExecutionClient,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_consensus_types::{
-    block::Block, common::Round, executed_block::ExecutedBlock, quorum_cert::QuorumCert,
+    block::Block, common::Round, pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
     sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
+use aptos_executor_types::StateComputeResult;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
@@ -41,7 +40,7 @@ mod block_store_test;
 #[path = "sync_manager.rs"]
 pub mod sync_manager;
 
-fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<ExecutedBlock>]) {
+fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<PipelinedBlock>]) {
     for block in ordered_blocks {
         observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
     }
@@ -65,7 +64,7 @@ fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<ExecutedBlock>]) {
 ///             ╰--------------> D3
 pub struct BlockStore {
     inner: Arc<RwLock<BlockTree>>,
-    state_computer: Arc<dyn StateComputer>,
+    execution_client: Arc<dyn TExecutionClient>,
     /// The persistent storage backing up the in-memory data structure, every write should go
     /// through this before in-memory tree.
     storage: Arc<dyn PersistentLivenessStorage>,
@@ -82,7 +81,7 @@ impl BlockStore {
     pub fn new(
         storage: Arc<dyn PersistentLivenessStorage>,
         initial_data: RecoveryData,
-        state_computer: Arc<dyn StateComputer>,
+        execution_client: Arc<dyn TExecutionClient>,
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
@@ -96,18 +95,18 @@ impl BlockStore {
             blocks,
             quorum_certs,
             highest_2chain_tc,
-            state_computer,
+            execution_client,
             storage,
             max_pruned_blocks_in_mem,
             time_service,
             vote_back_pressure_limit,
             payload_manager,
         ));
-        block_on(block_store.try_commit());
+        block_on(block_store.try_send_for_execution());
         block_store
     }
 
-    async fn try_commit(&self) {
+    async fn try_send_for_execution(&self) {
         // reproduce the same batches (important for the commit phase)
 
         let mut certs = self.inner.read().get_all_quorum_certs_with_commit_info();
@@ -121,7 +120,7 @@ impl BlockStore {
                     qc.ledger_info()
                 );
 
-                if let Err(e) = self.commit(qc.clone()).await {
+                if let Err(e) = self.send_for_execution(qc.clone()).await {
                     error!("Error in try-committing blocks. {}", e.to_string());
                 }
             }
@@ -134,7 +133,7 @@ impl BlockStore {
         blocks: Vec<Block>,
         quorum_certs: Vec<QuorumCert>,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
-        state_computer: Arc<dyn StateComputer>,
+        execution_client: Arc<dyn TExecutionClient>,
         storage: Arc<dyn PersistentLivenessStorage>,
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
@@ -173,7 +172,7 @@ impl BlockStore {
             vec![],                   /* reconfig_events */
         );
 
-        let executed_root_block = ExecutedBlock::new(
+        let pipelined_root_block = PipelinedBlock::new(
             *root_block,
             vec![],
             // Create a dummy state_compute_result with necessary fields filled in.
@@ -181,7 +180,7 @@ impl BlockStore {
         );
 
         let tree = BlockTree::new(
-            executed_root_block,
+            pipelined_root_block,
             root_qc,
             root_ordered_cert,
             root_commit_cert,
@@ -191,7 +190,7 @@ impl BlockStore {
 
         let block_store = Self {
             inner: Arc::new(RwLock::new(tree)),
-            state_computer,
+            execution_client,
             storage,
             time_service,
             vote_back_pressure_limit,
@@ -201,12 +200,9 @@ impl BlockStore {
         };
 
         for block in blocks {
-            block_store
-                .execute_and_insert_block(block)
-                .await
-                .unwrap_or_else(|e| {
-                    panic!("[BlockStore] failed to insert block during build {:?}", e)
-                });
+            block_store.insert_block(block).await.unwrap_or_else(|e| {
+                panic!("[BlockStore] failed to insert block during build {:?}", e)
+            });
         }
         for qc in quorum_certs {
             block_store
@@ -220,8 +216,8 @@ impl BlockStore {
         block_store
     }
 
-    /// Commit the given block id with the proof, returns () on success or error
-    pub async fn commit(&self, finality_proof: QuorumCert) -> anyhow::Result<()> {
+    /// Send an ordered block id with the proof for execution, returns () on success or error
+    pub async fn send_for_execution(&self, finality_proof: QuorumCert) -> anyhow::Result<()> {
         let block_id_to_commit = finality_proof.commit_info().id();
         let block_to_commit = self
             .get_block(block_id_to_commit)
@@ -242,14 +238,13 @@ impl BlockStore {
         let block_tree = self.inner.clone();
         let storage = self.storage.clone();
 
-        // This callback is invoked synchronously withe coupled-execution and asynchronously in decoupled setup.
-        // the callback could be used for multiple batches of blocks.
-        self.state_computer
-            .commit(
+        // This callback is invoked synchronously with and could be used for multiple batches of blocks.
+        self.execution_client
+            .finalize_order(
                 &blocks_to_commit,
                 finality_proof.ledger_info().clone(),
                 Box::new(
-                    move |committed_blocks: &[Arc<ExecutedBlock>],
+                    move |committed_blocks: &[Arc<PipelinedBlock>],
                           commit_decision: LedgerInfoWithSignatures| {
                         block_tree.write().commit_callback(
                             storage,
@@ -287,7 +282,7 @@ impl BlockStore {
             blocks,
             quorum_certs,
             prev_2chain_htc,
-            Arc::clone(&self.state_computer),
+            self.execution_client.clone(),
             Arc::clone(&self.storage),
             max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
@@ -300,10 +295,10 @@ impl BlockStore {
         *self.inner.write() = Arc::try_unwrap(inner)
             .unwrap_or_else(|_| panic!("New block tree is not shared"))
             .into_inner();
-        self.try_commit().await;
+        self.try_send_for_execution().await;
     }
 
-    /// Execute and insert a block if it passes all validation tests.
+    /// Insert a block if it passes all validation tests.
     /// Returns the Arc to the block kept in the block store after persisting it to storage
     ///
     /// This function assumes that the ancestors are present (returns MissingParent otherwise).
@@ -311,10 +306,7 @@ impl BlockStore {
     /// Duplicate inserts will return the previously inserted block (
     /// note that it is considered a valid non-error case, for example, it can happen if a validator
     /// receives a certificate for a block that is currently being added).
-    pub async fn execute_and_insert_block(
-        &self,
-        block: Block,
-    ) -> anyhow::Result<Arc<ExecutedBlock>> {
+    pub async fn insert_block(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
         if let Some(existing_block) = self.get_block(block.id()) {
             return Ok(existing_block);
         }
@@ -323,54 +315,28 @@ impl BlockStore {
             "Block with old round"
         );
 
-        let executed_block = match self.execute_block(block.clone()).await {
-            Ok(res) => Ok(res),
-            Err(ExecutorError::BlockNotFound(parent_block_id)) => {
-                // recover the block tree in executor
-                let blocks_to_reexecute = self
-                    .path_from_ordered_root(parent_block_id)
-                    .unwrap_or_default();
-
-                for block in blocks_to_reexecute {
-                    self.execute_block(block.block().clone()).await?;
-                }
-                self.execute_block(block).await
-            },
-            err => err,
-        }?;
-
+        let pipelined_block = PipelinedBlock::new_ordered(block.clone());
         // ensure local time past the block time
-        let block_time = Duration::from_micros(executed_block.timestamp_usecs());
+        let block_time = Duration::from_micros(pipelined_block.timestamp_usecs());
         let current_timestamp = self.time_service.get_current_timestamp();
         if let Some(t) = block_time.checked_sub(current_timestamp) {
             if t > Duration::from_secs(1) {
                 warn!(
                     "Long wait time {}ms for block {}",
                     t.as_millis(),
-                    executed_block.block()
+                    pipelined_block.block()
                 );
             }
             self.time_service.wait_until(block_time).await;
         }
-        if let Some(payload) = executed_block.block().payload() {
+        if let Some(payload) = pipelined_block.block().payload() {
             self.payload_manager
-                .prefetch_payload_data(payload, executed_block.block().timestamp_usecs());
+                .prefetch_payload_data(payload, pipelined_block.block().timestamp_usecs());
         }
         self.storage
-            .save_tree(vec![executed_block.block().clone()], vec![])
+            .save_tree(vec![pipelined_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;
-        self.inner.write().insert_block(executed_block)
-    }
-
-    async fn execute_block(&self, block: Block) -> ExecutorResult<ExecutedBlock> {
-        // Although NIL blocks don't have a payload, we still send a T::default() to compute
-        // because we may inject a block prologue transaction.
-        let pipeline_result = self
-            .state_computer
-            .compute(&block, block.parent_id(), None)
-            .await?;
-        let PipelineExecutionResult { input_txns, result } = pipeline_result;
-        Ok(ExecutedBlock::new(block, input_txns, result))
+        self.inner.write().insert_block(pipelined_block)
     }
 
     /// Validates quorum certificates and inserts it into block tree assuming dependencies exist.
@@ -381,19 +347,19 @@ impl BlockStore {
         // the QuorumCert's state on the next restart will work if there is a memory
         // corruption, for example.
         match self.get_block(qc.certified_block().id()) {
-            Some(executed_block) => {
+            Some(pipelined_block) => {
                 ensure!(
                     // decoupled execution allows dummy block infos
-                    executed_block
+                    pipelined_block
                         .block_info()
                         .match_ordered_only(qc.certified_block()),
                     "QC for block {} has different {:?} than local {:?}",
                     qc.certified_block().id(),
                     qc.certified_block(),
-                    executed_block.block_info()
+                    pipelined_block.block_info()
                 );
                 observe_block(
-                    executed_block.block().timestamp_usecs(),
+                    pipelined_block.block().timestamp_usecs(),
                     BlockStage::QC_ADDED,
                 );
             },
@@ -557,15 +523,15 @@ impl BlockReader for BlockStore {
         self.inner.read().block_exists(&block_id)
     }
 
-    fn get_block(&self, block_id: HashValue) -> Option<Arc<ExecutedBlock>> {
+    fn get_block(&self, block_id: HashValue) -> Option<Arc<PipelinedBlock>> {
         self.inner.read().get_block(&block_id)
     }
 
-    fn ordered_root(&self) -> Arc<ExecutedBlock> {
+    fn ordered_root(&self) -> Arc<PipelinedBlock> {
         self.inner.read().ordered_root()
     }
 
-    fn commit_root(&self) -> Arc<ExecutedBlock> {
+    fn commit_root(&self) -> Arc<PipelinedBlock> {
         self.inner.read().commit_root()
     }
 
@@ -573,15 +539,15 @@ impl BlockReader for BlockStore {
         self.inner.read().get_quorum_cert_for_block(&block_id)
     }
 
-    fn path_from_ordered_root(&self, block_id: HashValue) -> Option<Vec<Arc<ExecutedBlock>>> {
+    fn path_from_ordered_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>> {
         self.inner.read().path_from_ordered_root(block_id)
     }
 
-    fn path_from_commit_root(&self, block_id: HashValue) -> Option<Vec<Arc<ExecutedBlock>>> {
+    fn path_from_commit_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>> {
         self.inner.read().path_from_commit_root(block_id)
     }
 
-    fn highest_certified_block(&self) -> Arc<ExecutedBlock> {
+    fn highest_certified_block(&self) -> Arc<PipelinedBlock> {
         self.inner.read().highest_certified_block()
     }
 
@@ -638,11 +604,11 @@ impl BlockStore {
     }
 
     /// Helper function to insert the block with the qc together
-    pub async fn insert_block_with_qc(&self, block: Block) -> anyhow::Result<Arc<ExecutedBlock>> {
+    pub async fn insert_block_with_qc(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
         self.insert_single_quorum_cert(block.quorum_cert().clone())?;
         if self.ordered_root().round() < block.quorum_cert().commit_info().round() {
-            self.commit(block.quorum_cert().clone()).await?;
+            self.send_for_execution(block.quorum_cert().clone()).await?;
         }
-        self.execute_and_insert_block(block).await
+        self.insert_block(block).await
     }
 }

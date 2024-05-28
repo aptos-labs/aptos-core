@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         dummy_field: bool,
@@ -23,7 +23,4 @@ module 0x8675309::M {
         };
         Abort(0)
     }
-    spec fun $t0();
-    spec fun $t1(): u64;
-    spec fun $t2(): (u64, bool, M::R);
 } // end 0x8675309::M

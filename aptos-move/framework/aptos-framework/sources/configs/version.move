@@ -2,13 +2,16 @@
 module aptos_framework::version {
     use std::error;
     use std::signer;
+    use aptos_framework::chain_status;
+    use aptos_framework::config_buffer;
 
     use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration_with_dkg;
 
-    struct Version has key {
+    struct Version has drop, key, store {
         major: u64,
     }
 
@@ -30,10 +33,14 @@ module aptos_framework::version {
         move_to(aptos_framework, SetVersionCapability {});
     }
 
-    /// Updates the major version to a larger version.
-    /// This can be called by on chain governance.
+    /// Deprecated by `set_for_next_epoch()`.
+    ///
+    /// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
+    ///
+    /// TODO: update all the tests that reference this function, then disable this function.
     public entry fun set_version(account: &signer, major: u64) acquires Version {
         assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
+        chain_status::assert_genesis();
 
         let old_major = borrow_global<Version>(@aptos_framework).major;
         assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
@@ -43,6 +50,30 @@ module aptos_framework::version {
 
         // Need to trigger reconfiguration so validator nodes can sync on the updated version.
         reconfiguration::reconfigure();
+    }
+
+    /// Used in on-chain governances to update the major version for the next epoch.
+    /// Example usage:
+    /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
+    /// - `aptos_framework::aptos_governance::reconfigure(&framework_signer);`
+    public entry fun set_for_next_epoch(account: &signer, major: u64) acquires Version {
+        assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
+        let old_major = borrow_global<Version>(@aptos_framework).major;
+        assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
+        config_buffer::upsert(Version {major});
+    }
+
+    /// Only used in reconfigurations to apply the pending `Version`, if there is any.
+    public(friend) fun on_new_epoch(framework: &signer) acquires Version {
+        system_addresses::assert_aptos_framework(framework);
+        if (config_buffer::does_exist<Version>()) {
+            let new_value = config_buffer::extract<Version>();
+            if (exists<Version>(@aptos_framework)) {
+                *borrow_global_mut<Version>(@aptos_framework) = new_value;
+            } else {
+                move_to(framework, new_value);
+            }
+        }
     }
 
     /// Only called in tests and testnets. This allows the core resources account, which only exists in tests/testnets,

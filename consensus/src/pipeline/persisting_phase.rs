@@ -6,7 +6,7 @@ use crate::{
     pipeline::pipeline_phase::StatelessPipeline,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
 };
-use aptos_consensus_types::executed_block::ExecutedBlock;
+use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use async_trait::async_trait;
@@ -21,7 +21,7 @@ use std::{
 /// a response.
 
 pub struct PersistingRequest {
-    pub blocks: Vec<Arc<ExecutedBlock>>,
+    pub blocks: Vec<Arc<PipelinedBlock>>,
     pub commit_ledger_info: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
 }

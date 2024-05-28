@@ -5,10 +5,8 @@
 #![allow(clippy::arc_with_non_send_sync)]
 
 use crate::{
-    access_path::AccessPath,
     account_address::{self, AccountAddress},
     account_config::{AccountResource, CoinStoreResource},
-    account_state::AccountState,
     aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
@@ -19,14 +17,14 @@ use crate::{
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::ValidatorSet,
+    on_chain_config::{Features, ValidatorSet},
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         ChangeSet, ExecutionStatus, Module, RawTransaction, Script, SignatureCheckedTransaction,
-        SignedTransaction, Transaction, TransactionArgument, TransactionInfo,
-        TransactionListWithProof, TransactionPayload, TransactionStatus, TransactionToCommit,
-        Version, WriteSetPayload,
+        SignedTransaction, Transaction, TransactionArgument, TransactionAuxiliaryData,
+        TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionStatus,
+        TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -55,7 +53,6 @@ use proptest_derive::Arbitrary;
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
-    convert::TryFrom,
     iter::Iterator,
 };
 
@@ -94,12 +91,13 @@ impl Arbitrary for WriteSet {
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         // XXX there's no checking for repeated access paths here, nor in write_set. Is that
         // important? Not sure.
-        vec((any::<AccessPath>(), any::<WriteOp>()), 0..64)
+        vec((vec(any::<u8>(), 1..100), any::<WriteOp>()), 0..64)
             .prop_map(|write_set| {
-                let write_set_mut =
-                    WriteSetMut::new(write_set.iter().map(|(access_path, write_op)| {
-                        (StateKey::access_path(access_path.clone()), write_op.clone())
-                    }));
+                let write_set_mut = WriteSetMut::new(
+                    write_set
+                        .iter()
+                        .map(|(raw_key, write_op)| (StateKey::raw(raw_key), write_op.clone())),
+                );
                 write_set_mut
                     .freeze()
                     .expect("generated write sets should always be valid")
@@ -497,7 +495,8 @@ impl TransactionPayload {
 
 prop_compose! {
     fn arb_transaction_status()(vm_status in any::<VMStatus>()) -> TransactionStatus {
-        vm_status.into()
+        let (txn_status, _) = TransactionStatus::from_vm_status(vm_status, true, &Features::default());
+        txn_status
     }
 }
 
@@ -677,13 +676,26 @@ pub struct AccountStateGen {
 }
 
 impl AccountStateGen {
-    pub fn materialize(self, account_index: Index, universe: &AccountInfoUniverse) -> AccountState {
-        let address = universe.get_account_info(account_index).address;
+    pub fn materialize(
+        self,
+        account_index: Index,
+        universe: &AccountInfoUniverse,
+    ) -> impl IntoIterator<Item = (StateKey, Vec<u8>)> {
+        let address = &universe.get_account_info(account_index).address;
         let account_resource = self
             .account_resource_gen
             .materialize(account_index, universe);
         let balance_resource = self.balance_resource_gen.materialize();
-        AccountState::try_from((address, &account_resource, &balance_resource)).unwrap()
+        vec![
+            (
+                StateKey::resource_typed::<AccountResource>(address).unwrap(),
+                bcs::to_bytes(&account_resource).unwrap(),
+            ),
+            (
+                StateKey::resource_typed::<CoinStoreResource>(address).unwrap(),
+                bcs::to_bytes(&balance_resource).unwrap(),
+            ),
+        ]
     }
 }
 
@@ -783,12 +795,8 @@ impl TransactionToCommitGen {
             .account_state_gens
             .into_iter()
             .flat_map(|(index, account_gen)| {
-                let address = universe.get_account_info(index).address;
-                account_gen
-                    .materialize(index, universe)
-                    .into_resource_iter()
-                    .map(move |(key, value)| {
-                        let state_key = StateKey::access_path(AccessPath::new(address, key));
+                account_gen.materialize(index, universe).into_iter().map(
+                    move |(state_key, value)| {
                         (
                             (
                                 state_key.clone(),
@@ -796,7 +804,8 @@ impl TransactionToCommitGen {
                             ),
                             (state_key, WriteOp::legacy_modification(value.into())),
                         )
-                    })
+                    },
+                )
             })
             .unzip();
         let mut sharded_state_updates = arr![HashMap::new(); 16];
@@ -811,6 +820,7 @@ impl TransactionToCommitGen {
             WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
             events,
             false, /* event_gen never generates reconfig events */
+            TransactionAuxiliaryData::default(),
         )
     }
 
@@ -1165,6 +1175,7 @@ impl BlockGen {
             WriteSet::default(),
             Vec::new(),
             false,
+            TransactionAuxiliaryData::default(),
         ));
 
         // materialize ledger info

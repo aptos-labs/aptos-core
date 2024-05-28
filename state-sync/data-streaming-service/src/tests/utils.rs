@@ -39,9 +39,9 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
-        TransactionOutput, TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
-        Version,
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionAuxiliaryData,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionPayload, TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -307,7 +307,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         let mut state_keys_and_values = vec![];
         for _ in start_index..=end_index {
             state_keys_and_values.push((
-                StateKey::raw(HashValue::random().to_vec()),
+                StateKey::raw(HashValue::random().as_ref()),
                 StateValue::from(vec![]),
             ));
         }
@@ -993,7 +993,13 @@ fn create_transaction() -> Transaction {
 
 /// Creates an empty transaction output
 fn create_transaction_output() -> TransactionOutput {
-    TransactionOutput::new(WriteSet::default(), vec![], 0, TransactionStatus::Retry)
+    TransactionOutput::new(
+        WriteSet::default(),
+        vec![],
+        0,
+        TransactionStatus::Retry,
+        TransactionAuxiliaryData::default(),
+    )
 }
 
 /// Returns a random u64 with a value between 0 and `max_value` - 1 (inclusive).

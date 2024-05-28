@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::helpers::TEST_DAG_WINDOW;
 use crate::{
@@ -7,6 +8,7 @@ use crate::{
         dag_fetcher::{FetchRequestHandler, TDagFetcher},
         dag_state_sync::DagStateSynchronizer,
         dag_store::DagStore,
+        errors::DagFetchError,
         storage::DAGStorage,
         tests::{
             dag_test::MockStorage,
@@ -15,7 +17,7 @@ use crate::{
         types::{CertifiedNodeMessage, RemoteFetchRequest},
         CertifiedNode, DAGMessage, DAGRpcResult, RpcHandler, RpcWithFallback, TDAGNetworkSender,
     },
-    test_utils::EmptyStateComputer,
+    pipeline::execution_client::DummyExecutionClient,
 };
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
@@ -84,7 +86,7 @@ impl TDagFetcher for MockDagFetcher {
         remote_request: RemoteFetchRequest,
         _responders: Vec<Author>,
         new_dag: Arc<DagStore>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), DagFetchError> {
         let response = FetchRequestHandler::new(self.target_dag.clone(), self.epoch_state.clone())
             .process(remote_request)
             .await
@@ -112,13 +114,13 @@ impl OrderedNotifier for MockNotifier {
 
 fn setup(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> DagStateSynchronizer {
     let time_service = TimeService::mock();
-    let state_computer = Arc::new(EmptyStateComputer {});
+    let execution_client = Arc::new(DummyExecutionClient {});
     let payload_manager = Arc::new(MockPayloadManager {});
 
     DagStateSynchronizer::new(
         epoch_state,
         time_service,
-        state_computer,
+        execution_client,
         storage,
         payload_manager,
         TEST_DAG_WINDOW as Round,

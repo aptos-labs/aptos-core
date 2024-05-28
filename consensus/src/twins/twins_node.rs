@@ -11,7 +11,8 @@ use crate::{
     payload_manager::PayloadManager,
     pipeline::buffer_manager::OrderedBlocks,
     quorum_store::quorum_store_db::MockQuorumStoreDB,
-    test_utils::{MockStateComputer, MockStorage},
+    rand::rand_gen::storage::in_memory::InMemRandDb,
+    test_utils::{mock_execution_client::MockExecutionClient, MockStorage},
     util::time_service::ClockTimeService,
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -108,7 +109,8 @@ impl SMRNode {
         let (ordered_blocks_tx, mut ordered_blocks_events) = mpsc::unbounded::<OrderedBlocks>();
         let shared_mempool = MockSharedMempool::new();
         let (quorum_store_to_mempool_sender, _) = mpsc::channel(1_024);
-        let state_computer = Arc::new(MockStateComputer::new(
+
+        let execution_client = Arc::new(MockExecutionClient::new(
             state_sync_client,
             ordered_blocks_tx,
             Arc::clone(&storage),
@@ -142,7 +144,7 @@ impl SMRNode {
         let (timeout_sender, timeout_receiver) =
             aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
         let (self_sender, self_receiver) =
-            aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
+            aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
 
         let quorum_store_storage = Arc::new(MockQuorumStoreDB::new());
         let bounded_executor = BoundedExecutor::new(2, playground.handle());
@@ -154,13 +156,15 @@ impl SMRNode {
             consensus_network_client,
             timeout_sender,
             quorum_store_to_mempool_sender,
-            state_computer.clone(),
+            execution_client.clone(),
             storage.clone(),
             quorum_store_storage,
             reconfig_listener,
             bounded_executor,
             aptos_time_service::TimeService::real(),
             vtxn_pool,
+            Arc::new(InMemRandDb::new()),
+            None,
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);
@@ -173,7 +177,7 @@ impl SMRNode {
             loop {
                 let ordered_blocks = ordered_blocks_events.next().await.unwrap();
                 let commit = ordered_blocks.ordered_proof.clone();
-                state_computer
+                execution_client
                     .commit_to_storage(ordered_blocks)
                     .await
                     .unwrap();

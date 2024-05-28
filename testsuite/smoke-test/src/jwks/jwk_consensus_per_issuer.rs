@@ -1,19 +1,24 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     jwks::{
         dummy_provider::{
             request_handler::{EquivocatingServer, StaticContentServer},
-            DummyProvider,
+            DummyHttpServer,
         },
-        get_patched_jwks, put_provider_on_chain,
+        get_patched_jwks, update_jwk_consensus_config,
     },
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::jwks::{
-    jwk::JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, OIDCProvider, ProviderJWKs,
+use aptos_types::{
+    jwks::{
+        jwk::JWK, secure_test_rsa_jwk, unsupported::UnsupportedJWK, AllProvidersJWKs, ProviderJWKs,
+    },
+    keyless::test_utils::get_sample_iss,
+    on_chain_config::{JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig},
 };
 use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
@@ -42,35 +47,61 @@ async fn jwk_consensus_per_issuer() {
         .await
         .expect("Epoch 2 taking too long to arrive!");
 
-    info!("Initially the provider set is empty. So should be the JWK map.");
+    info!("Initially the provider set is empty. The JWK map should have the secure test jwk added via a patch at genesis.");
 
     sleep(Duration::from_secs(10)).await;
     let patched_jwks = get_patched_jwks(&client).await;
     debug!("patched_jwks={:?}", patched_jwks);
-    assert!(patched_jwks.jwks.entries.is_empty());
+    assert!(patched_jwks.jwks.entries.len() == 1);
 
     info!("Adding some providers, one seriously equivocating, the other well behaving.");
-    let (provider_alice, provider_bob) =
-        tokio::join!(DummyProvider::spawn(), DummyProvider::spawn());
-    provider_alice.update_request_handler(Some(Arc::new(EquivocatingServer::new(
+    let (alice_config_server, alice_jwks_server, bob_config_server, bob_jwks_server) = tokio::join!(
+        DummyHttpServer::spawn(),
+        DummyHttpServer::spawn(),
+        DummyHttpServer::spawn(),
+        DummyHttpServer::spawn()
+    );
+    let alice_issuer_id = "https://alice.io";
+    let bob_issuer_id = "https://bob.dev";
+    alice_config_server.update_request_handler(Some(Arc::new(StaticContentServer::new_str(
+        format!(
+            r#"{{"issuer": "{}", "jwks_uri": "{}"}}"#,
+            alice_issuer_id,
+            alice_jwks_server.url()
+        )
+        .as_str(),
+    ))));
+    bob_config_server.update_request_handler(Some(Arc::new(StaticContentServer::new_str(
+        format!(
+            r#"{{"issuer": "{}", "jwks_uri": "{}"}}"#,
+            bob_issuer_id,
+            bob_jwks_server.url()
+        )
+        .as_str(),
+    ))));
+
+    alice_jwks_server.update_request_handler(Some(Arc::new(EquivocatingServer::new(
         r#"{"keys": ["ALICE_JWK_V1A"]}"#.as_bytes().to_vec(),
         r#"{"keys": ["ALICE_JWK_V1B"]}"#.as_bytes().to_vec(),
         2,
     ))));
-    provider_bob.update_request_handler(Some(Arc::new(StaticContentServer::new(
+    bob_jwks_server.update_request_handler(Some(Arc::new(StaticContentServer::new(
         r#"{"keys": ["BOB_JWK_V0"]}"#.as_bytes().to_vec(),
     ))));
-    let providers = vec![
-        OIDCProvider {
-            name: b"https://alice.io".to_vec(),
-            config_url: provider_alice.open_id_config_url().into_bytes(),
-        },
-        OIDCProvider {
-            name: b"https://bob.dev".to_vec(),
-            config_url: provider_bob.open_id_config_url().into_bytes(),
-        },
-    ];
-    let txn_summary = put_provider_on_chain(cli, root_idx, providers).await;
+    let config = OnChainJWKConsensusConfig::V1(JWKConsensusConfigV1 {
+        oidc_providers: vec![
+            OIDCProvider {
+                name: alice_issuer_id.to_string(),
+                config_url: alice_config_server.url(),
+            },
+            OIDCProvider {
+                name: bob_issuer_id.to_string(),
+                config_url: bob_config_server.url(),
+            },
+        ],
+    });
+
+    let txn_summary = update_jwk_consensus_config(cli, root_idx, &config).await;
     debug!("txn_summary={:?}", txn_summary);
 
     info!("Wait for 60 secs and there should only update for Bob, not Alice.");
@@ -79,17 +110,30 @@ async fn jwk_consensus_per_issuer() {
     debug!("patched_jwks={:?}", patched_jwks);
     assert_eq!(
         AllProvidersJWKs {
-            entries: vec![ProviderJWKs {
-                issuer: b"https://bob.dev".to_vec(),
-                version: 1,
-                jwks: vec![
-                    JWK::Unsupported(UnsupportedJWK::new_with_payload("\"BOB_JWK_V0\"")).into()
-                ],
-            }]
+            entries: vec![
+                ProviderJWKs {
+                    issuer: bob_issuer_id.as_bytes().to_vec(),
+                    version: 1,
+                    jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
+                        "\"BOB_JWK_V0\""
+                    ))
+                    .into()],
+                },
+                ProviderJWKs {
+                    issuer: get_sample_iss().into_bytes(),
+                    version: 0,
+                    jwks: vec![secure_test_rsa_jwk().into()],
+                },
+            ]
         },
         patched_jwks.jwks
     );
 
     info!("Tear down.");
-    provider_alice.shutdown().await;
+    tokio::join!(
+        alice_jwks_server.shutdown(),
+        alice_config_server.shutdown(),
+        bob_jwks_server.shutdown(),
+        bob_config_server.shutdown()
+    );
 }

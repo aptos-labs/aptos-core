@@ -1,10 +1,7 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::vector {
     private fun create(): vector<u64> {
-        Vector<u64>(1, 2, 3)
-    }
-    spec fun $create(): vector<u64> {
-        Vector<u64>(1, 2, 3)
+        [Number(1), Number(2), Number(3)]
     }
 } // end 0x42::vector
 
@@ -13,12 +10,9 @@ module 0x42::vector {
 [variant baseline]
 fun vector::create(): vector<u64> {
      var $t0: vector<u64>
-     var $t1: u64
-     var $t2: u64
-     var $t3: u64
-  0: $t1 := 1
-  1: $t2 := 2
-  2: $t3 := 3
-  3: $t0 := vector($t1, $t2, $t3)
-  4: return $t0
+  0: $t0 := ["1", "2", "3"]
+  1: return $t0
 }
+
+
+============ bytecode verification succeeded ========

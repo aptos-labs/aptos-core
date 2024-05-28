@@ -60,8 +60,8 @@ pub async fn create_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {
     swarm
 }
 
-struct ActiveTrafficGuard {
-    finish_traffic: Arc<AtomicBool>,
+pub struct ActiveTrafficGuard {
+    pub finish_traffic: Arc<AtomicBool>,
 }
 
 impl Drop for ActiveTrafficGuard {
@@ -70,7 +70,11 @@ impl Drop for ActiveTrafficGuard {
     }
 }
 
-async fn start_traffic(num_accounts: usize, tps: f32, swarm: &mut dyn Swarm) -> ActiveTrafficGuard {
+pub async fn start_traffic(
+    num_accounts: usize,
+    tps: f32,
+    swarm: &mut dyn Swarm,
+) -> ActiveTrafficGuard {
     let validator_clients = swarm.get_all_nodes_clients_with_names();
 
     let finish = Arc::new(AtomicBool::new(false));
@@ -167,6 +171,47 @@ async fn test_no_failures() {
         5.0,
         1,
         no_failure_injection(),
+        Box::new(move |_, _, executed_rounds, executed_transactions, _, _| {
+            assert!(
+                executed_transactions >= 4,
+                "no progress with active consensus, only {} transactions",
+                executed_transactions
+            );
+            assert!(
+                executed_rounds >= 2,
+                "no progress with active consensus, only {} rounds",
+                executed_rounds
+            );
+            Ok(())
+        }),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn test_ordered_only_cert() {
+    let num_validators = 3;
+
+    let mut swarm = create_swarm(num_validators, 1).await;
+
+    test_consensus_fault_tolerance(
+        &mut swarm,
+        3,
+        5.0,
+        1,
+        Box::new(FailPointFailureInjection::new(Box::new(move |cycle, _| {
+            (
+                vec![(
+                    cycle % num_validators,
+                    "consensus::ordered_only_cert".to_string(),
+                    format!("{}%return", 50),
+                )],
+                true,
+            )
+        }))),
         Box::new(move |_, _, executed_rounds, executed_transactions, _, _| {
             assert!(
                 executed_transactions >= 4,

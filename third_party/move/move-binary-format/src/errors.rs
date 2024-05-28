@@ -148,6 +148,10 @@ impl VMError {
         self.0.major_status
     }
 
+    pub fn set_major_status(&mut self, major_status: StatusCode) {
+        self.0.major_status = major_status;
+    }
+
     pub fn sub_status(&self) -> Option<u64> {
         self.0.sub_status
     }
@@ -382,6 +386,17 @@ impl PartialVMError {
             indices,
             offsets,
         } = *self.0;
+        let bt = std::backtrace::Backtrace::capture();
+        let message = if std::backtrace::BacktraceStatus::Captured == bt.status() {
+            if let Some(message) = message {
+                Some(format!("{}\nBacktrace: {:#?}", message, bt).to_string())
+            } else {
+                Some(format!("Backtrace: {:#?}", bt).to_string())
+            }
+        } else {
+            message
+        };
+
         VMError(Box::new(VMError_ {
             major_status,
             sub_status,
@@ -491,7 +506,7 @@ impl PartialVMError {
         self
     }
 
-    /// Append the message `message` to the message field of the VM status, and insert a seperator
+    /// Append the message `message` to the message field of the VM status, and insert a separator
     /// if the original message is non-empty.
     pub fn append_message_with_separator(
         mut self,

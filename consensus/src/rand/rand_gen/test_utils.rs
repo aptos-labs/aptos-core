@@ -9,7 +9,7 @@ use aptos_consensus_types::{
     block::Block,
     block_data::{BlockData, BlockType},
     common::{Author, Round},
-    executed_block::ExecutedBlock,
+    pipelined_block::PipelinedBlock,
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
@@ -24,7 +24,7 @@ pub fn create_ordered_blocks(rounds: Vec<Round>) -> OrderedBlocks {
     let blocks = rounds
         .into_iter()
         .map(|round| {
-            ExecutedBlock::new(
+            PipelinedBlock::new(
                 Block::new_for_testing(
                     HashValue::random(),
                     BlockData::new_for_testing(
@@ -51,10 +51,14 @@ pub fn create_ordered_blocks(rounds: Vec<Round>) -> OrderedBlocks {
     }
 }
 
-pub(super) fn create_share_for_round(round: Round, author: Author) -> RandShare<MockShare> {
-    RandShare::<MockShare>::new(author, RandMetadata::new_for_testing(round), MockShare)
+pub(super) fn create_share_for_round(
+    epoch: u64,
+    round: Round,
+    author: Author,
+) -> RandShare<MockShare> {
+    RandShare::<MockShare>::new(author, RandMetadata { epoch, round }, MockShare)
 }
 
-pub(super) fn create_share(rand_metadata: RandMetadata, author: Author) -> RandShare<MockShare> {
-    RandShare::<MockShare>::new(author, rand_metadata, MockShare)
+pub(super) fn create_share(metadata: RandMetadata, author: Author) -> RandShare<MockShare> {
+    RandShare::<MockShare>::new(author, metadata, MockShare)
 }

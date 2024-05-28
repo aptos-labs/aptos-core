@@ -564,6 +564,7 @@ fn parse_visibility(context: &mut Context) -> Result<Visibility, Box<Diagnostic>
         },
     })
 }
+
 // Parse an attribute value. Either a value literal or a module access
 //      AttributeValue =
 //          <Value>
@@ -579,12 +580,19 @@ fn parse_attribute_value(context: &mut Context) -> Result<AttributeValue, Box<Di
 
 // Parse a single attribute
 //      Attribute =
-//          <Identifier>
-//          | <Identifier> "=" <AttributeValue>
-//          | <Identifier> "(" Comma<Attribute> ")"
+//          <AttributeName>
+//          | <AttributeName> "=" <AttributeValue>
+//          | <AttributeName> "(" Comma<Attribute> ")"
+//      AttributeName = <Identifier> ( "::" Identifier )* // merged into one identifier
 fn parse_attribute(context: &mut Context) -> Result<Attribute, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
-    let n = parse_identifier(context)?;
+    let mut n = parse_identifier(context)?;
+    while match_token(context.tokens, Tok::ColonColon)? {
+        let n1 = parse_identifier(context)?;
+        let id = Symbol::from(format!("{}::{}", n.value.as_str(), n1.value.as_str()));
+        let end_loc = context.tokens.previous_end_loc();
+        n = spanned(context.tokens.file_hash(), start_loc, end_loc, id);
+    }
     let attr_ = match context.tokens.peek() {
         Tok::Equal => {
             context.tokens.advance()?;
@@ -947,8 +955,8 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         },
         Tok::Identifier
             if context.tokens.content() == FOR_IDENT
-                && matches!(context.tokens.lookahead_nth(1), Ok(Tok::LParen))
-                && matches!(context.tokens.lookahead_nth(3), Ok(Tok::Identifier)) =>
+                && matches!(context.tokens.lookahead_nth(0), Ok(Tok::LParen))
+                && matches!(context.tokens.lookahead_nth(2), Ok(Tok::Identifier)) =>
         {
             let (control_exp, _) = parse_for_loop(context)?;
             // for loop isn't useful in an expression, so we ignore second result from
@@ -1423,9 +1431,8 @@ fn parse_name_exp(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     if context.tokens.peek() == Tok::Exclaim {
         context.tokens.advance()?;
-        let is_macro = true;
         let rhs = parse_call_args(context)?;
-        return Ok(Exp_::Call(n, is_macro, tys, rhs));
+        return Ok(Exp_::Call(n, CallKind::Macro, tys, rhs));
     }
 
     if context.tokens.peek() == Tok::Less && n.loc.end() as usize == start_loc {
@@ -1449,9 +1456,8 @@ fn parse_name_exp(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
 
         // Call: "(" Comma<Exp> ")"
         Tok::Exclaim | Tok::LParen => {
-            let is_macro = false;
             let rhs = parse_call_args(context)?;
-            Ok(Exp_::Call(n, is_macro, tys, rhs))
+            Ok(Exp_::Call(n, CallKind::Regular, tys, rhs))
         },
 
         // Other name reference...
@@ -1725,7 +1731,7 @@ fn parse_unary_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
 
 // Parse an expression term optionally followed by a chain of dot or index accesses:
 //      DotOrIndexChain =
-//          <DotOrIndexChain> "." <Identifier>
+//          <DotOrIndexChain> "." <Identifier> [  "(" Comma<Exp> ")" ]
 //          | <DotOrIndexChain> "[" <Exp> "]"                      spec only
 //          | <Term>
 fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
@@ -1736,7 +1742,29 @@ fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic
             Tok::Period => {
                 context.tokens.advance()?;
                 let n = parse_identifier(context)?;
-                Exp_::Dot(Box::new(lhs), n)
+                let ahead = context.tokens.peek();
+                if matches!(ahead, Tok::LParen | Tok::ColonColon) {
+                    let generics = if ahead == Tok::ColonColon {
+                        context.tokens.advance()?;
+                        Some(parse_comma_list(
+                            context,
+                            Tok::Less,
+                            Tok::Greater,
+                            parse_type,
+                            "a type",
+                        )?)
+                    } else {
+                        None
+                    };
+                    let mut args = parse_call_args(context)?;
+                    args.loc =
+                        Loc::new(context.tokens.file_hash(), lhs.loc.start(), args.loc.end());
+                    args.value.insert(0, lhs);
+                    let maccess = sp(n.loc, NameAccessChain_::One(n));
+                    Exp_::Call(maccess, CallKind::Receiver, generics, args)
+                } else {
+                    Exp_::Dot(Box::new(lhs), n)
+                }
             },
             Tok::LBracket => {
                 context.tokens.advance()?;
@@ -1922,7 +1950,10 @@ fn parse_quant_binding(context: &mut Context) -> Result<Spanned<(Bind, Exp)>, Bo
 
 fn make_builtin_call(loc: Loc, name: Symbol, type_args: Option<Vec<Type>>, args: Vec<Exp>) -> Exp {
     let maccess = sp(loc, NameAccessChain_::One(sp(loc, name)));
-    sp(loc, Exp_::Call(maccess, false, type_args, sp(loc, args)))
+    sp(
+        loc,
+        Exp_::Call(maccess, CallKind::Regular, type_args, sp(loc, args)),
+    )
 }
 
 //**************************************************************************************************

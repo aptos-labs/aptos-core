@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 mod dummy_provider;
 mod jwk_consensus_basic;
@@ -10,52 +11,71 @@ use aptos::{common::types::TransactionSummary, test::CliTestFramework};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
-use aptos_types::jwks::{
-    jwk::{JWKMoveStruct, JWK},
-    unsupported::UnsupportedJWK,
-    AllProvidersJWKs, OIDCProvider, PatchedJWKs, ProviderJWKs,
+use aptos_types::{
+    jwks::{
+        jwk::{JWKMoveStruct, JWK},
+        unsupported::UnsupportedJWK,
+        AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
+    },
+    on_chain_config::OnChainJWKConsensusConfig,
 };
 use move_core_types::account_address::AccountAddress;
 use std::time::Duration;
 
-pub async fn put_provider_on_chain(
+pub async fn update_jwk_consensus_config(
     cli: CliTestFramework,
     account_idx: usize,
-    providers: Vec<OIDCProvider>,
+    config: &OnChainJWKConsensusConfig,
 ) -> TransactionSummary {
-    let implementation = providers
-        .into_iter()
-        .map(|provider| {
-            let OIDCProvider { name, config_url } = provider;
+    let script = match config {
+        OnChainJWKConsensusConfig::Off => r#"
+script {
+    use aptos_framework::aptos_governance;
+    use aptos_framework::jwk_consensus_config;
+    fun main(core_resources: &signer) {
+        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let config = jwk_consensus_config::new_off();
+        jwk_consensus_config::set_for_next_epoch(&framework, config);
+        aptos_governance::reconfigure(&framework);
+    }
+}
+"#
+        .to_string(),
+        OnChainJWKConsensusConfig::V1(config_v1) => {
+            let provider_lines = config_v1
+                .oidc_providers
+                .iter()
+                .map(|provider| {
+                    format!(
+                        "jwk_consensus_config::new_oidc_provider(utf8(b\"{}\"), utf8(b\"{}\")),",
+                        provider.name, provider.config_url
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n            ");
             format!(
                 r#"
-        let issuer = b"{}";
-        let config_url = b"{}";
-        jwks::upsert_oidc_provider(&framework_signer, issuer, config_url);
-"#,
-                String::from_utf8(name).unwrap(),
-                String::from_utf8(config_url).unwrap(),
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("");
-
-    let add_dummy_provider_script = format!(
-        r#"
 script {{
     use aptos_framework::aptos_governance;
-    use aptos_framework::jwks;
+    use aptos_framework::jwk_consensus_config;
+    use std::string::utf8;
+
     fun main(core_resources: &signer) {{
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        {implementation}
-        aptos_governance::reconfigure(&framework_signer);
+        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let config = jwk_consensus_config::new_v1(vector[
+            {provider_lines}
+        ]);
+        jwk_consensus_config::set_for_next_epoch(&framework, config);
+        aptos_governance::reconfigure(&framework);
     }}
 }}
-"#,
-    );
-    cli.run_script(account_idx, &add_dummy_provider_script)
-        .await
-        .unwrap()
+"#
+            )
+        },
+    };
+    println!("script={script}");
+
+    cli.run_script(account_idx, script.as_str()).await.unwrap()
 }
 
 async fn get_patched_jwks(rest_client: &Client) -> PatchedJWKs {

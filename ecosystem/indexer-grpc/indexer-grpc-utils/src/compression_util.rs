@@ -1,18 +1,19 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::default_file_storage_format;
 use aptos_protos::{indexer::v1::TransactionsInStorage, transaction::v1::Transaction};
-use flate2::read::{GzDecoder, GzEncoder};
+use lz4::{Decoder, EncoderBuilder};
 use prost::Message;
 use ripemd::{Digest, Ripemd128};
 use serde::{Deserialize, Serialize};
-use std::io::Read;
+use std::io::{Read, Write};
 
 pub const FILE_ENTRY_TRANSACTION_COUNT: u64 = 1000;
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum StorageFormat {
-    GzipCompressedProto,
+    Lz4CompressedProto,
     // Only used for legacy file format.
     // Use by cache only.
     Base64UncompressedProto,
@@ -65,7 +66,7 @@ impl FileStoreMetadata {
 }
 
 pub enum CacheEntry {
-    GzipCompressionProto(Vec<u8>),
+    Lz4CompressionProto(Vec<u8>),
     // Only used for legacy cache entry.
     Base64UncompressedProto(Vec<u8>),
 }
@@ -73,7 +74,7 @@ pub enum CacheEntry {
 impl CacheEntry {
     pub fn new(bytes: Vec<u8>, storage_format: StorageFormat) -> Self {
         match storage_format {
-            StorageFormat::GzipCompressedProto => Self::GzipCompressionProto(bytes),
+            StorageFormat::Lz4CompressedProto => Self::Lz4CompressionProto(bytes),
             // Legacy format.
             StorageFormat::Base64UncompressedProto => Self::Base64UncompressedProto(bytes),
             StorageFormat::JsonBase64UncompressedProto => {
@@ -84,14 +85,14 @@ impl CacheEntry {
 
     pub fn into_inner(self) -> Vec<u8> {
         match self {
-            CacheEntry::GzipCompressionProto(bytes) => bytes,
+            CacheEntry::Lz4CompressionProto(bytes) => bytes,
             CacheEntry::Base64UncompressedProto(bytes) => bytes,
         }
     }
 
     pub fn size(&self) -> usize {
         match self {
-            CacheEntry::GzipCompressionProto(bytes) => bytes.len(),
+            CacheEntry::Lz4CompressionProto(bytes) => bytes.len(),
             CacheEntry::Base64UncompressedProto(bytes) => bytes.len(),
         }
     }
@@ -102,13 +103,15 @@ impl CacheEntry {
             .encode(&mut bytes)
             .expect("proto serialization failed.");
         match storage_format {
-            StorageFormat::GzipCompressedProto => {
-                let mut compressed = GzEncoder::new(bytes.as_slice(), flate2::Compression::fast());
-                let mut result = Vec::new();
+            StorageFormat::Lz4CompressedProto => {
+                let mut compressed = EncoderBuilder::new()
+                    .level(4)
+                    .build(Vec::new())
+                    .expect("Lz4 compression failed.");
                 compressed
-                    .read_to_end(&mut result)
-                    .expect("Gzip compression failed.");
-                CacheEntry::GzipCompressionProto(result)
+                    .write_all(&bytes)
+                    .expect("Lz4 compression failed.");
+                CacheEntry::Lz4CompressionProto(compressed.finish().0)
             },
             StorageFormat::Base64UncompressedProto => {
                 let base64 = base64::encode(bytes).into_bytes();
@@ -123,8 +126,8 @@ impl CacheEntry {
 
     pub fn build_key(version: u64, storage_format: StorageFormat) -> String {
         match storage_format {
-            StorageFormat::GzipCompressedProto => {
-                format!("gz:{}", version)
+            StorageFormat::Lz4CompressedProto => {
+                format!("l4:{}", version)
             },
             StorageFormat::Base64UncompressedProto => {
                 format!("{}", version)
@@ -138,12 +141,12 @@ impl CacheEntry {
 
     pub fn into_transaction(self) -> Transaction {
         match self {
-            CacheEntry::GzipCompressionProto(bytes) => {
-                let mut decompressor = GzDecoder::new(&bytes[..]);
+            CacheEntry::Lz4CompressionProto(bytes) => {
+                let mut decompressor = Decoder::new(&bytes[..]).expect("Lz4 decompression failed.");
                 let mut decompressed = Vec::new();
                 decompressor
                     .read_to_end(&mut decompressed)
-                    .expect("Gzip decompression failed.");
+                    .expect("Lz4 decompression failed.");
                 Transaction::decode(decompressed.as_slice()).expect("proto deserialization failed.")
             },
             CacheEntry::Base64UncompressedProto(bytes) => {
@@ -155,7 +158,7 @@ impl CacheEntry {
 }
 
 pub enum FileEntry {
-    GzipCompressionProto(Vec<u8>),
+    Lz4CompressionProto(Vec<u8>),
     // Only used for legacy file format.
     JsonBase64UncompressedProto(Vec<u8>),
 }
@@ -163,7 +166,7 @@ pub enum FileEntry {
 impl FileEntry {
     pub fn new(bytes: Vec<u8>, storage_format: StorageFormat) -> Self {
         match storage_format {
-            StorageFormat::GzipCompressedProto => Self::GzipCompressionProto(bytes),
+            StorageFormat::Lz4CompressedProto => Self::Lz4CompressionProto(bytes),
             StorageFormat::Base64UncompressedProto => {
                 panic!("Base64UncompressedProto is not supported.")
             },
@@ -173,14 +176,14 @@ impl FileEntry {
 
     pub fn into_inner(self) -> Vec<u8> {
         match self {
-            FileEntry::GzipCompressionProto(bytes) => bytes,
+            FileEntry::Lz4CompressionProto(bytes) => bytes,
             FileEntry::JsonBase64UncompressedProto(bytes) => bytes,
         }
     }
 
     pub fn size(&self) -> usize {
         match self {
-            FileEntry::GzipCompressionProto(bytes) => bytes.len(),
+            FileEntry::Lz4CompressionProto(bytes) => bytes.len(),
             FileEntry::JsonBase64UncompressedProto(bytes) => bytes.len(),
         }
     }
@@ -202,18 +205,20 @@ impl FileEntry {
             panic!("Starting version has to be a multiple of FILE_ENTRY_TRANSACTION_COUNT.")
         }
         match storage_format {
-            StorageFormat::GzipCompressedProto => {
+            StorageFormat::Lz4CompressedProto => {
                 let t = TransactionsInStorage {
                     starting_version: Some(transactions.first().unwrap().version),
                     transactions,
                 };
                 t.encode(&mut bytes).expect("proto serialization failed.");
-                let mut compressed = GzEncoder::new(bytes.as_slice(), flate2::Compression::fast());
-                let mut result = Vec::new();
+                let mut compressed = EncoderBuilder::new()
+                    .level(4)
+                    .build(Vec::new())
+                    .expect("Lz4 compression failed.");
                 compressed
-                    .read_to_end(&mut result)
-                    .expect("Gzip compression failed.");
-                FileEntry::GzipCompressionProto(result)
+                    .write_all(&bytes)
+                    .expect("Lz4 compression failed.");
+                FileEntry::Lz4CompressionProto(compressed.finish().0)
             },
             StorageFormat::Base64UncompressedProto => {
                 panic!("Base64UncompressedProto is not supported.")
@@ -246,9 +251,9 @@ impl FileEntry {
         hasher.update(starting_version.to_string());
         let file_prefix = format!("{:x}", hasher.finalize());
         match storage_format {
-            StorageFormat::GzipCompressedProto => {
+            StorageFormat::Lz4CompressedProto => {
                 format!(
-                    "compressed_files/gzip/{}_{}.bin",
+                    "compressed_files/lz4/{}_{}.bin",
                     file_prefix, starting_version
                 )
             },
@@ -263,12 +268,12 @@ impl FileEntry {
 
     pub fn into_transactions_in_storage(self) -> TransactionsInStorage {
         match self {
-            FileEntry::GzipCompressionProto(bytes) => {
-                let mut decompressor = GzDecoder::new(&bytes[..]);
+            FileEntry::Lz4CompressionProto(bytes) => {
+                let mut decompressor = Decoder::new(&bytes[..]).expect("Lz4 decompression failed.");
                 let mut decompressed = Vec::new();
                 decompressor
                     .read_to_end(&mut decompressed)
-                    .expect("Gzip decompression failed.");
+                    .expect("Lz4 decompression failed.");
                 TransactionsInStorage::decode(decompressed.as_slice())
                     .expect("proto deserialization failed.")
             },
@@ -316,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cache_entry_builder_gzip_compressed_proto() {
+    fn test_cache_entry_builder_lz4_compressed_proto() {
         let transaction = Transaction {
             version: 42,
             epoch: 333,
@@ -325,7 +330,7 @@ mod tests {
         let transaction_clone = transaction.clone();
         let proto_size = transaction.encoded_len();
         let cache_entry =
-            CacheEntry::from_transaction(transaction, StorageFormat::GzipCompressedProto);
+            CacheEntry::from_transaction(transaction, StorageFormat::Lz4CompressedProto);
         let compressed_size = cache_entry.size();
         assert!(compressed_size != proto_size);
         let deserialized_transaction = cache_entry.into_transaction();
@@ -378,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_builder_gzip_compressed_proto() {
+    fn test_file_entry_builder_lz4_compressed_proto() {
         let transactions = (1000..2000)
             .map(|version| Transaction {
                 version,
@@ -392,7 +397,7 @@ mod tests {
         };
         let transactions_in_storage_size = transactions_in_storage.encoded_len();
         let file_entry =
-            FileEntry::from_transactions(transactions.clone(), StorageFormat::GzipCompressedProto);
+            FileEntry::from_transactions(transactions.clone(), StorageFormat::Lz4CompressedProto);
         assert_ne!(file_entry.size(), transactions_in_storage_size);
         let deserialized_transactions = file_entry.into_transactions_in_storage();
         for (i, transaction) in transactions.iter().enumerate() {
@@ -401,10 +406,10 @@ mod tests {
     }
 
     #[test]
-    fn test_cache_entry_key_to_string_gzip_compressed_proto() {
+    fn test_cache_entry_key_to_string_lz4_compressed_proto() {
         assert_eq!(
-            CacheEntry::build_key(42, StorageFormat::GzipCompressedProto),
-            "gz:42"
+            CacheEntry::build_key(42, StorageFormat::Lz4CompressedProto),
+            "l4:42"
         );
     }
 
@@ -423,10 +428,10 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_key_to_string_gzip_compressed_proto() {
+    fn test_file_entry_key_to_string_lz4_compressed_proto() {
         assert_eq!(
-            FileEntry::build_key(42, StorageFormat::GzipCompressedProto),
-            "compressed_files/gzip/3d1bff1ba654ca5fdb6ac1370533d876_0.bin"
+            FileEntry::build_key(42, StorageFormat::Lz4CompressedProto),
+            "compressed_files/lz4/3d1bff1ba654ca5fdb6ac1370533d876_0.bin"
         );
     }
 
@@ -469,7 +474,7 @@ mod tests {
             "chain_id": 1,
             "file_folder_size": 1000,
             "version": 1,
-            "storage_format": "GzipCompressedProto"
+            "storage_format": "Lz4CompressedProto"
         }"#;
 
         let file_metadata: FileStoreMetadata = serde_json::from_str(file_metadata_serialized_json)
@@ -477,7 +482,7 @@ mod tests {
 
         assert_eq!(
             file_metadata.storage_format,
-            StorageFormat::GzipCompressedProto
+            StorageFormat::Lz4CompressedProto
         );
         assert_eq!(file_metadata.chain_id, 1);
         assert_eq!(file_metadata.file_folder_size, 1000);

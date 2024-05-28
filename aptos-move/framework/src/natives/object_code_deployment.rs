@@ -11,13 +11,13 @@ pub struct ExtendRef {
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct PublisherRef {
+pub struct ManagingRefs {
     pub extend_ref: ExtendRef,
 }
 
-impl PublisherRef {
+impl ManagingRefs {
     pub fn new(address: AccountAddress) -> Self {
-        PublisherRef {
+        ManagingRefs {
             extend_ref: ExtendRef { address },
         }
     }

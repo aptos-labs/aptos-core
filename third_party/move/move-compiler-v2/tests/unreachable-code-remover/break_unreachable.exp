@@ -5,42 +5,40 @@ fun m::test() {
      var $t0: u64
      var $t1: u64
      var $t2: u64
-     var $t3: u64
-     var $t4: bool
+     var $t3: bool
+     var $t4: u64
      var $t5: u64
      var $t6: u64
      var $t7: u64
      var $t8: u64
      var $t9: u64
      var $t10: u64
-     var $t11: u64
-  0: $t1 := 0
-  1: $t0 := infer($t1)
-  2: label L0
-  3: $t3 := 1
-  4: $t2 := +($t0, $t3)
-  5: $t0 := infer($t2)
-  6: $t5 := 10
-  7: $t4 := ==($t0, $t5)
-  8: if ($t4) goto 9 else goto 15
-  9: label L2
- 10: goto 25
- 11: $t7 := 1
- 12: $t6 := +($t0, $t7)
- 13: $t0 := infer($t6)
- 14: goto 20
- 15: label L3
- 16: goto 2
- 17: $t9 := 1
- 18: $t8 := +($t0, $t9)
- 19: $t0 := infer($t8)
- 20: label L4
- 21: $t11 := 1
- 22: $t10 := +($t0, $t11)
- 23: $t0 := infer($t10)
- 24: goto 2
- 25: label L1
- 26: return ()
+  0: $t0 := 0
+  1: label L0
+  2: $t2 := 1
+  3: $t1 := +($t0, $t2)
+  4: $t0 := infer($t1)
+  5: $t4 := 10
+  6: $t3 := ==($t0, $t4)
+  7: if ($t3) goto 8 else goto 14
+  8: label L2
+  9: goto 24
+ 10: $t6 := 1
+ 11: $t5 := +($t0, $t6)
+ 12: $t0 := infer($t5)
+ 13: goto 19
+ 14: label L3
+ 15: goto 1
+ 16: $t8 := 1
+ 17: $t7 := +($t0, $t8)
+ 18: $t0 := infer($t7)
+ 19: label L4
+ 20: $t10 := 1
+ 21: $t9 := +($t0, $t10)
+ 22: $t0 := infer($t9)
+ 23: goto 1
+ 24: label L1
+ 25: return ()
 }
 
 ============ after UnreachableCodeProcessor: ================
@@ -50,69 +48,66 @@ fun m::test() {
      var $t0: u64
      var $t1: u64
      var $t2: u64
-     var $t3: u64
-     var $t4: bool
+     var $t3: bool
+     var $t4: u64
      var $t5: u64
      var $t6: u64
      var $t7: u64
      var $t8: u64
      var $t9: u64
      var $t10: u64
-     var $t11: u64
      # maybe
-  0: $t1 := 0
+  0: $t0 := 0
      # maybe
-  1: $t0 := infer($t1)
+  1: label L0
      # maybe
-  2: label L0
+  2: $t2 := 1
      # maybe
-  3: $t3 := 1
+  3: $t1 := +($t0, $t2)
      # maybe
-  4: $t2 := +($t0, $t3)
+  4: $t0 := move($t1)
      # maybe
-  5: $t0 := infer($t2)
+  5: $t4 := 10
      # maybe
-  6: $t5 := 10
+  6: $t3 := ==($t0, $t4)
      # maybe
-  7: $t4 := ==($t0, $t5)
+  7: if ($t3) goto 8 else goto 14
      # maybe
-  8: if ($t4) goto 9 else goto 15
+  8: label L2
      # maybe
-  9: label L2
-     # maybe
- 10: goto 25
+  9: goto 24
      # no
- 11: $t7 := 1
+ 10: $t6 := 1
      # no
- 12: $t6 := +($t0, $t7)
+ 11: $t5 := +($t0, $t6)
      # no
- 13: $t0 := infer($t6)
+ 12: $t0 := move($t5)
      # no
- 14: goto 20
+ 13: goto 19
      # maybe
- 15: label L3
+ 14: label L3
      # maybe
- 16: goto 2
+ 15: goto 1
      # no
- 17: $t9 := 1
+ 16: $t8 := 1
      # no
- 18: $t8 := +($t0, $t9)
+ 17: $t7 := +($t0, $t8)
      # no
- 19: $t0 := infer($t8)
+ 18: $t0 := move($t7)
      # no
- 20: label L4
+ 19: label L4
      # no
- 21: $t11 := 1
+ 20: $t10 := 1
      # no
- 22: $t10 := +($t0, $t11)
+ 21: $t9 := +($t0, $t10)
      # no
- 23: $t0 := infer($t10)
+ 22: $t0 := move($t9)
      # no
- 24: goto 2
+ 23: goto 1
      # maybe
- 25: label L1
+ 24: label L1
      # maybe
- 26: return ()
+ 25: return ()
 }
 
 ============ after UnreachableCodeRemover: ================
@@ -122,28 +117,29 @@ fun m::test() {
      var $t0: u64
      var $t1: u64
      var $t2: u64
-     var $t3: u64
-     var $t4: bool
-     var $t5: u64
-     var $t6: u64
-     var $t7: u64
-     var $t8: u64
-     var $t9: u64
-     var $t10: u64
-     var $t11: u64
-  0: $t1 := 0
-  1: $t0 := infer($t1)
-  2: label L0
-  3: $t3 := 1
-  4: $t2 := +($t0, $t3)
-  5: $t0 := infer($t2)
-  6: $t5 := 10
-  7: $t4 := ==($t0, $t5)
-  8: if ($t4) goto 9 else goto 11
-  9: label L2
- 10: goto 13
- 11: label L3
- 12: goto 2
- 13: label L1
- 14: return ()
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+  0: $t0 := 0
+  1: label L0
+  2: $t2 := 1
+  3: $t1 := +($t0, $t2)
+  4: $t0 := move($t1)
+  5: $t4 := 10
+  6: $t3 := ==($t0, $t4)
+  7: if ($t3) goto 8 else goto 10
+  8: label L2
+  9: goto 12
+ 10: label L3
+ 11: goto 1
+ 12: label L1
+ 13: return ()
 }
+
+
+============ bytecode verification succeeded ========

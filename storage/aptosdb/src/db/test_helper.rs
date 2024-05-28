@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides reusable helpers in tests.
+use super::gather_state_updates_until_last_checkpoint;
 #[cfg(test)]
 use crate::state_store::StateStore;
 #[cfg(test)]
@@ -22,6 +23,8 @@ use aptos_storage_interface::{state_delta::StateDelta, DbReader, DbWriter, Order
 use aptos_temppath::TempPath;
 #[cfg(test)]
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+#[cfg(test)]
+use aptos_types::transaction::TransactionAuxiliaryData;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
@@ -29,16 +32,12 @@ use aptos_types::{
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     proptest_types::{AccountInfoUniverse, BlockGen},
-    state_store::{
-        create_empty_sharded_state_updates, state_key::StateKey, state_value::StateValue,
-        ShardedStateUpdates,
-    },
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, TransactionToCommit, Version},
 };
 #[cfg(test)]
 use arr_macro::arr;
 use proptest::{collection::vec, prelude::*, sample::Index};
-use rayon::prelude::*;
 use std::{collections::HashMap, fmt::Debug};
 
 prop_compose! {
@@ -928,6 +927,21 @@ pub(crate) fn put_transaction_infos(
         .unwrap()
 }
 
+#[cfg(test)]
+pub(crate) fn put_transaction_auxiliary_data(
+    db: &AptosDB,
+    version: Version,
+    auxiliary_data: &[TransactionAuxiliaryData],
+) {
+    let txns_to_commit: Vec<_> = auxiliary_data
+        .iter()
+        .cloned()
+        .map(TransactionToCommit::dummy_with_transaction_auxiliary_data)
+        .collect();
+    db.commit_transaction_auxiliary_data(&txns_to_commit, version)
+        .unwrap();
+}
+
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
     let leaf_node = Node::new_leaf(key.hash(), value.hash(), (key.clone(), version));
     db.state_merkle_db()
@@ -1047,62 +1061,4 @@ pub fn test_sync_transactions_impl(
             .flat_map(|(txns_to_commit, _)| txns_to_commit.iter())
             .collect(),
     );
-}
-
-pub fn gather_state_updates_until_last_checkpoint(
-    first_version: Version,
-    latest_in_memory_state: &StateDelta,
-    txns_to_commit: &[TransactionToCommit],
-) -> Option<ShardedStateUpdates> {
-    if let Some(latest_checkpoint_version) = latest_in_memory_state.base_version {
-        if latest_checkpoint_version >= first_version {
-            let idx = (latest_checkpoint_version - first_version) as usize;
-            assert!(
-                    txns_to_commit[idx].is_state_checkpoint(),
-                    "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
-                    latest_checkpoint_version,
-                    first_version + idx as u64
-                );
-            let mut sharded_state_updates = create_empty_sharded_state_updates();
-            sharded_state_updates.par_iter_mut().enumerate().for_each(
-                |(shard_id, state_updates_shard)| {
-                    txns_to_commit[..=idx].iter().for_each(|txn_to_commit| {
-                        state_updates_shard.extend(txn_to_commit.state_updates()[shard_id].clone());
-                    })
-                },
-            );
-            return Some(sharded_state_updates);
-        }
-    }
-
-    None
-}
-
-/// Test only methods for the DB
-impl AptosDB {
-    pub fn save_transactions_for_test(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-    ) -> Result<()> {
-        let state_updates_until_last_checkpoint = gather_state_updates_until_last_checkpoint(
-            first_version,
-            &latest_in_memory_state,
-            txns_to_commit,
-        );
-        self.save_transactions(
-            txns_to_commit,
-            first_version,
-            base_state_version,
-            ledger_info_with_sigs,
-            sync_commit,
-            latest_in_memory_state,
-            state_updates_until_last_checkpoint,
-            None,
-        )
-    }
 }

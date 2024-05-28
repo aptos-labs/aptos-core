@@ -133,6 +133,7 @@ spec aptos_framework::staking_config {
         rewards_rate_decrease_rate: FixedPoint64,
     ) {
         use std::signer;
+        pragma verify_duration_estimate = 120;
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         let addr = signer::address_of(aptos_framework);
         /// [high-level-req-1.2]
@@ -162,6 +163,7 @@ spec aptos_framework::staking_config {
     }
 
     spec calculate_and_save_latest_rewards_config(): StakingRewardsConfig {
+        pragma verify_duration_estimate = 120;
         requires features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
@@ -236,6 +238,7 @@ spec aptos_framework::staking_config {
         rewards_rate_decrease_rate: FixedPoint64,
     ) {
         use std::signer;
+        pragma verify_duration_estimate = 120; // verified but takes long
         include StakingRewardsConfigRequirement;
         let addr = signer::address_of(aptos_framework);
         /// [high-level-req-1.6]

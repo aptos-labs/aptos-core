@@ -20,7 +20,7 @@ use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
-use aptos_logger::{error, info, warn, Schema};
+use aptos_logger::{error, info, Schema};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
@@ -37,15 +37,12 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig, OnChainExecutionConfig},
     state_store::{
-        state_key::{StateKey, StateKeyInner},
-        state_key_prefix::StateKeyPrefix,
+        state_key::{inner::StateKeyInner, prefix::StateKeyPrefix, StateKey},
         state_value::StateValue,
         TStateView,
     },
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
-use aptos_utils::aptos_try;
-use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver};
 use futures::{channel::oneshot, SinkExt};
 use mini_moka::sync::Cache;
 use move_core_types::{
@@ -59,7 +56,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     ops::{Bound::Included, Deref},
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc, RwLock, RwLockWriteGuard,
     },
     time::Instant,
@@ -78,6 +75,7 @@ pub struct Context {
     view_function_stats: Arc<FunctionStats>,
     simulate_txn_stats: Arc<FunctionStats>,
     pub table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    pub wait_for_hash_active_connections: Arc<AtomicUsize>,
 }
 
 impl std::fmt::Debug for Context {
@@ -98,7 +96,7 @@ impl Context {
             let log_per_call_stats = node_config.api.periodic_function_stats_sec.is_some();
             (
                 Arc::new(FunctionStats::new(
-                    FunctionType::ViewFuntion,
+                    FunctionType::ViewFunction,
                     log_per_call_stats,
                 )),
                 Arc::new(FunctionStats::new(
@@ -130,6 +128,7 @@ impl Context {
             view_function_stats,
             simulate_txn_stats,
             table_info_reader,
+            wait_for_hash_active_connections: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -221,55 +220,33 @@ impl Context {
     }
 
     pub fn get_latest_ledger_info<E: ServiceUnavailableError>(&self) -> Result<LedgerInfo, E> {
-        let maybe_oldest_version = self
-            .db
-            .get_first_viable_txn_version()
-            .context("Failed to retrieve oldest version in DB")
-            .map_err(|e| {
-                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
-            })?;
         let ledger_info = self
             .get_latest_ledger_info_with_signatures()
             .context("Failed to retrieve latest ledger info")
             .map_err(|e| {
                 E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
             })?;
-
-        let (oldest_version, oldest_block_height, block_height) = match self
+        let (oldest_version, oldest_block_height) = self
             .db
-            .get_next_block_event(maybe_oldest_version)
-        {
-            Ok((version, oldest_block_event)) => {
-                let (_, _, newest_block_event) = self
-                    .db
-                    .get_block_info_by_version(ledger_info.ledger_info().version())
-                    .context("Failed to retrieve latest block information")
-                    .map_err(|e| {
-                        E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
-                    })?;
-                (
-                    version,
-                    oldest_block_event.height(),
-                    newest_block_event.height(),
-                )
-            },
-            Err(err) => {
-                // when event index is disabled, we won't be able to search the NewBlock event stream.
-                // TODO(grao): evaluate adding dedicated block_height_by_version index
-                warn!(
-                    error = ?err,
-                    "Failed to query event indices, might be turned off. Ignoring.",
-                );
-                (maybe_oldest_version, 0, 0)
-            },
-        };
+            .get_first_viable_block()
+            .context("Failed to retrieve oldest block information")
+            .map_err(|e| {
+                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
+            })?;
+        let (_, _, newest_block_event) = self
+            .db
+            .get_block_info_by_version(ledger_info.ledger_info().version())
+            .context("Failed to retrieve latest block information")
+            .map_err(|e| {
+                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
+            })?;
 
         Ok(LedgerInfo::new(
             &self.chain_id(),
             &ledger_info,
             oldest_version,
             oldest_block_height,
-            block_height,
+            newest_block_event.height(),
         ))
     }
 
@@ -326,8 +303,7 @@ impl Context {
         address: AccountAddress,
         version: Version,
     ) -> Result<Option<T>> {
-        let access_path = AccessPath::resource_access_path(address, T::struct_tag())?;
-        let bytes_opt = self.get_state_value(&StateKey::access_path(access_path), version)?;
+        let bytes_opt = self.get_state_value(&StateKey::resource_typed::<T>(&address)?, version)?;
         bytes_opt
             .map(|bytes| bcs::from_bytes(&bytes))
             .transpose()
@@ -440,38 +416,19 @@ impl Context {
 
         // We should be able to do an unwrap here, otherwise the above db read would fail.
         let state_view = self.state_view_at_version(version)?;
+        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
 
         // Extract resources from resource groups and flatten into all resources
         let kvs = kvs
             .into_iter()
-            .map(|(key, value)| {
-                let is_resource_group =
-                    |resolver: &dyn AptosMoveResolver, struct_tag: &StructTag| -> bool {
-                        aptos_try!({
-                            let md = aptos_framework::get_metadata(
-                                &resolver.get_module_metadata(&struct_tag.module_id()),
-                            )?;
-                            md.struct_attributes
-                                .get(struct_tag.name.as_ident_str().as_str())?
-                                .iter()
-                                .find(|attr| attr.is_resource_group())?;
-                            Some(())
-                        })
-                        .is_some()
-                    };
-
-                let resolver = state_view.as_move_resolver();
-                if is_resource_group(&resolver, &key) {
+            .map(|(tag, value)| {
+                if converter.is_resource_group(&tag) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
-                        .map(|map| {
-                            map.into_iter()
-                                .map(|(key, value)| (key, value))
-                                .collect::<Vec<_>>()
-                        })
+                        .map(|map| map.into_iter().map(|(t, v)| (t, v)).collect::<Vec<_>>())
                         .map_err(|e| e.into())
                 } else {
-                    Ok(vec![(key, value)])
+                    Ok(vec![(tag, value)])
                 }
             })
             .collect::<Result<Vec<Vec<(StructTag, Vec<u8>)>>>>()?
@@ -480,10 +437,7 @@ impl Context {
             .collect();
 
         let next_key = if let Some((struct_tag, _v)) = resource_iter.next().transpose()? {
-            Some(StateKey::access_path(AccessPath::new(
-                address,
-                AccessPath::resource_path_vec(struct_tag)?,
-            )))
+            Some(StateKey::resource(&address, &struct_tag)?)
         } else {
             None
         };
@@ -524,12 +478,10 @@ impl Context {
             .by_ref()
             .take(limit as usize)
             .collect::<Result<_>>()?;
-        let next_key = module_iter.next().transpose()?.map(|(module_id, _v)| {
-            StateKey::access_path(AccessPath::new(
-                address,
-                AccessPath::code_path_vec(module_id),
-            ))
-        });
+        let next_key = module_iter
+            .next()
+            .transpose()?
+            .map(|(module_id, _v)| StateKey::module_id(&module_id));
         Ok((kvs, next_key))
     }
 
@@ -624,7 +576,7 @@ impl Context {
 
         // We can only get the max_transactions page size
         let max_txns = std::cmp::min(
-            self.node_config.api.max_transactions_page_size,
+            self.node_config.api.max_block_transactions_page_size,
             (last_version - first_version + 1) as u16,
         );
         let txns = if with_transactions {
@@ -664,13 +616,14 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
                 // Update the timestamp if the next block occurs
-                if let Some(txn) = t.transaction.try_as_block_metadata() {
+                if let Some(txn) = t.transaction.try_as_block_metadata_ext() {
+                    timestamp = txn.timestamp_usecs();
+                } else if let Some(txn) = t.transaction.try_as_block_metadata() {
                     timestamp = txn.timestamp_usecs();
                 }
                 let txn = converter.try_into_onchain_transaction(timestamp, t)?;
@@ -695,8 +648,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -749,7 +701,7 @@ impl Context {
             .enumerate()
             .map(|(i, ((txn, txn_output), info))| {
                 let version = start_version + i as u64;
-                let (write_set, events, _, _) = txn_output.unpack();
+                let (write_set, events, _, _, _) = txn_output.unpack();
                 self.get_accumulator_root_hash(version)
                     .map(|h| (version, txn, info, events, h, write_set).into())
             })
@@ -1217,17 +1169,16 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let resolver = state_view.as_move_resolver();
 
             let gas_schedule_params =
-                match GasScheduleV2::fetch_config(&resolver).and_then(|gas_schedule| {
+                match GasScheduleV2::fetch_config(&state_view).and_then(|gas_schedule| {
                     let feature_version = gas_schedule.feature_version;
                     let gas_schedule = gas_schedule.to_btree_map();
                     AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
                         .ok()
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
-                    None => GasSchedule::fetch_config(&resolver)
+                    None => GasSchedule::fetch_config(&state_view)
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.to_btree_map();
                             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0).ok()
@@ -1282,9 +1233,8 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let resolver = state_view.as_move_resolver();
 
-            let block_executor_onchain_config = OnChainExecutionConfig::fetch_config(&resolver)
+            let block_executor_onchain_config = OnChainExecutionConfig::fetch_config(&state_view)
                 .unwrap_or_else(OnChainExecutionConfig::default_if_missing)
                 .block_executor_onchain_config();
 
@@ -1385,21 +1335,21 @@ pub enum LogEvent {
 }
 
 pub enum FunctionType {
-    ViewFuntion,
+    ViewFunction,
     TxnSimulation,
 }
 
 impl FunctionType {
     fn log_event(&self) -> LogEvent {
         match self {
-            FunctionType::ViewFuntion => LogEvent::ViewFunction,
+            FunctionType::ViewFunction => LogEvent::ViewFunction,
             FunctionType::TxnSimulation => LogEvent::TxnSimulation,
         }
     }
 
     fn operation_id(&self) -> &'static str {
         match self {
-            FunctionType::ViewFuntion => "view_function",
+            FunctionType::ViewFunction => "view_function",
             FunctionType::TxnSimulation => "txn_simulation",
         }
     }

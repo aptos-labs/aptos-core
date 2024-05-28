@@ -1,8 +1,11 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
+use self::real_dkg::RealDKG;
 use crate::{
-    dkg::dummy_dkg::DummyDKG, on_chain_config::OnChainConfig,
-    validator_verifier::ValidatorConsensusInfoMoveStruct,
+    dkg::real_dkg::rounding::DKGRoundingProfile,
+    on_chain_config::{OnChainConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct},
+    validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };
 use anyhow::Result;
 use aptos_crypto::Uniform;
@@ -12,9 +15,13 @@ use move_core_types::{
     move_resource::MoveStructType,
 };
 use once_cell::sync::Lazy;
-use rand::CryptoRng;
+use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, fmt::Debug};
+use std::{
+    collections::BTreeSet,
+    fmt::{Debug, Formatter},
+    time::Duration,
+};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct DKGTranscriptMetadata {
@@ -37,11 +44,20 @@ pub static DKG_START_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> =
     Lazy::new(|| TypeTag::Struct(Box::new(DKGStartEvent::struct_tag())));
 
 /// DKG transcript and its metadata.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DKGTranscript {
     pub metadata: DKGTranscriptMetadata,
     #[serde(with = "serde_bytes")]
     pub transcript_bytes: Vec<u8>,
+}
+
+impl Debug for DKGTranscript {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DKGTranscript")
+            .field("metadata", &self.metadata)
+            .field("transcript_bytes_len", &self.transcript_bytes.len())
+            .finish()
+    }
 }
 
 impl DKGTranscript {
@@ -63,29 +79,74 @@ impl DKGTranscript {
     }
 }
 
-// The input of DKG.
+/// Reflection of `0x1::dkg::DKGSessionMetadata` in rust.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGSessionMetadata {
     pub dealer_epoch: u64,
+    pub randomness_config: RandomnessConfigMoveStruct,
     pub dealer_validator_set: Vec<ValidatorConsensusInfoMoveStruct>,
     pub target_validator_set: Vec<ValidatorConsensusInfoMoveStruct>,
 }
 
-// The input and the run state of DKG.
+impl DKGSessionMetadata {
+    pub fn target_validator_consensus_infos_cloned(&self) -> Vec<ValidatorConsensusInfo> {
+        self.target_validator_set
+            .clone()
+            .into_iter()
+            .map(|obj| obj.try_into().unwrap())
+            .collect()
+    }
+
+    pub fn dealer_consensus_infos_cloned(&self) -> Vec<ValidatorConsensusInfo> {
+        self.dealer_validator_set
+            .clone()
+            .into_iter()
+            .map(|obj| obj.try_into().unwrap())
+            .collect()
+    }
+
+    pub fn randomness_config_derived(&self) -> Option<OnChainRandomnessConfig> {
+        OnChainRandomnessConfig::try_from(self.randomness_config.clone()).ok()
+    }
+}
+
+impl MayHaveRoundingSummary for DKGSessionMetadata {
+    fn rounding_summary(&self) -> Option<&RoundingSummary> {
+        None
+    }
+}
+
 /// Reflection of Move type `0x1::dkg::DKGSessionState`.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGSessionState {
     pub metadata: DKGSessionMetadata,
     pub start_time_us: u64,
-    pub result: Vec<u8>,
-    pub deadline_microseconds: u64,
+    pub transcript: Vec<u8>,
 }
 
+impl DKGSessionState {
+    pub fn target_epoch(&self) -> u64 {
+        self.metadata.dealer_epoch + 1
+    }
+}
 /// Reflection of Move type `0x1::dkg::DKGState`.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGState {
-    pub last_complete: Option<DKGSessionState>,
+    pub last_completed: Option<DKGSessionState>,
     pub in_progress: Option<DKGSessionState>,
+}
+
+impl DKGState {
+    pub fn maybe_last_complete(&self, epoch: u64) -> Option<&DKGSessionState> {
+        match &self.last_completed {
+            Some(session) if session.target_epoch() == epoch => Some(session),
+            _ => None,
+        }
+    }
+
+    pub fn last_complete(&self) -> &DKGSessionState {
+        self.last_completed.as_ref().unwrap()
+    }
 }
 
 impl OnChainConfig for DKGState {
@@ -93,22 +154,36 @@ impl OnChainConfig for DKGState {
     const TYPE_IDENTIFIER: &'static str = "DKGState";
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct RoundingSummary {
+    pub method: String,
+    pub output: DKGRoundingProfile,
+    pub error: Option<String>,
+    pub exec_time: Duration,
+}
+
+pub trait MayHaveRoundingSummary {
+    fn rounding_summary(&self) -> Option<&RoundingSummary>;
+}
+
+/// NOTE: this is a subset of the full scheme. Some data items/algorithms are not used in DKG and are omitted.
 pub trait DKGTrait: Debug {
     type DealerPrivateKey;
-    type PublicParams: Clone + Debug + Send + Sync;
-    type Transcript: Clone + Default + Send + Sync + Serialize + for<'a> Deserialize<'a>;
+    type PublicParams: Clone + Debug + Send + Sync + MayHaveRoundingSummary;
+    type Transcript: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a>;
     type InputSecret: Uniform;
     type DealtSecret;
     type DealtSecretShare;
-    type NewValidatorDecryptKey;
+    type DealtPubKeyShare;
+    type NewValidatorDecryptKey: Uniform;
 
     fn new_public_params(dkg_session_metadata: &DKGSessionMetadata) -> Self::PublicParams;
-    fn generate_predictable_input_secret_for_testing(
-        dealer_sk: &Self::DealerPrivateKey,
-    ) -> Self::InputSecret;
     fn aggregate_input_secret(secrets: Vec<Self::InputSecret>) -> Self::InputSecret;
-    fn dealt_secret_from_input(input: &Self::InputSecret) -> Self::DealtSecret;
-    fn generate_transcript<R: CryptoRng>(
+    fn dealt_secret_from_input(
+        pub_params: &Self::PublicParams,
+        input: &Self::InputSecret,
+    ) -> Self::DealtSecret;
+    fn generate_transcript<R: CryptoRng + RngCore>(
         rng: &mut R,
         params: &Self::PublicParams,
         input_secret: &Self::InputSecret,
@@ -120,14 +195,17 @@ pub trait DKGTrait: Debug {
 
     fn aggregate_transcripts(
         params: &Self::PublicParams,
-        transcripts: Vec<Self::Transcript>,
-    ) -> Self::Transcript;
+        accumulator: &mut Self::Transcript,
+        element: Self::Transcript,
+    );
+
     fn decrypt_secret_share_from_transcript(
         pub_params: &Self::PublicParams,
         trx: &Self::Transcript,
         player_idx: u64,
         dk: &Self::NewValidatorDecryptKey,
-    ) -> Result<Self::DealtSecretShare>;
+    ) -> Result<(Self::DealtSecretShare, Self::DealtPubKeyShare)>;
+
     fn reconstruct_secret_from_shares(
         pub_params: &Self::PublicParams,
         player_share_pairs: Vec<(u64, Self::DealtSecretShare)>,
@@ -136,6 +214,6 @@ pub trait DKGTrait: Debug {
 }
 
 pub mod dummy_dkg;
+pub mod real_dkg;
 
-// TODO: replace with RealDKG.
-pub type DefaultDKG = DummyDKG;
+pub type DefaultDKG = RealDKG;

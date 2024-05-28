@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::fields {
     struct T {
         h: u64,
@@ -11,21 +11,21 @@ module 0x42::fields {
         g: fields::T,
     }
     private fun read_generic_val(x: fields::G<u64>): u64 {
-        select fields::G.f(x)
+        select fields::G.f<fields::G<u64>>(x)
     }
     private fun read_ref(x: &fields::S): u64 {
-        select fields::T.h(select fields::S.g(x))
+        select fields::T.h<fields::T>(select fields::S.g<&fields::S>(x))
     }
     private fun read_val(x: fields::S): u64 {
-        select fields::T.h(select fields::S.g(x))
+        select fields::T.h<fields::T>(select fields::S.g<fields::S>(x))
     }
     private fun write_generic_val(x: &mut fields::G<u64>,v: u64) {
-        select fields::G.f(x) = v
+        select fields::G.f<&mut fields::G<u64>>(x) = v
     }
     private fun write_local_direct(): fields::S {
         {
           let x: fields::S = pack fields::S(0, pack fields::T(0));
-          select fields::T.h(select fields::S.g(x)) = 42;
+          select fields::T.h<fields::T>(select fields::S.g<fields::S>(x)) = 42;
           x
         }
     }
@@ -34,7 +34,7 @@ module 0x42::fields {
           let x: fields::S = pack fields::S(0, pack fields::T(0));
           {
             let r: &mut fields::S = Borrow(Mutable)(x);
-            select fields::T.h(select fields::S.g(r)) = 42;
+            select fields::T.h<fields::T>(select fields::S.g<&mut fields::S>(r)) = 42;
             x
           }
         }
@@ -43,37 +43,20 @@ module 0x42::fields {
         {
           let x: fields::S = pack fields::S(0, pack fields::T(0));
           {
-            let r: &mut u64 = Borrow(Mutable)(select fields::T.h(select fields::S.g(x)));
+            let r: &mut u64 = Borrow(Mutable)(select fields::T.h<fields::T>(select fields::S.g<fields::S>(x)));
             r = 42;
             x
           }
         }
     }
     private fun write_param(x: &mut fields::S) {
-        select fields::T.h(select fields::S.g(x)) = 42;
+        select fields::T.h<fields::T>(select fields::S.g<&mut fields::S>(x)) = 42;
         Tuple()
     }
     private fun write_val(x: fields::S): fields::S {
-        select fields::T.h(select fields::S.g(x)) = 42;
+        select fields::T.h<fields::T>(select fields::S.g<fields::S>(x)) = 42;
         x
     }
-    spec fun $read_generic_val(x: fields::G<u64>): u64 {
-        select fields::G.f(x)
-    }
-    spec fun $read_ref(x: fields::S): u64 {
-        select fields::T.h(select fields::S.g(x))
-    }
-    spec fun $read_val(x: fields::S): u64 {
-        select fields::T.h(select fields::S.g(x))
-    }
-    spec fun $write_generic_val(x: fields::G<u64>,v: u64) {
-        select fields::G.f(x) = v
-    }
-    spec fun $write_local_direct(): fields::S;
-    spec fun $write_local_via_ref(): fields::S;
-    spec fun $write_local_via_ref_2(): fields::S;
-    spec fun $write_param(x: &mut fields::S);
-    spec fun $write_val(x: fields::S): fields::S;
 } // end 0x42::fields
 
 ============ initial bytecode ================
@@ -129,26 +112,24 @@ fun fields::write_generic_val($t0: &mut fields::G<u64>, $t1: u64) {
 fun fields::write_local_direct(): fields::S {
      var $t0: fields::S
      var $t1: fields::S
-     var $t2: fields::S
-     var $t3: u64
-     var $t4: fields::T
+     var $t2: u64
+     var $t3: fields::T
+     var $t4: u64
      var $t5: u64
-     var $t6: u64
-     var $t7: &mut u64
-     var $t8: &mut fields::T
-     var $t9: &mut fields::S
-  0: $t3 := 0
-  1: $t5 := 0
-  2: $t4 := pack fields::T($t5)
-  3: $t2 := pack fields::S($t3, $t4)
-  4: $t1 := infer($t2)
-  5: $t6 := 42
-  6: $t9 := borrow_local($t1)
-  7: $t8 := borrow_field<fields::S>.g($t9)
-  8: $t7 := borrow_field<fields::T>.h($t8)
-  9: write_ref($t7, $t6)
- 10: $t0 := infer($t1)
- 11: return $t0
+     var $t6: &mut u64
+     var $t7: &mut fields::T
+     var $t8: &mut fields::S
+  0: $t2 := 0
+  1: $t4 := 0
+  2: $t3 := pack fields::T($t4)
+  3: $t1 := pack fields::S($t2, $t3)
+  4: $t5 := 42
+  5: $t8 := borrow_local($t1)
+  6: $t7 := borrow_field<fields::S>.g($t8)
+  7: $t6 := borrow_field<fields::T>.h($t7)
+  8: write_ref($t6, $t5)
+  9: $t0 := infer($t1)
+ 10: return $t0
 }
 
 
@@ -156,28 +137,24 @@ fun fields::write_local_direct(): fields::S {
 fun fields::write_local_via_ref(): fields::S {
      var $t0: fields::S
      var $t1: fields::S
-     var $t2: fields::S
-     var $t3: u64
-     var $t4: fields::T
-     var $t5: u64
-     var $t6: &mut fields::S
-     var $t7: &mut fields::S
-     var $t8: u64
-     var $t9: &mut u64
-     var $t10: &mut fields::T
-  0: $t3 := 0
-  1: $t5 := 0
-  2: $t4 := pack fields::T($t5)
-  3: $t2 := pack fields::S($t3, $t4)
-  4: $t1 := infer($t2)
-  5: $t7 := borrow_local($t1)
-  6: $t6 := infer($t7)
-  7: $t8 := 42
-  8: $t10 := borrow_field<fields::S>.g($t6)
-  9: $t9 := borrow_field<fields::T>.h($t10)
- 10: write_ref($t9, $t8)
- 11: $t0 := infer($t1)
- 12: return $t0
+     var $t2: u64
+     var $t3: fields::T
+     var $t4: u64
+     var $t5: &mut fields::S
+     var $t6: u64
+     var $t7: &mut u64
+     var $t8: &mut fields::T
+  0: $t2 := 0
+  1: $t4 := 0
+  2: $t3 := pack fields::T($t4)
+  3: $t1 := pack fields::S($t2, $t3)
+  4: $t5 := borrow_local($t1)
+  5: $t6 := 42
+  6: $t8 := borrow_field<fields::S>.g($t5)
+  7: $t7 := borrow_field<fields::T>.h($t8)
+  8: write_ref($t7, $t6)
+  9: $t0 := infer($t1)
+ 10: return $t0
 }
 
 
@@ -185,28 +162,24 @@ fun fields::write_local_via_ref(): fields::S {
 fun fields::write_local_via_ref_2(): fields::S {
      var $t0: fields::S
      var $t1: fields::S
-     var $t2: fields::S
-     var $t3: u64
-     var $t4: fields::T
-     var $t5: u64
-     var $t6: &mut u64
-     var $t7: &mut u64
-     var $t8: &mut fields::T
-     var $t9: &mut fields::S
-     var $t10: u64
-  0: $t3 := 0
-  1: $t5 := 0
-  2: $t4 := pack fields::T($t5)
-  3: $t2 := pack fields::S($t3, $t4)
-  4: $t1 := infer($t2)
-  5: $t9 := borrow_local($t1)
-  6: $t8 := borrow_field<fields::S>.g($t9)
-  7: $t7 := borrow_field<fields::T>.h($t8)
-  8: $t6 := infer($t7)
-  9: $t10 := 42
- 10: write_ref($t6, $t10)
- 11: $t0 := infer($t1)
- 12: return $t0
+     var $t2: u64
+     var $t3: fields::T
+     var $t4: u64
+     var $t5: &mut u64
+     var $t6: &mut fields::T
+     var $t7: &mut fields::S
+     var $t8: u64
+  0: $t2 := 0
+  1: $t4 := 0
+  2: $t3 := pack fields::T($t4)
+  3: $t1 := pack fields::S($t2, $t3)
+  4: $t7 := borrow_local($t1)
+  5: $t6 := borrow_field<fields::S>.g($t7)
+  6: $t5 := borrow_field<fields::T>.h($t6)
+  7: $t8 := 42
+  8: write_ref($t5, $t8)
+  9: $t0 := infer($t1)
+ 10: return $t0
 }
 
 
@@ -238,3 +211,6 @@ fun fields::write_val($t0: fields::S): fields::S {
   5: $t1 := infer($t0)
   6: return $t1
 }
+
+
+============ bytecode verification succeeded ========
