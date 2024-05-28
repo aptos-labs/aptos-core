@@ -21,7 +21,7 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "raw2move"
-path = "src/raw2move.rs"
+path = "src/cli/raw2move.rs"
 
 [[bin]]
 name = "generator"
