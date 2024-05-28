@@ -87,6 +87,12 @@ impl DeserializerConfig {
     }
 }
 
+impl Default for DeserializerConfig {
+    fn default() -> Self {
+        Self::new(VERSION_MAX, IDENTIFIER_SIZE_MAX)
+    }
+}
+
 /// Table info: table type, offset where the table content starts from, count of bytes for
 /// the table content.
 #[derive(Clone, Debug)]

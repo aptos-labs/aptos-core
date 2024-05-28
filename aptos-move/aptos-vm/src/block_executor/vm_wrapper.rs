@@ -2,9 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    aptos_vm::AptosVM, block_executor::AptosTransactionOutput, data_cache::AsMoveResolver,
-};
+use crate::{aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
@@ -13,11 +11,13 @@ use aptos_types::{
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
     },
+    vm::environment::Environment,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
+use std::sync::Arc;
 
 pub(crate) struct AptosExecutorTask<'a, S> {
     vm: AptosVM,
@@ -25,21 +25,16 @@ pub(crate) struct AptosExecutorTask<'a, S> {
 }
 
 impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
-    type Argument = &'a S;
+    type Environment = (Arc<Environment>, &'a S);
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(argument: &'a S) -> Self {
-        // AptosVM has to be initialized using configs from storage.
-        let vm = AptosVM::new(
-            &argument.as_move_resolver(),
-            /*override_is_delayed_field_optimization_capable=*/ Some(true),
-        );
-
+    fn init(env: Self::Environment) -> Self {
+        let vm = AptosVM::new_with_environment(env.0, env.1);
         Self {
             vm,
-            base_view: argument,
+            base_view: env.1,
         }
     }
 

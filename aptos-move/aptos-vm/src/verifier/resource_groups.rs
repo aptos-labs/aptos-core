@@ -5,6 +5,7 @@ use crate::move_vm_ext::SessionExt;
 use aptos_framework::{ResourceGroupScope, RuntimeModuleMetadataV1};
 use move_binary_format::{
     access::ModuleAccess,
+    deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, VMError, VMResult},
     normalized::Struct,
     CompiledModule,
@@ -35,13 +36,18 @@ pub(crate) fn validate_resource_groups(
     session: &mut SessionExt,
     modules: &[CompiledModule],
     safer_resource_groups: bool,
+    deserializer_config: &DeserializerConfig,
 ) -> Result<(), VMError> {
     let mut groups = BTreeMap::new();
     let mut members = BTreeMap::new();
 
     for module in modules {
-        let (new_groups, new_members) =
-            validate_module_and_extract_new_entries(session, module, safer_resource_groups)?;
+        let (new_groups, new_members) = validate_module_and_extract_new_entries(
+            session,
+            module,
+            safer_resource_groups,
+            deserializer_config,
+        )?;
         groups.insert(module.self_id(), new_groups);
         members.insert(module.self_id(), new_members);
     }
@@ -50,8 +56,11 @@ pub(crate) fn validate_resource_groups(
         for value in inner_members.values() {
             let value_module_id = value.module_id();
             if !groups.contains_key(&value_module_id) {
-                let (inner_groups, _, _) =
-                    extract_resource_group_metadata_from_module(session, &value_module_id)?;
+                let (inner_groups, _, _) = extract_resource_group_metadata_from_module(
+                    session,
+                    &value_module_id,
+                    deserializer_config,
+                )?;
                 groups.insert(value.module_id(), inner_groups);
             }
 
@@ -80,6 +89,7 @@ pub(crate) fn validate_module_and_extract_new_entries(
     session: &mut SessionExt,
     module: &CompiledModule,
     safer_resource_groups: bool,
+    deserializer_config: &DeserializerConfig,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
     BTreeMap<String, StructTag>,
@@ -92,7 +102,11 @@ pub(crate) fn validate_module_and_extract_new_entries(
         };
 
     let (original_groups, original_members, mut structs) =
-        extract_resource_group_metadata_from_module(session, &module.self_id())?;
+        extract_resource_group_metadata_from_module(
+            session,
+            &module.self_id(),
+            deserializer_config,
+        )?;
 
     for (member, value) in original_members {
         // We don't need to re-validate new_members above.
@@ -146,17 +160,15 @@ pub(crate) fn validate_module_and_extract_new_entries(
 pub(crate) fn extract_resource_group_metadata_from_module(
     session: &mut SessionExt,
     module_id: &ModuleId,
+    deserializer_config: &DeserializerConfig,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
     BTreeMap<String, StructTag>,
     BTreeSet<String>,
 )> {
-    let module = session.load_module(module_id).map(|module| {
-        CompiledModule::deserialize_with_config(
-            &module,
-            &session.get_vm_config().deserializer_config,
-        )
-    });
+    let module = session
+        .load_module(module_id)
+        .map(|module| CompiledModule::deserialize_with_config(&module, deserializer_config));
     let (metadata, module) = if let Ok(Ok(module)) = module {
         (
             aptos_framework::get_metadata_from_compiled_module(&module),

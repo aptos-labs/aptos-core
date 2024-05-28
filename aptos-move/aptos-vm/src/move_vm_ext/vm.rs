@@ -17,19 +17,15 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
 use aptos_types::{
-    chain_id::ChainId,
-    on_chain_config::{Features, TimedFeatures},
-    transaction::user_transaction_context::UserTransactionContext,
-    vm::configs::aptos_prod_vm_config,
+    on_chain_config::FeatureFlag, transaction::user_transaction_context::UserTransactionContext,
+    vm::environment::Environment,
 };
-use move_binary_format::errors::VMResult;
 use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
 pub struct MoveVmExt {
     inner: MoveVM,
-    chain_id: u8,
-    features: Features,
+    pub(crate) env: Arc<Environment>,
 }
 
 impl MoveVmExt {
@@ -37,13 +33,10 @@ impl MoveVmExt {
         native_gas_params: NativeGasParameters,
         misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
-        chain_id: u8,
-        features: Features,
-        timed_features: TimedFeatures,
+        env: Arc<Environment>,
         gas_hook: Option<F>,
         resolver: &impl AptosMoveResolver,
-        aggregator_v2_type_tagging: bool,
-    ) -> VMResult<Self>
+    ) -> Self
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
     {
@@ -51,48 +44,41 @@ impl MoveVmExt {
             gas_feature_version,
             native_gas_params.clone(),
             misc_gas_params.clone(),
-            timed_features.clone(),
-            features.clone(),
+            env.timed_features.clone(),
+            env.features.clone(),
         );
         if let Some(hook) = gas_hook {
             builder.set_gas_hook(hook);
         }
 
-        let paranoid_type_checks = crate::AptosVM::get_paranoid_checks();
-        let vm_config = aptos_prod_vm_config(
-            &features,
-            &timed_features,
-            aggregator_v2_type_tagging,
-            paranoid_type_checks,
-        );
-
-        Ok(Self {
-            inner: WarmVmCache::get_warm_vm(builder, vm_config, resolver)?,
-            chain_id,
-            features,
-        })
+        Self {
+            inner: WarmVmCache::get_warm_vm(
+                builder,
+                &env.deserializer_config,
+                &env.verifier_config,
+                &env.vm_config,
+                resolver,
+                env.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
+            )
+            .expect("should be able to create Move VM; check if there are duplicated natives"),
+            env,
+        }
     }
 
     pub fn new(
         native_gas_params: NativeGasParameters,
         misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
-        chain_id: u8,
-        features: Features,
-        timed_features: TimedFeatures,
+        env: Arc<Environment>,
         resolver: &impl AptosMoveResolver,
-        aggregator_v2_type_tagging: bool,
-    ) -> VMResult<Self> {
+    ) -> Self {
         Self::new_impl::<fn(DynamicExpression)>(
             native_gas_params,
             misc_gas_params,
             gas_feature_version,
-            chain_id,
-            features,
-            timed_features,
+            env,
             None,
             resolver,
-            aggregator_v2_type_tagging,
         )
     }
 
@@ -100,13 +86,10 @@ impl MoveVmExt {
         native_gas_params: NativeGasParameters,
         misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
-        chain_id: u8,
-        features: Features,
-        timed_features: TimedFeatures,
+        env: Arc<Environment>,
         gas_hook: Option<F>,
         resolver: &impl AptosMoveResolver,
-        aggregator_v2_type_tagging: bool,
-    ) -> VMResult<Self>
+    ) -> Self
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
     {
@@ -114,12 +97,9 @@ impl MoveVmExt {
             native_gas_params,
             misc_gas_params,
             gas_feature_version,
-            chain_id,
-            features,
-            timed_features,
+            env,
             gas_hook,
             resolver,
-            aggregator_v2_type_tagging,
         )
     }
 
@@ -139,12 +119,17 @@ impl MoveVmExt {
         extensions.add(NativeTableContext::new(txn_hash, resolver));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
-        extensions.add(NativeAggregatorContext::new(txn_hash, resolver, resolver));
+        extensions.add(NativeAggregatorContext::new(
+            txn_hash,
+            resolver,
+            self.env.vm_config.delayed_field_optimization_enabled,
+            resolver,
+        ));
         extensions.add(RandomnessContext::new());
         extensions.add(NativeTransactionContext::new(
             txn_hash.to_vec(),
             session_id.into_script_hash(),
-            self.chain_id,
+            self.env.chain_id.id(),
             user_transaction_context_opt,
         ));
         extensions.add(NativeCodeContext::default());
@@ -159,16 +144,8 @@ impl MoveVmExt {
         SessionExt::new(
             self.inner.new_session_with_extensions(resolver, extensions),
             resolver,
-            self.features.is_storage_slot_metadata_enabled(),
+            self.env.features.is_storage_slot_metadata_enabled(),
         )
-    }
-
-    pub(crate) fn features(&self) -> &Features {
-        &self.features
-    }
-
-    pub fn chain_id(&self) -> ChainId {
-        ChainId::new(self.chain_id)
     }
 }
 

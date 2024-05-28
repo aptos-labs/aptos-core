@@ -20,7 +20,7 @@ use move_binary_format::{
     },
     IndexKind,
 };
-use move_bytecode_verifier::{self, cyclic_dependencies, dependencies};
+use move_bytecode_verifier::{self, cyclic_dependencies, dependencies, VerifierConfig};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{NumBytes, NumTypeNodes},
@@ -53,6 +53,7 @@ mod type_loader;
 
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
+use move_binary_format::deserializer::DeserializerConfig;
 pub(crate) use script::{Script, ScriptCache};
 use type_loader::intern_type;
 
@@ -194,7 +195,9 @@ pub(crate) struct Loader {
     // other transactions.
     module_cache_hits: RwLock<BTreeSet<ModuleId>>,
 
-    vm_config: VMConfig,
+    pub(crate) deserializer_config: DeserializerConfig,
+    pub(crate) verifier_config: VerifierConfig,
+    pub(crate) vm_config: VMConfig,
 }
 
 impl Clone for Loader {
@@ -206,13 +209,20 @@ impl Clone for Loader {
             name_cache: self.name_cache.clone(),
             invalidated: RwLock::new(*self.invalidated.read()),
             module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
+            deserializer_config: self.deserializer_config.clone(),
+            verifier_config: self.verifier_config.clone(),
             vm_config: self.vm_config.clone(),
         }
     }
 }
 
 impl Loader {
-    pub(crate) fn new(natives: NativeFunctions, vm_config: VMConfig) -> Self {
+    pub(crate) fn new(
+        natives: NativeFunctions,
+        deserializer_config: DeserializerConfig,
+        verifier_config: VerifierConfig,
+        vm_config: VMConfig,
+    ) -> Self {
         Self {
             scripts: RwLock::new(ScriptCache::new()),
             type_cache: RwLock::new(TypeCache::new()),
@@ -220,6 +230,8 @@ impl Loader {
             natives,
             invalidated: RwLock::new(false),
             module_cache_hits: RwLock::new(BTreeSet::new()),
+            deserializer_config,
+            verifier_config,
             vm_config,
         }
     }
@@ -383,7 +395,7 @@ impl Loader {
     fn verify_script(&self, script: &CompiledScript) -> VMResult<()> {
         fail::fail_point!("verifier-failpoint-3", |_| { Ok(()) });
 
-        move_bytecode_verifier::verify_script_with_config(&self.vm_config.verifier_config, script)
+        move_bytecode_verifier::verify_script_with_config(&self.verifier_config, script)
     }
 
     fn verify_script_dependencies(
@@ -663,7 +675,7 @@ impl Loader {
         // module will NOT show up in `module_cache`. In the module republishing case, it means
         // that the old module is still in the `module_cache`, unless a new Loader is created,
         // which means that a new MoveVM instance needs to be created.
-        move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier_config, module)?;
+        move_bytecode_verifier::verify_module_with_config(&self.verifier_config, module)?;
         self.check_natives(module)?;
 
         let mut visited = BTreeSet::new();
@@ -1007,11 +1019,8 @@ impl Loader {
 
         // Verify the module if it hasn't been verified before.
         if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
-            move_bytecode_verifier::verify_module_with_config(
-                &self.vm_config.verifier_config,
-                &module,
-            )
-            .map_err(expect_no_verification_errors)?;
+            move_bytecode_verifier::verify_module_with_config(&self.verifier_config, &module)
+                .map_err(expect_no_verification_errors)?;
 
             VERIFIED_MODULES.lock().put(hash_value, ());
         }
@@ -1939,7 +1948,7 @@ impl Loader {
         &self,
         struct_name: &StructIdentifier,
     ) -> Option<IdentifierMappingKind> {
-        if !self.vm_config.aggregator_v2_type_tagging {
+        if !self.vm_config.delayed_field_optimization_enabled {
             return None;
         }
 

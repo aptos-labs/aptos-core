@@ -721,7 +721,7 @@ where
 
     fn worker_loop(
         &self,
-        executor_arguments: &E::Argument,
+        env: E::Environment,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
@@ -735,7 +735,7 @@ where
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(*executor_arguments);
+        let executor = E::init(env);
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
@@ -836,7 +836,7 @@ where
 
     pub(crate) fn execute_transactions_parallel(
         &self,
-        executor_initial_arguments: E::Argument,
+        env: E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
     ) -> Result<BlockOutput<E::Output>, ()> {
@@ -884,7 +884,7 @@ where
             for _ in 0..self.config.local.concurrency_level {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
-                        &executor_initial_arguments,
+                        env.clone(),
                         signature_verified_block,
                         &last_input_output,
                         &versioned_cache,
@@ -1000,14 +1000,14 @@ where
 
     pub(crate) fn execute_transactions_sequential(
         &self,
-        executor_arguments: E::Argument,
+        env: E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
         resource_group_bcs_fallback: bool,
     ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(executor_arguments);
+        let executor = E::init(env);
         drop(init_timer);
 
         let start_counter = gen_id_start_value(true);
@@ -1285,13 +1285,13 @@ where
 
     pub fn execute_block(
         &self,
-        executor_arguments: E::Argument,
+        env: E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
         if self.config.local.concurrency_level > 1 {
             let parallel_result = self.execute_transactions_parallel(
-                executor_arguments,
+                env.clone(),
                 signature_verified_block,
                 base_view,
             );
@@ -1314,7 +1314,7 @@ where
 
         // If we didn't run parallel or it didn't finish successfully - run sequential
         let sequential_result = self.execute_transactions_sequential(
-            executor_arguments,
+            env.clone(),
             signature_verified_block,
             base_view,
             false,
@@ -1337,7 +1337,7 @@ where
                 init_speculative_logs(signature_verified_block.len());
 
                 let sequential_result = self.execute_transactions_sequential(
-                    executor_arguments,
+                    env.clone(),
                     signature_verified_block,
                     base_view,
                     true,

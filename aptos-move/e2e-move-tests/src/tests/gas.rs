@@ -17,8 +17,8 @@ use aptos_gas_profiling::TransactionGasLog;
 use aptos_types::{
     account_address::{default_stake_pool_address, AccountAddress},
     transaction::{EntryFunction, TransactionPayload},
+    vm::configs::set_paranoid_type_checks,
 };
-use aptos_vm::AptosVM;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use std::path::Path;
 
@@ -71,7 +71,7 @@ fn test_gas() {
         }
     };
 
-    AptosVM::set_paranoid_type_checks(true);
+    set_paranoid_type_checks(true);
 
     run(
         &mut harness,

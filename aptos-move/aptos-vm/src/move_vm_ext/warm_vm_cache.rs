@@ -8,12 +8,13 @@ use aptos_framework::natives::code::PackageRegistry;
 use aptos_infallible::RwLock;
 use aptos_metrics_core::TimerHelper;
 use aptos_native_interface::SafeNativeBuilder;
-use aptos_types::{
-    on_chain_config::{FeatureFlag, Features, OnChainConfig},
-    state_store::state_key::StateKey,
-};
+use aptos_types::{on_chain_config::OnChainConfig, state_store::state_key::StateKey};
 use bytes::Bytes;
-use move_binary_format::errors::{Location, PartialVMError, VMResult};
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    errors::{Location, PartialVMError, VMResult},
+};
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
@@ -36,22 +37,42 @@ static WARM_VM_CACHE: Lazy<WarmVmCache> = Lazy::new(|| WarmVmCache {
 impl WarmVmCache {
     pub(crate) fn get_warm_vm(
         native_builder: SafeNativeBuilder,
-        vm_config: VMConfig,
+        deserializer_config: &DeserializerConfig,
+        verifier_config: &VerifierConfig,
+        vm_config: &VMConfig,
         resolver: &impl AptosMoveResolver,
+        bin_v7_enabled: bool,
     ) -> VMResult<MoveVM> {
-        WARM_VM_CACHE.get(native_builder, vm_config, resolver)
+        WARM_VM_CACHE.get(
+            native_builder,
+            deserializer_config,
+            verifier_config,
+            vm_config,
+            resolver,
+            bin_v7_enabled,
+        )
     }
 
     fn get(
         &self,
         mut native_builder: SafeNativeBuilder,
-        vm_config: VMConfig,
+        deserializer_config: &DeserializerConfig,
+        verifier_config: &VerifierConfig,
+        vm_config: &VMConfig,
         resolver: &impl AptosMoveResolver,
+        bin_v7_enabled: bool,
     ) -> VMResult<MoveVM> {
         let _timer = TIMER.timer_with(&["warm_vm_get"]);
         let id = {
             let _timer = TIMER.timer_with(&["get_warm_vm_id"]);
-            WarmVmId::new(&native_builder, &vm_config, resolver)?
+            WarmVmId::new(
+                &native_builder,
+                deserializer_config,
+                verifier_config,
+                vm_config,
+                resolver,
+                bin_v7_enabled,
+            )?
         };
 
         if let Some(vm) = self.cache.read().get(&id) {
@@ -69,7 +90,9 @@ impl WarmVmCache {
 
             let vm = MoveVM::new_with_config(
                 aptos_natives_with_builder(&mut native_builder),
-                vm_config,
+                deserializer_config.clone(),
+                verifier_config.clone(),
+                vm_config.clone(),
             )?;
             Self::warm_vm_up(&vm, resolver);
 
@@ -102,6 +125,8 @@ impl WarmVmCache {
 #[derive(Eq, Hash, PartialEq)]
 struct WarmVmId {
     natives: Bytes,
+    deserializer_config: Bytes,
+    verifier_config: Bytes,
     vm_config: Bytes,
     core_packages_registry: Option<Bytes>,
     bin_v7_enabled: bool,
@@ -110,8 +135,11 @@ struct WarmVmId {
 impl WarmVmId {
     fn new(
         native_builder: &SafeNativeBuilder,
+        deserializer_config: &DeserializerConfig,
+        verifier_config: &VerifierConfig,
         vm_config: &VMConfig,
         resolver: &impl AptosMoveResolver,
+        bin_v7_enabled: bool,
     ) -> VMResult<Self> {
         let natives = {
             let _timer = TIMER.timer_with(&["serialize_native_builder"]);
@@ -119,11 +147,11 @@ impl WarmVmId {
         };
         Ok(Self {
             natives,
+            deserializer_config: Self::deserializer_config_bytes(deserializer_config),
             vm_config: Self::vm_config_bytes(vm_config),
+            verifier_config: Self::verifier_config_bytes(verifier_config),
             core_packages_registry: Self::core_packages_id_bytes(resolver)?,
-            bin_v7_enabled: Features::fetch_config(resolver)
-                .unwrap_or_default()
-                .is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
+            bin_v7_enabled,
         })
     }
 
@@ -131,6 +159,20 @@ impl WarmVmId {
         let _timer = TIMER.timer_with(&["serialize_vm_config"]);
         bcs::to_bytes(vm_config)
             .expect("Failed to serialize VMConfig.")
+            .into()
+    }
+
+    fn deserializer_config_bytes(deserializer_config: &DeserializerConfig) -> Bytes {
+        let _timer = TIMER.timer_with(&["serialize_deserializer_config"]);
+        bcs::to_bytes(deserializer_config)
+            .expect("Failed to serialize DeserializerConfig.")
+            .into()
+    }
+
+    fn verifier_config_bytes(verifier_config: &VerifierConfig) -> Bytes {
+        let _timer = TIMER.timer_with(&["serialize_verifier_config"]);
+        bcs::to_bytes(verifier_config)
+            .expect("Failed to serialize VerifierConfig.")
             .into()
     }
 

@@ -34,9 +34,10 @@ use aptos_types::{
         randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
-        TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
+        APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
+    vm::environment::Environment,
     write_set::TransactionWrite,
 };
 use aptos_vm::{
@@ -128,20 +129,17 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = state_view.as_move_resolver();
+
+    let resolver = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        ChainId::test().id(),
-        Features::default(),
-        TimedFeaturesBuilder::enable_all().build(),
-        &data_cache,
-        false,
-    )
-    .unwrap();
+        Environment::genesis(),
+        &resolver,
+    );
     let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), None);
+    let mut session = move_vm.new_session(&resolver, SessionId::genesis(id1), None);
 
     // On-chain genesis process.
     let consensus_config = OnChainConsensusConfig::default_for_genesis();
@@ -246,20 +244,17 @@ pub fn encode_genesis_change_set(
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = state_view.as_move_resolver();
+
+    let resolver = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        ChainId::test().id(),
-        Features::default(),
-        TimedFeaturesBuilder::enable_all().build(),
-        &data_cache,
-        false,
-    )
-    .unwrap();
+        Environment::genesis(),
+        &resolver,
+    );
     let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), None);
+    let mut session = move_vm.new_session(&resolver, SessionId::genesis(id1), None);
 
     // On-chain genesis process.
     initialize(
@@ -1083,21 +1078,17 @@ pub fn test_genesis_module_publishing() {
     {
         state_view.add_module(&module.self_id(), module_bytes);
     }
-    let data_cache = state_view.as_move_resolver();
 
+    let resolver = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        ChainId::test().id(),
-        Features::default(),
-        TimedFeaturesBuilder::enable_all().build(),
-        &data_cache,
-        false,
-    )
-    .unwrap();
+        Environment::genesis(),
+        &resolver,
+    );
     let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), None);
+    let mut session = move_vm.new_session(&resolver, SessionId::genesis(id1), None);
     publish_framework(&mut session, aptos_cached_packages::head_release_bundle());
 }
 

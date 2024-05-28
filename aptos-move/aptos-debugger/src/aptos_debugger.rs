@@ -84,17 +84,13 @@ impl AptosDebugger {
             .check_signature()
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
-        // TODO(Gas): revisit this.
-        let resolver = state_view.as_move_resolver();
-        let vm = AptosVM::new(
-            &resolver,
-            /*override_is_delayed_field_optimization_capable=*/ Some(false),
-        );
-
         // Module bundle is deprecated!
         if let TransactionPayload::ModuleBundle(_) = txn.payload() {
-            anyhow::bail!("Module bundle payload has been removed")
+            bail!("Module bundle payload has been removed")
         }
+
+        let vm = AptosVM::new(&state_view);
+        let resolver = state_view.as_move_resolver();
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,

@@ -6,6 +6,7 @@ use move_binary_format::{
     file_format::{basic_test_module, basic_test_script},
     file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
 };
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
 use move_vm_runtime::{config::VMConfig, module_traversal::*, move_vm::MoveVM};
 use move_vm_test_utils::InMemoryStorage;
@@ -48,19 +49,20 @@ fn test_publish_module_with_custom_max_binary_format_version() {
 
     // Should reject the module with newer version with max binary format version being set to VERSION_MAX - 1
     {
+        let deserializer_config =
+            DeserializerConfig::new(VERSION_MAX.checked_sub(1).unwrap(), IDENTIFIER_SIZE_MAX);
+        let verifier_config = VerifierConfig::default();
+        let vm_config = VMConfig::default();
+
         let storage = InMemoryStorage::new();
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
                 move_stdlib::natives::GasParameters::zeros(),
             ),
-            VMConfig {
-                deserializer_config: DeserializerConfig::new(
-                    VERSION_MAX.checked_sub(1).unwrap(),
-                    IDENTIFIER_SIZE_MAX,
-                ),
-                ..Default::default()
-            },
+            deserializer_config,
+            verifier_config,
+            vm_config,
         )
         .unwrap();
         let mut sess = vm.new_session(&storage);
@@ -128,19 +130,20 @@ fn test_run_script_with_custom_max_binary_format_version() {
 
     // Should reject the module with newer version with max binary format version being set to VERSION_MAX - 1
     {
+        let deserializer_config =
+            DeserializerConfig::new(VERSION_MAX.checked_sub(1).unwrap(), IDENTIFIER_SIZE_MAX);
+        let verifier_config = VerifierConfig::default();
+        let vm_config = VMConfig::default();
+
         let storage = InMemoryStorage::new();
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
                 move_stdlib::natives::GasParameters::zeros(),
             ),
-            VMConfig {
-                deserializer_config: DeserializerConfig::new(
-                    VERSION_MAX.checked_sub(1).unwrap(),
-                    IDENTIFIER_SIZE_MAX,
-                ),
-                ..Default::default()
-            },
+            deserializer_config,
+            verifier_config,
+            vm_config,
         )
         .unwrap();
         let mut sess = vm.new_session(&storage);

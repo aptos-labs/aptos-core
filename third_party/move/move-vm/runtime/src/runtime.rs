@@ -16,11 +16,12 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     compatibility::Compatibility,
+    deserializer::DeserializerConfig,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{LocalIndex, SignatureIndex},
     normalized, CompiledModule, IndexKind,
 };
-use move_bytecode_verifier::script_signature;
+use move_bytecode_verifier::{script_signature, VerifierConfig};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -53,10 +54,17 @@ impl Clone for VMRuntime {
 impl VMRuntime {
     pub(crate) fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
+        deserializer_config: DeserializerConfig,
+        verifier_config: VerifierConfig,
         vm_config: VMConfig,
     ) -> PartialVMResult<Self> {
         Ok(VMRuntime {
-            loader: Loader::new(NativeFunctions::new(natives)?, vm_config),
+            loader: Loader::new(
+                NativeFunctions::new(natives)?,
+                deserializer_config,
+                verifier_config,
+                vm_config,
+            ),
             module_cache: Arc::new(ModuleCache::new()),
         })
     }
@@ -75,10 +83,7 @@ impl VMRuntime {
         let compiled_modules = match modules
             .iter()
             .map(|blob| {
-                CompiledModule::deserialize_with_config(
-                    blob,
-                    &self.loader.vm_config().deserializer_config,
-                )
+                CompiledModule::deserialize_with_config(blob, &self.loader.deserializer_config)
             })
             .collect::<PartialVMResult<Vec<_>>>()
         {

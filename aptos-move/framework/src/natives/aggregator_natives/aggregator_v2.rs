@@ -113,11 +113,7 @@ fn get_context_data<'t, 'b>(
     context: &'t mut SafeNativeContext<'_, 'b, '_, '_>,
 ) -> Option<(&'b dyn DelayedFieldResolver, RefMut<'t, DelayedFieldData>)> {
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    if aggregator_context
-        .delayed_field_resolver
-        .is_delayed_field_optimization_capable()
-        && context.aggregator_v2_delayed_fields_enabled()
-    {
+    if aggregator_context.delayed_field_optimization_enabled {
         Some((
             aggregator_context.delayed_field_resolver,
             aggregator_context.delayed_field_data.borrow_mut(),

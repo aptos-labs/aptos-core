@@ -8,9 +8,9 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEAT
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
-    on_chain_config::{Features, TimedFeaturesBuilder},
     state_store::StateView,
     transaction::{ChangeSet, Script, Version},
+    vm::environment::Environment,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -25,6 +25,7 @@ use move_core_types::{
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
+use std::sync::Arc;
 
 pub struct GenesisSession<'r, 'l>(SessionExt<'r, 'l>);
 
@@ -105,22 +106,19 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
     }
 }
 
-pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, chain_id: u8) -> ChangeSet
+pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F) -> ChangeSet
 where
     F: FnOnce(&mut GenesisSession),
 {
+    let env = Arc::new(Environment::new(state_view));
     let resolver = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
-        chain_id,
-        Features::default(),
-        TimedFeaturesBuilder::enable_all().build(),
+        env,
         &resolver,
-        false,
-    )
-    .unwrap();
+    );
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();

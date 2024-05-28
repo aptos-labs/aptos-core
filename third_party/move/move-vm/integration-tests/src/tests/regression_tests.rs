@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::compiler::{as_module, as_script, compile_units_with_stdlib};
-use move_binary_format::file_format::{Bytecode, CompiledModule, CompiledScript, SignatureIndex};
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    file_format::{Bytecode, CompiledModule, CompiledScript, SignatureIndex},
+};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress,
@@ -106,14 +109,16 @@ fn script_large_ty() {
     println!("Serialized len: {}", script.len());
     CompiledModule::deserialize(&module).unwrap();
 
-    let mut storage = InMemoryStorage::new();
-    let move_vm = MoveVM::new_with_config(vec![], VMConfig {
-        verifier_config,
+    let deserializer_config = DeserializerConfig::default();
+    let vm_config = VMConfig {
         paranoid_type_checks: true,
         type_size_limit: true,
-        ..Default::default()
-    })
-    .unwrap();
+        ..VMConfig::default()
+    };
+
+    let mut storage = InMemoryStorage::new();
+    let move_vm =
+        MoveVM::new_with_config(vec![], deserializer_config, verifier_config, vm_config).unwrap();
 
     let module_address = AccountAddress::from_hex_literal("0x42").unwrap();
     let module_identifier = Identifier::new("pwn").unwrap();

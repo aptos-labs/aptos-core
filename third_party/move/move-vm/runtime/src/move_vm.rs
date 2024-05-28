@@ -12,9 +12,11 @@ use crate::{
     session::Session,
 };
 use move_binary_format::{
+    deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, VMResult},
     CompiledModule,
 };
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     metadata::Metadata, resolver::MoveResolver,
@@ -30,15 +32,24 @@ impl MoveVM {
     pub fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
     ) -> VMResult<Self> {
-        Self::new_with_config(natives, VMConfig::default())
+        let deserializer_config = DeserializerConfig::default();
+        let verifier_config = VerifierConfig::default();
+        let vm_config = VMConfig {
+            // Keep the paranoid mode on as we most likely want this for tests.
+            paranoid_type_checks: true,
+            ..VMConfig::default()
+        };
+        Self::new_with_config(natives, deserializer_config, verifier_config, vm_config)
     }
 
     pub fn new_with_config(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
+        deserializer_config: DeserializerConfig,
+        verifier_config: VerifierConfig,
         vm_config: VMConfig,
     ) -> VMResult<Self> {
         Ok(Self {
-            runtime: VMRuntime::new(natives, vm_config)
+            runtime: VMRuntime::new(natives, deserializer_config, verifier_config, vm_config)
                 .map_err(|err| err.finish(Location::Undefined))?,
         })
     }
@@ -73,11 +84,7 @@ impl MoveVM {
         Session {
             move_vm: self,
             data_cache: TransactionDataCache::new(
-                self.runtime
-                    .loader()
-                    .vm_config()
-                    .deserializer_config
-                    .clone(),
+                self.runtime.loader().deserializer_config.clone(),
                 remote,
             ),
             module_store: ModuleStorageAdapter::new(self.runtime.module_storage()),
@@ -95,11 +102,7 @@ impl MoveVM {
         Session {
             move_vm: self,
             data_cache: TransactionDataCache::new(
-                self.runtime
-                    .loader()
-                    .vm_config()
-                    .deserializer_config
-                    .clone(),
+                self.runtime.loader().deserializer_config.clone(),
                 remote,
             ),
             module_store: ModuleStorageAdapter::new(module_storage),
@@ -118,11 +121,7 @@ impl MoveVM {
             .load_module(
                 module_id,
                 &mut TransactionDataCache::new(
-                    self.runtime
-                        .loader()
-                        .vm_config()
-                        .deserializer_config
-                        .clone(),
+                    self.runtime.loader().deserializer_config.clone(),
                     remote,
                 ),
                 &ModuleStorageAdapter::new(self.runtime.module_storage()),

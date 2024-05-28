@@ -25,6 +25,7 @@ use aptos_types::{
         EntryFunction as TransactionEntryFunction, ExecutionStatus, RawTransaction,
         Script as TransactionScript, Transaction, TransactionOutput, TransactionStatus,
     },
+    vm::configs::set_paranoid_type_checks,
 };
 use aptos_vm::{AptosVM, VMExecutor};
 use aptos_vm_genesis::GENESIS_KEYPAIR;
@@ -616,7 +617,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
         task_opt: Option<TaskInput<(InitCommand, Self::ExtraInitArgs)>>,
     ) -> (Self, Option<String>) {
-        AptosVM::set_paranoid_type_checks(true);
+        set_paranoid_type_checks(true);
         // Named address mapping
         let additional_named_address_mapping = match task_opt.as_ref().map(|t| &t.command) {
             Some((InitCommand { named_addresses }, _)) => {
@@ -1138,6 +1139,6 @@ pub fn run_aptos_test_with_config(
         };
     let v1_lib = precompiled_v1_stdlib_if_needed(&config);
     let v2_lib = precompiled_v2_stdlib_if_needed(&config);
-    AptosVM::set_paranoid_type_checks(true);
+    set_paranoid_type_checks(true);
     run_test_impl::<AptosTestAdapter>(config, path, v1_lib, v2_lib, &suffix)
 }

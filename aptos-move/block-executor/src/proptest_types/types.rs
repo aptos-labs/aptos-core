@@ -823,12 +823,12 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
-    type Argument = ();
+    type Environment = ();
     type Error = usize;
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
-    fn init(_argument: Self::Argument) -> Self {
+    fn init(_env: Self::Environment) -> Self {
         Self::new()
     }
 

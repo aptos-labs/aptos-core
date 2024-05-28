@@ -38,7 +38,6 @@ use move_resource_viewer::MoveValueAnnotator;
 use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
-    config::VMConfig,
     module_traversal::*,
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
@@ -82,8 +81,6 @@ pub struct AdapterPublishArgs {
 
 #[derive(Debug, Parser)]
 pub struct AdapterExecuteArgs {
-    #[clap(long, default_value = "true")]
-    pub check_runtime_types: bool,
     /// print more complete information for VMErrors on run
     #[clap(long)]
     pub verbose: bool,
@@ -156,30 +153,26 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         };
 
         adapter
-            .perform_session_action(
-                None,
-                |session, gas_status| {
-                    for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
-                        .into_iter()
-                        .map(|tmod| &tmod.named_module.module)
-                    {
-                        let mut module_bytes = vec![];
-                        module
-                            .serialize_for_version(
-                                Some(file_format_common::VERSION_MAX),
-                                &mut module_bytes,
-                            )
-                            .unwrap();
-                        let id = module.self_id();
-                        let sender = *id.address();
-                        session
-                            .publish_module(module_bytes, sender, gas_status)
-                            .unwrap();
-                    }
-                    Ok(())
-                },
-                production_vm_config_with_paranoid_type_checks(),
-            )
+            .perform_session_action(None, |session, gas_status| {
+                for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
+                    .into_iter()
+                    .map(|tmod| &tmod.named_module.module)
+                {
+                    let mut module_bytes = vec![];
+                    module
+                        .serialize_for_version(
+                            Some(file_format_common::VERSION_MAX),
+                            &mut module_bytes,
+                        )
+                        .unwrap();
+                    let id = module.self_id();
+                    let sender = *id.address();
+                    session
+                        .publish_module(module_bytes, sender, gas_status)
+                        .unwrap();
+                }
+                Ok(())
+            })
             .unwrap();
         let mut addr_to_name_mapping = BTreeMap::new();
         for (name, addr) in move_stdlib_named_addresses() {
@@ -213,24 +206,20 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let id = module.self_id();
         let sender = *id.address();
         let verbose = extra_args.verbose;
-        match self.perform_session_action(
-            gas_budget,
-            |session, gas_status| {
-                let compat = Compatibility::new(
-                    !extra_args.skip_check_struct_and_pub_function_linking,
-                    !extra_args.skip_check_struct_layout,
-                    !extra_args.skip_check_friend_linking,
-                );
+        match self.perform_session_action(gas_budget, |session, gas_status| {
+            let compat = Compatibility::new(
+                !extra_args.skip_check_struct_and_pub_function_linking,
+                !extra_args.skip_check_struct_layout,
+                !extra_args.skip_check_friend_linking,
+            );
 
-                session.publish_module_bundle_with_compat_config(
-                    vec![module_bytes],
-                    sender,
-                    gas_status,
-                    compat,
-                )
-            },
-            production_vm_config_with_paranoid_type_checks(),
-        ) {
+            session.publish_module_bundle_with_compat_config(
+                vec![module_bytes],
+                sender,
+                gas_status,
+                compat,
+            )
+        }) {
             Ok(()) => Ok((None, module)),
             Err(vm_error) => Err(anyhow!(
                 "Unable to publish module '{}'. Got VMError: {}",
@@ -272,19 +261,15 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
         let traversal_storage = TraversalStorage::new();
-        self.perform_session_action(
-            gas_budget,
-            |session, gas_status| {
-                session.execute_script(
-                    script_bytes,
-                    type_args,
-                    args,
-                    gas_status,
-                    &mut TraversalContext::new(&traversal_storage),
-                )
-            },
-            VMConfig::from(extra_args),
-        )
+        self.perform_session_action(gas_budget, |session, gas_status| {
+            session.execute_script(
+                script_bytes,
+                type_args,
+                args,
+                gas_status,
+                &mut TraversalContext::new(&traversal_storage),
+            )
+        })
         .map_err(|vm_error| {
             anyhow!(
                 "Script execution failed with VMError: {}",
@@ -326,20 +311,16 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let traversal_storage = TraversalStorage::new();
 
         let serialized_return_values = self
-            .perform_session_action(
-                gas_budget,
-                |session, gas_status| {
-                    session.execute_function_bypass_visibility(
-                        module,
-                        function,
-                        type_args,
-                        args,
-                        gas_status,
-                        &mut TraversalContext::new(&traversal_storage),
-                    )
-                },
-                VMConfig::from(extra_args),
-            )
+            .perform_session_action(gas_budget, |session, gas_status| {
+                session.execute_function_bypass_visibility(
+                    module,
+                    function,
+                    type_args,
+                    args,
+                    gas_status,
+                    &mut TraversalContext::new(&traversal_storage),
+                )
+            })
             .map_err(|vm_error| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
@@ -385,17 +366,13 @@ impl<'a> SimpleVMTestAdapter<'a> {
         &mut self,
         gas_budget: Option<u64>,
         f: impl FnOnce(&mut Session, &mut GasStatus) -> VMResult<Ret>,
-        vm_config: VMConfig,
     ) -> VMResult<Ret> {
         // start session
-        let vm = MoveVM::new_with_config(
-            move_stdlib::natives::all_natives(
-                STD_ADDR,
-                // TODO: come up with a suitable gas schedule
-                move_stdlib::natives::GasParameters::zeros(),
-            ),
-            vm_config,
-        )
+        let vm = MoveVM::new(move_stdlib::natives::all_natives(
+            STD_ADDR,
+            // TODO: come up with a suitable gas schedule
+            move_stdlib::natives::GasParameters::zeros(),
+        ))
         .unwrap();
         let (mut session, mut gas_status) = {
             let gas_status = get_gas_status(
@@ -564,20 +541,4 @@ pub fn run_test_with_config_and_exp_suffix(
     let v1_lib = precompiled_v1_stdlib_if_needed(&config);
     let v2_lib = precompiled_v2_stdlib_if_needed(&config);
     run_test_impl::<SimpleVMTestAdapter>(config, path, v1_lib, v2_lib, exp_suffix)
-}
-
-impl From<AdapterExecuteArgs> for VMConfig {
-    fn from(arg: AdapterExecuteArgs) -> VMConfig {
-        VMConfig {
-            paranoid_type_checks: arg.check_runtime_types,
-            ..Self::production()
-        }
-    }
-}
-
-fn production_vm_config_with_paranoid_type_checks() -> VMConfig {
-    VMConfig {
-        paranoid_type_checks: true,
-        ..VMConfig::production()
-    }
 }

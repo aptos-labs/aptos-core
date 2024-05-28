@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig,
     data_cache::TransactionDataCache,
     loader::{LoadedFunction, ModuleStorageAdapter},
     module_traversal::TraversalContext,
@@ -460,10 +459,6 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn get_move_vm(&self) -> &'l MoveVM {
         self.move_vm
-    }
-
-    pub fn get_vm_config(&self) -> &'l VMConfig {
-        self.move_vm.runtime.loader().vm_config()
     }
 
     pub fn get_struct_type(&self, index: StructNameIndex) -> Option<Arc<StructType>> {

@@ -4,6 +4,7 @@
 
 use crate::compiler::compile_modules_in_file;
 use move_binary_format::{
+    deserializer::DeserializerConfig,
     file_format::{
         empty_module, AbilitySet, AddressIdentifierIndex, IdentifierIndex, ModuleHandle,
         ModuleHandleIndex, StructHandle, StructTypeParameter, TableIndex,
@@ -53,31 +54,36 @@ impl Adapter {
                 Identifier::new("just_c").unwrap(),
             ),
         ];
-        let config = VMConfig {
-            verifier_config: VerifierConfig {
-                max_dependency_depth: Some(100),
-                ..Default::default()
-            },
+
+        let deserializer_config = DeserializerConfig::default();
+        let verifier_config = VerifierConfig {
+            max_dependency_depth: Some(100),
             ..Default::default()
         };
+        let vm_config = VMConfig::default();
         Self {
             store,
-            vm: Arc::new(MoveVM::new_with_config(vec![], config).unwrap()),
+            vm: Arc::new(
+                MoveVM::new_with_config(vec![], deserializer_config, verifier_config, vm_config)
+                    .unwrap(),
+            ),
             functions,
         }
     }
 
     fn fresh(self) -> Self {
-        let config = VMConfig {
-            verifier_config: VerifierConfig {
-                max_dependency_depth: Some(100),
-                ..Default::default()
-            },
+        let deserializer_config = DeserializerConfig::default();
+        let verifier_config = VerifierConfig {
+            max_dependency_depth: Some(100),
             ..Default::default()
         };
+        let vm_config = VMConfig::default();
         Self {
             store: self.store,
-            vm: Arc::new(MoveVM::new_with_config(vec![], config).unwrap()),
+            vm: Arc::new(
+                MoveVM::new_with_config(vec![], deserializer_config, verifier_config, vm_config)
+                    .unwrap(),
+            ),
             functions: self.functions,
         }
     }

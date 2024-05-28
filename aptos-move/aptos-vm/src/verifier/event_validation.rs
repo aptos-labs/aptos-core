@@ -37,6 +37,7 @@ fn metadata_validation_error(msg: &str) -> VMError {
 pub(crate) fn validate_module_events(
     session: &mut SessionExt,
     modules: &[CompiledModule],
+    deserializer_config: &DeserializerConfig,
 ) -> VMResult<()> {
     for module in modules {
         let mut new_event_structs =
@@ -50,7 +51,7 @@ pub(crate) fn validate_module_events(
         validate_emit_calls(&new_event_structs, module)?;
 
         let original_event_structs =
-            extract_event_metadata_from_module(session, &module.self_id())?;
+            extract_event_metadata_from_module(session, &module.self_id(), deserializer_config)?;
 
         for member in original_event_structs {
             // Fail if we see a removal of an event attribute.
@@ -120,13 +121,11 @@ pub(crate) fn validate_emit_calls(
 pub(crate) fn extract_event_metadata_from_module(
     session: &mut SessionExt,
     module_id: &ModuleId,
+    deserializer_config: &DeserializerConfig,
 ) -> VMResult<HashSet<String>> {
     let metadata = session.load_module(module_id).map(|module| {
-        CompiledModule::deserialize_with_config(
-            &module,
-            &session.get_vm_config().deserializer_config,
-        )
-        .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
+        CompiledModule::deserialize_with_config(&module, deserializer_config)
+            .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
     });
 
     if let Ok(Ok(Some(metadata))) = metadata {

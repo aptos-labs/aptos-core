@@ -3,11 +3,33 @@
 
 use crate::on_chain_config::{
     randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
-    ConfigStorage, FeatureFlag, Features, OnChainConfig, TimedFeatureFlag, TimedFeatures,
+    ConfigStorage, FeatureFlag, Features, OnChainConfig, TimedFeatureFlag, TimedFeatureOverride,
+    TimedFeatures,
 };
 use move_binary_format::deserializer::DeserializerConfig;
 use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::config::VMConfig;
+use once_cell::sync::OnceCell;
+
+static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
+static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
+
+pub fn set_paranoid_type_checks(enable: bool) {
+    PARANOID_TYPE_CHECKS.set(enable).ok();
+}
+
+/// Get the paranoid type check flag if already set, otherwise default to true.
+pub fn get_paranoid_type_checks() -> bool {
+    PARANOID_TYPE_CHECKS.get().cloned().unwrap_or(true)
+}
+
+pub fn set_timed_feature_override(profile: TimedFeatureOverride) {
+    TIMED_FEATURE_OVERRIDE.set(profile).ok();
+}
+
+pub fn get_timed_feature_override() -> Option<TimedFeatureOverride> {
+    TIMED_FEATURE_OVERRIDE.get().cloned()
+}
 
 pub fn aptos_prod_deserializer_config(features: &Features) -> DeserializerConfig {
     DeserializerConfig::new(
@@ -44,9 +66,8 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
 }
 
 pub fn aptos_prod_vm_config(
-    features: &Features,
     timed_features: &TimedFeatures,
-    aggregator_v2_type_tagging: bool,
+    delayed_field_optimization_enabled: bool,
     paranoid_type_checks: bool,
 ) -> VMConfig {
     let check_invariant_in_swap_loc =
@@ -62,12 +83,7 @@ pub fn aptos_prod_vm_config(
         type_byte_cost = 1;
     }
 
-    let deserializer_config = aptos_prod_deserializer_config(features);
-    let verifier_config = aptos_prod_verifier_config(features);
-
     VMConfig {
-        verifier_config,
-        deserializer_config,
         paranoid_type_checks,
         check_invariant_in_swap_loc,
         type_size_limit: true,
@@ -75,7 +91,7 @@ pub fn aptos_prod_vm_config(
         type_max_cost,
         type_base_cost,
         type_byte_cost,
-        aggregator_v2_type_tagging,
+        delayed_field_optimization_enabled,
     }
 }
 

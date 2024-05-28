@@ -22,7 +22,6 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
-    config::VMConfig,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
@@ -267,10 +266,7 @@ impl SharedTestingConfig {
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
     ) {
-        let mut config = VMConfig::default();
-        config.paranoid_type_checks = true;
-
-        let move_vm = MoveVM::new_with_config(self.native_function_table.clone(), config).unwrap();
+        let move_vm = MoveVM::new(self.native_function_table.clone()).unwrap();
         let extensions = extensions::new_extensions();
         let mut session =
             move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
