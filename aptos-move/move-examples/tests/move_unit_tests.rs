@@ -123,6 +123,11 @@ fn test_drand_lottery() {
 }
 
 #[test]
+fn test_raffle() {
+    test_common("raffle");
+}
+
+#[test]
 fn test_marketplace() {
     test_common("marketplace")
 }

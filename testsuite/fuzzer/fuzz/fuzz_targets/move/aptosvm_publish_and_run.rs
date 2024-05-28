@@ -296,12 +296,11 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         let m_de =
             CompiledModule::deserialize_with_config(&module_code, &vm_config.deserializer_config)
                 .map_err(|_| Corpus::Keep)?;
-        move_bytecode_verifier::verify_module_with_config(&vm_config.verifier, &m_de).map_err(
-            |e| {
+        move_bytecode_verifier::verify_module_with_config(&vm_config.verifier_config, &m_de)
+            .map_err(|e| {
                 check_for_invariant_violation_vmerror(e);
                 Corpus::Keep
-            },
-        )?
+            })?
     }
 
     if let ExecVariant::Script {
@@ -316,12 +315,11 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         let s_de =
             CompiledScript::deserialize_with_config(&script_code, &vm_config.deserializer_config)
                 .map_err(|_| Corpus::Keep)?;
-        move_bytecode_verifier::verify_script_with_config(&vm_config.verifier, &s_de).map_err(
-            |e| {
+        move_bytecode_verifier::verify_script_with_config(&vm_config.verifier_config, &s_de)
+            .map_err(|e| {
                 check_for_invariant_violation_vmerror(e);
                 Corpus::Keep
-            },
-        )?
+            })?
     }
 
     // check no duplicates

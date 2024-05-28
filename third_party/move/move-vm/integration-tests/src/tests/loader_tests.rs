@@ -54,7 +54,7 @@ impl Adapter {
             ),
         ];
         let config = VMConfig {
-            verifier: VerifierConfig {
+            verifier_config: VerifierConfig {
                 max_dependency_depth: Some(100),
                 ..Default::default()
             },
@@ -69,7 +69,7 @@ impl Adapter {
 
     fn fresh(self) -> Self {
         let config = VMConfig {
-            verifier: VerifierConfig {
+            verifier_config: VerifierConfig {
                 max_dependency_depth: Some(100),
                 ..Default::default()
             },
