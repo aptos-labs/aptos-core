@@ -2762,38 +2762,45 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.exit_scope();
                     self.new_bind_exp(loc, pat, binding, rest.into_exp())
                 },
-                Seq(exp) if items.len() > 1 => {
+                Seq(_) if items.len() > 1 => {
                     // This is an actual impl language sequence `s;rest`.
                     self.require_impl_language(loc);
-                    // There is an item after this one, so the value can be dropped. The default
-                    // type of the expression is `()`.
-                    let exp_loc = self.to_loc(&exp.loc);
-                    let var = self.fresh_type_var_idx();
-
-                    let item_type = Type::Var(var);
-                    let exp = self.translate_exp(exp, &item_type);
-                    let item_type = self.subs.specialize(&item_type);
-                    if self.subs.is_free_var_without_constraints(&item_type) {
-                        // If this is a totally unbound item, assign default unit type.
-                        self.add_constraint(
-                            &exp_loc,
-                            &Type::Var(var),
-                            WideningOrder::LeftToRight,
-                            Constraint::WithDefault(Type::unit()),
-                            Some(ConstraintContext::inferred()),
-                        )
-                        .expect("success on fresh var");
+                    let mut exps = vec![];
+                    let mut k = 0;
+                    while k < items.len() - 1 {
+                        if let Seq(exp) = &items[k].value {
+                            // There is an item after this one, so the value can be dropped. The default
+                            // type of the expression is `()`.
+                            let exp_loc = self.to_loc(&exp.loc);
+                            let var = self.fresh_type_var_idx();
+                            let item_type = Type::Var(var);
+                            let exp = self.translate_exp(exp, &item_type);
+                            let item_type = self.subs.specialize(&item_type);
+                            if self.subs.is_free_var_without_constraints(&item_type) {
+                                // If this is a totally unbound item, assign default unit type.
+                                self.add_constraint(
+                                    &exp_loc,
+                                    &Type::Var(var),
+                                    WideningOrder::LeftToRight,
+                                    Constraint::WithDefault(Type::unit()),
+                                    Some(ConstraintContext::inferred()),
+                                )
+                                .expect("success on fresh var");
+                            }
+                            if let ExpData::Sequence(_, mut es) = exp {
+                                exps.append(&mut es);
+                            } else {
+                                exps.push(exp.into_exp());
+                            }
+                        } else {
+                            break;
+                        }
+                        k += 1;
                     }
                     let rest =
-                        self.translate_seq_recursively(loc, &items[1..], expected_type, context);
+                        self.translate_seq_recursively(loc, &items[k..], expected_type, context);
+                    exps.push(rest.into_exp());
                     let id = self.new_node_id_with_type_loc(expected_type, loc);
-                    let exps = match exp {
-                        ExpData::Sequence(_, mut exps) => {
-                            exps.push(rest.into_exp());
-                            exps
-                        },
-                        _ => vec![exp.into_exp(), rest.into_exp()],
-                    };
                     ExpData::Sequence(id, exps)
                 },
                 Seq(exp) => self.translate_exp_in_context(exp, expected_type, context),
