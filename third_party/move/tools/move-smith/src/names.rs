@@ -1,0 +1,155 @@
+use arbitrary::{Arbitrary, Result, Unstructured};
+use std::collections::HashMap;
+
+// #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+// pub struct Identifier {
+//     pub name: String,
+// }
+
+pub type Identifier = String;
+pub type Scope = Option<String>;
+
+pub fn merge_scopes(parent: &Scope, child: &Scope) -> Scope {
+    match (parent, child) {
+        (Some(p), Some(c)) => Some(format!("{}::{}", p, c)),
+        (Some(p), None) => Some(p.clone()),
+        (None, Some(c)) => Some(c.clone()),
+        (None, None) => None,
+    }
+}
+
+pub fn is_under_scope(child: &Scope, parent: &Scope) -> bool {
+    match (child, parent) {
+        (Some(c), Some(p)) => c.starts_with(p),
+        (Some(_), None) => true,
+        (None, Some(_)) => false,
+        (None, None) => true,
+    }
+}
+
+#[derive(Debug)]
+pub struct IdentifierPool {
+    vars: Vec<Identifier>,
+    structs: Vec<Identifier>,
+    functions: Vec<Identifier>,
+    modules: Vec<Identifier>,
+    scripts: Vec<Identifier>,
+    constants: Vec<Identifier>,
+
+    scopes: HashMap<Identifier, Scope>,
+}
+
+#[derive(Debug, Clone, Arbitrary)]
+pub enum IdentifierType {
+    Var,
+    Struct,
+    Function,
+    Module,
+    Script,
+    Constant,
+}
+
+impl Default for IdentifierPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IdentifierPool {
+    pub fn new() -> Self {
+        Self {
+            vars: Vec::new(),
+            structs: Vec::new(),
+            functions: Vec::new(),
+            modules: Vec::new(),
+            scripts: Vec::new(),
+            constants: Vec::new(),
+            scopes: HashMap::new(),
+        }
+    }
+
+    pub fn next_identifier(&mut self, typ: IdentifierType, scope: &Scope) -> (Identifier, Scope) {
+        let cnt = self.identifier_count(&typ);
+        let name = self.construct_name(&typ, cnt);
+        self.insert_new_identifier(&typ, name.clone());
+        self.scopes.insert(name.clone(), scope.clone());
+        let scope = merge_scopes(scope, &Some(name.clone()));
+        (name, scope)
+    }
+
+    // TODO: maybe move this out to move_smith.rs since similar logic is used more there
+    pub fn random_existing_identifier(
+        &self,
+        u: &mut Unstructured,
+        scope: &Scope,
+        typ: Option<IdentifierType>,
+    ) -> Result<Option<Identifier>> {
+        let chosen_typ = typ.unwrap_or(IdentifierType::arbitrary(u)?);
+        let ident_of_typ = self.get_identifiers_of_type(&chosen_typ);
+        let ident_of_typ_in_scope = self.filter_under_scope(ident_of_typ, scope);
+        match ident_of_typ_in_scope.is_empty() {
+            true => Ok(None),
+            false => Ok(Some(u.choose(&ident_of_typ_in_scope)?.clone())),
+        }
+    }
+
+    pub fn filter_under_scope(
+        &self,
+        identifiers: &Vec<Identifier>,
+        parent_scope: &Scope,
+    ) -> Vec<Identifier> {
+        let mut in_scope = Vec::new();
+        for id in identifiers {
+            let id_scope = self.scopes.get(id).unwrap_or(&None);
+            if is_under_scope(id_scope, parent_scope) {
+                in_scope.push(id.clone());
+            }
+        }
+        in_scope
+    }
+
+    fn get_identifiers_of_type(&self, typ: &IdentifierType) -> &Vec<Identifier> {
+        match typ {
+            IdentifierType::Var => &self.vars,
+            IdentifierType::Struct => &self.structs,
+            IdentifierType::Function => &self.functions,
+            IdentifierType::Module => &self.modules,
+            IdentifierType::Script => &self.scripts,
+            IdentifierType::Constant => &self.constants,
+        }
+    }
+
+    fn insert_new_identifier(&mut self, typ: &IdentifierType, name: Identifier) {
+        match typ {
+            IdentifierType::Var => self.vars.push(name),
+            IdentifierType::Struct => self.structs.push(name),
+            IdentifierType::Function => self.functions.push(name),
+            IdentifierType::Module => self.modules.push(name),
+            IdentifierType::Script => self.scripts.push(name),
+            IdentifierType::Constant => self.constants.push(name),
+        }
+    }
+
+    fn identifier_count(&self, typ: &IdentifierType) -> usize {
+        match typ {
+            IdentifierType::Var => self.vars.len(),
+            IdentifierType::Struct => self.structs.len(),
+            IdentifierType::Function => self.functions.len(),
+            IdentifierType::Module => self.modules.len(),
+            IdentifierType::Script => self.scripts.len(),
+            IdentifierType::Constant => self.constants.len(),
+        }
+    }
+
+    fn construct_name(&self, typ: &IdentifierType, idx: usize) -> String {
+        let type_prefix = match typ {
+            IdentifierType::Var => "var",
+            IdentifierType::Struct => "Struct",
+            IdentifierType::Function => "function",
+            IdentifierType::Module => "Module",
+            IdentifierType::Script => "Script",
+            IdentifierType::Constant => "CONST",
+        };
+        format!("{}{}", type_prefix, idx)
+    }
+}

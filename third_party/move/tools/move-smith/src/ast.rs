@@ -1,81 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{names::Identifier, types::Type};
 use num_bigint::BigUint;
-
-#[derive(Debug, Clone)]
-pub struct Identifier {
-    pub name: String,
-}
-
-#[derive(Debug)]
-pub struct IdentifierPool {
-    var_count: u32,
-    struct_count: u32,
-    function_count: u32,
-    module_count: u32,
-    script_count: u32,
-    constant_count: u32,
-}
-
-pub enum IdentifierType {
-    Var,
-    Struct,
-    Function,
-    Module,
-    Script,
-    Constant,
-}
-
-impl Default for IdentifierPool {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl IdentifierPool {
-    pub fn new() -> Self {
-        Self {
-            var_count: 0,
-            struct_count: 0,
-            function_count: 0,
-            module_count: 0,
-            script_count: 0,
-            constant_count: 0,
-        }
-    }
-
-    pub fn next_identifier(&mut self, typ: IdentifierType) -> Identifier {
-        use IdentifierType as T;
-        let name = match typ {
-            T::Var => {
-                self.var_count += 1;
-                format!("var{}", self.var_count)
-            },
-            T::Struct => {
-                self.struct_count += 1;
-                format!("Struct{}", self.struct_count)
-            },
-            T::Function => {
-                self.function_count += 1;
-                format!("function{}", self.function_count)
-            },
-            T::Module => {
-                self.module_count += 1;
-                format!("Module{}", self.module_count)
-            },
-            T::Script => {
-                self.script_count += 1;
-                format!("Script{}", self.script_count)
-            },
-            T::Constant => {
-                self.constant_count += 1;
-                format!("CONST{}", self.constant_count)
-            },
-        };
-        Identifier { name }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -123,27 +50,26 @@ pub enum Statement {
     // Break,
     // Continue,
     // Assign(Assign),
-    // Decl(Decl),
+    Decl(Declaration),
     Expr(Expression),
+}
+
+// TODO: Support multiple declarations in a single statement
+#[derive(Debug, Clone)]
+pub struct Declaration {
+    pub typ: Type,
+    pub name: Identifier,
+    pub value: Option<Expression>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Expression {
     NumberLiteral(NumberLiteral),
+    Variable(Identifier),
 }
 
 #[derive(Debug, Clone)]
 pub struct NumberLiteral {
     pub value: BigUint,
     pub typ: Type,
-}
-
-#[derive(Debug, Clone)]
-pub enum Type {
-    U8,
-    U16,
-    U32,
-    U64,
-    U128,
-    U256,
 }

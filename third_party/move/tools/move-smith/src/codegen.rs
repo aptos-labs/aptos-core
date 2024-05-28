@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ast::*;
+use crate::{ast::*, names::Identifier, types::Type};
+use std::vec;
 
 pub trait CodeGenerator {
     fn emit_code(&self) -> String {
@@ -24,7 +25,7 @@ fn append_code_lines_with_indentation(
 
 impl CodeGenerator for Identifier {
     fn emit_code_lines(&self) -> Vec<String> {
-        vec![self.name.clone()]
+        vec![self.clone()]
     }
 }
 
@@ -78,8 +79,24 @@ impl CodeGenerator for FunctionBody {
 impl CodeGenerator for Statement {
     fn emit_code_lines(&self) -> Vec<String> {
         match self {
+            Statement::Decl(decl) => decl.emit_code_lines(),
             Statement::Expr(expr) => vec![format!("{};", expr.emit_code())],
         }
+    }
+}
+
+impl CodeGenerator for Declaration {
+    fn emit_code_lines(&self) -> Vec<String> {
+        let rhs = match self.value {
+            Some(ref expr) => format!(" = {}", expr.emit_code()),
+            None => "".to_string(),
+        };
+        vec![format!(
+            "let {}: {}{};",
+            self.name.emit_code(),
+            self.typ.emit_code(),
+            rhs
+        )]
     }
 }
 
@@ -87,6 +104,7 @@ impl CodeGenerator for Expression {
     fn emit_code_lines(&self) -> Vec<String> {
         match self {
             Expression::NumberLiteral(n) => n.emit_code_lines(),
+            Expression::Variable(ident) => ident.emit_code_lines(),
         }
     }
 }
@@ -107,6 +125,7 @@ impl CodeGenerator for Type {
             T::U64 => "u64".to_string(),
             T::U128 => "u128".to_string(),
             T::U256 => "u256".to_string(),
+            _ => unimplemented!(),
         }]
     }
 }
