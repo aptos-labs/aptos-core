@@ -12,7 +12,7 @@ use aptos_consensus_types::{block::Block, pipelined_block::OrderedBlockWindow};
 use aptos_executor_types::ExecutorResult;
 use aptos_logger::info;
 use aptos_types::transaction::SignedTransaction;
-use std::sync::Arc;
+use std::{cmp::Ordering, sync::Arc};
 
 pub struct BlockPreparer {
     payload_manager: Arc<PayloadManager>,
@@ -71,6 +71,31 @@ impl BlockPreparer {
                 .map(|b| b.id())
                 .collect::<Vec<_>>()
         );
+
+        // TODO: Copy-pasta from Mempool OrderedQueueKey. Make them share code?
+        txns.sort_by(|a, b| {
+            match a.gas_unit_price().cmp(&b.gas_unit_price()) {
+                Ordering::Equal => {},
+                ordering => return ordering,
+            }
+            match a
+                .expiration_timestamp_secs()
+                .cmp(&b.expiration_timestamp_secs())
+                .reverse()
+            {
+                Ordering::Equal => {},
+                ordering => return ordering,
+            }
+            match a.sender().cmp(&b.sender()) {
+                Ordering::Equal => {},
+                ordering => return ordering,
+            }
+            match a.sequence_number().cmp(&b.sequence_number()).reverse() {
+                Ordering::Equal => {},
+                ordering => return ordering,
+            }
+            a.committed_hash().cmp(&b.committed_hash())
+        });
 
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
