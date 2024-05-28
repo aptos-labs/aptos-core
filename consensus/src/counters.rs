@@ -650,11 +650,11 @@ pub static SYNC_INFO_RECEIVED_WITH_NEWER_CERT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Number of blocks being fetched from the network when syncing
-pub static BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING: Lazy<IntCounter> = Lazy::new(|| {
+/// Number of blocks being fetched from the network in block retriever
+pub static BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "aptos_consensus_blocks_fetched_from_network_while_syncing",
-        "Number of blocks being fetched from the network when syncing"
+        "aptos_consensus_blocks_fetched_from_network_in_block_retriever",
+        "Number of blocks being fetched from the network in block retriever"
     )
     .unwrap()
 });

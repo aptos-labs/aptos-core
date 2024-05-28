@@ -8,9 +8,9 @@ use crate::{
         BlockReader, BlockStore,
     },
     counters::{
+        BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER,
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC,
-        BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT,
-        BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING, LATE_EXECUTION_WITH_ORDER_VOTE_QC,
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT, LATE_EXECUTION_WITH_ORDER_VOTE_QC,
         SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_REGULAR_QC,
     },
     epoch_manager::LivenessStorageData,
@@ -401,7 +401,7 @@ impl BlockStore {
         }
 
         assert_eq!(blocks.len(), quorum_certs.len());
-        info!("[FastForwardSync] Fetched {} blocks. Requested num_blocks {}. Initial block hash {:?}, target block hash {:?}", 
+        info!("[FastForwardSync] Fetched {} blocks. Requested num_blocks {}. Initial block hash {:?}, target block hash {:?}",
             blocks.len(), num_blocks, highest_quorum_cert.certified_block().id(), highest_commit_cert.commit_info().id()
         );
         for (i, block) in blocks.iter().enumerate() {
@@ -702,7 +702,7 @@ impl BlockRetriever {
         target_block_id: HashValue,
         peers: Vec<AccountAddress>,
     ) -> anyhow::Result<Vec<Block>> {
-        BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING.inc_by(num_blocks);
+        BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER.inc_by(num_blocks);
         self.retrieve_block_for_id(initial_block_id, target_block_id, peers, num_blocks)
             .await
     }
