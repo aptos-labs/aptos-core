@@ -4,7 +4,7 @@ version = "0.0.0"
 
 [addresses]
 aptos_framework = "0x1"
-FACoin = "0x4"
+FACoin = "0xe09bf2342956e07ee7cc0e023c8f87138404a08161f3b3939a4d873eafcf96ee"
 
 [dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }

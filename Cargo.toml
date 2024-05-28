@@ -469,7 +469,7 @@ ark-ff = "0.4.0"
 ark-groth16 = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
-aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "7018c7272514018821107cdc8180350ec0d16551" }
+aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "2ae994c992c377f37d83d4d89797e0f40b40cfc1" }
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
 async-channel = "1.7.1"
