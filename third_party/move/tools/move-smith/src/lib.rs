@@ -5,6 +5,8 @@ pub mod ast;
 pub mod codegen;
 pub mod config;
 pub mod move_smith;
+pub mod names;
+pub mod types;
 pub mod utils;
 
 pub use codegen::CodeGenerator;

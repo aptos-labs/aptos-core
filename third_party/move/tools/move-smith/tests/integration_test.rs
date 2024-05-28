@@ -2,19 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use arbitrary::Unstructured;
-use move_smith::{ast::*, codegen::*, move_smith::*, utils::*};
+use move_smith::{ast::*, codegen::*, move_smith::*, types::*, utils::*};
 use num_bigint::BigUint;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 fn simple_module() -> Module {
     Module {
-        name: Identifier {
-            name: "SimpleModule".to_string(),
-        },
+        name: String::from("SimpleModule"),
         members: vec![ModuleMember::Function(Function {
-            name: Identifier {
-                name: "fun1".to_string(),
-            },
+            name: String::from("fun1"),
             body: FunctionBody {
                 stmts: vec![Statement::Expr(Expression::NumberLiteral(NumberLiteral {
                     value: BigUint::from(42u32),
