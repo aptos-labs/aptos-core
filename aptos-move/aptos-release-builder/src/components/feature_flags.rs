@@ -116,6 +116,7 @@ pub enum FeatureFlag {
     DispatchableFungibleAsset,
     NewAccountsDefaultToFaAptStore,
     OperationsDefaultToFaAptStore,
+    AggregatorV2IsAtLeastApi,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -300,6 +301,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::OperationsDefaultToFaAptStore => {
                 AptosFeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE
             },
+            FeatureFlag::AggregatorV2IsAtLeastApi => {
+                AptosFeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API
+            },
         }
     }
 }
@@ -412,6 +416,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE => {
                 FeatureFlag::OperationsDefaultToFaAptStore
+            },
+            AptosFeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API => {
+                FeatureFlag::AggregatorV2IsAtLeastApi
             },
         }
     }

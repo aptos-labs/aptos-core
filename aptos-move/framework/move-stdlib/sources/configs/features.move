@@ -514,6 +514,12 @@ module std::features {
         is_enabled(PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS)
     }
 
+    const AGGREGATOR_V2_IS_AT_LEAST_API: u64 = 66;
+
+    public fun aggregator_v2_is_at_least_api_enabled(): bool acquires Features {
+        is_enabled(AGGREGATOR_V2_IS_AT_LEAST_API)
+    }
+
     /// Whether we use more efficient native implementation of computing object derived address
     const OBJECT_NATIVE_DERIVED_ADDRESS: u64 = 62;
 

@@ -82,6 +82,7 @@ pub enum FeatureFlag {
     DISPATCHABLE_FUNGIBLE_ASSET = 63,
     NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE = 64,
     OPERATIONS_DEFAULT_TO_FA_APT_STORE = 65,
+    AGGREGATOR_V2_IS_AT_LEAST_API = 66,
 }
 
 impl FeatureFlag {
@@ -144,6 +145,7 @@ impl FeatureFlag {
             FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
             FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
+            FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
         ]
     }
 }

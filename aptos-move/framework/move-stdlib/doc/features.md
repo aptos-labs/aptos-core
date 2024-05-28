@@ -114,6 +114,7 @@ return true.
 -  [Function `coin_to_fungible_asset_migration_feature_enabled`](#0x1_features_coin_to_fungible_asset_migration_feature_enabled)
 -  [Function `get_primary_apt_fungible_store_at_user_address_feature`](#0x1_features_get_primary_apt_fungible_store_at_user_address_feature)
 -  [Function `primary_apt_fungible_store_at_user_address_enabled`](#0x1_features_primary_apt_fungible_store_at_user_address_enabled)
+-  [Function `aggregator_v2_is_at_least_api_enabled`](#0x1_features_aggregator_v2_is_at_least_api_enabled)
 -  [Function `get_object_native_derived_address_feature`](#0x1_features_get_object_native_derived_address_feature)
 -  [Function `object_native_derived_address_enabled`](#0x1_features_object_native_derived_address_enabled)
 -  [Function `get_dispatchable_fungible_asset_feature`](#0x1_features_get_dispatchable_fungible_asset_feature)
@@ -236,6 +237,15 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_V2_DELAYED_FIELDS">AGGREGATOR_V2_DELAYED_FIELDS</a>: u64 = 36;
+</code></pre>
+
+
+
+<a id="0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API">AGGREGATOR_V2_IS_AT_LEAST_API</a>: u64 = 66;
 </code></pre>
 
 
@@ -2770,6 +2780,30 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_primary_apt_fungible_store_at_user_address_enabled">primary_apt_fungible_store_at_user_address_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS">PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_aggregator_v2_is_at_least_api_enabled"></a>
+
+## Function `aggregator_v2_is_at_least_api_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_is_at_least_api_enabled">aggregator_v2_is_at_least_api_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_is_at_least_api_enabled">aggregator_v2_is_at_least_api_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API">AGGREGATOR_V2_IS_AT_LEAST_API</a>)
 }
 </code></pre>
 
