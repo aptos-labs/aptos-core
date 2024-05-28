@@ -93,11 +93,11 @@ module stablecoin::usdk {
         object::address_to_object(usdk_address())
     }
 
-    /// Called as part of deployment to initialize the stablecoin. 
-    /// Note: The signer has to be the account where the module is published. 
+    /// Called as part of deployment to initialize the stablecoin.
+    /// Note: The signer has to be the account where the module is published.
     /// Create a stablecoin token (a new Fungible Asset)
-    /// Ensure any stores for the stablecoin are untransferable. 
-    /// Store Roles, Management and State resources in the Metadata object. 
+    /// Ensure any stores for the stablecoin are untransferable.
+    /// Store Roles, Management and State resources in the Metadata object.
     /// Override deposit and withdraw functions of the newly created asset/token to add custom denylist logic.
     fun init_module(usdk_signer: &signer) {
         // Create the stablecoin with primary store support.
@@ -220,7 +220,7 @@ module stablecoin::usdk {
         let management = borrow_global<Management>(usdk_address());
         let tokens = fungible_asset::mint(&management.mint_ref, amount);
         // Ensure not to call pfs::deposit or dfa::deposit directly in the module.
-        deposit(primary_fungible_store::ensure_primary_store_exists(to, metadata()), tokens, &management.transfer_ref); 
+        deposit(primary_fungible_store::ensure_primary_store_exists(to, metadata()), tokens, &management.transfer_ref);
 
         event::emit(Mint {
             minter: signer::address_of(minter),

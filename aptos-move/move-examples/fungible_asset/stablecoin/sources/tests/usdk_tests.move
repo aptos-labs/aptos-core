@@ -23,7 +23,7 @@ module stablecoin::usdk_tests {
         let minter_store = primary_fungible_store::ensure_primary_store_exists(minter_address, asset);
         let receiver_store = primary_fungible_store::ensure_primary_store_exists(receiver_address, asset);
         dispatchable_fungible_asset::transfer(minter, minter_store, receiver_store, 10);
-        
+
         // denylist account, check if account is denylisted
         usdk::denylist(denylister, receiver_address);
         assert!(primary_fungible_store::is_frozen(receiver_address, asset), 0);
