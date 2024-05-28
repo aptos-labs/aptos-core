@@ -1,63 +1,31 @@
 use ark_groth16::{prepare_verifying_key, Groth16};
-use ark_crypto_primitives::snark::{CircuitSpecificSetupSNARK, SNARK};
+use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
 use ark_ff::Field;
-use ark_relations::{
-    lc,
-    r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError},
-};
+use ark_relations::r1cs::{ConstraintSynthesizer, SynthesisError};
 use ark_std::{
     rand::{RngCore, SeedableRng},
     test_rng, UniformRand,
 };
-
-struct MySillyCircuit<F: Field> {
-    a: Option<F>,
-    b: Option<F>,
-}
-
-impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for MySillyCircuit<ConstraintF> {
-    fn generate_constraints(
-        self,
-        cs: ConstraintSystemRef<ConstraintF>,
-    ) -> Result<(), SynthesisError> {
-        let a = cs.new_witness_variable(|| self.a.ok_or(SynthesisError::AssignmentMissing))?;
-        let b = cs.new_witness_variable(|| self.b.ok_or(SynthesisError::AssignmentMissing))?;
-        let c = cs.new_input_variable(|| {
-            let mut a = self.a.ok_or(SynthesisError::AssignmentMissing)?;
-            let b = self.b.ok_or(SynthesisError::AssignmentMissing)?;
-
-            a *= &b;
-            Ok(a)
-        })?;
-
-        cs.enforce_constraint(lc!() + a, lc!() + b, lc!() + c)?;
-        cs.enforce_constraint(lc!() + a, lc!() + b, lc!() + c)?;
-        cs.enforce_constraint(lc!() + a, lc!() + b, lc!() + c)?;
-        cs.enforce_constraint(lc!() + a, lc!() + b, lc!() + c)?;
-        cs.enforce_constraint(lc!() + a, lc!() + b, lc!() + c)?;
-        cs.enforce_constraint(lc!() + a, lc!() + b, lc!() + c)?;
-
-        Ok(())
-    }
-}
-
 use ark_std::{marker::PhantomData, vec::Vec};
 use ark_groth16::r1cs_to_qap::{LibsnarkReduction, R1CSToQAP};
-use ark_groth16::data_structures::{ProvingKey, VerifyingKey, Proof};
+use ark_groth16::data_structures::{VerifyingKey, Proof};
 use ark_serialize::*;
 use ark_std::rand::Rng;
-use ark_relations::r1cs::{ConstraintSystem, OptimizationGoal, Result as R1CSResult};
+use ark_relations::r1cs::Result as R1CSResult;
 use ark_ec::{AffineRepr,CurveGroup};
 use ark_ff::PrimeField;
 use std::ops::AddAssign;
 
-/// The SNARK of [[Groth16]](https://eprint.iacr.org/2016/260.pdf).
+/// The SNARK of [[Groth16]](https://eprint.iacr.org/2016/260.pdf), where "proving" implements the
+/// simulation algorithm instead, using the trapdoor output by the modified setup algorithm also
+/// implemented in this struct
 pub struct Groth16Simulator<E: Pairing, QAP: R1CSToQAP = LibsnarkReduction> {
     _p: PhantomData<(E, QAP)>,
 }
 
-/// The prover key for for the Groth16 zkSNARK.
+/// The simulation prover key for for the Groth16 zkSNARK, used only for simulating proofs with the
+/// secret trapdoor information
 #[derive(Clone, Debug, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ProvingKeyWithTrapdoor<E: Pairing> {
     /// Vector of elements from the verifying key
@@ -128,21 +96,11 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> {
         pk.vk.clone()))
     }
 
-    pub fn prove_with_trapdoor<R: RngCore>(
-        pk: &ProvingKeyWithTrapdoor<E>,
-        //circuit: C,
-        public_inputs: &[E::ScalarField],
-        rng: &mut R,
-    ) -> Result<Proof<E>, SynthesisError> {
-        Self::create_random_proof_with_trapdoor(public_inputs, pk, rng)
-    }
-
     /// Create a Groth16 proof that is zero-knowledge using the provided
     /// R1CS-to-QAP reduction.
     /// This method samples randomness for zero knowledges via `rng`.
     #[inline]
     pub fn create_random_proof_with_trapdoor(
-        //circuit: C,
         public_inputs: &[E::ScalarField],
         pk: &ProvingKeyWithTrapdoor<E>,
         rng: &mut impl Rng,
@@ -274,19 +232,15 @@ where
 
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
     for _ in 0..n_iters {
-        let a = E::ScalarField::from(3);//rand(&mut rng);
-        let b = E::ScalarField::from(4);//rand(&mut rng);
-        let mut c = a;
-        c *= b;
-
-        let proof = Groth16Simulator::<E>::prove_with_trapdoor(
-            &pk,
+        let proof = Groth16Simulator::<E>::create_random_proof_with_trapdoor(
             &[public_input],
+            &pk,
             &mut rng,
         )
         .unwrap();
 
         assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
+        let a = E::ScalarField::rand(&mut rng);
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
 }
@@ -295,5 +249,5 @@ use ark_bn254::Bn254;
 
 #[test]
 fn prove_and_verify() {
-    test_prove_and_verify::<Bn254>(1);
+    test_prove_and_verify::<Bn254>(25);
 }
