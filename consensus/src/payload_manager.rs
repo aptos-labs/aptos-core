@@ -11,7 +11,8 @@ use crate::{
 use aptos_consensus_types::{
     block::Block,
     common::{DataStatus, Payload, ProofWithData},
-    proof_of_store::ProofOfStore,
+    pipelined_block::PipelinedBlock,
+    proof_of_store::{BatchInfo, ProofOfStore},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError::DataNotFound, *};
@@ -21,7 +22,7 @@ use aptos_types::transaction::SignedTransaction;
 use futures::channel::mpsc::Sender;
 use itertools::Either;
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{hash_map::Entry, HashMap, HashSet},
     sync::Arc,
     time::Duration,
 };
@@ -78,50 +79,78 @@ impl PayloadManager {
         receivers
     }
 
+    fn batches_in_block(block: &Block) -> Vec<BatchInfo> {
+        let mut batches = vec![];
+        for payload in block.payload().iter() {
+            match payload {
+                Payload::DirectMempool(_) => {
+                    unreachable!("InQuorumStore should be used");
+                },
+                Payload::InQuorumStore(proof_with_status) => {
+                    for proof in proof_with_status.proofs.iter() {
+                        batches.push(proof.info().clone());
+                    }
+                },
+                Payload::InQuorumStoreWithLimit(proof_with_status) => {
+                    for proof in proof_with_status.proof_with_data.proofs.iter() {
+                        batches.push(proof.info().clone());
+                    }
+                },
+                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                    for (batch_info, _) in inline_batches.iter() {
+                        batches.push(batch_info.clone());
+                    }
+                    for proof in proof_with_data.proofs.iter() {
+                        batches.push(proof.info().clone());
+                    }
+                },
+            }
+        }
+        batches
+    }
+
+    fn batches_removed_from_window(block: &PipelinedBlock) -> Vec<BatchInfo> {
+        let mut batches_removed = HashSet::new();
+        if let Some(block_removed) = block.block_window().blocks().first() {
+            for batch in Self::batches_in_block(block_removed) {
+                batches_removed.insert(batch);
+            }
+        }
+        block
+            .block_window()
+            .blocks()
+            .iter()
+            .skip(1)
+            .for_each(|block| {
+                for batch in Self::batches_in_block(block) {
+                    batches_removed.remove(&batch);
+                }
+            });
+        for batch in Self::batches_in_block(block.block()) {
+            batches_removed.remove(&batch);
+        }
+        batches_removed.into_iter().collect()
+    }
+
     ///Pass commit information to BatchReader and QuorumStore wrapper for their internal cleanups.
-    pub fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
+    pub fn notify_commit(&self, block_timestamp: u64, blocks: &[Arc<PipelinedBlock>]) {
         match self {
             PayloadManager::DirectMempool | PayloadManager::Observer(_, _) => {},
             PayloadManager::InQuorumStore(batch_reader, coordinator_tx, _) => {
                 batch_reader.update_certified_timestamp(block_timestamp);
 
-                let batches: Vec<_> = payloads
-                    .into_iter()
-                    .flat_map(|payload| match payload {
-                        Payload::DirectMempool(_) => {
-                            unreachable!("InQuorumStore should be used");
-                        },
-                        Payload::InQuorumStore(proof_with_status) => proof_with_status
-                            .proofs
-                            .iter()
-                            .map(|proof| proof.info().clone())
-                            .collect::<Vec<_>>(),
-                        Payload::InQuorumStoreWithLimit(proof_with_status) => proof_with_status
-                            .proof_with_data
-                            .proofs
-                            .iter()
-                            .map(|proof| proof.info().clone())
-                            .collect::<Vec<_>>(),
-                        Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
-                            inline_batches
-                                .iter()
-                                .map(|(batch_info, _)| batch_info.clone())
-                                .chain(
-                                    proof_with_data
-                                        .proofs
-                                        .iter()
-                                        .map(|proof| proof.info().clone()),
-                                )
-                                .collect::<Vec<_>>()
-                        },
-                    })
-                    .collect();
+                let mut batches_removed = HashSet::new();
+                for block in blocks {
+                    for batch in Self::batches_removed_from_window(block) {
+                        batches_removed.insert(batch);
+                    }
+                }
 
                 let mut tx = coordinator_tx.clone();
 
                 if let Err(e) = tx.try_send(CoordinatorCommand::CommitNotification(
                     block_timestamp,
-                    batches,
+                    batches_removed.into_iter().collect(),
                 )) {
                     warn!(
                         "CommitNotification failed. Is the epoch shutting down? error: {}",

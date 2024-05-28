@@ -275,7 +275,6 @@ impl StateComputer for ExecutionProxy {
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
         let mut subscribable_txn_events = Vec::new();
-        let mut payloads = Vec::new();
         let logical_time = LogicalTime::new(
             finality_proof.ledger_info().epoch(),
             finality_proof.ledger_info().round(),
@@ -296,10 +295,6 @@ impl StateComputer for ExecutionProxy {
         for block in blocks {
             block_ids.push(block.id());
 
-            if let Some(payload) = block.block().payload() {
-                payloads.push(payload.clone());
-            }
-
             txns.extend(self.transactions_to_commit(block, &validators, is_randomness_enabled));
             subscribable_txn_events.extend(block.subscribable_events());
         }
@@ -317,9 +312,9 @@ impl StateComputer for ExecutionProxy {
         )
         .expect("spawn_blocking failed");
 
-        let blocks = blocks.to_vec();
+        let blocks_vec = blocks.to_vec();
         let wrapped_callback = move || {
-            callback(&blocks, finality_proof);
+            callback(&blocks_vec, finality_proof);
         };
         self.async_state_sync_notifier
             .clone()
@@ -328,7 +323,7 @@ impl StateComputer for ExecutionProxy {
             .expect("Failed to send async state sync notification");
 
         *latest_logical_time = logical_time;
-        payload_manager.notify_commit(block_timestamp, payloads);
+        payload_manager.notify_commit(block_timestamp, blocks);
         Ok(())
     }
 
@@ -358,7 +353,7 @@ impl StateComputer for ExecutionProxy {
         if let Some(inner) = self.state.read().as_ref() {
             inner
                 .payload_manager
-                .notify_commit(block_timestamp, Vec::new());
+                .notify_commit(block_timestamp, &vec![]);
         }
 
         fail_point!("consensus::sync_to", |_| {
