@@ -1019,7 +1019,11 @@ module aptos_framework::fungible_asset {
                 aggregator_v2::create_unbounded_aggregator_with_value(current)
             }
             else {
+<<<<<<< satya/concurrent_fungible_balance
                 aggregator_v2::create_aggregator_with_value(option::extract(&mut maximum), current)
+=======
+                aggregator_v2::create_aggregator_with_value(current, option::extract(&mut maximum))
+>>>>>>> igor/concurrent_fungible_balance
             },
         };
         move_to(&metadata_object_signer, supply);
@@ -1310,6 +1314,37 @@ module aptos_framework::fungible_asset {
         assert!(borrow_store_resource(&creator_store).balance == 0, 10);
         assert!(exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 11);
         assert!(aggregator_v2::read(&borrow_global<ConcurrentFungibleBalance>(object::object_address(&creator_store)).balance) == 10, 12);
+<<<<<<< satya/concurrent_fungible_balance
+
+        assert!(exists<FungibleStore>(object::object_address(&creator_store)), 9);
+        assert!(borrow_store_resource(&creator_store).balance == 0, 10);
+        assert!(exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 11);
+        assert!(aggregator_v2::read(&borrow_global<ConcurrentFungibleBalance>(object::object_address(&creator_store)).balance) == 30, 12);
+    }
+
+    #[test(fx = @aptos_framework, creator = @0xcafe)]
+    fun test_fungible_asset_default_concurrent(fx: &signer, creator: &signer) acquires Supply, ConcurrentSupply, FungibleStore, ConcurrentFungibleBalance {
+        let supply_feature = features::get_concurrent_fungible_assets_feature();
+        let balance_feature = features::get_concurrent_fungible_balance_feature();
+        let default_balance_feature = features::get_default_to_concurrent_fungible_balance_feature();
+
+        features::change_feature_flags_for_testing(fx, vector[supply_feature, balance_feature, default_balance_feature], vector[]);
+
+        let (creator_ref, token_object) = create_test_token(creator);
+        let (mint_ref, transfer_ref, _burn) = init_test_metadata(&creator_ref);
+        let test_token = object::convert<TestToken, Metadata>(token_object);
+        assert!(!exists<Supply>(object::object_address(&test_token)), 1);
+        assert!(exists<ConcurrentSupply>(object::object_address(&test_token)), 2);
+        let creator_store = create_test_store(creator, test_token);
+        assert!(exists<FungibleStore>(object::object_address(&creator_store)), 3);
+        assert!(exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 4);
+
+        let fa = mint(&mint_ref, 30);
+        assert!(supply(test_token) == option::some(30), 5);
+
+        deposit_with_ref(&transfer_ref, creator_store, fa);
+=======
+>>>>>>> igor/concurrent_fungible_balance
 
         assert!(exists<FungibleStore>(object::object_address(&creator_store)), 9);
         assert!(borrow_store_resource(&creator_store).balance == 0, 10);
