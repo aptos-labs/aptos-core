@@ -69,7 +69,7 @@ jobs:
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo build --locked --package=aptos-node --features=failpoints,indexer --release && LOCAL_SWARM_NODE_RELEASE=1 cargo llvm-cov nextest --lcov --output-path lcov_smoke.info -vv --ignore-run-fail -p smoke-test
+      - run: cargo build --locked --package=aptos-node --features=failpoints,indexer --release && LLVM_PROFDATA_FLAGS="--failure-mode=all" LOCAL_SWARM_NODE_RELEASE=1 cargo llvm-cov nextest --lcov --output-path lcov_smoke.info -vv --ignore-run-fail --profile smoke-test -p smoke-test
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
           RUST_MIN_STACK: 33554432
