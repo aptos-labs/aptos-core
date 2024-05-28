@@ -885,6 +885,7 @@ dependencies = [
  "futures-channel",
  "hex",
  "itertools 0.12.1",
+ "lru 0.7.8",
  "maplit",
  "mini-moka",
  "mirai-annotations",

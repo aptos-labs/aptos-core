@@ -51,12 +51,14 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
+use aptos_crypto::HashValue;
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
 use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
+    block_info::BlockInfo,
     epoch_state::EpochState,
     on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
@@ -69,6 +71,7 @@ use aptos_types::{
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
 use futures_channel::mpsc::UnboundedReceiver;
+use lru::LruCache;
 use serde::Serialize;
 use std::{mem::Discriminant, sync::Arc, time::Duration};
 use tokio::{
@@ -243,6 +246,10 @@ pub struct RoundManager {
     fast_rand_config: Option<RandConfig>,
     // Stores the order votes from all the rounds above highest_ordered_round
     pending_order_votes: PendingOrderVotes,
+    // Round manager broadcasts fast shares when forming a QC or when receiving a proposal.
+    // To avoid duplicate broadcasts for the same block, we keep track of blocks for
+    // which we recently broadcasted fast shares.
+    blocks_with_broadcasted_fast_shares: LruCache<HashValue, ()>,
 }
 
 impl RoundManager {
@@ -290,6 +297,7 @@ impl RoundManager {
             jwk_consensus_config,
             fast_rand_config,
             pending_order_votes: PendingOrderVotes::new(),
+            blocks_with_broadcasted_fast_shares: LruCache::new(5),
         }
     }
 
@@ -867,6 +875,30 @@ impl RoundManager {
         });
     }
 
+    async fn broadcast_fast_shares(&mut self, block_info: &BlockInfo) {
+        // generate and multicast randomness share for the fast path
+        if let Some(fast_config) = &self.fast_rand_config {
+            if !block_info.is_empty()
+                && !self
+                    .blocks_with_broadcasted_fast_shares
+                    .contains(&block_info.id())
+            {
+                let metadata = RandMetadata {
+                    epoch: block_info.epoch(),
+                    round: block_info.round(),
+                };
+                let self_share = Share::generate(fast_config, metadata);
+                let fast_share = FastShare::new(self_share);
+                info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
+                    .epoch(fast_share.epoch())
+                    .round(fast_share.round()));
+                self.network.broadcast_fast_share(fast_share).await;
+                self.blocks_with_broadcasted_fast_shares
+                    .put(block_info.id(), ());
+            }
+        }
+    }
+
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
         let vote = self
@@ -876,22 +908,8 @@ impl RoundManager {
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
 
-        // generate and multicast randomness share for the fast path
-        if let Some(fast_config) = &self.fast_rand_config {
-            let ledger_info = vote.ledger_info();
-            if !ledger_info.is_dummy() {
-                let metadata = RandMetadata {
-                    epoch: ledger_info.epoch(),
-                    round: ledger_info.round(),
-                };
-                let self_share = Share::generate(fast_config, metadata);
-                let fast_share = FastShare::new(self_share);
-                info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
-                    .epoch(fast_share.epoch())
-                    .round(fast_share.round()));
-                self.network.broadcast_fast_share(fast_share).await;
-            }
-        }
+        self.broadcast_fast_shares(vote.ledger_info().commit_info())
+            .await;
 
         if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
@@ -1118,6 +1136,8 @@ impl RoundManager {
                         "[RoundManager] Unable to process the created QC {:?}",
                         qc
                     ))?;
+                // Question: Should we broadcast order vote or fast share first?
+                self.broadcast_fast_shares(qc.certified_block()).await;
                 if self.onchain_config.order_vote_enabled() {
                     // Broadcast order vote if the QC is successfully aggregated
                     // Even if broadcast order vote fails, the function will return Ok

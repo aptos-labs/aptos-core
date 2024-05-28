@@ -144,7 +144,8 @@ impl LedgerRecoveryData {
             // We are setting ordered_root same as commit_root. As every committed block is also ordered, this is fine.
             // As the block store inserts all the fetched blocks and quorum certs and execute the blocks, the block store
             // updates highest_ordered_cert accordingly.
-            let root_ordered_cert = WrappedLedgerInfo::new(VoteData::dummy(), latest_ledger_info_sig.clone());
+            let root_ordered_cert =
+                WrappedLedgerInfo::new(VoteData::dummy(), latest_ledger_info_sig.clone());
             (root_ordered_cert.clone(), root_ordered_cert)
         } else {
             let root_ordered_cert = quorum_certs
