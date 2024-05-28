@@ -29,7 +29,6 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `default_to_concurrent_fungible_supply`](#0x1_fungible_asset_default_to_concurrent_fungible_supply)
 -  [Function `allow_upgrade_to_concurrent_fungible_balance`](#0x1_fungible_asset_allow_upgrade_to_concurrent_fungible_balance)
 -  [Function `default_to_concurrent_fungible_balance`](#0x1_fungible_asset_default_to_concurrent_fungible_balance)
--  [Function `auto_upgrade_to_concurrent_fungible_balance`](#0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance)
 -  [Function `add_fungibility`](#0x1_fungible_asset_add_fungibility)
 -  [Function `set_untransferable`](#0x1_fungible_asset_set_untransferable)
 -  [Function `is_untransferable`](#0x1_fungible_asset_is_untransferable)
@@ -1159,31 +1158,7 @@ Provided withdraw function type doesn't meet the signature requirement.
 
 
 <pre><code>inline <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_default_to_concurrent_fungible_balance">default_to_concurrent_fungible_balance</a>(): bool {
-    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_migrate_to_concurrent_fungible_balance_enabled">features::migrate_to_concurrent_fungible_balance_enabled</a>()
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance"></a>
-
-## Function `auto_upgrade_to_concurrent_fungible_balance`
-
-
-
-<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance">auto_upgrade_to_concurrent_fungible_balance</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code>inline <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance">auto_upgrade_to_concurrent_fungible_balance</a>(): bool {
-    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_migrate_to_concurrent_fungible_balance_enabled">features::migrate_to_concurrent_fungible_balance_enabled</a>()
+    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_default_to_concurrent_fungible_balance_enabled">features::default_to_concurrent_fungible_balance_enabled</a>()
 }
 </code></pre>
 
@@ -2973,10 +2948,6 @@ Destroy an empty fungible asset.
     <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> { metadata, amount } = fa;
     <b>if</b> (amount == 0) <b>return</b>;
 
-    <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance">auto_upgrade_to_concurrent_fungible_balance</a>()) {
-        <a href="fungible_asset.md#0x1_fungible_asset_ensure_store_upgraded_to_concurrent_internal">ensure_store_upgraded_to_concurrent_internal</a>(store_addr);
-    };
-
     <b>assert</b>!(<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_STORE_EXISTENCE">EFUNGIBLE_STORE_EXISTENCE</a>));
     <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr);
     <b>assert</b>!(metadata == store.metadata, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_ASSET_AND_STORE_MISMATCH">EFUNGIBLE_ASSET_AND_STORE_MISMATCH</a>));
@@ -3017,9 +2988,6 @@ Extract <code>amount</code> of the fungible asset from <code>store</code>.
     amount: u64,
 ): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_STORE_EXISTENCE">EFUNGIBLE_STORE_EXISTENCE</a>));
-    <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance">auto_upgrade_to_concurrent_fungible_balance</a>()) {
-        <a href="fungible_asset.md#0x1_fungible_asset_ensure_store_upgraded_to_concurrent_internal">ensure_store_upgraded_to_concurrent_internal</a>(store_addr);
-    };
 
     <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr);
     <b>let</b> metadata = store.metadata;
