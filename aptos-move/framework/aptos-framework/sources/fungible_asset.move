@@ -750,6 +750,7 @@ module aptos_framework::fungible_asset {
         store_addr: address,
         amount: u64
     ) acquires FungibleStore, Supply, ConcurrentSupply {
+        // ref metadata match is checked in burn() call
         burn(ref, withdraw_internal(store_addr, amount));
     }
 
@@ -858,8 +859,8 @@ module aptos_framework::fungible_asset {
         if (amount == 0) {
             return
         };
-
         let metadata_address = object::object_address(metadata);
+
         if (exists<ConcurrentSupply>(metadata_address)) {
             let supply = borrow_global_mut<ConcurrentSupply>(metadata_address);
             assert!(
@@ -886,8 +887,8 @@ module aptos_framework::fungible_asset {
         if (amount == 0) {
             return
         };
-
         let metadata_address = object::object_address(metadata);
+
         if (exists<ConcurrentSupply>(metadata_address)) {
             let supply = borrow_global_mut<ConcurrentSupply>(metadata_address);
 

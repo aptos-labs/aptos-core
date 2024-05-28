@@ -501,6 +501,8 @@ module std::features {
         is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION)
     }
 
+    const PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS: u64 = 61;
+
     #[deprecated]
     public fun get_primary_apt_fungible_store_at_user_address_feature(
     ): u64 {
@@ -508,8 +510,8 @@ module std::features {
     }
 
     #[deprecated]
-    public fun primary_apt_fungible_store_at_user_address_enabled(): bool {
-        abort error::invalid_argument(EINVALID_FEATURE)
+    public fun primary_apt_fungible_store_at_user_address_enabled(): bool acquires Features {
+        is_enabled(PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS)
     }
 
     /// Whether we use more efficient native implementation of computing object derived address

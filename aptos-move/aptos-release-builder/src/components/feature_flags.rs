@@ -111,6 +111,7 @@ pub enum FeatureFlag {
     RejectUnstableBytecode,
     TransactionContextExtension,
     CoinToFungibleAssetMigration,
+    PrimaryAPTFungibleStoreAtUserAddress,
     ObjectNativeDerivedAddress,
     DispatchableFungibleAsset,
     NewAccountsDefaultToFaAptStore,
@@ -286,6 +287,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CoinToFungibleAssetMigration => {
                 AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION
             },
+            FeatureFlag::PrimaryAPTFungibleStoreAtUserAddress => {
+                AptosFeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS
+            },
             FeatureFlag::ObjectNativeDerivedAddress => {
                 AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS
             },
@@ -395,6 +399,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION => {
                 FeatureFlag::CoinToFungibleAssetMigration
+            },
+            AptosFeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS => {
+                FeatureFlag::PrimaryAPTFungibleStoreAtUserAddress
             },
             AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS => {
                 FeatureFlag::ObjectNativeDerivedAddress
