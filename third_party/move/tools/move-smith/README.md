@@ -94,12 +94,12 @@ rustup component add --toolchain nightly llvm-tools-preview
 ├── src
 │   ├── ast.rs                    # The AST for the Move language by the fuzzer
 │   ├── cli
-│   │   └── generator.rs          # The static generator for debugging
+│   │   ├── generator.rs          # The static generator for debugging
+│   │   └── raw2move.rs           # Converts raw bytes from stdin to a Move program
 │   ├── codegen.rs                # Converts the AST to textual Move code
 │   ├── config.rs                 # Fuzzer configurations
 │   ├── lib.rs
 │   ├── move_smith.rs             # The core generation logic
-│   ├── raw2move.rs               # Simple helper that converts raw bytes from stdin to a Move program
 │   └── utils.rs
 └── tests
     └── integration_test.rs
