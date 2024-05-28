@@ -50,9 +50,9 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_latest_version(&self) -> Result<Version> {
-        gauged_api("get_latest_version", || {
-            self.ledger_db.metadata_db().get_latest_version()
+    fn get_synced_version(&self) -> Result<Version> {
+        gauged_api("get_synced_version", || {
+            self.ledger_db.metadata_db().get_synced_version()
         })
     }
 
@@ -525,10 +525,6 @@ impl DbReader for AptosDB {
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
             self.error_if_ledger_pruned("NewBlockEvent", version)?;
-            ensure!(
-                version <= self.get_latest_version()?,
-                "version older than latest version"
-            );
 
             let (_first_version, _last_version, new_block_event) = self.get_block_info_by_version(version)?;
             Ok(new_block_event.proposed_time())
@@ -545,7 +541,7 @@ impl DbReader for AptosDB {
                     u64::max_value(),
                     Order::Descending,
                     num_events as u64,
-                    self.get_latest_version().unwrap_or(0),
+                    self.get_synced_version().unwrap_or(0),
                 );
             }
 
@@ -572,13 +568,12 @@ impl DbReader for AptosDB {
         gauged_api("get_block_info", || {
             self.error_if_ledger_pruned("NewBlockEvent", version)?;
 
-            let latest_li = self.get_latest_ledger_info()?;
-            let committed_version = latest_li.ledger_info().version();
+            // N.b. Must use committed_version because if synced version is used, we won't be able
+            // to tell the end of the latest block.
+            let committed_version = self.get_committed_version()?;
             ensure!(
                 version <= committed_version,
-                "Requested version {} > committed version {}",
-                version,
-                committed_version
+                "Requested version {version} > committed version {committed_version}",
             );
 
             if !self.skip_index_and_usage {
@@ -607,8 +602,9 @@ impl DbReader for AptosDB {
         block_height: u64,
     ) -> Result<(Version, Version, NewBlockEvent)> {
         gauged_api("get_block_info_by_height", || {
-            let latest_li = self.get_latest_ledger_info()?;
-            let committed_version = latest_li.ledger_info().version();
+            // N.b. Must use committed_version because if synced version is used, we won't be able
+            // to tell the end of the latest block.
+            let committed_version = self.get_committed_version()?;
 
             if !self.skip_index_and_usage {
                 let event_key = new_block_event_key();

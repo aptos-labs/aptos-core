@@ -181,7 +181,7 @@ impl MetadataBackend for AptosDBBackend {
         let has_larger = events.first().map_or(false, |e| {
             (e.event.epoch(), e.event.round()) >= (target_epoch, target_round)
         });
-        let latest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
+        let latest_db_version = self.aptos_db.get_committed_version().unwrap_or(0);
         // check if fresher data has potential to give us different result
         if !has_larger && version < latest_db_version {
             let fresh_db_result = self.refresh_db_result(locked, latest_db_version);

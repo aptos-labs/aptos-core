@@ -76,7 +76,7 @@ impl LedgerMetadataDb {
         self.db.write_schemas(batch)
     }
 
-    pub(crate) fn get_latest_version(&self) -> Result<Version> {
+    pub(crate) fn get_synced_version(&self) -> Result<Version> {
         get_progress(&self.db, &DbMetadataKey::OverallCommitProgress)?.ok_or(
             AptosDbError::NotFound("No OverallCommitProgress in db.".to_string()),
         )

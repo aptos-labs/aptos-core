@@ -137,7 +137,7 @@ fn end_to_end() {
         assert_eq!(restore_ws, org_ws);
     }
 
-    assert_eq!(tgt_db.get_latest_version().unwrap(), target_version);
+    assert_eq!(tgt_db.get_synced_version().unwrap(), target_version);
     let recovered_transactions = tgt_db
         .get_transactions(
             0,

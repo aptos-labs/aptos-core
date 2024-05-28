@@ -680,7 +680,9 @@ mod database_mock {
 
             fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
 
-            fn get_latest_version(&self) -> Result<Version>;
+            fn get_synced_version(&self) -> Result<Version>;
+
+            fn get_committed_version(&self) -> Result<Version>;
 
             fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
 
