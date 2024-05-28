@@ -77,13 +77,8 @@ async fn main() {
         Duration::from_secs(10),
     );
     jwk::start_jwk_refresh_loop(
-        "https://www.facebook.com",
-        "https://www.facebook.com/.well-known/oauth/openid/jwks",
-        Duration::from_secs(10),
-    );
-    jwk::start_jwk_refresh_loop(
-        "https://id.twitch.tv/oauth2",
-        "https://id.twitch.tv/oauth2/keys",
+        "https://appleid.apple.com",
+        "https://appleid.apple.com/.well-known/openid-configuration",
         Duration::from_secs(10),
     );
 
