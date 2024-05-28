@@ -17,6 +17,7 @@ pub enum SourcePackageLayout {
     Examples,
     Manifest,
     DocTemplates,
+    Build,
 }
 
 impl SourcePackageLayout {
@@ -28,7 +29,8 @@ impl SourcePackageLayout {
     /// ├── scripts        (optional)
     /// ├── specifications (optional)
     /// ├── doc_templates      (optional)
-    /// └── tests          (optional, test mode)
+    /// ├── tests          (optional, test mode)
+    /// └── build          (created by package build to contain build artifacts)
     pub fn path(&self) -> &Path {
         Path::new(self.location_str())
     }
@@ -57,6 +59,7 @@ impl SourcePackageLayout {
             Self::Examples => "examples",
             Self::Specifications => "specifications",
             Self::DocTemplates => "doc_templates",
+            Self::Build => "build",
         }
     }
 
@@ -67,7 +70,8 @@ impl SourcePackageLayout {
             | Self::Scripts
             | Self::Examples
             | Self::Specifications
-            | Self::DocTemplates => true,
+            | Self::DocTemplates
+            | Self::Build => true,
         }
     }
 }

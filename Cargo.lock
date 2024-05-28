@@ -409,6 +409,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-move-stdlib",
  "aptos-proptest-helpers",
  "aptos-runtimes",
  "aptos-sdk",
@@ -2276,6 +2277,7 @@ dependencies = [
  "aptos-enum-conversion-derive",
  "aptos-event-notifications",
  "aptos-infallible",
+ "aptos-jwk-utils",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-network",
@@ -2291,11 +2293,23 @@ dependencies = [
  "futures-util",
  "move-core-types",
  "once_cell",
+ "serde",
+ "tokio",
+ "tokio-retry",
+]
+
+[[package]]
+name = "aptos-jwk-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-types",
+ "http",
+ "move-core-types",
  "reqwest",
  "serde",
  "serde_json",
  "tokio",
- "tokio-retry",
 ]
 
 [[package]]
@@ -10195,6 +10209,7 @@ dependencies = [
  "move-model",
  "move-prover",
  "move-prover-test-utils",
+ "move-stdlib",
  "serde",
  "tempfile",
 ]
@@ -10301,17 +10316,12 @@ name = "move-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bcs 0.1.4",
- "bytes",
  "clap 4.4.14",
  "codespan-reporting",
  "colored",
  "datatest-stable",
- "difference",
  "httpmock",
  "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier",
  "move-bytecode-viewer",
  "move-command-line-common",
  "move-compiler",
@@ -10321,23 +10331,15 @@ dependencies = [
  "move-disassembler",
  "move-docgen",
  "move-errmapgen",
- "move-ir-types",
  "move-model",
  "move-package",
  "move-prover",
- "move-resource-viewer",
  "move-stdlib",
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-test-utils",
  "once_cell",
- "reqwest",
- "serde",
- "serde_json",
- "serde_yaml 0.8.26",
  "tempfile",
- "toml_edit 0.14.4",
- "walkdir",
 ]
 
 [[package]]
@@ -10547,6 +10549,7 @@ name = "move-examples"
 version = "0.1.1"
 dependencies = [
  "move-cli",
+ "move-stdlib",
 ]
 
 [[package]]
@@ -10671,6 +10674,7 @@ dependencies = [
  "move-core-types",
  "move-docgen",
  "move-model",
+ "move-stdlib",
  "move-symbol-pool",
  "move-to-yul",
  "named-lock",
@@ -10923,7 +10927,6 @@ dependencies = [
  "difference",
  "move-binary-format",
  "move-bytecode-source-map",
- "move-cli",
  "move-command-line-common",
  "move-compiler",
  "move-compiler-v2",
@@ -15567,18 +15570,6 @@ version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cda73e2f1397b1262d6dfdcef8aafae14d1de7748d66822d3bfeeb6d03e5e4b"
 dependencies = [
- "serde",
-]
-
-[[package]]
-name = "toml_edit"
-version = "0.14.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5376256e44f2443f8896ac012507c19a012df0fe8758b55246ae51a2279db51f"
-dependencies = [
- "combine",
- "indexmap 1.9.3",
- "itertools 0.10.5",
  "serde",
 ]
 

@@ -5,10 +5,9 @@ module raffle::raffle {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
     use aptos_framework::randomness;
-    use aptos_std::smart_vector;
-    use aptos_std::smart_vector::SmartVector;
     use aptos_framework::coin::Coin;
     use std::signer;
+    use std::vector;
 
     // We need this friend declaration so our tests can call `init_module`.
     friend raffle::raffle_test;
@@ -25,7 +24,10 @@ module raffle::raffle {
     /// A raffle: a list of users who bought tickets.
     struct Raffle has key {
         // A list of users who bought raffle tickets (repeats allowed).
-        tickets: SmartVector<address>,
+        //
+        // **WARNING:** Using SmartVector here will make the module vulnerable to **undergasing attacks**.
+        // See [AIP-41](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-41.md#undergasing-attacks).
+        tickets: vector<address>,
         coins: Coin<AptosCoin>,
         is_closed: bool,
     }
@@ -35,7 +37,7 @@ module raffle::raffle {
         move_to(
             deployer,
             Raffle {
-                tickets: smart_vector::empty(),
+                tickets: vector::empty(),
                 coins: coin::zero(),
                 is_closed: false,
             }
@@ -60,7 +62,7 @@ module raffle::raffle {
         coin::merge(&mut raffle.coins, coins);
 
         // Issue a ticket for that user
-        smart_vector::push_back(&mut raffle.tickets, signer::address_of(user))
+        vector::push_back(&mut raffle.tickets, signer::address_of(user))
     }
 
     #[randomness]
@@ -84,11 +86,11 @@ module raffle::raffle {
     public(friend) fun randomly_pick_winner_internal(): address acquires Raffle {
         let raffle = borrow_global_mut<Raffle>(@raffle);
         assert!(!raffle.is_closed, E_RAFFLE_HAS_CLOSED);
-        assert!(!smart_vector::is_empty(&raffle.tickets), E_NO_TICKETS);
+        assert!(!vector::is_empty(&raffle.tickets), E_NO_TICKETS);
 
         // Pick a random winner in [0, |raffle.tickets|)
-        let winner_idx = randomness::u64_range(0, smart_vector::length(&raffle.tickets));
-        let winner = *smart_vector::borrow(&raffle.tickets, winner_idx);
+        let winner_idx = randomness::u64_range(0, vector::length(&raffle.tickets));
+        let winner = *vector::borrow(&raffle.tickets, winner_idx);
 
         // Pay the winner
         let coins = coin::extract_all(&mut raffle.coins);
