@@ -114,6 +114,8 @@ pub enum FeatureFlag {
     PrimaryAPTFungibleStoreAtUserAddress,
     ObjectNativeDerivedAddress,
     DispatchableFungibleAsset,
+    NewAccountsDefaultToFaAptStore,
+    OperationsDefaultToFaAptStore,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -292,6 +294,12 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS
             },
             FeatureFlag::DispatchableFungibleAsset => AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
+            FeatureFlag::NewAccountsDefaultToFaAptStore => {
+                AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE
+            },
+            FeatureFlag::OperationsDefaultToFaAptStore => {
+                AptosFeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE
+            },
         }
     }
 }
@@ -399,6 +407,12 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::ObjectNativeDerivedAddress
             },
             AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET => FeatureFlag::DispatchableFungibleAsset,
+            AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE => {
+                FeatureFlag::NewAccountsDefaultToFaAptStore
+            },
+            AptosFeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE => {
+                FeatureFlag::OperationsDefaultToFaAptStore
+            },
         }
     }
 }
