@@ -152,17 +152,6 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> {
         let a = E::ScalarField::rand(rng);
         let b = E::ScalarField::rand(rng);
 
-        /*let cs = ConstraintSystem::new_ref();
-
-        // Set the optimization goal
-        cs.set_optimization_goal(OptimizationGoal::Constraints);
-
-        // Synthesize the circuit.
-        circuit.generate_constraints(cs.clone())?;
-        cs.finalize();
-
-        let prover = cs.borrow().unwrap();*/
-
         Self::create_proof_with_trapdoor(pk, a, b, public_inputs)
     }
 
