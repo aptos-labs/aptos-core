@@ -67,9 +67,7 @@ impl LatencyMonitor {
             // Wait for the next round
             loop_ticker.next().await;
 
-            // Get the highest committed version from storage (storage doesn't know for sure
-            //   the timestamp for the latest synced version)
-            let highest_committed_version = match self.storage.get_committed_version() {
+            let highest_synced_version = match self.storage.get_synced_version() {
                 Ok(version) => version,
                 Err(error) => {
                     sample!(
@@ -77,7 +75,7 @@ impl LatencyMonitor {
                         warn!(
                             (LogSchema::new(LogEntry::LatencyMonitor)
                                 .event(LogEvent::StorageReadFailed)
-                                .message(&format!("Unable to read the highest committed version: {:?}", error)))
+                                .message(&format!("Unable to read the highest synced version: {:?}", error)))
                         );
                     );
                     continue; // Continue to the next round
@@ -87,7 +85,7 @@ impl LatencyMonitor {
             // Get the latest block timestamp from storage
             let latest_block_timestamp_usecs = match self
                 .storage
-                .get_block_timestamp(highest_committed_version)
+                .get_block_timestamp(highest_synced_version)
             {
                 Ok(block_timestamp_usecs) => block_timestamp_usecs,
                 Err(error) => {
@@ -107,7 +105,7 @@ impl LatencyMonitor {
             self.update_block_timestamp_lag(latest_block_timestamp_usecs);
 
             // Update the latency metrics for all versions that we've now synced
-            self.update_latency_metrics(highest_committed_version);
+            self.update_latency_metrics(highest_synced_version);
 
             // Get the highest advertised version from the global data summary
             let advertised_data = &self.data_client.get_global_data_summary().advertised_data;
@@ -128,7 +126,7 @@ impl LatencyMonitor {
 
             // Update the advertised version timestamps
             self.update_advertised_version_timestamps(
-                highest_committed_version,
+                highest_synced_version,
                 highest_advertised_version,
             );
         }
