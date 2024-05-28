@@ -44,7 +44,7 @@ This module provides an interface to burn or collect and redistribute transactio
     -  [Function `emit_fee_statement`](#@Specification_1_emit_fee_statement)
 
 
-<pre><code><b>use</b> <a href="apt_primary_fungible_store.md#0x1_apt_primary_fungible_store">0x1::apt_primary_fungible_store</a>;
+<pre><code><b>use</b> <a href="aptos_account.md#0x1_aptos_account">0x1::aptos_account</a>;
 <b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -561,12 +561,12 @@ Burn transaction fees in epilogue.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">burn_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> {
     <b>if</b> (<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a>&gt;(@aptos_framework)) {
         <b>let</b> burn_ref = &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a>&gt;(@aptos_framework).burn_ref;
-        <a href="apt_primary_fungible_store.md#0x1_apt_primary_fungible_store_burn_from">apt_primary_fungible_store::burn_from</a>(burn_ref, <a href="account.md#0x1_account">account</a>, fee);
+        <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store">aptos_account::burn_from_fungible_store</a>(burn_ref, <a href="account.md#0x1_account">account</a>, fee);
     } <b>else</b> {
         <b>let</b> burn_cap = &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap;
         <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store_enabled">features::operations_default_to_fa_apt_store_enabled</a>()) {
             <b>let</b> (burn_ref, burn_receipt) = <a href="coin.md#0x1_coin_get_paired_burn_ref">coin::get_paired_burn_ref</a>(burn_cap);
-            <a href="apt_primary_fungible_store.md#0x1_apt_primary_fungible_store_burn_from">apt_primary_fungible_store::burn_from</a>(&burn_ref, <a href="account.md#0x1_account">account</a>, fee);
+            <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store">aptos_account::burn_from_fungible_store</a>(&burn_ref, <a href="account.md#0x1_account">account</a>, fee);
             <a href="coin.md#0x1_coin_return_paired_burn_ref">coin::return_paired_burn_ref</a>(burn_ref, burn_receipt);
         } <b>else</b> {
             <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>&lt;AptosCoin&gt;(
