@@ -249,7 +249,7 @@ The semantics of deposit will be governed by the function specified in DispatchF
             func
         )
     } <b>else</b> {
-        <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(store, fa)
+        <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), fa)
     }
 }
 </code></pre>
