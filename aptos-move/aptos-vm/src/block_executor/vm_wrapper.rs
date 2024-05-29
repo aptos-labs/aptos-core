@@ -7,38 +7,35 @@ use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    state_store::StateView,
+    state_store::{StateView, StateViewId},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
     },
-    vm::environment::Environment,
+    vm::environment::AptosEnvironment,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
-use std::sync::Arc;
 
-pub(crate) struct AptosExecutorTask<'a, S> {
+pub(crate) struct AptosExecutorTask {
     vm: AptosVM,
-    base_view: &'a S,
+    id: StateViewId,
 }
 
-impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
-    type Environment = (Arc<Environment>, &'a S);
+impl ExecutorTask for AptosExecutorTask {
+    type Environment = AptosEnvironment;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(env: Self::Environment) -> Self {
-        let vm = AptosVM::new_with_environment(env.0, env.1);
-        Self {
-            vm,
-            base_view: env.1,
-        }
+    fn init(env: Self::Environment, state_view: &impl StateView) -> Self {
+        let vm = AptosVM::new_with_environment(env.0, state_view);
+        let id = state_view.id();
+        Self { vm, id }
     }
 
-    // This function is called by the BlockExecutor for each transaction is intends
+    // This function is called by the BlockExecutor for each transaction it intends
     // to execute (via the ExecutorTask trait). It can be as a part of sequential
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
@@ -51,7 +48,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
         });
 
-        let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
+        let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
         let resolver = self
             .vm
             .as_move_resolver_with_group_view(executor_with_group_view);

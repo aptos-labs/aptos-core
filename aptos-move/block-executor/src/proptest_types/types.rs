@@ -828,7 +828,7 @@ where
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
-    fn init(_env: Self::Environment) -> Self {
+    fn init(_env: Self::Environment, _state_view: &impl TStateView<Key = K>) -> Self {
         Self::new()
     }
 

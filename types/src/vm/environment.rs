@@ -30,6 +30,10 @@ pub struct Environment {
     pub vm_config: VMConfig,
 }
 
+// Wrapper to allow trait bounds on the inner type.
+#[derive(Clone)]
+pub struct AptosEnvironment(pub Arc<Environment>);
+
 impl Environment {
     pub fn new(state_view: &impl StateView) -> Self {
         let features = Features::fetch_config(state_view).unwrap_or_default();

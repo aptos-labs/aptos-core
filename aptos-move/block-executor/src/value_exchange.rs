@@ -12,6 +12,7 @@ use aptos_types::{
     executable::Executable,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
+    vm::deserialization::Deserializer,
     write_set::TransactionWrite,
 };
 use bytes::Bytes;
@@ -30,18 +31,19 @@ pub(crate) struct TemporaryValueToIdentifierMapping<
     T: Transaction,
     S: TStateView<Key = T::Key>,
     X: Executable,
+    E: Deserializer,
 > {
-    latest_view: &'a LatestView<'a, T, S, X>,
+    latest_view: &'a LatestView<'a, T, S, X, E>,
     txn_idx: TxnIndex,
     // These are the delayed field keys that were touched when utilizing this mapping
     // to replace ids with values or values with ids
     delayed_field_ids: RefCell<HashSet<T::Identifier>>,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
-    TemporaryValueToIdentifierMapping<'a, T, S, X>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer>
+    TemporaryValueToIdentifierMapping<'a, T, S, X, E>
 {
-    pub fn new(latest_view: &'a LatestView<'a, T, S, X>, txn_idx: TxnIndex) -> Self {
+    pub fn new(latest_view: &'a LatestView<'a, T, S, X, E>, txn_idx: TxnIndex) -> Self {
         Self {
             latest_view,
             txn_idx,
@@ -61,8 +63,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
 // For aggregators V2, values are replaced with identifiers at deserialization time,
 // and are replaced back when the value is serialized. The "lifted" values are cached
 // by the `LatestView` in the aggregators multi-version data structure.
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIdentifierMapping
-    for TemporaryValueToIdentifierMapping<'a, T, S, X>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer>
+    ValueToIdentifierMapping for TemporaryValueToIdentifierMapping<'a, T, S, X, E>
 {
     type Identifier = T::Identifier;
 

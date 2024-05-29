@@ -28,7 +28,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput, TransactionStatus,
     },
-    vm::environment::Environment,
+    vm::environment::{AptosEnvironment, Environment},
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
@@ -416,7 +416,7 @@ impl BlockAptosVM {
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
         let executor = BlockExecutor::<
             SignatureVerifiedTransaction,
-            AptosExecutorTask<S>,
+            AptosExecutorTask,
             S,
             L,
             ExecutableTestType,
@@ -424,8 +424,7 @@ impl BlockAptosVM {
 
         let environment = Environment::new(state_view).try_enable_delayed_field_optimization();
         let ret = executor.execute_block(
-            // TODO: avoid passing both environment & state view when remaining configs are moved.
-            (Arc::new(environment), state_view),
+            AptosEnvironment(Arc::new(environment)),
             signature_verified_block,
             state_view,
         );
