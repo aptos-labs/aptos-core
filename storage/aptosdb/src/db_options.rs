@@ -154,6 +154,12 @@ fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut O
         let prefix_extractor =
             SliceTransform::create("state_key_extractor", state_key_extractor, None);
         cf_opts.set_prefix_extractor(prefix_extractor);
+        // compact SST if 1000 consecutive deletions are seen
+        cf_opts.add_compact_on_deletion_collector_factory(
+            1_000,  // sliding window size
+            1_000,  // how many deletions within the window to trigger compaction
+            0.0, // triggering based on deletion ratio, <=0 or >1 to disable
+        );
     }
 }
 
