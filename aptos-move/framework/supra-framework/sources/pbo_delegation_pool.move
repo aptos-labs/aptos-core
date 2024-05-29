@@ -733,6 +733,7 @@ module supra_framework::pbo_delegation_pool {
             let stake = vector::pop_back(&mut principle_stake);
             table::add(&mut principle_stake_table, delegator, stake);
         };
+
         move_to(&stake_pool_signer, DelegationPool {
             active_shares: pool_u64::create_with_scaling_factor(SHARES_SCALING_FACTOR),
             observed_lockup_cycle: olc_with_index(0),
