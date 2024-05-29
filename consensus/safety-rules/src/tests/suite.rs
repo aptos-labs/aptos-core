@@ -86,11 +86,18 @@ fn test_order_votes_correct_execution(safety_rules: &Callback) {
 
     let (proof, genesis_qc) = test_utils::make_genesis(&signer);
     let round = genesis_qc.certified_block().round();
+    let epoch = genesis_qc.certified_block().epoch();
 
     let data = random_payload(2048);
-
+    //        __ tc0
+    //       /
+    // genesis -- p0 -- p1 -- p2 -- p3
+    //            \
+    //             \--  tc1
     let p0 = test_utils::make_proposal_with_qc(round + 1, genesis_qc.clone(), &signer);
+    let tc0 = test_utils::make_timeout_cert(round + 1, p0.block().quorum_cert(), &signer);
     let p1 = test_utils::make_proposal_with_parent(data.clone(), round + 2, &p0, None, &signer);
+    let tc1 = test_utils::make_timeout_cert(round + 2, p1.block().quorum_cert(), &signer);
     let p2 = test_utils::make_proposal_with_parent(data.clone(), round + 3, &p1, None, &signer);
     let p3 = test_utils::make_proposal_with_parent(data, round + 4, &p2, Some(&p0), &signer);
 
@@ -114,7 +121,19 @@ fn test_order_votes_correct_execution(safety_rules: &Callback) {
 
     safety_rules.construct_and_sign_order_vote(&ov1).unwrap();
 
+    // After observing QC on block 1, can't timeout on block 0.
+    assert_err!(safety_rules.sign_timeout_with_qc(
+        &TwoChainTimeout::new(epoch, round + 1, p0.block().quorum_cert().clone()),
+        Some(&tc0),
+    ));
+
     safety_rules.construct_and_sign_order_vote(&ov2).unwrap();
+
+    // After observing QC on block 2, can't timeout on block 1.
+    assert_err!(safety_rules.sign_timeout_with_qc(
+        &TwoChainTimeout::new(epoch, round + 2, p1.block().quorum_cert().clone()),
+        Some(&tc1),
+    ));
 
     safety_rules.construct_and_sign_order_vote(&ov3).unwrap();
 }
