@@ -33,26 +33,14 @@ impl CodeGenerator for Module {
     fn emit_code_lines(&self) -> Vec<String> {
         let mut code = vec![
             "//# publish".to_string(),
-            format!("module 0xCAFE::{} {{", self.name.emit_code())
+            format!("module 0xCAFE::{} {{", self.name.emit_code()),
         ];
-        for member in &self.members {
+        for f in &self.functions {
             // Prepend 4 spaces to each line of the member's code
-            append_code_lines_with_indentation(
-                &mut code,
-                member.emit_code_lines(),
-                INDENTATION_SIZE,
-            )
+            append_code_lines_with_indentation(&mut code, f.emit_code_lines(), INDENTATION_SIZE)
         }
         code.push("}\n".to_string());
         code
-    }
-}
-
-impl CodeGenerator for ModuleMember {
-    fn emit_code_lines(&self) -> Vec<String> {
-        match self {
-            ModuleMember::Function(f) => f.emit_code_lines(),
-        }
     }
 }
 
@@ -82,7 +70,10 @@ impl CodeGenerator for Function {
             parameters,
             return_type
         )];
-        let mut body = self.body.emit_code_lines();
+        let mut body = match self.body {
+            Some(ref body) => body.emit_code_lines(),
+            None => Vec::new(),
+        };
 
         if let Some(ref expr) = self.return_stmt {
             body.push(expr.emit_code().to_string());

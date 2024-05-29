@@ -37,32 +37,36 @@ impl MoveSmith {
         }
     }
 
+    pub fn generate(&mut self, u: &mut Unstructured) -> Result<()> {
+        let num_modules = u.int_in_range(1..=self.config.max_num_modules)?;
+
+        let mut modules = Vec::new();
+        for _ in 0..num_modules {
+            modules.push(self.generate_module(u)?);
+        }
+
+        self.modules = modules;
+        Ok(())
+    }
+
     pub fn generate_module(&mut self, u: &mut Unstructured) -> Result<Module> {
         let (name, scope) = self.id_pool.next_identifier(IdentifierType::Module, &None);
 
-        let len = u.int_in_range(1..=self.config.max_num_members_in_module)?;
-        let mut members = Vec::new();
-        for _ in 0..len {
-            members.push(self.generate_module_member(u, &scope)?);
+        // Function signatures
+        let mut functions = Vec::new();
+        for _ in 0..u.int_in_range(1..=self.config.max_num_functions_in_module)? {
+            functions.push(self.generate_function_signature_only(u, &scope)?);
         }
 
-        Ok(Module { name, members })
-    }
-
-    fn generate_module_member(
-        &mut self,
-        u: &mut Unstructured,
-        parent_scope: &Scope,
-    ) -> Result<ModuleMember> {
-        match u.int_in_range(0..=0)? {
-            0 => Ok(ModuleMember::Function(
-                self.generate_function(u, parent_scope)?,
-            )),
-            _ => panic!("Invalid module member type"),
+        // Function bodies
+        for f in functions.iter_mut() {
+            self.fill_function(u, f)?;
         }
+
+        Ok(Module { name, functions })
     }
 
-    fn generate_function(
+    fn generate_function_signature_only(
         &mut self,
         u: &mut Unstructured,
         parent_scope: &Scope,
@@ -72,16 +76,19 @@ impl MoveSmith {
             .next_identifier(IdentifierType::Function, parent_scope);
         let signature = self.generate_function_signature(u, &scope)?;
 
-        let body = self.generate_function_body(u, &scope)?;
-
-        let return_stmt = self.generate_return_stmt(u, &scope, &signature)?;
-
         Ok(Function {
             signature,
             name,
-            body,
-            return_stmt,
+            body: None,
+            return_stmt: None,
         })
+    }
+
+    fn fill_function(&mut self, u: &mut Unstructured, function: &mut Function) -> Result<()> {
+        let scope = self.id_pool.get_scope_for_children(&function.name);
+        function.body = Some(self.generate_function_body(u, &scope)?);
+        function.return_stmt = self.generate_return_stmt(u, &scope, &function.signature)?;
+        Ok(())
     }
 
     fn generate_function_signature(
