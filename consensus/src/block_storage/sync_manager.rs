@@ -4,9 +4,9 @@
 
 use crate::{
     block_storage::{
+        pending_blocks::PendingBlocks,
         tracing::{observe_block, BlockStage},
         BlockReader, BlockStore,
-        pending_blocks::PendingBlocks,
     },
     counters::{
         BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER,
@@ -125,7 +125,7 @@ impl BlockStore {
         // we still need to insert ordered cert explicitly. This will send the highest ordered block
         // to execution.
         if self.order_vote_enabled {
-            self.insert_ordered_cert(&sync_info.highest_ordered_cert(), &mut retriever)
+            self.insert_ordered_cert(&sync_info.highest_ordered_cert())
                 .await?;
         } else {
             // When order votes are disabled, the highest_ordered_cert().certified_block().id() need not be
@@ -137,7 +137,7 @@ impl BlockStore {
                     .highest_ordered_cert()
                     .as_ref()
                     .clone()
-                    .into_quorum_cert(),
+                    .into_quorum_cert(self.order_vote_enabled)?,
                 &mut retriever,
             )
             .await?;
@@ -183,7 +183,6 @@ impl BlockStore {
     pub async fn insert_ordered_cert(
         &self,
         ordered_cert: &WrappedLedgerInfo,
-        retriever: &mut BlockRetriever,
     ) -> anyhow::Result<()> {
         if self.ordered_root().round() < ordered_cert.ledger_info().ledger_info().round() {
             if let Some(ordered_block) = self.get_block(ordered_cert.commit_info().id()) {
@@ -195,17 +194,6 @@ impl BlockStore {
                 }
                 SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC.inc();
                 self.send_for_execution(ordered_cert.clone()).await?;
-                if ordered_cert.ledger_info().ledger_info().ends_epoch() {
-                    retriever
-                        .network
-                        .broadcast_epoch_change(EpochChangeProof::new(
-                            vec![ordered_cert.ledger_info().clone()],
-                            // TODO: Should more be true/false?
-                            /* more = */
-                            false,
-                        ))
-                        .await;
-                }
             } else {
                 bail!("Ordered block not found in block store when inserting ordered cert");
             }
@@ -368,9 +356,12 @@ impl BlockStore {
         if !order_vote_enabled {
             // check if highest_commit_cert comes from a fork
             // if so, we need to fetch it's block as well, to have a proof of commit.
+            let highest_commit_certified_block_id = highest_commit_cert
+                .certified_block(order_vote_enabled)?
+                .id();
             if !blocks
                 .iter()
-                .any(|block| block.id() == highest_commit_cert.certified_block().id())
+                .any(|block| block.id() == highest_commit_certified_block_id)
             {
                 info!(
                     "Found forked QC {}, fetching it as well",
@@ -379,9 +370,9 @@ impl BlockStore {
                 BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC.inc_by(1);
                 let mut additional_blocks = retriever
                     .retrieve_blocks_in_range(
-                        highest_commit_cert.certified_block().id(),
+                        highest_commit_certified_block_id,
                         1,
-                        highest_commit_cert.certified_block().id(),
+                        highest_commit_certified_block_id,
                         highest_commit_cert
                             .ledger_info()
                             .get_voters(&retriever.validator_addresses()),
@@ -392,14 +383,17 @@ impl BlockStore {
                 let block = additional_blocks.pop().expect("blocks are empty");
                 assert_eq!(
                     block.id(),
-                    highest_commit_cert.certified_block().id(),
+                    highest_commit_certified_block_id,
                     "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
-                    highest_commit_cert.certified_block().id(),
+                    highest_commit_certified_block_id,
                     block.id(),
                 );
-
                 blocks.push(block);
-                quorum_certs.push(highest_commit_cert.clone().into_quorum_cert());
+                quorum_certs.push(
+                    highest_commit_cert
+                        .clone()
+                        .into_quorum_cert(order_vote_enabled)?,
+                );
             }
         }
 

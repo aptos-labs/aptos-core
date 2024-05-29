@@ -4,6 +4,7 @@
 
 use crate::{quorum_cert::QuorumCert, vote_data::VoteData};
 use anyhow::{ensure, Context};
+use aptos_crypto::hash::CryptoHash;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
@@ -56,9 +57,22 @@ impl WrappedLedgerInfo {
         }
     }
 
-    // Caution: Use this only when order_vote_enabled is set to false.
-    pub fn certified_block(&self) -> &BlockInfo {
-        self.vote_data.proposed()
+    fn verify_consensus_data_hash(&self) -> anyhow::Result<()> {
+        let vote_hash = self.vote_data.hash();
+        ensure!(
+            self.ledger_info().ledger_info().consensus_data_hash() == vote_hash,
+            "WrappedLedgerInfo's vote data hash mismatch LedgerInfo"
+        );
+        Ok(())
+    }
+
+    pub fn certified_block(&self, order_vote_enabled: bool) -> anyhow::Result<&BlockInfo> {
+        ensure!(
+            !order_vote_enabled,
+            "wrapped_ledger_info.certified_block should not be called when order votes are enabled"
+        );
+        self.verify_consensus_data_hash()?;
+        Ok(self.vote_data.proposed())
     }
 
     pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
@@ -109,8 +123,15 @@ impl WrappedLedgerInfo {
         Ok(Self::new(self.vote_data.clone(), executed_ledger_info))
     }
 
-    // Caution: Use this only when order_vote_enabled is set to false.
-    pub fn into_quorum_cert(self) -> QuorumCert {
-        QuorumCert::new(self.vote_data.clone(), self.signed_ledger_info.clone())
+    pub fn into_quorum_cert(self, order_vote_enabled: bool) -> anyhow::Result<QuorumCert> {
+        ensure!(
+            !order_vote_enabled,
+            "wrapped_ledger_info.into_quorum_cert should not be called when order votes are enabled"
+        );
+        self.verify_consensus_data_hash()?;
+        Ok(QuorumCert::new(
+            self.vote_data.clone(),
+            self.signed_ledger_info.clone(),
+        ))
     }
 }

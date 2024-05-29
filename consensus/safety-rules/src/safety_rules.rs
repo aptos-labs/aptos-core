@@ -80,7 +80,7 @@ impl SafetyRules {
     }
 
     pub(crate) fn verify_order_vote_proposal(
-        &mut self,
+        &self,
         order_vote_proposal: &OrderVoteProposal,
     ) -> Result<(), Error> {
         let proposed_block = order_vote_proposal.block();
