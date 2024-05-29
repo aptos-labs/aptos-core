@@ -8,10 +8,11 @@ use crate::{
     transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
 };
-use aptos_consensus_types::block::Block;
+use aptos_consensus_types::{block::Block, pipelined_block::OrderedBlockWindow};
 use aptos_executor_types::ExecutorResult;
+use aptos_logger::info;
 use aptos_types::transaction::SignedTransaction;
-use std::sync::Arc;
+use std::{cmp::Ordering, sync::Arc};
 
 pub struct BlockPreparer {
     payload_manager: Arc<PayloadManager>,
@@ -35,9 +36,67 @@ impl BlockPreparer {
         }
     }
 
-    pub async fn prepare_block(&self, block: &Block) -> ExecutorResult<Vec<SignedTransaction>> {
-        let (txns, max_txns_from_block_to_execute) =
+    pub async fn prepare_block(
+        &self,
+        block: &Block,
+        block_window: &OrderedBlockWindow,
+    ) -> ExecutorResult<Vec<SignedTransaction>> {
+        info!(
+            "BlockPreparer: Preparing for block {} and window {:?}",
+            block.id(),
+            block_window
+                .blocks()
+                .iter()
+                .map(|b| b.id())
+                .collect::<Vec<_>>()
+        );
+
+        let mut txns = vec![];
+        for block in block_window.blocks() {
+            let (block_txns, _) = self.payload_manager.get_transactions(block).await?;
+            txns.extend(block_txns);
+        }
+        // We take the ordered block's max_txns
+        let (current_block_txns, max_txns_from_block_to_execute) =
             self.payload_manager.get_transactions(block).await?;
+        txns.extend(current_block_txns);
+
+        info!(
+            "BlockPreparer: Prepared {} transactions for block {} and window {:?}",
+            txns.len(),
+            block.id(),
+            block_window
+                .blocks()
+                .iter()
+                .map(|b| b.id())
+                .collect::<Vec<_>>()
+        );
+
+        // TODO: Copy-pasta from Mempool OrderedQueueKey. Make them share code?
+        txns.sort_by(|a, b| {
+            match a.gas_unit_price().cmp(&b.gas_unit_price()) {
+                Ordering::Equal => {},
+                ordering => return ordering.reverse(),
+            }
+            match a
+                .expiration_timestamp_secs()
+                .cmp(&b.expiration_timestamp_secs())
+                .reverse()
+            {
+                Ordering::Equal => {},
+                ordering => return ordering.reverse(),
+            }
+            match a.sender().cmp(&b.sender()) {
+                Ordering::Equal => {},
+                ordering => return ordering.reverse(),
+            }
+            match a.sequence_number().cmp(&b.sequence_number()).reverse() {
+                Ordering::Equal => {},
+                ordering => return ordering.reverse(),
+            }
+            a.committed_hash().cmp(&b.committed_hash()).reverse()
+        });
+
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
