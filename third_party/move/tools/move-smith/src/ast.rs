@@ -10,17 +10,12 @@ pub struct Module {
     // pub address: Option<LeadingNameAccess>,
     pub name: Identifier,
     // pub is_spec_module: bool,
-    pub members: Vec<ModuleMember>,
-}
-
-#[derive(Debug, Clone)]
-pub enum ModuleMember {
-    Function(Function),
-    // Struct(StructDefinition),
-    // Use(UseDecl),
-    // Friend(FriendDecl),
-    // Constant(Constant),
-    // Spec(SpecBlock),
+    pub functions: Vec<Function>,
+    // pub strcuts: Vec<StructDefinition>,
+    // pub uses: Vec<UseDecl>,
+    // pub friends: Vec<FriendDecl>,
+    // pub constants: Vec<Constant>,
+    // pub specs: Vec<SpecBlock>,
 }
 
 #[derive(Debug, Clone)]
@@ -33,7 +28,7 @@ pub struct Function {
     // pub access_specifiers: Option<Vec<AccessSpecifier>>,
     pub name: Identifier,
     // pub inline: bool,
-    pub body: FunctionBody,
+    pub body: Option<FunctionBody>,
 
     pub return_stmt: Option<Expression>,
 }

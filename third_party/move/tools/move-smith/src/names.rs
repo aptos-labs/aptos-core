@@ -77,6 +77,17 @@ impl IdentifierPool {
         (name, scope)
     }
 
+    pub fn get_parent_scope_of(&self, id: &Identifier) -> Option<Scope> {
+        self.scopes.get(id).cloned()
+    }
+
+    pub fn get_scope_for_children(&self, id: &Identifier) -> Scope {
+        match self.scopes.get(id) {
+            Some(scope) => merge_scopes(scope, &Some(id.clone())),
+            None => Some(id.clone()),
+        }
+    }
+
     pub fn filter_identifier_in_scope(
         &self,
         identifiers: &Vec<Identifier>,
