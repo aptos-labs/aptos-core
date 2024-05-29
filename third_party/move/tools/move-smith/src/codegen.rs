@@ -55,12 +55,37 @@ impl CodeGenerator for ModuleMember {
 
 impl CodeGenerator for Function {
     fn emit_code_lines(&self) -> Vec<String> {
-        let mut code = vec![format!("fun {}() {{", self.name.emit_code())];
-        append_code_lines_with_indentation(
-            &mut code,
-            self.body.emit_code_lines(),
-            INDENTATION_SIZE,
-        );
+        let parameters = match self.signature.parameters.len() {
+            0 => "".to_string(),
+            _ => {
+                let params: Vec<String> = self
+                    .signature
+                    .parameters
+                    .iter()
+                    .map(|(ident, typ)| format!("{}: {}", ident.emit_code(), typ.emit_code()))
+                    .collect();
+                params.join(", ").to_string()
+            },
+        };
+
+        let return_type = match self.signature.return_type {
+            Some(ref typ) => format!(": {}", typ.emit_code()),
+            None => "".to_string(),
+        };
+
+        let mut code = vec![format!(
+            "fun {}({}){} {{",
+            self.name.emit_code(),
+            parameters,
+            return_type
+        )];
+        let mut body = self.body.emit_code_lines();
+
+        if let Some(ref expr) = self.return_stmt {
+            body.push(expr.emit_code().to_string());
+        }
+
+        append_code_lines_with_indentation(&mut code, body, INDENTATION_SIZE);
         code.push("}".to_string());
         code
     }
