@@ -169,6 +169,7 @@ impl MoveSmith {
                         Some(typ),
                     )?)
                 },
+                Type::Bool => Expression::Boolean(bool::arbitrary(u)?),
                 _ => unimplemented!(),
             };
             choices.push(candidate);

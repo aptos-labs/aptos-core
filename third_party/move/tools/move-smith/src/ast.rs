@@ -66,6 +66,7 @@ pub struct Declaration {
 pub enum Expression {
     NumberLiteral(NumberLiteral),
     Variable(Identifier),
+    Boolean(bool),
 }
 
 #[derive(Debug, Clone)]
