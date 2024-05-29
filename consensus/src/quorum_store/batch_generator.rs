@@ -339,7 +339,7 @@ impl BatchGenerator {
             .mempool_proxy
             .pull_internal(
                 max_count,
-                self.config.sender_max_batch_bytes as u64,
+                self.config.sender_max_total_bytes as u64,
                 self.txns_in_progress_sorted.clone(),
             )
             .await
