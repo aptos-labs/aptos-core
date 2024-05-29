@@ -16894,7 +16894,7 @@ dependencies = [
 [[package]]
 name = "x25519-dalek"
 version = "1.2.0"
-source = "git+https://github.com/aptos-labs/x25519-dalek?branch=zeroize_v1#762a9501668d213daa4a1864fa1f9db22716b661"
+source = "git+https://github.com/Tranduy1dol/x25519-dalek?branch=zeroize_v1.7#d98aca90959611359089b2194874faa200d55977"
 dependencies = [
  "curve25519-dalek 3.2.0",
  "rand_core 0.5.1",
