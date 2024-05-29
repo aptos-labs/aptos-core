@@ -41,6 +41,8 @@ Flags:
     You can use the `MOVE_PR_PROFILE` environment variable to
     determine which cargo profile to use. (The default
     is `ci`, `debug` might be faster for build.)
+    You can also run those tests with `UB=1` to record new
+    baseline files where applicable.
 EOF
       exit 1
       ;;
@@ -84,7 +86,6 @@ ARTIFACT_CRATE_PATHS="\
 # This is a partial list of Move crates, to keep this script fast.
 # May be extended as needed but should be kept minimal.
 MOVE_CRATES="\
-  -p move-model\
   -p move-stackless-bytecode\
   -p move-stdlib\
   -p move-bytecode-verifier\
@@ -93,21 +94,43 @@ MOVE_CRATES="\
   -p move-compiler-v2\
   -p move-compiler-v2-transactional-tests\
   -p move-prover-boogie-backend\
-  -p move-prover-bytecode-pipeline\
   -p move-prover\
-  -p move-docgen\
-  -p move-to-yul\
   -p move-transactional-test-runner\
   -p move-vm-runtime\
-  -p move-vm-transactional-tests\
   -p move-vm-types\
-  -p move-unit-test\
-  -p move-package\
 "
 
-INTEGRATION_TEST_CRATES="\
+# This is a list of crates for integration testing which depends on the
+# MOVE_COMPILER_V2 env var.
+MOVE_CRATES_V2_ENV_DEPENDENT="\
+  -p aptos-transactional-test-harness \
+  -p bytecode-verifier-transactional-tests \
+  -p move-async-vm \
+  -p move-cli \
+  -p move-model \
+  -p move-package \
+  -p move-prover-bytecode-pipeline \
+  -p move-stackless-bytecode \
+  -p move-to-yul \
+  -p move-transactional-test-runner \
+  -p move-unit-test \
+  -p move-vm-transactional-tests \
+  -p aptos-move-stdlib\
+  -p move-abigen\
+  -p move-docgen\
+  -p move-stdlib\
+  -p move-table-extension\
+  -p move-vm-integration-tests\
+  -p aptos-move-examples\
   -p e2e-move-tests\
   -p aptos-framework\
+"
+
+# Crates which do depend on compiler env but currently
+# do not maintain separate v2 baseline files. Those
+# are listed here for documentation and later fixing.
+MOVE_CRATES_V2_ENV_DEPENDENT_FAILURES="\
+  -p aptos-api\
 "
 
 if [ ! -z "$CHECK" ]; then
@@ -150,11 +173,11 @@ if [ ! -z "$TEST" ]; then
 fi
 
 if [ ! -z "$INTEGRATION_TEST" ]; then
-  echo "*************** [move-pr] Running extended tests"
+  echo "*************** [move-pr] Running integration tests"
   (
     cd $BASE
-    cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
-     $MOVE_CRATES $INTEGRATION_TEST_CRATES
+    MOVE_COMPILER_V2=false cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
+       $MOVE_CRATES $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi
 
@@ -162,8 +185,14 @@ if [ ! -z "$COMPILER_V2_TEST" ]; then
   echo "*************** [move-pr] Running integration tests with compiler v2"
   (
     cd $BASE
+    # Need to ensure that aptos-cached-packages is build without the v2 flag,
+    # to avoid regenerating incompatible markdown docs. We really need to
+    # first build and then test the exact same package set, otherwise
+    # rebuild will be triggered via feature unification.
+    MOVE_COMPILER_V2=false cargo build --profile $MOVE_PR_PROFILE \
+     $MOVE_CRATES_V2_ENV_DEPENDENT
     MOVE_COMPILER_V2=true cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
-     $INTEGRATION_TEST_CRATES
+     $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi
 
