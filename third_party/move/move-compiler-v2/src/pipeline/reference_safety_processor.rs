@@ -248,7 +248,7 @@ impl BorrowEdgeKind {
 
     /// Determines whether the region derived from this edge has overlap with the region
     /// of the other edge. Overlap can only be excluded for field edges.
-    fn overlaps(&self, other: &BorrowEdgeKind) -> bool {
+    fn could_overlap(&self, other: &BorrowEdgeKind) -> bool {
         use BorrowEdgeKind::*;
         match (self, other) {
             (BorrowField(_, field1), BorrowField(_, field2)) => field1 == field2,
@@ -257,8 +257,9 @@ impl BorrowEdgeKind {
     }
 
     /// Returns true if there is any overlap between the edges in the two sets.
-    fn any_overlap(set1: &BTreeSet<BorrowEdgeKind>, set2: &BTreeSet<BorrowEdgeKind>) -> bool {
-        set1.iter().any(|k1| set2.iter().any(|k2| k1.overlaps(k2)))
+    fn any_could_overlap(set1: &BTreeSet<BorrowEdgeKind>, set2: &BTreeSet<BorrowEdgeKind>) -> bool {
+        set1.iter()
+            .any(|k1| set2.iter().any(|k2| k1.could_overlap(k2)))
     }
 }
 
@@ -553,10 +554,10 @@ impl LifetimeState {
     ///            |    |
     ///           n1   n2
     /// ```
-    /// If `e1.kind == e2.kind`, this forms a hyper edge `{e1.kind} -> [e1, e2]`, otherwise it will
-    /// be two independent hyper edges `{e1.kind} -> [e1]` and `{e2.kind} -> [e2]`. The former
-    /// reflects that the edges of the same kind are the same abstract borrow operation, independent
-    /// of the number of edges involved.
+    /// If `kind == e1.kind == e2.kind`, this forms a hyper edge `{kind} -> [e1, e2]`, otherwise
+    /// it will be two independent hyper edges `{e1.kind} -> [e1]` and `{e2.kind} -> [e2]`. The
+    /// former reflects that the edges of the same kind are the same abstract borrow operation,
+    /// independent of the number of edges involved.
     fn group_children_into_hyper_edges(
         &self,
         labels: &BTreeSet<LifetimeLabel>,
@@ -572,20 +573,11 @@ impl LifetimeState {
         // Now compute the result.
         let mut result: BTreeMap<BTreeSet<BorrowEdgeKind>, Vec<&BorrowEdge>> = BTreeMap::new();
         for (_, mut edges) in target_to_incoming {
-            if edges.len() > 1 {
-                // Weak set of edges need to be grouped together
-                let key = edges
-                    .iter()
-                    .map(|e| e.kind.clone())
-                    .collect::<BTreeSet<_>>();
-                result.entry(key).or_default().append(&mut edges);
-            } else {
-                let edge = edges.pop().unwrap();
-                result
-                    .entry([edge.kind.clone()].into_iter().collect())
-                    .or_default()
-                    .push(edge)
-            }
+            let key = edges
+                .iter()
+                .map(|e| e.kind.clone())
+                .collect::<BTreeSet<_>>();
+            result.entry(key).or_default().append(&mut edges);
         }
         result
     }
@@ -1190,7 +1182,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     );
                 }
                 if (BorrowEdgeKind::any_is_mut(kinds1) || BorrowEdgeKind::any_is_mut(kinds2))
-                    && BorrowEdgeKind::any_overlap(kinds1, kinds2)
+                    && BorrowEdgeKind::any_could_overlap(kinds1, kinds2)
                 {
                     for (e1, e2) in edges1.iter().cartesian_product(edges2.iter()) {
                         if e1 == e2 || !edges_reported.insert([*e1, *e2].into_iter().collect()) {
@@ -1720,7 +1712,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     if &sibling_edge.target == label
                         || sibling_edge.kind == edge.kind
                             && matches!(edge.kind, BorrowEdgeKind::Call(..))
-                        || !sibling_edge.kind.overlaps(&edge.kind)
+                        || !sibling_edge.kind.could_overlap(&edge.kind)
                     {
                         // The sibling edge is harmless if
                         // (a) it is not actually a sibling but leads to the same target
