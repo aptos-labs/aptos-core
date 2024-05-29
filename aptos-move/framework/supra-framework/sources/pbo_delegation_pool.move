@@ -1505,11 +1505,13 @@ module supra_framework::pbo_delegation_pool {
         let new_shares = pool_u64::amount_to_shares(pending_inactive_shares_pool(pool), coins_amount);
         // never create a new pending withdrawal unless delegator owns some pending_inactive shares
         if (new_shares == 0) { return 0 };
+
         // Always update governance records before any change to the shares pool.
         let pool_address = get_pool_address(pool);
         if (partial_governance_voting_enabled(pool_address)) {
             update_governance_records_for_buy_in_pending_inactive_shares(pool, pool_address, new_shares, shareholder);
         };
+
         // cannot buy inactive shares, only pending_inactive at current lockup cycle
         pool_u64::buy_in(pending_inactive_shares_pool_mut(pool), shareholder, coins_amount);
 
@@ -1973,6 +1975,7 @@ module supra_framework::pbo_delegation_pool {
         if (!account::exists_at(validator_address)) {
             account::create_account_for_test(validator_address);
         };
+
         initialize_delegation_pool(validator, commission_percentage, vector::empty<u8>(), delegator_address, principle_stake, coin, principle_lockup_time);
         let pool_address = get_owned_pool_address(validator_address);
 
@@ -2542,151 +2545,153 @@ module supra_framework::pbo_delegation_pool {
         assert_delegation(validator_address, pool_address, 300 * ONE_APT - fee, 0, 0);
         stake::assert_stake_pool(pool_address, 100 * ONE_APT, 0, 200 * ONE_APT, 0);
 
-        // // cannot unlock pending_active stake (only 100/300 stake can be displaced)
-        // unlock(validator, pool_address, 100 * ONE_APT);
-        // assert_delegation(validator_address, pool_address, 200 * ONE_APT - fee, 0, 100 * ONE_APT);
-        // assert_pending_withdrawal(validator_address, pool_address, true, 0, false, 100 * ONE_APT);
-        // stake::assert_stake_pool(pool_address, 0, 0, 200 * ONE_APT, 100 * ONE_APT);
-        // assert_inactive_shares_pool(pool_address, 0, true, 100 * ONE_APT);
-        //
-        // // reactivate entire pending_inactive stake progressively
-        // reactivate_stake(validator, pool_address, 50 * ONE_APT);
-        //
-        // assert_delegation(validator_address, pool_address, 250 * ONE_APT - fee, 0, 50 * ONE_APT);
-        // assert_pending_withdrawal(validator_address, pool_address, true, 0, false, 50 * ONE_APT);
-        // stake::assert_stake_pool(pool_address, 50 * ONE_APT, 0, 200 * ONE_APT, 50 * ONE_APT);
-        //
-        // reactivate_stake(validator, pool_address, 50 * ONE_APT);
-        //
-        // assert_delegation(validator_address, pool_address, 300 * ONE_APT - fee, 0, 0);
-        // assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
-        // stake::assert_stake_pool(pool_address, 100 * ONE_APT, 0, 200 * ONE_APT, 0);
-        // // pending_inactive shares pool has not been deleted (as can still `unlock` this OLC)
-        // assert_inactive_shares_pool(pool_address, 0, true, 0);
-        //
-        // end_aptos_epoch();
-        // // 10000000000 * 1.01 active stake + 20000000000 pending_active stake
-        // assert_delegation(validator_address, pool_address, 301 * ONE_APT, 0, 0);
-        // stake::assert_stake_pool(pool_address, 301 * ONE_APT, 0, 0, 0);
-        //
-        // // can unlock more than at previous epoch as the pending_active stake became active
-        // unlock(validator, pool_address, 150 * ONE_APT);
-        // assert_delegation(validator_address, pool_address, 15100000001, 0, 14999999999);
-        // stake::assert_stake_pool(pool_address, 15100000001, 0, 0, 14999999999);
-        // assert_pending_withdrawal(validator_address, pool_address, true, 0, false, 14999999999);
-        //
-        // assert!(stake::get_remaining_lockup_secs(pool_address) == LOCKUP_CYCLE_SECONDS - EPOCH_DURATION, 0);
-        // end_aptos_epoch(); // additionally forwards EPOCH_DURATION seconds
-        //
-        // // pending_inactive stake should have not been inactivated
-        // // 15100000001 * 1.01 active stake + 14999999999 pending_inactive * 1.01 stake
-        // assert_delegation(validator_address, pool_address, 15251000001, 0, 15149999998);
-        // assert_pending_withdrawal(validator_address, pool_address, true, 0, false, 15149999998);
-        // stake::assert_stake_pool(pool_address, 15251000001, 0, 0, 15149999998);
-        //
-        // timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS - 3 * EPOCH_DURATION);
-        // end_aptos_epoch(); // additionally forwards EPOCH_DURATION seconds and expires lockup cycle
-        //
-        // // 15251000001 * 1.01 active stake + 15149999998 * 1.01 pending_inactive(now inactive) stake
-        // assert_delegation(validator_address, pool_address, 15403510001, 15301499997, 0);
-        // assert_pending_withdrawal(validator_address, pool_address, true, 0, true, 15301499997);
-        // stake::assert_stake_pool(pool_address, 15403510001, 15301499997, 0, 0);
-        //
-        // // add 50 coins from another account
-        // stake::mint(delegator, 50 * ONE_APT);
-        // add_stake(delegator, pool_address, 50 * ONE_APT);
-        //
-        // // observed lockup cycle should have advanced at `add_stake`(on synchronization)
-        // assert!(observed_lockup_cycle(pool_address) == 1, 0);
-        //
-        // fee = get_add_stake_fee(pool_address, 50 * ONE_APT);
-        // assert_delegation(delegator_address, pool_address, 4999999999 - fee, 0, 0);
-        // assert_delegation(validator_address, pool_address, 15403510001, 15301499997, 0);
-        // stake::assert_stake_pool(pool_address, 15403510001, 15301499997, 50 * ONE_APT, 0);
-        //
-        // // cannot withdraw stake unlocked by others
-        // withdraw(delegator, pool_address, 50 * ONE_APT);
-        // assert!(coin::balance<SupraCoin>(delegator_address) == 0, 0);
-        //
-        // // withdraw own unlocked stake
-        // withdraw(validator, pool_address, 15301499997);
-        // assert!(coin::balance<SupraCoin>(validator_address) == 15301499997, 0);
-        // assert_delegation(validator_address, pool_address, 15403510001, 0, 0);
-        // // pending withdrawal has been executed and deleted
-        // assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
-        // // inactive shares pool on OLC 0 has been deleted because its stake has been withdrawn
-        // assert_inactive_shares_pool(pool_address, 0, false, 0);
-        //
-        // // new pending withdrawal can be created on lockup cycle 1
-        // unlock(validator, pool_address, 5403510001);
-        // assert_delegation(validator_address, pool_address, 10000000000, 0, 5403510000);
-        // assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 5403510000);
-        //
-        // // end lockup cycle 1
-        // timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-        // end_aptos_epoch();
-        //
-        // // 10000000000 * 1.01 active stake + 5403510000 * 1.01 pending_inactive(now inactive) stake
-        // assert_delegation(validator_address, pool_address, 10100000000, 5457545100, 0);
-        // assert_pending_withdrawal(validator_address, pool_address, true, 1, true, 5457545100);
-        //
-        // // unlock when the pending withdrawal exists and gets automatically executed
-        // let balance = coin::balance<SupraCoin>(validator_address);
-        // unlock(validator, pool_address, 10100000000);
-        // assert!(coin::balance<SupraCoin>(validator_address) == balance + 5457545100, 0);
-        // assert_delegation(validator_address, pool_address, 0, 0, 10100000000);
-        // // this is the new pending withdrawal replacing the executed one
-        // assert_pending_withdrawal(validator_address, pool_address, true, 2, false, 10100000000);
-        //
-        // // create dummy validator to ensure the existing validator can leave the set
-        // let coin = stake::mint_coins(100 * ONE_APT);
-        // initialize_test_validator(delegator, 100 * ONE_APT, true, true, delegator_address_vec, principle_stake, coin, principle_lockup_time);
-        // // inactivate validator
-        // stake::leave_validator_set(validator, pool_address);
-        // end_aptos_epoch();
-        //
-        // // expire lockup cycle on the stake pool
-        // timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-        // let observed_lockup_cycle = observed_lockup_cycle(pool_address);
-        // end_aptos_epoch();
-        //
-        // // observed lockup cycle should be unchanged as no stake has been inactivated
-        // synchronize_delegation_pool(pool_address);
-        // assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle, 0);
-        //
-        // // stake is pending_inactive as it has not been inactivated
-        // stake::assert_stake_pool(pool_address, 5100500001, 0, 0, 10303010000);
-        // // 10100000000 * 1.01 * 1.01 pending_inactive stake
-        // assert_delegation(validator_address, pool_address, 0, 0, 10303010000);
-        // // the pending withdrawal should be reported as still pending
-        // assert_pending_withdrawal(validator_address, pool_address, true, 2, false, 10303010000);
-        //
-        // // validator is inactive and lockup expired => pending_inactive stake is withdrawable
-        // balance = coin::balance<SupraCoin>(validator_address);
-        // withdraw(validator, pool_address, 10303010000);
-        //
-        // assert!(coin::balance<SupraCoin>(validator_address) == balance + 10303010000, 0);
-        // assert_delegation(validator_address, pool_address, 0, 0, 0);
-        // assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
-        // stake::assert_stake_pool(pool_address, 5100500001, 0, 0, 0);
-        // // pending_inactive shares pool has not been deleted (as can still `unlock` this OLC)
-        // assert_inactive_shares_pool(pool_address, observed_lockup_cycle(pool_address), true, 0);
-        //
-        // stake::mint(validator, 30 * ONE_APT);
-        // add_stake(validator, pool_address, 30 * ONE_APT);
-        // unlock(validator, pool_address, 10 * ONE_APT);
-        //
-        // assert_delegation(validator_address, pool_address, 1999999999, 0, 1000000000);
-        // // the pending withdrawal should be reported as still pending
-        // assert_pending_withdrawal(validator_address, pool_address, true, 2, false, 1000000000);
-        //
-        // balance = coin::balance<SupraCoin>(validator_address);
-        // // pending_inactive balance would be under threshold => redeem entire balance
-        // withdraw(validator, pool_address, 1);
-        // // pending_inactive balance has been withdrawn and the pending withdrawal executed
-        // assert_delegation(validator_address, pool_address, 1999999999, 0, 0);
-        // assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
-        // assert!(coin::balance<SupraCoin>(validator_address) == balance + 1000000000, 0);
+        // cannot unlock pending_active stake (only 100/300 stake can be displaced)
+        unlock(validator, pool_address, 100 * ONE_APT);
+        assert_delegation(validator_address, pool_address, 200 * ONE_APT - fee, 0, 100 * ONE_APT);
+        assert_pending_withdrawal(validator_address, pool_address, true, 0, false, 100 * ONE_APT);
+        stake::assert_stake_pool(pool_address, 0, 0, 200 * ONE_APT, 100 * ONE_APT);
+        assert_inactive_shares_pool(pool_address, 0, true, 100 * ONE_APT);
+
+        // reactivate entire pending_inactive stake progressively
+        reactivate_stake(validator, pool_address, 50 * ONE_APT);
+
+        assert_delegation(validator_address, pool_address, 250 * ONE_APT - fee, 0, 50 * ONE_APT);
+        assert_pending_withdrawal(validator_address, pool_address, true, 0, false, 50 * ONE_APT);
+        stake::assert_stake_pool(pool_address, 50 * ONE_APT, 0, 200 * ONE_APT, 50 * ONE_APT);
+
+        reactivate_stake(validator, pool_address, 50 * ONE_APT);
+
+        assert_delegation(validator_address, pool_address, 300 * ONE_APT - fee, 0, 0);
+        assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
+        stake::assert_stake_pool(pool_address, 100 * ONE_APT, 0, 200 * ONE_APT, 0);
+        // pending_inactive shares pool has not been deleted (as can still `unlock` this OLC)
+        assert_inactive_shares_pool(pool_address, 0, true, 0);
+
+        end_aptos_epoch();
+        // 10000000000 * 1.01 active stake + 20000000000 pending_active stake
+        assert_delegation(validator_address, pool_address, 301 * ONE_APT, 0, 0);
+        stake::assert_stake_pool(pool_address, 301 * ONE_APT, 0, 0, 0);
+
+        // can unlock more than at previous epoch as the pending_active stake became active
+        unlock(validator, pool_address, 150 * ONE_APT);
+        assert_delegation(validator_address, pool_address, 15100000001, 0, 14999999999);
+        stake::assert_stake_pool(pool_address, 15100000001, 0, 0, 14999999999);
+        assert_pending_withdrawal(validator_address, pool_address, true, 0, false, 14999999999);
+
+        assert!(stake::get_remaining_lockup_secs(pool_address) == LOCKUP_CYCLE_SECONDS - EPOCH_DURATION, 0);
+        end_aptos_epoch(); // additionally forwards EPOCH_DURATION seconds
+
+        // pending_inactive stake should have not been inactivated
+        // 15100000001 * 1.01 active stake + 14999999999 pending_inactive * 1.01 stake
+        assert_delegation(validator_address, pool_address, 15251000001, 0, 15149999998);
+        assert_pending_withdrawal(validator_address, pool_address, true, 0, false, 15149999998);
+        stake::assert_stake_pool(pool_address, 15251000001, 0, 0, 15149999998);
+
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS - 3 * EPOCH_DURATION);
+        end_aptos_epoch(); // additionally forwards EPOCH_DURATION seconds and expires lockup cycle
+
+        // 15251000001 * 1.01 active stake + 15149999998 * 1.01 pending_inactive(now inactive) stake
+        assert_delegation(validator_address, pool_address, 15403510001, 15301499997, 0);
+        assert_pending_withdrawal(validator_address, pool_address, true, 0, true, 15301499997);
+        stake::assert_stake_pool(pool_address, 15403510001, 15301499997, 0, 0);
+
+        // add 50 coins from another account
+        stake::mint(delegator, 50 * ONE_APT);
+        add_stake(delegator, pool_address, 50 * ONE_APT);
+
+        // observed lockup cycle should have advanced at `add_stake`(on synchronization)
+        assert!(observed_lockup_cycle(pool_address) == 1, 0);
+
+        fee = get_add_stake_fee(pool_address, 50 * ONE_APT);
+        assert_delegation(delegator_address, pool_address, 4999999999 - fee, 0, 0);
+        assert_delegation(validator_address, pool_address, 15403510001, 15301499997, 0);
+        stake::assert_stake_pool(pool_address, 15403510001, 15301499997, 50 * ONE_APT, 0);
+
+        // cannot withdraw stake unlocked by others
+        withdraw(delegator, pool_address, 50 * ONE_APT);
+        assert!(coin::balance<SupraCoin>(delegator_address) == 0, 0);
+
+        // withdraw own unlocked stake
+        withdraw(validator, pool_address, 15301499997);
+        assert!(coin::balance<SupraCoin>(validator_address) == 15301499997, 0);
+        assert_delegation(validator_address, pool_address, 15403510001, 0, 0);
+        // pending withdrawal has been executed and deleted
+        assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
+        // inactive shares pool on OLC 0 has been deleted because its stake has been withdrawn
+        assert_inactive_shares_pool(pool_address, 0, false, 0);
+
+        // new pending withdrawal can be created on lockup cycle 1
+        unlock(validator, pool_address, 5403510001);
+        assert_delegation(validator_address, pool_address, 10000000000, 0, 5403510000);
+        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 5403510000);
+
+        // end lockup cycle 1
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 10000000000 * 1.01 active stake + 5403510000 * 1.01 pending_inactive(now inactive) stake
+        assert_delegation(validator_address, pool_address, 10100000000, 5457545100, 0);
+        assert_pending_withdrawal(validator_address, pool_address, true, 1, true, 5457545100);
+
+        // unlock when the pending withdrawal exists and gets automatically executed
+        let balance = coin::balance<SupraCoin>(validator_address);
+        unlock(validator, pool_address, 10100000000);
+        assert!(coin::balance<SupraCoin>(validator_address) == balance + 5457545100, 0);
+        assert_delegation(validator_address, pool_address, 0, 0, 10100000000);
+        // this is the new pending withdrawal replacing the executed one
+        assert_pending_withdrawal(validator_address, pool_address, true, 2, false, 10100000000);
+
+        // create dummy validator to ensure the existing validator can leave the set
+        let delegator_address_vec = vector[@0x010];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
+        initialize_test_validator(delegator, 100 * ONE_APT, true, true, delegator_address_vec, principle_stake, coin, principle_lockup_time);
+        // inactivate validator
+        stake::leave_validator_set(validator, pool_address);
+        end_aptos_epoch();
+
+        // expire lockup cycle on the stake pool
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        let observed_lockup_cycle = observed_lockup_cycle(pool_address);
+        end_aptos_epoch();
+
+        // observed lockup cycle should be unchanged as no stake has been inactivated
+        synchronize_delegation_pool(pool_address);
+        assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle, 0);
+
+        // stake is pending_inactive as it has not been inactivated
+        stake::assert_stake_pool(pool_address, 5100500001, 0, 0, 10303010000);
+        // 10100000000 * 1.01 * 1.01 pending_inactive stake
+        assert_delegation(validator_address, pool_address, 0, 0, 10303010000);
+        // the pending withdrawal should be reported as still pending
+        assert_pending_withdrawal(validator_address, pool_address, true, 2, false, 10303010000);
+
+        // validator is inactive and lockup expired => pending_inactive stake is withdrawable
+        balance = coin::balance<SupraCoin>(validator_address);
+        withdraw(validator, pool_address, 10303010000);
+
+        assert!(coin::balance<SupraCoin>(validator_address) == balance + 10303010000, 0);
+        assert_delegation(validator_address, pool_address, 0, 0, 0);
+        assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
+        stake::assert_stake_pool(pool_address, 5100500001, 0, 0, 0);
+        // pending_inactive shares pool has not been deleted (as can still `unlock` this OLC)
+        assert_inactive_shares_pool(pool_address, observed_lockup_cycle(pool_address), true, 0);
+
+        stake::mint(validator, 30 * ONE_APT);
+        add_stake(validator, pool_address, 30 * ONE_APT);
+        unlock(validator, pool_address, 10 * ONE_APT);
+
+        assert_delegation(validator_address, pool_address, 1999999999, 0, 1000000000);
+        // the pending withdrawal should be reported as still pending
+        assert_pending_withdrawal(validator_address, pool_address, true, 2, false, 1000000000);
+
+        balance = coin::balance<SupraCoin>(validator_address);
+        // pending_inactive balance would be under threshold => redeem entire balance
+        withdraw(validator, pool_address, 1);
+        // pending_inactive balance has been withdrawn and the pending withdrawal executed
+        assert_delegation(validator_address, pool_address, 1999999999, 0, 0);
+        assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
+        assert!(coin::balance<SupraCoin>(validator_address) == balance + 1000000000, 0);
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
@@ -2976,94 +2981,96 @@ module supra_framework::pbo_delegation_pool {
         stake::mint(delegator, 200 * ONE_APT);
         add_stake(delegator, pool_address, 200 * ONE_APT);
 
-        // // create inactive and pending_inactive stakes on the stake pool
-        // unlock(validator, pool_address, 200 * ONE_APT);
-        //
-        // timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-        // end_aptos_epoch();
-        //
-        // unlock(delegator, pool_address, 100 * ONE_APT);
-        //
-        // // check no excess pending_inactive is inactivated in the special case
-        // // the validator had gone inactive before its lockup expired
-        //
-        // let observed_lockup_cycle = observed_lockup_cycle(pool_address);
-        //
-        // // create dummy validator to ensure the existing validator can leave the set
-        // let coin = stake::mint_coins(100 * ONE_APT);
-        // initialize_test_validator(delegator, 100 * ONE_APT, true, true, delegator_address_vec, principle_stake, coin, principle_lockup_time);
-        // // inactivate validator
-        // stake::leave_validator_set(validator, pool_address);
-        // end_aptos_epoch();
-        // assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE, 0);
-        //
-        // // expire lockup afterwards
-        // timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-        // end_aptos_epoch();
-        //
-        // synchronize_delegation_pool(pool_address);
-        // // no new inactive stake detected => OLC does not advance
-        // assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle, 0);
-        //
-        // // pending_inactive stake has not been inactivated
-        // stake::assert_stake_pool(pool_address, 113231100001, 20200000000, 0, 10200999997);
-        // assert_delegation(delegator_address, pool_address, 10201000000, 0, 10200999997);
-        // assert_delegation(validator_address, pool_address, 103030100000, 20200000000, 0);
-        //
-        // // withdraw some inactive stake (remaining pending_inactive is not inactivated)
-        // withdraw(validator, pool_address, 200000000);
-        // stake::assert_stake_pool(pool_address, 113231100001, 20000000001, 0, 10200999997);
-        // assert_delegation(delegator_address, pool_address, 10201000000, 0, 10200999997);
-        // assert_delegation(validator_address, pool_address, 103030100000, 20000000001, 0);
-        //
-        // // withdraw some pending_inactive stake (remaining pending_inactive is not inactivated)
-        // withdraw(delegator, pool_address, 200999997);
-        // stake::assert_stake_pool(pool_address, 113231100001, 20000000001, 0, 10000000001);
-        // assert_delegation(delegator_address, pool_address, 10201000000, 0, 10000000001);
-        // assert_delegation(validator_address, pool_address, 103030100000, 20000000001, 0);
-        //
-        // // no new inactive stake detected => OLC does not advance
-        // assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle, 0);
-        //
-        // unlock(delegator, pool_address, 10201000000);
-        // withdraw(delegator, pool_address, 10201000000);
-        // assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle, 0);
-        //
-        // assert_delegation(delegator_address, pool_address, 0, 0, 10000000002);
-        // assert_delegation(validator_address, pool_address, 103030100001, 20000000001, 0);
-        // assert_pending_withdrawal(validator_address, pool_address, true, 0, true, 20000000001);
-        // assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10000000002);
-        // stake::assert_stake_pool(pool_address, 103030100001, 20000000001, 0, 10000000002);
-        //
-        // // reactivate validator
-        // stake::join_validator_set(validator, pool_address);
-        // assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_PENDING_ACTIVE, 0);
-        // end_aptos_epoch();
-        //
-        // assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 0);
-        // // no rewards have been produced yet and no stake inactivated as lockup has been refreshed
-        // stake::assert_stake_pool(pool_address, 103030100001, 20000000001, 0, 10000000002);
-        //
-        // synchronize_delegation_pool(pool_address);
-        // assert_pending_withdrawal(validator_address, pool_address, true, 0, true, 20000000001);
-        // assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10000000002);
-        // assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle, 0);
-        //
-        // // cannot withdraw pending_inactive stake anymore
-        // withdraw(delegator, pool_address, 10000000002);
-        // assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10000000002);
-        //
-        // // earning rewards is resumed from this epoch on
-        // end_aptos_epoch();
-        // stake::assert_stake_pool(pool_address, 104060401001, 20000000001, 0, 10100000002);
-        //
-        // // new pending_inactive stake earns rewards but so does the old one
-        // unlock(validator, pool_address, 104060401001);
-        // assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 104060401000);
-        // assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10100000002);
-        // end_aptos_epoch();
-        // assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 105101005010);
-        // assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10201000002);
+        // create inactive and pending_inactive stakes on the stake pool
+        unlock(validator, pool_address, 200 * ONE_APT);
+
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        unlock(delegator, pool_address, 100 * ONE_APT);
+
+        // check no excess pending_inactive is inactivated in the special case
+        // the validator had gone inactive before its lockup expired
+
+        let observed_lockup_cycle = observed_lockup_cycle(pool_address);
+
+        // create dummy validator to ensure the existing validator can leave the set
+        let delegator_address_vec = vector[@0x010];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
+        initialize_test_validator(delegator, 100 * ONE_APT, true, true, delegator_address_vec, principle_stake, coin, principle_lockup_time);
+        // inactivate validator
+        stake::leave_validator_set(validator, pool_address);
+        end_aptos_epoch();
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE, 0);
+
+        // expire lockup afterwards
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        synchronize_delegation_pool(pool_address);
+        // no new inactive stake detected => OLC does not advance
+        assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle, 0);
+
+        // pending_inactive stake has not been inactivated
+        stake::assert_stake_pool(pool_address, 113231100001, 20200000000, 0, 10200999997);
+        assert_delegation(delegator_address, pool_address, 10201000000, 0, 10200999997);
+        assert_delegation(validator_address, pool_address, 103030100000, 20200000000, 0);
+
+        // withdraw some inactive stake (remaining pending_inactive is not inactivated)
+        withdraw(validator, pool_address, 200000000);
+        stake::assert_stake_pool(pool_address, 113231100001, 20000000001, 0, 10200999997);
+        assert_delegation(delegator_address, pool_address, 10201000000, 0, 10200999997);
+        assert_delegation(validator_address, pool_address, 103030100000, 20000000001, 0);
+
+        // withdraw some pending_inactive stake (remaining pending_inactive is not inactivated)
+        withdraw(delegator, pool_address, 200999997);
+        stake::assert_stake_pool(pool_address, 113231100001, 20000000001, 0, 10000000001);
+        assert_delegation(delegator_address, pool_address, 10201000000, 0, 10000000001);
+        assert_delegation(validator_address, pool_address, 103030100000, 20000000001, 0);
+
+        // no new inactive stake detected => OLC does not advance
+        assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle, 0);
+
+        unlock(delegator, pool_address, 10201000000);
+        withdraw(delegator, pool_address, 10201000000);
+        assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle, 0);
+
+        assert_delegation(delegator_address, pool_address, 0, 0, 10000000002);
+        assert_delegation(validator_address, pool_address, 103030100001, 20000000001, 0);
+        assert_pending_withdrawal(validator_address, pool_address, true, 0, true, 20000000001);
+        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10000000002);
+        stake::assert_stake_pool(pool_address, 103030100001, 20000000001, 0, 10000000002);
+
+        // reactivate validator
+        stake::join_validator_set(validator, pool_address);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_PENDING_ACTIVE, 0);
+        end_aptos_epoch();
+
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 0);
+        // no rewards have been produced yet and no stake inactivated as lockup has been refreshed
+        stake::assert_stake_pool(pool_address, 103030100001, 20000000001, 0, 10000000002);
+
+        synchronize_delegation_pool(pool_address);
+        assert_pending_withdrawal(validator_address, pool_address, true, 0, true, 20000000001);
+        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10000000002);
+        assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle, 0);
+
+        // cannot withdraw pending_inactive stake anymore
+        withdraw(delegator, pool_address, 10000000002);
+        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10000000002);
+
+        // earning rewards is resumed from this epoch on
+        end_aptos_epoch();
+        stake::assert_stake_pool(pool_address, 104060401001, 20000000001, 0, 10100000002);
+
+        // new pending_inactive stake earns rewards but so does the old one
+        unlock(validator, pool_address, 104060401001);
+        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 104060401000);
+        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10100000002);
+        end_aptos_epoch();
+        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 105101005010);
+        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10201000002);
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123)]
@@ -4050,31 +4057,31 @@ module supra_framework::pbo_delegation_pool {
         assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator1_address) == 0, 1);
         assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator2_address) == 0, 1);
 
-        // // delegator1 unlocks stake and changes its voter. No voting power change until next lockup cycle.
-        // unlock(delegator1, pool_address, 90 * ONE_APT);
-        // delegate_voting_power(delegator1, pool_address, voter2_address);
-        // assert!(calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 100 * ONE_APT, 1);
-        // assert!(calculate_and_update_voter_total_voting_power(pool_address, voter2_address) == 90 * ONE_APT, 1);
-        // assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator1_address) == 0, 1);
-        // assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator2_address) == 0, 1);
-        //
-        // // One cycle passed. The voter change takes effects.
-        // timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-        // end_aptos_epoch();
-        // // Withdrawl inactive shares will not change voting power.
-        // withdraw(delegator1, pool_address, 45 * ONE_APT);
-        // assert!(calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 0, 1);
-        // assert!(calculate_and_update_voter_total_voting_power(pool_address, voter2_address) == 100 * ONE_APT, 1);
-        // assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator1_address) == 0, 1);
-        // assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator2_address) == 0, 1);
-        //
-        // // voter2 adds stake for itself. Voting power changes immediately.
-        // stake::mint(voter2, 110 * ONE_APT);
-        // add_stake(voter2, pool_address, 10 * ONE_APT);
-        // assert!(calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 0, 1);
-        // assert!(calculate_and_update_voter_total_voting_power(pool_address, voter2_address) == 110 * ONE_APT, 1);
-        // assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator1_address) == 0, 1);
-        // assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator2_address) == 0, 1);
+        // delegator1 unlocks stake and changes its voter. No voting power change until next lockup cycle.
+        unlock(delegator1, pool_address, 90 * ONE_APT);
+        delegate_voting_power(delegator1, pool_address, voter2_address);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 100 * ONE_APT, 1);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, voter2_address) == 90 * ONE_APT, 1);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator1_address) == 0, 1);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator2_address) == 0, 1);
+
+        // One cycle passed. The voter change takes effects.
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        // Withdrawl inactive shares will not change voting power.
+        withdraw(delegator1, pool_address, 45 * ONE_APT);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 0, 1);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, voter2_address) == 100 * ONE_APT, 1);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator1_address) == 0, 1);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator2_address) == 0, 1);
+
+        // voter2 adds stake for itself. Voting power changes immediately.
+        stake::mint(voter2, 110 * ONE_APT);
+        add_stake(voter2, pool_address, 10 * ONE_APT);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 0, 1);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, voter2_address) == 110 * ONE_APT, 1);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator1_address) == 0, 1);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator2_address) == 0, 1);
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010, voter1 = @0x030)]
