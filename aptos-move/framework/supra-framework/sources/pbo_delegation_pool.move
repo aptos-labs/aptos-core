@@ -3159,8 +3159,8 @@ module supra_framework::pbo_delegation_pool {
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(supra_framework);
         let delegator_address = vector[@0x010];
-        let principle_stake = vector[300 * ONE_APT];
-        let coin = stake::mint_coins(300 * ONE_APT);
+        let principle_stake = vector[0];
+        let coin = stake::mint_coins(0);
         let principle_lockup_time = 0;
         initialize_test_validator(validator, 200 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
 
@@ -3169,22 +3169,50 @@ module supra_framework::pbo_delegation_pool {
 
         let delegator_address = signer::address_of(delegator);
         account::create_account_for_test(delegator_address);
+        stake::mint(delegator, 300 * ONE_APT);
+        add_stake(delegator, pool_address, 300 * ONE_APT);
 
-        assert_delegation(delegator_address, pool_address, 300 * ONE_APT, 0, 0);
+        let fee = get_add_stake_fee(pool_address, 300 * ONE_APT);
+        assert_delegation(delegator_address, pool_address, 300 * ONE_APT - fee, 0, 0);
         assert_delegation(validator_address, pool_address, 200 * ONE_APT, 0, 0);
-        stake::assert_stake_pool(pool_address, 500 * ONE_APT, 0, 0, 0);
+        stake::assert_stake_pool(pool_address, 200 * ONE_APT, 0, 300 * ONE_APT, 0);
 
         end_aptos_epoch();
         // `delegator` got its `add_stake` fee back and `validator` its active stake rewards
+        assert_delegation(delegator_address, pool_address, 300 * ONE_APT, 0, 0);
+        assert_delegation(validator_address, pool_address, 20199999999, 0, 0);
+        stake::assert_stake_pool(pool_address, 502 * ONE_APT, 0, 0, 0);
+
+        // delegators earn their own rewards from now on
+        end_aptos_epoch();
         assert_delegation(delegator_address, pool_address, 303 * ONE_APT, 0, 0);
-        assert_delegation(validator_address, pool_address, 202 * ONE_APT, 0, 0);
-        stake::assert_stake_pool(pool_address, 505 * ONE_APT, 0, 0, 0);
+        assert_delegation(validator_address, pool_address, 20401999999, 0, 0);
+        stake::assert_stake_pool(pool_address, 50702000000, 0, 0, 0);
 
         // delegators earn their own rewards from now on
         end_aptos_epoch();
         assert_delegation(delegator_address, pool_address, 30603000000, 0, 0);
-        assert_delegation(validator_address, pool_address, 20402000000, 0, 0);
-        stake::assert_stake_pool(pool_address, 51005000000, 0, 0, 0);
+        assert_delegation(validator_address, pool_address, 20606019999, 0, 0);
+        stake::assert_stake_pool(pool_address, 51209020000, 0, 0, 0);
+
+        end_aptos_epoch();
+        assert_delegation(delegator_address, pool_address, 30909030000, 0, 0);
+        assert_delegation(validator_address, pool_address, 20812080199, 0, 0);
+        stake::assert_stake_pool(pool_address, 51721110200, 0, 0, 0);
+
+        // add more stake in pending_active state than currently active
+        stake::mint(delegator, 1000 * ONE_APT);
+        add_stake(delegator, pool_address, 1000 * ONE_APT);
+
+        fee = get_add_stake_fee(pool_address, 1000 * ONE_APT);
+        assert_delegation(delegator_address, pool_address, 130909030000 - fee, 0, 0);
+        assert_delegation(validator_address, pool_address, 20812080199, 0, 0);
+
+        end_aptos_epoch();
+        // `delegator` got its `add_stake` fee back and `validator` its active stake rewards
+        assert_delegation(delegator_address, pool_address, 131218120300, 0, 0);
+        assert_delegation(validator_address, pool_address, 21020201001, 0, 0);
+        stake::assert_stake_pool(pool_address, 152238321302, 0, 0, 0);
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123)]
