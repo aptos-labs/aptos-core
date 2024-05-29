@@ -113,15 +113,11 @@ impl TestDB {
 
 impl TestDB {
     fn iter(&self) -> SchemaIterator<TestSchema> {
-        self.db
-            .iter(Default::default())
-            .expect("Failed to create iterator.")
+        self.db.iter().expect("Failed to create iterator.")
     }
 
     fn rev_iter(&self) -> SchemaIterator<TestSchema> {
-        self.db
-            .rev_iter(Default::default())
-            .expect("Failed to create iterator.")
+        self.db.rev_iter().expect("Failed to create iterator.")
     }
 }
 

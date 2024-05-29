@@ -54,7 +54,7 @@ impl Cmd {
         read_opts.set_prefix_same_as_start(true);
         let mut iter = db
             .db_shard(key.get_shard_id())
-            .iter::<StateValueSchema>(read_opts)?;
+            .iter_with_opts::<StateValueSchema>(read_opts)?;
         iter.seek(&(key.clone(), self.version))?;
         let res = iter
             .next()
