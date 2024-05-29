@@ -14,6 +14,7 @@ use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
+    order_vote_msg::OrderVoteMsg,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
@@ -75,6 +76,9 @@ pub enum ConsensusMsg {
     RandGenMessage(RandGenMessage),
     /// Quorum Store: Response to the batch request.
     BatchResponseV2(Box<BatchResponse>),
+    /// OrderVoteMsg is the struct that is broadcasted by a validator on receiving quorum certificate
+    /// on a block.
+    OrderVoteMsg(Box<OrderVoteMsg>),
 }
 
 /// Network type for consensus
@@ -90,6 +94,7 @@ impl ConsensusMsg {
             ConsensusMsg::SyncInfo(_) => "SyncInfo",
             ConsensusMsg::EpochChangeProof(_) => "EpochChangeProof",
             ConsensusMsg::VoteMsg(_) => "VoteMsg",
+            ConsensusMsg::OrderVoteMsg(_) => "OrderVoteMsg",
             ConsensusMsg::CommitVoteMsg(_) => "CommitVoteMsg",
             ConsensusMsg::CommitDecisionMsg(_) => "CommitDecisionMsg",
             ConsensusMsg::BatchMsg(_) => "BatchMsg",
