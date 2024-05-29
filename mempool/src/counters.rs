@@ -236,6 +236,42 @@ pub static MEMPOOL_GET_BATCH_FINAL_NUM_BYTES: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static MEMPOOL_REQUESTED_TXNS_IN_GET_BATCH: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_requested_txns_in_get_batch",
+        "Number of txns requested in get batch request",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_REQUESTED_BYTES_IN_GET_BATCH: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_requested_bytes_in_get_batch",
+        "Number of bytes requested in get batch request",
+        BYTE_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_UNFILLED_TXNS_IN_GET_BATCH: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_unfilled_txns_in_get_batch",
+        "Number of txns unfilled in get batch response",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_UNFILLED_BYTES_IN_GET_BATCH: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_unfilled_bytes_in_get_batch",
+        "Number of bytes unfilled in get batch response",
+        BYTE_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 pub static MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_mempool_remaining_txns_after_get_batch",

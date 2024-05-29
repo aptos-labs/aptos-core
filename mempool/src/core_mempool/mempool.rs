@@ -313,6 +313,8 @@ impl Mempool {
     ) -> Vec<SignedTransaction> {
         counters::MEMPOOL_GET_BATCH_REQUESTS.inc();
         counters::MEMPOOL_TOTAL_NUM_TXNS.observe(self.transactions.total_num_transactions() as f64);
+        counters::MEMPOOL_REQUESTED_TXNS_IN_GET_BATCH.observe(max_txns as f64);
+        counters::MEMPOOL_REQUESTED_BYTES_IN_GET_BATCH.observe(max_bytes as f64);
         let mempool_total_txns_excluding_progressing = self
             .transactions
             .total_num_transactions_excluding(&exclude_transactions);
@@ -465,6 +467,10 @@ impl Mempool {
         counters::MEMPOOL_GET_BATCH_FINAL_NUM_BYTES.observe(total_bytes as f64);
         counters::MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH
             .observe((mempool_total_txns_excluding_progressing - block.len() as u64) as f64);
+        counters::MEMPOOL_UNFILLED_TXNS_IN_GET_BATCH
+            .observe((max_txns.saturating_sub(block.len() as u64)) as f64);
+        counters::MEMPOOL_UNFILLED_BYTES_IN_GET_BATCH
+            .observe((max_bytes.saturating_sub(total_bytes)) as f64);
         block
     }
 

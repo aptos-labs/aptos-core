@@ -657,6 +657,15 @@ pub static QS_BACKPRESSURE_DYNAMIC_MAX: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
+pub static QS_DYNAMIC_MAX_PULL_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_dynamic_max_pull_txns",
+        "What the dynamic max pull txns is set to",
+        TRANSACTION_COUNT_BUCKETS.clone()
+    )
+    .unwrap()
+});
+
 pub static QS_MAX_PULL_TXNS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_max_pull_txns",
@@ -678,6 +687,15 @@ pub static BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
         )
         .unwrap(),
     )
+});
+
+pub static QS_SINCE_LAST_NON_EMPTY_PULL_TIME: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_since_last_non_empty_pull_ms",
+        "Histogram of the time since last non-empty pull time",
+        QUORUM_STORE_LATENCY_BUCKETS.to_vec()
+    )
+    .unwrap()
 });
 
 /// Histogram of the time durations for empty batch creation.
