@@ -2774,38 +2774,40 @@ module supra_framework::pbo_delegation_pool {
         unlock(validator, pool_address, 50 * ONE_APT);
 
         // create dummy validator to ensure the existing validator can leave the set
-        // let coin = stake::mint_coins(100 * ONE_APT);
-        // initialize_test_validator(delegator1, 100 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
-        // // inactivate validator
-        // stake::leave_validator_set(validator, pool_address);
-        // end_aptos_epoch();
-        //
-        // // move to lockup cycle 3
-        // (_, inactive, _, pending_inactive) = stake::get_stake(pool_address);
-        // timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-        // end_aptos_epoch();
-        //
-        // // pending_inactive stake has not been inactivated as validator is inactive
-        // let (_, inactive_now, _, pending_inactive_now) = stake::get_stake(pool_address);
-        // assert!(inactive_now == inactive, inactive_now);
-        // assert!(pending_inactive_now == pending_inactive, pending_inactive_now);
-        //
-        // // total_coins_inactive remains unchanged in the absence of a new OLC
-        // synchronize_delegation_pool(pool_address);
-        // assert!(total_coins_inactive(pool_address) == inactive, 0);
-        //
-        // // withdraw entire pending_inactive stake
-        // withdraw(validator, pool_address, MAX_U64);
-        // assert!(total_coins_inactive(pool_address) == inactive, 0);
-        // (_, _, _, pending_inactive) = stake::get_stake(pool_address);
-        // assert!(pending_inactive == 0, pending_inactive);
-        //
-        // // withdraw entire inactive stake
-        // withdraw(delegator1, pool_address, MAX_U64);
-        // withdraw(delegator2, pool_address, MAX_U64);
-        // assert!(total_coins_inactive(pool_address) == 0, 0);
-        // (_, inactive, _, _) = stake::get_stake(pool_address);
-        // assert!(inactive == 0, inactive);
+        let delegator_address = vector[@0x010];
+        let principle_stake = vector[100 * ONE_APT];
+        let coin = stake::mint_coins(100 * ONE_APT);
+        initialize_test_validator(delegator1, 100 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
+        // inactivate validator
+        stake::leave_validator_set(validator, pool_address);
+        end_aptos_epoch();
+
+        // move to lockup cycle 3
+        (_, inactive, _, pending_inactive) = stake::get_stake(pool_address);
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // pending_inactive stake has not been inactivated as validator is inactive
+        let (_, inactive_now, _, pending_inactive_now) = stake::get_stake(pool_address);
+        assert!(inactive_now == inactive, inactive_now);
+        assert!(pending_inactive_now == pending_inactive, pending_inactive_now);
+
+        // total_coins_inactive remains unchanged in the absence of a new OLC
+        synchronize_delegation_pool(pool_address);
+        assert!(total_coins_inactive(pool_address) == inactive, 0);
+
+        // withdraw entire pending_inactive stake
+        withdraw(validator, pool_address, MAX_U64);
+        assert!(total_coins_inactive(pool_address) == inactive, 0);
+        (_, _, _, pending_inactive) = stake::get_stake(pool_address);
+        assert!(pending_inactive == 0, pending_inactive);
+
+        // withdraw entire inactive stake
+        withdraw(delegator1, pool_address, MAX_U64);
+        withdraw(delegator2, pool_address, MAX_U64);
+        assert!(total_coins_inactive(pool_address) == 0, 0);
+        (_, inactive, _, _) = stake::get_stake(pool_address);
+        assert!(inactive == 0, inactive);
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123)]
