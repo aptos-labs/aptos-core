@@ -105,6 +105,7 @@ impl CodeGenerator for Expression {
         match self {
             Expression::NumberLiteral(n) => n.emit_code_lines(),
             Expression::Variable(ident) => ident.emit_code_lines(),
+            Expression::Boolean(b) => vec![b.to_string()],
         }
     }
 }
@@ -125,6 +126,7 @@ impl CodeGenerator for Type {
             T::U64 => "u64".to_string(),
             T::U128 => "u128".to_string(),
             T::U256 => "u256".to_string(),
+            T::Bool => "bool".to_string(),
             _ => unimplemented!(),
         }]
     }

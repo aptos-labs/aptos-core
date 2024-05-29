@@ -69,13 +69,16 @@ impl TypePool {
 
     /// Returns one of the basic types that does not require a type argument.
     pub fn random_basic_type(&mut self, u: &mut Unstructured) -> Result<Type> {
-        Ok(match u.int_in_range(0..=5)? {
+        Ok(match u.int_in_range(0..=6)? {
             0 => Type::U8,
             1 => Type::U16,
             2 => Type::U32,
             3 => Type::U64,
             4 => Type::U128,
             5 => Type::U256,
+            6 => Type::Bool,
+            // x => Type::Address, // Leave these two until the end
+            // x => Type::Signer,
             _ => panic!("Unsupported basic type"),
         })
     }
