@@ -1,0 +1,68 @@
+diff --git a/third_party/move/move-compiler-v2/transactional-tests/tests/tests.rs b/third_party/move/move-compiler-v2/transactional-tests/tests/tests.rs
+index 121249ce8f..cb2cdc1904 100644
+--- a/third_party/move/move-compiler-v2/transactional-tests/tests/tests.rs
++++ b/third_party/move/move-compiler-v2/transactional-tests/tests/tests.rs
+@@ -44,7 +44,8 @@ const TEST_CONFIGS: &[TestConfig] = &[
+             (Experiment::ACQUIRES_CHECK, false),
+         ],
+         language_version: LanguageVersion::V2_0,
+-        include: &[], // all tests except those excluded below
++        // include: &[], // all tests except those excluded below
++        include: &["/move-smith/"], // all tests except those excluded below
+         exclude: &["/operator_eval/"],
+     },
+     TestConfig {
+@@ -55,7 +56,8 @@ const TEST_CONFIGS: &[TestConfig] = &[
+             (Experiment::ACQUIRES_CHECK, false),
+         ],
+         language_version: LanguageVersion::V2_0,
+-        include: &[], // all tests except those excluded below
++        // include: &[], // all tests except those excluded below
++        include: &["/move-smith/"], // all tests except those excluded below
+         exclude: &["/operator_eval/"],
+     },
+     TestConfig {
+@@ -67,25 +69,26 @@ const TEST_CONFIGS: &[TestConfig] = &[
+             (Experiment::ACQUIRES_CHECK, false),
+         ],
+         language_version: LanguageVersion::V2_0,
+-        include: &[], // all tests except those excluded below
++        // include: &[], // all tests except those excluded below
++        include: &["/move-smith/"], // all tests except those excluded below
+         exclude: &["/operator_eval/"],
+     },
+-    TestConfig {
+-        name: "operator-eval-lang-1",
+-        runner: |p| run(p, get_config_by_name("operator-eval-lang-1")),
+-        experiments: &[(Experiment::OPTIMIZE, true)],
+-        language_version: LanguageVersion::V1,
+-        include: &["/operator_eval/"],
+-        exclude: &[],
+-    },
+-    TestConfig {
+-        name: "operator-eval-lang-2",
+-        runner: |p| run(p, get_config_by_name("operator-eval-lang-2")),
+-        experiments: &[(Experiment::OPTIMIZE, true)],
+-        language_version: LanguageVersion::V2_0,
+-        include: &["/operator_eval/"],
+-        exclude: &[],
+-    },
++    // TestConfig {
++    //     name: "operator-eval-lang-1",
++    //     runner: |p| run(p, get_config_by_name("operator-eval-lang-1")),
++    //     experiments: &[(Experiment::OPTIMIZE, true)],
++    //     language_version: LanguageVersion::V1,
++    //     include: &["/operator_eval/"],
++    //     exclude: &[],
++    // },
++    // TestConfig {
++    //     name: "operator-eval-lang-2",
++    //     runner: |p| run(p, get_config_by_name("operator-eval-lang-2")),
++    //     experiments: &[(Experiment::OPTIMIZE, true)],
++    //     language_version: LanguageVersion::V2_0,
++    //     include: &["/operator_eval/"],
++    //     exclude: &[],
++    // },
+ ];
+
+ /// Test files which must use separate baselines because their result
