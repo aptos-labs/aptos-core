@@ -1382,14 +1382,6 @@ impl TransactionInfo {
         ))
     }
 
-    pub fn inject_auxiliary_error_data(&mut self, auxiliary_data: TransactionAuxiliaryData) {
-        match self {
-            Self::V0(ref mut info) => {
-                info.inject_auxiliary_error_data(auxiliary_data);
-            },
-        }
-    }
-
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_placeholder(
         gas_used: u64,
@@ -1476,14 +1468,6 @@ impl TransactionInfoV0 {
             state_change_hash,
             state_checkpoint_hash,
             state_cemetery_hash: None,
-        }
-    }
-
-    pub fn inject_auxiliary_error_data(&mut self, auxiliary_data: TransactionAuxiliaryData) {
-        if let Some(detail) = auxiliary_data.get_detail_error_message() {
-            if let ExecutionStatus::MiscellaneousError(None) = &mut self.status {
-                self.status = ExecutionStatus::MiscellaneousError(Some(detail.status_code()))
-            }
         }
     }
 

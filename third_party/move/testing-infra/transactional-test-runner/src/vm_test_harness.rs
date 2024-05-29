@@ -6,7 +6,7 @@ use crate::{
     framework::{either_or_no_modules, run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{EmptyCommand, InitCommand, SyntaxChoice, TaskInput},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use move_binary_format::{
     compatibility::Compatibility, errors::VMResult, file_format::CompiledScript,
@@ -43,7 +43,10 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
 };
-use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
+use move_vm_test_utils::{
+    gas_schedule::{CostTable, Gas, GasStatus},
+    InMemoryStorage,
+};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -395,7 +398,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
         )
         .unwrap();
         let (mut session, mut gas_status) = {
-            let gas_status = move_cli::sandbox::utils::get_gas_status(
+            let gas_status = get_gas_status(
                 &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
                 gas_budget,
             )
@@ -412,6 +415,21 @@ impl<'a> SimpleVMTestAdapter<'a> {
         self.storage.apply(changeset).unwrap();
         Ok(res)
     }
+}
+
+fn get_gas_status(cost_table: &CostTable, gas_budget: Option<u64>) -> Result<GasStatus> {
+    let gas_status = if let Some(gas_budget) = gas_budget {
+        // TODO(Gas): This should not be hardcoded.
+        let max_gas_budget = u64::MAX.checked_div(1000).unwrap();
+        if gas_budget >= max_gas_budget {
+            bail!("Gas budget set too high; maximum is {}", max_gas_budget)
+        }
+        GasStatus::new(cost_table, Gas::new(gas_budget))
+    } else {
+        // no budget specified. Disable gas metering
+        GasStatus::new_unmetered()
+    };
+    Ok(gas_status)
 }
 
 static PRECOMPILED_MOVE_STDLIB: Lazy<Option<(FullyCompiledProgram, Vec<PackagePaths>)>> =

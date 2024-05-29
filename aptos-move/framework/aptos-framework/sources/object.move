@@ -588,9 +588,7 @@ module aptos_framework::object {
         let count = 0;
         while (owner != current_address) {
             count = count + 1;
-            if (std::features::max_object_nesting_check_enabled()) {
-                assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING))
-            };
+            assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
             // At this point, the first object exists and so the more likely case is that the
             // object's owner is not an object. So we return a more sensible error.
             assert!(
@@ -672,9 +670,7 @@ module aptos_framework::object {
         let count = 0;
         while (owner != current_address) {
             count = count + 1;
-            if (std::features::max_object_nesting_check_enabled()) {
-                assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING))
-            };
+            assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
             if (!exists<ObjectCore>(current_address)) {
                 return false
             };
@@ -907,11 +903,6 @@ module aptos_framework::object {
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 131078, location = Self)]
     fun test_exceeding_maximum_object_nesting_owns_should_fail(creator: &signer) acquires ObjectCore {
-        use std::features;
-        let feature = features::get_max_object_nesting_check_feature();
-        let fx = account::create_signer_for_test(@0x1);
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
-
         let obj1 = create_simple_object(creator, b"1");
         let obj2 = create_simple_object(creator, b"2");
         let obj3 = create_simple_object(creator, b"3");
@@ -947,11 +938,6 @@ module aptos_framework::object {
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 131078, location = Self)]
     fun test_exceeding_maximum_object_nesting_transfer_should_fail(creator: &signer) acquires ObjectCore {
-        use std::features;
-        let feature = features::get_max_object_nesting_check_feature();
-        let fx = account::create_signer_for_test(@0x1);
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
-
         let obj1 = create_simple_object(creator, b"1");
         let obj2 = create_simple_object(creator, b"2");
         let obj3 = create_simple_object(creator, b"3");
@@ -978,11 +964,6 @@ module aptos_framework::object {
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 131078, location = Self)]
     fun test_cyclic_ownership_transfer_should_fail(creator: &signer) acquires ObjectCore {
-        use std::features;
-        let feature = features::get_max_object_nesting_check_feature();
-        let fx = account::create_signer_for_test(@0x1);
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
-
         let obj1 = create_simple_object(creator, b"1");
         // This creates a cycle (self-loop) in ownership.
         transfer(creator, obj1, object_address(&obj1));
@@ -993,11 +974,6 @@ module aptos_framework::object {
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 131078, location = Self)]
     fun test_cyclic_ownership_owns_should_fail(creator: &signer) acquires ObjectCore {
-        use std::features;
-        let feature = features::get_max_object_nesting_check_feature();
-        let fx = account::create_signer_for_test(@0x1);
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
-
         let obj1 = create_simple_object(creator, b"1");
         // This creates a cycle (self-loop) in ownership.
         transfer(creator, obj1, object_address(&obj1));
