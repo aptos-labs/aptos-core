@@ -25,7 +25,7 @@ use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     fmt::Write as FmtWrite,
     fs::{self, File},
     io::{Read, Write},
@@ -37,24 +37,24 @@ use std::{
 /// The maximum number of subheadings that are allowed
 const MAX_SUBSECTIONS: usize = 6;
 
-/// Rex for generating code doc
-static REX_CODE: Lazy<Regex> = Lazy::new(|| {
+/// Regexp for generating code doc
+static REGEX_CODE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         "(?P<ident>(\\b\\w+\\b\\s*::\\s*)*\\b\\w+\\b)(?P<call>\\s*[(<])?|(?P<lt><)|(?P<gt>>)|(?P<nl>\n)|(?P<lb>\\{)|(?P<rb>\\})|(?P<amper>\\&)|(?P<squote>')|(?P<dquote>\")|(?P<sharp>#)|(?P<mul>\\*)|(?P<plus>\\+)|(?P<minus>\\-)|(?P<eq>\\=)|(?P<bar>\\|)|(?P<tilde>\\~)",
     )
         .unwrap()
 });
 
-/// Rex for replacing html entities
-static REX_HTML_ENTITY: Lazy<Regex> = Lazy::new(|| {
+/// Regexp for replacing html entities
+static REGEX_HTML_ENTITY: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         "(?P<lt><)|(?P<gt>>)|(?P<lb>\\{)|(?P<rb>\\})|(?P<amper>\\&)|(?P<squote>')|(?P<dquote>\")|(?P<mul>\\*)|(?P<plus>\\+)|(?P<minus>\\-)|(?P<eq>\\=)|(?P<bar>\\|)|(?P<tilde>\\~)",
     )
         .unwrap()
 });
 
-/// Rex of html elements to skip
-static REX_HTML_ELEMENTS_TO_SKIP: Lazy<Regex> = Lazy::new(|| {
+/// Regexp of html elements which are not encoded and left untouched
+static REGEX_HTML_ELEMENTS_TO_SKIP: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r"</?(h[1-6]|p|span|div|a|em|strong|br|hr|pre|blockquote|ul|ol|li|dl|dt|dd|table|tr|th|td|thead|tbody|tfoot|code)(\s*|(\s+\b\w+\b\s*=[^>]*))>"
     ).unwrap()
@@ -1767,6 +1767,7 @@ impl<'env> Docgen<'env> {
 
     /// Decorates documentation text, identifying code fragments and decorating them
     /// as code. Code blocks in comments are untouched.
+    /// When generating mdx-compatible doc, need to encode html entities
     fn decorate_text(&self, text: &str) -> String {
         let mut decorated_text = String::new();
         let mut chars = text.chars().peekable();
@@ -1803,7 +1804,7 @@ impl<'env> Docgen<'env> {
                         let rb = chars.next().unwrap();
                         let full_str = format!("{}{}{}", chr, str, rb);
                         // skip encoding if `str` is a html element
-                        if REX_HTML_ELEMENTS_TO_SKIP.is_match(&full_str) {
+                        if REGEX_HTML_ELEMENTS_TO_SKIP.is_match(&full_str) {
                             decorated_text.push_str(&full_str);
                         } else {
                             decorated_text.push_str(
@@ -1858,24 +1859,24 @@ impl<'env> Docgen<'env> {
 
     /// Replace html entities if the output format needs to be mdx compatible
     fn replace_for_mdx(&self, cap: &Captures) -> String {
-        static MDX: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
-            let mut map = HashMap::new();
-            map.insert("lt", "&lt;");
-            map.insert("gt", "&gt;");
-            map.insert("lb", "&#123;");
-            map.insert("rb", "&#125;");
-            map.insert("amper", "&amp;");
-            map.insert("dquote", "&quot;");
-            map.insert("squote", "&apos;");
-            map.insert("sharp", "&#35;");
-            map.insert("mul", "&#42;");
-            map.insert("plus", "&#43;");
-            map.insert("minus", "&#45;");
-            map.insert("eq", "&#61;");
-            map.insert("bar", "&#124;");
-            map.insert("tilde", "&#126;");
-            map.insert("nl", "<br />");
-            map
+        static MDX: Lazy<Vec<(&str, &str)>> = Lazy::new(|| {
+            vec![
+                ("lt", "&lt;"),
+                ("gt", "&gt;"),
+                ("lb", "&#123;"),
+                ("rb", "&#125;"),
+                ("amper", "&amp;"),
+                ("dquote", "&quot;"),
+                ("squote", "&apos;"),
+                ("sharp", "&#35;"),
+                ("mul", "&#42;"),
+                ("plus", "&#43;"),
+                ("minus", "&#45;"),
+                ("eq", "&#61;"),
+                ("bar", "&#124;"),
+                ("tilde", "&#126;"),
+                ("nl", "<br />"),
+            ]
         });
         let mut r = "".to_string();
         for (group_name, replacement) in MDX.iter() {
@@ -1893,7 +1894,7 @@ impl<'env> Docgen<'env> {
     fn decorate_code(&self, code: &str) -> String {
         let mut r = String::new();
         let mut at = 0;
-        while let Some(cap) = REX_CODE.captures(&code[at..]) {
+        while let Some(cap) = REGEX_CODE.captures(&code[at..]) {
             let replacement = {
                 if cap.name("lt").is_some() {
                     "&lt;".to_owned()
@@ -1941,7 +1942,7 @@ impl<'env> Docgen<'env> {
     fn encode_html_entities_in_text(&self, code: &str) -> String {
         let mut r = String::new();
         let mut at = 0;
-        while let Some(cap) = REX_HTML_ENTITY.captures(&code[at..]) {
+        while let Some(cap) = REGEX_HTML_ENTITY.captures(&code[at..]) {
             let replacement = self.replace_for_mdx(&cap);
             if replacement.is_empty() {
                 r += &code[at..at + cap.get(0).unwrap().end()];
