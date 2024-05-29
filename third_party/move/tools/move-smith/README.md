@@ -45,6 +45,12 @@ After running a fuzzing session, the coverage of all stored corpus can be genera
 ./scripts/coverage.sh gen <fuzz_target>
 ```
 
+## Debugging
+
+The script `./scripts/check_output.sh` is a helper for checking the generated programs.
+By default it generates 10 Move packages stored in `output/`, compiles them, and reports any error encountered.
+Use `./scripts/check_output.sh N` to generate `N` packages instead.
+
 This will create an HTML report at `coverage/<fuzz_target>/index.html`.
 
 # Dependencies
@@ -87,9 +93,10 @@ rustup component add --toolchain nightly llvm-tools-preview
 │   ├── artifacts                 # The inputs that trigger crashes (created after a fuzzing session starts)
 │   ├── corpus                    # The corpus of inputs for all fuzz targets (created after a fuzzing session starts)
 │   ├── coverage                  # Stores the aggregated raw coverage files (created after collecting coverage)
-│   └── fuzz_targets              # Entry points of different fuzz harness
+│   └── fuzz_targets
 |       └── module_only.rs        # Basic fuzzer that only generates a module and tries to compile it
 ├── scripts
+│   ├── check_output.sh           # Generate Move programs/packages and try to compile them
 │   └── coverage.sh               # Collect coverage and generate human-readable reports.
 ├── src
 │   ├── ast.rs                    # The AST for the Move language by the fuzzer
@@ -100,7 +107,12 @@ rustup component add --toolchain nightly llvm-tools-preview
 │   ├── config.rs                 # Fuzzer configurations
 │   ├── lib.rs
 │   ├── move_smith.rs             # The core generation logic
+│   ├── names.rs
+│   ├── types.rs
 │   └── utils.rs
+├── target
+│   └── aarch64-apple-darwin
+│       └── coverage
 └── tests
     └── integration_test.rs
 ```
