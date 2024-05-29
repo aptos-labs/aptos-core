@@ -5,10 +5,7 @@ use anyhow::anyhow;
 use aptos_types::{
     on_chain_config::{Features, OnChainConfig},
     state_store::{state_key::StateKey, StateView},
-};
-use aptos_vm::{
-    gas::get_gas_config_from_storage,
-    move_vm_ext::{get_max_binary_format_version, get_max_identifier_size},
+    vm::configs::aptos_prod_deserializer_config,
 };
 use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
 use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
@@ -24,13 +21,7 @@ pub struct ModuleView<'a, S> {
 impl<'a, S: StateView> ModuleView<'a, S> {
     pub fn new(state_view: &'a S) -> Self {
         let features = Features::fetch_config(state_view).unwrap_or_default();
-        let (_, gas_feature_version) = get_gas_config_from_storage(state_view);
-
-        let max_binary_format_version =
-            get_max_binary_format_version(&features, Some(gas_feature_version));
-        let max_identifier_size = get_max_identifier_size(&features);
-        let deserializer_config =
-            DeserializerConfig::new(max_binary_format_version, max_identifier_size);
+        let deserializer_config = aptos_prod_deserializer_config(&features);
 
         Self {
             module_cache: RefCell::new(HashMap::new()),

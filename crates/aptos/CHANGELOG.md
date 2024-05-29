@@ -3,6 +3,11 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Adds a check for safe usage of randomness features. Public functions are not allowed to call randomness features unless explicitly allowed via attribute `#[lint::allow_unsafe_randomness]`.
+- The Move syntax now supports structured attribute names, as in `#[attribute_area::attribute_name]`.
+
+## [3.3.1] - 2024/05/21
+- Fixed incompatibility bug that broken local simulation and gas profiling.
 
 ## [3.3.0] - 2024/05/03
 - **Breaking Change** Update View functions to use BCS for submission.  Allows for all arguments to be supported in view functions.  Note some input arguments that were previously inputted as strings may be handled differently.

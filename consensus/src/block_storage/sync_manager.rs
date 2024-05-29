@@ -6,6 +6,7 @@ use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
         BlockReader, BlockStore,
+        pending_blocks::PendingBlocks,
     },
     counters::{
         BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER,
@@ -35,13 +36,15 @@ use aptos_consensus_types::{
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
 };
 use fail::fail_point;
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
+use futures_channel::oneshot;
 use rand::{prelude::*, Rng};
 use std::{clone::Clone, cmp::min, sync::Arc, time::Duration};
 use tokio::time;
@@ -94,7 +97,7 @@ impl BlockStore {
     ) -> anyhow::Result<()> {
         self.sync_to_highest_commit_cert(
             sync_info.highest_commit_cert().ledger_info(),
-            &retriever.network,
+            retriever.network.clone(),
         )
         .await;
 
@@ -246,7 +249,7 @@ impl BlockStore {
         while let Some(block) = pending.pop() {
             let block_qc = block.quorum_cert().clone();
             self.insert_single_quorum_cert(block_qc)?;
-            self.insert_ordered_block(block).await?;
+            self.insert_block(block).await?;
         }
         self.insert_single_quorum_cert(qc)
     }
@@ -458,14 +461,15 @@ impl BlockStore {
     async fn sync_to_highest_commit_cert(
         &self,
         ledger_info: &LedgerInfoWithSignatures,
-        network: &Arc<NetworkSender>,
+        network: Arc<NetworkSender>,
     ) {
         // if the block exists between commit root and ordered root
         if self.commit_root().round() < ledger_info.commit_info().round()
             && self.block_exists(ledger_info.commit_info().id())
             && self.ordered_root().round() >= ledger_info.commit_info().round()
         {
-            network.send_commit_proof(ledger_info.clone()).await
+            let proof = ledger_info.clone();
+            tokio::spawn(async move { network.send_commit_proof(proof).await });
         }
     }
 
@@ -520,6 +524,7 @@ pub struct BlockRetriever {
     preferred_peer: Author,
     validator_addresses: Vec<AccountAddress>,
     max_blocks_to_request: u64,
+    pending_blocks: Arc<Mutex<PendingBlocks>>,
 }
 
 impl BlockRetriever {
@@ -528,12 +533,14 @@ impl BlockRetriever {
         preferred_peer: Author,
         validator_addresses: Vec<AccountAddress>,
         max_blocks_to_request: u64,
+        pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
         Self {
             network,
             preferred_peer,
             validator_addresses,
             max_blocks_to_request,
+            pending_blocks,
         }
     }
 
@@ -559,6 +566,28 @@ impl BlockRetriever {
         monitor!("retrieve_block_for_id_chunk", {
             let mut interval = time::interval(retry_interval);
             let mut futures = FuturesUnordered::new();
+            if retrieve_batch_size == 1 {
+                let (tx, rx) = oneshot::channel();
+                self.pending_blocks
+                    .lock()
+                    .insert_request(target_block_id, tx);
+                let author = self.network.author();
+                futures.push(
+                    async move {
+                        let response = rx
+                            .await
+                            .map(|block| {
+                                BlockRetrievalResponse::new(
+                                    BlockRetrievalStatus::SucceededWithTarget,
+                                    vec![block],
+                                )
+                            })
+                            .map_err(|_| anyhow::anyhow!("self retrieval failed"));
+                        (author, response)
+                    }
+                    .boxed(),
+                )
+            }
             let request = BlockRetrievalRequest::new_with_target_block_id(
                 block_id,
                 retrieve_batch_size,
@@ -599,7 +628,7 @@ impl BlockRetriever {
                                 peer,
                                 rpc_timeout,
                             );
-                            futures.push(async move { (remote_peer, future.await) });
+                            futures.push(async move { (remote_peer, future.await) }.boxed());
                         }
                     }
                     Some((peer, response)) = futures.next() => {

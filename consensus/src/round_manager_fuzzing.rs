@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::BlockStore,
+    block_storage::{pending_blocks::PendingBlocks, BlockStore},
     liveness::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
@@ -92,6 +92,7 @@ fn build_empty_store(
         10,
         Arc::from(PayloadManager::DirectMempool),
         false,
+        Arc::new(Mutex::new(PendingBlocks::new())),
     ))
 }
 

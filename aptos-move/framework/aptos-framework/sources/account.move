@@ -185,7 +185,7 @@ module aptos_framework::account {
         });
     }
 
-    fun create_account_if_does_not_exist(account_address: address) {
+    public fun create_account_if_does_not_exist(account_address: address) {
         if (!exists<Account>(account_address)) {
             create_account(account_address);
         }

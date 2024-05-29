@@ -4911,7 +4911,8 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<pre><code><b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a>;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
 <b>ensures</b> <b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>&gt;(addr) == <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a> {
     consensus_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
