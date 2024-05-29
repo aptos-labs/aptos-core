@@ -3480,8 +3480,8 @@ module supra_framework::pbo_delegation_pool {
         let new_operator_address = signer::address_of(new_operator);
         account::create_account_for_test(new_operator_address);
         let delegator_address = vector[@0x010];
-        let principle_stake = vector[200 * ONE_APT];
-        let coin = stake::mint_coins(200 * ONE_APT);
+        let principle_stake = vector[0];
+        let coin = stake::mint_coins(0);
         let principle_lockup_time = 0;
 
         // create delegation pool of commission fee 12.65%
@@ -3492,6 +3492,8 @@ module supra_framework::pbo_delegation_pool {
         let delegator_address = signer::address_of(delegator);
         account::create_account_for_test(delegator_address);
 
+        stake::mint(delegator, 200 * ONE_APT);
+        add_stake(delegator, pool_address, 200 * ONE_APT);
         unlock(delegator, pool_address, 100 * ONE_APT);
 
         // activate validator
@@ -3548,8 +3550,8 @@ module supra_framework::pbo_delegation_pool {
         let beneficiary_address = signer::address_of(beneficiary);
         aptos_account::create_account(beneficiary_address);
         let delegator_address = vector[@0x010];
-        let principle_stake = vector[2000000 * ONE_APT];
-        let coin = stake::mint_coins(2000000 * ONE_APT);
+        let principle_stake = vector[0];
+        let coin = stake::mint_coins(0);
         let principle_lockup_time = 0;
         // create delegation pool of commission fee 12.65%
         initialize_delegation_pool(operator1, 1265, vector::empty<u8>(), delegator_address, principle_stake, coin, principle_lockup_time);
@@ -3559,7 +3561,8 @@ module supra_framework::pbo_delegation_pool {
 
         let delegator_address = signer::address_of(delegator);
         account::create_account_for_test(delegator_address);
-
+        stake::mint(delegator, 2000000 * ONE_APT);
+        add_stake(delegator, pool_address, 2000000 * ONE_APT);
         unlock(delegator, pool_address, 1000000 * ONE_APT);
 
         // activate validator
@@ -3615,8 +3618,8 @@ module supra_framework::pbo_delegation_pool {
         let operator_address = signer::address_of(operator);
         account::create_account_for_test(operator_address);
         let delegator_address = vector[@0x010];
-        let principle_stake = vector[200 * ONE_APT];
-        let coin = stake::mint_coins(200 * ONE_APT);
+        let principle_stake = vector[0];
+        let coin = stake::mint_coins(0);
         let principle_lockup_time = 0;
         // create delegation pool of commission fee 12.65%
         initialize_delegation_pool(operator, 1265, vector::empty<u8>(), delegator_address, principle_stake, coin, principle_lockup_time);
@@ -3626,6 +3629,8 @@ module supra_framework::pbo_delegation_pool {
         let delegator_address = signer::address_of(delegator);
         account::create_account_for_test(delegator_address);
 
+        stake::mint(delegator, 200 * ONE_APT);
+        add_stake(delegator, pool_address, 200 * ONE_APT);
         unlock(delegator, pool_address, 100 * ONE_APT);
 
         // activate validator
