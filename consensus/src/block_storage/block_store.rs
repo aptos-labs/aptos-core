@@ -5,6 +5,7 @@
 use crate::{
     block_storage::{
         block_tree::BlockTree,
+        pending_blocks::PendingBlocks,
         tracing::{observe_block, BlockStage},
         BlockReader,
     },
@@ -23,7 +24,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::StateComputeResult;
-use aptos_infallible::RwLock;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use futures::executor::block_on;
@@ -75,6 +76,7 @@ pub struct BlockStore {
     payload_manager: Arc<PayloadManager>,
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
+    pending_blocks: Arc<Mutex<PendingBlocks>>,
 }
 
 impl BlockStore {
@@ -86,6 +88,7 @@ impl BlockStore {
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
         payload_manager: Arc<PayloadManager>,
+        pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
@@ -101,6 +104,7 @@ impl BlockStore {
             time_service,
             vote_back_pressure_limit,
             payload_manager,
+            pending_blocks,
         ));
         block_on(block_store.try_send_for_execution());
         block_store
@@ -139,6 +143,7 @@ impl BlockStore {
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
         payload_manager: Arc<PayloadManager>,
+        pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
@@ -197,15 +202,13 @@ impl BlockStore {
             payload_manager,
             #[cfg(any(test, feature = "fuzzing"))]
             back_pressure_for_test: AtomicBool::new(false),
+            pending_blocks,
         };
 
         for block in blocks {
-            block_store
-                .insert_ordered_block(block)
-                .await
-                .unwrap_or_else(|e| {
-                    panic!("[BlockStore] failed to insert block during build {:?}", e)
-                });
+            block_store.insert_block(block).await.unwrap_or_else(|e| {
+                panic!("[BlockStore] failed to insert block during build {:?}", e)
+            });
         }
         for qc in quorum_certs {
             block_store
@@ -240,6 +243,9 @@ impl BlockStore {
 
         let block_tree = self.inner.clone();
         let storage = self.storage.clone();
+        self.pending_blocks
+            .lock()
+            .gc(finality_proof.commit_info().round());
 
         // This callback is invoked synchronously with and could be used for multiple batches of blocks.
         self.execution_client
@@ -291,6 +297,7 @@ impl BlockStore {
             Arc::clone(&self.time_service),
             self.vote_back_pressure_limit,
             self.payload_manager.clone(),
+            self.pending_blocks.clone(),
         )
         .await;
 
@@ -309,7 +316,7 @@ impl BlockStore {
     /// Duplicate inserts will return the previously inserted block (
     /// note that it is considered a valid non-error case, for example, it can happen if a validator
     /// receives a certificate for a block that is currently being added).
-    pub async fn insert_ordered_block(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
+    pub async fn insert_block(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
         if let Some(existing_block) = self.get_block(block.id()) {
             return Ok(existing_block);
         }
@@ -446,6 +453,10 @@ impl BlockStore {
             .gauge("back_pressure")
             .set((ordered_round - commit_round) as i64);
         ordered_round > self.vote_back_pressure_limit + commit_round
+    }
+
+    pub fn pending_blocks(&self) -> Arc<Mutex<PendingBlocks>> {
+        self.pending_blocks.clone()
     }
 
     pub fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
@@ -612,6 +623,6 @@ impl BlockStore {
         if self.ordered_root().round() < block.quorum_cert().commit_info().round() {
             self.send_for_execution(block.quorum_cert().clone()).await?;
         }
-        self.insert_ordered_block(block).await
+        self.insert_block(block).await
     }
 }
