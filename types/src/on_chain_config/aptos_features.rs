@@ -83,6 +83,8 @@ pub enum FeatureFlag {
     NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE = 64,
     OPERATIONS_DEFAULT_TO_FA_APT_STORE = 65,
     AGGREGATOR_V2_IS_AT_LEAST_API = 66,
+    CONCURRENT_FUNGIBLE_BALANCE = 67,
+    DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE = 68,
 }
 
 impl FeatureFlag {
@@ -146,6 +148,7 @@ impl FeatureFlag {
             FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
+            FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
         ]
     }
 }
