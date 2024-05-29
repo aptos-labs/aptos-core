@@ -364,7 +364,7 @@ dependencies = [
  "aptos-logger",
  "aptos-runtimes",
  "aptos-storage-interface",
- "aptos-system-utils",
+ "aptos-system-utils 0.1.0",
  "aptos-types",
  "bcs 0.1.4",
  "http",
@@ -1398,7 +1398,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-node-resource-metrics",
- "aptos-profiler",
+ "aptos-profiler 0.1.0",
  "aptos-push-metrics",
  "aptos-sdk",
  "aptos-storage-interface",
@@ -1959,7 +1959,7 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
+ "aptos-moving-average",
  "aptos-protos 1.3.0",
  "async-trait",
  "clap 4.4.14",
@@ -1986,7 +1986,7 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
+ "aptos-moving-average",
  "aptos-protos 1.3.0",
  "async-trait",
  "clap 4.4.14",
@@ -2013,7 +2013,7 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
+ "aptos-moving-average",
  "async-trait",
  "clap 4.4.14",
  "futures",
@@ -2048,7 +2048,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-mempool-notifications",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
+ "aptos-moving-average",
  "aptos-proptest-helpers",
  "aptos-protos 1.3.0",
  "aptos-runtimes",
@@ -2127,7 +2127,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
- "aptos-system-utils",
+ "aptos-system-utils 0.1.0",
  "async-trait",
  "backtrace",
  "clap 4.4.14",
@@ -2653,15 +2653,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf#4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf"
-dependencies = [
- "chrono",
-]
-
-[[package]]
-name = "aptos-moving-average"
-version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a11f0b6532349aa6b9a80c9a1d77524f02d8a013#a11f0b6532349aa6b9a80c9a1d77524f02d8a013"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=b10a6d0687deabefcbdea10cf4f828e52befe01f#b10a6d0687deabefcbdea10cf4f828e52befe01f"
 dependencies = [
  "chrono",
 ]
@@ -3141,6 +3133,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-profiler"
+version = "0.1.0"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
+dependencies = [
+ "anyhow",
+ "backtrace",
+ "jemalloc-sys",
+ "jemallocator",
+ "pprof",
+ "regex",
+]
+
+[[package]]
 name = "aptos-proptest-helpers"
 version = "0.1.0"
 dependencies = [
@@ -3163,14 +3168,13 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.3.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.10.0#b24f6cd08f84b179e49090c7e51a501c535096ca"
+source = "git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.12.1#4b9a2593facaee92b28df2e99b2773a7e4f930f5"
 dependencies = [
  "futures-core",
  "pbjson",
  "prost 0.12.3",
- "prost-types 0.12.3",
  "serde",
- "tonic 0.10.2",
+ "tonic 0.11.0",
 ]
 
 [[package]]
@@ -3700,7 +3704,27 @@ name = "aptos-system-utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-profiler",
+ "aptos-profiler 0.1.0",
+ "async-mutex",
+ "http",
+ "hyper",
+ "lazy_static",
+ "mime",
+ "pprof",
+ "regex",
+ "rstack-self",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "aptos-system-utils"
+version = "0.1.0"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
+dependencies = [
+ "anyhow",
+ "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
  "async-mutex",
  "http",
  "hyper",
@@ -12690,12 +12714,12 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a11f0b6532349aa6b9a80c9a1d77524f02d8a013#a11f0b6532349aa6b9a80c9a1d77524f02d8a013"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=b10a6d0687deabefcbdea10cf4f828e52befe01f#b10a6d0687deabefcbdea10cf4f828e52befe01f"
 dependencies = [
  "ahash 0.8.11",
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a11f0b6532349aa6b9a80c9a1d77524f02d8a013)",
- "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.10.0)",
+ "aptos-moving-average",
+ "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.12.1)",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
@@ -12715,6 +12739,7 @@ dependencies = [
  "google-cloud-pubsub",
  "hex",
  "itertools 0.12.1",
+ "jemallocator",
  "kanal",
  "native-tls",
  "num_cpus",
@@ -12732,7 +12757,7 @@ dependencies = [
  "strum 0.24.1",
  "tokio",
  "tokio-postgres",
- "tonic 0.10.2",
+ "tonic 0.11.0",
  "tracing",
  "unescape",
  "url",
@@ -14288,9 +14313,10 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a11f0b6532349aa6b9a80c9a1d77524f02d8a013#a11f0b6532349aa6b9a80c9a1d77524f02d8a013"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=b10a6d0687deabefcbdea10cf4f828e52befe01f#b10a6d0687deabefcbdea10cf4f828e52befe01f"
 dependencies = [
  "anyhow",
+ "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
  "async-trait",
  "backtrace",
  "clap 4.4.14",
@@ -15630,38 +15656,6 @@ dependencies = [
  "tower-service",
  "tracing",
  "webpki-roots 0.23.1",
-]
-
-[[package]]
-name = "tonic"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d560933a0de61cf715926b9cac824d4c883c2c43142f787595e48280c40a1d0e"
-dependencies = [
- "async-stream",
- "async-trait",
- "axum 0.6.20",
- "base64 0.21.6",
- "bytes",
- "flate2",
- "h2",
- "http",
- "http-body",
- "hyper",
- "hyper-timeout",
- "percent-encoding",
- "pin-project 1.1.3",
- "prost 0.12.3",
- "rustls 0.21.10",
- "rustls-native-certs 0.6.3",
- "rustls-pemfile 1.0.4",
- "tokio",
- "tokio-rustls 0.24.1",
- "tokio-stream",
- "tower",
- "tower-layer",
- "tower-service",
- "tracing",
 ]
 
 [[package]]
