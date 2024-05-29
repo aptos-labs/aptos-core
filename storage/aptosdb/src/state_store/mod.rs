@@ -152,7 +152,7 @@ impl DbReader for StateDb {
         let mut iter = self
             .state_kv_db
             .db_shard(state_key.get_shard_id())
-            .iter::<StateValueSchema>(read_opts)?;
+            .iter_with_opts::<StateValueSchema>(read_opts)?;
         iter.seek(&(state_key.clone(), version))?;
         Ok(iter
             .next()
@@ -1076,9 +1076,7 @@ impl StateStore {
             .state_db
             .state_merkle_db
             .metadata_db()
-            .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
-            Default::default(),
-        )?;
+            .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>()?;
         iter.seek_to_first();
 
         let all_rows = iter.collect::<Result<Vec<_>>>()?;
@@ -1087,12 +1085,10 @@ impl StateStore {
             all_rows.into_iter().map(|(k, _v)| k).collect();
         if self.state_merkle_db.sharding_enabled() {
             for i in 0..NUM_STATE_SHARDS as u8 {
-                let mut iter = self
-                    .state_merkle_db
-                    .db_shard(i)
-                    .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
-                    Default::default(),
-                )?;
+                let mut iter =
+                    self.state_merkle_db
+                        .db_shard(i)
+                        .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>()?;
                 iter.seek_to_first();
 
                 let all_rows = iter.collect::<Result<Vec<_>>>()?;

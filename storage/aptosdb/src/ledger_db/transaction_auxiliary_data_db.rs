@@ -8,7 +8,7 @@ use crate::{
     },
     utils::iterators::ExpectContinuousVersions,
 };
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::transaction::{TransactionAuxiliaryData, Version};
 use std::{path::Path, sync::Arc};
@@ -63,9 +63,7 @@ impl TransactionAuxiliaryDataDb {
         start_version: Version,
         num_transaction_auxiliary_data: usize,
     ) -> Result<impl Iterator<Item = Result<TransactionAuxiliaryData>> + '_> {
-        let mut iter = self
-            .db
-            .iter::<TransactionAuxiliaryDataSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<TransactionAuxiliaryDataSchema>()?;
         iter.seek(&start_version)?;
         iter.expect_continuous_versions(start_version, num_transaction_auxiliary_data)
     }

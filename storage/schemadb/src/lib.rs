@@ -248,12 +248,22 @@ impl DB {
     }
 
     /// Returns a forward [`SchemaIterator`] on a certain schema.
-    pub fn iter<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
+    pub fn iter<S: Schema>(&self) -> DbResult<SchemaIterator<S>> {
+        self.iter_with_opts(ReadOptions::default())
+    }
+
+    /// Returns a forward [`SchemaIterator`] on a certain schema, with non-default ReadOptions
+    pub fn iter_with_opts<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
         self.iter_with_direction::<S>(opts, ScanDirection::Forward)
     }
 
     /// Returns a backward [`SchemaIterator`] on a certain schema.
-    pub fn rev_iter<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
+    pub fn rev_iter<S: Schema>(&self) -> DbResult<SchemaIterator<S>> {
+        self.rev_iter_with_opts(ReadOptions::default())
+    }
+
+    /// Returns a backward [`SchemaIterator`] on a certain schema, with non-default ReadOptions
+    pub fn rev_iter_with_opts<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
         self.iter_with_direction::<S>(opts, ScanDirection::Backward)
     }
 

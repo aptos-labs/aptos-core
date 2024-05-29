@@ -87,9 +87,7 @@ impl EventStore {
         ledger_version: Version,
         event_key: &EventKey,
     ) -> Result<Option<u64>> {
-        let mut iter = self
-            .event_db
-            .iter::<EventByVersionSchema>(ReadOptions::default())?;
+        let mut iter = self.event_db.iter::<EventByVersionSchema>()?;
         iter.seek_for_prev(&(*event_key, ledger_version, u64::max_value()));
 
         Ok(iter.next().transpose()?.and_then(
@@ -127,9 +125,7 @@ impl EventStore {
             u64,     // index among events for the same transaction
         )>,
     > {
-        let mut iter = self
-            .event_db
-            .iter::<EventByKeySchema>(ReadOptions::default())?;
+        let mut iter = self.event_db.iter::<EventByKeySchema>()?;
         iter.seek(&(*event_key, start_seq_num))?;
 
         let mut result = Vec::new();
@@ -183,9 +179,7 @@ impl EventStore {
             u64,     // sequence number
         )>,
     > {
-        let mut iter = self
-            .event_db
-            .iter::<EventByVersionSchema>(ReadOptions::default())?;
+        let mut iter = self.event_db.iter::<EventByVersionSchema>()?;
         iter.seek_for_prev(&(*event_key, version, u64::MAX))?;
 
         match iter.next().transpose()? {
@@ -211,9 +205,7 @@ impl EventStore {
             u64,     // sequence number
         )>,
     > {
-        let mut iter = self
-            .event_db
-            .iter::<EventByVersionSchema>(ReadOptions::default())?;
+        let mut iter = self.event_db.iter::<EventByVersionSchema>()?;
         iter.seek(&(*event_key, version, 0))?;
 
         match iter.next().transpose()? {
@@ -239,9 +231,7 @@ impl EventStore {
             u64,     // sequence number
         )>,
     > {
-        let mut iter = self
-            .event_db
-            .iter::<EventByVersionSchema>(ReadOptions::default())?;
+        let mut iter = self.event_db.iter::<EventByVersionSchema>()?;
         iter.seek(&(*event_key, version + 1, 0))?;
 
         match iter.next().transpose()? {
@@ -351,9 +341,7 @@ impl EventStore {
         end: Version,
         db_batch: &SchemaBatch,
     ) -> anyhow::Result<()> {
-        let mut iter = self
-            .event_db
-            .iter::<EventAccumulatorSchema>(Default::default())?;
+        let mut iter = self.event_db.iter::<EventAccumulatorSchema>()?;
         iter.seek(&(begin, Position::from_inorder_index(0)))?;
         while let Some(((version, position), _)) = iter.next().transpose()? {
             if version >= end {

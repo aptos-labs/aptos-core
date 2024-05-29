@@ -550,7 +550,7 @@ impl DbReader for AptosDB {
             }
 
             let db = self.ledger_db.metadata_db_arc();
-            let mut iter = db.rev_iter::<BlockInfoSchema>(ReadOptions::default())?;
+            let mut iter = db.rev_iter::<BlockInfoSchema>()?;
             iter.seek_to_last();
 
             let mut events = Vec::with_capacity(num_events);
