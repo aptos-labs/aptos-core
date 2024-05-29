@@ -27,13 +27,22 @@ pub enum ModuleMember {
 pub struct Function {
     // pub attributes: Vec<Attributes>,
     // pub visibility: Visibility,
-    // pub signature: FunctionSignature,
+    pub signature: FunctionSignature,
     /// `None` indicates no specifiers given, `Some([])` indicates the `pure` keyword has been
     /// used.
     // pub access_specifiers: Option<Vec<AccessSpecifier>>,
     pub name: Identifier,
     // pub inline: bool,
     pub body: FunctionBody,
+
+    pub return_stmt: Option<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionSignature {
+    // pub type_parameters: Vec<(Name, Vec<Ability>)>,
+    pub parameters: Vec<(Identifier, Type)>,
+    pub return_type: Option<Type>,
 }
 
 #[derive(Debug, Clone)]
@@ -43,7 +52,6 @@ pub struct FunctionBody {
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-    // Return(Option<Expression>),
     // If(If),
     // While(While),
     // For(For),

@@ -10,6 +10,13 @@ fn simple_module() -> Module {
     Module {
         name: String::from("SimpleModule"),
         members: vec![ModuleMember::Function(Function {
+            signature: FunctionSignature {
+                parameters: vec![
+                    (String::from("param1"), Type::U64),
+                    (String::from("param2"), Type::U8),
+                ],
+                return_type: Some(Type::U32),
+            },
             name: String::from("fun1"),
             body: FunctionBody {
                 stmts: vec![Statement::Expr(Expression::NumberLiteral(NumberLiteral {
@@ -17,6 +24,10 @@ fn simple_module() -> Module {
                     typ: Type::U32,
                 }))],
             },
+            return_stmt: Some(Expression::NumberLiteral(NumberLiteral {
+                value: BigUint::from(111u32),
+                typ: Type::U32,
+            })),
         })],
     }
 }
@@ -33,12 +44,13 @@ fn get_raw_data() -> Vec<u8> {
 fn test_emit_code() {
     let lines = simple_module().emit_code_lines();
     println!("{}", lines.join("\n"));
-    assert_eq!(lines.len(), 5);
+    assert_eq!(lines.len(), 6);
     assert_eq!(lines[0], "module 0xCAFE::SimpleModule {");
-    assert_eq!(lines[1], "    fun fun1() {");
+    assert_eq!(lines[1], "    fun fun1(param1: u64, param2: u8): u32 {");
     assert_eq!(lines[2], "        42u32;");
-    assert_eq!(lines[3], "    }");
-    assert_eq!(lines[4], "}\n");
+    assert_eq!(lines[3], "        111u32");
+    assert_eq!(lines[4], "    }");
+    assert_eq!(lines[5], "}\n");
 }
 
 #[test]

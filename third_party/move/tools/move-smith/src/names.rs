@@ -1,4 +1,4 @@
-use arbitrary::{Arbitrary, Result, Unstructured};
+use arbitrary::Arbitrary;
 use std::collections::HashMap;
 
 // #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -18,7 +18,7 @@ pub fn merge_scopes(parent: &Scope, child: &Scope) -> Scope {
     }
 }
 
-pub fn is_under_scope(child: &Scope, parent: &Scope) -> bool {
+pub fn is_in_scope(child: &Scope, parent: &Scope) -> bool {
     match (child, parent) {
         (Some(c), Some(p)) => c.starts_with(p),
         (Some(_), None) => true,
@@ -77,23 +77,7 @@ impl IdentifierPool {
         (name, scope)
     }
 
-    // TODO: maybe move this out to move_smith.rs since similar logic is used more there
-    pub fn random_existing_identifier(
-        &self,
-        u: &mut Unstructured,
-        scope: &Scope,
-        typ: Option<IdentifierType>,
-    ) -> Result<Option<Identifier>> {
-        let chosen_typ = typ.unwrap_or(IdentifierType::arbitrary(u)?);
-        let ident_of_typ = self.get_identifiers_of_type(&chosen_typ);
-        let ident_of_typ_in_scope = self.filter_under_scope(ident_of_typ, scope);
-        match ident_of_typ_in_scope.is_empty() {
-            true => Ok(None),
-            false => Ok(Some(u.choose(&ident_of_typ_in_scope)?.clone())),
-        }
-    }
-
-    pub fn filter_under_scope(
+    pub fn filter_identifier_in_scope(
         &self,
         identifiers: &Vec<Identifier>,
         parent_scope: &Scope,
@@ -101,14 +85,22 @@ impl IdentifierPool {
         let mut in_scope = Vec::new();
         for id in identifiers {
             let id_scope = self.scopes.get(id).unwrap_or(&None);
-            if is_under_scope(id_scope, parent_scope) {
+            if is_in_scope(id_scope, parent_scope) {
                 in_scope.push(id.clone());
             }
         }
         in_scope
     }
 
-    fn get_identifiers_of_type(&self, typ: &IdentifierType) -> &Vec<Identifier> {
+    pub fn get_all_identifiers(&self) -> Vec<Identifier> {
+        self.scopes.keys().cloned().collect()
+    }
+
+    pub fn get_identifiers_of_ident_type(&self, typ: IdentifierType) -> Vec<Identifier> {
+        self._get_identifiers_of_ident_type(typ).clone()
+    }
+
+    fn _get_identifiers_of_ident_type(&self, typ: IdentifierType) -> &Vec<Identifier> {
         match typ {
             IdentifierType::Var => &self.vars,
             IdentifierType::Struct => &self.structs,

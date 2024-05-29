@@ -56,15 +56,18 @@ impl TypePool {
         self.mapping.insert(id.clone(), typ.clone());
     }
 
-    pub fn get_type(&mut self, id: &Identifier) -> Option<Type> {
+    pub fn get_type(&self, id: &Identifier) -> Option<Type> {
         self.mapping.get(id).cloned()
     }
 
-    pub fn get_identifiers_of_type(&self, typ: &Type) -> Vec<Identifier> {
-        self.mapping
-            .iter()
-            .filter_map(|(id, t)| if t == typ { Some(id.clone()) } else { None })
-            .collect()
+    pub fn filter_identifier_with_type(&self, typ: &Type, ids: Vec<Identifier>) -> Vec<Identifier> {
+        let mut res = Vec::new();
+        for id in ids {
+            if self.get_type(&id) == Some(typ.clone()) {
+                res.push(id);
+            }
+        }
+        res
     }
 
     /// Returns one of the basic types that does not require a type argument.
