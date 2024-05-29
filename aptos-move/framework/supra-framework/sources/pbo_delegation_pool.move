@@ -114,7 +114,6 @@ module supra_framework::pbo_delegation_pool {
     use std::features;
     use std::signer;
     use std::vector;
-    use aptos_std::debug;
 
     use aptos_std::math64;
     use aptos_std::pool_u64_unbound::{Self as pool_u64, total_coins};
@@ -1303,23 +1302,16 @@ module supra_framework::pbo_delegation_pool {
         // short-circuit if amount to unlock is 0 so no event is emitted
         if (amount == 0) { return };
         // fail unlock of more stake than `active` on the stake pool
-        let (active, inactive, pending_active, pending_inactive) = stake::get_stake(pool_address);
-
+        let (active, _, _, _) = stake::get_stake(pool_address);
         assert!(amount <= active, error::invalid_argument(ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK));
 
         // synchronize delegation and stake pools before any user operation
         synchronize_delegation_pool(pool_address);
-        // let (active, inactive, pending_active, pending_inactive) = stake::get_stake(pool_address);
-        // debug::print(&active);
-        // debug::print(&inactive);
-        // debug::print(&pending_active);
-        // debug::print(&pending_inactive);
+
         let pool = borrow_global_mut<DelegationPool>(pool_address);
         let delegator_address = signer::address_of(delegator);
         // fail if the amount after withdraw is less than the principle stake and the lockup time is not expired
         if (table::contains(&pool.principle_stake, delegator_address) && pool.principle_lockup_time > timestamp::now_seconds()) {
-            debug::print(&pool_u64::balance(&pool.active_shares,delegator_address));
-            debug::print(&amount);
             assert!(pool_u64::balance(&pool.active_shares,delegator_address) - amount >= *table::borrow(&pool.principle_stake, delegator_address), error::invalid_argument(BALANCE_BELOW_PRINCIPLE_STAKE));
         };
         amount = coins_to_transfer_to_ensure_min_stake(
@@ -1343,9 +1335,6 @@ module supra_framework::pbo_delegation_pool {
             },
         );
         let (active_stake, _, pending_active, _)= stake::get_stake(pool_address);
-        // debug::print(&active_stake);
-        // debug::print(&pool_u64::total_coins(&pool.active_shares));
-        // fail if coin in StakePool.active does not match with the balance in active_shares pool.
         assert!( active_stake + pending_active == pool_u64::total_coins(&pool.active_shares), error::invalid_state(ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL));
     }
 
