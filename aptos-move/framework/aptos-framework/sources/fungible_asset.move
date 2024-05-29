@@ -428,9 +428,21 @@ module aptos_framework::fungible_asset {
     }
 
     #[view]
-    /// Get the decimals from the `metadata` object.
+    /// Get the decimals of the fungible asset from the `metadata` object.
     public fun decimals<T: key>(metadata: Object<T>): u8 acquires Metadata {
         borrow_fungible_metadata(&metadata).decimals
+    }
+
+    #[view]
+    /// Get the icon_uri of the fungible asset from the `metadata` object.
+    public fun icon_uri<T: key>(metadata: Object<T>): String acquires Metadata {
+        borrow_fungible_metadata(&metadata).icon_uri
+    }
+
+    #[view]
+    /// Get the project_uri of the fungible asset from the `metadata` object.
+    public fun project_uri<T: key>(metadata: Object<T>): String acquires Metadata {
+        borrow_fungible_metadata(&metadata).project_uri
     }
 
     #[view]
@@ -1020,6 +1032,9 @@ module aptos_framework::fungible_asset {
         assert!(maximum(metadata) == option::some(100), 2);
         assert!(name(metadata) == string::utf8(b"TEST"), 3);
         assert!(symbol(metadata) == string::utf8(b"@@"), 4);
+        assert!(icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 8);
+        assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 9);
+
         assert!(decimals(metadata) == 0, 5);
 
         increase_supply(&metadata, 50);
