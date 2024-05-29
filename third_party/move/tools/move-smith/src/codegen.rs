@@ -31,7 +31,10 @@ impl CodeGenerator for Identifier {
 
 impl CodeGenerator for Module {
     fn emit_code_lines(&self) -> Vec<String> {
-        let mut code = vec![format!("module 0xCAFE::{} {{", self.name.emit_code())];
+        let mut code = vec![
+            "//# publish".to_string(),
+            format!("module 0xCAFE::{} {{", self.name.emit_code())
+        ];
         for member in &self.members {
             // Prepend 4 spaces to each line of the member's code
             append_code_lines_with_indentation(
