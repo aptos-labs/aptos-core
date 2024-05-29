@@ -1,15 +1,19 @@
 #!/bin/bash
 
+NUM_PROG=${1:-10}
+PARENT_DIR=$(realpath $(dirname $0)/..)
+OUTPUT_DIR="$PARENT_DIR/output"
+
 function get_error() {
   find $1 -name compile.log | while read f; do
     grep "error\[E" $f
   done | sort | uniq
 }
 
-rm -rf output
-cargo run --bin generator -- -o output -s 1234 -p -n $1
+rm -rf $OUTPUT_DIR
+cargo run --bin generator -- -o $OUTPUT_DIR -s 1234 -p -n $NUM_PROG
 
-for p in output/*; do
+for p in $OUTPUT_DIR/*; do
   if [ -d "$p" ]; then
     echo "Checking $p"
     (
@@ -27,4 +31,4 @@ done
 
 echo
 echo "Errors are:"
-get_error output
+get_error $OUTPUT_DIR
