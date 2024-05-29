@@ -12,9 +12,7 @@ pub struct RequiredGasDeposit {
 
 impl RequiredGasDeposit {
     pub fn default_for_genesis() -> Self {
-        Self {
-            gas_amount: None,
-        }
+        Self { gas_amount: None }
     }
 
     pub fn default_if_missing() -> Self {
