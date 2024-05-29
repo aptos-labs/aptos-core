@@ -76,7 +76,7 @@ impl BlockPreparer {
         txns.sort_by(|a, b| {
             match a.gas_unit_price().cmp(&b.gas_unit_price()) {
                 Ordering::Equal => {},
-                ordering => return ordering,
+                ordering => return ordering.reverse(),
             }
             match a
                 .expiration_timestamp_secs()
@@ -84,17 +84,17 @@ impl BlockPreparer {
                 .reverse()
             {
                 Ordering::Equal => {},
-                ordering => return ordering,
+                ordering => return ordering.reverse(),
             }
             match a.sender().cmp(&b.sender()) {
                 Ordering::Equal => {},
-                ordering => return ordering,
+                ordering => return ordering.reverse(),
             }
             match a.sequence_number().cmp(&b.sequence_number()).reverse() {
                 Ordering::Equal => {},
-                ordering => return ordering,
+                ordering => return ordering.reverse(),
             }
-            a.committed_hash().cmp(&b.committed_hash())
+            a.committed_hash().cmp(&b.committed_hash()).reverse()
         });
 
         let txn_filter = self.txn_filter.clone();
