@@ -119,7 +119,14 @@ const TXN_CONSENSUS_PULLED_BUCKETS: &[f64] = &[1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 25
 
 static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
-        /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 20,
+        /*start=*/ 1.5, /*factor=*/ 1.3, /*count=*/ 40,
+    )
+    .unwrap()
+});
+
+static BYTE_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+    exponential_buckets(
+        /*start=*/ 500.0, /*factor=*/ 1.3, /*count=*/ 45,
     )
     .unwrap()
 });
@@ -163,6 +170,77 @@ pub static CORE_MEMPOOL_REMOVED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_core_mempool_removed_txns_count",
         "Number of txns removed from core mempool"
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_GET_BATCH_REQUESTS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_mempool_get_batch_requests",
+        "Number of get batch requests received by mempool"
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_TOTAL_NUM_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_total_num_txns",
+        "Total number of txns in mempool",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_TXNS_EXCLUDING_PROGRESING: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_txns_excluding_progressing",
+        "Number of txns in mempool excluding those in the progressing state",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_GET_BATCH_INITIAL_NUM_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_get_batch_initial_num_txns",
+        "Number of txns in mempool when get batch request is received",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_GET_BATCH_INITIAL_NUM_BYTES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_get_batch_initial_num_bytes",
+        "Number of bytes in mempool when get batch request is received",
+        BYTE_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_GET_BATCH_FINAL_NUM_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_get_batch_final_num_txns",
+        "Number of txns in mempool when get batch response is sent",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_GET_BATCH_FINAL_NUM_BYTES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_get_batch_final_num_bytes",
+        "Number of bytes in mempool when get batch response is sent",
+        BYTE_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_remaining_txns_after_get_batch",
+        "Number of txns remaining in mempool after get batch response is sent",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
     )
     .unwrap()
 });

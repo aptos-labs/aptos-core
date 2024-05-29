@@ -311,6 +311,13 @@ impl Mempool {
         return_non_full: bool,
         exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
     ) -> Vec<SignedTransaction> {
+        counters::MEMPOOL_GET_BATCH_REQUESTS.inc();
+        counters::MEMPOOL_TOTAL_NUM_TXNS.observe(self.transactions.total_num_transactions() as f64);
+        let mempool_total_txns_excluding_progressing = self
+            .transactions
+            .total_num_transactions_excluding(&exclude_transactions);
+        counters::MEMPOOL_TXNS_EXCLUDING_PROGRESING
+            .observe(mempool_total_txns_excluding_progressing as f64);
         let start_time = Instant::now();
         let exclude_size = exclude_transactions.len();
         let mut inserted = HashSet::new();
@@ -364,6 +371,22 @@ impl Mempool {
                 skipped.insert((txn.address, tx_seq));
             }
         }
+        counters::MEMPOOL_GET_BATCH_INITIAL_NUM_TXNS.observe(result.len() as f64);
+        counters::MEMPOOL_GET_BATCH_INITIAL_NUM_BYTES.observe(
+            result
+                .iter()
+                .map(|(sender, sequence_number)| {
+                    if let Some((txn, _)) = self
+                        .transactions
+                        .get_with_ranking_score(sender, *sequence_number)
+                    {
+                        txn.txn_bytes_len()
+                    } else {
+                        0
+                    }
+                })
+                .sum::<usize>() as f64,
+        );
         let result_size = result.len();
         let result_end_time = start_time.elapsed();
         let result_time = result_end_time.saturating_sub(gas_end_time);
@@ -438,6 +461,10 @@ impl Mempool {
         for transaction in &block {
             self.log_consensus_pulled_latency(transaction.sender(), transaction.sequence_number());
         }
+        counters::MEMPOOL_GET_BATCH_FINAL_NUM_TXNS.observe(block.len() as f64);
+        counters::MEMPOOL_GET_BATCH_FINAL_NUM_BYTES.observe(total_bytes as f64);
+        counters::MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH
+            .observe((mempool_total_txns_excluding_progressing - block.len() as u64) as f64);
         block
     }
 

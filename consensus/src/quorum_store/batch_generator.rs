@@ -231,6 +231,7 @@ impl BatchGenerator {
             if num_batch_txns > 0 {
                 let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
                 let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
+                counters::BATCH_SIZE_IN_BYTES.observe(batch.batch_info().num_bytes() as f64);
                 batches.push(batch);
                 *total_batches_remaining = total_batches_remaining.saturating_sub(1);
                 txns_remaining -= num_batch_txns;
@@ -327,6 +328,8 @@ impl BatchGenerator {
 
     pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
         counters::BATCH_PULL_EXCLUDED_TXNS.observe(self.txns_in_progress_sorted.len() as f64);
+        counters::SCHEDULED_BATCH_PULLS.inc();
+        counters::QS_MAX_PULL_TXNS.observe(max_count as f64);
         trace!(
             "QS: excluding txs len: {:?}",
             self.txns_in_progress_sorted.len()
@@ -366,6 +369,7 @@ impl BatchGenerator {
         let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;
         let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
+        counters::CREATED_NUM_BATCHES_PER_PULL.observe(batches.len() as f64);
         self.last_end_batch_time = Instant::now();
         counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
 
