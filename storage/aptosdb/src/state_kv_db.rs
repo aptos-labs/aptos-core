@@ -282,8 +282,10 @@ impl StateKvDb {
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
         let mut read_opts = ReadOptions::default();
+
         // We want `None` if the state_key changes in iteration.
         read_opts.set_prefix_same_as_start(true);
+
         let mut iter = self
             .db_shard(state_key.get_shard_id())
             .iter_with_opts::<StateValueSchema>(read_opts)?;
