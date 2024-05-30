@@ -10443,6 +10443,7 @@ dependencies = [
  "log",
  "move-binary-format",
  "move-bytecode-source-map",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-compiler",
  "move-core-types",
