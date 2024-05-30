@@ -206,6 +206,21 @@ pub enum EntryFunctionCall {
         proposal_id: u64,
     },
 
+    /// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
+    AptosGovernanceBatchPartialVote {
+        stake_pools: Vec<AccountAddress>,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
+    },
+
+    /// Vote on proposal with proposal_id and all voting power from multiple stake_pools.
+    AptosGovernanceBatchVote {
+        stake_pools: Vec<AccountAddress>,
+        proposal_id: u64,
+        should_pass: bool,
+    },
+
     /// Create a single-step proposal with the backing `stake_pool`.
     /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
     /// only the exact script with matching hash can be successfully executed.
@@ -1097,6 +1112,22 @@ impl EntryFunctionCall {
             AptosGovernanceAddApprovedScriptHashScript { proposal_id } => {
                 aptos_governance_add_approved_script_hash_script(proposal_id)
             },
+            AptosGovernanceBatchPartialVote {
+                stake_pools,
+                proposal_id,
+                voting_power,
+                should_pass,
+            } => aptos_governance_batch_partial_vote(
+                stake_pools,
+                proposal_id,
+                voting_power,
+                should_pass,
+            ),
+            AptosGovernanceBatchVote {
+                stake_pools,
+                proposal_id,
+                should_pass,
+            } => aptos_governance_batch_vote(stake_pools, proposal_id, should_pass),
             AptosGovernanceCreateProposal {
                 stake_pool,
                 execution_hash,
@@ -2046,6 +2077,56 @@ pub fn aptos_governance_add_approved_script_hash_script(proposal_id: u64) -> Tra
         ident_str!("add_approved_script_hash_script").to_owned(),
         vec![],
         vec![bcs::to_bytes(&proposal_id).unwrap()],
+    ))
+}
+
+/// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
+pub fn aptos_governance_batch_partial_vote(
+    stake_pools: Vec<AccountAddress>,
+    proposal_id: u64,
+    voting_power: u64,
+    should_pass: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_governance").to_owned(),
+        ),
+        ident_str!("batch_partial_vote").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&stake_pools).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
+            bcs::to_bytes(&voting_power).unwrap(),
+            bcs::to_bytes(&should_pass).unwrap(),
+        ],
+    ))
+}
+
+/// Vote on proposal with proposal_id and all voting power from multiple stake_pools.
+pub fn aptos_governance_batch_vote(
+    stake_pools: Vec<AccountAddress>,
+    proposal_id: u64,
+    should_pass: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_governance").to_owned(),
+        ),
+        ident_str!("batch_vote").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&stake_pools).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
+            bcs::to_bytes(&should_pass).unwrap(),
+        ],
     ))
 }
 
@@ -4783,6 +4864,33 @@ mod decoder {
         }
     }
 
+    pub fn aptos_governance_batch_partial_vote(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosGovernanceBatchPartialVote {
+                stake_pools: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                voting_power: bcs::from_bytes(script.args().get(2)?).ok()?,
+                should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn aptos_governance_batch_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosGovernanceBatchVote {
+                stake_pools: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                should_pass: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_governance_create_proposal(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6332,6 +6440,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_governance_add_approved_script_hash_script".to_string(),
             Box::new(decoder::aptos_governance_add_approved_script_hash_script),
+        );
+        map.insert(
+            "aptos_governance_batch_partial_vote".to_string(),
+            Box::new(decoder::aptos_governance_batch_partial_vote),
+        );
+        map.insert(
+            "aptos_governance_batch_vote".to_string(),
+            Box::new(decoder::aptos_governance_batch_vote),
         );
         map.insert(
             "aptos_governance_create_proposal".to_string(),
