@@ -1,9 +1,9 @@
 /// This module defines a minimal and generic Coin and Balance.
 /// modified from https://github.com/move-language/move/tree/main/language/documentation/tutorial
 module aptos_framework::aptos_coin {
-    use std::string;
     use std::error;
     use std::signer;
+    use std::string;
     use std::vector;
     use std::option::{Self, Option};
 
@@ -69,6 +69,7 @@ module aptos_framework::aptos_coin {
 
     /// Can only be called during genesis for tests to grant mint capability to aptos framework and core resources
     /// accounts.
+    /// Expects account and APT store to be registered before calling.
     public(friend) fun configure_accounts_for_test(
         aptos_framework: &signer,
         core_resources: &signer,
@@ -77,7 +78,6 @@ module aptos_framework::aptos_coin {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         // Mint the core resource account AptosCoin for gas so it can execute system transactions.
-        coin::register<AptosCoin>(core_resources);
         let coins = coin::mint<AptosCoin>(
             18446744073709551615,
             &mint_cap,

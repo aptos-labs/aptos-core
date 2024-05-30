@@ -4,6 +4,7 @@
 
 use crate::{
     block_storage::{
+        pending_blocks::PendingBlocks,
         tracing::{observe_block, BlockStage},
         BlockStore,
     },
@@ -175,6 +176,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
     proof_cache: ProofCache,
     observer_network: Option<NetworkClient<ObserverMessage>>,
+    pending_blocks: Arc<Mutex<PendingBlocks>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -243,6 +245,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .time_to_live(Duration::from_secs(20))
                 .build(),
             observer_network,
+            pending_blocks: Arc::new(Mutex::new(PendingBlocks::new())),
         }
     }
 
@@ -539,6 +542,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         // shutdown existing processor first to avoid race condition with state sync.
         self.shutdown_current_processor().await;
+        *self.pending_blocks.lock() = PendingBlocks::new();
         // make sure storage is on this ledger_info too, it should be no-op if it's already committed
         // panic if this doesn't succeed since the current processors are already shutdown.
         self.execution_client
@@ -561,8 +565,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         max_blocks_allowed: u64,
     ) {
         let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
-            QueueStyle::LIFO,
-            1,
+            QueueStyle::KLAST,
+            10,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
         );
         let task = async move {
@@ -641,7 +645,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: Arc<NetworkSender>,
     ) {
         let (recovery_manager_tx, recovery_manager_rx) = aptos_channel::new(
-            QueueStyle::LIFO,
+            QueueStyle::KLAST,
             10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
@@ -657,6 +661,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config
                 .max_blocks_per_sending_request(onchain_consensus_config.quorum_store_enabled()),
             self.payload_manager.clone(),
+            onchain_consensus_config.order_vote_enabled(),
+            self.pending_blocks.clone(),
         );
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
     }
@@ -819,6 +825,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Arc::clone(&self.time_service),
             self.config.vote_back_pressure_limit,
             payload_manager,
+            onchain_consensus_config.order_vote_enabled(),
+            self.pending_blocks.clone(),
         ));
 
         info!(epoch = epoch, "Create ProposalGenerator");
@@ -844,7 +852,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .allow_batches_without_pos_in_proposal,
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
-            QueueStyle::LIFO,
+            QueueStyle::KLAST,
             10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
@@ -1141,8 +1149,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .await;
 
         let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(
-            QueueStyle::FIFO,
-            100,
+            QueueStyle::KLAST,
+            10,
             None,
         );
 
@@ -1221,7 +1229,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
-        match self.storage.start() {
+        match self.storage.start(consensus_config.order_vote_enabled()) {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 self.recovery_mode = false;
                 self.start_round_manager(
@@ -1391,6 +1399,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let max_batch_expiry_gap_usecs =
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let payload_manager = self.payload_manager.clone();
+            let pending_blocks = self.pending_blocks.clone();
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(
@@ -1413,6 +1422,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                 peer_id,
                                 verified_event,
                                 payload_manager,
+                                pending_blocks,
                             );
                         },
                         Err(e) => {
@@ -1439,6 +1449,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ConsensusMsg::ProposalMsg(_)
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
+            | ConsensusMsg::OrderVoteMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)
             | ConsensusMsg::BatchMsg(_)
@@ -1539,6 +1550,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         peer_id: AccountAddress,
         event: VerifiedEvent,
         payload_manager: Arc<PayloadManager>,
+        pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) {
         if let VerifiedEvent::ProposalMsg(proposal) = &event {
             observe_block(
@@ -1559,7 +1571,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         payload_manager
                             .prefetch_payload_data(payload, p.proposal().timestamp_usecs());
                     }
+                    pending_blocks.lock().insert_block(p.proposal().clone());
                 }
+
                 Self::forward_event_to(buffered_proposal_tx, peer_id, proposal_event)
                     .context("proposal precheck sender")
             },

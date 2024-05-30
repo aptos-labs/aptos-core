@@ -5,6 +5,8 @@
 use crate::{ConsensusState, Error};
 use aptos_consensus_types::{
     block_data::BlockData,
+    order_vote::OrderVote,
+    order_vote_proposal::OrderVoteProposal,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::VoteProposal,
@@ -44,6 +46,12 @@ pub trait TSafetyRules {
         vote_proposal: &VoteProposal,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<Vote, Error>;
+
+    /// Attempts to create an order vote for a block given the quroum certificate for the block.
+    fn construct_and_sign_order_vote(
+        &mut self,
+        order_vote_proposal: &OrderVoteProposal,
+    ) -> Result<OrderVote, Error>;
 
     /// As the holder of the private key, SafetyRules also signs a commit vote.
     /// This returns the signature for the commit vote.

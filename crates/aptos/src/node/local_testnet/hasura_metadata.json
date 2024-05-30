@@ -1,5 +1,5 @@
 {
-  "resource_version": 385,
+  "resource_version": 399,
   "metadata": {
     "version": 3,
     "sources": [
@@ -9,9 +9,52 @@
         "tables": [
           {
             "table": {
+              "name": "parsed_asset_uris",
+              "schema": "nft_metadata_crawler"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "animation_optimizer_retry_count",
+                    "asset_uri",
+                    "cdn_animation_uri",
+                    "cdn_image_uri",
+                    "cdn_json_uri",
+                    "image_optimizer_retry_count",
+                    "json_parser_retry_count",
+                    "raw_animation_uri",
+                    "raw_image_uri"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "account_transactions",
               "schema": "public"
             },
+            "object_relationships": [
+              {
+                "name": "user_transaction",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "user_transactions",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
             "array_relationships": [
               {
                 "name": "coin_activities",
@@ -596,17 +639,19 @@
                 "role": "anonymous",
                 "permission": {
                   "columns": [
-                    "last_transaction_version",
+                    "domain",
+                    "domain_expiration_timestamp",
+                    "domain_with_suffix",
+                    "expiration_timestamp",
                     "is_active",
                     "is_primary",
-                    "domain",
+                    "last_transaction_version",
                     "owner_address",
                     "registered_address",
                     "subdomain",
+                    "subdomain_expiration_policy",
                     "token_name",
-                    "token_standard",
-                    "domain_with_suffix",
-                    "expiration_timestamp"
+                    "token_standard"
                   ],
                   "filter": {},
                   "limit": 100,
@@ -734,7 +779,23 @@
               "name": "current_collections_v2",
               "schema": "public"
             },
-            "object_relationships": [],
+            "object_relationships": [
+              {
+                "name": "cdn_asset_uris",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "uri": "asset_uri"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "parsed_asset_uris",
+                      "schema": "nft_metadata_crawler"
+                    }
+                  }
+                }
+              }
+            ],
             "select_permissions": [
               {
                 "role": "anonymous",
@@ -1073,6 +1134,21 @@
                 }
               },
               {
+                "name": "cdn_asset_uris",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_uri": "asset_uri"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "parsed_asset_uris",
+                      "schema": "nft_metadata_crawler"
+                    }
+                  }
+                }
+              },
+              {
                 "name": "current_collection",
                 "using": {
                   "manual_configuration": {
@@ -1086,9 +1162,11 @@
                     }
                   }
                 }
-              },
+              }
+            ],
+            "array_relationships": [
               {
-                "name": "current_token_ownership",
+                "name": "current_token_ownerships",
                 "using": {
                   "manual_configuration": {
                     "column_mapping": {
@@ -1109,7 +1187,9 @@
                 "permission": {
                   "columns": [
                     "collection_id",
+                    "decimals",
                     "description",
+                    "is_deleted_v2",
                     "is_fungible_v2",
                     "largest_property_version_v1",
                     "last_transaction_timestamp",
@@ -1254,6 +1334,7 @@
                     "is_soulbound_v2",
                     "last_transaction_timestamp",
                     "last_transaction_version",
+                    "non_transferrable_by_owner",
                     "owner_address",
                     "property_version_v1",
                     "storage_id",
@@ -1761,6 +1842,35 @@
           },
           {
             "table": {
+              "name": "signatures",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "is_sender_primary",
+                    "multi_agent_index",
+                    "multi_sig_index",
+                    "public_key",
+                    "public_key_indices",
+                    "signature",
+                    "signer",
+                    "threshold",
+                    "transaction_block_height",
+                    "transaction_version",
+                    "type"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "table_items",
               "schema": "public"
             },
@@ -2136,7 +2246,7 @@
           "GET"
         ],
         "name": "Latest Processor Status",
-        "url": "get_lastest_processor_status"
+        "url": "get_latest_processor_status"
       }
     ],
     "api_limits": {

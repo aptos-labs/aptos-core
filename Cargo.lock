@@ -364,7 +364,7 @@ dependencies = [
  "aptos-logger",
  "aptos-runtimes",
  "aptos-storage-interface",
- "aptos-system-utils",
+ "aptos-system-utils 0.1.0",
  "aptos-types",
  "bcs 0.1.4",
  "http",
@@ -886,6 +886,7 @@ dependencies = [
  "futures-channel",
  "hex",
  "itertools 0.12.1",
+ "lru 0.7.8",
  "maplit",
  "mini-moka",
  "mirai-annotations",
@@ -939,6 +940,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-types",
  "bcs 0.1.4",
+ "fail",
  "futures",
  "itertools 0.12.1",
  "mini-moka",
@@ -1397,7 +1399,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-node-resource-metrics",
- "aptos-profiler",
+ "aptos-profiler 0.1.0",
  "aptos-push-metrics",
  "aptos-sdk",
  "aptos-storage-interface",
@@ -2126,7 +2128,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
- "aptos-system-utils",
+ "aptos-system-utils 0.1.0",
  "async-trait",
  "backtrace",
  "clap 4.4.14",
@@ -2512,7 +2514,6 @@ dependencies = [
  "aptos-consensus-types",
  "aptos-crypto",
  "aptos-event-notifications",
- "aptos-experimental-runtimes",
  "aptos-id-generator",
  "aptos-infallible",
  "aptos-logger",
@@ -2660,7 +2661,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a11f0b6532349aa6b9a80c9a1d77524f02d8a013#a11f0b6532349aa6b9a80c9a1d77524f02d8a013"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=ca60e51b53c3be6f9517de7c73d4711e9c1f7236#ca60e51b53c3be6f9517de7c73d4711e9c1f7236"
 dependencies = [
  "chrono",
 ]
@@ -3140,6 +3141,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-profiler"
+version = "0.1.0"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
+dependencies = [
+ "anyhow",
+ "backtrace",
+ "jemalloc-sys",
+ "jemallocator",
+ "pprof",
+ "regex",
+]
+
+[[package]]
 name = "aptos-proptest-helpers"
 version = "0.1.0"
 dependencies = [
@@ -3162,14 +3176,13 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.3.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.10.0#b24f6cd08f84b179e49090c7e51a501c535096ca"
+source = "git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.12.1#4b9a2593facaee92b28df2e99b2773a7e4f930f5"
 dependencies = [
  "futures-core",
  "pbjson",
  "prost 0.12.3",
- "prost-types 0.12.3",
  "serde",
- "tonic 0.10.2",
+ "tonic 0.11.0",
 ]
 
 [[package]]
@@ -3382,6 +3395,7 @@ dependencies = [
  "aptos-secure-storage",
  "aptos-types",
  "aptos-vault-client",
+ "claims",
  "criterion",
  "once_cell",
  "proptest",
@@ -3699,7 +3713,27 @@ name = "aptos-system-utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-profiler",
+ "aptos-profiler 0.1.0",
+ "async-mutex",
+ "http",
+ "hyper",
+ "lazy_static",
+ "mime",
+ "pprof",
+ "regex",
+ "rstack-self",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "aptos-system-utils"
+version = "0.1.0"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
+dependencies = [
+ "anyhow",
+ "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
  "async-mutex",
  "http",
  "hyper",
@@ -5182,17 +5216,16 @@ dependencies = [
 
 [[package]]
 name = "bindgen"
-version = "0.65.1"
+version = "0.69.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfdf7b466f9a4903edc73f95d6d2bcd5baf8ae620638762244d3f60143643cc5"
+checksum = "a00dc851838a2120612785d195287475a3ac45514741da670b735818822129a0"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.4.1",
  "cexpr",
  "clang-sys",
+ "itertools 0.12.1",
  "lazy_static",
  "lazycell",
- "peeking_take_while",
- "prettyplease",
  "proc-macro2",
  "quote",
  "regex",
@@ -9742,9 +9775,9 @@ dependencies = [
 
 [[package]]
 name = "librocksdb-sys"
-version = "0.11.0+8.1.1"
+version = "0.16.0+8.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3386f101bcb4bd252d8e9d2fb41ec3b0862a15a62b478c355b2982efa469e3e"
+checksum = "ce3d60bc059831dc1c83903fb45c103f75db65c5a7bf22272764d9cc683e348c"
 dependencies = [
  "bindgen",
  "bzip2-sys",
@@ -11913,12 +11946,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "peeking_take_while"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
-
-[[package]]
 name = "pem"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12562,16 +12589,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prettyplease"
-version = "0.2.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a41cf62165e97c7f814d2221421dbb9afcbcdb0a88068e5ea206e19951c2cbb5"
-dependencies = [
- "proc-macro2",
- "syn 2.0.48",
-]
-
-[[package]]
 name = "prettytable-rs"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12689,12 +12706,12 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a11f0b6532349aa6b9a80c9a1d77524f02d8a013#a11f0b6532349aa6b9a80c9a1d77524f02d8a013"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=ca60e51b53c3be6f9517de7c73d4711e9c1f7236#ca60e51b53c3be6f9517de7c73d4711e9c1f7236"
 dependencies = [
  "ahash 0.8.11",
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a11f0b6532349aa6b9a80c9a1d77524f02d8a013)",
- "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.10.0)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=ca60e51b53c3be6f9517de7c73d4711e9c1f7236)",
+ "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.12.1)",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
@@ -12714,6 +12731,7 @@ dependencies = [
  "google-cloud-pubsub",
  "hex",
  "itertools 0.12.1",
+ "jemallocator",
  "kanal",
  "native-tls",
  "num_cpus",
@@ -12731,7 +12749,7 @@ dependencies = [
  "strum 0.24.1",
  "tokio",
  "tokio-postgres",
- "tonic 0.10.2",
+ "tonic 0.11.0",
  "tracing",
  "unescape",
  "url",
@@ -13519,9 +13537,9 @@ dependencies = [
 
 [[package]]
 name = "rocksdb"
-version = "0.21.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb6f170a4041d50a0ce04b0d2e14916d6ca863ea2e422689a5b694395d299ffe"
+checksum = "6bd13e55d6d7b8cd0ea569161127567cd587676c99f4472f779a0279aa60a7a7"
 dependencies = [
  "libc",
  "librocksdb-sys",
@@ -14287,9 +14305,10 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a11f0b6532349aa6b9a80c9a1d77524f02d8a013#a11f0b6532349aa6b9a80c9a1d77524f02d8a013"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=ca60e51b53c3be6f9517de7c73d4711e9c1f7236#ca60e51b53c3be6f9517de7c73d4711e9c1f7236"
 dependencies = [
  "anyhow",
+ "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
  "async-trait",
  "backtrace",
  "clap 4.4.14",
@@ -15629,38 +15648,6 @@ dependencies = [
  "tower-service",
  "tracing",
  "webpki-roots 0.23.1",
-]
-
-[[package]]
-name = "tonic"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d560933a0de61cf715926b9cac824d4c883c2c43142f787595e48280c40a1d0e"
-dependencies = [
- "async-stream",
- "async-trait",
- "axum 0.6.20",
- "base64 0.21.6",
- "bytes",
- "flate2",
- "h2",
- "http",
- "http-body",
- "hyper",
- "hyper-timeout",
- "percent-encoding",
- "pin-project 1.1.3",
- "prost 0.12.3",
- "rustls 0.21.10",
- "rustls-native-certs 0.6.3",
- "rustls-pemfile 1.0.4",
- "tokio",
- "tokio-rustls 0.24.1",
- "tokio-stream",
- "tower",
- "tower-layer",
- "tower-service",
- "tracing",
 ]
 
 [[package]]

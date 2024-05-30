@@ -1,6 +1,6 @@
 overwrite: true
 documents: src/indexer/queries/**/*.graphql
-schema: https://indexer.mainnet.aptoslabs.com/v1/graphql
+schema: https://api.mainnet.aptoslabs.com/v1/graphql
 generates:
   src/indexer/generated/types.ts:
     plugins:
