@@ -507,7 +507,7 @@ fn report_bytecode_verification_error(
             Severity::Bug,
             loc,
             &format!(
-                "unexpected error returned from bytecode verification: {:#?}",
+                "unexpected error returned from bytecode verification. This is a compiler bug, consider reporting it.\n{:#?}",
                 e
             ),
         )
@@ -531,7 +531,7 @@ fn report_bytecode_verification_error(
                     loc,
                     &format!(
                         "reference safety check failed on bytecode level. \
-                This is a known issue, to be fixed later, resulting from a difference between \
+                This is a known issue, to be fixed later, resulting from differences between \
                 safety rules of the v1 and v2 compiler. Try to rewrite your code \
                  to workaround this problem.{}",
                         debug_info
@@ -543,7 +543,7 @@ fn report_bytecode_verification_error(
                 loc,
                 &format!(
                     "bytecode verification failed with \
-                unexpected status code `{:?}`.{}",
+                unexpected status code `{:?}`. This is a compiler bug, consider reporting it.{}",
                     e.major_status(),
                     debug_info
                 ),

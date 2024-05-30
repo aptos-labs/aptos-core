@@ -15,7 +15,7 @@ B0:
 ============ bytecode verification failed ========
 
 Diagnostics:
-bug: bytecode verification failed with unexpected status code `EQUALITY_OP_TYPE_MISMATCH_ERROR`.
+bug: bytecode verification failed with unexpected status code `EQUALITY_OP_TYPE_MISMATCH_ERROR`. This is a compiler bug, consider reporting it.
   ┌─ tests/bytecode-verify-failure/equality.move:3:9
   │
 3 │         x == y
