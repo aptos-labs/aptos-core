@@ -165,10 +165,11 @@ impl DbReader for StateDb {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         let (_, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(state_key, version)?;
+            .get_with_proof_ext(state_key, version, root_depth)?;
         Ok(proof)
     }
 
@@ -177,10 +178,11 @@ impl DbReader for StateDb {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         let (leaf_data, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(state_key, version)?;
+            .get_with_proof_ext(state_key, version, root_depth)?;
         Ok((
             match leaf_data {
                 Some((_, (key, version))) => Some(self.expect_value_by_version(&key, version)?),
@@ -243,9 +245,10 @@ impl DbReader for StateStore {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         self.deref()
-            .get_state_proof_by_version_ext(state_key, version)
+            .get_state_proof_by_version_ext(state_key, version, root_depth)
     }
 
     /// Get the state value with proof extension given the state key and version
@@ -253,9 +256,10 @@ impl DbReader for StateStore {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         self.deref()
-            .get_state_value_with_proof_by_version_ext(state_key, version)
+            .get_state_value_with_proof_by_version_ext(state_key, version, root_depth)
     }
 }
 
@@ -338,7 +342,7 @@ impl StateStore {
         crash_if_difference_is_too_large: bool,
     ) {
         let ledger_metadata_db = ledger_db.metadata_db();
-        if let Ok(overall_commit_progress) = ledger_metadata_db.get_latest_version() {
+        if let Ok(overall_commit_progress) = ledger_metadata_db.get_synced_version() {
             info!(
                 overall_commit_progress = overall_commit_progress,
                 "Start syncing databases..."
@@ -383,7 +387,7 @@ impl StateStore {
                 &state_kv_db,
                 state_kv_commit_progress,
                 overall_commit_progress,
-                difference as usize,
+                std::cmp::max(difference as usize, 1), /* batch_size */
             )
             .expect("Failed to truncate state K/V db.");
         } else {
@@ -436,7 +440,7 @@ impl StateStore {
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
-            .get_latest_version()
+            .get_synced_version()
             .map_or(0, |v| v + 1);
 
         let latest_snapshot_version = state_db

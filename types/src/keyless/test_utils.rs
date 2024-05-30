@@ -21,7 +21,7 @@ use crate::{
     transaction::{authenticator::EphemeralSignature, RawTransaction, SignedTransaction},
 };
 use aptos_crypto::{
-    ed25519::Ed25519PrivateKey, poseidon_bn254::fr_to_bytes_le, SigningKey, Uniform,
+    ed25519::Ed25519PrivateKey, poseidon_bn254::keyless::fr_to_bytes_le, SigningKey, Uniform,
 };
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
@@ -175,7 +175,7 @@ pub fn get_sample_jwt_token() -> String {
     let jwt_payload_b64 = base64url_encode_str(SAMPLE_JWT_PAYLOAD_JSON.as_str());
     let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
     let rng = ring::rand::SystemRandom::new();
-    let sk = &*SAMPLE_JWK_SK;
+    let sk = *SAMPLE_JWK_SK;
     let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
 
     sk.sign(
@@ -198,7 +198,7 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     let jwt_payload_b64 = base64url_encode_str(SAMPLE_JWT_PAYLOAD_JSON.as_str());
     let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
     let rng = ring::rand::SystemRandom::new();
-    let sk = &*SAMPLE_JWK_SK;
+    let sk = *SAMPLE_JWK_SK;
     let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
 
     sk.sign(

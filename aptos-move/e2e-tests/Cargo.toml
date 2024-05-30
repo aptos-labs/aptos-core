@@ -25,7 +25,6 @@ aptos-gas-meter = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-keygen = { workspace = true }
-aptos-memory-usage-tracker = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
@@ -51,3 +50,7 @@ proptest-derive = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
+
+[features]
+default = []
+fuzzing = []

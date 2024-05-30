@@ -686,6 +686,11 @@ impl<'a> FunctionGenerator<'a> {
     /// Generate code for the load instruction.
     fn gen_load(&mut self, ctx: &BytecodeContext, dest: &TempIndex, cons: &Constant) {
         self.flush_any_conflicts(ctx, std::slice::from_ref(dest), &[]);
+        self.gen_load_push(ctx, cons, ctx.fun_ctx.fun.get_local_type(*dest));
+        self.abstract_push_result(ctx, vec![*dest]);
+    }
+
+    fn gen_load_push(&mut self, ctx: &BytecodeContext, cons: &Constant, dest_type: &Type) {
         use Constant::*;
         match cons {
             Bool(b) => {
@@ -703,17 +708,38 @@ impl<'a> FunctionGenerator<'a> {
             U256(n) => self.emit(FF::Bytecode::LdU256(
                 move_core_types::u256::U256::from_le_bytes(&n.to_le_bytes()),
             )),
+            Vector(vec) if vec.is_empty() => {
+                self.gen_vector_load_push(ctx, vec, dest_type);
+            },
             _ => {
-                let cons = self.gen.constant_index(
-                    &ctx.fun_ctx.module,
-                    &ctx.fun_ctx.loc,
-                    cons,
-                    ctx.fun_ctx.fun.get_local_type(*dest),
-                );
+                let cons =
+                    self.gen
+                        .constant_index(&ctx.fun_ctx.module, &ctx.fun_ctx.loc, cons, dest_type);
                 self.emit(FF::Bytecode::LdConst(cons));
             },
         }
-        self.abstract_push_result(ctx, vec![*dest]);
+    }
+
+    fn gen_vector_load_push(
+        &mut self,
+        ctx: &BytecodeContext,
+        vec: &Vec<Constant>,
+        vec_type: &Type,
+    ) {
+        let fun_ctx = ctx.fun_ctx;
+        let elem_type = if let Type::Vector(el) = vec_type {
+            el.as_ref().clone()
+        } else {
+            fun_ctx.internal_error("expected vector type");
+            Type::new_prim(PrimitiveType::Bool)
+        };
+        for cons in vec.iter() {
+            self.gen_load_push(ctx, cons, &elem_type);
+        }
+        let sign = self
+            .gen
+            .signature(&fun_ctx.module, &fun_ctx.loc, vec![elem_type]);
+        self.emit(FF::Bytecode::VecPack(sign, vec.len() as u64));
     }
 
     /// Generates code for an inline spec block. The spec block needs

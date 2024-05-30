@@ -10,7 +10,7 @@ use crate::{
     },
     transport::{Connection, ConnectionMetadata},
 };
-use aptos_config::network_id::NetworkId;
+use aptos_config::network_id::NetworkContext;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::channel::oneshot;
 use serde::Serialize;
@@ -60,9 +60,9 @@ pub enum ConnectionRequest {
 #[derive(Clone, PartialEq, Eq, Serialize)]
 pub enum ConnectionNotification {
     /// Connection with a new peer has been established.
-    NewPeer(ConnectionMetadata, NetworkId),
+    NewPeer(ConnectionMetadata, NetworkContext),
     /// Connection to a peer has been terminated. This could have been triggered from either end.
-    LostPeer(ConnectionMetadata, NetworkId),
+    LostPeer(ConnectionMetadata, NetworkContext, DisconnectReason),
 }
 
 impl fmt::Debug for ConnectionNotification {
@@ -74,11 +74,11 @@ impl fmt::Debug for ConnectionNotification {
 impl fmt::Display for ConnectionNotification {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ConnectionNotification::NewPeer(metadata, network_id) => {
-                write!(f, "[{},{}]", metadata, network_id)
+            ConnectionNotification::NewPeer(metadata, context) => {
+                write!(f, "[{},{}]", metadata, context)
             },
-            ConnectionNotification::LostPeer(metadata, network_id) => {
-                write!(f, "[{},{}]", metadata, network_id)
+            ConnectionNotification::LostPeer(metadata, context, reason) => {
+                write!(f, "[{},{},{}]", metadata, context, reason)
             },
         }
     }

@@ -260,6 +260,30 @@ spec aptos_framework::aptos_account {
         ensures exists<aptos_framework::coin::CoinStore<CoinType>>(to);
     }
 
+    spec register_apt(account_signer: &signer) {
+        // TODO: temporary mockup.
+        pragma verify = false;
+    }
+
+    spec fungible_transfer_only(source: &signer, to: address, amount: u64) {
+        // TODO: temporary mockup.
+        pragma verify = false;
+    }
+
+    spec is_fungible_balance_at_least(account: address, amount: u64): bool {
+        // TODO: temporary mockup.
+        pragma verify = false;
+    }
+
+    spec burn_from_fungible_store(
+        ref: &BurnRef,
+        account: address,
+        amount: u64,
+    ) {
+        // TODO: temporary mockup.
+        pragma verify = false;
+    }
+
     spec schema CreateAccountTransferAbortsIf {
         to: address;
         aborts_if !account::exists_at(to) && length_judgment(to);

@@ -6,7 +6,7 @@ use aptos::test::CliTestFramework;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    poseidon_bn254::fr_to_bytes_le,
+    poseidon_bn254::keyless::fr_to_bytes_le,
     SigningKey, Uniform,
 };
 use aptos_forge::{AptosPublicInfo, LocalSwarm, NodeExt, Swarm, SwarmExt};
@@ -16,7 +16,7 @@ use aptos_types::{
     jwks::{
         jwk::{JWKMoveStruct, JWK},
         rsa::RSA_JWK,
-        AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
+        secure_test_rsa_jwk, AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
     },
     keyless::{
         get_public_inputs_hash,
@@ -156,7 +156,7 @@ async fn test_keyless_secure_test_jwk_initialized_at_genesis() {
         entries: vec![ProviderJWKs {
             issuer: iss.into_bytes(),
             version: 0,
-            jwks: vec![JWKMoveStruct::from(RSA_JWK::secure_test_jwk())],
+            jwks: vec![secure_test_rsa_jwk().into()],
         }],
     };
     assert_eq!(expected_providers_jwks, patched_jwks.jwks);

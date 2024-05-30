@@ -6,11 +6,11 @@ use crate::{
     config::{
         dkg_config::DKGConfig, jwk_consensus_config::JWKConsensusConfig,
         netbench_config::NetbenchConfig, node_config_loader::NodeConfigLoader,
-        node_startup_config::NodeStartupConfig, persistable_config::PersistableConfig,
-        utils::RootPath, AdminServiceConfig, ApiConfig, BaseConfig, ConsensusConfig, Error,
-        ExecutionConfig, IndexerConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig,
-        MempoolConfig, NetworkConfig, PeerMonitoringServiceConfig, SafetyRulesTestConfig,
-        StateSyncConfig, StorageConfig,
+        node_startup_config::NodeStartupConfig, observer_config::ObserverConfig,
+        persistable_config::PersistableConfig, utils::RootPath, AdminServiceConfig, ApiConfig,
+        BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
+        InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
+        PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
     },
     network_id::NetworkId,
 };
@@ -41,6 +41,8 @@ pub struct NodeConfig {
     pub base: BaseConfig,
     #[serde(default)]
     pub consensus: ConsensusConfig,
+    #[serde(default)]
+    pub consensus_observer: ObserverConfig,
     #[serde(default)]
     pub dag_consensus: DagConsensusConfig,
     #[serde(default)]

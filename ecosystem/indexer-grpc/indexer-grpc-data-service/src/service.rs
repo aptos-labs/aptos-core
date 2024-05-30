@@ -3,9 +3,8 @@
 
 use crate::metrics::{
     BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT,
-    LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
-    PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
-    SHORT_CONNECTION_COUNT,
+    LATEST_PROCESSED_VERSION_PER_PROCESSOR, PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR,
+    PROCESSED_VERSIONS_COUNT_PER_PROCESSOR, SHORT_CONNECTION_COUNT,
 };
 use anyhow::{Context, Result};
 use aptos_indexer_grpc_utils::{
@@ -15,7 +14,8 @@ use aptos_indexer_grpc_utils::{
     config::IndexerGrpcFileStoreConfig,
     constants::{
         IndexerGrpcRequestMetadata, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER,
-        MESSAGE_SIZE_LIMIT,
+        MESSAGE_SIZE_LIMIT, REQUEST_HEADER_APTOS_APPLICATION_NAME, REQUEST_HEADER_APTOS_EMAIL,
+        REQUEST_HEADER_APTOS_IDENTIFIER, REQUEST_HEADER_APTOS_IDENTIFIER_TYPE,
     },
     counters::{log_grpc_step, IndexerGrpcStep, NUM_MULTI_FETCH_OVERLAPPED_VERSIONS},
     file_store_operator::FileStoreOperator,
@@ -62,9 +62,6 @@ const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
 
 const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
 
-/// This comes from API Gateway. The identifier uniquely identifies the requester, which
-/// in the case of indexer-grpc is always an application.
-const REQUEST_HEADER_APTOS_IDENTIFIER: &str = "x-aptos-identifier";
 const RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER: &str = "x-aptos-connection-id";
 const SERVICE_TYPE: &str = "data_service";
 
@@ -140,10 +137,7 @@ impl RawData for RawDataServerWrapper {
             _ => return Result::Err(Status::aborted("Invalid request token")),
         };
         CONNECTION_COUNT
-            .with_label_values(&[
-                &request_metadata.request_identifier,
-                &request_metadata.processor_name,
-            ])
+            .with_label_values(&request_metadata.get_label_values())
             .inc();
         let request = req.into_inner();
 
@@ -153,9 +147,12 @@ impl RawData for RawDataServerWrapper {
         let (tx, rx) = channel(self.data_service_response_channel_size);
         let current_version = match &request.starting_version {
             Some(version) => *version,
-            None => {
-                return Result::Err(Status::aborted("Starting version is not set"));
-            },
+            // Live mode if starting version isn't specified
+            None => self
+                .in_memory_cache
+                .latest_version()
+                .await
+                .saturating_sub(1),
         };
 
         let file_store_operator: Box<dyn FileStoreOperator> = self.file_store_config.create();
@@ -508,10 +505,7 @@ async fn data_fetcher_task(
             .map(|t| t.encoded_len())
             .sum::<usize>();
         BYTES_READY_TO_TRANSFER_FROM_SERVER
-            .with_label_values(&[
-                &request_metadata.request_identifier,
-                &request_metadata.processor_name,
-            ])
+            .with_label_values(&request_metadata.get_label_values())
             .inc_by(bytes_ready_to_transfer as u64);
         // 2. Push the data to the response channel, i.e. stream the data to the client.
         let current_batch_size = transaction_data.as_slice().len();
@@ -535,35 +529,17 @@ async fn data_fetcher_task(
             .await
         {
             Ok(_) => {
-                PROCESSED_BATCH_SIZE
-                    .with_label_values(&[
-                        request_metadata.request_identifier.as_str(),
-                        request_metadata.processor_name.as_str(),
-                    ])
-                    .set(current_batch_size as i64);
                 // TODO: Reasses whether this metric useful
-                LATEST_PROCESSED_VERSION_OLD
-                    .with_label_values(&[
-                        request_metadata.request_identifier.as_str(),
-                        request_metadata.processor_name.as_str(),
-                    ])
+                LATEST_PROCESSED_VERSION_PER_PROCESSOR
+                    .with_label_values(&request_metadata.get_label_values())
                     .set(end_of_batch_version as i64);
-                PROCESSED_VERSIONS_COUNT
-                    .with_label_values(&[
-                        request_metadata.request_identifier.as_str(),
-                        request_metadata.processor_name.as_str(),
-                    ])
+                PROCESSED_VERSIONS_COUNT_PER_PROCESSOR
+                    .with_label_values(&request_metadata.get_label_values())
                     .inc_by(current_batch_size as u64);
                 if let Some(data_latency_in_secs) = data_latency_in_secs {
-                    PROCESSED_LATENCY_IN_SECS
-                        .with_label_values(&[
-                            request_metadata.request_identifier.as_str(),
-                            request_metadata.processor_name.as_str(),
-                        ])
+                    PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR
+                        .with_label_values(&request_metadata.get_label_values())
                         .set(data_latency_in_secs);
-                    PROCESSED_LATENCY_IN_SECS_ALL
-                        .with_label_values(&[])
-                        .observe(data_latency_in_secs);
                 }
             },
             Err(SendTimeoutError::Timeout(_)) => {
@@ -589,10 +565,7 @@ async fn data_fetcher_task(
     if let Some(start_time) = connection_start_time {
         if start_time.elapsed().as_secs() < SHORT_CONNECTION_DURATION_IN_SECS {
             SHORT_CONNECTION_COUNT
-                .with_label_values(&[
-                    request_metadata.request_identifier.as_str(),
-                    request_metadata.processor_name.as_str(),
-                ])
+                .with_label_values(&request_metadata.get_label_values())
                 .inc();
         }
     }
@@ -855,7 +828,16 @@ fn get_request_metadata(
     req: &Request<GetTransactionsRequest>,
 ) -> tonic::Result<IndexerGrpcRequestMetadata> {
     let request_metadata_pairs = vec![
+        (
+            "request_identifier_type",
+            REQUEST_HEADER_APTOS_IDENTIFIER_TYPE,
+        ),
         ("request_identifier", REQUEST_HEADER_APTOS_IDENTIFIER),
+        ("request_email", REQUEST_HEADER_APTOS_EMAIL),
+        (
+            "request_application_name",
+            REQUEST_HEADER_APTOS_APPLICATION_NAME,
+        ),
         ("request_token", GRPC_AUTH_TOKEN_HEADER),
         ("processor_name", GRPC_REQUEST_NAME_HEADER),
     ];

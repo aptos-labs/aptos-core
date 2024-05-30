@@ -119,7 +119,7 @@ module aptos_framework::keyless_account {
         assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.beta_g2)), E_INVALID_BN254_G2_SERIALIZATION);
         assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.gamma_g2)), E_INVALID_BN254_G2_SERIALIZATION);
         assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.delta_g2)), E_INVALID_BN254_G2_SERIALIZATION);
-        for(i in 0..vector::length(&vk.gamma_abc_g1)) {
+        for (i in 0..vector::length(&vk.gamma_abc_g1)) {
             assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(vector::borrow(&vk.gamma_abc_g1, i))), E_INVALID_BN254_G1_SERIALIZATION);
         };
     }
@@ -185,6 +185,7 @@ module aptos_framework::keyless_account {
         let config = borrow_global_mut<Configuration>(signer::address_of(fx));
         vector::push_back(&mut config.override_aud_vals, aud);
     }
+
     /// Queues up a change to the Groth16 verification key. The change will only be effective after reconfiguration.
     /// Only callable via governance proposal.
     ///
@@ -300,7 +301,7 @@ module aptos_framework::keyless_account {
             }
         };
 
-        if(config_buffer::does_exist<Configuration>()) {
+        if (config_buffer::does_exist<Configuration>()) {
             let config = config_buffer::extract();
             if (exists<Configuration>(@aptos_framework)) {
                 *borrow_global_mut<Configuration>(@aptos_framework) = config;

@@ -14,21 +14,6 @@ from collections import deque
 
 from verify_core.common import clear_artifacts, query_backup_latest_version
 
-# This script runs the replay-verify from the root of aptos-core
-# It assumes the aptos-debugger binary is already built with the release profile
-
-
-# The key is the runner's number and the value is the range of txns that the runner is responsible for
-# This mapping is generated in 3 steps:
-# (1) allocate the txns to runners based on how much time the runners in past takes to finish evenly distributed txns, example script https://gist.github.com/areshand/d00ce302d3bafe0f7b97c311113eba1b
-# (2) rerun the flow with new ranges and check the time each runner takes to finish again
-# (3) manual adjust the range based on times each takes to finish the work to make sure each runner takes similar time to finish
-
-#  Note: this range needs to be updated when the last range's time is over 2 hrs. (we will send a low pri alert once the time is over 2 hrs)
-#  Oncall should
-#  1. seal the last range with the latest txn version and start a new range with the [latest_txn_version + 1, sys.maxsize]
-#  2. meanwhile, the oncall should delete the old ranges that are beyond 300M window that we want to scan
-#
 
 TESTNET_RANGES = [
     [250000000, 255584106],
@@ -48,13 +33,11 @@ TESTNET_RANGES = [
     [551052676, 582481398],
     [582481399, 640_000_000],
     [640_000_001, 980_000_000],
-    [980_000_000, sys.maxsize],
+    [980_000_000, 1_000_000_000],
+    [1_000_000_001, sys.maxsize],
 ]
 
 MAINNET_RANGES = [
-    [45_000_001, 100_000_000],
-    [100_000_001, 116_000_000],
-    [116_000_001, 155_000_000],
     [155_000_001, 180_000_000],
     [180_000_001, 190_000_000],
     [190_000_001, 200_000_000],
@@ -69,7 +52,11 @@ MAINNET_RANGES = [
     [331_000_001, 354_000_000],
     [354_000_001, 400_000_000],
     [400_000_001, 490_000_000],
-    [490_000_000, sys.maxsize],
+    [490_000_000, 550_000_000],
+    [550_000_001, 650_000_000],
+    [650_000_001, 750_000_000],
+    [750_000_001, 850_000_000],
+    [850_000_001, sys.maxsize],
 ]
 
 

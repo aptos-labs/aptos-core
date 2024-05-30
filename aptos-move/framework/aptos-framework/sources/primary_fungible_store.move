@@ -16,7 +16,6 @@ module aptos_framework::primary_fungible_store {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata, MintRef, TransferRef, BurnRef};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
-    use std::features;
     use std::option::Option;
     use std::signer;
     use std::string::String;
@@ -61,10 +60,11 @@ module aptos_framework::primary_fungible_store {
         owner: address,
         metadata: Object<T>,
     ): Object<FungibleStore> acquires DeriveRefPod {
-        if (!primary_store_exists(owner, metadata)) {
-            create_primary_store(owner, metadata)
+        let store_addr = primary_store_address(owner, metadata);
+        if (fungible_asset::store_exists(store_addr)) {
+            object::address_to_object(store_addr)
         } else {
-            primary_store(owner, metadata)
+            create_primary_store(owner, metadata)
         }
     }
 
@@ -76,12 +76,7 @@ module aptos_framework::primary_fungible_store {
         let metadata_addr = object::object_address(&metadata);
         object::address_to_object<Metadata>(metadata_addr);
         let derive_ref = &borrow_global<DeriveRefPod>(metadata_addr).metadata_derive_ref;
-        let constructor_ref = if (metadata_addr == @aptos_fungible_asset && features::primary_apt_fungible_store_at_user_address_enabled(
-        )) {
-            &object::create_sticky_object_at_address(owner_addr, owner_addr)
-        } else {
-            &object::create_user_derived_object(owner_addr, derive_ref)
-        };
+        let constructor_ref = &object::create_user_derived_object(owner_addr, derive_ref);
         // Disable ungated transfer as deterministic stores shouldn't be transferrable.
         let transfer_ref = &object::generate_transfer_ref(constructor_ref);
         object::disable_ungated_transfer(transfer_ref);
@@ -93,11 +88,7 @@ module aptos_framework::primary_fungible_store {
     /// Get the address of the primary store for the given account.
     public fun primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
         let metadata_addr = object::object_address(&metadata);
-        if (metadata_addr == @aptos_fungible_asset && features::primary_apt_fungible_store_at_user_address_enabled()) {
-            owner
-        } else {
-            object::create_user_derived_object_address(owner, metadata_addr)
-        }
+        object::create_user_derived_object_address(owner, metadata_addr)
     }
 
     #[view]
@@ -161,7 +152,7 @@ module aptos_framework::primary_fungible_store {
     public(friend) fun force_deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod {
         let metadata = fungible_asset::asset_metadata(&fa);
         let store = ensure_primary_store_exists(owner, metadata);
-        fungible_asset::deposit_internal(store, fa);
+        fungible_asset::deposit_internal(object::object_address(&store), fa);
     }
 
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.

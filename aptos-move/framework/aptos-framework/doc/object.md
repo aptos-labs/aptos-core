@@ -23,6 +23,7 @@ make it so that a reference to a global object can be returned from a function.
 
 -  [Resource `ObjectCore`](#0x1_object_ObjectCore)
 -  [Resource `TombStone`](#0x1_object_TombStone)
+-  [Resource `Untransferable`](#0x1_object_Untransferable)
 -  [Struct `ObjectGroup`](#0x1_object_ObjectGroup)
 -  [Struct `Object`](#0x1_object_Object)
 -  [Struct `ConstructorRef`](#0x1_object_ConstructorRef)
@@ -34,6 +35,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Struct `TransferEvent`](#0x1_object_TransferEvent)
 -  [Struct `Transfer`](#0x1_object_Transfer)
 -  [Constants](#@Constants_0)
+-  [Function `is_untransferable`](#0x1_object_is_untransferable)
 -  [Function `is_burnt`](#0x1_object_is_burnt)
 -  [Function `address_to_object`](#0x1_object_address_to_object)
 -  [Function `is_object`](#0x1_object_is_object)
@@ -70,6 +72,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `generate_signer_for_extending`](#0x1_object_generate_signer_for_extending)
 -  [Function `address_from_extend_ref`](#0x1_object_address_from_extend_ref)
 -  [Function `disable_ungated_transfer`](#0x1_object_disable_ungated_transfer)
+-  [Function `set_untransferable`](#0x1_object_set_untransferable)
 -  [Function `enable_ungated_transfer`](#0x1_object_enable_ungated_transfer)
 -  [Function `generate_linear_transfer_ref`](#0x1_object_generate_linear_transfer_ref)
 -  [Function `transfer_with_ref`](#0x1_object_transfer_with_ref)
@@ -85,6 +88,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `owner`](#0x1_object_owner)
 -  [Function `is_owner`](#0x1_object_is_owner)
 -  [Function `owns`](#0x1_object_owns)
+-  [Function `root_owner`](#0x1_object_root_owner)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -106,12 +110,14 @@ make it so that a reference to a global object can be returned from a function.
     -  [Function `create_object_from_guid`](#@Specification_1_create_object_from_guid)
     -  [Function `create_object_internal`](#@Specification_1_create_object_internal)
     -  [Function `generate_delete_ref`](#@Specification_1_generate_delete_ref)
+    -  [Function `generate_transfer_ref`](#@Specification_1_generate_transfer_ref)
     -  [Function `object_from_constructor_ref`](#@Specification_1_object_from_constructor_ref)
     -  [Function `create_guid`](#@Specification_1_create_guid)
     -  [Function `new_event_handle`](#@Specification_1_new_event_handle)
     -  [Function `object_from_delete_ref`](#@Specification_1_object_from_delete_ref)
     -  [Function `delete`](#@Specification_1_delete)
     -  [Function `disable_ungated_transfer`](#@Specification_1_disable_ungated_transfer)
+    -  [Function `set_untransferable`](#@Specification_1_set_untransferable)
     -  [Function `enable_ungated_transfer`](#@Specification_1_enable_ungated_transfer)
     -  [Function `generate_linear_transfer_ref`](#@Specification_1_generate_linear_transfer_ref)
     -  [Function `transfer_with_ref`](#@Specification_1_transfer_with_ref)
@@ -126,6 +132,7 @@ make it so that a reference to a global object can be returned from a function.
     -  [Function `owner`](#@Specification_1_owner)
     -  [Function `is_owner`](#@Specification_1_is_owner)
     -  [Function `owns`](#@Specification_1_owns)
+    -  [Function `root_owner`](#@Specification_1_root_owner)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -215,6 +222,35 @@ This is added to objects that are burnt (ownership transferred to BURN_ADDRESS).
 </dt>
 <dd>
  Track the previous owner before the object is burnt so they can reclaim later if so desired.
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_object_Untransferable"></a>
+
+## Resource `Untransferable`
+
+The existence of this renders all <code><a href="object.md#0x1_object_TransferRef">TransferRef</a></code>s irrelevant. The object cannot be moved.
+
+
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
 </dd>
 </dl>
 
@@ -588,6 +624,16 @@ Exceeds maximum nesting for an object transfer.
 
 
 
+<a id="0x1_object_ENOT_MOVABLE"></a>
+
+Object is untransferable any operations that might result in a transfer are disallowed.
+
+
+<pre><code><b>const</b> <a href="object.md#0x1_object_ENOT_MOVABLE">ENOT_MOVABLE</a>: u64 = 9;
+</code></pre>
+
+
+
 <a id="0x1_object_ENOT_OBJECT_OWNER"></a>
 
 The caller does not have ownership permissions
@@ -717,6 +763,31 @@ derivation to produce an object address.
 </code></pre>
 
 
+
+<a id="0x1_object_is_untransferable"></a>
+
+## Function `is_untransferable`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_untransferable">is_untransferable</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_untransferable">is_untransferable</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool {
+    <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(<a href="object.md#0x1_object">object</a>.inner)
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_object_is_burnt"></a>
 
@@ -1342,6 +1413,7 @@ Generates the TransferRef, which can be used to manage object transfers.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_transfer_ref">generate_transfer_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_TransferRef">TransferRef</a> {
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_MOVABLE">ENOT_MOVABLE</a>));
     <a href="object.md#0x1_object_TransferRef">TransferRef</a> { self: ref.self }
 }
 </code></pre>
@@ -1595,7 +1667,7 @@ Removes from the specified Object from global storage.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(ref: <a href="object.md#0x1_object_DeleteRef">DeleteRef</a>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(ref: <a href="object.md#0x1_object_DeleteRef">DeleteRef</a>) <b>acquires</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a>, <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <b>let</b> object_core = <b>move_from</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
     <b>let</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
         guid_creation_num: _,
@@ -1603,6 +1675,11 @@ Removes from the specified Object from global storage.
         allow_ungated_transfer: _,
         transfer_events,
     } = object_core;
+
+    <b>if</b> (<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self)) {
+      <b>let</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a> {} = <b>move_from</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
+    };
+
     <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(transfer_events);
 }
 </code></pre>
@@ -1687,6 +1764,34 @@ Disable direct transfer, transfers can only be triggered via a TransferRef
 
 </details>
 
+<a id="0x1_object_set_untransferable"></a>
+
+## Function `set_untransferable`
+
+Prevent moving of the object
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_set_untransferable">set_untransferable</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_set_untransferable">set_untransferable</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+    <a href="object.md#0x1_object">object</a>.allow_ungated_transfer = <b>false</b>;
+    <b>let</b> object_signer = <a href="object.md#0x1_object_generate_signer">generate_signer</a>(ref);
+    <b>move_to</b>(&object_signer, <a href="object.md#0x1_object_Untransferable">Untransferable</a> {});
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_object_enable_ungated_transfer"></a>
 
 ## Function `enable_ungated_transfer`
@@ -1704,6 +1809,7 @@ Enable direct transfer.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_enable_ungated_transfer">enable_ungated_transfer</a>(ref: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_MOVABLE">ENOT_MOVABLE</a>));
     <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
     <a href="object.md#0x1_object">object</a>.allow_ungated_transfer = <b>true</b>;
 }
@@ -1731,6 +1837,7 @@ time of generation is the owner at the time of transferring.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_linear_transfer_ref">generate_linear_transfer_ref</a>(ref: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>): <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_MOVABLE">ENOT_MOVABLE</a>));
     <b>let</b> owner = <a href="object.md#0x1_object_owner">owner</a>(<a href="object.md#0x1_object_Object">Object</a>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt; { inner: ref.self });
     <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a> {
         self: ref.self,
@@ -1760,6 +1867,7 @@ Transfer to the destination address using a LinearTransferRef.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_ref">transfer_with_ref</a>(ref: <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a>, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_MOVABLE">ENOT_MOVABLE</a>));
     <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
     <b>assert</b>!(
         <a href="object.md#0x1_object">object</a>.owner == ref.owner,
@@ -1991,9 +2099,7 @@ objects may have cyclic dependencies.
     <b>let</b> count = 0;
     <b>while</b> (owner != current_address) {
         count = count + 1;
-        <b>if</b> (std::features::max_object_nesting_check_enabled()) {
-            <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>))
-        };
+        <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>));
         // At this point, the first <a href="object.md#0x1_object">object</a> <b>exists</b> and so the more likely case is that the
         // <a href="object.md#0x1_object">object</a>'s owner is not an <a href="object.md#0x1_object">object</a>. So we <b>return</b> a more sensible <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a>.
         <b>assert</b>!(
@@ -2195,9 +2301,7 @@ Return true if the provided address has indirect or direct ownership of the prov
     <b>let</b> count = 0;
     <b>while</b> (owner != current_address) {
         count = count + 1;
-        <b>if</b> (std::features::max_object_nesting_check_enabled()) {
-            <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>))
-        };
+        <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>));
         <b>if</b> (!<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address)) {
             <b>return</b> <b>false</b>
         };
@@ -2206,6 +2310,36 @@ Return true if the provided address has indirect or direct ownership of the prov
         current_address = <a href="object.md#0x1_object">object</a>.owner;
     };
     <b>true</b>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_root_owner"></a>
+
+## Function `root_owner`
+
+Returns the root owner of an object. As objects support nested ownership, it can be useful
+to determine the identity of the starting point of ownership.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_root_owner">root_owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_root_owner">root_owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    <b>let</b> obj_owner = <a href="object.md#0x1_object_owner">owner</a>(<a href="object.md#0x1_object">object</a>);
+    <b>while</b> (<a href="object.md#0x1_object_is_object">is_object</a>(obj_owner)) {
+        obj_owner = <a href="object.md#0x1_object_owner">owner</a>(<a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_owner));
+    };
+    obj_owner
 }
 </code></pre>
 
@@ -2782,6 +2916,25 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
+<a id="@Specification_1_generate_transfer_ref"></a>
+
+### Function `generate_transfer_ref`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_transfer_ref">generate_transfer_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_TransferRef">object::TransferRef</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
+<b>ensures</b> result == <a href="object.md#0x1_object_TransferRef">TransferRef</a> {
+    self: ref.self,
+};
+</code></pre>
+
+
+
 <a id="@Specification_1_object_from_constructor_ref"></a>
 
 ### Function `object_from_constructor_ref`
@@ -2904,6 +3057,25 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
+<a id="@Specification_1_set_untransferable"></a>
+
+### Function `set_untransferable`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_set_untransferable">set_untransferable</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
+<b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
+<b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).allow_ungated_transfer == <b>false</b>;
+</code></pre>
+
+
+
 <a id="@Specification_1_enable_ungated_transfer"></a>
 
 ### Function `enable_ungated_transfer`
@@ -2915,7 +3087,8 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).allow_ungated_transfer == <b>true</b>;
 </code></pre>
 
@@ -2932,7 +3105,8 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
 <b>let</b> owner = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).owner;
 <b>ensures</b> result == <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a> {
     self: ref.self,
@@ -2953,7 +3127,8 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
-<pre><code><b>let</b> <a href="object.md#0x1_object">object</a> = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
+<b>let</b> <a href="object.md#0x1_object">object</a> = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
 // This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
 <b>aborts_if</b> <a href="object.md#0x1_object">object</a>.owner != ref.owner;
@@ -3168,6 +3343,22 @@ Return true if the provided address has indirect or direct ownership of the prov
 <b>let</b> current_address = object_0.owner;
 <b>aborts_if</b> <a href="object.md#0x1_object">object</a>.inner != owner && !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
 <b>ensures</b> current_address_0 == owner ==&gt; result == <b>true</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_root_owner"></a>
+
+### Function `root_owner`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_root_owner">root_owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 

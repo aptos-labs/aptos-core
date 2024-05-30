@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
-use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
@@ -98,18 +96,11 @@ impl AptosDebugger {
             anyhow::bail!("Module bundle payload has been removed")
         }
 
-        let (status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
+        let (status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
             &txn,
             &log_context,
-            |gas_feature_version, gas_params, storage_gas_params, balance| {
-                let gas_meter =
-                    MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
-                        gas_feature_version,
-                        gas_params,
-                        storage_gas_params,
-                        balance,
-                    )));
+            |gas_meter| {
                 let gas_profiler = match txn.payload() {
                     TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
                     TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
@@ -125,7 +116,7 @@ impl AptosDebugger {
                         unreachable!("Module bundle payload has already been checked because before this function is called")
                     },
                 };
-                Ok(gas_profiler)
+                gas_profiler
             },
         )?;
 
@@ -219,10 +210,6 @@ impl AptosDebugger {
             ret.push(result)
         }
         Ok(ret)
-    }
-
-    pub async fn get_latest_version(&self) -> Result<Version> {
-        self.debugger.get_latest_version().await
     }
 
     pub async fn get_version_by_account_sequence(

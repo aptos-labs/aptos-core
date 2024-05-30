@@ -20,6 +20,7 @@ use move_binary_format::{
 };
 use rand::{distributions::Alphanumeric, prelude::StdRng, seq::SliceRandom, Rng};
 use rand_core::RngCore;
+use serde::{Deserialize, Serialize};
 
 //
 // Contains all the code to work on the Simple package
@@ -94,6 +95,12 @@ pub enum MultiSigConfig {
     Random(usize),
     Publisher,
     FeePayerPublisher,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct BCSStream {
+    data: Vec<u8>,
+    cursor: u64,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -252,6 +259,7 @@ pub enum EntryPoints {
         length: u64,
         num_points_per_txn: usize,
     },
+    DeserializeU256,
 }
 
 impl EntryPoints {
@@ -305,6 +313,7 @@ impl EntryPoints {
             | EntryPoints::VectorPictureRead { .. }
             | EntryPoints::InitializeSmartTablePicture
             | EntryPoints::SmartTablePicture { .. } => "complex",
+            EntryPoints::DeserializeU256 => "bcs_stream",
         }
     }
 
@@ -361,6 +370,7 @@ impl EntryPoints {
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
                 "smart_table_picture"
             },
+            EntryPoints::DeserializeU256 => "bcs_stream",
         }
     }
 
@@ -666,6 +676,19 @@ impl EntryPoints {
                     bcs::to_bytes(&colors).unwrap(),  // colors
                 ])
             },
+            EntryPoints::DeserializeU256 => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let mut u256_bytes = [0u8; 32];
+                rng.fill_bytes(&mut u256_bytes);
+                get_payload(
+                    module_id,
+                    ident_str!("deserialize_u256_entry").to_owned(),
+                    vec![
+                        bcs::to_bytes(&u256_bytes.to_vec()).unwrap(),
+                        bcs::to_bytes(&0u64).unwrap(),
+                    ],
+                )
+            },
         }
     }
 
@@ -764,6 +787,7 @@ impl EntryPoints {
             },
             EntryPoints::InitializeSmartTablePicture => AutomaticArgs::Signer,
             EntryPoints::SmartTablePicture { .. } => AutomaticArgs::None,
+            EntryPoints::DeserializeU256 => AutomaticArgs::None,
         }
     }
 }

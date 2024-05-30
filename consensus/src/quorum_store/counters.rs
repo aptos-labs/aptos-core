@@ -713,3 +713,11 @@ pub static BATCH_RECEIVED_REPLIES_VOTING_POWER: Lazy<Histogram> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static BATCH_RECEIVED_LATE_REPLIES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_received_late_replies",
+        "Number of votes that came late."
+    )
+    .unwrap()
+});

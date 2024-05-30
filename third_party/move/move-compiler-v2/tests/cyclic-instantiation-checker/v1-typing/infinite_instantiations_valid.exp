@@ -1,0 +1,29 @@
+// -- Model dump before bytecode pipeline
+module 0x42::M {
+    struct Box {
+        f: #0,
+    }
+    public fun t0<T>() {
+        M::t1<T>();
+        M::t0<T>()
+    }
+    public fun t1<T>() {
+        M::t0<T>();
+        M::t1<T>()
+    }
+    public fun x<T>() {
+        M::y<M::Box<T>>()
+    }
+    public fun y<T>() {
+        M::z<M::Box<T>>()
+    }
+    public fun z<T>() {
+        M::z<T>()
+    }
+} // end 0x42::M
+module 0x42::N {
+    use 0x42::M; // resolved as: 0x42::M
+    public fun t<T>() {
+        M::t0<M::Box<T>>()
+    }
+} // end 0x42::N
