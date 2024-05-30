@@ -18,7 +18,9 @@ Ok(
             gas_used: 3,
             status: Keep(
                 MiscellaneousError(
-                    None,
+                    Some(
+                        LINKER_ERROR,
+                    ),
                 ),
             ),
             auxiliary_data: V1(

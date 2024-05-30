@@ -543,17 +543,13 @@ impl FakeExecutor {
             },
             onchain: onchain_config,
         };
-        BlockAptosVM::execute_block::<
-            _,
-            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-        >(
+        BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
             txn_block,
             &state_view,
             config,
             None,
-        )
-        .map(BlockOutput::into_transaction_outputs_forced)
+        ).map(BlockOutput::into_transaction_outputs_forced)
     }
 
     pub fn execute_transaction_block_with_state_view(
@@ -666,11 +662,9 @@ impl FakeExecutor {
         let mut outputs = self
             .execute_block(txn_block)
             .expect("The VM should not fail to startup");
-        let mut txn_output = outputs
+        outputs
             .pop()
-            .expect("A block with one transaction should have one output");
-        txn_output.fill_error_status();
-        txn_output
+            .expect("A block with one transaction should have one output")
     }
 
     pub fn execute_transaction_with_gas_profiler(
