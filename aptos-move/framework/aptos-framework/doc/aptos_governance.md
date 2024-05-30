@@ -77,6 +77,8 @@ on a proposal multiple times as long as the total voting power of these votes do
     -  [Function `create_proposal`](#@Specification_1_create_proposal)
     -  [Function `create_proposal_v2`](#@Specification_1_create_proposal_v2)
     -  [Function `create_proposal_v2_impl`](#@Specification_1_create_proposal_v2_impl)
+    -  [Function `batch_vote`](#@Specification_1_batch_vote)
+    -  [Function `batch_partial_vote`](#@Specification_1_batch_partial_vote)
     -  [Function `vote`](#@Specification_1_vote)
     -  [Function `partial_vote`](#@Specification_1_partial_vote)
     -  [Function `vote_internal`](#@Specification_1_vote_internal)
@@ -2476,6 +2478,38 @@ The same as spec of <code><a href="aptos_governance.md#0x1_aptos_governance_crea
 <pre><code><b>pragma</b> verify_duration_estimate = 60;
 <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_CreateProposalAbortsIf">CreateProposalAbortsIf</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_batch_vote"></a>
+
+### Function `batch_vote`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_batch_vote">batch_vote</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, stake_pools: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, proposal_id: u64, should_pass: bool)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_batch_partial_vote"></a>
+
+### Function `batch_partial_vote`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_batch_partial_vote">batch_partial_vote</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, stake_pools: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, proposal_id: u64, voting_power: u64, should_pass: bool)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
