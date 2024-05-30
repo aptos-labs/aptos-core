@@ -20,7 +20,7 @@ pub fn merge_scopes(parent: &Scope, child: &Scope) -> Scope {
 
 pub fn is_in_scope(child: &Scope, parent: &Scope) -> bool {
     match (child, parent) {
-        (Some(c), Some(p)) => c.starts_with(p),
+        (Some(c), Some(p)) => c == p || c.starts_with(&format!("{}::", p)),
         (Some(_), None) => true,
         (None, Some(_)) => false,
         (None, None) => true,

@@ -4,7 +4,7 @@
 use crate::{
     ast::*,
     config::Config,
-    names::{Identifier, IdentifierPool, IdentifierType, Scope},
+    names::{is_in_scope, Identifier, IdentifierPool, IdentifierType, Scope},
     types::{Type, TypePool},
 };
 use arbitrary::{Arbitrary, Result, Unstructured};
@@ -37,36 +37,52 @@ impl MoveSmith {
         }
     }
 
+    pub fn get_compile_unit(&self) -> CompileUnit {
+        CompileUnit {
+            modules: self.modules.clone(),
+        }
+    }
+
     pub fn generate(&mut self, u: &mut Unstructured) -> Result<()> {
         let num_modules = u.int_in_range(1..=self.config.max_num_modules)?;
 
         let mut modules = Vec::new();
         for _ in 0..num_modules {
-            modules.push(self.generate_module(u)?);
+            modules.push(self.generate_module_skeleton(u)?);
         }
-
         self.modules = modules;
+
+        let filled_modules = self
+            .modules
+            .clone()
+            .into_iter()
+            .map(|m| self.fill_module(u, m))
+            .collect::<Result<Vec<Module>>>()?;
+        self.modules = filled_modules;
         Ok(())
     }
 
-    pub fn generate_module(&mut self, u: &mut Unstructured) -> Result<Module> {
+    pub fn generate_module_skeleton(&mut self, u: &mut Unstructured) -> Result<Module> {
         let (name, scope) = self.id_pool.next_identifier(IdentifierType::Module, &None);
 
         // Function signatures
         let mut functions = Vec::new();
         for _ in 0..u.int_in_range(1..=self.config.max_num_functions_in_module)? {
-            functions.push(self.generate_function_signature_only(u, &scope)?);
+            functions.push(self.generate_function_skeleton(u, &scope)?);
         }
-
-        // Function bodies
-        for f in functions.iter_mut() {
-            self.fill_function(u, f)?;
-        }
-
         Ok(Module { name, functions })
     }
 
-    fn generate_function_signature_only(
+    pub fn fill_module(&mut self, u: &mut Unstructured, mut module: Module) -> Result<Module> {
+        // Function bodies
+        for f in module.functions.iter_mut() {
+            self.fill_function(u, f)?;
+        }
+
+        Ok(module)
+    }
+
+    fn generate_function_skeleton(
         &mut self,
         u: &mut Unstructured,
         parent_scope: &Scope,
@@ -134,7 +150,7 @@ impl MoveSmith {
                 );
                 match ids.is_empty() {
                     true => {
-                        let expr = self.generate_expression_of_type(u, parent_scope, typ)?;
+                        let expr = self.generate_expression_of_type(u, parent_scope, typ, true)?;
                         Ok(Some(expr))
                     },
                     false => {
@@ -185,11 +201,11 @@ impl MoveSmith {
 
         let typ = self.type_pool.random_basic_type(u)?;
         // let value = match bool::arbitrary(u)? {
-        //     true => Some(self.generate_expression_of_type(u, parent_scope, &typ)?),
+        //     true => Some(self.generate_expression_of_type(u, parent_scope, &typ, true)?),
         //     false => None,
         // };
         // TODO: disabled declaration without value for now, need to keep track of initialization
-        let value = Some(self.generate_expression_of_type(u, parent_scope, &typ)?);
+        let value = Some(self.generate_expression_of_type(u, parent_scope, &typ, true)?);
         self.type_pool.insert(&name, &typ);
         Ok(Declaration { typ, name, value })
     }
@@ -199,8 +215,10 @@ impl MoveSmith {
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Expression> {
+        let callable = self.get_callable_functions(parent_scope);
+        let max = if callable.is_empty() { 1 } else { 2 };
         let expr = loop {
-            match u.int_in_range(0..=1)? {
+            match u.int_in_range(0..=max)? {
                 0 => {
                     break Expression::NumberLiteral(self.generate_number_literal(
                         u,
@@ -219,6 +237,13 @@ impl MoveSmith {
                         break Expression::Variable(ident);
                     }
                 },
+                2 => {
+                    let call = self.generate_function_call(u, parent_scope)?;
+                    match call {
+                        Some(c) => break Expression::FunctionCall(c),
+                        None => panic!("No callable functions"),
+                    }
+                },
                 _ => panic!("Invalid expression type"),
             }
         };
@@ -230,6 +255,7 @@ impl MoveSmith {
         u: &mut Unstructured,
         parent_scope: &Scope,
         typ: &Type,
+        allow_call: bool,
     ) -> Result<Expression> {
         // Store candidate expressions for the given type
         let mut choices: Vec<Expression> = Vec::new();
@@ -260,8 +286,56 @@ impl MoveSmith {
         }
 
         // TODO: call functions with the given type
+        if allow_call {
+            let callables: Vec<Function> = self
+                .get_callable_functions(parent_scope)
+                .into_iter()
+                .filter(|f| f.signature.return_type == Some(typ.clone()))
+                .collect();
+            if !callables.is_empty() {
+                let func = u.choose(&callables)?;
+                let call = self.generate_call_to_function(u, parent_scope, func)?;
+                choices.push(Expression::FunctionCall(call));
+            }
+        }
 
         Ok(u.choose(&choices)?.clone())
+    }
+
+    fn generate_function_call(
+        &mut self,
+        u: &mut Unstructured,
+        parent_scope: &Scope,
+    ) -> Result<Option<FunctionCall>> {
+        let callables = self.get_callable_functions(parent_scope);
+        if callables.is_empty() {
+            return Ok(None);
+        }
+
+        let func = u.choose(&callables)?.clone();
+        Ok(Some(self.generate_call_to_function(
+            u,
+            parent_scope,
+            &func,
+        )?))
+    }
+
+    fn generate_call_to_function(
+        &mut self,
+        u: &mut Unstructured,
+        parent_scope: &Scope,
+        func: &Function,
+    ) -> Result<FunctionCall> {
+        let mut args = Vec::new();
+
+        for (_, typ) in func.signature.parameters.iter() {
+            let expr = self.generate_expression_of_type(u, parent_scope, typ, false)?;
+            args.push(expr);
+        }
+        Ok(FunctionCall {
+            name: func.name.clone(),
+            args,
+        })
     }
 
     /// Generate a random numerical literal.
@@ -313,6 +387,20 @@ impl MoveSmith {
             },
             _ => panic!("Invalid number literal type"),
         })
+    }
+
+    // TODO: Handle visibility check
+    fn get_callable_functions(&self, scope: &Scope) -> Vec<Function> {
+        let mut funcs = Vec::new();
+        for m in self.modules.iter() {
+            for f in m.functions.iter() {
+                let parent_scope = self.id_pool.get_parent_scope_of(&f.name).unwrap();
+                if is_in_scope(scope, &parent_scope) {
+                    funcs.push(f.clone());
+                }
+            }
+        }
+        funcs
     }
 
     fn get_filtered_identifiers(
