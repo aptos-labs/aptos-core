@@ -468,6 +468,7 @@ module aptos_framework::object {
     public fun generate_linear_transfer_ref(ref: &TransferRef): LinearTransferRef acquires ObjectCore {
         assert!(!exists<Untransferable>(ref.self), error::permission_denied(ENOT_MOVABLE));
         let owner = owner(Object<ObjectCore> { inner: ref.self });
+        assert!(owner != BURN_ADDRESS, error::permission_denied(ENOT_MOVABLE));
         LinearTransferRef {
             self: ref.self,
             owner,
@@ -622,6 +623,7 @@ module aptos_framework::object {
     ) acquires TombStone, ObjectCore {
         let object_addr = object.inner;
         assert!(exists<TombStone>(object_addr), error::invalid_argument(EOBJECT_NOT_BURNT));
+        assert!(owner(object) == BURN_ADDRESS, error::invalid_argument(EOBJECT_NOT_BURNT));
 
         let TombStone { original_owner: original_owner_addr } = move_from<TombStone>(object_addr);
         assert!(original_owner_addr == signer::address_of(original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
