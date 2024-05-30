@@ -470,7 +470,7 @@ module aptos_framework::aptos_governance {
         should_pass: bool,
     ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
         vector::for_each(stake_pools, |stake_pool| {
-            partial_vote(voter, stake_pool, proposal_id, voting_power, should_pass);
+            vote_internal(voter, stake_pool, proposal_id, voting_power, should_pass);
         });
     }
 
