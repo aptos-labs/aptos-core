@@ -17,8 +17,8 @@ use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
-use aptos_storage_interface::Result;
+use aptos_schemadb::{schema::KeyCodec, ReadOptions, SchemaBatch, DB};
+use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
@@ -280,19 +280,67 @@ impl StateKvDb {
         &self,
         state_key: &StateKey,
         version: Version,
+        min_readable_version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
         let mut read_opts = ReadOptions::default();
 
         // We want `None` if the state_key changes in iteration.
         read_opts.set_prefix_same_as_start(true);
 
+        if min_readable_version > 0 {
+            // Set upper bound in case iteration goes into chunk of deletions by the pruner.
+            //   iterate_upper_bound is exclusive, so we need to set it to min_readable_version - 1
+            read_opts.set_iterate_upper_bound(KeyCodec::<StateValueSchema>::encode_key(&(
+                state_key.clone(),
+                min_readable_version - 1,
+            ))?)
+        }
+
         let mut iter = self
             .db_shard(state_key.get_shard_id())
             .iter_with_opts::<StateValueSchema>(read_opts)?;
         iter.seek(&(state_key.clone(), version))?;
-        Ok(iter
-            .next()
-            .transpose()?
-            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+        let in_prune_window_result = iter.next().transpose()?;
+        if let Some(((_, version), val_opt)) = in_prune_window_result {
+            // Found value or tombstone.
+            return Ok(val_opt.map(|val| (version, val)));
+        }
+
+        if min_readable_version == 0 {
+            // Entire key range has been gone through
+            return Ok(None)
+        }
+
+        // Nothing found within the prune window.
+        let mut read_opts = ReadOptions::default();
+
+        // We want `None` if the state_key changes in iteration.
+        read_opts.set_prefix_same_as_start(true);
+
+        // Outside the prune window, there's either the latest value before all the deletes and
+        // overwrites (by the pruner and the trancator) or nothing but deletes and overwrites,
+        // so we can conclude that the value does not exist if the underlying iterator skips
+        // anything.
+        read_opts.set_max_skippable_internal_keys(1);
+
+        let mut iter = self
+            .db_shard(state_key.get_shard_id())
+            .iter_with_opts::<StateValueSchema>(read_opts)?;
+
+        iter.seek(&(state_key.clone(), min_readable_version))?;
+        let ret = match iter.next() {
+            None => None,
+            Some(Ok(((_, version), val_opt))) => {
+                // Found value or tombstone.
+                val_opt.map(|val| (version, val))
+            },
+            Some(Err(AptosDbError::RocksDbIncompleteResult(..))) => {
+                // Underlying iterator saw nothing before deletes.
+                None
+            },
+            Some(Err(err)) => return Err(err),
+        };
+
+        Ok(ret)
     }
 }
