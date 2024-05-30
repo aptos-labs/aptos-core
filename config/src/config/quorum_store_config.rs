@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 pub const BATCH_PADDING_BYTES: usize = 160;
-const DEFAULT_MAX_NUM_BATCHES: usize = 30;
+const DEFAULT_MAX_NUM_BATCHES: usize = 35;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -84,18 +84,18 @@ impl Default for QuorumStoreConfig {
             batch_generation_poll_interval_ms: 25,
             batch_generation_min_non_empty_interval_ms: 200,
             batch_generation_max_interval_ms: 250,
-            sender_max_batch_txns: 250,
+            sender_max_batch_txns: 350,
             // TODO: on next release, remove BATCH_PADDING_BYTES
             sender_max_batch_bytes: 1024 * 1024 - BATCH_PADDING_BYTES,
             sender_max_num_batches: DEFAULT_MAX_NUM_BATCHES,
             sender_max_total_txns: 3500,
             // TODO: on next release, remove DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES
-            sender_max_total_bytes: 4 * 1024 * 1024 - DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES,
-            receiver_max_batch_txns: 250,
+            sender_max_total_bytes: 5 * 1024 * 1024 - DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES,
+            receiver_max_batch_txns: 350,
             receiver_max_batch_bytes: 1024 * 1024 + BATCH_PADDING_BYTES,
-            receiver_max_num_batches: 30,
+            receiver_max_num_batches: 35,
             receiver_max_total_txns: 3500,
-            receiver_max_total_bytes: 4 * 1024 * 1024
+            receiver_max_total_bytes: 5 * 1024 * 1024
                 + DEFAULT_MAX_NUM_BATCHES
                 + BATCH_PADDING_BYTES,
             batch_request_num_peers: 5,
