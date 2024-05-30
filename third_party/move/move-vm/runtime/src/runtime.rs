@@ -440,13 +440,6 @@ impl VMRuntime {
             function,
         } = func;
 
-        // FIXME: Replay testing.
-        // script_signature::verify_module_function_signature_by_name(
-        //     module.module(),
-        //     IdentStr::new(function.as_ref().name()).unwrap(),
-        //     move_bytecode_verifier::no_additional_script_signature_checks,
-        // )?;
-
         self.execute_function_impl(
             function,
             ty_args,
@@ -461,7 +454,6 @@ impl VMRuntime {
         )
     }
 
-    // See Session::execute_script for what contracts to follow.
     pub(crate) fn execute_script(
         &self,
         script: impl Borrow<[u8]>,
@@ -473,7 +465,7 @@ impl VMRuntime {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<()> {
-        // load the script, perform verification
+        // Load the script, performing its verification.
         let (
             func,
             LoadedFunctionInstantiation {
