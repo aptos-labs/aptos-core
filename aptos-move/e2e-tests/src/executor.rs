@@ -70,8 +70,6 @@ use move_core_types::{
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
-#[cfg(any(test, feature = "fuzzing"))]
-use rayon::ThreadPool;
 use serde::Serialize;
 use std::{
     collections::BTreeSet,
@@ -119,12 +117,12 @@ pub enum ExecutorMode {
 pub struct FakeExecutor {
     data_store: FakeDataStore,
     event_store: Vec<ContractEvent>,
-    executor_thread_pool: Arc<ThreadPool>,
+    executor_thread_pool: Arc<rayon::ThreadPool>,
     block_time: u64,
     executed_output: Option<GoldenOutputs>,
     trace_dir: Option<PathBuf>,
     rng: KeyGen,
-    /// If set, determines whether or not to execute a comparison test with the parallel
+    /// If set, determines whether to execute a comparison test with the parallel
     /// block executor.
     /// If not set, environment variable E2E_PARALLEL_EXEC must be set
     /// s.t. the comparison test is executed (BothComparison).
@@ -173,7 +171,7 @@ impl FakeExecutor {
     pub fn from_genesis_with_existing_thread_pool(
         write_set: &WriteSet,
         chain_id: ChainId,
-        executor_thread_pool: Arc<ThreadPool>,
+        executor_thread_pool: Arc<rayon::ThreadPool>,
     ) -> Self {
         let mut executor = FakeExecutor {
             data_store: FakeDataStore::default(),
