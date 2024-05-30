@@ -2,5 +2,6 @@
 *.css
 *.profraw
 *.profdata
+*.log
 coverage/
 output/
