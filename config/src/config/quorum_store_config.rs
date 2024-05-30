@@ -73,7 +73,7 @@ pub struct QuorumStoreConfig {
     /// The maximum number of transactions a BatchMsg received from peers can contain. Each BatchMsg can contain
     /// multiple batches.
     pub receiver_max_total_txns: usize,
-    /// The maximum number of byte a BatchMsg received from peers can contain. Each BatchMsg can contain
+    /// The maximum number of bytes a BatchMsg received from peers can contain. Each BatchMsg can contain
     /// multiple batches.
     pub receiver_max_total_bytes: usize,
     pub batch_request_num_peers: usize,
