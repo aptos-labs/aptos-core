@@ -1073,9 +1073,7 @@ module aptos_framework::aptos_governance {
         let voter_1_addr = signer::address_of(&voter_1);
         let voter_2_addr = signer::address_of(&voter_2);
         stake::set_delegated_voter(&voter_2, voter_1_addr);
-
         create_proposal_for_test(&proposer, true);
-
         batch_vote(&voter_1, vector[voter_1_addr, voter_2_addr], 0, true);
         test_resolving_proposal_generic(aptos_framework, true, execution_hash);
     }
@@ -1094,9 +1092,7 @@ module aptos_framework::aptos_governance {
         let voter_1_addr = signer::address_of(&voter_1);
         let voter_2_addr = signer::address_of(&voter_2);
         stake::set_delegated_voter(&voter_2, voter_1_addr);
-
         create_proposal_for_test(&proposer, true);
-        
         batch_partial_vote(&voter_1, vector[voter_1_addr, voter_2_addr], 0, 9, true);
         test_resolving_proposal_generic(aptos_framework, true, execution_hash);
     }
