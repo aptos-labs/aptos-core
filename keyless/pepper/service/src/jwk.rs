@@ -26,7 +26,11 @@ pub async fn fetch_jwks(jwk_url: &str) -> Result<DashMap<KeyID, Arc<DecodingKey>
         .text()
         .await
         .map_err(|e| anyhow!("error while getting response as text: {}", e))?;
-    let JwkSet { keys } = serde_json::from_str(text.as_str())
+    parse_jwks(&text)
+}
+
+pub fn parse_jwks(text: &str) -> Result<DashMap<KeyID, Arc<DecodingKey>>> {
+    let JwkSet { keys } = serde_json::from_str(text)
         .map_err(|e| anyhow!("error while parsing json: {}", e))?;
     let key_map: DashMap<KeyID, Arc<DecodingKey>> = keys
         .into_iter()
