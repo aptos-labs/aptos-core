@@ -266,8 +266,6 @@ fn native_is_at_least_impl(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_aggregator_api_not_enabled!(context);
-
     debug_assert_eq!(args.len(), 2);
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_IS_AT_LEAST_BASE)?;
