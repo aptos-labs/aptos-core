@@ -37,9 +37,11 @@ impl Cmd {
             .yellow()
         );
 
-        let ledger_db = self.db_dir.open_ledger_db()?;
+        let latest_version = {
+            let ledger_db = self.db_dir.open_ledger_db()?;
+            ledger_db.metadata_db().get_synced_version()?
+        };
         let db = self.db_dir.open_state_kv_db()?;
-        let latest_version = ledger_db.metadata_db().get_synced_version()?;
         println!("latest version: {latest_version}");
         if self.version != Version::MAX && self.version > latest_version {
             println!(
@@ -70,7 +72,7 @@ impl Cmd {
             },
             Some(((_key, version), value_opt)) => {
                 assert_eq!(_key, key);
-                assert!(version < self.version);
+                assert!(version <= self.version);
 
                 println!("{}", "Value found:".to_string().yellow());
                 println!("   version: {}", version);

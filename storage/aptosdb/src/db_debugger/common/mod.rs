@@ -45,7 +45,7 @@ impl DbDir {
                 enable_storage_sharding: self.sharding_config.enable_storage_sharding,
                 ..Default::default()
             },
-            true,
+            false,
             leger_db.metadata_db_arc(),
         )
     }
@@ -57,7 +57,7 @@ impl DbDir {
                 enable_storage_sharding: self.sharding_config.enable_storage_sharding,
                 ..Default::default()
             },
-            true,
+            false,
         )
     }
 }
