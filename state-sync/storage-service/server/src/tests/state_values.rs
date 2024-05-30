@@ -1,13 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::{
-    mock,
-    mock::{MockClient, MockDatabaseReader},
-    utils,
-};
+use crate::tests::{mock, mock::MockClient, utils};
 use aptos_config::config::StorageServiceConfig;
 use aptos_crypto::hash::HashValue;
+use aptos_infallible::Mutex;
 use aptos_storage_service_types::{
     requests::{DataRequest, StateValuesWithProofRequest},
     responses::{DataResponse, StorageServiceResponse},
@@ -22,8 +19,9 @@ use aptos_types::{
 };
 use bytes::Bytes;
 use claims::assert_matches;
-use mockall::{predicate::eq, Sequence};
+use mockall::predicate::{always, eq};
 use rand::Rng;
+use std::sync::Arc;
 
 #[tokio::test]
 async fn test_get_states_with_proof() {
@@ -34,19 +32,20 @@ async fn test_get_states_with_proof() {
         let version = 101;
         let start_index = 100;
         let end_index = start_index + chunk_size - 1;
+        let raw_values = create_state_keys_and_values(chunk_size, 1);
         let state_value_chunk_with_proof = StateValueChunkWithProof {
             first_index: start_index,
             last_index: end_index,
             first_key: HashValue::random(),
             last_key: HashValue::random(),
-            raw_values: vec![],
+            raw_values,
             proof: SparseMerkleRangeProof::new(vec![]),
             root_hash: HashValue::random(),
         };
 
         // Create the mock db reader
         let mut db_reader = mock::create_mock_db_reader();
-        expect_get_state_values_with_proof(
+        utils::expect_get_state_values_with_proof(
             &mut db_reader,
             version,
             start_index,
@@ -81,19 +80,20 @@ async fn test_get_states_with_proof_chunk_limit() {
     let chunk_size = max_state_chunk_size * 10; // Set a chunk request larger than the max
     let version = 101;
     let start_index = 100;
+    let raw_values = create_state_keys_and_values(max_state_chunk_size, 1);
     let state_value_chunk_with_proof = StateValueChunkWithProof {
         first_index: start_index,
         last_index: start_index + max_state_chunk_size - 1,
         first_key: HashValue::random(),
         last_key: HashValue::random(),
-        raw_values: vec![],
+        raw_values,
         proof: SparseMerkleRangeProof::new(vec![]),
         root_hash: HashValue::random(),
     };
 
     // Create the mock db reader
     let mut db_reader = mock::create_mock_db_reader();
-    expect_get_state_values_with_proof(
+    utils::expect_get_state_values_with_proof(
         &mut db_reader,
         version,
         start_index,
@@ -145,7 +145,7 @@ async fn test_get_states_with_proof_invalid() {
 #[tokio::test]
 async fn test_get_states_with_proof_network_limit() {
     // Test different byte limits
-    for network_limit_bytes in [1, 512, 1024, 10 * 1024] {
+    for network_limit_bytes in [1, 1024, 10 * 1024, 50 * 1024, 100 * 1024] {
         get_states_with_proof_network_limit(network_limit_bytes).await;
     }
 }
@@ -197,25 +197,6 @@ fn create_state_keys_and_values(
         .collect()
 }
 
-/// Sets an expectation on the given mock db for a call to fetch state values with proof
-fn expect_get_state_values_with_proof(
-    mock_db: &mut MockDatabaseReader,
-    version: u64,
-    start_index: u64,
-    chunk_size: u64,
-    state_value_chunk_with_proof: StateValueChunkWithProof,
-) {
-    mock_db
-        .expect_get_state_value_chunk_with_proof()
-        .times(1)
-        .with(
-            eq(version),
-            eq(start_index as usize),
-            eq(chunk_size as usize),
-        )
-        .returning(move |_, _, _| Ok(state_value_chunk_with_proof.clone()));
-}
-
 /// Sends a state values with proof request and processes the response
 async fn get_state_values_with_proof(
     mock_client: &mut MockClient,
@@ -232,42 +213,65 @@ async fn get_state_values_with_proof(
     utils::send_storage_request(mock_client, use_compression, data_request).await
 }
 
-/// A helper method to request a states with proof chunk using the
+/// A helper method to request a states with proof chunk using
 /// the specified network limit.
 async fn get_states_with_proof_network_limit(network_limit_bytes: u64) {
     for use_compression in [true, false] {
         // Create test data
         let max_state_chunk_size = StorageServiceConfig::default().max_state_chunk_size;
-        let min_bytes_per_state_value = 100;
+        let min_bytes_per_state_value = 10_000;
         let version = 101;
         let start_index = 100;
+        let end_index = start_index + max_state_chunk_size - 1;
 
-        // Create the mock db reader
+        // Create an iterator that returns the relevant state values
+        let state_values =
+            create_state_keys_and_values(max_state_chunk_size, min_bytes_per_state_value);
+        let state_value_iterator = Box::new(state_values.clone().into_iter().map(Ok))
+            as Box<
+                dyn Iterator<Item = aptos_storage_interface::Result<(StateKey, StateValue)>>
+                    + Send
+                    + Sync,
+            >;
+
+        // Create the mock db reader with expectations for the state value iterator
         let mut db_reader = mock::create_mock_db_reader();
-        let mut expectation_sequence = Sequence::new();
-        let mut chunk_size = max_state_chunk_size;
-        while chunk_size >= 1 {
-            let state_value_chunk_with_proof = StateValueChunkWithProof {
-                first_index: start_index,
-                last_index: start_index + chunk_size - 1,
-                first_key: HashValue::random(),
-                last_key: HashValue::random(),
-                raw_values: create_state_keys_and_values(chunk_size, min_bytes_per_state_value),
-                proof: SparseMerkleRangeProof::new(vec![]),
-                root_hash: HashValue::random(),
-            };
-            db_reader
-                .expect_get_state_value_chunk_with_proof()
-                .times(1)
-                .with(
-                    eq(version),
-                    eq(start_index as usize),
-                    eq(chunk_size as usize),
-                )
-                .in_sequence(&mut expectation_sequence)
-                .returning(move |_, _, _| Ok(state_value_chunk_with_proof.clone()));
-            chunk_size /= 2;
-        }
+        db_reader
+            .expect_get_state_value_chunk_iter()
+            .times(1)
+            .with(
+                eq(version),
+                eq(start_index as usize),
+                eq(max_state_chunk_size as usize),
+            )
+            .return_once(move |_, _, _| Ok(state_value_iterator));
+
+        // Create a shared object to store the state values found by the db reader
+        let shared_state_values = Arc::new(Mutex::new(state_values));
+        let state_values = shared_state_values.clone();
+
+        // Set expectations for the chunk proof
+        db_reader
+            .expect_get_state_value_chunk_proof()
+            .times(1)
+            .with(eq(version), eq(start_index as usize), always())
+            .return_once(move |_, given_start_index, given_state_values| {
+                // Save the state values for verification
+                *state_values.lock() = given_state_values.clone();
+
+                // Return a state value chunk with proof
+                let end_index = given_start_index + given_state_values.len() - 1;
+                let state_value_chunk_with_proof = StateValueChunkWithProof {
+                    first_index: given_start_index as u64,
+                    last_index: end_index as u64,
+                    first_key: HashValue::random(),
+                    last_key: HashValue::random(),
+                    raw_values: given_state_values,
+                    proof: SparseMerkleRangeProof::new(vec![]),
+                    root_hash: HashValue::random(),
+                };
+                Ok(state_value_chunk_with_proof)
+            });
 
         // Create a storage config with the specified max network byte limit
         let storage_config = StorageServiceConfig {
@@ -286,7 +290,7 @@ async fn get_states_with_proof_network_limit(network_limit_bytes: u64) {
             &mut mock_client,
             version,
             start_index,
-            start_index + max_state_chunk_size + 1000, // Request more than the max chunk
+            end_index,
             use_compression,
         )
         .await
@@ -294,14 +298,28 @@ async fn get_states_with_proof_network_limit(network_limit_bytes: u64) {
 
         // Verify the response adheres to the network limits
         match response.get_data_response().unwrap() {
-            DataResponse::StateValueChunkWithProof(state_value_chunk_with_proof) => {
-                let num_response_bytes = bcs::serialized_size(&response).unwrap() as u64;
-                let num_state_values = state_value_chunk_with_proof.raw_values.len() as u64;
+            DataResponse::StateValueChunkWithProof(mut state_value_chunk_with_proof) => {
+                // Update the chunk with the shared state values
+                state_value_chunk_with_proof.raw_values = shared_state_values.lock().clone();
+
+                // Verify the response
+                let num_response_bytes =
+                    utils::get_num_serialized_bytes(&response.get_data_response());
                 if num_response_bytes > network_limit_bytes {
-                    assert_eq!(num_state_values, 1); // Data cannot be reduced more than a single item
+                    // Verify the state values are larger than the network limit
+                    let state_values = state_value_chunk_with_proof.raw_values.clone();
+                    let num_state_value_bytes = utils::get_num_serialized_bytes(&state_values);
+                    assert!(num_state_value_bytes > network_limit_bytes);
+
+                    // Verify the response is only 1 state value over the network limit
+                    let state_values = &state_values[0..state_values.len() - 1];
+                    let num_state_value_bytes = utils::get_num_serialized_bytes(&state_values);
+                    assert!(num_state_value_bytes <= network_limit_bytes);
                 } else {
+                    // Verify data fits correctly into the limit
+                    let num_state_values = state_value_chunk_with_proof.raw_values.len() as u64;
                     let max_num_state_values = network_limit_bytes / min_bytes_per_state_value;
-                    assert!(num_state_values <= max_num_state_values); // Verify data fits correctly into the limit
+                    assert!(num_state_values <= max_num_state_values);
                 }
             },
             _ => panic!("Expected state values with proof but got: {:?}", response),

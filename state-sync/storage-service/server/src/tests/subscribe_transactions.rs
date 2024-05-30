@@ -35,13 +35,13 @@ async fn test_subscribe_transactions_different_networks() {
                 peer_version_1 + 1,
                 highest_version,
                 highest_version,
-                include_events,
+                true, // Always create events, even if not included in the response
             );
             let transaction_list_with_proof_2 = utils::create_transaction_list_with_proof(
                 peer_version_2 + 1,
                 highest_version,
                 highest_version,
-                include_events,
+                true, // Always create events, even if not included in the response
             );
 
             // Create the mock db reader
@@ -121,6 +121,7 @@ async fn test_subscribe_transactions_different_networks() {
                 response_receiver_1,
                 transaction_list_with_proof_1,
                 highest_ledger_info.clone(),
+                include_events,
             )
             .await;
             utils::verify_new_transactions_with_proof(
@@ -128,6 +129,7 @@ async fn test_subscribe_transactions_different_networks() {
                 response_receiver_2,
                 transaction_list_with_proof_2,
                 highest_ledger_info,
+                include_events,
             )
             .await;
         }
@@ -156,7 +158,7 @@ async fn test_subscribe_transactions_epoch_change() {
             peer_version + 1,
             epoch_change_version,
             epoch_change_version,
-            include_events,
+            true, // Always create events, even if not included in the response
         );
 
         // Create the mock db reader
@@ -213,6 +215,7 @@ async fn test_subscribe_transactions_epoch_change() {
             response_receiver,
             transaction_list_with_proof,
             epoch_change_proof.ledger_info_with_sigs[0].clone(),
+            include_events,
         )
         .await;
     }
@@ -241,7 +244,7 @@ async fn test_subscribe_transactions_max_chunk() {
             peer_version + 1,
             peer_version + requested_chunk_size,
             peer_version + requested_chunk_size,
-            include_events,
+            true, // Always create events, even if not included in the response
         );
 
         // Create the mock db reader
@@ -290,6 +293,7 @@ async fn test_subscribe_transactions_max_chunk() {
             response_receiver,
             transaction_list_with_proof,
             highest_ledger_info,
+            include_events,
         )
         .await;
     }
@@ -322,7 +326,7 @@ async fn test_subscribe_transactions_streaming() {
                 start_version,
                 end_version,
                 highest_version,
-                false,
+                true, // Always create events, even if not included in the response
             )
         })
         .collect();
@@ -396,6 +400,7 @@ async fn test_subscribe_transactions_streaming() {
                 &mut mock_client,
                 &mut response_receivers,
                 stream_request_index,
+                false,
             )
             .await;
         }
@@ -445,7 +450,7 @@ async fn test_subscribe_transactions_streaming_epoch_change() {
                 *start_version,
                 *end_version,
                 highest_version,
-                false,
+                true, // Always create events, even if not included in the response
             )
         })
         .collect();
@@ -532,6 +537,7 @@ async fn test_subscribe_transactions_streaming_epoch_change() {
             &mut mock_client,
             &mut response_receivers,
             stream_request_index,
+            false,
         )
         .await;
     }
@@ -564,7 +570,7 @@ async fn test_subscribe_transactions_streaming_loop() {
                 start_version,
                 end_version,
                 highest_version,
-                false,
+                true, // Always create events, even if not included in the response
             )
         })
         .collect();
@@ -639,6 +645,7 @@ async fn test_subscribe_transactions_streaming_loop() {
             response_receiver,
             transaction_lists_with_proofs[stream_request_index as usize].clone(),
             highest_ledger_info.clone(),
+            false,
         )
         .await;
     }
@@ -689,6 +696,7 @@ async fn verify_transaction_subscription_response(
     mock_client: &mut MockClient,
     response_receivers: &mut HashMap<u64, Receiver<Result<Bytes, RpcError>>>,
     stream_request_index: u64,
+    include_events: bool,
 ) {
     let response_receiver = response_receivers.remove(&stream_request_index).unwrap();
     utils::verify_new_transactions_with_proof(
@@ -696,6 +704,7 @@ async fn verify_transaction_subscription_response(
         response_receiver,
         expected_transaction_lists_with_proofs[stream_request_index as usize].clone(),
         expected_target_ledger_info,
+        include_events,
     )
     .await;
 }

@@ -70,7 +70,11 @@ async fn test_peers_with_ready_subscriptions() {
 
     // Create the storage reader
     let storage_service_config = StorageServiceConfig::default();
-    let storage_reader = StorageReader::new(storage_service_config, Arc::new(db_reader));
+    let storage_reader = StorageReader::new(
+        storage_service_config,
+        Arc::new(db_reader),
+        time_service.clone(),
+    );
 
     // Create test data with an empty storage server summary
     let cached_storage_server_summary =
@@ -188,8 +192,12 @@ async fn test_remove_expired_subscriptions_no_new_data() {
 
     // Create the mock storage reader and time service
     let db_reader = mock::create_mock_db_reader();
-    let storage_reader = StorageReader::new(storage_service_config, Arc::new(db_reader));
     let time_service = TimeService::mock();
+    let storage_reader = StorageReader::new(
+        storage_service_config,
+        Arc::new(db_reader),
+        time_service.clone(),
+    );
 
     // Create test data with an empty storage server summary
     let cached_storage_server_summary =
@@ -337,6 +345,7 @@ async fn test_remove_expired_subscriptions_blocked_stream() {
     let storage_reader = StorageReader::new(
         storage_service_config,
         Arc::new(mock::create_mock_db_reader()),
+        time_service.clone(),
     );
 
     // Update the storage server summary so that there is new data (at version 5)
@@ -437,6 +446,7 @@ async fn test_remove_expired_subscriptions_blocked_stream_index() {
     let storage_reader = StorageReader::new(
         storage_service_config,
         Arc::new(mock::create_mock_db_reader()),
+        time_service.clone(),
     );
 
     // Update the storage server summary so that there is new data (at version 5)
@@ -964,6 +974,7 @@ async fn test_subscription_overwrite_streams() {
         response_receiver,
         transaction_list_with_proof,
         highest_ledger_info,
+        false,
     )
     .await;
 }

@@ -251,7 +251,7 @@ async fn get_transactions_or_outputs_with_proof(
     utils::send_storage_request(mock_client, use_compression, data_request).await
 }
 
-/// A helper method to request transactions or outputs with proof using the
+/// A helper method to request transactions or outputs with proof using
 /// the specified network limit.
 async fn get_transactions_or_outputs_with_proof_network_limit(network_limit_bytes: u64) {
     for use_compression in [true, false] {

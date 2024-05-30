@@ -4,8 +4,12 @@
 use crate::tests::{mock, mock::MockClient, utils};
 use aptos_config::config::StorageServiceConfig;
 use aptos_storage_service_types::{responses::DataResponse, StorageServiceError};
+use aptos_types::{
+    contract_event::ContractEvent,
+    transaction::{Transaction, TransactionInfo},
+};
 use claims::assert_matches;
-use mockall::{predicate::eq, Sequence};
+use mockall::predicate::{always, eq};
 
 #[tokio::test]
 async fn test_get_transactions_with_proof() {
@@ -18,11 +22,11 @@ async fn test_get_transactions_with_proof() {
             let start_version = 0;
             let end_version = start_version + chunk_size - 1;
             let proof_version = end_version;
-            let transaction_list_with_proof = utils::create_transaction_list_with_proof(
+            let mut transaction_list_with_proof = utils::create_transaction_list_with_proof(
                 start_version,
                 end_version,
                 proof_version,
-                include_events,
+                true, // Always create events, even if not included in the response
             );
 
             // Create the mock db reader
@@ -56,6 +60,10 @@ async fn test_get_transactions_with_proof() {
             // Verify the response is correct
             match response.get_data_response().unwrap() {
                 DataResponse::TransactionsWithProof(transactions_with_proof) => {
+                    // If events are not included, remove them from the expected response
+                    if !include_events {
+                        transaction_list_with_proof.events = None;
+                    }
                     assert_eq!(transactions_with_proof, transaction_list_with_proof)
                 },
                 _ => panic!("Expected transactions with proof but got: {:?}", response),
@@ -74,11 +82,11 @@ async fn test_get_transactions_with_chunk_limit() {
         let start_version = 0;
         let end_version = start_version + max_transaction_chunk_size - 1;
         let proof_version = end_version;
-        let transaction_list_with_proof = utils::create_transaction_list_with_proof(
+        let mut transaction_list_with_proof = utils::create_transaction_list_with_proof(
             start_version,
             end_version,
             proof_version,
-            include_events,
+            true, // Always create events, even if not included in the response
         );
 
         // Create the mock db reader
@@ -112,6 +120,10 @@ async fn test_get_transactions_with_chunk_limit() {
         // Verify the response is correct
         match response.get_data_response().unwrap() {
             DataResponse::TransactionsWithProof(transactions_with_proof) => {
+                // If events are not included, remove them from the expected response
+                if !include_events {
+                    transaction_list_with_proof.events = None;
+                }
                 assert_eq!(transactions_with_proof, transaction_list_with_proof)
             },
             _ => panic!("Expected transactions with proof but got: {:?}", response),
@@ -145,7 +157,7 @@ async fn test_get_transactions_with_proof_invalid() {
 #[tokio::test]
 async fn test_get_transactions_with_proof_network_limit() {
     // Test different byte limits
-    for network_limit_bytes in [1, 1024, 10 * 1024, 100 * 1024] {
+    for network_limit_bytes in [1, 1024, 10 * 1024, 50 * 1024, 100 * 1024] {
         get_transactions_with_proof_network_limit(network_limit_bytes).await;
     }
 }
@@ -185,7 +197,7 @@ async fn test_get_transactions_with_proof_not_serviceable() {
     }
 }
 
-/// A helper method to request a transactions with proof chunk using the
+/// A helper method to request a transactions with proof chunk using
 /// the specified network limit.
 async fn get_transactions_with_proof_network_limit(network_limit_bytes: u64) {
     for use_compression in [true, false] {
@@ -193,34 +205,68 @@ async fn get_transactions_with_proof_network_limit(network_limit_bytes: u64) {
             // Create test data
             let max_transaction_chunk_size =
                 StorageServiceConfig::default().max_transaction_chunk_size;
-            let min_bytes_per_transaction = 512; // 0.5 KB
+            let min_bytes_per_transaction = 15_000; // Make these large so that infos and events are negligible
             let start_version = 121245;
             let proof_version = 202020;
+            let transaction_list_with_proof = utils::create_transaction_list_using_sizes(
+                start_version,
+                max_transaction_chunk_size,
+                min_bytes_per_transaction,
+                true, // Always create events, even if not included in the response
+            );
 
-            // Create the mock db reader
+            // Fetch the transactions, infos and events from the transaction list
+            let transactions = transaction_list_with_proof.transactions.into_iter().map(Ok);
+            let transaction_infos = transaction_list_with_proof
+                .proof
+                .transaction_infos
+                .into_iter()
+                .map(Ok);
+            let transaction_events = transaction_list_with_proof
+                .events
+                .unwrap()
+                .into_iter()
+                .map(Ok);
+
+            // Create iterators for the transactions, infos and events
+            let transaction_iterator = Box::new(transactions)
+                as Box<dyn Iterator<Item = aptos_storage_interface::Result<Transaction>> + Send>;
+            let transaction_info_iterator = Box::new(transaction_infos)
+                as Box<
+                    dyn Iterator<Item = aptos_storage_interface::Result<TransactionInfo>> + Send,
+                >;
+            let transaction_event_iterator = Box::new(transaction_events)
+                as Box<
+                    dyn Iterator<Item = aptos_storage_interface::Result<Vec<ContractEvent>>> + Send,
+                >;
+
+            // Create the mock db reader and expect calls to get the iterators
             let mut db_reader = mock::create_mock_db_reader();
-            let mut expectation_sequence = Sequence::new();
-            let mut chunk_size = max_transaction_chunk_size;
-            while chunk_size >= 1 {
-                let transaction_list_with_proof = utils::create_transaction_list_using_sizes(
-                    start_version,
-                    chunk_size,
-                    min_bytes_per_transaction,
-                    include_events,
-                );
-                db_reader
-                    .expect_get_transactions()
-                    .times(1)
-                    .with(
-                        eq(start_version),
-                        eq(chunk_size),
-                        eq(proof_version),
-                        eq(include_events),
-                    )
-                    .in_sequence(&mut expectation_sequence)
-                    .returning(move |_, _, _, _| Ok(transaction_list_with_proof.clone()));
-                chunk_size /= 2;
-            }
+            db_reader
+                .expect_get_transaction_iterator()
+                .times(1)
+                .with(eq(start_version), eq(max_transaction_chunk_size))
+                .return_once(move |_, _| Ok(transaction_iterator));
+            db_reader
+                .expect_get_transaction_info_iterator()
+                .times(1)
+                .with(eq(start_version), eq(max_transaction_chunk_size))
+                .return_once(move |_, _| Ok(transaction_info_iterator));
+            db_reader
+                .expect_get_events_iterator()
+                .times(1)
+                .with(eq(start_version), eq(max_transaction_chunk_size))
+                .return_once(move |_, _| Ok(transaction_event_iterator));
+
+            // Expect calls to get the accumulator range proof
+            let accumulator_range_proof = transaction_list_with_proof
+                .proof
+                .ledger_info_to_transaction_infos_proof;
+            db_reader
+                .expect_get_transaction_accumulator_range_proof()
+                .times(1)
+                .with(eq(start_version), always(), eq(proof_version))
+                .return_once(move |_, _, _| Ok(accumulator_range_proof));
 
             // Create a storage config with the specified max network byte limit
             let storage_config = StorageServiceConfig {
@@ -238,7 +284,7 @@ async fn get_transactions_with_proof_network_limit(network_limit_bytes: u64) {
             let response = utils::get_transactions_with_proof(
                 &mut mock_client,
                 start_version,
-                start_version + max_transaction_chunk_size - 1,
+                start_version + (max_transaction_chunk_size * 10), // Request more than the max chunk
                 proof_version,
                 include_events,
                 use_compression,
@@ -249,13 +295,24 @@ async fn get_transactions_with_proof_network_limit(network_limit_bytes: u64) {
             // Verify the response is correct
             match response.get_data_response().unwrap() {
                 DataResponse::TransactionsWithProof(transactions_with_proof) => {
-                    let num_response_bytes = bcs::serialized_size(&response).unwrap() as u64;
-                    let num_transactions = transactions_with_proof.transactions.len() as u64;
+                    let num_response_bytes =
+                        utils::get_num_serialized_bytes(&response.get_data_response());
+                    let num_transactions = transactions_with_proof.transactions.len();
                     if num_response_bytes > network_limit_bytes {
-                        assert_eq!(num_transactions, 1); // Data cannot be reduced more than a single item
+                        // Verify the transactions are larger than the network limit
+                        let num_transaction_bytes =
+                            utils::get_num_serialized_bytes(&transactions_with_proof.transactions);
+                        assert!(num_transaction_bytes > network_limit_bytes);
+
+                        // Verify the response is only 1 transaction over the network limit
+                        let transactions =
+                            &transactions_with_proof.transactions[0..num_transactions - 1];
+                        let num_transaction_bytes = utils::get_num_serialized_bytes(&transactions);
+                        assert!(num_transaction_bytes <= network_limit_bytes);
                     } else {
+                        // Verify data fits correctly into the limit
                         let max_transactions = network_limit_bytes / min_bytes_per_transaction;
-                        assert!(num_transactions <= max_transactions); // Verify data fits correctly into the limit
+                        assert!(num_transactions as u64 <= max_transactions);
                     }
                 },
                 _ => panic!("Expected transactions with proof but got: {:?}", response),

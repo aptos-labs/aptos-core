@@ -8,8 +8,13 @@ use aptos_storage_service_types::{
     responses::{DataResponse, StorageServiceResponse},
     StorageServiceError,
 };
+use aptos_types::{
+    contract_event::ContractEvent,
+    transaction::{Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionOutput},
+    write_set::WriteSet,
+};
 use claims::assert_matches;
-use mockall::{predicate::eq, Sequence};
+use mockall::predicate::{always, eq};
 
 #[tokio::test]
 async fn test_get_transaction_outputs_with_proof() {
@@ -189,35 +194,98 @@ async fn get_outputs_with_proof(
     utils::send_storage_request(mock_client, use_compression, data_request).await
 }
 
-/// A helper method to request a transaction outputs with proof chunk using the
+/// A helper method to request a transaction outputs with proof chunk using
 /// the specified network limit.
 async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64) {
     for use_compression in [true, false] {
         // Create test data
         let max_output_chunk_size =
             StorageServiceConfig::default().max_transaction_output_chunk_size;
-        let min_bytes_per_output = 1536; // 1.5 KB
+        let min_bytes_per_transaction_and_output = 15_000; // Make these large so that infos and events are negligible
         let start_version = 455;
         let proof_version = 1000000;
+        let output_list_with_proof = utils::create_output_list_using_sizes(
+            start_version,
+            max_output_chunk_size,
+            min_bytes_per_transaction_and_output,
+        );
 
-        // Create the mock db reader
+        // Fetch the transactions, infos, write sets, events and auxiliary data from the output list
+        let (transactions, transaction_outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
+            output_list_with_proof
+                .transactions_and_outputs
+                .into_iter()
+                .unzip();
+        let transaction_infos = output_list_with_proof
+            .proof
+            .transaction_infos
+            .into_iter()
+            .map(Ok);
+        let transaction_write_sets = transaction_outputs
+            .clone()
+            .into_iter()
+            .map(|output| Ok(output.write_set().clone()));
+        let transaction_events = transaction_outputs
+            .clone()
+            .into_iter()
+            .map(|output| Ok(output.events().to_vec()));
+        let transaction_auxiliary_data = transaction_outputs
+            .clone()
+            .into_iter()
+            .map(|output| Ok(output.auxiliary_data().clone()));
+
+        // Create iterators for the transactions, infos, write sets, events and auxiliary data
+        let transaction_iterator = Box::new(transactions.into_iter().map(Ok))
+            as Box<dyn Iterator<Item = aptos_storage_interface::Result<Transaction>> + Send>;
+        let transaction_info_iterator = Box::new(transaction_infos)
+            as Box<dyn Iterator<Item = aptos_storage_interface::Result<TransactionInfo>> + Send>;
+        let transaction_write_set_iterator = Box::new(transaction_write_sets)
+            as Box<dyn Iterator<Item = aptos_storage_interface::Result<WriteSet>> + Send>;
+        let transaction_event_iterator = Box::new(transaction_events)
+            as Box<dyn Iterator<Item = aptos_storage_interface::Result<Vec<ContractEvent>>> + Send>;
+        let transaction_auxiliary_data_iterator = Box::new(transaction_auxiliary_data)
+            as Box<
+                dyn Iterator<Item = aptos_storage_interface::Result<TransactionAuxiliaryData>>
+                    + Send,
+            >;
+
+        // Create the mock db reader and expect calls to get the iterators
         let mut db_reader = mock::create_mock_db_reader();
-        let mut expectation_sequence = Sequence::new();
-        let mut chunk_size = max_output_chunk_size;
-        while chunk_size >= 1 {
-            let output_list_with_proof = utils::create_output_list_using_sizes(
-                start_version,
-                chunk_size,
-                min_bytes_per_output,
-            );
-            db_reader
-                .expect_get_transaction_outputs()
-                .times(1)
-                .with(eq(start_version), eq(chunk_size), eq(proof_version))
-                .in_sequence(&mut expectation_sequence)
-                .returning(move |_, _, _| Ok(output_list_with_proof.clone()));
-            chunk_size /= 2;
-        }
+        db_reader
+            .expect_get_transaction_iterator()
+            .times(1)
+            .with(eq(start_version), eq(max_output_chunk_size))
+            .return_once(move |_, _| Ok(transaction_iterator));
+        db_reader
+            .expect_get_transaction_info_iterator()
+            .times(1)
+            .with(eq(start_version), eq(max_output_chunk_size))
+            .return_once(move |_, _| Ok(transaction_info_iterator));
+        db_reader
+            .expect_get_write_set_iterator()
+            .times(1)
+            .with(eq(start_version), eq(max_output_chunk_size))
+            .return_once(move |_, _| Ok(transaction_write_set_iterator));
+        db_reader
+            .expect_get_events_iterator()
+            .times(1)
+            .with(eq(start_version), eq(max_output_chunk_size))
+            .return_once(move |_, _| Ok(transaction_event_iterator));
+        db_reader
+            .expect_get_auxiliary_data_iterator()
+            .times(1)
+            .with(eq(start_version), eq(max_output_chunk_size))
+            .return_once(move |_, _| Ok(transaction_auxiliary_data_iterator));
+
+        // Expect calls to get the accumulator range proof
+        let accumulator_range_proof = output_list_with_proof
+            .proof
+            .ledger_info_to_transaction_infos_proof;
+        db_reader
+            .expect_get_transaction_accumulator_range_proof()
+            .times(1)
+            .with(eq(start_version), always(), eq(proof_version))
+            .return_once(move |_, _, _| Ok(accumulator_range_proof));
 
         // Create a storage config with the specified max network byte limit
         let storage_config = StorageServiceConfig {
@@ -245,13 +313,28 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64) {
         // Verify the response is correct
         match response.get_data_response().unwrap() {
             DataResponse::TransactionOutputsWithProof(outputs_with_proof) => {
-                let num_response_bytes = bcs::serialized_size(&response).unwrap() as u64;
-                let num_outputs = outputs_with_proof.transactions_and_outputs.len() as u64;
+                let num_response_bytes =
+                    utils::get_num_serialized_bytes(&response.get_data_response());
+                let num_transactions_and_outputs =
+                    outputs_with_proof.transactions_and_outputs.len();
                 if num_response_bytes > network_limit_bytes {
-                    assert_eq!(num_outputs, 1); // Data cannot be reduced more than a single item
+                    // Verify the transactions and outputs are larger than the network limit
+                    let num_serialized_bytes = utils::get_num_serialized_bytes(
+                        &outputs_with_proof.transactions_and_outputs,
+                    );
+                    assert!(num_serialized_bytes > network_limit_bytes);
+
+                    // Verify the response is only 1 data item over the network limit
+                    let transactions_and_outputs = &outputs_with_proof.transactions_and_outputs
+                        [0..num_transactions_and_outputs - 1];
+                    let num_serialized_bytes =
+                        utils::get_num_serialized_bytes(&transactions_and_outputs);
+                    assert!(num_serialized_bytes <= network_limit_bytes);
                 } else {
-                    let max_outputs = network_limit_bytes / min_bytes_per_output;
-                    assert!(num_outputs <= max_outputs); // Verify data fits correctly into the limit
+                    // Verify data fits correctly into the limit
+                    let max_transactions_and_outputs =
+                        network_limit_bytes / min_bytes_per_transaction_and_output;
+                    assert!(num_transactions_and_outputs as u64 <= max_transactions_and_outputs);
                 }
             },
             _ => panic!("Expected outputs with proof but got: {:?}", response),

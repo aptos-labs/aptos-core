@@ -17,7 +17,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use claims::assert_matches;
-use mockall::{predicate::eq, Sequence};
+use mockall::predicate::eq;
 use rand::Rng;
 
 #[tokio::test]
@@ -28,11 +28,10 @@ async fn test_get_epoch_ending_ledger_infos() {
         // Create test data
         let start_epoch = 11;
         let expected_end_epoch = start_epoch + chunk_size - 1;
+        let ledger_info_with_sigs =
+            create_epoch_ending_ledger_infos(start_epoch, expected_end_epoch);
         let epoch_change_proof = EpochChangeProof {
-            ledger_info_with_sigs: create_epoch_ending_ledger_infos(
-                start_epoch,
-                expected_end_epoch,
-            ),
+            ledger_info_with_sigs,
             more: false,
         };
 
@@ -41,7 +40,7 @@ async fn test_get_epoch_ending_ledger_infos() {
         utils::expect_get_epoch_ending_ledger_infos(
             &mut db_reader,
             start_epoch,
-            expected_end_epoch + 1,
+            expected_end_epoch,
             epoch_change_proof.clone(),
         );
 
@@ -77,8 +76,9 @@ async fn test_get_epoch_ending_ledger_infos_chunk_limit() {
     let chunk_size = max_epoch_chunk_size * 10; // Set a chunk request larger than the max
     let start_epoch = 11;
     let expected_end_epoch = start_epoch + max_epoch_chunk_size - 1;
+    let ledger_info_with_sigs = create_epoch_ending_ledger_infos(start_epoch, expected_end_epoch);
     let epoch_change_proof = EpochChangeProof {
-        ledger_info_with_sigs: create_epoch_ending_ledger_infos(start_epoch, expected_end_epoch),
+        ledger_info_with_sigs,
         more: false,
     };
 
@@ -87,7 +87,7 @@ async fn test_get_epoch_ending_ledger_infos_chunk_limit() {
     utils::expect_get_epoch_ending_ledger_infos(
         &mut db_reader,
         start_epoch,
-        expected_end_epoch + 1,
+        expected_end_epoch,
         epoch_change_proof.clone(),
     );
 
@@ -143,7 +143,7 @@ async fn test_get_epoch_ending_ledger_infos_invalid() {
 #[tokio::test]
 async fn test_get_epoch_ending_ledger_infos_network_limit() {
     // Test different byte limits
-    for network_limit_bytes in [1, 10 * 1024, 50 * 1024, 100 * 1024, 1024 * 1024] {
+    for network_limit_bytes in [1, 1024, 10 * 1024, 50 * 1024, 100 * 1024] {
         get_epoch_ending_ledger_infos_network_limit(network_limit_bytes).await;
     }
 }
@@ -186,7 +186,7 @@ fn create_epoch_ending_ledger_infos(
     end_epoch: Epoch,
 ) -> Vec<LedgerInfoWithSignatures> {
     let mut ledger_info_with_sigs = vec![];
-    for epoch in start_epoch..end_epoch {
+    for epoch in start_epoch..=end_epoch {
         ledger_info_with_sigs.push(utils::create_test_ledger_info_with_sigs(epoch, 0));
     }
     ledger_info_with_sigs
@@ -219,7 +219,7 @@ fn create_epoch_ending_ledger_infos_using_sizes(
         .collect()
 }
 
-/// A helper method to request a states with proof chunk using the
+/// A helper method to request a states with proof chunk using
 /// the specified network limit.
 async fn get_epoch_ending_ledger_infos_network_limit(network_limit_bytes: u64) {
     for use_compression in [true, false] {
@@ -229,25 +229,25 @@ async fn get_epoch_ending_ledger_infos_network_limit(network_limit_bytes: u64) {
         let start_epoch = 98754;
         let expected_end_epoch = start_epoch + max_epoch_chunk_size - 1;
 
-        // Create the mock db reader
+        // Create an iterator that returns the relevant epoch ending ledger infos
+        let epoch_ending_ledger_infos = create_epoch_ending_ledger_infos_using_sizes(
+            max_epoch_chunk_size,
+            min_bytes_per_ledger_info,
+        );
+        let ledger_info_iterator = Box::new(epoch_ending_ledger_infos.into_iter().map(Ok))
+            as Box<
+                dyn Iterator<Item = aptos_storage_interface::Result<LedgerInfoWithSignatures>>
+                    + Send,
+            >;
+
+        // Create the mock db reader with expectations
         let mut db_reader = mock::create_mock_db_reader();
-        let mut expectation_sequence = Sequence::new();
-        let mut chunk_size = max_epoch_chunk_size;
-        while chunk_size >= 1 {
-            let ledger_info_with_sigs =
-                create_epoch_ending_ledger_infos_using_sizes(chunk_size, min_bytes_per_ledger_info);
-            let epoch_change_proof = EpochChangeProof {
-                ledger_info_with_sigs,
-                more: false,
-            };
-            db_reader
-                .expect_get_epoch_ending_ledger_infos()
-                .times(1)
-                .with(eq(start_epoch), eq(start_epoch + chunk_size))
-                .in_sequence(&mut expectation_sequence)
-                .returning(move |_, _| Ok(epoch_change_proof.clone()));
-            chunk_size /= 2;
-        }
+        let end_epoch = expected_end_epoch + 1; // The end epoch is exclusive in DbReader
+        db_reader
+            .expect_get_epoch_ending_ledger_info_iterator()
+            .times(1)
+            .with(eq(start_epoch), eq(end_epoch))
+            .return_once(move |_, _| Ok(ledger_info_iterator));
 
         // Create a storage config with the specified max network byte limit
         let storage_config = StorageServiceConfig {
@@ -272,13 +272,27 @@ async fn get_epoch_ending_ledger_infos_network_limit(network_limit_bytes: u64) {
         // Verify the response adheres to the network limits
         match response.get_data_response().unwrap() {
             DataResponse::EpochEndingLedgerInfos(epoch_change_proof) => {
-                let num_response_bytes = bcs::serialized_size(&response).unwrap() as u64;
-                let num_ledger_infos = epoch_change_proof.ledger_info_with_sigs.len() as u64;
+                let num_response_bytes =
+                    utils::get_num_serialized_bytes(&response.get_data_response());
                 if num_response_bytes > network_limit_bytes {
-                    assert_eq!(num_ledger_infos, 1); // Data cannot be reduced more than a single item
+                    // Verify the ledger infos are larger than the network limit
+                    let epoch_ending_ledger_infos =
+                        epoch_change_proof.ledger_info_with_sigs.clone();
+                    let num_ledger_info_bytes =
+                        utils::get_num_serialized_bytes(&epoch_ending_ledger_infos);
+                    assert!(num_ledger_info_bytes > network_limit_bytes);
+
+                    // Verify the response is only 1 ledger info over the network limit
+                    let epoch_ending_ledger_infos =
+                        &epoch_ending_ledger_infos[0..epoch_ending_ledger_infos.len() - 1];
+                    let num_ledger_info_bytes =
+                        utils::get_num_serialized_bytes(epoch_ending_ledger_infos);
+                    assert!(num_ledger_info_bytes <= network_limit_bytes);
                 } else {
+                    // Verify data fits correctly into the limit
+                    let num_ledger_infos = epoch_change_proof.ledger_info_with_sigs.len() as u64;
                     let max_num_ledger_infos = network_limit_bytes / min_bytes_per_ledger_info;
-                    assert!(num_ledger_infos <= max_num_ledger_infos); // Verify data fits correctly into the limit
+                    assert!(num_ledger_infos <= max_num_ledger_infos);
                 }
             },
             _ => panic!("Expected epoch ending ledger infos but got: {:?}", response),
