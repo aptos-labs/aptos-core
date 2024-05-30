@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 pub const BATCH_PADDING_BYTES: usize = 160;
-const DEFAULT_MAX_NUM_BATCHES: usize = 20;
+const DEFAULT_MAX_NUM_BATCHES: usize = 25;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -29,14 +29,14 @@ impl Default for QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
             // Roughly, target TPS * commit latency seconds
-            backlog_txn_limit_count: 37_500,
+            backlog_txn_limit_count: 75_000,
             // QS will create batches at the max rate until this number is reached
             backlog_per_validator_batch_limit_count: 4,
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
-            dynamic_min_txn_per_s: 320,
-            dynamic_max_txn_per_s: 13500,
+            dynamic_min_txn_per_s: 1500,
+            dynamic_max_txn_per_s: 20_000,
         }
     }
 }
@@ -88,13 +88,13 @@ impl Default for QuorumStoreConfig {
             // TODO: on next release, remove BATCH_PADDING_BYTES
             sender_max_batch_bytes: 1024 * 1024 - BATCH_PADDING_BYTES,
             sender_max_num_batches: DEFAULT_MAX_NUM_BATCHES,
-            sender_max_total_txns: 3000,
+            sender_max_total_txns: 3500,
             // TODO: on next release, remove DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES
             sender_max_total_bytes: 4 * 1024 * 1024 - DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES,
             receiver_max_batch_txns: 250,
             receiver_max_batch_bytes: 1024 * 1024 + BATCH_PADDING_BYTES,
-            receiver_max_num_batches: 20,
-            receiver_max_total_txns: 3000,
+            receiver_max_num_batches: 25,
+            receiver_max_total_txns: 3500,
             receiver_max_total_bytes: 4 * 1024 * 1024
                 + DEFAULT_MAX_NUM_BATCHES
                 + BATCH_PADDING_BYTES,
