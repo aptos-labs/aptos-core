@@ -76,7 +76,7 @@ impl Default for MempoolConfig {
             capacity_bytes: 2 * 1024 * 1024 * 1024,
             capacity_per_user: 100,
             default_failovers: 0,
-            enable_intelligent_peer_prioritization: false,
+            enable_intelligent_peer_prioritization: true,
             shared_mempool_peer_update_interval_ms: 1_000,
             shared_mempool_priority_update_interval_secs: 600, // 10 minutes (frequent reprioritization is expensive)
             system_transaction_timeout_secs: 600,

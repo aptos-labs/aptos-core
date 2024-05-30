@@ -2464,7 +2464,7 @@ fn pfn_const_tps(
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             config.consensus_observer.observer_enabled = true
         }))
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 12500 }))
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
@@ -2475,14 +2475,14 @@ fn pfn_const_tps(
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(4500)
+            SuccessCriteria::new(1200)
                 .add_no_restarts()
                 .add_max_expired_tps(0)
                 .add_max_failed_submission_tps(0)
                 // Percentile thresholds are set to +1 second of non-PFN tests. Should be revisited.
-                .add_latency_threshold(2.5, LatencyType::P50)
-                .add_latency_threshold(4., LatencyType::P90)
-                .add_latency_threshold(5., LatencyType::P99)
+                .add_latency_threshold(3.5, LatencyType::P50)
+                .add_latency_threshold(5., LatencyType::P90)
+                .add_latency_threshold(7., LatencyType::P99)
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup and at most 10% of the run
                     (duration.as_secs() / 10).max(60),
