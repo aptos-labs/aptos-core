@@ -8,7 +8,7 @@ use crate::{
     logging::{LogEvent, LogSchema},
     persistent_liveness_storage::PersistentLivenessStorage,
 };
-use anyhow::bail;
+use anyhow::{bail, ensure};
 use aptos_consensus_types::{
     pipelined_block::{OrderedBlockWindow, PipelinedBlock},
     quorum_cert::QuorumCert,
@@ -34,6 +34,15 @@ struct LinkableBlock {
 
 impl LinkableBlock {
     pub fn new(block: PipelinedBlock) -> Self {
+        info!(
+            "New LinkableBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}",
+            block.id(),
+            block.parent_id(),
+            block.round(),
+            block.epoch(),
+            block.payload().map_or(0, |p| p.len())
+        );
+
         Self {
             executed_block: Arc::new(block),
             children: HashSet::new(),
@@ -235,15 +244,29 @@ impl BlockTree {
             checked_verify_eq!(existing_block.compute_result(), block.compute_result());
             Ok(existing_block)
         } else {
+            // TODO: for now this is just hardcoded for window size 2 (current + 2 parents)
+            let window_size = std::cmp::min(block.round(), 2);
+            let mut current_block = &block;
+            let mut block_window = vec![];
+            for _ in 0..window_size {
+                current_block = match self.get_linkable_block(&current_block.parent_id()) {
+                    Some(parent_block) => {
+                        block_window.push(parent_block.executed_block().block().clone());
+                        parent_block.executed_block()
+                    },
+                    None => break,
+                };
+            }
+            ensure!(
+                block_window.len() as u64 == window_size,
+                "Block window is not complete"
+            );
+
             match self.get_linkable_block_mut(&block.parent_id()) {
                 Some(parent_block) => {
                     parent_block.add_child(block_id);
-                    // TODO: is there some placeholder for a root block that needs to be ignored?
-                    // TODO: for now this is just hardcoded for window size 2 (current and parent)
-                    let block = block.set_block_window(OrderedBlockWindow::new(vec![parent_block
-                        .executed_block
-                        .block()
-                        .clone()]));
+
+                    let block = block.set_block_window(OrderedBlockWindow::new(block_window));
                     let linkable_block = LinkableBlock::new(block);
                     let arc_block = Arc::clone(linkable_block.executed_block());
                     assert!(self.id_to_block.insert(block_id, linkable_block).is_none());
