@@ -25,6 +25,7 @@ use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     common::Author,
+    order_vote_msg::OrderVoteMsg,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
@@ -370,7 +371,7 @@ impl NetworkSender {
             if let Err(e) = network_sender.send_to(peer, msg.clone()) {
                 warn!(
                     remote_peer = peer,
-                    error = ?e, "Failed to send a msg to peer",
+                    error = ?e, "Failed to send a msg {:?} to peer", msg
                 );
             }
         }
@@ -400,6 +401,7 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
+    #[allow(dead_code)]
     pub async fn send_commit_vote(
         &self,
         commit_vote: CommitVote,
@@ -415,6 +417,12 @@ impl NetworkSender {
     pub async fn broadcast_vote(&self, vote_msg: VoteMsg) {
         fail_point!("consensus::send::vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_order_vote(&self, order_vote_msg: OrderVoteMsg) {
+        fail_point!("consensus::send::order_vote", |_| ());
+        let msg = ConsensusMsg::OrderVoteMsg(Box::new(order_vote_msg));
         self.broadcast(msg).await
     }
 
@@ -736,6 +744,7 @@ impl NetworkTask {
                         },
                         consensus_msg @ (ConsensusMsg::ProposalMsg(_)
                         | ConsensusMsg::VoteMsg(_)
+                        | ConsensusMsg::OrderVoteMsg(_)
                         | ConsensusMsg::SyncInfo(_)
                         | ConsensusMsg::EpochRetrievalRequest(_)
                         | ConsensusMsg::EpochChangeProof(_)) => {
@@ -843,6 +852,9 @@ impl NetworkTask {
                     {
                         warn!(error = ?e, "aptos channel closed");
                     };
+                },
+                _ => {
+                    // Ignore `NewPeer` and `LostPeer` events
                 },
             });
         }

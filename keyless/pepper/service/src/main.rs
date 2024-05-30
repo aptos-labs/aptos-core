@@ -7,7 +7,7 @@ use aptos_keyless_pepper_service::{
     account_managers::ACCOUNT_MANAGERS,
     jwk,
     metrics::start_metric_server,
-    process_v0, process_v1,
+    process_signature_v0, process_v0,
     vuf_keys::{PEPPER_VUF_VERIFICATION_KEY_JSON, VUF_SK},
     ProcessingFailure,
     ProcessingFailure::{BadRequest, InternalError},
@@ -36,13 +36,15 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
         (&Method::GET, "/about") => {
             build_response(origin, StatusCode::OK, ABOUT_JSON.deref().clone())
         },
-        (&Method::GET, "/v0/vuf-pub-key") | (&Method::GET, "/v1/vuf-pub-key") => build_response(
+        (&Method::GET, "/v0/vuf-pub-key") => build_response(
             origin,
             StatusCode::OK,
             PEPPER_VUF_VERIFICATION_KEY_JSON.deref().clone(),
         ),
+        (&Method::POST, "/v0/signature") => {
+            handle_fetch_common(origin, req, process_signature_v0).await
+        },
         (&Method::POST, "/v0/fetch") => handle_fetch_common(origin, req, process_v0).await,
-        (&Method::POST, "/v1/fetch") => handle_fetch_common(origin, req, process_v1).await,
         (&Method::OPTIONS, _) => hyper::Response::builder()
             .status(StatusCode::OK)
             .header(ACCESS_CONTROL_ALLOW_ORIGIN, origin)
@@ -76,13 +78,8 @@ async fn main() {
         Duration::from_secs(10),
     );
     jwk::start_jwk_refresh_loop(
-        "https://www.facebook.com",
-        "https://www.facebook.com/.well-known/oauth/openid/jwks",
-        Duration::from_secs(10),
-    );
-    jwk::start_jwk_refresh_loop(
-        "https://id.twitch.tv/oauth2",
-        "https://id.twitch.tv/oauth2/keys",
+        "https://appleid.apple.com",
+        "https://appleid.apple.com/.well-known/openid-configuration",
         Duration::from_secs(10),
     );
 

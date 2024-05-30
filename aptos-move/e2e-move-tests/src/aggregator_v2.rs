@@ -371,6 +371,19 @@ impl AggV2TestHarness {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::add_sub", agg_loc, &[a, b])
     }
 
+    pub fn add_if_at_least(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+        min_value: u128,
+        delta: u128,
+    ) -> SignedTransaction {
+        self.create_entry_agg_func_with_args(
+            "0x1::aggregator_v2_test::add_if_at_least",
+            agg_loc,
+            &[min_value, delta],
+        )
+    }
+
     pub fn add_delete(&mut self, agg_loc: &AggregatorLocation, value: u128) -> SignedTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::add_delete", agg_loc, &[
             value,
