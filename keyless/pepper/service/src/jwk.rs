@@ -5,10 +5,7 @@ use crate::{metrics::JWK_FETCH_SECONDS, Issuer, KeyID};
 use anyhow::{anyhow, Result};
 use aptos_logger::warn;
 use dashmap::DashMap;
-use jsonwebtoken::{
-    jwk::{Jwk, JwkSet},
-    DecodingKey,
-};
+use jsonwebtoken::{jwk::JwkSet, DecodingKey};
 use once_cell::sync::Lazy;
 use std::{sync::Arc, time::Duration};
 use tokio::time::Instant;
@@ -26,8 +23,12 @@ pub async fn fetch_jwks(jwk_url: &str) -> Result<DashMap<KeyID, Arc<DecodingKey>
         .text()
         .await
         .map_err(|e| anyhow!("error while getting response as text: {}", e))?;
-    let JwkSet { keys } = serde_json::from_str(text.as_str())
-        .map_err(|e| anyhow!("error while parsing json: {}", e))?;
+    parse_jwks(&text)
+}
+
+pub fn parse_jwks(text: &str) -> Result<DashMap<KeyID, Arc<DecodingKey>>> {
+    let JwkSet { keys } =
+        serde_json::from_str(text).map_err(|e| anyhow!("error while parsing json: {}", e))?;
     let key_map: DashMap<KeyID, Arc<DecodingKey>> = keys
         .into_iter()
         .filter_map(
@@ -78,20 +79,6 @@ pub fn start_jwk_refresh_loop(issuer: &str, jwk_url: &str, refresh_interval: Dur
 }
 
 pub fn cached_decoding_key(issuer: &String, kid: &String) -> Result<Arc<DecodingKey>> {
-    let test_jwk = r#"{
-        "kid": "test-rsa",
-        "kty": "RSA",
-        "alg": "RS256",
-        "use": "sig",
-        "n": "y5Efs1ZzisLLKCARSvTztgWj5JFP3778dZWt-od78fmOZFxem3a_aYbOXSJToRp862do0PxJ4PDMpmqwV5f7KplFI6NswQV-WPufQH8IaHXZtuPdCjPOcHybcDiLkO12d0dG6iZQUzypjAJf63APcadio-4JDNWlGC5_Ow_XQ9lIY71kTMiT9lkCCd0ZxqEifGtnJe5xSoZoaMRKrvlOw-R6iVjLUtPAk5hyUX95LDKxwAR-oshnj7gmATejga2EvH9ozdn3M8Go11PSDa04OQxPcA25OoDTfxLvT28LRpSXrbmUWZ-O_lGtDl3ZAtjIguYGEobTk4N11eRssC95Cw",
-        "e": "AQAB"
-    }"#;
-    if kid.eq("test-rsa") {
-        let key = serde_json::from_str::<Jwk>(test_jwk)
-            .map_err(|e| anyhow!("error while parsing json: {}", e))?;
-        let decoding_key = DecodingKey::from_jwk(&key)?;
-        return Ok(Arc::new(decoding_key));
-    }
     let key_set = DECODING_KEY_CACHE
         .get(issuer)
         .ok_or_else(|| anyhow!("unknown issuer: {}", issuer))?;
