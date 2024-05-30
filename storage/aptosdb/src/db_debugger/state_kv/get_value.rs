@@ -62,22 +62,29 @@ impl Cmd {
         iter.seek(&(key.clone(), self.version))?;
         let res = iter
             .next()
-            .transpose()?
-            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value)));
+            .transpose()?;
 
         match res {
             None => {
                 println!("{}", "Value not found.".to_string().yellow());
             },
-            Some((version, value)) => {
+            Some(((_key, version), value_opt)) => {
+                assert_eq!(_key, key);
+                assert!(version < self.version);
+
                 println!("{}", "Value found:".to_string().yellow());
-                println!("   version: {version}");
-                if value.bytes().len() > 1024 {
-                    println!("     value: {} bytes", value.bytes().len())
-                } else {
-                    println!("     value: {:?}", value.bytes())
+                println!("   version: {}", version);
+                match value_opt {
+                    None => println!("     value: tombstone"),
+                    Some(value) => {
+                        if value.bytes().len() > 1024 {
+                            println!("     value: {} bytes", value.bytes().len())
+                        } else {
+                            println!("     value: {:?}", value.bytes())
+                        }
+                        println!("  metadata: {:?}", value.into_metadata());
+                    }
                 }
-                println!("  metadata: {:?}", value.into_metadata());
             },
         }
 
