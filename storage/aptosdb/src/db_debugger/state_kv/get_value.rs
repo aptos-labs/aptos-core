@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::db_debugger::common::DbDir;
+use crate::{
+    db_debugger::common::DbDir,
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
+};
 use aptos_storage_interface::Result;
 use aptos_types::{state_store::state_key::StateKey, transaction::Version};
 use clap::Parser;
@@ -36,7 +39,12 @@ impl Cmd {
         let ledger_db = self.db_dir.open_ledger_db()?;
         let db = self.db_dir.open_state_kv_db()?;
         let latest_version = ledger_db.metadata_db().get_latest_version()?;
-        println!("latest version: {latest_version}");
+        let pruner_progress = db
+            .metadata_db()
+            .get::<DbMetadataSchema>(&DbMetadataKey::StateKvPrunerProgress)?
+            .map(|v| v.expect_version())
+            .unwrap_or(0);
+        println!("latest version: {latest_version}, pruner_progress: {pruner_progress}");
         if self.version != Version::MAX && self.version > latest_version {
             println!(
                 "{}",
@@ -48,7 +56,7 @@ impl Cmd {
             );
         }
 
-        match db.get_state_value_with_version_by_version(&key, self.version)? {
+        match db.get_state_value_with_version_by_version(&key, self.version, pruner_progress)? {
             None => {
                 println!("{}", "Value not found.".to_string().yellow());
             },

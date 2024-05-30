@@ -8,7 +8,7 @@ use crate::{
     common::NUM_STATE_SHARDS,
     ledger_db::LedgerDb,
     metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
-    pruner::{StateKvPrunerManager, StateMerklePrunerManager},
+    pruner::{PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         stale_node_index::StaleNodeIndexSchema,
@@ -146,8 +146,11 @@ impl DbReader for StateDb {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
-        self.state_kv_db
-            .get_state_value_with_version_by_version(state_key, version)
+        self.state_kv_db.get_state_value_with_version_by_version(
+            state_key,
+            version,
+            self.state_kv_pruner.get_min_readable_version(),
+        )
     }
 
     /// Returns the proof of the given state key and version.
