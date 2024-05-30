@@ -43,14 +43,8 @@ fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
         )
         .1;
 
-    assert_eq!(
-        output
-            .auxiliary_data()
-            .get_detail_error_message()
-            .unwrap()
-            .status_code(),
-        status_code
-    );
+    assert_some!(output.auxiliary_data().get_detail_error_message());
+    println!("auxiliary data {:?}", output.auxiliary_data());
     let write_set: Vec<(&StateKey, &WriteOp)> = output
         .change_set()
         .concrete_write_set_iter()
@@ -61,6 +55,6 @@ fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
     assert!(!output.status().is_discarded());
     assert_ok_eq!(
         output.status().as_kept_status(),
-        ExecutionStatus::MiscellaneousError(None)
+        ExecutionStatus::MiscellaneousError(Some(status_code))
     );
 }

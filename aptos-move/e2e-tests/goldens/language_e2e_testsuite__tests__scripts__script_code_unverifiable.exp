@@ -18,7 +18,9 @@ Ok(
             gas_used: 3,
             status: Keep(
                 MiscellaneousError(
-                    None,
+                    Some(
+                        NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
+                    ),
                 ),
             ),
             auxiliary_data: V1(
