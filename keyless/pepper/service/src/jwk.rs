@@ -5,10 +5,7 @@ use crate::{metrics::JWK_FETCH_SECONDS, Issuer, KeyID};
 use anyhow::{anyhow, Result};
 use aptos_logger::warn;
 use dashmap::DashMap;
-use jsonwebtoken::{
-    jwk::JwkSet,
-    DecodingKey,
-};
+use jsonwebtoken::{jwk::JwkSet, DecodingKey};
 use once_cell::sync::Lazy;
 use std::{sync::Arc, time::Duration};
 use tokio::time::Instant;
@@ -30,8 +27,8 @@ pub async fn fetch_jwks(jwk_url: &str) -> Result<DashMap<KeyID, Arc<DecodingKey>
 }
 
 pub fn parse_jwks(text: &str) -> Result<DashMap<KeyID, Arc<DecodingKey>>> {
-    let JwkSet { keys } = serde_json::from_str(text)
-        .map_err(|e| anyhow!("error while parsing json: {}", e))?;
+    let JwkSet { keys } =
+        serde_json::from_str(text).map_err(|e| anyhow!("error while parsing json: {}", e))?;
     let key_map: DashMap<KeyID, Arc<DecodingKey>> = keys
         .into_iter()
         .filter_map(
