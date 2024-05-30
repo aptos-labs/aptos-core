@@ -19,6 +19,9 @@ pub struct Cmd {
 
     #[clap(long)]
     version: Version,
+
+    #[clap(long)]
+    max_skips: u64,
 }
 
 impl Cmd {
@@ -52,6 +55,7 @@ impl Cmd {
         let mut read_opts = ReadOptions::default();
         // We want `None` if the state_key changes in iteration.
         read_opts.set_prefix_same_as_start(true);
+        read_opts.set_max_skippable_internal_keys(self.max_skips);
         let mut iter = db
             .db_shard(key.get_shard_id())
             .iter::<StateValueSchema>(read_opts)?;
