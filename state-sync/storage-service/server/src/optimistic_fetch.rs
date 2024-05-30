@@ -33,7 +33,7 @@ use mini_moka::sync::Cache;
 use std::{cmp::min, collections::HashMap, ops::Deref, sync::Arc, time::Instant};
 use tokio::runtime::Handle;
 
-/// An optimistic fetch request from a peer
+/// An optimistic fetch request from a peer!
 pub struct OptimisticFetchRequest {
     request: StorageServiceRequest,
     response_sender: ResponseSender,
