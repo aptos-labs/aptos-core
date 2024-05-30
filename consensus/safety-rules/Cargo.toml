@@ -37,6 +37,7 @@ aptos-config = { workspace = true, features = ["fuzzing"] }
 aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
 aptos-proptest-helpers = { workspace = true }
 aptos-secure-storage = { workspace = true, features = ["testing"] }
+claims = { workspace = true }
 criterion = { workspace = true }
 proptest = { workspace = true }
 rusty-fork = { workspace = true }

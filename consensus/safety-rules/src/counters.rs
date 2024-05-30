@@ -10,6 +10,7 @@ use once_cell::sync::Lazy;
 
 pub const EPOCH: &str = "epoch";
 pub const LAST_VOTED_ROUND: &str = "last_voted_round";
+pub const HIGHEST_TIMEOUT_ROUND: &str = "highest_timeout_round";
 pub const PREFERRED_ROUND: &str = "preferred_round";
 pub const WAYPOINT_VERSION: &str = "waypoint_version";
 
