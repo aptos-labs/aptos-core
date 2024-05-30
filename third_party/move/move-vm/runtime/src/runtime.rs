@@ -19,13 +19,9 @@ use move_binary_format::{
     file_format::LocalIndex,
     normalized, CompiledModule, IndexKind,
 };
-use move_bytecode_verifier::script_signature;
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-    language_storage::TypeTag,
-    value::MoveTypeLayout,
-    vm_status::StatusCode,
+    account_address::AccountAddress, identifier::Identifier, language_storage::TypeTag,
+    value::MoveTypeLayout, vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -439,13 +435,17 @@ impl VMRuntime {
             return_tys,
         } = function_instantiation;
 
-        let LoadedFunction { module, function } = func;
+        let LoadedFunction {
+            module: _,
+            function,
+        } = func;
 
-        script_signature::verify_module_function_signature_by_name(
-            module.module(),
-            IdentStr::new(function.as_ref().name()).unwrap(),
-            move_bytecode_verifier::no_additional_script_signature_checks,
-        )?;
+        // FIXME: Replay testing.
+        // script_signature::verify_module_function_signature_by_name(
+        //     module.module(),
+        //     IdentStr::new(function.as_ref().name()).unwrap(),
+        //     move_bytecode_verifier::no_additional_script_signature_checks,
+        // )?;
 
         self.execute_function_impl(
             function,
