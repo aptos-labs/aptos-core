@@ -280,6 +280,22 @@ pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
+pub static PROPOSER_BLOCK_SIZE_TXNS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_proposer_block_size_txns",
+        "Number of transactions in the block proposed by the proposer"
+    )
+    .unwrap()
+});
+
+pub static PROPOSER_BLOCK_SIZE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_proposer_block_size_bytes",
+        "Size of the block proposed by the proposer in bytes"
+    )
+    .unwrap()
+});
+
 /// Amount of time (in seconds) proposal is delayed due to backpressure/backoff
 pub static PROPOSER_DELAY_PROPOSAL: Lazy<Gauge> = Lazy::new(|| {
     register_gauge!(
