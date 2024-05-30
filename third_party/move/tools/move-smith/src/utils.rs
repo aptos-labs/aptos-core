@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ast::Module, move_smith::MoveSmith};
+use crate::{ast::CompileUnit, move_smith::MoveSmith};
 use arbitrary::{Result, Unstructured};
 use move_compiler::{
     shared::{known_attributes::KnownAttribute, Flags},
@@ -10,10 +10,11 @@ use move_compiler::{
 use std::{fs::File, io::Write};
 use tempfile::tempdir;
 
-pub fn raw_to_module(data: &[u8]) -> Result<Module> {
+pub fn raw_to_module(data: &[u8]) -> Result<CompileUnit> {
     let mut u = Unstructured::new(data);
     let mut smith = MoveSmith::default();
-    smith.generate_module(&mut u)
+    smith.generate(&mut u)?;
+    Ok(smith.get_compile_unit())
 }
 
 pub fn compile_modules(code: String) {

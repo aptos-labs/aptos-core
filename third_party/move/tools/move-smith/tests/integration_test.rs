@@ -35,7 +35,7 @@ fn simple_module() -> Module {
 fn get_raw_data() -> Vec<u8> {
     let seed: u64 = 12345;
     let mut rng = StdRng::seed_from_u64(seed);
-    let mut buffer = vec![0u8; 1024];
+    let mut buffer = vec![0u8; 4096];
     rng.fill(&mut buffer[..]);
     buffer
 }
@@ -59,8 +59,9 @@ fn test_generation_and_compile() {
     let raw_data = get_raw_data();
     let mut u = Unstructured::new(&raw_data);
     let mut smith = MoveSmith::default();
-    let module = smith.generate_module(&mut u).unwrap();
-    let lines = module.emit_code();
+    smith.generate(&mut u).unwrap();
+    let compile_unit = smith.get_compile_unit();
+    let lines = compile_unit.emit_code();
     println!("{}", lines);
 
     compile_modules(lines);

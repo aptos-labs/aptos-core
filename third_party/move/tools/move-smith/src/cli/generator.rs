@@ -26,7 +26,7 @@ struct Args {
     package: bool,
 }
 
-const BUFFER_SIZE_PER_FILE: usize = 2048;
+const BUFFER_SIZE_PER_FILE: usize = 8192;
 const MOVE_TOML_TEMPLATE: &str = r#"[package]
 name = "test"
 version = "0.0.0"

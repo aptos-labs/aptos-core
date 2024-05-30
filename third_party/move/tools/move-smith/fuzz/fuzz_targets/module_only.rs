@@ -5,15 +5,15 @@
 
 use arbitrary::Unstructured;
 use libfuzzer_sys::fuzz_target;
-use move_smith::{ast::Module, utils::compile_modules, CodeGenerator, MoveSmith};
+use move_smith::{utils::compile_modules, CodeGenerator, MoveSmith};
 
 fuzz_target!(|data: &[u8]| {
     let u = &mut Unstructured::new(data);
     let mut smith = MoveSmith::default();
-    let module: Module = match smith.generate_module(u) {
-        Ok(module) => module,
+    match smith.generate(u) {
+        Ok(()) => (),
         Err(_) => return,
     };
-    let code = module.emit_code();
+    let code = smith.get_compile_unit().emit_code();
     compile_modules(code);
 });

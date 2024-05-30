@@ -5,6 +5,11 @@ use crate::{names::Identifier, types::Type};
 use num_bigint::BigUint;
 
 #[derive(Debug, Clone)]
+pub struct CompileUnit {
+    pub modules: Vec<Module>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Module {
     // pub attributes: Vec<Attributes>,
     // pub address: Option<LeadingNameAccess>,
@@ -70,10 +75,17 @@ pub enum Expression {
     NumberLiteral(NumberLiteral),
     Variable(Identifier),
     Boolean(bool),
+    FunctionCall(FunctionCall),
 }
 
 #[derive(Debug, Clone)]
 pub struct NumberLiteral {
     pub value: BigUint,
     pub typ: Type,
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionCall {
+    pub name: Identifier,
+    pub args: Vec<Expression>,
 }

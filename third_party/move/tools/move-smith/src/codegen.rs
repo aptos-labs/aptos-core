@@ -29,6 +29,16 @@ impl CodeGenerator for Identifier {
     }
 }
 
+impl CodeGenerator for CompileUnit {
+    fn emit_code_lines(&self) -> Vec<String> {
+        let mut code = Vec::new();
+        for m in &self.modules {
+            code.extend(m.emit_code_lines());
+        }
+        code
+    }
+}
+
 impl CodeGenerator for Module {
     fn emit_code_lines(&self) -> Vec<String> {
         let mut code = vec![
@@ -125,7 +135,24 @@ impl CodeGenerator for Expression {
             Expression::NumberLiteral(n) => n.emit_code_lines(),
             Expression::Variable(ident) => ident.emit_code_lines(),
             Expression::Boolean(b) => vec![b.to_string()],
+            Expression::FunctionCall(c) => c.emit_code_lines(),
         }
+    }
+}
+
+impl CodeGenerator for FunctionCall {
+    fn emit_code_lines(&self) -> Vec<String> {
+        let mut code = format!("{}(", self.name.emit_code());
+        code.push_str(
+            self.args
+                .iter()
+                .map(|arg| arg.emit_code())
+                .collect::<Vec<String>>()
+                .join(", ")
+                .as_str(),
+        );
+        code.push(')');
+        vec![code]
     }
 }
 
