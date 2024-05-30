@@ -10,24 +10,32 @@ function get_error() {
   done | sort | uniq
 }
 
+function check_compile() {
+  if [ -d "$p" ]; then
+    echo "Checking $1"
+    (
+      cd "$1"
+      aptos move compile > compile.log 2>&1
+      if [ $? -ne 0 ]; then
+        echo "Compile $1: failed"
+        get_error .
+      else
+        echo "Compile $1: success"
+      fi
+    )
+  fi
+}
+
 rm -rf $OUTPUT_DIR
 cargo run --bin generator -- -o $OUTPUT_DIR -s 1234 -p -n $NUM_PROG
 
+N=8
 for p in $OUTPUT_DIR/*; do
-  if [ -d "$p" ]; then
-    echo "Checking $p"
-    (
-        cd "$p"
-        aptos move compile > compile.log 2>&1
-        if [ $? -ne 0 ]; then
-          echo "Compile $p: failed"
-          get_error .
-        else
-          echo "Compile $p: success"
-        fi
-    )
-  fi
+  ((i=i%N)); ((i++==0)) && wait
+  check_compile $p &
 done
+
+wait
 
 echo
 echo "Errors are:"
