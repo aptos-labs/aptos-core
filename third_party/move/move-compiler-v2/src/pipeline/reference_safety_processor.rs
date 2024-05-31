@@ -116,10 +116,10 @@ use abstract_domain_derive::AbstractDomain;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use log::{debug, log_enabled, Level};
-use move_binary_format::file_format::CodeOffset;
+use move_binary_format::{file_format, file_format::CodeOffset};
 use move_model::{
     ast::TempIndex,
-    model::{FieldId, FunctionEnv, GlobalEnv, Loc, Parameter, QualifiedInstId, StructId},
+    model::{FieldId, FunId, FunctionEnv, GlobalEnv, Loc, Parameter, QualifiedInstId, StructId},
     ty::Type,
 };
 use move_stackless_bytecode::{
@@ -240,6 +240,27 @@ impl BorrowEdgeKind {
             Freeze => false,
         }
     }
+
+    /// Returns true if any of the edge kinds in the set is mut
+    fn any_is_mut(kinds: &BTreeSet<BorrowEdgeKind>) -> bool {
+        kinds.iter().any(|k| k.is_mut())
+    }
+
+    /// Determines whether the region derived from this edge has overlap with the region
+    /// of the other edge. Overlap can only be excluded for field edges.
+    fn could_overlap(&self, other: &BorrowEdgeKind) -> bool {
+        use BorrowEdgeKind::*;
+        match (self, other) {
+            (BorrowField(_, field1), BorrowField(_, field2)) => field1 == field2,
+            _ => true,
+        }
+    }
+
+    /// Returns true if there is any overlap between the edges in the two sets.
+    fn any_could_overlap(set1: &BTreeSet<BorrowEdgeKind>, set2: &BTreeSet<BorrowEdgeKind>) -> bool {
+        set1.iter()
+            .any(|k1| set2.iter().any(|k2| k1.could_overlap(k2)))
+    }
 }
 
 impl LifetimeLabel {
@@ -266,17 +287,7 @@ impl BorrowEdge {
     }
 }
 
-impl BorrowEdgeKind {
-    /// Determines whether the region derived from this edge has overlap with the region
-    /// of the other edge. Overlap can only be excluded for field edges.
-    fn overlaps(&self, other: &BorrowEdgeKind) -> bool {
-        use BorrowEdgeKind::*;
-        match (self, other) {
-            (BorrowField(_, field1), BorrowField(_, field2)) => field1 == field2,
-            _ => true,
-        }
-    }
-}
+impl BorrowEdgeKind {}
 
 impl AbstractDomain for LifetimeState {
     /// The join operator of the dataflow analysis domain.
@@ -518,16 +529,55 @@ impl LifetimeState {
         self.parent_edges(label).any(|(_, e)| e.kind.is_mut())
     }
 
-    /// Returns the children grouped by their edge kind.
-    fn grouped_children(
+    /// Returns the children of the given nodes, grouped into hyper edges. A hyper edge
+    /// is constituted by a set of edge kinds and associated list of edges. Each hyper edge
+    /// represents an abstract borrow operation.
+    ///
+    /// 1) All edges which lead into the same node are considered to be part of the same hyper
+    /// edge. Consider:
+    ///
+    /// ```text
+    ///           \     /
+    ///         e1 \   / e2
+    ///             \ /
+    ///              n
+    /// ```
+    /// This forms a hyper edge `{e1.kind, e2.kind} -> [e1, e2]`. Both edges have to be in the same
+    /// group because `n` has a 'weak' borrow history, it can either stem from `e1` or `e2`.
+    ///
+    /// 2) For all other edges not leading into the same node, they are grouped according
+    /// their kind. Consider:
+    ///
+    /// ```text
+    ///            |    |
+    ///         e1 |    | e2
+    ///            |    |
+    ///           n1   n2
+    /// ```
+    /// If `kind == e1.kind == e2.kind`, this forms a hyper edge `{kind} -> [e1, e2]`, otherwise
+    /// it will be two independent hyper edges `{e1.kind} -> [e1]` and `{e2.kind} -> [e2]`. The
+    /// former reflects that the edges of the same kind are the same abstract borrow operation,
+    /// independent of the number of edges involved.
+    fn group_children_into_hyper_edges(
         &self,
         labels: &BTreeSet<LifetimeLabel>,
-    ) -> BTreeMap<BorrowEdgeKind, Vec<&BorrowEdge>> {
-        let mut result: BTreeMap<BorrowEdgeKind, Vec<&BorrowEdge>> = BTreeMap::new();
-        for label in labels {
-            for edge in self.children(label) {
-                result.entry(edge.kind.clone()).or_default().push(edge)
-            }
+    ) -> BTreeMap<BTreeSet<BorrowEdgeKind>, Vec<&BorrowEdge>> {
+        // First compute map from target nodes to edges, allowing to identify weak edges.
+        let mut target_to_incoming: BTreeMap<LifetimeLabel, Vec<&BorrowEdge>> = BTreeMap::new();
+        for edge in labels.iter().flat_map(|l| self.children(l)) {
+            target_to_incoming
+                .entry(edge.target)
+                .or_default()
+                .push(edge)
+        }
+        // Now compute the result.
+        let mut result: BTreeMap<BTreeSet<BorrowEdgeKind>, Vec<&BorrowEdge>> = BTreeMap::new();
+        for (_, mut edges) in target_to_incoming {
+            let key = edges
+                .iter()
+                .map(|e| e.kind.clone())
+                .collect::<BTreeSet<_>>();
+            result.entry(key).or_default().append(&mut edges);
         }
         result
     }
@@ -1104,13 +1154,36 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         let mut edges_reported: BTreeSet<BTreeSet<&BorrowEdge>> = BTreeSet::new();
         // Continue to process hyper nodes
         while let Some(hyper) = hyper_nodes.pop_first() {
-            let hyper_edges = self.state.grouped_children(&hyper);
+            let hyper_edges = self.state.group_children_into_hyper_edges(&hyper);
             // Check 2-wise combinations of hyper edges for issues. This discovers cases where edges
             // conflict because of mutability.
             for mut perm in hyper_edges.iter().combinations(2) {
-                let (kind1, edges1) = perm.pop().unwrap();
-                let (kind2, edges2) = perm.pop().unwrap();
-                if (kind1.is_mut() || kind2.is_mut()) && kind1.overlaps(kind2) {
+                let (kinds1, edges1) = perm.pop().unwrap();
+                let (kinds2, edges2) = perm.pop().unwrap();
+                if DEBUG {
+                    debug!(
+                        "{}[{}] vs {}[{}]",
+                        kinds1
+                            .iter()
+                            .map(|k| k.display(self.target()).to_string())
+                            .join("|"),
+                        edges1
+                            .iter()
+                            .map(|e| e.display(self.target(), true).to_string())
+                            .join(","),
+                        kinds2
+                            .iter()
+                            .map(|k| k.display(self.target()).to_string())
+                            .join("|"),
+                        edges2
+                            .iter()
+                            .map(|e| e.display(self.target(), true).to_string())
+                            .join(","),
+                    );
+                }
+                if (BorrowEdgeKind::any_is_mut(kinds1) || BorrowEdgeKind::any_is_mut(kinds2))
+                    && BorrowEdgeKind::any_could_overlap(kinds1, kinds2)
+                {
                     for (e1, e2) in edges1.iter().cartesian_product(edges2.iter()) {
                         if e1 == e2 || !edges_reported.insert([*e1, *e2].into_iter().collect()) {
                             continue;
@@ -1530,13 +1603,17 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         }
     }
 
-    /// Process a function call. For now we implement standard Move semantics, where
+    /// Process a function call. For now, we implement standard Move semantics, where
     /// 1) every output immutable reference is a child of all input references;
     /// 2) every output mutable reference is a child of all input mutable references,
     /// because mutable references cannot be derived from immutable references.
     /// Here would be the point where to
     /// evaluate lifetime modifiers in future language versions.
     fn call_operation(&mut self, oper: Operation, dests: &[TempIndex], srcs: &[TempIndex]) {
+        // If this a function call, check acquires conditions for global borrows.
+        if let Operation::Function(mid, fid, inst) = &oper {
+            self.check_global_access(mid.qualified_inst(*fid, inst.clone()))
+        }
         // Check validness of arguments
         for src in srcs {
             self.check_read_local(*src, ReadMode::Argument);
@@ -1596,6 +1673,46 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         }
     }
 
+    /// Checks whether a function potentially accesses a global resource which is
+    /// currently borrowed.
+    fn check_global_access(&mut self, fun_id: QualifiedInstId<FunId>) {
+        let fun = self.global_env().get_function(fun_id.to_qualified_id());
+        let specifiers = fun.get_access_specifiers().unwrap_or(&[]);
+
+        for (global, label) in &self.state.global_to_label_map {
+            let is_mut = self.state.children(label).any(|e| e.kind.is_mut());
+            // We are only checking positive specifiers, as negatives say nothing
+            // about what is accessed.
+            for spec in specifiers.iter().filter(|s| !s.negated) {
+                if spec
+                    .resource
+                    .1
+                    .matches(self.global_env(), &fun_id.inst, global)
+                    // For mut global borrows, no access is allowed at all. For
+                    // non-mut, write access is not allowed.
+                    && (is_mut || spec.kind.subsumes(&file_format::AccessKind::Writes))
+                {
+                    self.error_with_hints(
+                        self.cur_loc(),
+                        format!(
+                            "function {} global `{}` which is currently {}borrowed",
+                            spec.kind,
+                            self.global_env().display(global),
+                            if is_mut { "mutably " } else { "" }
+                        ),
+                        "function called here",
+                        self.borrow_info(label, |_| true)
+                            .into_iter()
+                            .chain(iter::once((
+                                spec.loc.clone(),
+                                "access declared here".to_owned(),
+                            ))),
+                    )
+                }
+            }
+        }
+    }
+
     /// Process a FreezeRef instruction.
     ///
     /// Freezes have specific conditions in the v1 borrow semantics as also implemented
@@ -1639,7 +1756,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     if &sibling_edge.target == label
                         || sibling_edge.kind == edge.kind
                             && matches!(edge.kind, BorrowEdgeKind::Call(..))
-                        || !sibling_edge.kind.overlaps(&edge.kind)
+                        || !sibling_edge.kind.could_overlap(&edge.kind)
                     {
                         // The sibling edge is harmless if
                         // (a) it is not actually a sibling but leads to the same target
@@ -2031,15 +2148,8 @@ struct BorrowEdgeDisplay<'a>(&'a FunctionTarget<'a>, &'a BorrowEdge, bool);
 impl<'a> Display for BorrowEdgeDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let edge = &self.1;
+        write!(f, "{}", edge.kind.display(self.0))?;
         let display_child = self.2;
-        use BorrowEdgeKind::*;
-        (match &edge.kind {
-            BorrowLocal(is_mut) => write!(f, "borrow({})", is_mut),
-            BorrowGlobal(is_mut, offs) => write!(f, "borrow_global({}, {})", is_mut, offs),
-            BorrowField(is_mut, _) => write!(f, "borrow_field({})", is_mut),
-            Call(is_mut, _, offs) => write!(f, "call({}, {})", is_mut, offs),
-            Freeze => write!(f, "freeze"),
-        })?;
         if display_child {
             write!(f, " -> {}", edge.target)
         } else {
@@ -2055,6 +2165,32 @@ impl BorrowEdge {
         display_child: bool,
     ) -> BorrowEdgeDisplay<'a> {
         BorrowEdgeDisplay(target, self, display_child)
+    }
+}
+
+struct BorrowEdgeKindDisplay<'a>(&'a FunctionTarget<'a>, &'a BorrowEdgeKind);
+impl<'a> Display for BorrowEdgeKindDisplay<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use BorrowEdgeKind::*;
+        let mut_str = if self.1.is_mut() { "mut" } else { "imm" };
+        match &self.1 {
+            BorrowLocal(_) => write!(f, "borrow_{}", mut_str),
+            BorrowGlobal(_, offs) => write!(f, "borrow_global_{}@{}", mut_str, offs),
+            BorrowField(_, field_id) => write!(
+                f,
+                "borrow_{}.{}",
+                mut_str,
+                field_id.symbol().display(self.0.symbol_pool()),
+            ),
+            Call(_, _, offs) => write!(f, "call_{}@{}", mut_str, offs),
+            Freeze => write!(f, "freeze"),
+        }
+    }
+}
+
+impl BorrowEdgeKind {
+    fn display<'a>(&'a self, target: &'a FunctionTarget) -> BorrowEdgeKindDisplay<'a> {
+        BorrowEdgeKindDisplay(target, self)
     }
 }
 

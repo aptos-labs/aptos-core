@@ -91,6 +91,7 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         Arc::new(SimulatedTimeService::new()),
         10,
         Arc::from(PayloadManager::DirectMempool),
+        false,
         Arc::new(Mutex::new(PendingBlocks::new())),
     ))
 }
@@ -204,7 +205,11 @@ pub fn placeholder_ledger_info() -> LedgerInfo {
 }
 
 pub fn placeholder_sync_info() -> SyncInfo {
-    SyncInfo::new(certificate_for_genesis(), certificate_for_genesis(), None)
+    SyncInfo::new(
+        certificate_for_genesis(),
+        certificate_for_genesis().into_wrapped_ledger_info(),
+        None,
+    )
 }
 
 fn nocapture() -> bool {

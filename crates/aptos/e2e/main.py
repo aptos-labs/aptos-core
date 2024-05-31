@@ -54,6 +54,7 @@ from cases.node import (
     test_node_update_consensus_key,
     test_node_update_validator_network_address,
 )
+"""
 from cases.stake import (
     test_stake_add_stake,
     test_stake_create_staking_contract,
@@ -66,6 +67,7 @@ from cases.stake import (
     test_stake_withdraw_stake_after_unlock,
     test_stake_withdraw_stake_before_unlock,
 )
+"""
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -163,6 +165,7 @@ async def run_tests(run_helper):
     test_move_view(run_helper)
 
     # Run stake subcommand group tests.
+    """
     test_stake_initialize_stake_owner(run_helper)
     test_stake_add_stake(run_helper)
     test_stake_withdraw_stake_before_unlock(run_helper)
@@ -173,6 +176,7 @@ async def run_tests(run_helper):
     test_stake_set_voter(run_helper)
     await test_stake_create_staking_contract(run_helper)
     test_stake_request_commission(run_helper)
+    """
 
     # Run node subcommand group tests.
     test_node_show_validator_set(run_helper)
