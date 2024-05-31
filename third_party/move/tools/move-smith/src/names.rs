@@ -88,6 +88,10 @@ impl IdentifierPool {
         }
     }
 
+    pub fn flatten_access(&self, id: &Identifier) -> Option<Identifier> {
+        self.get_scope_for_children(id)
+    }
+
     pub fn filter_identifier_in_scope(
         &self,
         identifiers: &Vec<Identifier>,

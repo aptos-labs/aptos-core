@@ -14,6 +14,8 @@ pub struct Config {
 
     pub max_num_stmt_in_func: usize,
     pub max_num_params_in_func: usize,
+
+    pub max_num_calls_in_script: usize,
 }
 
 impl Default for Config {
@@ -31,6 +33,8 @@ impl Default for Config {
 
             max_num_stmt_in_func: 20,
             max_num_params_in_func: 5,
+
+            max_num_calls_in_script: 20,
         }
     }
 }
