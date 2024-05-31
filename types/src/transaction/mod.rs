@@ -1263,17 +1263,6 @@ impl TransactionOutput {
         (write_set, events, gas_used, status, auxiliary_data)
     }
 
-    // This function is supposed to be called in various tests only
-    pub fn fill_error_status(&mut self) {
-        if let TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)) = self.status {
-            if let Some(detail) = self.auxiliary_data.get_detail_error_message() {
-                self.status = TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-                    detail.status_code(),
-                )));
-            }
-        }
-    }
-
     pub fn ensure_match_transaction_info(
         &self,
         version: Version,
