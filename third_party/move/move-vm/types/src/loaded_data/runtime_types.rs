@@ -129,18 +129,18 @@ impl DepthFormula {
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct StructType {
     pub idx: StructNameIndex,
-    pub fields: Vec<Type>,
+    pub field_tys: Vec<Type>,
     pub field_names: Vec<Identifier>,
-    pub phantom_ty_args_mask: SmallBitVec,
+    pub phantom_ty_params_mask: SmallBitVec,
     pub abilities: AbilitySet,
-    pub type_parameters: Vec<StructTypeParameter>,
+    pub ty_params: Vec<StructTypeParameter>,
     pub name: Identifier,
     pub module: ModuleId,
 }
 
 impl StructType {
-    pub fn type_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
-        self.type_parameters.iter().map(|param| &param.constraints)
+    pub fn ty_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
+        self.ty_params.iter().map(|param| &param.constraints)
     }
 
     // Check if the local struct handle is compatible with the defined struct type.
@@ -152,9 +152,9 @@ impl StructType {
             );
         }
 
-        if self.phantom_ty_args_mask.len() != struct_handle.type_parameters.len()
+        if self.phantom_ty_params_mask.len() != struct_handle.type_parameters.len()
             || !self
-                .phantom_ty_args_mask
+                .phantom_ty_params_mask
                 .iter()
                 .zip(struct_handle.type_parameters.iter())
                 .all(|(defined_is_phantom, local_type_parameter)| {
@@ -807,7 +807,7 @@ impl TypeBuilder {
             ty_args: triomphe::Arc::new(ty_params),
             ability: AbilityInfo::generic_struct(
                 struct_ty.abilities,
-                struct_ty.phantom_ty_args_mask.clone(),
+                struct_ty.phantom_ty_params_mask.clone(),
             ),
         };
 
@@ -1052,25 +1052,25 @@ impl TypeBuilder {
             T::Struct(struct_tag) => {
                 let struct_ty = resolver(struct_tag.as_ref())?;
 
-                if struct_ty.type_parameters.is_empty() && struct_tag.type_params.is_empty() {
+                if struct_ty.ty_params.is_empty() && struct_tag.type_args.is_empty() {
                     Struct {
                         idx: struct_ty.idx,
                         ability: AbilityInfo::struct_(struct_ty.abilities),
                     }
                 } else {
                     let mut ty_args = vec![];
-                    for ty_arg_tag in &struct_tag.type_params {
-                        let ty_arg = self.create_ty_impl(ty_arg_tag, resolver, count, depth + 1)?;
+                    for ty_arg in &struct_tag.type_args {
+                        let ty_arg = self.create_ty_impl(ty_arg, resolver, count, depth + 1)?;
                         ty_args.push(ty_arg);
                     }
-                    Type::verify_ty_arg_abilities(struct_ty.type_param_constraints(), &ty_args)
+                    Type::verify_ty_arg_abilities(struct_ty.ty_param_constraints(), &ty_args)
                         .map_err(|e| e.finish(Location::Undefined))?;
                     StructInstantiation {
                         idx: struct_ty.idx,
                         ty_args: triomphe::Arc::new(ty_args),
                         ability: AbilityInfo::generic_struct(
                             struct_ty.abilities,
-                            struct_ty.phantom_ty_args_mask.clone(),
+                            struct_ty.phantom_ty_params_mask.clone(),
                         ),
                     }
                 }

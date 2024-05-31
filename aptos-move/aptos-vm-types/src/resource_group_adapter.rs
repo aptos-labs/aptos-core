@@ -86,7 +86,7 @@ fn test_group_size_same_as_bcs() {
                     address: PeerId::ONE,
                     module: Identifier::new("a").unwrap(),
                     name: Identifier::new(format!("a_{}", j)).unwrap(),
-                    type_params: vec![],
+                    type_args: vec![],
                 },
                 reused_vec.slice(0..j),
             );

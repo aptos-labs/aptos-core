@@ -202,7 +202,7 @@ fn call_get_entry_function_payload_from_native_txn_context(
                 address: AccountAddress::from_hex_literal("0x1").unwrap(),
                 module: ident_str!("transaction_fee").to_owned(),
                 name: ident_str!("FeeStatement").to_owned(),
-                type_params: vec![],
+                type_args: vec![],
             })),
         ],
         vec![

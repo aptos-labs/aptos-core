@@ -564,6 +564,7 @@ fn parse_visibility(context: &mut Context) -> Result<Visibility, Box<Diagnostic>
         },
     })
 }
+
 // Parse an attribute value. Either a value literal or a module access
 //      AttributeValue =
 //          <Value>
@@ -579,12 +580,19 @@ fn parse_attribute_value(context: &mut Context) -> Result<AttributeValue, Box<Di
 
 // Parse a single attribute
 //      Attribute =
-//          <Identifier>
-//          | <Identifier> "=" <AttributeValue>
-//          | <Identifier> "(" Comma<Attribute> ")"
+//          <AttributeName>
+//          | <AttributeName> "=" <AttributeValue>
+//          | <AttributeName> "(" Comma<Attribute> ")"
+//      AttributeName = <Identifier> ( "::" Identifier )* // merged into one identifier
 fn parse_attribute(context: &mut Context) -> Result<Attribute, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
-    let n = parse_identifier(context)?;
+    let mut n = parse_identifier(context)?;
+    while match_token(context.tokens, Tok::ColonColon)? {
+        let n1 = parse_identifier(context)?;
+        let id = Symbol::from(format!("{}::{}", n.value.as_str(), n1.value.as_str()));
+        let end_loc = context.tokens.previous_end_loc();
+        n = spanned(context.tokens.file_hash(), start_loc, end_loc, id);
+    }
     let attr_ = match context.tokens.peek() {
         Tok::Equal => {
             context.tokens.advance()?;

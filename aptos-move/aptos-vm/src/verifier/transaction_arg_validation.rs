@@ -109,7 +109,7 @@ pub fn validate_combine_signer_and_txn_args(
     are_struct_constructors_enabled: bool,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
     // entry function should not return
-    if !func.return_.is_empty() {
+    if !func.return_tys.is_empty() {
         return Err(VMStatus::error(
             StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
             None,
@@ -117,7 +117,7 @@ pub fn validate_combine_signer_and_txn_args(
     }
     let mut signer_param_cnt = 0;
     // find all signer params at the beginning
-    for ty in func.parameters.iter() {
+    for ty in func.param_tys.iter() {
         match ty {
             Type::Signer => signer_param_cnt += 1,
             Type::Reference(inner_type) => {
@@ -133,9 +133,9 @@ pub fn validate_combine_signer_and_txn_args(
     let ty_builder = session.get_ty_builder();
 
     // Need to keep this here to ensure we return the historic correct error code for replay
-    for ty in func.parameters[signer_param_cnt..].iter() {
+    for ty in func.param_tys[signer_param_cnt..].iter() {
         let ty = ty_builder
-            .create_ty_with_subst(ty, &func.type_arguments)
+            .create_ty_with_subst(ty, &func.ty_args)
             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
         let valid = is_valid_txn_arg(session, &ty, allowed_structs);
         if !valid {
@@ -146,7 +146,7 @@ pub fn validate_combine_signer_and_txn_args(
         }
     }
 
-    if (signer_param_cnt + args.len()) != func.parameters.len() {
+    if (signer_param_cnt + args.len()) != func.param_tys.len() {
         return Err(VMStatus::error(
             StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
             None,
@@ -169,9 +169,9 @@ pub fn validate_combine_signer_and_txn_args(
     // FAILED_TO_DESERIALIZE_ARGUMENT error.
     let args = construct_args(
         session,
-        &func.parameters[signer_param_cnt..],
+        &func.param_tys[signer_param_cnt..],
         args,
-        &func.type_arguments,
+        &func.ty_args,
         allowed_structs,
         false,
     )?;
@@ -430,13 +430,15 @@ fn validate_and_construct(
     )?;
     let mut args = vec![];
     let ty_builder = session.get_ty_builder();
-    for param_type in &instantiation.parameters {
+    for param_ty in &instantiation.param_tys {
         let mut arg = vec![];
+        let arg_ty = ty_builder
+            .create_ty_with_subst(param_ty, &instantiation.ty_args)
+            .unwrap();
+
         recursively_construct_arg(
             session,
-            &ty_builder
-                .create_ty_with_subst(param_type, &instantiation.type_arguments)
-                .unwrap(),
+            &arg_ty,
             allowed_structs,
             cursor,
             initial_cursor_len,

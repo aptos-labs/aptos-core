@@ -43,8 +43,6 @@ use aptos_types::{
     },
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
-use aptos_utils::aptos_try;
-use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver};
 use futures::{channel::oneshot, SinkExt};
 use mini_moka::sync::Cache;
 use move_core_types::{
@@ -418,38 +416,19 @@ impl Context {
 
         // We should be able to do an unwrap here, otherwise the above db read would fail.
         let state_view = self.state_view_at_version(version)?;
+        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
 
         // Extract resources from resource groups and flatten into all resources
         let kvs = kvs
             .into_iter()
-            .map(|(key, value)| {
-                let is_resource_group =
-                    |resolver: &dyn AptosMoveResolver, struct_tag: &StructTag| -> bool {
-                        aptos_try!({
-                            let md = aptos_framework::get_metadata(
-                                &resolver.get_module_metadata(&struct_tag.module_id()),
-                            )?;
-                            md.struct_attributes
-                                .get(struct_tag.name.as_ident_str().as_str())?
-                                .iter()
-                                .find(|attr| attr.is_resource_group())?;
-                            Some(())
-                        })
-                        .is_some()
-                    };
-
-                let resolver = state_view.as_move_resolver();
-                if is_resource_group(&resolver, &key) {
+            .map(|(tag, value)| {
+                if converter.is_resource_group(&tag) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
-                        .map(|map| {
-                            map.into_iter()
-                                .map(|(key, value)| (key, value))
-                                .collect::<Vec<_>>()
-                        })
+                        .map(|map| map.into_iter().map(|(t, v)| (t, v)).collect::<Vec<_>>())
                         .map_err(|e| e.into())
                 } else {
-                    Ok(vec![(key, value)])
+                    Ok(vec![(tag, value)])
                 }
             })
             .collect::<Result<Vec<Vec<(StructTag, Vec<u8>)>>>>()?
@@ -597,7 +576,7 @@ impl Context {
 
         // We can only get the max_transactions page size
         let max_txns = std::cmp::min(
-            self.node_config.api.max_transactions_page_size,
+            self.node_config.api.max_block_transactions_page_size,
             (last_version - first_version + 1) as u16,
         );
         let txns = if with_transactions {
@@ -637,8 +616,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -670,8 +648,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -1192,17 +1169,16 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let resolver = state_view.as_move_resolver();
 
             let gas_schedule_params =
-                match GasScheduleV2::fetch_config(&resolver).and_then(|gas_schedule| {
+                match GasScheduleV2::fetch_config(&state_view).and_then(|gas_schedule| {
                     let feature_version = gas_schedule.feature_version;
                     let gas_schedule = gas_schedule.to_btree_map();
                     AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
                         .ok()
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
-                    None => GasSchedule::fetch_config(&resolver)
+                    None => GasSchedule::fetch_config(&state_view)
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.to_btree_map();
                             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0).ok()
@@ -1257,9 +1233,8 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let resolver = state_view.as_move_resolver();
 
-            let block_executor_onchain_config = OnChainExecutionConfig::fetch_config(&resolver)
+            let block_executor_onchain_config = OnChainExecutionConfig::fetch_config(&state_view)
                 .unwrap_or_else(OnChainExecutionConfig::default_if_missing)
                 .block_executor_onchain_config();
 
