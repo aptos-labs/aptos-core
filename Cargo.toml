@@ -694,7 +694,7 @@ reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
-rocksdb = { version = "0.22.0", features = ["lz4"] }
+rocksdb = { version = "0.21.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default_features = false }
 rstest = "0.15.0"
