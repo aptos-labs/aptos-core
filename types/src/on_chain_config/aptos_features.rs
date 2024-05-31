@@ -122,14 +122,12 @@ impl FeatureFlag {
             FeatureFlag::REFUNDABLE_BYTES,
             FeatureFlag::OBJECT_CODE_DEPLOYMENT,
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
-            FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
             FeatureFlag::MODULE_EVENT_MIGRATION,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE,
             FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
-            FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
         ]
     }
 }
