@@ -25,15 +25,15 @@ use futures::future::join_all;
 use itertools::Itertools;
 use rand::seq::IteratorRandom;
 use std::{
+    borrow::Borrow,
     collections::HashMap,
-    sync::{atomic::AtomicU64, Arc, Mutex},
+    sync::{atomic::AtomicU64, Arc},
     time::Instant,
 };
-use std::ops::DerefMut;
 use tokio::time::sleep;
 
 pub struct SubmissionWorker {
-    pub(crate) accounts: Vec<Arc<Mutex<LocalAccount>>>,
+    pub(crate) accounts: Vec<Arc<LocalAccount>>,
     client: RestClient,
     stop: Arc<AtomicBool>,
     params: EmitModeParams,
@@ -56,7 +56,7 @@ impl SubmissionWorker {
         skip_latency_stats: bool,
         rng: ::rand::rngs::StdRng,
     ) -> Self {
-        let accounts = accounts.into_iter().map(|account| Arc::new(Mutex::new(account))).collect();
+        let accounts = accounts.into_iter().map(Arc::new).collect();
         Self {
             accounts,
             client,
@@ -201,7 +201,7 @@ impl SubmissionWorker {
             }
         }
 
-        self.accounts.into_iter().map(|account_arc_mutex| Arc::into_inner(account_arc_mutex).unwrap().into_inner().unwrap()).collect()
+        self.accounts.into_iter().map(|account_arc_mutex| Arc::into_inner(account_arc_mutex).unwrap()).collect()
     }
 
     // returns true if it returned early
@@ -246,11 +246,9 @@ impl SubmissionWorker {
             .await;
 
         // self.accounts.iter().for_each(|account| {})
-        for account in self.accounts.iter() {
-            let account = account.clone();
-            let mut locker = account.lock().unwrap();
+        for account in self.accounts.iter_mut() {
             update_account_seq_num(
-                locker.deref_mut(),
+                Arc::get_mut(account).unwrap(),
                 &account_to_start_and_end_seq_num,
                 &latest_fetched_counts,
             );
@@ -277,7 +275,7 @@ impl SubmissionWorker {
                     num_expired,
                     self.accounts
                         .iter()
-                        .map(|a| a.lock().unwrap().address())
+                        .map(|a| a.address())
                         .collect::<Vec<_>>(),
                 )
             );
@@ -322,7 +320,7 @@ impl SubmissionWorker {
             .into_iter()
             .flat_map(|account| {
                 self.txn_generator
-                    .generate_transactions(account.clone(), self.params.transactions_per_account)
+                    .generate_transactions(account.borrow(), self.params.transactions_per_account)
             })
             .collect()
     }

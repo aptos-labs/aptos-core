@@ -16,18 +16,10 @@ pub struct FrameworkUpgrade;
 
 impl FrameworkUpgrade {
     pub const EPOCH_DURATION_SECS: u64 = 10;
-}
 
-impl Test for FrameworkUpgrade {
-    fn name(&self) -> &'static str {
-        "framework_upgrade::framework-upgrade"
-    }
-}
-
-impl NetworkTest for FrameworkUpgrade {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        let mut ctx_locker = ctx.ctx.lock().unwrap();
-        let mut ctx = ctx_locker.deref_mut();
+    async fn async_run(&self, ctx: NetworkContextSynchronizer<'_>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
         let runtime = Runtime::new()?;
 
         let epoch_duration = Duration::from_secs(Self::EPOCH_DURATION_SECS);
@@ -61,11 +53,11 @@ impl NetworkTest for FrameworkUpgrade {
         let msg = format!("Upgrade the nodes to version: {}", new_version);
         info!("{}", msg);
         ctx.report.report_text(msg);
-        runtime.block_on(batch_update(&mut ctx, first_half, &new_version))?;
+        runtime.block_on(batch_update(ctx, first_half, &new_version))?;
 
         // Generate some traffic
         let duration = Duration::from_secs(30);
-        let txn_stat = generate_traffic(&mut ctx, &all_validators, duration)?;
+        let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::full-framework-upgrade", self.name()),
             &txn_stat,
@@ -116,7 +108,7 @@ impl NetworkTest for FrameworkUpgrade {
         ))?;
 
         // Update the sequence number for the root account
-        let root_account = ctx.swarm().chain_info().root_account().lock().unwrap().address();
+        let root_account = ctx.swarm().chain_info().root_account().address();
         // Test the module publishing workflow
         let sequence_number = runtime
             .block_on(
@@ -131,11 +123,11 @@ impl NetworkTest for FrameworkUpgrade {
         ctx.swarm()
             .chain_info()
             .root_account()
-            .lock().unwrap().set_sequence_number(sequence_number);
+            .set_sequence_number(sequence_number);
 
         // Generate some traffic
         let duration = Duration::from_secs(30);
-        let txn_stat = generate_traffic(&mut ctx, &all_validators, duration)?;
+        let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::full-framework-upgrade", self.name()),
             &txn_stat,
@@ -157,10 +149,10 @@ impl NetworkTest for FrameworkUpgrade {
         let msg = format!("Upgrade the remaining nodes to version: {}", new_version);
         info!("{}", msg);
         ctx.report.report_text(msg);
-        runtime.block_on(batch_update(&mut ctx, second_half, &new_version))?;
+        runtime.block_on(batch_update(ctx, second_half, &new_version))?;
 
         let duration = Duration::from_secs(30);
-        let txn_stat = generate_traffic(&mut ctx, &all_validators, duration)?;
+        let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::full-framework-upgrade", self.name()),
             &txn_stat,
@@ -169,5 +161,17 @@ impl NetworkTest for FrameworkUpgrade {
         ctx.swarm().fork_check(epoch_duration)?;
 
         Ok(())
+    }
+}
+
+impl Test for FrameworkUpgrade {
+    fn name(&self) -> &'static str {
+        "framework_upgrade::framework-upgrade"
+    }
+}
+
+impl NetworkTest for FrameworkUpgrade {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+        ctx.handle.clone().block_on(self.async_run(ctx))
     }
 }

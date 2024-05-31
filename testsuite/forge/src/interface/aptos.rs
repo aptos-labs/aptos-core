@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ops::DerefMut;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
 use anyhow::anyhow;
@@ -109,7 +108,7 @@ impl<'t> AptosContext<'t> {
         self.public_info.get_balance(address).await
     }
 
-    pub fn root_account(&mut self) -> Arc<Mutex<LocalAccount>> {
+    pub fn root_account(&mut self) -> Arc<LocalAccount> {
         self.public_info.root_account.clone()
     }
 }
@@ -119,7 +118,7 @@ pub struct AptosPublicInfo {
     inspection_service_url: Url,
     rest_api_url: Url,
     rest_client: RestClient,
-    root_account: Arc<Mutex<LocalAccount>>,
+    root_account: Arc<LocalAccount>,
     rng: ::rand::rngs::StdRng,
 }
 
@@ -128,7 +127,7 @@ impl AptosPublicInfo {
         chain_id: ChainId,
         inspection_service_url_str: String,
         rest_api_url_str: String,
-        root_account: Arc<Mutex<LocalAccount>>,
+        root_account: Arc<LocalAccount>,
     ) -> Self {
         let rest_api_url = Url::parse(&rest_api_url_str).unwrap();
         let inspection_service_url = Url::parse(&inspection_service_url_str).unwrap();
@@ -154,14 +153,14 @@ impl AptosPublicInfo {
         self.inspection_service_url.as_str()
     }
 
-    pub fn root_account(&mut self) -> Arc<Mutex<LocalAccount>> {
+    pub fn root_account(&mut self) -> Arc<LocalAccount> {
         self.root_account.clone()
     }
 
     pub async fn create_user_account(&mut self, pubkey: &Ed25519PublicKey) -> Result<()> {
         let auth_key = AuthenticationKey::ed25519(pubkey);
         let create_account_txn =
-            self.root_account.lock().unwrap()
+            self.root_account
                 .sign_with_transaction_builder(self.transaction_factory().payload(
                     aptos_stdlib::aptos_account_create_account(auth_key.account_address()),
                 ));
@@ -177,7 +176,7 @@ impl AptosPublicInfo {
     ) -> Result<AccountAddress> {
         let auth_key = AuthenticationKey::any_key(pubkey.clone());
         let create_account_txn =
-            self.root_account.lock().unwrap()
+            self.root_account
                 .sign_with_transaction_builder(self.transaction_factory().payload(
                     aptos_stdlib::aptos_account_create_account(auth_key.account_address()),
                 ));
@@ -188,7 +187,7 @@ impl AptosPublicInfo {
     }
 
     pub async fn mint(&mut self, addr: AccountAddress, amount: u64) -> Result<()> {
-        let mint_txn = self.root_account.lock().unwrap().sign_with_transaction_builder(
+        let mint_txn = self.root_account.sign_with_transaction_builder(
             self.transaction_factory()
                 .payload(aptos_stdlib::aptos_coin_mint(addr, amount)),
         );
@@ -307,14 +306,14 @@ impl AptosPublicInfo {
         reconfig(
             &self.rest_client,
             &self.transaction_factory(),
-            self.root_account.lock().unwrap().deref_mut(),
+            self.root_account.clone(),
         )
         .await
     }
 
     /// Syncs the root account to it's sequence number in the event that a faucet changed it's value
     pub async fn sync_root_account_sequence_number(&mut self) {
-        let root_address = self.root_account().lock().unwrap().address();
+        let root_address = self.root_account().address();
         let root_sequence_number = self
             .client()
             .get_account_bcs(root_address)
@@ -322,7 +321,7 @@ impl AptosPublicInfo {
             .unwrap()
             .into_inner()
             .sequence_number();
-        self.root_account().lock().unwrap()
+        self.root_account()
             .set_sequence_number(root_sequence_number);
     }
 }
@@ -330,21 +329,23 @@ impl AptosPublicInfo {
 pub async fn reconfig(
     client: &RestClient,
     transaction_factory: &TransactionFactory,
-    root_account: &mut LocalAccount,
+    root_account: Arc<LocalAccount>,
 ) -> State {
     let aptos_version = client.get_aptos_version().await.unwrap();
     let current = aptos_version.into_inner();
     let current_version = *current.major.inner();
-    let txns = vec![
-        root_account.sign_with_transaction_builder(transaction_factory.clone().payload(
-            aptos_stdlib::version_set_for_next_epoch(current_version + 1),
-        )),
-        root_account.sign_with_transaction_builder(
-            transaction_factory
-                .clone()
-                .payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
-        ),
-    ];
+    let txns = {
+        vec![
+            root_account.sign_with_transaction_builder(transaction_factory.clone().payload(
+                aptos_stdlib::version_set_for_next_epoch(current_version + 1),
+            )),
+            root_account.sign_with_transaction_builder(
+                transaction_factory
+                    .clone()
+                    .payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+            ),
+        ]
+    };
 
     submit_and_wait_reconfig(client, txns).await
 }

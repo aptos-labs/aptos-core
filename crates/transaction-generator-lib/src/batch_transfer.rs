@@ -39,7 +39,7 @@ impl BatchTransferTransactionGenerator {
 impl TransactionGenerator for BatchTransferTransactionGenerator {
     fn generate_transactions(
         &mut self,
-        account: Arc<std::sync::Mutex<LocalAccount>>,
+        account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
@@ -48,7 +48,7 @@ impl TransactionGenerator for BatchTransferTransactionGenerator {
                 .all_addresses
                 .clone_from_pool(self.batch_size, &mut self.rng);
             requests.push(
-                account.lock().unwrap().sign_with_transaction_builder(self.txn_factory.payload(
+                account.sign_with_transaction_builder(self.txn_factory.payload(
                     aptos_stdlib::aptos_account_batch_transfer(receivers, vec![
                         self.send_amount;
                         self.batch_size

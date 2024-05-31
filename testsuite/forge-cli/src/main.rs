@@ -2662,10 +2662,9 @@ impl Test for RestartValidator {
 
 impl NetworkTest for RestartValidator {
     fn run(&self, ctxa: NetworkContextSynchronizer) -> Result<()> {
-        let runtime = Runtime::new()?;
-        runtime.block_on(async {
-            let mut ctx_locker = ctxa.ctx.lock().unwrap();
-            let mut ctx = ctx_locker.deref_mut();
+        ctxa.handle.clone().block_on(async {
+            let mut ctx_locker = ctxa.ctx.lock().await;
+            let ctx = ctx_locker.deref_mut();
             let node = ctx.swarm().validators_mut().next().unwrap();
             node.health_check().await.expect("node health check failed");
             node.stop().await.unwrap();
@@ -2689,17 +2688,18 @@ impl Test for EmitTransaction {
 
 impl NetworkTest for EmitTransaction {
     fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        let mut ctx_locker = ctx.ctx.lock().unwrap();
-        let mut ctx = ctx_locker.deref_mut();
-        let duration = Duration::from_secs(10);
-        let all_validators = ctx
-            .swarm()
-            .validators()
-            .map(|v| v.peer_id())
-            .collect::<Vec<_>>();
-        let stats = generate_traffic(ctx, &all_validators, duration).unwrap();
-        ctx.report.report_txn_stats(self.name().to_string(), &stats);
-
+        ctx.handle.clone().block_on(async {
+            let mut ctx_locker = ctx.ctx.lock().await;
+            let ctx = ctx_locker.deref_mut();
+            let duration = Duration::from_secs(10);
+            let all_validators = ctx
+                .swarm()
+                .validators()
+                .map(|v| v.peer_id())
+                .collect::<Vec<_>>();
+            let stats = generate_traffic(ctx, &all_validators, duration).unwrap();
+            ctx.report.report_txn_stats(self.name().to_string(), &stats);
+        });
         Ok(())
     }
 }
@@ -2722,7 +2722,7 @@ impl Test for Delay {
 }
 
 impl NetworkTest for Delay {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+    fn run(&self, _ctx: NetworkContextSynchronizer) -> Result<()> {
         info!("forge sleep {}", self.seconds);
         std::thread::sleep(Duration::from_secs(self.seconds));
         Ok(())
@@ -2740,10 +2740,11 @@ impl Test for GatherMetrics {
 
 impl NetworkTest for GatherMetrics {
     fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        let mut ctx_locker = ctx.ctx.lock().unwrap();
-        let mut ctx = ctx_locker.deref_mut();
-        let runtime = ctx.runtime.handle();
-        runtime.block_on(gather_metrics_one(ctx));
+        ctx.handle.clone().block_on(async {
+            let mut ctx_locker = ctx.ctx.lock().await;
+            let ctx = ctx_locker.deref_mut();
+            gather_metrics_one(ctx).await;
+        });
         Ok(())
     }
 }

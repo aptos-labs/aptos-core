@@ -11,7 +11,7 @@ use aptos_types::{
 
 async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
     local_account: &LocalAccount,
-    info: &mut AptosPublicInfo<'_>,
+    info: &mut AptosPublicInfo,
     f: F,
     expected: &str,
 ) {

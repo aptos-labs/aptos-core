@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use super::Test;
 use crate::{
     prometheus_metrics::LatencyBreakdown,
@@ -23,19 +23,21 @@ pub trait NetworkTest: Test {
 
 #[derive(Clone)]
 pub struct NetworkContextSynchronizer<'t> {
-    pub ctx: Arc<Mutex<NetworkContext<'t>>>,
+    pub ctx: Arc<tokio::sync::Mutex<NetworkContext<'t>>>,
+    pub handle: tokio::runtime::Handle,
 }
 
 // TODO: some useful things that don't need to hold the lock or make a copy
 impl<'t> NetworkContextSynchronizer<'t> {
-    pub fn new(ctx: NetworkContext<'t>) -> Self {
+    pub fn new(ctx: NetworkContext<'t>, handle: tokio::runtime::Handle) -> Self {
         Self{
-            ctx: Arc::new(Mutex::new(ctx)),
+            ctx: Arc::new(tokio::sync::Mutex::new(ctx)),
+            handle,
         }
     }
 
-    pub fn report_text(&self, text: String) {
-        let mut locker = self.ctx.lock().unwrap();
+    pub async fn report_text(&self, text: String) {
+        let mut locker = self.ctx.lock().await;
         locker.report.report_text(text);
     }
 }

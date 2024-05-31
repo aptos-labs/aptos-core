@@ -38,7 +38,7 @@ impl PhasedTxnMixGenerator {
 impl TransactionGenerator for PhasedTxnMixGenerator {
     fn generate_transactions(
         &mut self,
-        account: Arc<std::sync::Mutex<LocalAccount>>,
+        account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let phase = if self.txn_mix_per_phase.len() == 1 {

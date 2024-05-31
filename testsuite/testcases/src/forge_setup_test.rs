@@ -19,18 +19,12 @@ const STATE_SYNC_VERSION_COUNTER_NAME: &str = "aptos_state_sync_version";
 
 pub struct ForgeSetupTest;
 
-impl Test for ForgeSetupTest {
-    fn name(&self) -> &'static str {
-        "verify_forge_setup"
-    }
-}
-
-impl NetworkTest for ForgeSetupTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+impl ForgeSetupTest {
+    async fn async_run(&self, ctx: NetworkContextSynchronizer<'_>) -> Result<()> {
         let mut rng = StdRng::from_seed(OsRng.gen());
         let runtime = Runtime::new().unwrap();
-        let mut ctx_locker = ctx.ctx.lock().unwrap();
-        let mut ctx = ctx_locker.deref_mut();
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
 
         let swarm = ctx.swarm();
 
@@ -78,11 +72,23 @@ impl NetworkTest for ForgeSetupTest {
         }
 
         let duration = Duration::from_secs(10 * num_pfns);
-        let txn_stat = generate_traffic(&mut ctx, &pfns, duration)?;
+        let txn_stat = generate_traffic(ctx, &pfns, duration)?;
 
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat);
 
         Ok(())
+    }
+}
+
+impl Test for ForgeSetupTest {
+    fn name(&self) -> &'static str {
+        "verify_forge_setup"
+    }
+}
+
+impl NetworkTest for ForgeSetupTest {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+        ctx.handle.clone().block_on(self.async_run(ctx))
     }
 }

@@ -17,7 +17,7 @@ use crate::emitter::{
 use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
-use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
+use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -41,7 +41,6 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use std::ops::DerefMut;
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
 // Max is 100k TPS for 3 hours
@@ -670,7 +669,7 @@ impl TxnEmitter {
 
     pub async fn start_job(
         &mut self,
-        root_account: Arc<std::sync::Mutex<LocalAccount>>,
+        root_account: Arc<LocalAccount>,
         req: EmitJobRequest,
         stats_tracking_phases: usize,
     ) -> Result<EmitJob> {
@@ -816,7 +815,7 @@ impl TxnEmitter {
 
     async fn emit_txn_for_impl(
         mut self,
-        source_account: Arc<std::sync::Mutex<LocalAccount>>,
+        source_account: Arc<LocalAccount>,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         print_stats_interval: Option<u64>,
@@ -852,7 +851,7 @@ impl TxnEmitter {
 
     pub async fn emit_txn_for(
         self,
-        source_account: Arc<std::sync::Mutex<LocalAccount>>,
+        source_account: Arc<LocalAccount>,
         emit_job_request: EmitJobRequest,
         duration: Duration,
     ) -> Result<TxnStats> {
@@ -862,7 +861,7 @@ impl TxnEmitter {
 
     pub async fn emit_txn_for_with_stats(
         self,
-        source_account: Arc<std::sync::Mutex<LocalAccount>>,
+        source_account: Arc<LocalAccount>,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         interval_secs: u64,
@@ -1134,7 +1133,7 @@ pub fn parse_seed(seed_string: &str) -> [u8; 32] {
 }
 
 pub async fn create_accounts(
-    root_account: Arc<std::sync::Mutex<LocalAccount>>,
+    root_account: Arc<LocalAccount>,
     txn_factory: &TransactionFactory,
     account_generator: Box<dyn LocalAccountGenerator>,
     req: &EmitJobRequest,

@@ -10,6 +10,8 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use rand::random;
+// use std::borrow::Borrow;
+use std::sync::Arc;
 use std::time::Duration;
 
 pub const MAX_CATCH_UP_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to catch up
@@ -46,7 +48,7 @@ pub async fn execute_transactions(
         transfer_and_maybe_reconfig(
             client,
             &transaction_factory,
-            swarm.chain_info().root_account,
+            swarm.chain_info().root_account.clone(),
             sender,
             receiver,
             num_transfers,
@@ -115,7 +117,7 @@ pub async fn transfer_coins(
 pub async fn transfer_and_maybe_reconfig(
     client: &RestClient,
     transaction_factory: &TransactionFactory,
-    root_account: &mut LocalAccount,
+    root_account: Arc<LocalAccount>,
     sender: &mut LocalAccount,
     receiver: &LocalAccount,
     num_transfers: usize,
@@ -123,7 +125,7 @@ pub async fn transfer_and_maybe_reconfig(
     for _ in 0..num_transfers {
         // Reconfigurations have a 20% chance of being executed
         if random::<u16>() % 5 == 0 {
-            reconfig(client, transaction_factory, root_account).await;
+            reconfig(client, transaction_factory, root_account.clone()).await;
         }
 
         transfer_coins(client, transaction_factory, sender, receiver, 1).await;

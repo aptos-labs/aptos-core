@@ -50,8 +50,7 @@ impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
         runtime.block_on(async {
 
             let root_cli_index = {
-                let root_account_arc = swarm.chain_info().root_account();
-                let root_account = root_account_arc.lock().unwrap();
+                let root_account = swarm.chain_info().root_account();
                 cli.add_account_with_address_to_cli(
                     root_account.private_key().clone(),
                     root_account.address(),

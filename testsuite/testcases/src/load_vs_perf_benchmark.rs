@@ -207,10 +207,8 @@ impl LoadVsPerfBenchmark {
 
         Ok(result)
     }
-}
 
-impl NetworkTest for LoadVsPerfBenchmark {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+    async fn async_run(&self, ctx: NetworkContextSynchronizer<'_>) -> Result<()> {
         assert!(
             self.criteria.is_empty() || self.criteria.len() == self.workloads.len(),
             "Invalid config, {} criteria and {} workloads given",
@@ -218,8 +216,8 @@ impl NetworkTest for LoadVsPerfBenchmark {
             self.workloads.len(),
         );
 
-        let mut ctx_locker = ctx.ctx.lock().unwrap();
-        let mut ctx = ctx_locker.deref_mut();
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
         let rt = Runtime::new().unwrap();
 
         let mut continous_job = if let Some(continuous_traffic) = &self.continuous_traffic {
@@ -232,7 +230,7 @@ impl NetworkTest for LoadVsPerfBenchmark {
                 &nodes_to_send_load_to,
                 rng,
             )
-            .context("create emitter")?;
+                .context("create emitter")?;
 
             let job = rt
                 .block_on(emitter.start_job(
@@ -262,7 +260,7 @@ impl NetworkTest for LoadVsPerfBenchmark {
             info!("Starting for {:?}", self.workloads);
             results.push(
                 self.evaluate_single(
-                    &mut ctx,
+                    ctx,
                     &self.workloads,
                     index,
                     phase_duration
@@ -342,6 +340,12 @@ impl NetworkTest for LoadVsPerfBenchmark {
         }
 
         Ok(())
+    }
+}
+
+impl NetworkTest for LoadVsPerfBenchmark {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+        ctx.handle.clone().block_on(self.async_run(ctx))
     }
 }
 

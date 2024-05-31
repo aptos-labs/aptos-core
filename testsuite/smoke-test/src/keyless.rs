@@ -318,7 +318,7 @@ async fn test_keyless_groth16_with_bad_tw_signature() {
 }
 
 async fn sign_transaction<'a>(
-    info: &mut AptosPublicInfo<'a>,
+    info: &mut AptosPublicInfo,
     mut sig: KeylessSignature,
     pk: KeylessPublicKey,
     jwk: &RSA_JWK,
@@ -477,7 +477,7 @@ async fn setup_local_net() -> (
 
 async fn remove_training_wheels<'a>(
     cli: &mut CliTestFramework,
-    info: &mut AptosPublicInfo<'a>,
+    info: &mut AptosPublicInfo,
     root_idx: usize,
 ) {
     let script = format!(
@@ -642,7 +642,7 @@ async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {
 
 async fn rotate_vk_by_governance<'a>(
     cli: &mut CliTestFramework,
-    info: &mut AptosPublicInfo<'a>,
+    info: &mut AptosPublicInfo,
     vk: &Groth16VerificationKey,
     root_idx: usize,
 ) {

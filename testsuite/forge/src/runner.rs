@@ -547,7 +547,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             let initial_version = self.initial_version();
             // The genesis version should always match the initial node version
             let genesis_version = initial_version.clone();
-            let runtime = Runtime::new().unwrap();
+            let runtime = Runtime::new().unwrap(); // TODO: new multithreaded?
             let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
             let mut swarm = runtime.block_on(self.factory.launch_swarm(
                 &mut rng,
@@ -596,7 +596,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     self.tests.success_criteria.clone(),
                 );
                 // let network_ctx = Arc::new(Mutex::new(network_ctx));
-                let network_ctx = NetworkContextSynchronizer::new(network_ctx);
+                let network_ctx = NetworkContextSynchronizer::new(network_ctx, runtime.handle().clone());
                 let result = run_test(|| test.run(network_ctx));
                 report.report_text(result.to_string());
                 summary.handle_result(test.name().to_owned(), result)?;

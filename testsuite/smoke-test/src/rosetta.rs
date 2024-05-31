@@ -467,7 +467,7 @@ async fn test_account_balance() {
 }
 
 async fn create_staking_contract(
-    info: &AptosPublicInfo<'_>,
+    info: &AptosPublicInfo,
     account: &mut LocalAccount,
     operator: AccountAddress,
     voter: AccountAddress,
@@ -491,7 +491,7 @@ async fn create_staking_contract(
 }
 
 async fn unlock_stake(
-    info: &AptosPublicInfo<'_>,
+    info: &AptosPublicInfo,
     account: &mut LocalAccount,
     operator: AccountAddress,
     amount: u64,
@@ -509,7 +509,7 @@ async fn unlock_stake(
 }
 
 async fn create_delegation_pool(
-    info: &AptosPublicInfo<'_>,
+    info: &AptosPublicInfo,
     account: &mut LocalAccount,
     commission_percentage: u64,
     sequence_number: u64,

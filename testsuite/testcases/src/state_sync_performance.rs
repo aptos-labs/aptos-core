@@ -19,6 +19,24 @@ const NUM_STATE_VALUE_COUNTER_NAME: &str = "aptos_jellyfish_leaf_count"; // The 
 /// In the test, all fullnodes are wiped, restarted and timed to synchronize.
 pub struct StateSyncFullnodePerformance;
 
+impl StateSyncFullnodePerformance {
+    async fn async_run(&self, ctx: NetworkContextSynchronizer<'_>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
+        let all_fullnodes = get_fullnodes_and_check_setup(ctx, self.name())?;
+
+        // Emit a lot of traffic and ensure the fullnodes can all sync
+        emit_traffic_and_ensure_bounded_sync(ctx, &all_fullnodes)?;
+
+        // Stop and reset the fullnodes so they start syncing from genesis
+        stop_and_reset_nodes(ctx, &all_fullnodes, &[])?;
+
+        // Wait for all nodes to catch up to the highest synced version
+        // then calculate and display the throughput results.
+        ensure_state_sync_transaction_throughput(ctx, self.name())
+    }
+}
+
 impl Test for StateSyncFullnodePerformance {
     fn name(&self) -> &'static str {
         "StateSyncFullnodePerformance"
@@ -27,19 +45,7 @@ impl Test for StateSyncFullnodePerformance {
 
 impl NetworkTest for StateSyncFullnodePerformance {
     fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        let mut ctx_locker = ctx.ctx.lock().unwrap();
-        let mut ctx = ctx_locker.deref_mut();
-        let all_fullnodes = get_fullnodes_and_check_setup(&mut ctx, self.name())?;
-
-        // Emit a lot of traffic and ensure the fullnodes can all sync
-        emit_traffic_and_ensure_bounded_sync(&mut ctx, &all_fullnodes)?;
-
-        // Stop and reset the fullnodes so they start syncing from genesis
-        stop_and_reset_nodes(&mut ctx, &all_fullnodes, &[])?;
-
-        // Wait for all nodes to catch up to the highest synced version
-        // then calculate and display the throughput results.
-        ensure_state_sync_transaction_throughput(&mut ctx, self.name())
+        ctx.handle.clone().block_on(self.async_run(ctx))
     }
 }
 
@@ -47,20 +53,14 @@ impl NetworkTest for StateSyncFullnodePerformance {
 /// In the test, all fullnodes are wiped, restarted and timed to synchronize.
 pub struct StateSyncFullnodeFastSyncPerformance;
 
-impl Test for StateSyncFullnodeFastSyncPerformance {
-    fn name(&self) -> &'static str {
-        "StateSyncFullnodeFastSyncPerformance"
-    }
-}
-
-impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
-    fn run(&self, ctxa: NetworkContextSynchronizer) -> Result<()> {
-        let mut ctx_locker = ctxa.ctx.lock().unwrap();
-        let mut ctx = ctx_locker.deref_mut();
-        let all_fullnodes = get_fullnodes_and_check_setup(&mut ctx, self.name())?;
+impl StateSyncFullnodeFastSyncPerformance {
+    async fn async_run(&self, ctxa: NetworkContextSynchronizer<'_>) -> Result<()> {
+        let mut ctx_locker = ctxa.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
+        let all_fullnodes = get_fullnodes_and_check_setup(ctx, self.name())?;
 
         // Emit a lot of traffic and ensure the fullnodes can all sync
-        emit_traffic_and_ensure_bounded_sync(&mut ctx, &all_fullnodes)?;
+        emit_traffic_and_ensure_bounded_sync(ctx, &all_fullnodes)?;
 
         // Wait for an epoch change to ensure fast sync can download all the latest states
         info!("Waiting for an epoch change.");
@@ -105,12 +105,12 @@ impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
         );
 
         // Stop and reset the fullnodes so they start syncing from genesis
-        stop_and_reset_nodes(&mut ctx, &all_fullnodes, &[])?;
+        stop_and_reset_nodes(ctx, &all_fullnodes, &[])?;
 
         // Wait for all nodes to catch up to the highest synced epoch
         // then calculate and display the throughput results.
         display_state_sync_state_throughput(
-            &mut ctx,
+            ctx,
             self.name(),
             highest_synced_epoch,
             number_of_state_values,
@@ -121,20 +121,26 @@ impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
     }
 }
 
+impl Test for StateSyncFullnodeFastSyncPerformance {
+    fn name(&self) -> &'static str {
+        "StateSyncFullnodeFastSyncPerformance"
+    }
+}
+
+impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
+    fn run(&self, ctxa: NetworkContextSynchronizer) -> Result<()> {
+        ctxa.handle.clone().block_on(self.async_run(ctxa))
+    }
+}
+
 /// A state sync performance test that measures validator sync performance.
 /// In the test, 2 validators are wiped, restarted and timed to synchronize.
 pub struct StateSyncValidatorPerformance;
 
-impl Test for StateSyncValidatorPerformance {
-    fn name(&self) -> &'static str {
-        "StateSyncValidatorPerformance"
-    }
-}
-
-impl NetworkTest for StateSyncValidatorPerformance {
-    fn run(&self, ctxa: NetworkContextSynchronizer) -> Result<()> {
-        let mut ctx_locker = ctxa.ctx.lock().unwrap();
-        let mut ctx = ctx_locker.deref_mut();
+impl StateSyncValidatorPerformance {
+    async fn async_run(&self, ctxa: NetworkContextSynchronizer<'_>) -> Result<()> {
+        let mut ctx_locker = ctxa.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
         // Verify we have at least 7 validators (i.e., 3f+1, where f is 2)
         // so we can kill 2 validators but still make progress.
         let all_validators = ctx
@@ -159,16 +165,28 @@ impl NetworkTest for StateSyncValidatorPerformance {
         );
 
         // Generate some traffic through the validators.
-        emit_traffic_and_ensure_bounded_sync(&mut ctx, &all_validators)?;
+        emit_traffic_and_ensure_bounded_sync(ctx, &all_validators)?;
 
         // Stop and reset two validators so they start syncing from genesis
         info!("Deleting data for two validators!");
         let validators_to_reset = &all_validators[0..2];
-        stop_and_reset_nodes(&mut ctx, &[], validators_to_reset)?;
+        stop_and_reset_nodes(ctx, &[], validators_to_reset)?;
 
         // Wait for all nodes to catch up to the highest synced version
         // then calculate and display the throughput results.
-        ensure_state_sync_transaction_throughput(&mut ctx, self.name())
+        ensure_state_sync_transaction_throughput(ctx, self.name())
+    }
+}
+
+impl Test for StateSyncValidatorPerformance {
+    fn name(&self) -> &'static str {
+        "StateSyncValidatorPerformance"
+    }
+}
+
+impl NetworkTest for StateSyncValidatorPerformance {
+    fn run(&self, ctxa: NetworkContextSynchronizer) -> Result<()> {
+        ctxa.handle.clone().block_on(self.async_run(ctxa))
     }
 }
 

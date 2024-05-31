@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ops::Deref;
 use super::{publishing::publish_util::Package, ReliableTransactionSubmitter};
 use crate::{
     create_account_transaction, publishing::publish_util::PackageHandler, RootAccountHandle,
@@ -14,6 +13,7 @@ use aptos_sdk::{
 };
 use async_trait::async_trait;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
+use std::borrow::Borrow;
 use std::sync::Arc;
 
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously
@@ -83,16 +83,15 @@ impl CustomModulesDelegationGenerator {
 impl TransactionGenerator for CustomModulesDelegationGenerator {
     fn generate_transactions(
         &mut self,
-        account: Arc<std::sync::Mutex<LocalAccount>>,
+        account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
 
         for _ in 0..num_to_create {
             let (package, publisher) = self.packages.choose(&mut self.rng).unwrap();
-            let account = account.lock().unwrap();
             let request = (self.txn_generator)(
-                account.deref(),
+                account,
                 package,
                 publisher,
                 &self.txn_factory,
@@ -222,7 +221,7 @@ impl CustomModulesDelegationGeneratorCreator {
             let publisher = LocalAccount::generate(&mut rng);
             let publisher_address = publisher.address();
             requests_create.push(create_account_transaction(
-                root_account.get_root_account(),
+                root_account.get_root_account().borrow(),
                 publisher_address,
                 &init_txn_factory,
                 publisher_balance,

@@ -96,7 +96,7 @@ pub struct LocalSwarm {
     fullnodes: HashMap<PeerId, LocalNode>,
     public_networks: HashMap<PeerId, NetworkConfig>,
     dir: SwarmDirectory,
-    root_account: Arc<std::sync::Mutex<LocalAccount>>,
+    root_account: Arc<LocalAccount>,
     chain_id: ChainId,
     root_key: ConfigKey<Ed25519PrivateKey>,
 
@@ -245,7 +245,7 @@ impl LocalSwarm {
             AccountKey::from_private_key(root_key.private_key()),
             0,
         );
-        let root_account = Arc::new(std::sync::Mutex::new(root_account));
+        let root_account = Arc::new(root_account);
 
         Ok(LocalSwarm {
             node_name_counter: validators.len(),

@@ -11,19 +11,11 @@ use tokio::runtime::Runtime;
 
 pub struct TwinValidatorTest;
 
-impl Test for TwinValidatorTest {
-    fn name(&self) -> &'static str {
-        "twin validator"
-    }
-}
-
-impl NetworkLoadTest for TwinValidatorTest {}
-
-impl NetworkTest for TwinValidatorTest {
-    fn run(&self, ctxa: NetworkContextSynchronizer) -> anyhow::Result<()> {
+impl TwinValidatorTest {
+    async fn async_run(&self, ctxa: NetworkContextSynchronizer<'_>) -> anyhow::Result<()> {
         {
-            let mut ctx_locker = ctxa.ctx.lock().unwrap();
-            let mut ctx = ctx_locker.deref_mut();
+            let mut ctx_locker = ctxa.ctx.lock().await;
+            let ctx = ctx_locker.deref_mut();
             let runtime = Runtime::new().unwrap();
 
             let all_validators_ids = ctx
@@ -75,5 +67,19 @@ impl NetworkTest for TwinValidatorTest {
             })?;
         }
         <dyn NetworkLoadTest>::run(self, ctxa)
+    }
+}
+
+impl Test for TwinValidatorTest {
+    fn name(&self) -> &'static str {
+        "twin validator"
+    }
+}
+
+impl NetworkLoadTest for TwinValidatorTest {}
+
+impl NetworkTest for TwinValidatorTest {
+    fn run(&self, ctxa: NetworkContextSynchronizer) -> anyhow::Result<()> {
+        ctxa.handle.clone().block_on(self.async_run(ctxa))
     }
 }

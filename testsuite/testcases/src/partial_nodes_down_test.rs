@@ -16,10 +16,10 @@ impl Test for PartialNodesDown {
     }
 }
 
-impl NetworkTest for PartialNodesDown {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        let mut ctx_locker = ctx.ctx.lock().unwrap();
-        let mut ctx = ctx_locker.deref_mut();
+impl PartialNodesDown {
+    async fn async_run(&self, ctx: NetworkContextSynchronizer<'_>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
         let runtime = Runtime::new()?;
         let duration = Duration::from_secs(120);
         let all_validators = ctx
@@ -37,7 +37,7 @@ impl NetworkTest for PartialNodesDown {
         thread::sleep(Duration::from_secs(5));
 
         // Generate some traffic
-        let txn_stat = generate_traffic(&mut ctx, &up_nodes, duration)?;
+        let txn_stat = generate_traffic(ctx, &up_nodes, duration)?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat);
         for n in &down_nodes {
@@ -47,5 +47,11 @@ impl NetworkTest for PartialNodesDown {
         }
 
         Ok(())
+    }
+}
+
+impl NetworkTest for PartialNodesDown {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+        ctx.handle.clone().block_on(self.async_run(ctx))
     }
 }

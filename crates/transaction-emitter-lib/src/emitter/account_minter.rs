@@ -29,11 +29,10 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use std::ops::Deref;
 use aptos_types::account_address::AccountAddress;
 
 pub struct SourceAccountManager<'t> {
-    pub source_account: Arc<std::sync::Mutex<LocalAccount>>,
+    pub source_account: Arc<LocalAccount>,
     pub txn_executor: &'t dyn ReliableTransactionSubmitter,
     pub req: &'t EmitJobRequest,
     pub txn_factory: TransactionFactory,
@@ -45,14 +44,14 @@ impl<'t> RootAccountHandle for SourceAccountManager<'t> {
         self.check_approve_funds(amount, reason).await.unwrap();
     }
 
-    fn get_root_account(&self) -> Arc<std::sync::Mutex<LocalAccount>> {
+    fn get_root_account(&self) -> Arc<LocalAccount> {
         self.source_account.clone()
     }
 }
 
 impl<'t> SourceAccountManager<'t> {
     fn source_account_address(&self) -> AccountAddress {
-        self.source_account.lock().unwrap().address()
+        self.source_account.address()
     }
 
     // returns true if we might want to recheck the volume, as it was auto-approved.
@@ -132,7 +131,7 @@ impl<'t> SourceAccountManager<'t> {
         info!("Minting new coins to root");
 
         let txn = self
-            .source_account.lock().unwrap()
+            .source_account
             .sign_with_transaction_builder(self.txn_factory.payload(
                 aptos_stdlib::aptos_coin_mint(self.source_account_address(), amount),
             ));
@@ -399,7 +398,7 @@ impl<'t> AccountMinter<'t> {
 
     pub async fn create_and_fund_seed_accounts(
         &mut self,
-        mut new_source_account: Option<LocalAccount>,
+        new_source_account: Option<LocalAccount>,
         txn_executor: &dyn ReliableTransactionSubmitter,
         account_generator: Box<dyn LocalAccountGenerator>,
         seed_account_num: usize,
@@ -418,7 +417,7 @@ impl<'t> AccountMinter<'t> {
                 self.source_account.get_root_account().clone()
             },
             Some(param_account) => {
-                Arc::new(std::sync::Mutex::new(param_account))
+                Arc::new(param_account)
             },
         };
         while i < seed_account_num {
@@ -481,13 +480,13 @@ impl<'t> AccountMinter<'t> {
     ) -> Result<LocalAccount> {
         const NUM_TRIES: usize = 3;
         let root_account = self.source_account.get_root_account();
-        let root_address = root_account.lock().unwrap().address();
+        let root_address = root_account.address();
         for i in 0..NUM_TRIES {
             {
                 let new_sequence_number = txn_executor
                     .query_sequence_number(root_address)
                     .await?;
-                root_account.lock().unwrap().set_sequence_number(new_sequence_number);
+                root_account.set_sequence_number(new_sequence_number);
             }
 
             let new_source_account = LocalAccount::generate(self.rng());
@@ -544,7 +543,7 @@ async fn create_and_fund_new_accounts(
         .map(|chunk| chunk.to_vec())
         .collect::<Vec<_>>();
     let source_address = source_account.address();
-    let source_account = Arc::new(std::sync::Mutex::new(source_account));
+    let source_account = Arc::new(source_account);
     for batch in accounts_by_batch {
         let creation_requests: Vec<_> = batch
             .iter()
@@ -567,13 +566,13 @@ async fn create_and_fund_new_accounts(
 }
 
 pub fn create_and_fund_account_request(
-    creation_account: Arc<std::sync::Mutex<LocalAccount>>,
+    creation_account: Arc<LocalAccount>,
     amount: u64,
     pubkey: &Ed25519PublicKey,
     txn_factory: &TransactionFactory,
 ) -> SignedTransaction {
     let auth_key = AuthenticationKey::ed25519(pubkey);
-    creation_account.lock().unwrap().sign_with_transaction_builder(txn_factory.payload(
+    creation_account.sign_with_transaction_builder(txn_factory.payload(
         aptos_stdlib::aptos_account_transfer(auth_key.account_address(), amount),
     ))
 }

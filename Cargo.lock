@@ -3827,6 +3827,7 @@ dependencies = [
  "rand 0.7.3",
  "reqwest",
  "tokio",
+ "tokio-scoped",
 ]
 
 [[package]]
@@ -15465,6 +15466,16 @@ dependencies = [
  "rustls 0.22.2",
  "rustls-pki-types",
  "tokio",
+]
+
+[[package]]
+name = "tokio-scoped"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4beb8ba13bc53ac53ce1d52b42f02e5d8060f0f42138862869beb769722b256"
+dependencies = [
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

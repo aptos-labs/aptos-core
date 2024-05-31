@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ops::DerefMut;
+// use std::ops::DerefMut;
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_forge::{reconfig, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test, TestReport, FORGE_KEY_SEED, NetworkContextSynchronizer};
@@ -129,23 +129,21 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
                     .await
                     .unwrap();
 
-                let root_account_arcmutex = swarm.chain_info().root_account();
-                let mut root_account_locker = root_account_arcmutex.lock().unwrap();
+                let root_account = swarm.chain_info().root_account();
                 reconfig(
                     &rest_client,
                     &transaction_factory,
-                    root_account_locker.deref_mut(),
+                    root_account,
                 )
                 .await;
             }
 
             {
-                let root_account_arcmutex = swarm.chain_info().root_account();
-                let mut root_account_locker = root_account_arcmutex.lock().unwrap();
+                let root_account = swarm.chain_info().root_account();
                 reconfig(
                     &rest_client,
                     &transaction_factory,
-                    root_account_locker.deref_mut(),
+                    root_account,
                 )
                     .await;
             }
@@ -160,23 +158,21 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
             for operator_index in validator_cli_indices.iter().rev().take(num_validators / 3) {
                 cli.join_validator_set(*operator_index, None).await.unwrap();
 
-                let root_account_arcmutex = swarm.chain_info().root_account();
-                let mut root_account_locker = root_account_arcmutex.lock().unwrap();
+                let root_account = swarm.chain_info().root_account();
                 reconfig(
                     &rest_client,
                     &transaction_factory,
-                    root_account_locker.deref_mut(),
+                    root_account,
                 )
                 .await;
             }
 
             {
-                let root_account_arcmutex = swarm.chain_info().root_account();
-                let mut root_account_locker = root_account_arcmutex.lock().unwrap();
+                let root_account = swarm.chain_info().root_account();
                 reconfig(
                     &rest_client,
                     &transaction_factory,
-                    root_account_locker.deref_mut(),
+                    root_account,
                 )
                     .await;
             }

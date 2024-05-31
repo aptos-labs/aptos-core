@@ -14,7 +14,7 @@ impl Test for ReconfigurationTest {
 }
 
 impl NetworkTest for ReconfigurationTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+    fn run(&self, _ctx: NetworkContextSynchronizer) -> Result<()> {
         Err(anyhow!("Not supported in aptos-framework yet"))
     }
     // TODO(https://github.com/aptos-labs/aptos-core/issues/317): add back after support those transactions in aptos-framework

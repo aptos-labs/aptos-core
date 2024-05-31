@@ -42,13 +42,13 @@ use std::{
     env, str,
     sync::Arc,
 };
-use std::sync::Mutex;
+// use std::sync::Mutex;
 use tokio::{runtime::Runtime, time::Duration};
 
 pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
     fullnodes: HashMap<PeerId, K8sNode>,
-    root_account: Arc<Mutex<LocalAccount>>,
+    root_account: Arc<LocalAccount>,
     kube_client: K8sClient,
     versions: Arc<HashMap<Version, String>>,
     pub chain_id: ChainId,
@@ -87,7 +87,7 @@ impl K8sSwarm {
             )
         })?;
         let root_account = LocalAccount::new(address, account_key, sequence_number);
-        let root_account = Arc::new(Mutex::new(root_account));
+        let root_account = Arc::new(root_account);
 
         let mut versions = HashMap::new();
         let cur_version = Version::new(0, image_tag.to_string());
