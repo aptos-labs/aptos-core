@@ -2,10 +2,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::ModuleStorageAdapter;
 use crate::{
     loader::{
-        access_specifier_loader::load_access_specifier, Loader, Module, Resolver, ScriptHash,
+        access_specifier_loader::load_access_specifier, Loader, ModuleStorageAdapter, Resolver,
+        ScriptHash,
     },
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
 };
@@ -35,7 +35,7 @@ pub struct Function {
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
-    pub ty_param_abilities: Vec<AbilitySet>,
+    pub(crate) ty_param_abilities: Vec<AbilitySet>,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
     pub(crate) is_native: bool,
@@ -43,22 +43,45 @@ pub struct Function {
     pub(crate) is_entry: bool,
     pub(crate) scope: Scope,
     pub(crate) name: Identifier,
-    pub return_tys: Vec<Type>,
+    pub(crate) return_tys: Vec<Type>,
     pub(crate) local_tys: Vec<Type>,
-    pub param_tys: Vec<Type>,
+    pub(crate) param_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
 }
 
-// This struct must be treated as an identifier for a function and not somehow relying on
-// the internal implementation.
+// An instantiated and loaded runtime function representation.
 pub struct LoadedFunction {
-    pub(crate) module: Arc<Module>,
+    pub(crate) ty_args: Vec<Type>,
     pub(crate) function: Arc<Function>,
 }
 
 impl LoadedFunction {
+    pub fn ty_args(&self) -> &[Type] {
+        &self.ty_args
+    }
+
+    pub fn module_id(&self) -> Option<ModuleId> {
+        self.function.module_id().cloned()
+    }
+
     pub fn is_friend_or_private(&self) -> bool {
         self.function.is_friend_or_private()
+    }
+
+    pub(crate) fn is_entry(&self) -> bool {
+        self.function.is_entry()
+    }
+
+    pub fn param_tys(&self) -> &[Type] {
+        self.function.param_tys()
+    }
+
+    pub fn return_tys(&self) -> &[Type] {
+        self.function.return_tys()
+    }
+
+    pub fn ty_param_abilities(&self) -> &[AbilitySet] {
+        self.function.ty_param_abilities()
     }
 }
 
@@ -181,7 +204,7 @@ impl Function {
         self.local_tys.len()
     }
 
-    pub(crate) fn param_count(&self) -> usize {
+    pub fn param_count(&self) -> usize {
         self.param_tys.len()
     }
 
@@ -193,7 +216,7 @@ impl Function {
         &self.code
     }
 
-    pub(crate) fn ty_arg_abilities(&self) -> &[AbilitySet] {
+    pub fn ty_param_abilities(&self) -> &[AbilitySet] {
         &self.ty_param_abilities
     }
 
@@ -201,11 +224,11 @@ impl Function {
         &self.local_tys
     }
 
-    pub(crate) fn return_tys(&self) -> &[Type] {
+    pub fn return_tys(&self) -> &[Type] {
         &self.return_tys
     }
 
-    pub(crate) fn param_tys(&self) -> &[Type] {
+    pub fn param_tys(&self) -> &[Type] {
         &self.param_tys
     }
 

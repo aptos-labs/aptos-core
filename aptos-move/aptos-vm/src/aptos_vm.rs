@@ -764,7 +764,7 @@ impl AptosVM {
             )?;
         }
 
-        let loaded_func = session.load_script(script.code(), script.ty_args().to_vec())?;
+        let func = session.load_script(script.code(), script.ty_args())?;
 
         // TODO(Gerardo): consolidate the extended validation to verifier.
         verifier::event_validation::verify_no_event_emission_in_script(
@@ -776,7 +776,7 @@ impl AptosVM {
             session,
             senders,
             convert_txn_args(script.args()),
-            &loaded_func,
+            &func,
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
 
@@ -813,7 +813,7 @@ impl AptosVM {
             )])?;
         }
 
-        let (function, instantiation) =
+        let function =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
 
         // The `has_randomness_attribute()` should have been feature-gated in 1.11...
@@ -832,16 +832,10 @@ impl AptosVM {
             session,
             senders,
             entry_fn.args().to_vec(),
-            &instantiation,
+            &function,
             struct_constructors_enabled,
         )?;
-        session.execute_entry_function(
-            function,
-            instantiation,
-            args,
-            gas_meter,
-            traversal_context,
-        )?;
+        session.execute_entry_function(function, args, gas_meter, traversal_context)?;
         Ok(())
     }
 
@@ -2255,13 +2249,13 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         gas_meter: &mut impl AptosGasMeter,
     ) -> anyhow::Result<Vec<Vec<u8>>> {
-        let (_, instantiation) = session.load_function(&module_id, &func_name, &type_args)?;
+        let func = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.extract_module_metadata(&module_id);
         let arguments = verifier::view_function::validate_view_function(
             session,
             arguments,
             func_name.as_ident_str(),
-            &instantiation,
+            &func,
             metadata.as_ref().map(Arc::as_ref),
             vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;

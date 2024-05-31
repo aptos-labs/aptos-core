@@ -61,21 +61,22 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn execute_entry_function(
         &mut self,
         func: LoadedFunction,
-        instantiation: LoadedFunctionInstantiation,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<()> {
-        if !func.function.is_entry() {
+        if !func.is_entry() {
             return Err(PartialVMError::new(
                 StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
             )
-            .finish(Location::Module(func.module.module.self_id())));
+            .finish(Location::Module(
+                func.module_id()
+                    .expect("Entry function always has module id"),
+            )));
         }
 
         self.move_vm.runtime.execute_function_instantiation(
             func,
-            instantiation,
             args,
             &mut self.data_cache,
             &self.module_store,
@@ -96,7 +97,7 @@ impl<'r, 'l> Session<'r, 'l> {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<SerializedReturnValues> {
-        let (func, instantiation) = self.move_vm.runtime.loader().load_function(
+        let func = self.move_vm.runtime.loader().load_function(
             module,
             function_name,
             &ty_args,
@@ -106,7 +107,6 @@ impl<'r, 'l> Session<'r, 'l> {
 
         self.move_vm.runtime.execute_function_instantiation(
             func,
-            instantiation,
             args,
             &mut self.data_cache,
             &self.module_store,
@@ -116,17 +116,15 @@ impl<'r, 'l> Session<'r, 'l> {
         )
     }
 
-    pub fn execute_instantiated_function(
+    pub fn execute_loaded_function(
         &mut self,
         func: LoadedFunction,
-        instantiation: LoadedFunctionInstantiation,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<SerializedReturnValues> {
         self.move_vm.runtime.execute_function_instantiation(
             func,
-            instantiation,
             args,
             &mut self.data_cache,
             &self.module_store,
@@ -338,15 +336,14 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn load_script(
         &mut self,
         script: impl Borrow<[u8]>,
-        ty_args: Vec<TypeTag>,
-    ) -> VMResult<LoadedFunctionInstantiation> {
-        let (_, instantiation) = self.move_vm.runtime.loader().load_script(
+        ty_args: &[TypeTag],
+    ) -> VMResult<LoadedFunction> {
+        self.move_vm.runtime.loader().load_script(
             script.borrow(),
-            &ty_args,
+            ty_args,
             &mut self.data_cache,
             &self.module_store,
-        )?;
-        Ok(instantiation)
+        )
     }
 
     /// Load a module, a function, and all of its types into cache
@@ -355,9 +352,8 @@ impl<'r, 'l> Session<'r, 'l> {
         module_id: &ModuleId,
         function_name: &IdentStr,
         expected_return_type: &Type,
-    ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
-        let (func, instantiation) = self
-            .move_vm
+    ) -> VMResult<LoadedFunction> {
+        self.move_vm
             .runtime
             .loader()
             .load_function_with_type_arg_inference(
@@ -366,8 +362,7 @@ impl<'r, 'l> Session<'r, 'l> {
                 expected_return_type,
                 &mut self.data_cache,
                 &self.module_store,
-            )?;
-        Ok((func, instantiation))
+            )
     }
 
     /// Load a module, a function, and all of its types into cache
@@ -375,12 +370,12 @@ impl<'r, 'l> Session<'r, 'l> {
         &mut self,
         module_id: &ModuleId,
         function_name: &IdentStr,
-        type_arguments: &[TypeTag],
-    ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
+        ty_args: &[TypeTag],
+    ) -> VMResult<LoadedFunction> {
         self.move_vm.runtime.loader().load_function(
             module_id,
             function_name,
-            type_arguments,
+            ty_args,
             &mut self.data_cache,
             &self.module_store,
         )
@@ -510,10 +505,4 @@ impl<'r, 'l> Session<'r, 'l> {
                 script.borrow(),
             )
     }
-}
-
-pub struct LoadedFunctionInstantiation {
-    pub ty_args: Vec<Type>,
-    pub param_tys: Vec<Type>,
-    pub return_tys: Vec<Type>,
 }

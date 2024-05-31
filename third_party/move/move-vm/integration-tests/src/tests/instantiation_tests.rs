@@ -128,11 +128,10 @@ fn instantiation_err() {
 
     let res = session.load_function(&cm.self_id(), ident_str!("f"), &[ty_arg]);
     assert!(res.is_ok());
-    let (function, instantiation) = res.unwrap();
+    let function = res.unwrap();
 
     let err = session.execute_entry_function(
         function,
-        instantiation,
         Vec::<Vec<u8>>::new(),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
