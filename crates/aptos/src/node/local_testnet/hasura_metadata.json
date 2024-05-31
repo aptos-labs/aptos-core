@@ -1,5 +1,5 @@
 {
-  "resource_version": 399,
+  "resource_version": 319,
   "metadata": {
     "version": 3,
     "sources": [
@@ -136,10 +136,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "account_address",
-                    "transaction_version"
-                  ],
+                  "columns": ["account_address", "transaction_version"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -255,10 +252,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "account_address",
-                    "transaction_version"
-                  ],
+                  "columns": ["account_address", "transaction_version"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -337,10 +331,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "address",
-                    "transaction_version"
-                  ],
+                  "columns": ["address", "transaction_version"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -1586,10 +1577,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "delegator_address",
-                    "pool_address"
-                  ],
+                  "columns": ["delegator_address", "pool_address"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -1706,10 +1694,12 @@
                     "icon_uri",
                     "last_transaction_timestamp",
                     "last_transaction_version",
+                    "maximum_v2",
                     "name",
                     "project_uri",
                     "supply_aggregator_table_handle_v1",
                     "supply_aggregator_table_key_v1",
+                    "supply_v2",
                     "symbol",
                     "token_standard"
                   ],
@@ -1728,10 +1718,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "db",
-                    "is_indexer_up"
-                  ],
+                  "columns": ["db", "is_indexer_up"],
                   "filter": {},
                   "limit": 100
                 }
@@ -1747,9 +1734,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "chain_id"
-                  ],
+                  "columns": ["chain_id"],
                   "filter": {}
                 }
               }
@@ -1764,10 +1749,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "address",
-                    "transaction_version"
-                  ],
+                  "columns": ["address", "transaction_version"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -1784,10 +1766,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "num_active_delegator",
-                    "pool_address"
-                  ],
+                  "columns": ["num_active_delegator", "pool_address"],
                   "filter": {},
                   "limit": 100
                 }
@@ -1901,11 +1880,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "handle",
-                    "key_type",
-                    "value_type"
-                  ],
+                  "columns": ["handle", "key_type", "value_type"],
                   "filter": {},
                   "limit": 100
                 }
@@ -2242,9 +2217,7 @@
             "query_name": "Latest Processor Status"
           }
         },
-        "methods": [
-          "GET"
-        ],
+        "methods": ["GET"],
         "name": "Latest Processor Status",
         "url": "get_latest_processor_status"
       }

@@ -240,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "3.4.0"
+version = "3.4.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -2661,7 +2661,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=ca60e51b53c3be6f9517de7c73d4711e9c1f7236#ca60e51b53c3be6f9517de7c73d4711e9c1f7236"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d#5244b84fa5ed872e5280dc8df032d744d62ad29d"
 dependencies = [
  "chrono",
 ]
@@ -9171,9 +9171,9 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.17.8"
+version = "0.17.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "763a5a8f45087d6bcea4222e7b72c291a054edf80e4ef6efd2a4979878c7bea3"
+checksum = "fb28741c9db9a713d93deb3bb9515c20788cef5815265bee4980e87bde7e0f25"
 dependencies = [
  "console",
  "instant",
@@ -10464,6 +10464,7 @@ dependencies = [
 name = "move-compiler-v2-transactional-tests"
 version = "0.1.0"
 dependencies = [
+ "aptos-vm",
  "datatest-stable",
  "itertools 0.12.1",
  "move-command-line-common",
@@ -10539,6 +10540,7 @@ name = "move-docgen"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap 4.4.14",
  "codespan",
  "codespan-reporting",
  "datatest-stable",
@@ -12707,11 +12709,11 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=ca60e51b53c3be6f9517de7c73d4711e9c1f7236#ca60e51b53c3be6f9517de7c73d4711e9c1f7236"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d#5244b84fa5ed872e5280dc8df032d744d62ad29d"
 dependencies = [
  "ahash 0.8.11",
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=ca60e51b53c3be6f9517de7c73d4711e9c1f7236)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d)",
  "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.12.1)",
  "async-trait",
  "base64 0.13.1",
@@ -14035,7 +14037,7 @@ version = "0.39.0"
 source = "git+https://github.com/banool/self_update.git?rev=8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b#8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b"
 dependencies = [
  "hyper",
- "indicatif 0.17.8",
+ "indicatif 0.17.7",
  "log",
  "quick-xml 0.23.1",
  "regex",
@@ -14306,7 +14308,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=ca60e51b53c3be6f9517de7c73d4711e9c1f7236#ca60e51b53c3be6f9517de7c73d4711e9c1f7236"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d#5244b84fa5ed872e5280dc8df032d744d62ad29d"
 dependencies = [
  "anyhow",
  "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",

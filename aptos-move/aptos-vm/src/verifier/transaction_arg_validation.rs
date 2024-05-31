@@ -22,7 +22,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
-    session::LoadedFunctionInstantiation,
+    LoadedFunction,
 };
 use move_vm_types::{
     gas::{GasMeter, UnmeteredGasMeter},
@@ -105,11 +105,11 @@ pub fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
     senders: Vec<AccountAddress>,
     args: Vec<Vec<u8>>,
-    func: &LoadedFunctionInstantiation,
+    func: &LoadedFunction,
     are_struct_constructors_enabled: bool,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
-    // entry function should not return
-    if !func.return_tys.is_empty() {
+    // Entry function should not return.
+    if !func.return_tys().is_empty() {
         return Err(VMStatus::error(
             StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
             None,
@@ -117,7 +117,7 @@ pub fn validate_combine_signer_and_txn_args(
     }
     let mut signer_param_cnt = 0;
     // find all signer params at the beginning
-    for ty in func.param_tys.iter() {
+    for ty in func.param_tys() {
         match ty {
             Type::Signer => signer_param_cnt += 1,
             Type::Reference(inner_type) => {
@@ -133,8 +133,8 @@ pub fn validate_combine_signer_and_txn_args(
     let ty_builder = session.get_ty_builder();
 
     // Need to keep this here to ensure we return the historic correct error code for replay
-    for ty in func.param_tys[signer_param_cnt..].iter() {
-        let subst_res = ty_builder.create_ty_with_subst(ty, &func.ty_args);
+    for ty in func.param_tys()[signer_param_cnt..].iter() {
+        let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
         let ty = if ty_builder.is_legacy() {
             subst_res.unwrap()
         } else {
@@ -150,7 +150,7 @@ pub fn validate_combine_signer_and_txn_args(
         }
     }
 
-    if (signer_param_cnt + args.len()) != func.param_tys.len() {
+    if (signer_param_cnt + args.len()) != func.param_tys().len() {
         return Err(VMStatus::error(
             StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
             None,
@@ -173,9 +173,9 @@ pub fn validate_combine_signer_and_txn_args(
     // FAILED_TO_DESERIALIZE_ARGUMENT error.
     let args = construct_args(
         session,
-        &func.param_tys[signer_param_cnt..],
+        &func.param_tys()[signer_param_cnt..],
         args,
-        &func.ty_args,
+        func.ty_args(),
         allowed_structs,
         false,
     )?;
@@ -196,12 +196,12 @@ pub fn validate_combine_signer_and_txn_args(
 // Return whether the argument is valid/allowed and whether it needs construction.
 pub(crate) fn is_valid_txn_arg(
     session: &SessionExt,
-    typ: &Type,
+    ty: &Type,
     allowed_structs: &ConstructorMap,
 ) -> bool {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
-    match typ {
+    match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
         Vector(inner) => is_valid_txn_arg(session, inner, allowed_structs),
         Struct { idx, .. } | StructInstantiation { idx, .. } => {
@@ -431,17 +431,17 @@ fn validate_and_construct(
         *max_invocations -= 1;
     }
 
-    let (function, instantiation) = session.load_function_with_type_arg_inference(
+    let function = session.load_function_with_type_arg_inference(
         &constructor.module_id,
         constructor.func_name,
         expected_type,
     )?;
     let mut args = vec![];
     let ty_builder = session.get_ty_builder();
-    for param_ty in &instantiation.param_tys {
+    for param_ty in function.param_tys() {
         let mut arg = vec![];
         let arg_ty = ty_builder
-            .create_ty_with_subst(param_ty, &instantiation.ty_args)
+            .create_ty_with_subst(param_ty, function.ty_args())
             .unwrap();
 
         recursively_construct_arg(
@@ -457,9 +457,8 @@ fn validate_and_construct(
         args.push(arg);
     }
     let storage = TraversalStorage::new();
-    let serialized_result = session.execute_instantiated_function(
+    let serialized_result = session.execute_loaded_function(
         function,
-        instantiation,
         args,
         gas_meter,
         &mut TraversalContext::new(&storage),

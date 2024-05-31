@@ -35,6 +35,7 @@ use std::{
 use thiserror::Error;
 
 const ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE: &str = "lint::allow_unsafe_randomness";
+const FMT_SKIP_ATTRIBUTE: &str = "fmt::skip";
 const INIT_MODULE_FUN: &str = "init_module";
 const LEGACY_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
 const ERROR_PREFIX: &str = "E";
@@ -51,8 +52,9 @@ const RANDOMNESS_MODULE_NAME: &str = "randomness";
 
 // top-level attribute names, only.
 pub fn get_all_attribute_names() -> &'static BTreeSet<String> {
-    const ALL_ATTRIBUTE_NAMES: [&str; 7] = [
+    const ALL_ATTRIBUTE_NAMES: [&str; 8] = [
         ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE,
+        FMT_SKIP_ATTRIBUTE,
         LEGACY_ENTRY_FUN_ATTRIBUTE,
         RESOURCE_GROUP,
         RESOURCE_GROUP_MEMBER,

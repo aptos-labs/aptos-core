@@ -77,11 +77,12 @@ fn test_publish_module_with_nested_loops() {
         sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
             .unwrap();
 
+        let func = sess
+            .load_function(&m.self_id(), &Identifier::new("foo").unwrap(), &[])
+            .unwrap();
         let err1 = sess
             .execute_entry_function(
-                &m.self_id(),
-                &Identifier::new("foo").unwrap(),
-                vec![],
+                func,
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
@@ -90,17 +91,18 @@ fn test_publish_module_with_nested_loops() {
 
         assert!(err1.exec_state().unwrap().stack_trace().is_empty());
 
+        let func = sess
+            .load_function(&m.self_id(), &Identifier::new("foo2").unwrap(), &[])
+            .unwrap();
         let err2 = sess
             .execute_entry_function(
-                &m.self_id(),
-                &Identifier::new("foo2").unwrap(),
-                vec![],
+                func,
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
 
-        assert!(err2.exec_state().unwrap().stack_trace().len() == 1);
+        assert_eq!(err2.exec_state().unwrap().stack_trace().len(), 1);
     }
 }
