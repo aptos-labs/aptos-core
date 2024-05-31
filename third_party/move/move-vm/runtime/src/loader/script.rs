@@ -218,30 +218,16 @@ impl ScriptCache {
         }
     }
 
-    pub(crate) fn get(&self, hash: &ScriptHash) -> Option<(Arc<Function>, Vec<Type>, Vec<Type>)> {
-        self.scripts.get(hash).map(|script| {
-            (
-                script.entry_point(),
-                script.entry_point().param_tys().to_vec(),
-                script.entry_point().return_tys().to_vec(),
-            )
-        })
+    pub(crate) fn get(&self, hash: &ScriptHash) -> Option<Arc<Function>> {
+        self.scripts.get(hash).map(|script| script.entry_point())
     }
 
-    pub(crate) fn insert(
-        &mut self,
-        hash: ScriptHash,
-        script: Script,
-    ) -> (Arc<Function>, Vec<Type>, Vec<Type>) {
+    pub(crate) fn insert(&mut self, hash: ScriptHash, script: Script) -> Arc<Function> {
         match self.get(&hash) {
             Some(cached) => cached,
             None => {
                 let script = self.scripts.insert(hash, script);
-                (
-                    script.entry_point(),
-                    script.entry_point().param_tys().to_vec(),
-                    script.entry_point().return_tys().to_vec(),
-                )
+                script.entry_point()
             },
         }
     }

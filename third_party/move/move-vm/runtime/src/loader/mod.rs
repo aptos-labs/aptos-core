@@ -301,7 +301,7 @@ impl Loader {
         let hash_value: [u8; 32] = sha3_256.finalize().into();
 
         let mut scripts = self.scripts.write();
-        let (main, _param_tys, _return_tys) = match scripts.get(&hash_value) {
+        let main = match scripts.get(&hash_value) {
             Some(cached) => cached,
             None => {
                 let ver_script = self.deserialize_and_verify_script(
