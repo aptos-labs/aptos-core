@@ -18,3 +18,10 @@ path = "fuzz_targets/module_only.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "transactional"
+path = "fuzz_targets/transactional.rs"
+test = false
+doc = false
+bench = false
