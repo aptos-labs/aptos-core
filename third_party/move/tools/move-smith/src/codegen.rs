@@ -35,6 +35,37 @@ impl CodeGenerator for CompileUnit {
         for m in &self.modules {
             code.extend(m.emit_code_lines());
         }
+
+        for s in &self.scripts {
+            code.extend(s.emit_code_lines());
+        }
+
+        code
+    }
+}
+
+impl CodeGenerator for Script {
+    fn emit_code_lines(&self) -> Vec<String> {
+        let mut code = vec!["//# run".to_string(), "script {".to_string()];
+        let main = Function {
+            signature: FunctionSignature {
+                parameters: Vec::new(),
+                return_type: None,
+            },
+            visibility: Visibility { public: false },
+            name: "main".to_string(),
+            body: Some(FunctionBody {
+                stmts: self
+                    .main
+                    .iter()
+                    .map(|f| Statement::Expr(Expression::FunctionCall(f.clone())))
+                    .collect(),
+            }),
+            return_stmt: None,
+        };
+        let main_code = main.emit_code_lines();
+        append_code_lines_with_indentation(&mut code, main_code, INDENTATION_SIZE);
+        code.push("}\n".to_string());
         code
     }
 }
@@ -121,8 +152,15 @@ impl CodeGenerator for Function {
             None => "".to_string(),
         };
 
+        let visibility = if self.visibility.public {
+            "public "
+        } else {
+            ""
+        };
+
         let mut code = vec![format!(
-            "fun {}({}){} {{",
+            "{}fun {}({}){} {{",
+            visibility,
             self.name.emit_code(),
             parameters,
             return_type

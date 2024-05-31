@@ -15,6 +15,7 @@ pub struct MoveSmith {
 
     // The output code
     pub modules: Vec<Module>,
+    pub script: Option<Script>,
 
     // Bookkeeping
     pub id_pool: IdentifierPool,
@@ -31,6 +32,7 @@ impl MoveSmith {
     pub fn new(config: Config) -> Self {
         Self {
             modules: Vec::new(),
+            script: None,
             config,
             id_pool: IdentifierPool::new(),
             type_pool: TypePool::new(),
@@ -40,6 +42,10 @@ impl MoveSmith {
     pub fn get_compile_unit(&self) -> CompileUnit {
         CompileUnit {
             modules: self.modules.clone(),
+            scripts: match &self.script {
+                Some(s) => vec![s.clone()],
+                None => Vec::new(),
+            },
         }
     }
 
@@ -59,11 +65,35 @@ impl MoveSmith {
             .map(|m| self.fill_module(u, m))
             .collect::<Result<Vec<Module>>>()?;
         self.modules = filled_modules;
+
+        self.generate_script(u)?;
+        Ok(())
+    }
+
+    pub fn generate_script(&mut self, u: &mut Unstructured) -> Result<()> {
+        let mut script = Script { main: Vec::new() };
+
+        let all_funcs = self
+            .modules
+            .iter()
+            .flat_map(|m| m.functions.iter().cloned())
+            .collect::<Vec<Function>>();
+
+        for _ in 0..u.int_in_range(1..=self.config.max_num_calls_in_script)? {
+            let func = u.choose(&all_funcs)?;
+            let mut call = self.generate_call_to_function(u, &None, func, false)?;
+            call.name = self.id_pool.flatten_access(&call.name).unwrap();
+            script.main.push(call);
+        }
+
+        self.script = Some(script);
         Ok(())
     }
 
     pub fn generate_module_skeleton(&mut self, u: &mut Unstructured) -> Result<Module> {
-        let (name, scope) = self.id_pool.next_identifier(IdentifierType::Module, &None);
+        let (name, scope) = self
+            .id_pool
+            .next_identifier(IdentifierType::Module, &Some("0xCAFE".to_string()));
 
         // Struct names
         let mut structs = Vec::new();
@@ -225,6 +255,7 @@ impl MoveSmith {
 
         Ok(Function {
             signature,
+            visibility: Visibility { public: true },
             name,
             body: None,
             return_stmt: None,
@@ -281,7 +312,8 @@ impl MoveSmith {
                 );
                 match ids.is_empty() {
                     true => {
-                        let expr = self.generate_expression_of_type(u, parent_scope, typ, true)?;
+                        let expr =
+                            self.generate_expression_of_type(u, parent_scope, typ, true, true)?;
                         Ok(Some(expr))
                     },
                     false => {
@@ -332,11 +364,11 @@ impl MoveSmith {
 
         let typ = self.type_pool.random_basic_type(u)?;
         // let value = match bool::arbitrary(u)? {
-        //     true => Some(self.generate_expression_of_type(u, parent_scope, &typ, true)?),
+        //     true => Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?),
         //     false => None,
         // };
         // TODO: disabled declaration without value for now, need to keep track of initialization
-        let value = Some(self.generate_expression_of_type(u, parent_scope, &typ, true)?);
+        let value = Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?);
         self.type_pool.insert_mapping(&name, &typ);
         Ok(Declaration { typ, name, value })
     }
@@ -386,6 +418,7 @@ impl MoveSmith {
         u: &mut Unstructured,
         parent_scope: &Scope,
         typ: &Type,
+        allow_var: bool,
         allow_call: bool,
     ) -> Result<Expression> {
         // Store candidate expressions for the given type
@@ -407,12 +440,14 @@ impl MoveSmith {
         choices.push(candidate);
 
         // Access identifier with the given type
-        let idents = self.get_filtered_identifiers(Some(typ), None, Some(parent_scope));
+        if allow_var {
+            let idents = self.get_filtered_identifiers(Some(typ), None, Some(parent_scope));
 
-        // TODO: select from many?
-        if !idents.is_empty() {
-            let candidate = u.choose(&idents)?.clone();
-            choices.push(Expression::Variable(candidate));
+            // TODO: select from many?
+            if !idents.is_empty() {
+                let candidate = u.choose(&idents)?.clone();
+                choices.push(Expression::Variable(candidate));
+            }
         }
 
         // TODO: call functions with the given type
@@ -424,7 +459,7 @@ impl MoveSmith {
                 .collect();
             if !callables.is_empty() {
                 let func = u.choose(&callables)?;
-                let call = self.generate_call_to_function(u, parent_scope, func)?;
+                let call = self.generate_call_to_function(u, parent_scope, func, true)?;
                 choices.push(Expression::FunctionCall(call));
             }
         }
@@ -444,7 +479,7 @@ impl MoveSmith {
 
         let mut fields = Vec::new();
         for (name, typ) in struct_def.fields.iter() {
-            let expr = self.generate_expression_of_type(u, parent_scope, typ, true)?;
+            let expr = self.generate_expression_of_type(u, parent_scope, typ, true, true)?;
             fields.push((name.clone(), expr));
         }
         Ok(Expression::StructInitialization(StructInitialization {
@@ -468,6 +503,7 @@ impl MoveSmith {
             u,
             parent_scope,
             &func,
+            true,
         )?))
     }
 
@@ -476,11 +512,12 @@ impl MoveSmith {
         u: &mut Unstructured,
         parent_scope: &Scope,
         func: &Function,
+        allow_var: bool,
     ) -> Result<FunctionCall> {
         let mut args = Vec::new();
 
         for (_, typ) in func.signature.parameters.iter() {
-            let expr = self.generate_expression_of_type(u, parent_scope, typ, false)?;
+            let expr = self.generate_expression_of_type(u, parent_scope, typ, allow_var, false)?;
             args.push(expr);
         }
         Ok(FunctionCall {
