@@ -247,8 +247,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/reference-safety/"],
             exclude: vec![],
             exp_suffix: None,
-            // TODO(#13485): Need to turn off acquires check for now to test 2.0 access specifiers
-            options: opts.clone().set_experiment(Experiment::ACQUIRES_CHECK, false),
+            options: opts.clone(),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
@@ -270,8 +269,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             // Some reference tests create different errors since variable names are
             // known without optimizations, so we need to have a different exp file
             exp_suffix: Some("no-opt.exp"),
-            options: opts.clone().set_experiment(Experiment::OPTIMIZE, false)
-                .set_experiment(Experiment::ACQUIRES_CHECK, false),
+            options: opts.clone().set_experiment(Experiment::OPTIMIZE, false),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
