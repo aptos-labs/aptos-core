@@ -43,21 +43,41 @@ impl Type {
 #[derive(Default, Debug, Clone)]
 pub struct TypePool {
     mapping: HashMap<Identifier, Type>,
+    all_types: Vec<Type>,
 }
 
 impl TypePool {
     pub fn new() -> Self {
         Self {
             mapping: HashMap::new(),
+            all_types: vec![
+                Type::U8,
+                Type::U16,
+                Type::U32,
+                Type::U64,
+                Type::U128,
+                Type::U256,
+                Type::Bool,
+                // Type::Address,
+                // Type::Signer,
+            ],
         }
     }
 
-    pub fn insert(&mut self, id: &Identifier, typ: &Type) {
+    pub fn insert_mapping(&mut self, id: &Identifier, typ: &Type) {
         self.mapping.insert(id.clone(), typ.clone());
+    }
+
+    pub fn register_type(&mut self, typ: Type) {
+        self.all_types.push(typ);
     }
 
     pub fn get_type(&self, id: &Identifier) -> Option<Type> {
         self.mapping.get(id).cloned()
+    }
+
+    pub fn get_all_types(&self) -> Vec<Type> {
+        self.all_types.clone()
     }
 
     pub fn filter_identifier_with_type(&self, typ: &Type, ids: Vec<Identifier>) -> Vec<Identifier> {
