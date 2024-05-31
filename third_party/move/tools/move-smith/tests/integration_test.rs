@@ -17,6 +17,7 @@ fn simple_module() -> Module {
                 ],
                 return_type: Some(Type::U32),
             },
+            visibility: Visibility { public: true },
             name: String::from("fun1"),
             body: Some(FunctionBody {
                 stmts: vec![Statement::Expr(Expression::NumberLiteral(NumberLiteral {
@@ -48,7 +49,10 @@ fn test_emit_code() {
     assert_eq!(lines.len(), 7);
     assert_eq!(lines[0], "//# publish");
     assert_eq!(lines[1], "module 0xCAFE::SimpleModule {");
-    assert_eq!(lines[2], "    fun fun1(param1: u64, param2: u8): u32 {");
+    assert_eq!(
+        lines[2],
+        "    public fun fun1(param1: u64, param2: u8): u32 {"
+    );
     assert_eq!(lines[3], "        42u32;");
     assert_eq!(lines[4], "        111u32");
     assert_eq!(lines[5], "    }");

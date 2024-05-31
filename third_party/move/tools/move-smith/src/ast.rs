@@ -8,6 +8,7 @@ use num_bigint::BigUint;
 #[derive(Debug, Clone)]
 pub struct CompileUnit {
     pub modules: Vec<Module>,
+    pub scripts: Vec<Script>,
 }
 
 #[derive(Debug, Clone)]
@@ -25,9 +26,15 @@ pub struct Module {
 }
 
 #[derive(Debug, Clone)]
+pub struct Script {
+    // pub uses: Vec<UseDecl>,
+    pub main: Vec<FunctionCall>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Function {
     // pub attributes: Vec<Attributes>,
-    // pub visibility: Visibility,
+    pub visibility: Visibility,
     pub signature: FunctionSignature,
     /// `None` indicates no specifiers given, `Some([])` indicates the `pure` keyword has been
     /// used.
@@ -37,6 +44,11 @@ pub struct Function {
     pub body: Option<FunctionBody>,
 
     pub return_stmt: Option<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Visibility {
+    pub public: bool,
 }
 
 #[derive(Debug, Clone)]
