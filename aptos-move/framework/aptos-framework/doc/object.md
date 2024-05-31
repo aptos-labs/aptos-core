@@ -1866,8 +1866,14 @@ Transfer to the destination address using a LinearTransferRef.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_ref">transfer_with_ref</a>(ref: <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a>, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_ref">transfer_with_ref</a>(ref: <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a>, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a>, <a href="object.md#0x1_object_TombStone">TombStone</a> {
     <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_MOVABLE">ENOT_MOVABLE</a>));
+
+    // Undo soft burn <b>if</b> present <b>as</b> we don't want the original owner <b>to</b> be able <b>to</b> reclaim by calling unburn later.
+    <b>if</b> (<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(ref.self)) {
+        <b>let</b> <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner: _ } = <b>move_from</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(ref.self);
+    };
+
     <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
     <b>assert</b>!(
         <a href="object.md#0x1_object">object</a>.owner == ref.owner,
