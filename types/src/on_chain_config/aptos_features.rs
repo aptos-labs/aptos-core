@@ -10,7 +10,6 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     language_storage::CORE_CODE_ADDRESS,
 };
-use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
@@ -153,15 +152,6 @@ impl FeatureFlag {
     }
 }
 
-static ENABLED_FEATURES: OnceCell<Vec<FeatureFlag>> = OnceCell::new();
-pub fn hack_enable_default_features_for_genesis(enable_features: Vec<FeatureFlag>) {
-    ENABLED_FEATURES.set(enable_features).ok();
-}
-static DISABLED_FEATURES: OnceCell<Vec<FeatureFlag>> = OnceCell::new();
-pub fn hack_disable_default_features_for_genesis(disable_features: Vec<FeatureFlag>) {
-    DISABLED_FEATURES.set(disable_features).ok();
-}
-
 /// Representation of features on chain as a bitset.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Features {
@@ -178,16 +168,7 @@ impl Default for Features {
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
         }
-        if let Some(enabled_features) = ENABLED_FEATURES.get() {
-            for feature in enabled_features.iter() {
-                features.enable(*feature);
-            }
-        }
-        if let Some(disabled_features) = DISABLED_FEATURES.get() {
-            for feature in disabled_features.iter() {
-                features.disable(*feature);
-            }
-        }
+
         features
     }
 }
@@ -373,20 +354,4 @@ mod test {
             file_format_common::VERSION_MAX
         );
     }
-}
-
-#[test]
-fn test_enabling_disabling_features() {
-    hack_enable_default_features_for_genesis(vec![
-        FeatureFlag::BLS12_381_STRUCTURES,
-        FeatureFlag::CODE_DEPENDENCY_CHECK,
-    ]);
-    hack_disable_default_features_for_genesis(vec![
-        FeatureFlag::BN254_STRUCTURES,
-        FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
-    ]);
-    let features = Features::default();
-    assert_eq!(features.is_enabled(FeatureFlag::BLS12_381_STRUCTURES), true);
-    assert_eq!(features.is_enabled(FeatureFlag::BULLETPROOFS_NATIVES), true);
-    assert_eq!(features.is_enabled(FeatureFlag::BN254_STRUCTURES), false);
 }

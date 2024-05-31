@@ -1,14 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
 use crate::builder::InitGenesisConfigFn;
 use aptos_config::config::{IdentityBlob, NodeConfig};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_temppath::TempPath;
 use rand::{rngs::StdRng, SeedableRng};
+use aptos_types::on_chain_config::Features;
 
 pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
     test_config_with_custom_onchain(None)
+}
+
+pub fn test_config_with_custom_features(init_features: Features) -> (NodeConfig, Ed25519PrivateKey) {
+    test_config_with_custom_onchain(Some(Arc::new(move |config| {
+        config.initial_features_override = Some(init_features.clone());
+    })))
 }
 
 pub fn test_config_with_custom_onchain(

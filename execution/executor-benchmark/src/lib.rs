@@ -52,6 +52,7 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
+use aptos_types::on_chain_config::Features;
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
@@ -108,6 +109,7 @@ pub fn run_benchmark<V>(
     pruner_config: PrunerConfig,
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
+    init_features: Features,
 ) where
     V: TransactionBlockExecutor + 'static,
 {
@@ -116,12 +118,10 @@ pub fn run_benchmark<V>(
         checkpoint_dir.as_ref(),
         enable_storage_sharding,
     );
-
-    let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
+    let (mut config, genesis_key) = aptos_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
-
     let (db, executor) = init_db_and_executor::<V>(&config);
 
     let mut root_account = TransactionGenerator::read_root_account(genesis_key, &db);
@@ -301,6 +301,7 @@ pub fn add_accounts<V>(
     verify_sequence_numbers: bool,
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
+    init_features: Features,
 ) where
     V: TransactionBlockExecutor + 'static,
 {
@@ -320,6 +321,7 @@ pub fn add_accounts<V>(
         verify_sequence_numbers,
         enable_storage_sharding,
         pipeline_config,
+        init_features,
     );
 }
 
@@ -333,10 +335,11 @@ fn add_accounts_impl<V>(
     verify_sequence_numbers: bool,
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
+    init_features: Features,
 ) where
     V: TransactionBlockExecutor + 'static,
 {
-    let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
+    let (mut config, genesis_key) = aptos_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = output_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
