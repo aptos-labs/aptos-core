@@ -1,12 +1,12 @@
 /// Design:
 /// CommitteeInfoStore: store all the committee information, supported operation: add, remove
-/// CommitteeInfo: store all the dora node information, supported operation: add, remove
-/// DoraNodeInfo: store the dora node information, supported operation: update
-/// NodeData: store the dora node information with operator's address
+/// CommitteeInfo: store all the node information, supported operation: add, remove
+/// NodeInfo: store the node information, supported operation: update
+/// NodeData: store the node information with operator's address
 /// requirements:
 /// 1. two committee has different id
 /// 2. two indentical node should not be in the same committee
-module supra_framework::dora_committee {
+module supra_framework::committee_map {
     use std::error;
     use std::option;
     use std::signer;
@@ -36,7 +36,7 @@ module supra_framework::dora_committee {
     const CLAN: u8 = 2;
     const TRIBE: u8 = 3;
 
-    const SEED_COMMITTEE: vector<u8> = b"supra_framework::dora_committee::CommitteeInfoStore";
+    const SEED_COMMITTEE: vector<u8> = b"supra_framework::committee_map::CommitteeInfoStore";
 
     /// Capability that grants an owner the right to perform action.
     struct OwnerCap has drop {}
@@ -60,17 +60,17 @@ module supra_framework::dora_committee {
     }
 
     struct CommitteeInfo has store, drop, copy {
-        // map from node address to DoraNodeInfo which provides other details pertaining to the node
-        map: SimpleMap<address, DoraNodeInfo>,
+        // map from node address to NodeInfo which provides other details pertaining to the node
+        map: SimpleMap<address, NodeInfo>,
         // a flag that indicates whether the committee already has performed DKG successfully or not, thus indicating whether corresponding public key are valid to be used for threshold signing
         has_valid_dkg: bool,
         committee_type: u8
     }
 
-    struct DoraNodeInfo has store, copy, drop {
+    struct NodeInfo has store, copy, drop {
         ip_public_address: vector<u8>,
         // public key to be used for voting
-        dora_public_key: vector<u8>,
+        node_public_key: vector<u8>,
         // public key for secure TLS connection
         network_public_key: vector<u8>,
         cg_public_key: vector<u8>,
@@ -83,7 +83,7 @@ module supra_framework::dora_committee {
     struct NodeData has copy, drop {
         operator: address,
         ip_public_address: vector<u8>,
-        dora_public_key: vector<u8>,
+        node_public_key: vector<u8>,
         network_public_key: vector<u8>,
         cg_public_key: vector<u8>,
         network_port: u16,
@@ -108,18 +108,18 @@ module supra_framework::dora_committee {
 
     struct AddCommitteeMemberEvent has store, drop {
         committee_id: u64,
-        committee_member: DoraNodeInfo
+        committee_member: NodeInfo
     }
 
     struct RemoveCommitteeMemberEvent has store, drop {
         committee_id: u64,
-        committee_member: DoraNodeInfo
+        committee_member: NodeInfo
     }
 
     struct UpdateNodeInfoEvent has store, drop {
         committee_id: u64,
-        old_node_info: DoraNodeInfo,
-        new_node_info: DoraNodeInfo
+        old_node_info: NodeInfo,
+        new_node_info: NodeInfo
     }
 
     struct CreateCommitteeInfoStoreEvent has store, drop {
@@ -198,23 +198,23 @@ module supra_framework::dora_committee {
     }
 
     #[view]
-    /// Get the committee's dora node vector and committee type
+    /// Get the committee's node vector and committee type
     public fun get_committee_info(com_store_addr: address, id: u64): (vector<NodeData>, u8) acquires CommitteeInfoStore {
         let committee_store = borrow_global<CommitteeInfoStore>(com_store_addr);
         let committee = simple_map::borrow(&committee_store.committee_map, &id);
-        let (addrs, dora_nodes) = simple_map::to_vec_pair(committee.map);
+        let (addrs, nodes) = simple_map::to_vec_pair(committee.map);
         let node_data_vec = vector::empty<NodeData>();
         while (vector::length(&addrs) > 0) {
             let addr = vector::pop_back(&mut addrs);
-            let dora_node_info = vector::pop_back(&mut dora_nodes);
+            let node_info = vector::pop_back(&mut nodes);
             let node_data = NodeData {
                 operator: addr,
-                ip_public_address: dora_node_info.ip_public_address,
-                dora_public_key: dora_node_info.dora_public_key,
-                network_public_key: dora_node_info.network_public_key,
-                cg_public_key: dora_node_info.cg_public_key,
-                network_port: dora_node_info.network_port,
-                rpc_port: dora_node_info.rpc_port,
+                ip_public_address: node_info.ip_public_address,
+                node_public_key: node_info.node_public_key,
+                network_public_key: node_info.network_public_key,
+                cg_public_key: node_info.cg_public_key,
+                network_port: node_info.network_port,
+                rpc_port: node_info.rpc_port,
             };
             vector::push_back(&mut node_data_vec, node_data);
         };
@@ -247,19 +247,19 @@ module supra_framework::dora_committee {
     ): NodeData acquires CommitteeInfoStore {
         let committee_store = borrow_global<CommitteeInfoStore>(com_store_addr);
         let committee = simple_map::borrow(&committee_store.committee_map, &id);
-        let (addrs, dora_nodes) = simple_map::to_vec_pair(committee.map);
+        let (addrs, nodes) = simple_map::to_vec_pair(committee.map);
         let (flag, index) = vector::index_of(&addrs, &node_address);
         assert!(flag, error::invalid_argument(NODE_NOT_FOUND));
-        let dora_node_info = vector::borrow(&dora_nodes, index);
+        let node_info = vector::borrow(&nodes, index);
 
         NodeData {
             operator: node_address,
-            ip_public_address: dora_node_info.ip_public_address,
-            dora_public_key: dora_node_info.dora_public_key,
-            network_public_key: dora_node_info.network_public_key,
-            cg_public_key: dora_node_info.cg_public_key,
-            network_port: dora_node_info.network_port,
-            rpc_port: dora_node_info.rpc_port,
+            ip_public_address: node_info.ip_public_address,
+            node_public_key: node_info.node_public_key,
+            network_public_key: node_info.network_public_key,
+            cg_public_key: node_info.cg_public_key,
+            network_port: node_info.network_port,
+            rpc_port: node_info.rpc_port,
         }
     }
 
@@ -275,17 +275,17 @@ module supra_framework::dora_committee {
     }
 
     #[view]
-    /// Get a tuple of the node itself and dora node peers vector for a single node
+    /// Get a tuple of the node itself and node peers vector for a single node
     public fun get_peers_for_node(
         com_store_addr: address,
         node_address: address
     ): (NodeData, vector<NodeData>) acquires CommitteeInfoStore {
         let committee_id = get_committee_id_for_node(com_store_addr, node_address);
         let this_node = get_node_info(com_store_addr, committee_id, node_address);
-        let (dora_node_info,_) = get_committee_info(com_store_addr, committee_id);
-        let (_, index) = vector::index_of(&dora_node_info, &this_node);
-        let self= vector::remove(&mut dora_node_info, index);
-        (self, dora_node_info)
+        let (node_info,_) = get_committee_info(com_store_addr, committee_id);
+        let (_, index) = vector::index_of(&node_info, &this_node);
+        let self= vector::remove(&mut node_info, index);
+        (self, node_info)
     }
 
     #[view]
@@ -297,9 +297,9 @@ module supra_framework::dora_committee {
     }
 
     /// Update the dkg flag
-    public fun update_dkg_flag(
-        com_store_addr: address,
+    public entry fun update_dkg_flag(
         owner_signer: &signer,
+        com_store_addr: address,
         com_id: u64,
         flag_value: bool
     ) acquires CommitteeInfoStore, SupraCommitteeEventHandler {
@@ -320,12 +320,12 @@ module supra_framework::dora_committee {
 
     /// This function is used to add a new committee to the store
     public entry fun upsert_committee(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         id: u64,
         node_addresses: vector<address>,
         ip_public_address: vector<vector<u8>>,
-        dora_public_key: vector<vector<u8>>,
+        node_public_key: vector<vector<u8>>,
         network_public_key: vector<vector<u8>>,
         cg_public_key: vector<vector<u8>>,
         network_port: vector<u16>,
@@ -339,7 +339,7 @@ module supra_framework::dora_committee {
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
         assert!(
-            node_address_len == vector::length(&dora_public_key),
+            node_address_len == vector::length(&node_public_key),
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
         assert!(
@@ -361,31 +361,31 @@ module supra_framework::dora_committee {
         // Only the OwnerCap capability can access it
         let _acquire = &capability::acquire(owner_signer, &OwnerCap {});
         let committee_store = borrow_global_mut<CommitteeInfoStore>(com_store_addr);
-        let dora_node_info = vector::empty<DoraNodeInfo>();
+        let node_infos = vector::empty<NodeInfo>();
         let node_addresses_for_iteration = node_addresses;
         while (vector::length(&node_addresses_for_iteration) > 0) {
             let ip_public_address = vector::pop_back(&mut ip_public_address);
-            let dora_public_key = vector::pop_back(&mut dora_public_key);
+            let node_public_key = vector::pop_back(&mut node_public_key);
             let network_public_key = vector::pop_back(&mut network_public_key);
             let cg_public_key = vector::pop_back(&mut cg_public_key);
             let network_port = vector::pop_back(&mut network_port);
             let rpc_port = vector::pop_back(&mut rpc_port);
-            let dora_node = DoraNodeInfo {
+            let node_info = NodeInfo {
                 ip_public_address: copy ip_public_address,
-                dora_public_key: copy dora_public_key,
+                node_public_key: copy node_public_key,
                 network_public_key: copy network_public_key,
                 cg_public_key: copy cg_public_key,
                 network_port,
                 rpc_port,
             };
-            vector::push_back(&mut dora_node_info, dora_node);
+            vector::push_back(&mut node_infos, node_info);
             // Also update the node_to_committee_map
             let node_address = vector::pop_back(&mut node_addresses_for_iteration);
             simple_map::upsert(&mut committee_store.node_to_committee_map, node_address, id);
         };
-        vector::reverse(&mut dora_node_info);
+        vector::reverse(&mut node_infos);
         let committee_info = CommitteeInfo {
-            map: simple_map::new_from(node_addresses, dora_node_info),
+            map: simple_map::new_from(node_addresses, node_infos),
             has_valid_dkg: false,
             committee_type: validate_committee_type(committee_type, node_address_len)
         };
@@ -414,12 +414,12 @@ module supra_framework::dora_committee {
 
     /// Add the committee in bulk
     public entry fun upsert_committee_bulk(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         ids: vector<u64>,
         node_addresses_bulk: vector<vector<address>>,
         ip_public_address_bulk: vector<vector<vector<u8>>>,
-        dora_public_key_bulk: vector<vector<vector<u8>>>,
+        node_public_key_bulk: vector<vector<vector<u8>>>,
         network_public_key_bulk: vector<vector<vector<u8>>>,
         cg_public_key_bulk: vector<vector<vector<u8>>>,
         network_port_bulk: vector<vector<u16>>,
@@ -437,7 +437,7 @@ module supra_framework::dora_committee {
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
         assert!(
-            ids_len == vector::length(&dora_public_key_bulk),
+            ids_len == vector::length(&node_public_key_bulk),
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
         assert!(
@@ -460,19 +460,19 @@ module supra_framework::dora_committee {
             let id = vector::pop_back(&mut ids);
             let node_addresses = vector::pop_back(&mut node_addresses_bulk);
             let ip_public_address = vector::pop_back(&mut ip_public_address_bulk);
-            let dora_public_key = vector::pop_back(&mut dora_public_key_bulk);
+            let node_public_key = vector::pop_back(&mut node_public_key_bulk);
             let network_public_key = vector::pop_back(&mut network_public_key_bulk);
             let cg_public_key = vector::pop_back(&mut cg_public_key_bulk);
             let network_port = vector::pop_back(&mut network_port_bulk);
             let rpc_port = vector::pop_back(&mut rpc_por_bulkt);
             let committee_type = vector::pop_back(&mut committee_types);
             upsert_committee(
-                com_store_addr,
                 owner_signer,
+                com_store_addr,
                 id,
                 node_addresses,
                 ip_public_address,
-                dora_public_key,
+                node_public_key,
                 network_public_key,
                 cg_public_key,
                 network_port,
@@ -484,8 +484,8 @@ module supra_framework::dora_committee {
 
     /// Remove the committee from the store
     public entry fun remove_committee(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         id: u64
     ) acquires CommitteeInfoStore, SupraCommitteeEventHandler {
         // Only the OwnerCap capability can access it
@@ -518,24 +518,24 @@ module supra_framework::dora_committee {
 
     /// Remove the committee in bulk
     public entry fun remove_committee_bulk(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         ids: vector<u64>
     ) acquires CommitteeInfoStore, SupraCommitteeEventHandler {
         while (vector::length(&ids) > 0) {
             let id = vector::pop_back(&mut ids);
-            remove_committee(com_store_addr, owner_signer, id);
+            remove_committee(owner_signer, com_store_addr, id);
         }
     }
 
     /// Upsert the node to the committee
     public entry fun upsert_committee_member(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         id: u64,
         node_address: address,
         ip_public_address: vector<u8>,
-        dora_public_key: vector<u8>,
+        node_public_key: vector<u8>,
         network_public_key: vector<u8>,
         cg_public_key: vector<u8>,
         network_port: u16,
@@ -546,9 +546,9 @@ module supra_framework::dora_committee {
 
         let committee_store = borrow_global_mut<CommitteeInfoStore>(com_store_addr);
         let committee = simple_map::borrow_mut(&mut committee_store.committee_map, &id);
-        let dora_node_info = DoraNodeInfo {
+        let node_info = NodeInfo {
             ip_public_address: copy ip_public_address,
-            dora_public_key: copy dora_public_key,
+            node_public_key: copy node_public_key,
             network_public_key: copy network_public_key,
             cg_public_key: copy cg_public_key,
             network_port: network_port,
@@ -560,7 +560,7 @@ module supra_framework::dora_committee {
                 &mut event_handler.add_committee_member,
                 AddCommitteeMemberEvent {
                     committee_id: id,
-                    committee_member: dora_node_info
+                    committee_member: node_info
                 })
         } else {
             emit_event(
@@ -568,22 +568,22 @@ module supra_framework::dora_committee {
                 UpdateNodeInfoEvent {
                     committee_id: id,
                     old_node_info: *simple_map::borrow(&committee.map, &node_address),
-                    new_node_info: dora_node_info
+                    new_node_info: node_info
                 })
         };
-        simple_map::upsert(&mut committee.map, node_address, dora_node_info);
+        simple_map::upsert(&mut committee.map, node_address, node_info);
         // Also update the node_to_committee_map
         simple_map::upsert(&mut committee_store.node_to_committee_map, node_address, id);
     }
 
-    /// Upsert dora nodes to the committee
+    /// Upsert nodes to the committee
     public entry fun upsert_committee_member_bulk(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         ids: vector<u64>,
         node_addresses: vector<address>,
         ip_public_address: vector<vector<u8>>,
-        dora_public_key: vector<vector<u8>>,
+        node_public_key: vector<vector<u8>>,
         network_public_key: vector<vector<u8>>,
         cg_public_key: vector<vector<u8>>,
         network_port: vector<u16>,
@@ -599,7 +599,7 @@ module supra_framework::dora_committee {
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
         assert!(
-            vector::length(&ids) == vector::length(&dora_public_key),
+            vector::length(&ids) == vector::length(&node_public_key),
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
         assert!(
@@ -622,18 +622,18 @@ module supra_framework::dora_committee {
             let id = vector::pop_back(&mut ids);
             let node_address = vector::pop_back(&mut node_addresses);
             let ip_public_address = vector::pop_back(&mut ip_public_address);
-            let dora_public_key = vector::pop_back(&mut dora_public_key);
+            let node_public_key = vector::pop_back(&mut node_public_key);
             let network_public_key = vector::pop_back(&mut network_public_key);
             let cg_public_key = vector::pop_back(&mut cg_public_key);
             let network_port = vector::pop_back(&mut network_port);
             let rpc_port = vector::pop_back(&mut rpc_port);
             upsert_committee_member(
-                com_store_addr,
                 owner_signer,
+                com_store_addr,
                 id,
                 node_address,
                 ip_public_address,
-                dora_public_key,
+                node_public_key,
                 network_public_key,
                 cg_public_key,
                 network_port,
@@ -644,8 +644,8 @@ module supra_framework::dora_committee {
 
     /// Remove the node from the committee
     public entry fun remove_committee_member(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         id: u64,
         node_address: address
     ) acquires CommitteeInfoStore, SupraCommitteeEventHandler {
@@ -661,9 +661,9 @@ module supra_framework::dora_committee {
             &mut event_handler.remove_committee_member,
             RemoveCommitteeMemberEvent {
                 committee_id: id,
-                committee_member: DoraNodeInfo {
+                committee_member: NodeInfo {
                     ip_public_address: node_info.ip_public_address,
-                    dora_public_key: node_info.dora_public_key,
+                    node_public_key: node_info.node_public_key,
                     network_public_key: node_info.network_public_key,
                     cg_public_key: node_info.cg_public_key,
                     network_port: node_info.network_port,
@@ -688,22 +688,22 @@ module supra_framework::dora_committee {
             return (false, NodeData {
                 operator: copy node_address,
                 ip_public_address: vector::empty(),
-                dora_public_key: vector::empty(),
+                node_public_key: vector::empty(),
                 network_public_key: vector::empty(),
                 cg_public_key: vector::empty(),
                 network_port: 0,
                 rpc_port: 0,
             })
         } else {
-            let dora_node_info = *simple_map::borrow(&committee.map, &node_address);
+            let node_info = *simple_map::borrow(&committee.map, &node_address);
             (true, NodeData {
                 operator: copy node_address,
-                ip_public_address: dora_node_info.ip_public_address,
-                dora_public_key: dora_node_info.dora_public_key,
-                network_public_key: dora_node_info.network_public_key,
-                cg_public_key: dora_node_info.cg_public_key,
-                network_port: dora_node_info.network_port,
-                rpc_port: dora_node_info.rpc_port,
+                ip_public_address: node_info.ip_public_address,
+                node_public_key: node_info.node_public_key,
+                network_public_key: node_info.network_public_key,
+                cg_public_key: node_info.cg_public_key,
+                network_port: node_info.network_port,
+                rpc_port: node_info.rpc_port,
             })
         }
     }
@@ -722,8 +722,8 @@ module supra_framework::dora_committee {
         // Add node to the committee
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -734,7 +734,7 @@ module supra_framework::dora_committee {
             vector[123, 123],
             1
         );
-        remove_committee(resource_address, owner_signer, 1);
+        remove_committee(owner_signer,resource_address,1);
     }
 
     #[test(owner_signer = @0xCEFEF)]
@@ -744,8 +744,8 @@ module supra_framework::dora_committee {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -757,8 +757,8 @@ module supra_framework::dora_committee {
             1
         );
         upsert_committee_member(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             @0x1,
             vector[123],
@@ -777,8 +777,8 @@ module supra_framework::dora_committee {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -790,8 +790,8 @@ module supra_framework::dora_committee {
             1
         );
         upsert_committee_member(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             @0x1,
             vector[123],
@@ -801,7 +801,7 @@ module supra_framework::dora_committee {
             123,
             123
         );
-        remove_committee_member(resource_address, owner_signer, 1, @0x1);
+        remove_committee_member(owner_signer, resource_address, 1, @0x1);
     }
 
     #[test(owner_signer = @0xCEFEF)]
@@ -811,8 +811,8 @@ module supra_framework::dora_committee {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee_bulk(
-            resource_address,
             owner_signer,
+            resource_address,
             vector[1, 1],
             vector[vector[@0x1, @0x2], vector[@0x1, @0x2]],
             vector[vector[vector[123], vector[124]], vector[vector[125], vector[126]]],
@@ -832,8 +832,8 @@ module supra_framework::dora_committee {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -844,7 +844,7 @@ module supra_framework::dora_committee {
             vector[123, 123],
             1
         );
-        remove_committee_bulk(resource_address, owner_signer, vector[1]);
+        remove_committee_bulk(owner_signer, resource_address, vector[1]);
     }
 
     #[test(owner_signer = @0xCEFEF)]
@@ -854,8 +854,8 @@ module supra_framework::dora_committee {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -867,8 +867,8 @@ module supra_framework::dora_committee {
             1
         );
         upsert_committee_member_bulk(
-            resource_address,
             owner_signer,
+            resource_address,
             vector[1],
             vector[@0x1],
             vector[vector[123]],
@@ -887,8 +887,8 @@ module supra_framework::dora_committee {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -899,7 +899,7 @@ module supra_framework::dora_committee {
             vector[123, 123],
             1
         );
-        update_dkg_flag(resource_address, owner_signer, 1, true);
+        update_dkg_flag(owner_signer, resource_address, 1, true);
     }
 
     #[test(owner_signer = @0xCEFEF)]
@@ -909,8 +909,8 @@ module supra_framework::dora_committee {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -932,8 +932,8 @@ module supra_framework::dora_committee {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -956,8 +956,8 @@ module supra_framework::dora_committee {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -979,8 +979,8 @@ module supra_framework::dora_committee {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -1002,8 +1002,8 @@ module supra_framework::dora_committee {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -1025,8 +1025,8 @@ module supra_framework::dora_committee {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
