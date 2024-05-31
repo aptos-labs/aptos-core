@@ -21,7 +21,6 @@ pub struct VMConfig {
     pub paranoid_type_checks: bool,
     pub ty_config: TypeConfig,
     pub check_invariant_in_swap_loc: bool,
-    pub type_size_limit: bool,
     /// Maximum value nest depth for structs
     pub max_value_nest_depth: Option<u64>,
     pub type_max_cost: u64,
@@ -38,7 +37,6 @@ impl Default for VMConfig {
             paranoid_type_checks: false,
             ty_config: TypeConfig::default(),
             check_invariant_in_swap_loc: true,
-            type_size_limit: false,
             max_value_nest_depth: Some(DEFAULT_MAX_VALUE_NEST_DEPTH),
             type_max_cost: 0,
             type_base_cost: 0,
