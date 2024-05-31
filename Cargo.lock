@@ -240,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "3.4.0"
+version = "3.4.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -2661,7 +2661,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=ca60e51b53c3be6f9517de7c73d4711e9c1f7236#ca60e51b53c3be6f9517de7c73d4711e9c1f7236"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d#5244b84fa5ed872e5280dc8df032d744d62ad29d"
 dependencies = [
  "chrono",
 ]
@@ -12707,11 +12707,11 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=ca60e51b53c3be6f9517de7c73d4711e9c1f7236#ca60e51b53c3be6f9517de7c73d4711e9c1f7236"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d#5244b84fa5ed872e5280dc8df032d744d62ad29d"
 dependencies = [
  "ahash 0.8.11",
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=ca60e51b53c3be6f9517de7c73d4711e9c1f7236)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d)",
  "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.12.1)",
  "async-trait",
  "base64 0.13.1",
@@ -14306,7 +14306,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=ca60e51b53c3be6f9517de7c73d4711e9c1f7236#ca60e51b53c3be6f9517de7c73d4711e9c1f7236"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=5244b84fa5ed872e5280dc8df032d744d62ad29d#5244b84fa5ed872e5280dc8df032d744d62ad29d"
 dependencies = [
  "anyhow",
  "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
