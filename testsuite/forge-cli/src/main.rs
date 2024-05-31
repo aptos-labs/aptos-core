@@ -2483,7 +2483,7 @@ fn pfn_const_tps(
                 config.execution.concurrency_level = 58;
             }
         }))
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad { mempool_backlog: 50000 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad { mempool_backlog: 30000 }))
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
