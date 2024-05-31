@@ -107,15 +107,15 @@ fn native_check_dispatch_type_compatibility_impl(
         )
     };
 
-    if lhs.param_tys.is_empty() {
+    if lhs.param_tys().is_empty() {
         return Err(SafeNativeError::Abort { abort_code: 2 });
     }
 
     Ok(smallvec![Value::bool(
-        rhs.ty_param_abilities == lhs.ty_param_abilities
-            && rhs.return_tys == lhs.return_tys
-            && lhs.param_tys[0..lhs.param_tys.len() - 1] == rhs.param_tys
-            && !rhs.def_is_friend_or_private
+        rhs.ty_param_abilities() == lhs.ty_param_abilities()
+            && rhs.return_tys() == lhs.return_tys()
+            && &lhs.param_tys()[0..lhs.param_count() - 1] == rhs.param_tys()
+            && !rhs.is_friend_or_private()
             && lhs_id != rhs_id
     )])
 }

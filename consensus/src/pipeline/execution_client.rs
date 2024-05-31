@@ -181,6 +181,7 @@ impl ExecutionProxyClient {
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
+        onchain_consensus_config: &OnChainConsensusConfig,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_ordered_round: Round,
         publisher: Option<Publisher>,
@@ -267,6 +268,7 @@ impl ExecutionProxyClient {
             reset_buffer_manager_rx,
             epoch_state,
             self.bounded_executor.clone(),
+            onchain_consensus_config.order_vote_enabled(),
             publisher,
         );
 
@@ -298,6 +300,7 @@ impl TExecutionClient for ExecutionProxyClient {
             epoch_state.clone(),
             rand_config,
             fast_rand_config,
+            onchain_consensus_config,
             rand_msg_rx,
             highest_ordered_round,
             self.observer_network.clone().map(Publisher::new),

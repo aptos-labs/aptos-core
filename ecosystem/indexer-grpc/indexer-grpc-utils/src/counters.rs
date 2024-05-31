@@ -278,8 +278,11 @@ pub fn log_grpc_step(
             duration_in_secs,
             size_in_bytes,
             // Request metadata variables
-            request_identifier = &request_metadata.request_identifier,
             processor_name = &request_metadata.processor_name,
+            request_identifier_type = &request_metadata.request_identifier_type,
+            request_identifier = &request_metadata.request_identifier,
+            request_email = &request_metadata.request_email,
+            request_application_name = &request_metadata.request_application_name,
             connection_id = &request_metadata.request_connection_id,
             service_type,
             step = step.get_step(),

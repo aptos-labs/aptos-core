@@ -48,7 +48,7 @@ fun explicate_drop::test0(): u8 {
      #
   1: $t1 := borrow_local($t2)
      # live vars: $t1
-     # graph: {@100=local($t2)[borrow(false) -> @101],@101=derived[]}
+     # graph: {@100=local($t2)[borrow_imm -> @101],@101=derived[]}
      # locals: {$t1=@101,$t2=@100}
      # globals: {}
      #
@@ -84,7 +84,7 @@ fun explicate_drop::test0(): u8 {
   1: $t1 := borrow_local($t2)
      # abort state: {returns}
      # live vars: $t1
-     # graph: {@100=local($t2)[borrow(false) -> @101],@101=derived[]}
+     # graph: {@100=local($t2)[borrow_imm -> @101],@101=derived[]}
      # locals: {$t1=@101,$t2=@100}
      # globals: {}
      #

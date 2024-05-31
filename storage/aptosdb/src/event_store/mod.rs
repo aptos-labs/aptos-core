@@ -256,16 +256,6 @@ impl EventStore {
         }
     }
 
-    pub fn get_block_metadata(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
-        let (first_version, event_index, seq_num) = self
-            .lookup_event_before_or_at_version(&new_block_event_key(), version)?
-            .ok_or_else(|| AptosDbError::NotFound("NewBlockEvent".to_string()))?;
-
-        let new_block_event = self.get_event_by_version_and_index(first_version, event_index)?;
-        let payload = bcs::from_bytes(new_block_event.event_data())?;
-        Ok((first_version, payload))
-    }
-
     /// Finds the first event sequence number in a specified stream on which `comp` returns false.
     /// (assuming the whole stream is partitioned by `comp`)
     fn search_for_event_lower_bound<C>(

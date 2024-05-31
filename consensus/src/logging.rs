@@ -20,6 +20,7 @@ pub struct LogSchema {
 
 #[derive(Serialize)]
 pub enum LogEvent {
+    BroadcastOrderVote,
     CommitViaBlock,
     CommitViaSync,
     IncrementalProofExpired,
@@ -39,6 +40,7 @@ pub enum LogEvent {
     ReceiveProposal,
     ReceiveSyncInfo,
     ReceiveVote,
+    ReceiveOrderVote,
     RetrieveBlock,
     StateSync,
     Timeout,

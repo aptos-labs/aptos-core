@@ -131,6 +131,7 @@ impl ProcessorManager {
             pb_channel_txn_chunk_size: 100_000,
             per_table_chunk_sizes: Default::default(),
             transaction_filter: Default::default(),
+            grpc_response_item_timeout_in_secs: 10,
         };
         let manager = Self {
             config,

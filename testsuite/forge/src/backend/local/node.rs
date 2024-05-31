@@ -367,6 +367,10 @@ impl Node for LocalNode {
     fn expose_metric(&self) -> Result<u64> {
         Ok(0)
     }
+
+    fn service_name(&self) -> Option<String> {
+        None
+    }
 }
 
 impl Validator for LocalNode {}

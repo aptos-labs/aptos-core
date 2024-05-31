@@ -5,7 +5,7 @@ use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_keyless_pepper_common::{
     jwt,
     vuf::{self, VUF},
-    PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey,
+    PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey, SignatureResponse,
 };
 use aptos_types::{
     keyless::{Configuration, OpenIdSig},
@@ -69,6 +69,7 @@ async fn main() {
     println!();
     let vuf_pub_key_url = format!("{url}/v0/vuf-pub-key");
     let fetch_url = format!("{url}/v0/fetch");
+    let sig_url = format!("{url}/v0/signature");
     println!();
     println!(
         "Action 1: fetch its verification key with a GET request to {}",
@@ -148,24 +149,37 @@ async fn main() {
         fetch_url,
         serde_json::to_string_pretty(&pepper_request).unwrap()
     );
-    let raw_response = client
+    let pepper_raw_response = client
         .post(fetch_url)
         .json(&pepper_request)
         .send()
         .await
         .unwrap();
-    assert_eq!(StatusCode::OK, raw_response.status());
-    let pepper_response = raw_response.json::<PepperResponse>().await.unwrap();
+    assert_eq!(StatusCode::OK, pepper_raw_response.status());
+    let pepper_response = pepper_raw_response.json::<PepperResponse>().await.unwrap();
     println!();
     println!(
         "pepper_service_response={}",
         serde_json::to_string_pretty(&pepper_response).unwrap()
     );
-    let PepperResponse {
-        signature,
-        pepper,
-        address,
-    } = pepper_response;
+    let PepperResponse { pepper, address } = pepper_response;
+
+    let signature_raw_response = client
+        .post(sig_url)
+        .json(&pepper_request)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(StatusCode::OK, signature_raw_response.status());
+    let signature_response = signature_raw_response
+        .json::<SignatureResponse>()
+        .await
+        .unwrap();
+    println!(
+        "signature_response={}",
+        serde_json::to_string_pretty(&signature_response).unwrap()
+    );
+    let SignatureResponse { signature } = signature_response;
     println!("signature={:?}", hex::encode(signature.clone()));
     println!("pepper={:?}", hex::encode(pepper.clone()));
     println!("address={:?}", hex::encode(address.clone()));

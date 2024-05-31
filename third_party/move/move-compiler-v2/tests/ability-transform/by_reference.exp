@@ -480,7 +480,7 @@ fun <SELF>_0::check() {
      #
  17: $t6 := borrow_local($t7)
      # live vars: $t6
-     # graph: {@1100=local($t7)[borrow(false) -> @1101],@1101=derived[]}
+     # graph: {@1100=local($t7)[borrow_imm -> @1101],@1101=derived[]}
      # locals: {$t6=@1101,$t7=@1100}
      # globals: {}
      #
@@ -552,7 +552,7 @@ fun <SELF>_0::check() {
      #
  29: $t12 := borrow_local($t13)
      # live vars: $t12
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[borrow(false) -> @1D01],@1D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[borrow_imm -> @1D01],@1D01=derived[]}
      # locals: {$t7=@1100,$t12=@1D01,$t13=@1D00}
      # globals: {}
      #
@@ -624,79 +624,79 @@ fun <SELF>_0::check() {
      #
  41: $t16 := borrow_local($t17)
      # live vars: $t16
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
  42: $t18 := 1
      # live vars: $t16, $t18
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
  43: write_ref($t16, $t18)
      # live vars: $t16
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
  44: $t20 := [104, 101, 108, 108, 111]
      # live vars: $t16, $t20
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
  45: $t19 := borrow_local($t20)
      # live vars: $t16, $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  46: $t21 := [98, 121, 101]
      # live vars: $t16, $t19, $t21
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  47: write_ref($t19, $t21)
      # live vars: $t16, $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  48: $t23 := read_ref($t16)
      # live vars: $t19, $t23
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  49: $t24 := 1
      # live vars: $t19, $t23, $t24
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  50: $t22 := ==($t23, $t24)
      # live vars: $t19, $t22
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  51: if ($t22) goto 52 else goto 54
      # live vars: $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  52: label L12
      # live vars: $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  53: goto 57
      # live vars: $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
@@ -714,13 +714,13 @@ fun <SELF>_0::check() {
      #
  56: abort($t25)
      # live vars: $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  57: label L14
      # live vars: $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
@@ -1049,7 +1049,7 @@ fun <SELF>_0::check() {
  17: $t6 := borrow_local($t7)
      # abort state: {returns,aborts}
      # live vars: $t6
-     # graph: {@1100=local($t7)[borrow(false) -> @1101],@1101=derived[]}
+     # graph: {@1100=local($t7)[borrow_imm -> @1101],@1101=derived[]}
      # locals: {$t6=@1101,$t7=@1100}
      # globals: {}
      #
@@ -1133,7 +1133,7 @@ fun <SELF>_0::check() {
  29: $t12 := borrow_local($t13)
      # abort state: {returns,aborts}
      # live vars: $t12
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[borrow(false) -> @1D01],@1D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[borrow_imm -> @1D01],@1D01=derived[]}
      # locals: {$t7=@1100,$t12=@1D01,$t13=@1D00}
      # globals: {}
      #
@@ -1217,91 +1217,91 @@ fun <SELF>_0::check() {
  41: $t16 := borrow_local($t17)
      # abort state: {returns,aborts}
      # live vars: $t16
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
  42: $t18 := 1
      # abort state: {returns,aborts}
      # live vars: $t16, $t18
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
  43: write_ref($t16, $t18)
      # abort state: {returns,aborts}
      # live vars: $t16
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
  44: $t20 := [104, 101, 108, 108, 111]
      # abort state: {returns,aborts}
      # live vars: $t16, $t20
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
  45: $t19 := borrow_local($t20)
      # abort state: {returns,aborts}
      # live vars: $t16, $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  46: $t21 := [98, 121, 101]
      # abort state: {returns,aborts}
      # live vars: $t16, $t19, $t21
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  47: write_ref($t19, $t21)
      # abort state: {returns,aborts}
      # live vars: $t16, $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow_mut -> @2901],@2901=derived[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  48: $t23 := read_ref($t16)
      # abort state: {returns,aborts}
      # live vars: $t19, $t23
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  49: $t24 := 1
      # abort state: {returns,aborts}
      # live vars: $t19, $t23, $t24
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  50: $t22 := ==($t23, $t24)
      # abort state: {returns,aborts}
      # live vars: $t19, $t22
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  51: if ($t22) goto 52 else goto 54
      # abort state: {returns,aborts}
      # live vars: $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  52: label L12
      # abort state: {returns,aborts}
      # live vars: $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  53: goto 57
      # abort state: {aborts}
      # live vars: $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
@@ -1322,14 +1322,14 @@ fun <SELF>_0::check() {
  56: abort($t25)
      # abort state: {returns,aborts}
      # live vars: $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
  57: label L14
      # abort state: {returns,aborts}
      # live vars: $t19
-     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow_mut -> @2D01],@2D01=derived[]}
      # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
