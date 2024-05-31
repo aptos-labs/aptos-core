@@ -649,7 +649,11 @@ mod tests {
                 Vec::new(),
             )
             .unwrap(),
-            SyncInfo::new(previous_qc.clone(), previous_qc, None),
+            SyncInfo::new(
+                previous_qc.clone(),
+                previous_qc.into_wrapped_ledger_info(),
+                None,
+            ),
         );
         timed_block_on(&runtime, async {
             nodes[0]

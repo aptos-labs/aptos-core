@@ -13,6 +13,8 @@ use crate::{
 use aptos_consensus_types::{
     block_data::BlockData,
     common::{Author, Round},
+    order_vote::OrderVote,
+    order_vote_proposal::OrderVoteProposal,
     quorum_cert::QuorumCert,
     safety_data::SafetyData,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
@@ -77,6 +79,28 @@ impl SafetyRules {
             .map_err(|error| Error::InvalidAccumulatorExtension(error.to_string()))
     }
 
+    pub(crate) fn verify_order_vote_proposal(
+        &self,
+        order_vote_proposal: &OrderVoteProposal,
+    ) -> Result<(), Error> {
+        let proposed_block = order_vote_proposal.block();
+        let qc = order_vote_proposal.quorum_cert();
+        if qc.certified_block() != order_vote_proposal.block_info() {
+            return Err(Error::InvalidOneChainQuorumCertificate(
+                qc.certified_block().id(),
+                order_vote_proposal.block_info().id(),
+            ));
+        }
+        if qc.certified_block().id() != proposed_block.id() {
+            return Err(Error::InvalidOneChainQuorumCertificate(
+                qc.certified_block().id(),
+                proposed_block.id(),
+            ));
+        }
+        self.verify_qc(qc)?;
+        Ok(())
+    }
+
     pub(crate) fn sign<T: Serialize + CryptoHash>(
         &self,
         message: &T,
@@ -120,6 +144,20 @@ impl SafetyRules {
             updated = true;
         }
         updated
+    }
+
+    pub(crate) fn update_highest_timeout_round(
+        &self,
+        timeout: &TwoChainTimeout,
+        safety_data: &mut SafetyData,
+    ) {
+        if timeout.round() > safety_data.highest_timeout_round {
+            safety_data.highest_timeout_round = timeout.round();
+            trace!(
+                SafetyLogSchema::new(LogEntry::HighestTimeoutRound, LogEvent::Update)
+                    .highest_timeout_round(safety_data.highest_timeout_round)
+            );
+        }
     }
 
     /// Second voting rule
@@ -250,6 +288,7 @@ impl SafetyRules {
                     0,
                     0,
                     None,
+                    0,
                 ))?;
 
                 info!(SafetyLogSchema::new(LogEntry::Epoch, LogEvent::Update)
@@ -404,6 +443,14 @@ impl TSafetyRules for SafetyRules {
             |log| log.round(round),
             LogEntry::ConstructAndSignVoteTwoChain,
         )
+    }
+
+    fn construct_and_sign_order_vote(
+        &mut self,
+        order_vote_proposal: &OrderVoteProposal,
+    ) -> Result<OrderVote, Error> {
+        let cb = || self.guarded_construct_and_sign_order_vote(order_vote_proposal);
+        run_and_log(cb, |log| log, LogEntry::ConstructAndSignOrderVote)
     }
 
     fn sign_commit_vote(

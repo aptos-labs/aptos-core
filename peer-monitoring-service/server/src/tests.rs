@@ -134,7 +134,7 @@ async fn test_get_network_information_fullnode() {
         distance_from_validators: peer_distance_1,
     };
     let peer_monitoring_metadata_1 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
+        PeerMonitoringMetadata::new(None, None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
         .unwrap();
@@ -154,7 +154,7 @@ async fn test_get_network_information_fullnode() {
         distance_from_validators: peer_distance_1,
     };
     let peer_monitoring_metadata_1 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
+        PeerMonitoringMetadata::new(None, None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
         .unwrap();
@@ -182,7 +182,7 @@ async fn test_get_network_information_fullnode() {
         distance_from_validators: peer_distance_2,
     };
     let peer_monitoring_metadata_2 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
+        PeerMonitoringMetadata::new(None, None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_2, connection_metadata_2.clone())
         .unwrap();
@@ -251,7 +251,7 @@ async fn test_get_network_information_validator() {
         distance_from_validators: peer_distance_1,
     };
     let peer_monitoring_metadata_1 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
+        PeerMonitoringMetadata::new(None, None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
         .unwrap();
@@ -270,7 +270,7 @@ async fn test_get_network_information_validator() {
         distance_from_validators: peer_distance_2,
     };
     let peer_monitoring_metadata_2 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
+        PeerMonitoringMetadata::new(None, None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_2, connection_metadata_2.clone())
         .unwrap();
@@ -680,7 +680,9 @@ mod database_mock {
 
             fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
 
-            fn get_latest_version(&self) -> Result<Version>;
+            fn get_synced_version(&self) -> Result<Version>;
+
+            fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
             fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
 

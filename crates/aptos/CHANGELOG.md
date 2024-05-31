@@ -4,6 +4,11 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [3.4.0] - 2024/05/30
+- Adds a check for safe usage of randomness features. Public functions are not allowed to call randomness features unless explicitly allowed via attribute `#[lint::allow_unsafe_randomness]`.
+- The Move syntax now supports structured attribute names, as in `#[attribute_area::attribute_name]`.
+- Upgraded indexer processors for localnet from a11f0b6532349aa6b9a80c9a1d77524f02d8a013 to ca60e51b53c3be6f9517de7c73d4711e9c1f7236. Upgraded Hasura metadata accordingly.
+
 ## [3.3.1] - 2024/05/21
 - Fixed incompatibility bug that broken local simulation and gas profiling.
 

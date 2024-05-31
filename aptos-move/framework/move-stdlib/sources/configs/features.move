@@ -503,11 +503,21 @@ module std::features {
 
     const PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS: u64 = 61;
 
+    #[deprecated]
     public fun get_primary_apt_fungible_store_at_user_address_feature(
-    ): u64 { PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS }
+    ): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
 
+    #[deprecated]
     public fun primary_apt_fungible_store_at_user_address_enabled(): bool acquires Features {
         is_enabled(PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS)
+    }
+
+    const AGGREGATOR_V2_IS_AT_LEAST_API: u64 = 66;
+
+    public fun aggregator_v2_is_at_least_api_enabled(): bool acquires Features {
+        is_enabled(AGGREGATOR_V2_IS_AT_LEAST_API)
     }
 
     /// Whether we use more efficient native implementation of computing object derived address
@@ -528,6 +538,45 @@ module std::features {
 
     public fun dispatchable_fungible_asset_enabled(): bool acquires Features {
         is_enabled(DISPATCHABLE_FUNGIBLE_ASSET)
+    }
+
+    /// Lifetime: transient
+    const NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE: u64 = 64;
+
+    public fun get_new_accounts_default_to_fa_apt_store_feature(): u64 { NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE }
+
+    public fun new_accounts_default_to_fa_apt_store_enabled(): bool acquires Features {
+        is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE)
+    }
+
+    /// Lifetime: transient
+    const OPERATIONS_DEFAULT_TO_FA_APT_STORE: u64 = 65;
+
+    public fun get_operations_default_to_fa_apt_store_feature(): u64 { OPERATIONS_DEFAULT_TO_FA_APT_STORE }
+
+    public fun operations_default_to_fa_apt_store_enabled(): bool acquires Features {
+        is_enabled(OPERATIONS_DEFAULT_TO_FA_APT_STORE)
+    }
+
+    /// Whether enable concurent Fungible Balance
+    /// to create higher throughput concurrent variants.
+    /// Lifetime: transient
+    const CONCURRENT_FUNGIBLE_BALANCE: u64 = 67;
+
+    public fun get_concurrent_fungible_balance_feature(): u64 { CONCURRENT_FUNGIBLE_BALANCE }
+
+    public fun concurrent_fungible_balance_enabled(): bool acquires Features {
+        is_enabled(CONCURRENT_FUNGIBLE_BALANCE)
+    }
+
+    /// Whether to default new Fungible Store to the concurrent variant.
+    /// Lifetime: transient
+    const DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE: u64 = 68;
+
+    public fun get_default_to_concurrent_fungible_balance_feature(): u64 { DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE }
+
+    public fun default_to_concurrent_fungible_balance_enabled(): bool acquires Features {
+        is_enabled(DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE)
     }
 
     // ============================================================================================
