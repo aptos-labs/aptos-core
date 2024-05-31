@@ -10464,6 +10464,7 @@ dependencies = [
 name = "move-compiler-v2-transactional-tests"
 version = "0.1.0"
 dependencies = [
+ "aptos-vm",
  "datatest-stable",
  "itertools 0.12.1",
  "move-command-line-common",
