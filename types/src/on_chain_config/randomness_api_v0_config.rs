@@ -12,7 +12,9 @@ pub struct RequiredGasDeposit {
 
 impl RequiredGasDeposit {
     pub fn default_for_genesis() -> Self {
-        Self { gas_amount: None }
+        Self {
+            gas_amount: Some(10_000),
+        }
     }
 
     pub fn default_if_missing() -> Self {
@@ -38,7 +40,7 @@ pub struct AllowCustomMaxGasFlag {
 
 impl AllowCustomMaxGasFlag {
     pub fn default_for_genesis() -> Self {
-        Self { value: false }
+        Self { value: true }
     }
 
     pub fn default_if_missing() -> Self {
