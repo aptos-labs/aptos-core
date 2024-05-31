@@ -1,0 +1,9 @@
+
+============ bytecode verification failed ========
+
+Diagnostics:
+error: reference safety check failed on bytecode level. This is a known issue, to be fixed later, resulting from differences between safety rules of the v1 and v2 compiler. Try to rewrite your code to workaround this problem.
+   ┌─ tests/reference-safety/bug_12817_order_dependency.move:14:9
+   │
+14 │         *r2 + *r1 // <- changed order here
+   │         ^^^
