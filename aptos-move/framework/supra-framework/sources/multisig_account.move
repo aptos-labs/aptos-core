@@ -1147,6 +1147,10 @@ module supra_framework::multisig_account {
     #[test_only]
     use std::string::utf8;
     use std::features;
+    #[test_only]
+    use supra_framework::coin::{destroy_mint_cap, destroy_burn_cap};
+    #[test_only]
+    use supra_framework::supra_coin;
 
     #[test_only]
     const PAYLOAD: vector<u8> = vector[1, 2, 3];
@@ -1173,6 +1177,18 @@ module supra_framework::multisig_account {
             framework_signer, vector[features::get_multisig_accounts_feature()], vector[]);
         timestamp::set_time_has_started_for_testing(framework_signer);
         chain_id::initialize_for_test(framework_signer, 1);
+    }
+
+    #[test_only]
+    fun setup_disabled() {
+        let framework_signer = &create_signer(@0x1);
+        features::change_feature_flags(
+            framework_signer, vector[], vector[features::get_multisig_accounts_feature()]);
+        timestamp::set_time_has_started_for_testing(framework_signer);
+        chain_id::initialize_for_test(framework_signer, 1);
+        let (burn, mint) = supra_coin::initialize_for_test(framework_signer);
+        destroy_mint_cap(mint);
+        destroy_burn_cap(burn);
     }
 
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
@@ -1289,8 +1305,9 @@ module supra_framework::multisig_account {
     #[expected_failure(abort_code = 0xD000E, location = Self)]
     public entry fun test_create_with_without_feature_flag_enabled_should_fail(
         owner: &signer) acquires MultisigAccount {
+        setup_disabled();
         create_account(address_of(owner));
-        create(owner, 2, vector[], vector[]);
+        create(owner, 1, vector[], vector[]);
     }
 
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
