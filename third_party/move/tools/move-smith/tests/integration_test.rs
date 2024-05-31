@@ -34,6 +34,31 @@ fn simple_module() -> Module {
     }
 }
 
+fn simple_script() -> Script {
+    Script {
+        main: vec![FunctionCall {
+            name: String::from("0xCAFE::SimpleModule::fun1"),
+            args: vec![
+                Expression::NumberLiteral(NumberLiteral {
+                    value: BigUint::from(555u64),
+                    typ: Type::U64,
+                }),
+                Expression::NumberLiteral(NumberLiteral {
+                    value: BigUint::from(255u8),
+                    typ: Type::U8,
+                }),
+            ],
+        }],
+    }
+}
+
+fn simple_compile_unit() -> CompileUnit {
+    CompileUnit {
+        modules: vec![simple_module()],
+        scripts: vec![simple_script()],
+    }
+}
+
 fn get_raw_data() -> Vec<u8> {
     let seed: u64 = 12345;
     let mut rng = StdRng::seed_from_u64(seed);
@@ -70,4 +95,10 @@ fn test_generation_and_compile() {
     println!("{}", lines);
 
     compile_modules(lines);
+}
+
+#[test]
+fn test_run_transactional_test() {
+    let code = simple_compile_unit().emit_code();
+    run_transactional_test(code).unwrap();
 }

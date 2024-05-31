@@ -13,7 +13,10 @@ rand = { workspace = true }
 tempfile = { workspace = true }
 
 move-compiler = { path = "../../move-compiler" }
+move-compiler-v2 = { path = "../../move-compiler-v2" }
+move-model = { path = "../../move-model" }
 move-stdlib = { path = "../../move-stdlib" }
+move-transactional-test-runner = { path = "../../testing-infra/transactional-test-runner" }
 
 [lib]
 name = "move_smith"

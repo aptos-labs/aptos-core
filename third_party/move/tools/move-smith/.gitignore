@@ -3,5 +3,6 @@
 *.profraw
 *.profdata
 *.log
+*.svg
 coverage/
 output/
