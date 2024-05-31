@@ -15,12 +15,8 @@ use move_binary_format::{
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    vm_status::{
-        sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode,
-        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-    },
+    vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use serde::Serialize;
 use smallbitvec::SmallBitVec;
 use smallvec::{smallvec, SmallVec};
 use std::{
@@ -676,35 +672,39 @@ impl fmt::Display for Type {
     }
 }
 
-#[derive(Clone, Serialize)]
-pub struct TypeConfig {
-    // Maximum number of nodes a fully-instantiated type has.
-    max_ty_size: usize,
-    // Maximum depth (in terms of number of nodes) a fully-instantiated type has.
-    max_ty_depth: usize,
-}
-
-impl Default for TypeConfig {
-    fn default() -> Self {
-        Self {
-            max_ty_size: 256,
-            max_ty_depth: 256,
-        }
-    }
-}
-
+/// Controls creation of runtime types, i.e., methods offered by this struct
+/// should be the only way to construct any type.
 #[derive(Clone)]
-pub struct TypeBuilder {
-    max_ty_size: usize,
-    max_ty_depth: usize,
+pub enum TypeBuilder {
+    // Legacy configurations only limits type depth during type substitution. Will
+    // be removed in the nearest future when the new one stabilizes. The enum can
+    // be converted into the struct at that point.
+    Legacy,
+    New {
+        // Maximum number of nodes a fully-instantiated type has.
+        max_ty_size: u64,
+        // Maximum depth (in terms of number of nodes) a fully-instantiated type has.
+        max_ty_depth: u64,
+    },
 }
 
 impl TypeBuilder {
-    pub fn new(ty_config: &TypeConfig) -> Self {
-        Self {
-            max_ty_size: ty_config.max_ty_size,
-            max_ty_depth: ty_config.max_ty_depth,
+    pub const LEGACY_MAX_TYPE_INSTANTIATION_NODES: u64 = 128;
+    const LEGACY_TYPE_DEPTH_MAX: u64 = 256;
+
+    pub fn is_legacy(&self) -> bool {
+        matches!(self, Self::Legacy)
+    }
+
+    pub fn new(max_ty_size: u64, max_ty_depth: u64) -> Self {
+        Self::New {
+            max_ty_size,
+            max_ty_depth,
         }
+    }
+
+    pub fn legacy() -> Self {
+        Self::Legacy
     }
 
     #[inline]
@@ -746,39 +746,58 @@ impl TypeBuilder {
     /// Returns an error if the type size or depth are too large.
     #[inline]
     pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
-        let mut count = 1;
-        let inner_ty = self.clone_impl(inner_ty, &mut count, 2).map_err(|e| {
-            e.append_message_with_separator(
-                '.',
-                format!(
-                    "Failed to create a (mutable: {}) reference type with inner type {}",
-                    is_mut, inner_ty
-                ),
-            )
-        })?;
-        let inner_ty = Box::new(inner_ty);
-        Ok(if is_mut {
-            Type::MutableReference(inner_ty)
+        if self.is_legacy() {
+            let inner_ty = Box::new(inner_ty.clone());
+            Ok(if is_mut {
+                Type::MutableReference(inner_ty)
+            } else {
+                Type::Reference(inner_ty)
+            })
         } else {
-            Type::Reference(inner_ty)
-        })
+            let mut count = 1;
+            let check = |c: &mut u64, d: u64| self.check(c, d);
+            let inner_ty = self
+                .clone_impl(inner_ty, &mut count, 2, check)
+                .map_err(|e| {
+                    e.append_message_with_separator(
+                        '.',
+                        format!(
+                            "Failed to create a (mutable: {}) reference type with inner type {}",
+                            is_mut, inner_ty
+                        ),
+                    )
+                })?;
+            let inner_ty = Box::new(inner_ty);
+            Ok(if is_mut {
+                Type::MutableReference(inner_ty)
+            } else {
+                Type::Reference(inner_ty)
+            })
+        }
     }
 
     /// Creates a vector type with the given element type, returning an error
     /// if the type size or depth are too large.
     #[inline]
     pub fn create_vec_ty(&self, elem_ty: &Type) -> PartialVMResult<Type> {
-        let mut count = 1;
-        let elem_ty = self.clone_impl(elem_ty, &mut count, 2).map_err(|e| {
-            e.append_message_with_separator(
-                '.',
-                format!(
-                    "Failed to create a vector type with element type {}",
-                    elem_ty
-                ),
-            )
-        })?;
-        Ok(Type::Vector(TriompheArc::new(elem_ty)))
+        if self.is_legacy() {
+            Ok(Type::Vector(TriompheArc::new(elem_ty.clone())))
+        } else {
+            let mut count = 1;
+            let check = |c: &mut u64, d: u64| self.check(c, d);
+            let elem_ty = self
+                .clone_impl(elem_ty, &mut count, 2, check)
+                .map_err(|e| {
+                    e.append_message_with_separator(
+                        '.',
+                        format!(
+                            "Failed to create a vector type with element type {}",
+                            elem_ty
+                        ),
+                    )
+                })?;
+            Ok(Type::Vector(TriompheArc::new(elem_ty)))
+        }
     }
 
     #[inline]
@@ -795,26 +814,75 @@ impl TypeBuilder {
         ty_params: Vec<Type>,
         ty_args: &[Type],
     ) -> PartialVMResult<Type> {
-        let ty = Type::StructInstantiation {
-            idx: struct_ty.idx,
-            ty_args: triomphe::Arc::new(ty_params),
-            ability: AbilityInfo::generic_struct(
-                struct_ty.abilities,
-                struct_ty.phantom_ty_params_mask.clone(),
-            ),
-        };
-
-        // We need to count the struct type itself.
-        let mut count = 1;
-        self.subst_impl(&ty, ty_args, &mut count, 2).map_err(|e| {
-            e.append_message_with_separator(
-                '.',
-                format!(
-                    "Failed to instantiate a type {} with type arguments {:?}",
-                    ty, ty_args
+        if self.is_legacy() {
+            Ok(Type::StructInstantiation {
+                idx: struct_ty.idx,
+                ty_args: triomphe::Arc::new(
+                    ty_params
+                        .iter()
+                        .map(|ty| self.create_ty_with_subst(ty, ty_args))
+                        .collect::<PartialVMResult<Vec<_>>>()?,
                 ),
-            )
-        })
+                ability: AbilityInfo::generic_struct(
+                    struct_ty.abilities,
+                    struct_ty.phantom_ty_params_mask.clone(),
+                ),
+            })
+        } else {
+            let ty = Type::StructInstantiation {
+                idx: struct_ty.idx,
+                ty_args: triomphe::Arc::new(ty_params),
+                ability: AbilityInfo::generic_struct(
+                    struct_ty.abilities,
+                    struct_ty.phantom_ty_params_mask.clone(),
+                ),
+            };
+
+            // We need to count the struct type itself.
+            let mut count = 1;
+            let check = |c: &mut u64, d: u64| self.check(c, d);
+            self.subst_impl(&ty, ty_args, &mut count, 2, check)
+                .map_err(|e| {
+                    if self.is_legacy() {
+                        e
+                    } else {
+                        e.append_message_with_separator(
+                            '.',
+                            format!(
+                                "Failed to instantiate a type {} with type arguments {:?}",
+                                ty, ty_args
+                            ),
+                        )
+                    }
+                })
+        }
+    }
+
+    // This has to be a separate method because there are two different legacy instantiation
+    // constructions, where one uses the legacy checks and the other does not.
+    pub fn create_struct_instantiation_ty_with_legacy_check(
+        &self,
+        struct_ty: &StructType,
+        ty_params: Vec<Type>,
+        ty_args: &[Type],
+    ) -> PartialVMResult<Type> {
+        if self.is_legacy() {
+            Ok(Type::StructInstantiation {
+                idx: struct_ty.idx,
+                ty_args: triomphe::Arc::new(
+                    ty_params
+                        .iter()
+                        .map(|ty| self.create_ty_with_subst_with_legacy_check(ty, ty_args))
+                        .collect::<PartialVMResult<_>>()?,
+                ),
+                ability: AbilityInfo::generic_struct(
+                    struct_ty.abilities,
+                    struct_ty.phantom_ty_params_mask.clone(),
+                ),
+            })
+        } else {
+            self.create_struct_instantiation_ty(struct_ty, ty_params, ty_args)
+        }
     }
 
     /// Creates a type for a Move constant. Note that constant types can be
@@ -823,13 +891,17 @@ impl TypeBuilder {
         let mut count = 0;
         self.create_constant_ty_impl(const_tok, &mut count, 1)
             .map_err(|e| {
-                e.append_message_with_separator(
-                    '.',
-                    format!(
-                        "Failed to construct a type for constant token {:?}",
-                        const_tok
-                    ),
-                )
+                if self.is_legacy() {
+                    e
+                } else {
+                    e.append_message_with_separator(
+                        '.',
+                        format!(
+                            "Failed to construct a type for constant token {:?}",
+                            const_tok
+                        ),
+                    )
+                }
             })
     }
 
@@ -845,15 +917,96 @@ impl TypeBuilder {
     /// Clones the given type, at the same time instantiating all its type parameters.
     pub fn create_ty_with_subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
         let mut count = 0;
-        self.subst_impl(ty, ty_args, &mut count, 1)
+
+        let check = |c: &mut u64, d: u64| {
+            if self.is_legacy() {
+                self.legacy_check_in_subst(c, d)
+            } else {
+                self.check(c, d)
+            }
+        };
+
+        self.subst_impl(ty, ty_args, &mut count, 1, check)
     }
 
-    fn check(&self, count: &mut usize, depth: usize) -> PartialVMResult<()> {
-        if *count >= self.max_ty_size {
-            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+    // This has to be a separate method because legacy type construction used both:
+    //  1) depth check only,
+    //  2) no checks
+    // in different places. When legacy implementation is removed, this function can
+    // be removed in favour of "normal" type substitution.
+    pub fn create_ty_with_subst_with_legacy_check(
+        &self,
+        ty: &Type,
+        ty_args: &[Type],
+    ) -> PartialVMResult<Type> {
+        if self.is_legacy() {
+            match ty {
+                Type::MutableReference(_) | Type::Reference(_) | Type::Vector(_) => {
+                    if legacy_count_type_nodes(ty) > Self::LEGACY_MAX_TYPE_INSTANTIATION_NODES {
+                        return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+                    }
+                },
+                Type::StructInstantiation {
+                    ty_args: struct_inst,
+                    ..
+                } => {
+                    let mut sum_nodes = 1u64;
+                    for ty in ty_args.iter().chain(struct_inst.iter()) {
+                        sum_nodes = sum_nodes.saturating_add(legacy_count_type_nodes(ty));
+                        if sum_nodes > Self::LEGACY_MAX_TYPE_INSTANTIATION_NODES {
+                            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+                        }
+                    }
+                },
+                Type::Address
+                | Type::Bool
+                | Type::Signer
+                | Type::Struct { .. }
+                | Type::TyParam(_)
+                | Type::U8
+                | Type::U16
+                | Type::U32
+                | Type::U64
+                | Type::U128
+                | Type::U256 => (),
+            };
         }
-        if depth > self.max_ty_depth {
+        self.create_ty_with_subst(ty, ty_args)
+    }
+
+    fn legacy_check_in_subst(&self, _count: &mut u64, depth: u64) -> PartialVMResult<()> {
+        if depth > Self::LEGACY_TYPE_DEPTH_MAX {
             return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
+        }
+        Ok(())
+    }
+
+    fn check(&self, count: &mut u64, depth: u64) -> PartialVMResult<()> {
+        match self {
+            Self::New {
+                max_ty_size,
+                max_ty_depth,
+            } => {
+                if *count >= *max_ty_size {
+                    return Err(
+                        PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
+                            "Type size is larger than maximum {}",
+                            *max_ty_size
+                        )),
+                    );
+                }
+                if depth > *max_ty_depth {
+                    return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED)
+                        .with_message(format!(
+                            "Type depth is larger than maximum {}",
+                            *max_ty_depth
+                        )));
+                }
+            },
+
+            // No checks in legacy implementation. Depth check for substitution
+            // is handled separately.
+            Self::Legacy => {},
         }
         Ok(())
     }
@@ -861,8 +1014,8 @@ impl TypeBuilder {
     fn create_constant_ty_impl(
         &self,
         const_tok: &SignatureToken,
-        count: &mut usize,
-        depth: usize,
+        count: &mut u64,
+        depth: u64,
     ) -> PartialVMResult<Type> {
         use SignatureToken as S;
         use Type::*;
@@ -884,58 +1037,94 @@ impl TypeBuilder {
             },
 
             S::Struct(_) | S::StructInstantiation(_, _) => {
+                let msg = if self.is_legacy() {
+                    "Unable to load const type signature".to_string()
+                } else {
+                    "Struct constants are not supported".to_string()
+                };
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("Struct constants are not supported".to_string()),
-                )
+                        .with_message(msg),
+                );
             },
 
             tok => {
+                let msg = if self.is_legacy() {
+                    "Unable to load const type signature".to_string()
+                } else {
+                    format!(
+                        "{:?} is not allowed or is not a meaningful token for a constant",
+                        tok
+                    )
+                };
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!(
-                            "{:?} is not allowed or is not a meaningful token for a constant",
-                            tok
-                        )),
-                )
+                        .with_message(msg),
+                );
             },
         })
     }
 
-    fn subst_impl(
+    fn subst_impl<G>(
         &self,
         ty: &Type,
         ty_args: &[Type],
-        count: &mut usize,
-        depth: usize,
-    ) -> PartialVMResult<Type> {
-        self.apply_subst(
+        count: &mut u64,
+        depth: u64,
+        check: G,
+    ) -> PartialVMResult<Type>
+    where
+        G: Fn(&mut u64, u64) -> PartialVMResult<()> + Copy,
+    {
+        Self::apply_subst(
             ty,
             |idx, c, d| match ty_args.get(idx as usize) {
-                Some(ty) => self.clone_impl(ty, c, d),
-                None => Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!(
-                            "Type substitution failed: there are {} type arguments and index {} is out of bounds",
+                Some(ty) => self.clone_impl(ty, c, d, check),
+                None => {
+                    let msg = if self.is_legacy() {
+                        format!(
+                            "type substitution failed: index out of bounds -- len {} got {}",
+                            ty_args.len(),
+                            idx
+                        )
+                    } else {
+                        format!(
+                            "Type substitution failed: index {} is out of bounds for {} type arguments",
                             idx,
                             ty_args.len()
-                        )),
-                ),
+                        )
+                    };
+                    Err(
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message(msg),
+                    )
+                },
             },
             count,
             depth,
+            check,
         )
     }
 
-    fn clone_impl(&self, ty: &Type, count: &mut usize, depth: usize) -> PartialVMResult<Type> {
-        self.apply_subst(
+    fn clone_impl<G>(
+        &self,
+        ty: &Type,
+        count: &mut u64,
+        depth: u64,
+        check: G,
+    ) -> PartialVMResult<Type>
+    where
+        G: Fn(&mut u64, u64) -> PartialVMResult<()> + Copy,
+    {
+        Self::apply_subst(
             ty,
             |idx, _, _| {
                 // The type cannot contain type parameters anymore (it also does not make
                 // sense to have them!), and so it is the caller's responsibility to ensure
                 // type substitution has been performed.
                 Err(
-                    PartialVMError::new(UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(format!(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
                         "There is an unresolved type parameter (index: {}) when cloning type {}",
                         idx, ty
                     )),
@@ -943,22 +1132,24 @@ impl TypeBuilder {
             },
             count,
             depth,
+            check,
         )
     }
 
-    fn apply_subst<F>(
-        &self,
+    fn apply_subst<F, G>(
         ty: &Type,
         subst: F,
-        count: &mut usize,
-        depth: usize,
+        count: &mut u64,
+        depth: u64,
+        check: G,
     ) -> PartialVMResult<Type>
     where
-        F: Fn(u16, &mut usize, usize) -> PartialVMResult<Type> + Copy,
+        F: Fn(u16, &mut u64, u64) -> PartialVMResult<Type> + Copy,
+        G: Fn(&mut u64, u64) -> PartialVMResult<()> + Copy,
     {
         use Type::*;
 
-        self.check(count, depth)?;
+        check(count, depth)?;
         *count += 1;
         Ok(match ty {
             TyParam(idx) => {
@@ -977,15 +1168,15 @@ impl TypeBuilder {
             Address => Address,
             Signer => Signer,
             Vector(elem_ty) => {
-                let elem_ty = self.apply_subst(elem_ty, subst, count, depth + 1)?;
+                let elem_ty = Self::apply_subst(elem_ty, subst, count, depth + 1, check)?;
                 Vector(TriompheArc::new(elem_ty))
             },
             Reference(inner_ty) => {
-                let inner_ty = self.apply_subst(inner_ty, subst, count, depth + 1)?;
+                let inner_ty = Self::apply_subst(inner_ty, subst, count, depth + 1, check)?;
                 Reference(Box::new(inner_ty))
             },
             MutableReference(inner_ty) => {
-                let inner_ty = self.apply_subst(inner_ty, subst, count, depth + 1)?;
+                let inner_ty = Self::apply_subst(inner_ty, subst, count, depth + 1, check)?;
                 MutableReference(Box::new(inner_ty))
             },
             Struct { idx, ability } => Struct {
@@ -998,10 +1189,9 @@ impl TypeBuilder {
                 ability,
             } => {
                 let mut instantiated_tys = vec![];
-                for non_instantiated_ty in non_instantiated_tys.iter() {
-                    let instantiated_ty =
-                        self.apply_subst(non_instantiated_ty, subst, count, depth + 1)?;
-                    instantiated_tys.push(instantiated_ty);
+                for ty in non_instantiated_tys.iter() {
+                    let ty = Self::apply_subst(ty, subst, count, depth + 1, check)?;
+                    instantiated_tys.push(ty);
                 }
                 StructInstantiation {
                     idx: *idx,
@@ -1016,8 +1206,8 @@ impl TypeBuilder {
         &self,
         ty_tag: &TypeTag,
         resolver: &mut F,
-        count: &mut usize,
-        depth: usize,
+        count: &mut u64,
+        depth: u64,
     ) -> VMResult<Type>
     where
         F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
@@ -1073,7 +1263,7 @@ impl TypeBuilder {
 
     #[cfg(test)]
     pub fn new_for_test() -> Self {
-        Self {
+        Self::New {
             max_ty_size: 11,
             max_ty_depth: 5,
         }
@@ -1082,9 +1272,36 @@ impl TypeBuilder {
     #[cfg(test)]
     fn num_nodes_in_subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<usize> {
         let mut count = 0;
-        self.subst_impl(ty, ty_args, &mut count, 1)?;
-        Ok(count)
+
+        let check = |c: &mut u64, d: u64| self.check(c, d);
+        self.subst_impl(ty, ty_args, &mut count, 1, check)?;
+        Ok(count as usize)
     }
+}
+
+pub fn legacy_count_type_nodes(ty: &Type) -> u64 {
+    let mut todo = vec![ty];
+    let mut result = 0;
+    while let Some(ty) = todo.pop() {
+        match ty {
+            Type::Vector(ty) => {
+                result += 1;
+                todo.push(ty);
+            },
+            Type::Reference(ty) | Type::MutableReference(ty) => {
+                result += 1;
+                todo.push(ty);
+            },
+            Type::StructInstantiation { ty_args, .. } => {
+                result += 1;
+                todo.extend(ty_args.iter())
+            },
+            _ => {
+                result += 1;
+            },
+        }
+    }
+    result
 }
 
 #[cfg(test)]
@@ -1223,7 +1440,7 @@ mod unit_tests {
     #[test]
     fn test_create_nested_tys() {
         let ty_builder = TypeBuilder::new_for_test();
-        let ty = vec_ty_for_test(ty_builder.max_ty_depth - 1);
+        let ty = vec_ty_for_test(10);
 
         // These types have the maximum possible depth!
         let vec_ty = assert_ok!(ty_builder.create_vec_ty(&ty));

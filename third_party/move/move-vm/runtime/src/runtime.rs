@@ -30,7 +30,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::Type,
+    loaded_data::runtime_types::{Type, TypeBuilder},
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
@@ -54,9 +54,10 @@ impl VMRuntime {
     pub(crate) fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
+        ty_builder: TypeBuilder,
     ) -> PartialVMResult<Self> {
         Ok(VMRuntime {
-            loader: Loader::new(NativeFunctions::new(natives)?, vm_config),
+            loader: Loader::new(NativeFunctions::new(natives)?, vm_config, ty_builder),
             module_cache: Arc::new(ModuleCache::new()),
         })
     }
@@ -366,6 +367,7 @@ impl VMRuntime {
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
         let ty_builder = self.loader().ty_builder();
+
         let param_tys = param_tys
             .into_iter()
             .map(|ty| ty_builder.create_ty_with_subst(&ty, &ty_args))

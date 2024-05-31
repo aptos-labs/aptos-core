@@ -20,6 +20,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
+use move_vm_types::loaded_data::runtime_types::TypeBuilder;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
@@ -67,9 +68,12 @@ impl WarmVmCache {
                 return Ok(vm.clone());
             }
 
-            let vm = MoveVM::new_with_config(
+            let vm = MoveVM::new_with_ty_builder(
                 aptos_natives_with_builder(&mut native_builder),
                 vm_config,
+                // FIXME: How do we extract gas params here if we need to initialize type builder when creating the VM....
+                //   It is a result, use features?
+                TypeBuilder::Legacy,
             )?;
             Self::warm_vm_up(&vm, resolver);
 

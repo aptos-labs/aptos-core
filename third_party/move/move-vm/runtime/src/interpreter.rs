@@ -351,9 +351,7 @@ impl Interpreter {
     ) -> PartialVMResult<Frame> {
         let mut locals = Locals::new(func.local_count());
         let param_count = func.param_count();
-        let is_generic = !ty_args.is_empty();
 
-        let ty_builder = loader.ty_builder();
         for i in 0..param_count {
             locals.store_loc(
                 param_count - i - 1,
@@ -363,16 +361,15 @@ impl Interpreter {
 
             if self.paranoid_type_checks {
                 let ty = self.operand_stack.pop_ty()?;
-                if is_generic {
-                    ty.paranoid_check_eq(
-                        &ty_builder.create_ty_with_subst(
-                            &func.local_tys()[param_count - i - 1],
-                            &ty_args,
-                        )?,
-                    )?;
+                let expected_ty = &func.local_tys()[param_count - i - 1];
+                if !ty_args.is_empty() {
+                    let expected_ty = loader
+                        .ty_builder()
+                        .create_ty_with_subst_with_legacy_check(expected_ty, &ty_args)?;
+                    ty.paranoid_check_eq(&expected_ty)?;
                 } else {
                     // Directly check against the expected type to save a clone here.
-                    ty.paranoid_check_eq(&func.local_tys()[param_count - i - 1])?;
+                    ty.paranoid_check_eq(expected_ty)?;
                 }
             }
         }
@@ -399,11 +396,14 @@ impl Interpreter {
             if ty_args.is_empty() {
                 function.local_tys().to_vec()
             } else {
-                let ty_builder = loader.ty_builder();
                 function
                     .local_tys()
                     .iter()
-                    .map(|ty| ty_builder.create_ty_with_subst(ty, &ty_args))
+                    .map(|ty| {
+                        loader
+                            .ty_builder()
+                            .create_ty_with_subst_with_legacy_check(ty, &ty_args)
+                    })
                     .collect::<PartialVMResult<Vec<_>>>()?
             }
         } else {
@@ -475,6 +475,7 @@ impl Interpreter {
         ty_args: Vec<Type>,
     ) -> PartialVMResult<()> {
         let ty_builder = resolver.loader().ty_builder();
+
         let mut args = VecDeque::new();
         let expected_args = function.param_count();
         for _ in 0..expected_args {
@@ -484,10 +485,15 @@ impl Interpreter {
 
         if self.paranoid_type_checks {
             for i in 0..expected_args {
-                let expected_ty = ty_builder
-                    .create_ty_with_subst(&function.param_tys()[expected_args - i - 1], &ty_args)?;
                 let ty = self.operand_stack.pop_ty()?;
-                ty.paranoid_check_eq(&expected_ty)?;
+                let expected_ty = &function.param_tys()[expected_args - i - 1];
+                if !ty_args.is_empty() {
+                    let expected_ty =
+                        ty_builder.create_ty_with_subst_with_legacy_check(expected_ty, &ty_args)?;
+                    ty.paranoid_check_eq(&expected_ty)?;
+                } else {
+                    ty.paranoid_check_eq(expected_ty)?;
+                }
                 args_ty.push_front(ty);
             }
         }
@@ -540,8 +546,8 @@ impl Interpreter {
 
                 if self.paranoid_type_checks {
                     for ty in function.return_tys() {
-                        self.operand_stack
-                            .push_ty(ty_builder.create_ty_with_subst(ty, &ty_args)?)?;
+                        let ty = ty_builder.create_ty_with_subst_with_legacy_check(ty, &ty_args)?;
+                        self.operand_stack.push_ty(ty)?;
                     }
                 }
 
@@ -1399,7 +1405,7 @@ impl FrameTypeCache {
             Self::get_or(&mut self.field_instantiation, idx, |idx| {
                 let struct_type = resolver.field_instantiation_to_struct(idx, ty_args)?;
                 let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
-                let field_ty = resolver.get_field_type_generic(idx, ty_args)?;
+                let field_ty = resolver.get_generic_field_ty(idx, ty_args)?;
                 let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
                 Ok(((field_ty, field_ty_count), (struct_type, struct_ty_count)))
             })?;
@@ -1414,7 +1420,7 @@ impl FrameTypeCache {
         ty_args: &[Type],
     ) -> PartialVMResult<(&Type, NumTypeNodes)> {
         let (ty, ty_count) = Self::get_or(&mut self.struct_def_instantiation_type, idx, |idx| {
-            let ty = resolver.get_struct_type_generic(idx, ty_args)?;
+            let ty = resolver.get_generic_struct_ty(idx, ty_args)?;
             let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
             Ok((ty, ty_count))
         })?;
@@ -1616,6 +1622,7 @@ impl Frame {
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
         let ty_builder = resolver.loader().ty_builder();
+
         match instruction {
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),
             Bytecode::Branch(_)
@@ -1688,7 +1695,7 @@ impl Frame {
                 let expected_ty = resolver.field_handle_to_struct(*fh_idx);
                 ty.paranoid_check_ref_eq(&expected_ty, false)?;
 
-                let field_ty = resolver.get_field_type(*fh_idx)?;
+                let field_ty = resolver.get_field_ty(*fh_idx)?;
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
                 interpreter.operand_stack.push_ty(field_ref_ty)?;
             },
@@ -1697,7 +1704,7 @@ impl Frame {
                 let expected_inner_ty = resolver.field_handle_to_struct(*fh_idx);
                 ref_ty.paranoid_check_ref_eq(&expected_inner_ty, true)?;
 
-                let field_ty = resolver.get_field_type(*fh_idx)?;
+                let field_ty = resolver.get_field_ty(*fh_idx)?;
                 let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
                 interpreter.operand_stack.push_ty(field_mut_ref_ty)?;
             },
@@ -1722,10 +1729,10 @@ impl Frame {
             Bytecode::Pack(idx) => {
                 let field_count = resolver.field_count(*idx);
                 let args_ty = resolver.get_struct_field_tys(*idx)?;
-                let output_ty = resolver.get_struct_type(*idx);
+                let output_ty = resolver.get_struct_ty(*idx);
                 let ability = output_ty.abilities()?;
 
-                // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
+                // If the struct has a key ability, we expect all of its field to have store ability but not key ability.
                 let field_expected_abilities = if ability.has_key() {
                     ability
                         .remove(Ability::Key)
@@ -1761,7 +1768,7 @@ impl Frame {
                 let args_ty = ty_cache.get_struct_fields_types(*idx, resolver, ty_args)?;
                 let ability = output_ty.abilities()?;
 
-                // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
+                // If the struct has a key ability, we expect all of its field to have store ability but not key ability.
                 let field_expected_abilities = if ability.has_key() {
                     ability
                         .remove(Ability::Key)
@@ -1793,7 +1800,7 @@ impl Frame {
             },
             Bytecode::Unpack(idx) => {
                 let struct_ty = interpreter.operand_stack.pop_ty()?;
-                struct_ty.paranoid_check_eq(&resolver.get_struct_type(*idx))?;
+                struct_ty.paranoid_check_eq(&resolver.get_struct_ty(*idx))?;
                 let struct_decl = resolver.get_struct_field_tys(*idx)?;
                 for ty in struct_decl.field_tys.iter() {
                     interpreter.operand_stack.push_ty(ty.clone())?;
@@ -1893,7 +1900,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_address_ty()?;
-                let struct_ty = resolver.get_struct_type(*idx);
+                let struct_ty = resolver.get_struct_ty(*idx);
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
                 let struct_mut_ref_ty = ty_builder.create_ref_ty(&struct_ty, true)?;
@@ -1904,7 +1911,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_address_ty()?;
-                let struct_ty = resolver.get_struct_type(*idx);
+                let struct_ty = resolver.get_struct_ty(*idx);
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
                 let struct_ref_ty = ty_builder.create_ref_ty(&struct_ty, false)?;
@@ -1947,7 +1954,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_signer_ref_ty()?;
-                ty.paranoid_check_eq(&resolver.get_struct_type(*idx))?;
+                ty.paranoid_check_eq(&resolver.get_struct_ty(*idx))?;
                 ty.paranoid_check_has_ability(Ability::Key)?;
             },
             Bytecode::MoveToGeneric(idx) => {
@@ -1964,7 +1971,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_address_ty()?;
-                let ty = resolver.get_struct_type(*idx);
+                let ty = resolver.get_struct_ty(*idx);
                 ty.paranoid_check_has_ability(Ability::Key)?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
@@ -2306,7 +2313,7 @@ impl Frame {
                     },
                     Bytecode::Pack(sd_idx) => {
                         let field_count = resolver.field_count(*sd_idx);
-                        let struct_type = resolver.get_struct_type(*sd_idx);
+                        let struct_type = resolver.get_struct_ty(*sd_idx);
                         check_depth_of_type(resolver, &struct_type)?;
                         gas_meter.charge_pack(
                             false,
@@ -2549,7 +2556,7 @@ impl Frame {
                     Bytecode::MutBorrowGlobal(sd_idx) | Bytecode::ImmBorrowGlobal(sd_idx) => {
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobal(_));
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx);
+                        let ty = resolver.get_struct_ty(*sd_idx);
                         interpreter.borrow_global(
                             is_mut,
                             false,
@@ -2582,7 +2589,7 @@ impl Frame {
                     },
                     Bytecode::Exists(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx);
+                        let ty = resolver.get_struct_ty(*sd_idx);
                         interpreter.exists(
                             false,
                             resolver.loader(),
@@ -2611,7 +2618,7 @@ impl Frame {
                     },
                     Bytecode::MoveFrom(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx);
+                        let ty = resolver.get_struct_ty(*sd_idx);
                         interpreter.move_from(
                             false,
                             resolver.loader(),
@@ -2646,7 +2653,7 @@ impl Frame {
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx);
+                        let ty = resolver.get_struct_ty(*sd_idx);
                         interpreter.move_to(
                             false,
                             resolver.loader(),

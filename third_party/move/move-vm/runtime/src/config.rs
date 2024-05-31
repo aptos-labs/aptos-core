@@ -6,7 +6,6 @@ use move_binary_format::{
     file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
 };
 use move_bytecode_verifier::VerifierConfig;
-use move_vm_types::loaded_data::runtime_types::TypeConfig;
 use serde::Serialize;
 
 pub const DEFAULT_MAX_VALUE_NEST_DEPTH: u64 = 128;
@@ -19,7 +18,6 @@ pub struct VMConfig {
     // When this flag is set to true, MoveVM will perform type checks at every instruction
     // execution to ensure that type safety cannot be violated at runtime.
     pub paranoid_type_checks: bool,
-    pub ty_config: TypeConfig,
     pub check_invariant_in_swap_loc: bool,
     /// Maximum value nest depth for structs
     pub max_value_nest_depth: Option<u64>,
@@ -35,7 +33,6 @@ impl Default for VMConfig {
             verifier_config: VerifierConfig::default(),
             deserializer_config: DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX),
             paranoid_type_checks: false,
-            ty_config: TypeConfig::default(),
             check_invariant_in_swap_loc: true,
             max_value_nest_depth: Some(DEFAULT_MAX_VALUE_NEST_DEPTH),
             type_max_cost: 0,

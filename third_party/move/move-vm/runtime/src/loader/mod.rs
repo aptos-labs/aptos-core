@@ -53,7 +53,7 @@ mod type_loader;
 
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
-use move_vm_types::loaded_data::runtime_types::TypeBuilder;
+use move_vm_types::loaded_data::runtime_types::{legacy_count_type_nodes, TypeBuilder};
 pub(crate) use script::{Script, ScriptCache};
 use type_loader::intern_type;
 
@@ -215,8 +215,11 @@ impl Clone for Loader {
 }
 
 impl Loader {
-    pub(crate) fn new(natives: NativeFunctions, vm_config: VMConfig) -> Self {
-        let ty_builder = TypeBuilder::new(&vm_config.ty_config);
+    pub(crate) fn new(
+        natives: NativeFunctions,
+        vm_config: VMConfig,
+        ty_builder: TypeBuilder,
+    ) -> Self {
         Self {
             scripts: RwLock::new(ScriptCache::new()),
             type_cache: RwLock::new(TypeCache::new()),
@@ -328,6 +331,21 @@ impl Loader {
             .iter()
             .map(|ty| self.load_type(ty, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()?;
+
+        #[allow(clippy::collapsible_if)]
+        if self.ty_builder.is_legacy() {
+            if ty_args.iter().map(legacy_count_type_nodes).sum::<u64>()
+                > TypeBuilder::LEGACY_MAX_TYPE_INSTANTIATION_NODES
+            {
+                return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES)
+                    .with_message(format!(
+                        "Too many type nodes when instantiating a type for script {}",
+                        &main.name
+                    ))
+                    .finish(Location::Script));
+            };
+        }
+
         Type::verify_ty_arg_abilities(main.ty_arg_abilities(), &ty_args).map_err(|e| {
             e.with_message(format!(
                 "Failed to verify type arguments for script {}",
@@ -778,9 +796,7 @@ impl Loader {
                 .get_struct_type_by_identifier(&struct_tag.name, &module_id)
                 .map_err(|e| e.finish(Location::Undefined))
         };
-
-        let ty_builder = self.ty_builder();
-        ty_builder.create_ty(ty_tag, resolver)
+        self.ty_builder().create_ty(ty_tag, resolver)
     }
 
     /// Traverses the whole transitive closure of dependencies, starting from the specified
@@ -1292,8 +1308,22 @@ impl<'a> Resolver<'a> {
         let ty_builder = self.loader().ty_builder();
         let mut instantiation = vec![];
         for ty in &func_inst.instantiation {
-            instantiation.push(ty_builder.create_ty_with_subst(ty, ty_args)?);
+            let ty = ty_builder.create_ty_with_subst_with_legacy_check(ty, ty_args)?;
+            instantiation.push(ty);
         }
+
+        if ty_builder.is_legacy() {
+            // Check if the function instantiation over all generics is larger
+            // than MAX_TYPE_INSTANTIATION_NODES.
+            let mut sum_nodes = 1u64;
+            for ty in ty_args.iter().chain(instantiation.iter()) {
+                sum_nodes = sum_nodes.saturating_add(legacy_count_type_nodes(ty));
+                if sum_nodes > TypeBuilder::LEGACY_MAX_TYPE_INSTANTIATION_NODES {
+                    return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+                }
+            }
+        }
+
         Ok(instantiation)
     }
 
@@ -1301,17 +1331,18 @@ impl<'a> Resolver<'a> {
     // Type resolution
     //
 
-    pub(crate) fn get_struct_type(&self, idx: StructDefinitionIndex) -> Type {
-        let struct_def = match &self.binary {
+    pub(crate) fn get_struct_ty(&self, idx: StructDefinitionIndex) -> Type {
+        let struct_ty = match &self.binary {
             BinaryType::Module(module) => module.struct_at(idx),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
+
         self.loader()
             .ty_builder()
-            .create_struct_ty(struct_def.idx, AbilityInfo::struct_(struct_def.abilities))
+            .create_struct_ty(struct_ty.idx, AbilityInfo::struct_(struct_ty.abilities))
     }
 
-    pub(crate) fn get_struct_type_generic(
+    pub(crate) fn get_generic_struct_ty(
         &self,
         idx: StructDefInstantiationIndex,
         ty_args: &[Type],
@@ -1321,16 +1352,31 @@ impl<'a> Resolver<'a> {
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
 
-        let struct_ty = &struct_inst.definition_struct_type;
         let ty_builder = self.loader().ty_builder();
-        ty_builder.create_struct_instantiation_ty(
+        if ty_builder.is_legacy() {
+            let mut sum_nodes = 1u64;
+            for ty in ty_args.iter().chain(struct_inst.instantiation.iter()) {
+                sum_nodes = sum_nodes.saturating_add(legacy_count_type_nodes(ty));
+                if sum_nodes > TypeBuilder::LEGACY_MAX_TYPE_INSTANTIATION_NODES {
+                    return Err(
+                        PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
+                            "Number of type instantiation nodes exceeded the maximum of {}",
+                            TypeBuilder::LEGACY_MAX_TYPE_INSTANTIATION_NODES
+                        )),
+                    );
+                }
+            }
+        }
+
+        let struct_ty = &struct_inst.definition_struct_type;
+        ty_builder.create_struct_instantiation_ty_with_legacy_check(
             struct_ty,
             struct_inst.instantiation.clone(),
             ty_args,
         )
     }
 
-    pub(crate) fn get_field_type(&self, idx: FieldHandleIndex) -> PartialVMResult<&Type> {
+    pub(crate) fn get_field_ty(&self, idx: FieldHandleIndex) -> PartialVMResult<&Type> {
         match &self.binary {
             BinaryType::Module(module) => {
                 let handle = &module.field_handles[idx.0 as usize];
@@ -1340,7 +1386,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub(crate) fn get_field_type_generic(
+    pub(crate) fn get_generic_field_ty(
         &self,
         idx: FieldInstantiationIndex,
         ty_args: &[Type],
@@ -1351,16 +1397,15 @@ impl<'a> Resolver<'a> {
         };
 
         let ty_builder = self.loader().ty_builder();
-        let instantiation_types = field_instantiation
+        let instantiation_tys = field_instantiation
             .instantiation
             .iter()
             .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        ty_builder.create_ty_with_subst(
-            &field_instantiation.definition_struct_type.field_tys[field_instantiation.offset],
-            &instantiation_types,
-        )
+        let field_ty =
+            &field_instantiation.definition_struct_type.field_tys[field_instantiation.offset];
+        ty_builder.create_ty_with_subst(field_ty, &instantiation_tys)
     }
 
     pub(crate) fn get_struct_field_tys(
@@ -1382,19 +1427,19 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => module.struct_instantiation_at(idx.0),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        let struct_type = &struct_inst.definition_struct_type;
+        let struct_ty = &struct_inst.definition_struct_type;
 
         let ty_builder = self.loader().ty_builder();
-        let instantiation_types = struct_inst
+        let instantiation_tys = struct_inst
             .instantiation
             .iter()
             .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        struct_type
+        struct_ty
             .field_tys
             .iter()
-            .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, &instantiation_types))
+            .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, &instantiation_tys))
             .collect::<PartialVMResult<Vec<_>>>()
     }
 
@@ -1413,8 +1458,9 @@ impl<'a> Resolver<'a> {
         let ty = self.single_type_at(idx);
 
         if !ty_args.is_empty() {
-            let ty_builder = self.loader().ty_builder();
-            ty_builder.create_ty_with_subst(ty, ty_args)
+            self.loader()
+                .ty_builder()
+                .create_ty_with_subst_with_legacy_check(ty, ty_args)
         } else {
             Ok(ty.clone())
         }
@@ -1473,13 +1519,11 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => {
                 let field_inst = &module.field_instantiations[idx.0 as usize];
                 let struct_ty = &field_inst.definition_struct_type;
+                let ty_params = field_inst.instantiation.clone();
 
-                let ty_builder = self.loader().ty_builder();
-                ty_builder.create_struct_instantiation_ty(
-                    struct_ty,
-                    field_inst.instantiation.clone(),
-                    ty_args,
-                )
+                self.loader()
+                    .ty_builder()
+                    .create_struct_instantiation_ty(struct_ty, ty_params, ty_args)
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
         }
@@ -1697,11 +1741,13 @@ impl Loader {
         // times. Right now these are Aggregator and AggregatorSnapshot.
         let maybe_mapping = self.get_identifier_mapping_kind(name);
 
-        let ty_builder = self.ty_builder();
         let field_tys = struct_type
             .field_tys
             .iter()
-            .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
+            .map(|ty| {
+                self.ty_builder()
+                    .create_ty_with_subst_with_legacy_check(ty, ty_args)
+            })
             .collect::<PartialVMResult<Vec<_>>>()?;
         let (mut field_layouts, field_has_identifier_mappings): (Vec<MoveTypeLayout>, Vec<bool>) =
             field_tys
@@ -1909,13 +1955,14 @@ impl Loader {
         };
         let struct_tag = self.struct_name_to_type_tag(struct_idx, ty_args, &mut gas_context)?;
 
-        let ty_builder = self.ty_builder();
         let field_layouts = struct_type
             .field_names
             .iter()
             .zip(&struct_type.field_tys)
             .map(|(n, ty)| {
-                let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
+                let ty = self
+                    .ty_builder()
+                    .create_ty_with_subst_with_legacy_check(ty, ty_args)?;
                 let l =
                     self.type_to_fully_annotated_layout_impl(&ty, module_store, count, depth)?;
                 Ok(MoveFieldLayout::new(n.clone(), l))
