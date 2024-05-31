@@ -45,12 +45,59 @@ impl CodeGenerator for Module {
             "//# publish".to_string(),
             format!("module 0xCAFE::{} {{", self.name.emit_code()),
         ];
+
+        for s in &self.structs {
+            append_code_lines_with_indentation(&mut code, s.emit_code_lines(), INDENTATION_SIZE)
+        }
+
         for f in &self.functions {
-            // Prepend 4 spaces to each line of the member's code
             append_code_lines_with_indentation(&mut code, f.emit_code_lines(), INDENTATION_SIZE)
         }
+
         code.push("}\n".to_string());
         code
+    }
+}
+
+impl CodeGenerator for StructDefinition {
+    fn emit_code_lines(&self) -> Vec<String> {
+        let abilities = match self.abilities.len() {
+            0 => "".to_string(),
+            _ => {
+                let abilities = self
+                    .abilities
+                    .iter()
+                    .map(|ability| ability.emit_code())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+                    .to_string();
+                format!("has {} ", abilities)
+            },
+        };
+        let mut code = vec![format!("struct {} {}{{", self.name.emit_code(), abilities)];
+
+        let mut fields_code = Vec::new();
+        for (field_name, field_type) in &self.fields {
+            fields_code.push(format!(
+                "{}: {},",
+                field_name.emit_code(),
+                field_type.emit_code(),
+            ));
+        }
+        append_code_lines_with_indentation(&mut code, fields_code, INDENTATION_SIZE);
+        code.push("}\n".to_string());
+        code
+    }
+}
+
+impl CodeGenerator for Ability {
+    fn emit_code_lines(&self) -> Vec<String> {
+        match self {
+            Ability::Copy => vec!["copy".to_string()],
+            Ability::Drop => vec!["drop".to_string()],
+            Ability::Store => vec!["store".to_string()],
+            Ability::Key => vec!["key".to_string()],
+        }
     }
 }
 
@@ -136,7 +183,22 @@ impl CodeGenerator for Expression {
             Expression::Variable(ident) => ident.emit_code_lines(),
             Expression::Boolean(b) => vec![b.to_string()],
             Expression::FunctionCall(c) => c.emit_code_lines(),
+            Expression::StructInitialization(s) => s.emit_code_lines(),
         }
+    }
+}
+
+impl CodeGenerator for StructInitialization {
+    fn emit_code_lines(&self) -> Vec<String> {
+        let mut code = vec![format!("{} {{", self.name.emit_code())];
+
+        let mut field_code = Vec::new();
+        for (field, expr) in &self.fields {
+            field_code.push(format!("{}: {}", field.emit_code(), expr.emit_code()));
+        }
+        append_code_lines_with_indentation(&mut code, field_code, INDENTATION_SIZE);
+        code.push("}\n".to_string());
+        code
     }
 }
 
@@ -173,6 +235,7 @@ impl CodeGenerator for Type {
             T::U128 => "u128".to_string(),
             T::U256 => "u256".to_string(),
             T::Bool => "bool".to_string(),
+            T::Struct(id) => id.emit_code(),
             _ => unimplemented!(),
         }]
     }

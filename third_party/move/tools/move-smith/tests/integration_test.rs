@@ -29,6 +29,7 @@ fn simple_module() -> Module {
                 typ: Type::U32,
             })),
         }],
+        structs: Vec::new(),
     }
 }
 
