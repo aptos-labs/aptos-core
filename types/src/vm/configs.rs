@@ -71,7 +71,7 @@ pub fn aptos_prod_vm_config(
         deserializer_config,
         paranoid_type_checks,
         check_invariant_in_swap_loc,
-        ty_config: TypeConfig::production(),
+        ty_config: TypeConfig::default(),
         max_value_nest_depth: Some(128),
         type_max_cost,
         type_base_cost,

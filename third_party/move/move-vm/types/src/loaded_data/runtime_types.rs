@@ -684,13 +684,6 @@ pub struct TypeConfig {
     max_ty_depth: usize,
 }
 
-impl TypeConfig {
-    pub fn production() -> Self {
-        // TODO: pick the right parameters.
-        Self::default()
-    }
-}
-
 impl Default for TypeConfig {
     fn default() -> Self {
         Self {

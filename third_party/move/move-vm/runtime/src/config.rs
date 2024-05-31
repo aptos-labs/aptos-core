@@ -50,7 +50,6 @@ impl VMConfig {
     pub fn production() -> Self {
         Self {
             verifier_config: VerifierConfig::production(),
-            ty_config: TypeConfig::production(),
             ..Self::default()
         }
     }
