@@ -2,10 +2,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::ModuleStorageAdapter;
 use crate::{
     loader::{
-        access_specifier_loader::load_access_specifier, Loader, Module, Resolver, ScriptHash,
+        access_specifier_loader::load_access_specifier, Loader, ModuleStorageAdapter, Resolver,
+        ScriptHash,
     },
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
 };
@@ -35,27 +35,57 @@ pub struct Function {
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
-    pub ty_param_abilities: Vec<AbilitySet>,
+    pub(crate) ty_param_abilities: Vec<AbilitySet>,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
-    pub(crate) def_is_native: bool,
-    pub def_is_friend_or_private: bool,
+    pub(crate) is_native: bool,
+    pub(crate) is_friend_or_private: bool,
+    pub(crate) is_entry: bool,
     pub(crate) scope: Scope,
     pub(crate) name: Identifier,
-    pub return_tys: Vec<Type>,
+    pub(crate) return_tys: Vec<Type>,
     pub(crate) local_tys: Vec<Type>,
-    pub param_tys: Vec<Type>,
+    pub(crate) param_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
 }
 
-// This struct must be treated as an identifier for a function and not somehow relying on
-// the internal implementation.
+// An instantiated and loaded runtime function representation.
 pub struct LoadedFunction {
-    pub(crate) module: Arc<Module>,
+    pub(crate) ty_args: Vec<Type>,
     pub(crate) function: Arc<Function>,
 }
 
-impl std::fmt::Debug for Function {
+impl LoadedFunction {
+    pub fn ty_args(&self) -> &[Type] {
+        &self.ty_args
+    }
+
+    pub fn module_id(&self) -> Option<ModuleId> {
+        self.function.module_id().cloned()
+    }
+
+    pub fn is_friend_or_private(&self) -> bool {
+        self.function.is_friend_or_private()
+    }
+
+    pub(crate) fn is_entry(&self) -> bool {
+        self.function.is_entry()
+    }
+
+    pub fn param_tys(&self) -> &[Type] {
+        self.function.param_tys()
+    }
+
+    pub fn return_tys(&self) -> &[Type] {
+        self.function.return_tys()
+    }
+
+    pub fn ty_param_abilities(&self) -> &[AbilitySet] {
+        self.function.ty_param_abilities()
+    }
+}
+
+impl Debug for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.debug_struct("Function")
             .field("scope", &self.scope)
@@ -76,19 +106,20 @@ impl Function {
         let handle = module.function_handle_at(def.function);
         let name = module.identifier_at(handle.name).to_owned();
         let module_id = module.self_id();
-        let def_is_friend_or_private = match def.visibility {
+
+        let is_friend_or_private = match def.visibility {
             Visibility::Friend | Visibility::Private => true,
             Visibility::Public => false,
         };
-        let (native, def_is_native) = if def.is_native() {
-            (
-                natives.resolve(
-                    module_id.address(),
-                    module_id.name().as_str(),
-                    name.as_str(),
-                ),
-                true,
-            )
+        let is_entry = def.is_entry;
+
+        let (native, is_native) = if def.is_native() {
+            let native = natives.resolve(
+                module_id.address(),
+                module_id.name().as_str(),
+                name.as_str(),
+            );
+            (native, true)
         } else {
             (None, false)
         };
@@ -122,8 +153,9 @@ impl Function {
             code,
             ty_param_abilities,
             native,
-            def_is_native,
-            def_is_friend_or_private,
+            is_native,
+            is_friend_or_private,
+            is_entry,
             scope,
             name,
             local_tys,
@@ -172,7 +204,7 @@ impl Function {
         self.local_tys.len()
     }
 
-    pub(crate) fn param_count(&self) -> usize {
+    pub fn param_count(&self) -> usize {
         self.param_tys.len()
     }
 
@@ -184,7 +216,7 @@ impl Function {
         &self.code
     }
 
-    pub(crate) fn ty_arg_abilities(&self) -> &[AbilitySet] {
+    pub fn ty_param_abilities(&self) -> &[AbilitySet] {
         &self.ty_param_abilities
     }
 
@@ -192,11 +224,11 @@ impl Function {
         &self.local_tys
     }
 
-    pub(crate) fn return_tys(&self) -> &[Type] {
+    pub fn return_tys(&self) -> &[Type] {
         &self.return_tys
     }
 
-    pub(crate) fn param_tys(&self) -> &[Type] {
+    pub fn param_tys(&self) -> &[Type] {
         &self.param_tys
     }
 
@@ -213,11 +245,15 @@ impl Function {
     }
 
     pub(crate) fn is_native(&self) -> bool {
-        self.def_is_native
+        self.is_native
     }
 
-    pub(crate) fn is_friend_or_private(&self) -> bool {
-        self.def_is_friend_or_private
+    pub fn is_friend_or_private(&self) -> bool {
+        self.is_friend_or_private
+    }
+
+    pub(crate) fn is_entry(&self) -> bool {
+        self.is_entry
     }
 
     pub(crate) fn get_native(&self) -> PartialVMResult<&UnboxedNativeFunction> {
