@@ -4,7 +4,7 @@ task 1 'publish'. lines 4-26:
 Error: VMError with status STLOC_UNSAFE_TO_DESTROY_ERROR at location Module ModuleId { address: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6, name: Identifier("m") } at index 0 for function definition at code offset 11 in function definition 0
 
 task 2 'run'. lines 28-28:
-Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(None)
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(LINKER_ERROR))
 
 task 3 'run'. lines 30-44:
-Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(None)
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(STLOC_UNSAFE_TO_DESTROY_ERROR))
