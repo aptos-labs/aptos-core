@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{names::Identifier, types::Type};
+use arbitrary::Arbitrary;
 use num_bigint::BigUint;
 
 #[derive(Debug, Clone)]
@@ -16,7 +17,7 @@ pub struct Module {
     pub name: Identifier,
     // pub is_spec_module: bool,
     pub functions: Vec<Function>,
-    // pub strcuts: Vec<StructDefinition>,
+    pub structs: Vec<StructDefinition>,
     // pub uses: Vec<UseDecl>,
     // pub friends: Vec<FriendDecl>,
     // pub constants: Vec<Constant>,
@@ -51,6 +52,23 @@ pub struct FunctionBody {
 }
 
 #[derive(Debug, Clone)]
+pub struct StructDefinition {
+    pub name: Identifier,
+    // pub attributes: Vec<Attributes>,
+    pub abilities: Vec<Ability>,
+    // pub type_parameters: Vec<StructTypeParameter>,
+    pub fields: Vec<(Identifier, Type)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
+pub enum Ability {
+    Copy,
+    Drop,
+    Store,
+    Key,
+}
+
+#[derive(Debug, Clone)]
 pub enum Statement {
     // If(If),
     // While(While),
@@ -76,12 +94,19 @@ pub enum Expression {
     Variable(Identifier),
     Boolean(bool),
     FunctionCall(FunctionCall),
+    StructInitialization(StructInitialization),
 }
 
 #[derive(Debug, Clone)]
 pub struct NumberLiteral {
     pub value: BigUint,
     pub typ: Type,
+}
+
+#[derive(Debug, Clone)]
+pub struct StructInitialization {
+    pub name: Identifier,
+    pub fields: Vec<(Identifier, Expression)>,
 }
 
 #[derive(Debug, Clone)]
