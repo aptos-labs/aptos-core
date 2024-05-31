@@ -172,6 +172,7 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> 
     }
 }
 
+// TODO: this is now very similar to WriteOp, should be a wrapper and remove boilerplate below.
 #[derive(Debug)]
 pub(crate) struct ValueType {
     /// Wrapping the types used for testing to add TransactionWrite trait implementation (below).
@@ -281,10 +282,6 @@ impl TransactionWrite for ValueType {
 
     fn write_op_kind(&self) -> WriteOpKind {
         self.write_op_kind.clone()
-    }
-
-    fn eq_ignoring_bytes(&self, other: &ValueType) -> bool {
-        self.write_op_kind == other.write_op_kind && self.metadata == other.metadata
     }
 
     fn as_state_value(&self) -> Option<StateValue> {

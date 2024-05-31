@@ -17,7 +17,10 @@ use aptos_aggregator::{
     delta_math::DeltaHistory,
 };
 use aptos_types::{
-    executable::ExecutableTestType, state_store::state_value::StateValue, write_set::WriteOpKind,
+    executable::ExecutableTestType,
+    on_chain_config::CurrentTimeMicroseconds,
+    state_store::state_value::{StateValue, StateValueMetadata},
+    write_set::WriteOpKind,
 };
 use bytes::Bytes;
 use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
@@ -80,8 +83,13 @@ impl TransactionWrite for TestMetadataValue {
         unimplemented!("Irrelevant for the test")
     }
 
-    fn eq_ignoring_bytes(&self, other: &TestMetadataValue) -> bool {
-        self.metadata == other.metadata
+    fn as_state_value_metadata(&self) -> Option<StateValueMetadata> {
+        Some(StateValueMetadata::legacy(
+            self.metadata,
+            &CurrentTimeMicroseconds {
+                microseconds: self.metadata,
+            },
+        ))
     }
 
     fn set_bytes(&mut self, _bytes: Bytes) {

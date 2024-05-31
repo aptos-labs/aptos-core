@@ -127,7 +127,7 @@ where
         // For tracking whether it's required to (re-)validate the suffix of transactions in the block.
         // May happen, for instance, when the recent execution wrote outside of the previous write/delta
         // set (vanilla Block-STM rule), or if resource group size or metadata changed from an estimate
-        // (since those resource group validations use rely on estimates).
+        // (since those resource group validations rely on estimates).
         let mut needs_suffix_validation = false;
         let mut apply_updates = |output: &E::Output| -> Result<
             Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, // Cached resource writes
@@ -281,6 +281,17 @@ where
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
                 Module => versioned_cache.modules().remove(&k, idx_to_execute),
                 Group => {
+                    // A change in state observable during speculative execution
+                    // (which includes group metadata and size) changes, suffix
+                    // re-validation is needed. For resources where speculative
+                    // execution waits on estimates, having a write that was there
+                    // but not anymore does not qualify, as it can only cause
+                    // additional waiting but not an incorrect speculation result.
+                    // However, a group size or metadata might be read, and then
+                    // speculative group update might be removed below. Without
+                    // triggering suffix re-validation, a later transaction might
+                    // end up with the incorrect read result (corresponding to the
+                    // removed group information from an incorrect speculative state).
                     needs_suffix_validation = true;
 
                     versioned_cache.data().remove(&k, idx_to_execute);
@@ -356,6 +367,7 @@ where
                         // Execution may wait for estimates.
                         versioned_cache.group_data().mark_estimate(&k, txn_idx);
 
+                        // Group metadata lives in same versioned cache as data / resources.
                         // We are not marking metadata change as estimate, but after
                         // a transaction execution changes metadata, suffix validation
                         // is guaranteed to be triggered. Estimation affecting execution

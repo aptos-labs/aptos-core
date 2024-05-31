@@ -309,28 +309,24 @@ impl WriteOpSize {
 pub trait TransactionWrite: Debug {
     fn bytes(&self) -> Option<&Bytes>;
 
-    /// Returns state value that would be observed by a read following the 'self' write.
+    // Returns state value that would be observed by a read following the 'self' write.
     fn as_state_value(&self) -> Option<StateValue>;
 
-    /// Returns metadata that would be observed by a read following the 'self' write.
-    /// Provided as a separate method to avoid the clone in as_state_value method
-    /// (although default implementation below does just that).
+    // Returns metadata that would be observed by a read following the 'self' write.
+    // Provided as a separate method to avoid the clone in as_state_value method
+    // (although default implementation below does just that).
     fn as_state_value_metadata(&self) -> Option<StateValueMetadata> {
         self.as_state_value()
             .map(|state_value| state_value.into_metadata())
     }
 
-    /// Check equality against another instance, ignoring the bytes (payload) but otherwise
-    /// considering everything else (metadata, kind, etc).
-    fn eq_ignoring_bytes(&self, other: &Self) -> bool;
-
-    /// Often, the contents of W:TransactionWrite are converted to Option<StateValue>, e.g.
-    /// to emulate reading from storage after W has been applied. However, in some contexts,
-    /// it is also helpful to convert a StateValue to a potential instance of W that would
-    /// have the desired effect. This allows e.g. storing sentinel elements of type W in
-    /// data-structures (notably in MVHashMap). The kind of W will be Modification and not
-    /// Creation, but o.w. if there are several instances of W that correspond to the
-    /// provided maybe_state_value, an arbitrary one may be provided.
+    // Often, the contents of W:TransactionWrite are converted to Option<StateValue>, e.g.
+    // to emulate reading from storage after W has been applied. However, in some contexts,
+    // it is also helpful to convert a StateValue to a potential instance of W that would
+    // have the desired effect. This allows e.g. storing sentinel elements of type W in
+    // data-structures (notably in MVHashMap). The kind of W will be Modification and not
+    // Creation, but o.w. if there are several instances of W that correspond to the
+    // provided maybe_state_value, an arbitrary one may be provided.
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self;
 
     fn extract_raw_bytes(&self) -> Option<Bytes> {
@@ -388,43 +384,6 @@ impl TransactionWrite for WriteOp {
     // read would not read the metadata of the deletion op.
     fn as_state_value_metadata(&self) -> Option<StateValueMetadata> {
         self.bytes().map(|_| self.metadata().clone())
-    }
-
-    // Note: this checks more than just self.metadata() == other.metadata() (e.g. kind too).
-    fn eq_ignoring_bytes(&self, other: &WriteOp) -> bool {
-        match (self, other) {
-            (
-                WriteOp::Creation {
-                    metadata: self_metadata,
-                    ..
-                },
-                WriteOp::Creation {
-                    metadata: other_metadata,
-                    ..
-                },
-            )
-            | (
-                WriteOp::Modification {
-                    metadata: self_metadata,
-                    ..
-                },
-                WriteOp::Modification {
-                    metadata: other_metadata,
-                    ..
-                },
-            )
-            | (
-                WriteOp::Deletion {
-                    metadata: self_metadata,
-                    ..
-                },
-                WriteOp::Deletion {
-                    metadata: other_metadata,
-                    ..
-                },
-            ) => self_metadata == other_metadata,
-            _ => false,
-        }
     }
 
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {

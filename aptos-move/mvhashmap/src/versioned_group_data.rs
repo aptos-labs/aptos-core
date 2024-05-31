@@ -176,7 +176,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
 
         // Remove any prior entries.
         let mut prev_tag_and_sizes: HashMap<T, Option<usize>> =
-            self.remove(shifted_idx.clone(), true).into_iter().collect();
+            self.remove(shifted_idx.clone()).into_iter().collect();
 
         // Changes the set of values, or the size of the entries (that might have been
         // used even when marked as an estimate, if self.size_changed was still false).
@@ -247,9 +247,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         }
     }
 
-    // Replacing is true when called from 'write' and false when called from pub remove (case when
-    // a write from a prior speculative execution is being fully removed).
-    fn remove(&mut self, shifted_idx: ShiftedTxnIndex, replacing: bool) -> Vec<(T, Option<usize>)> {
+    fn remove(&mut self, shifted_idx: ShiftedTxnIndex) -> Vec<(T, Option<usize>)> {
         // Remove idx updates first, then entries.
         let idx_update_tags: Vec<(T, Option<usize>)> = self
             .idx_to_update
@@ -270,10 +268,6 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                     .remove(&shifted_idx),
                 "Entry for tag / idx must exist to be removed"
             );
-        }
-
-        if !replacing && !idx_update_tags.is_empty() {
-            self.size_changed = true;
         }
 
         idx_update_tags
@@ -468,13 +462,12 @@ impl<
 
     /// Remove all entries from transaction 'txn_idx' at access path 'key'.
     pub fn remove(&self, key: &K, txn_idx: TxnIndex) {
-        self.group_values
-            .get_mut(key)
-            .expect("Path must exist")
-            .remove(
-                ShiftedTxnIndex::new(txn_idx),
-                false, /* not replacing */
-            );
+        let mut group = self.group_values.get_mut(key).expect("Path must exist");
+        let removed = group.remove(ShiftedTxnIndex::new(txn_idx));
+
+        if !removed.is_empty() {
+            group.size_changed = true;
+        }
     }
 
     /// Read the latest value corresponding to a tag at a given group (identified by key).
@@ -499,7 +492,7 @@ impl<
     /// and the group size has changed between speculative executions then a dependency is
     /// returned. Otherwise, the size is computed including the sizes of estimated entries.
     /// This works w. Block-STM, because a validation wave is triggered when any group entry
-    /// size changes after re-execution (incl. size '0', i.e. not matching entries).
+    /// size changes after re-execution (also when an entry is added or removed).
     pub fn get_group_size(
         &self,
         key: &K,

@@ -361,7 +361,9 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         }));
     }
 
-    /// Versioned write of metadata at a given resource group key (and version).
+    /// Versioned write of metadata at a given resource group key (and version). Returns true
+    /// if the previously stored metadata has changed as observed by later transactions (e.g.
+    /// metadata of a deletion can never be observed by later transactions).
     pub fn write_metadata(
         &self,
         key: K,
@@ -383,9 +385,10 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         // Changes versioned metadata that was stored.
         prev_entry.map_or(true, |entry| -> bool {
             if let EntryCell::Write(_, existing_v) = &entry.cell {
-                !existing_v
-                    .extract_value_no_layout()
-                    .eq_ignoring_bytes(&*arc_data)
+                arc_data.as_state_value_metadata()
+                    != existing_v
+                        .extract_value_no_layout()
+                        .as_state_value_metadata()
             } else {
                 unreachable!("Group metadata can't be written at AggregatorV1 key");
             }

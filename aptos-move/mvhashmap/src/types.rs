@@ -361,10 +361,6 @@ pub(crate) mod test {
             unimplemented!("Irrelevant for the test")
         }
 
-        fn eq_ignoring_bytes(&self, _other: &TestValue) -> bool {
-            unimplemented!("Irrelevant for the test")
-        }
-
         fn set_bytes(&mut self, bytes: Bytes) {
             self.bytes = bytes;
         }
