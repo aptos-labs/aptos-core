@@ -1,0 +1,24 @@
+[package]
+name = "raikou"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitvec = { workspace = true }
+defaultmap = "0.5.0"  # Since version 0.6.0, the maps are !Send and !Sync
+env_logger = { workspace = true }
+futures = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+rand = { workspace = true, features = ["small_rng"] }
+rand_distr = { workspace = true }
+thread_local = { workspace = true }
+tokio = { workspace = true }
