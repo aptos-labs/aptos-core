@@ -12,6 +12,7 @@ use crate::common::{
     utils::{prompt_yes, prompt_yes_with_override, read_line},
 };
 use aptos_cached_packages::aptos_stdlib;
+use aptos_config::config;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     encoding_type::EncodingType,
@@ -75,18 +76,25 @@ pub struct RotateKey {
     #[clap(flatten)]
     pub(crate) new_hardware_wallet_options: HardwareWalletOptions,
 
-    /// Name of the profile to save the new private key
-    ///
-    /// If not provided, it will interactively have you save a profile,
-    /// unless `--skip_saving_profile` is provided
+    /// Skip saving profile(s)
     #[clap(long)]
+    pub(crate) skip_saving_profiles: bool,
+
+    /// Name of the profile to save for the new authentication key
+    #[clap(conflicts_with = "skip_saving_profiles", long)]
     pub(crate) save_to_profile: Option<String>,
 
-    /// Skip saving profile
-    ///
-    /// This skips the interactive profile saving after rotating the authentication key
-    #[clap(long)]
-    pub(crate) skip_saving_profile: bool,
+    /// New name for the profile that has just been rendered stale by the rotation operation, when
+    /// rotation was from an account with a profile
+    #[clap(
+        conflicts_with_all = &[
+            "new_private_key",
+            "new_private_key_file",
+            "skip_saving_profiles",
+        ],
+        long,
+    )]
+    pub(crate) rename_stale_profile_to: Option<String>,
 }
 
 impl ParsePrivateKey for RotateKey {}
@@ -118,6 +126,64 @@ impl CliCommand<RotateSummary> for RotateKey {
     }
 
     async fn execute(self) -> CliTypedResult<RotateSummary> {
+        // Verify profile names before executing rotation operation, to avoid erroring out in a
+        // manner that results in corrupted config state.
+        if self.save_to_profile.is_some() || self.rename_stale_profile_to.is_some() {
+            // Verify no conflict between new and stale profile names, and that neither are empty.
+            if let Some(stale_name) = self.rename_stale_profile_to {
+                if self.save_to_profile == self.rename_stale_profile_to {
+                    return Err(CliError::CommandArgumentError(
+                        "Stale profile and new profile may not have same name".to_string(),
+                    ));
+                };
+                if stale_name.is_empty() {
+                    return Err(CliError::CommandArgumentError(
+                        "Stale profile name may not be empty".to_string(),
+                    ));
+                }
+            };
+            if let Some(new_name) = self.save_to_profile {
+                if new_name.is_empty() {
+                    return Err(CliError::CommandArgumentError(
+                        "New profile name may not be empty".to_string(),
+                    ));
+                }
+            };
+
+            // Verify that config exists.
+            let mut config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
+
+            // Verify that the stale profile name does not already exist in the config, and that the
+            // new profile name does not already exist in the config unless it is the same as the
+            // stale profile's original name (in which case it will be overwritten).
+            if let Some(profiles) = config.profiles {
+                if let Some(stale_name) = self.rename_stale_profile_to {
+                    if profiles.contains_key(&stale_name) {
+                        return Err(CliError::CommandArgumentError(format!(
+                            "Profile {} already exists",
+                            stale_name
+                        )));
+                    };
+                };
+                if let Some(new_name) = self.save_to_profile {
+                    if profiles.contains_key(&new_name) {
+                        if self.rename_stale_profile_to.is_some()
+                            && self.rename_stale_profile_to
+                                == self.txn_options.profile_options.profile
+                        {
+                            // Do nothing, since new profile will overwrite stale profile and stale
+                            // profile will be renamed.
+                        } else {
+                            return Err(CliError::CommandArgumentError(format!(
+                                "Profile {} already exists",
+                                new_name
+                            )));
+                        }
+                    };
+                };
+            };
+        };
+
         // Get current signer options.
         let current_derivation_path = if self.txn_options.profile_options.profile.is_some() {
             self.txn_options.profile_options.derivation_path()?
@@ -238,59 +304,22 @@ impl CliCommand<RotateSummary> for RotateKey {
 
         let mut profile_name: String;
 
-        if self.save_to_profile.is_none() {
-            if self.skip_saving_profile
-                || !prompt_yes("Do you want to create a profile for the new key?")
-            {
-                return Ok(RotateSummary {
-                    transaction: txn_summary,
-                    message: None,
-                });
-            }
-
-            eprintln!("Enter the name for the profile");
-            profile_name = read_line("Profile name")?.trim().to_string();
-        } else {
-            // We can safely unwrap here
-            profile_name = self.save_to_profile.unwrap();
+        if self.skip_saving_profiles {
+            return Ok(RotateSummary {
+                transaction: txn_summary,
+                message: None,
+            });
         }
 
-        // Check if profile name exists
+        // If no config exists, then the error should've been caught earlier during the profile
+        // name verification step.
         let mut config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
-
-        if let Some(ref profiles) = config.profiles {
-            if profiles.contains_key(&profile_name) {
-                if let Err(cli_err) = prompt_yes_with_override(
-                    format!(
-                        "Profile {} exits. Do you want to provide a new profile name?",
-                        profile_name
-                    )
-                    .as_str(),
-                    self.txn_options.prompt_options,
-                ) {
-                    match cli_err {
-                        CliError::AbortedError => {
-                            return Ok(RotateSummary {
-                                transaction: txn_summary,
-                                message: None,
-                            });
-                        },
-                        _ => {
-                            return Err(cli_err);
-                        },
-                    }
-                }
-
-                eprintln!("Enter the name for the profile");
-                profile_name = read_line("Profile name")?.trim().to_string();
-            }
+        if config.profiles.is_none() {
+            config.profiles = Some(BTreeMap::new());
         }
 
-        if profile_name.is_empty() {
-            return Err(CliError::AbortedError);
-        }
-
-        let mut profile_config = ProfileConfig {
+        // Create new config.
+        let mut new_profile_config = ProfileConfig {
             public_key: Some(new_public_key),
             account: Some(current_address),
             private_key: new_private_key,
@@ -299,25 +328,25 @@ impl CliCommand<RotateSummary> for RotateKey {
         };
 
         if let Some(url) = self.txn_options.rest_options.url {
-            profile_config.rest_url = Some(url.into());
-        }
-
-        if config.profiles.is_none() {
-            config.profiles = Some(BTreeMap::new());
+            new_profile_config.rest_url = Some(url.into());
         }
 
         config
             .profiles
             .as_mut()
             .unwrap()
-            .insert(profile_name.clone(), profile_config);
+            .insert(new_profile_name.clone(), new_profile_config);
         config.save()?;
 
-        eprintln!("Profile {} is saved.", profile_name);
+        eprintln!("Profile {} is saved.", new_profile_name);
 
+        // Update this
         Ok(RotateSummary {
             transaction: txn_summary,
-            message: Some(format!("Profile {} is saved.", profile_name)),
+            message: Some(format!(
+                "New profile {} is saved, stale profile {} renamed to {}.",
+                new_profile_name
+            )),
         })
     }
 }
