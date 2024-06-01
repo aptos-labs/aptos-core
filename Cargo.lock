@@ -10413,6 +10413,7 @@ dependencies = [
  "arbitrary",
  "backtrace",
  "indexmap 1.9.3",
+ "move-bytecode-spec",
  "move-core-types",
  "proptest",
  "proptest-derive",
@@ -10438,6 +10439,15 @@ dependencies = [
  "move-ir-types",
  "move-symbol-pool",
  "serde",
+]
+
+[[package]]
+name = "move-bytecode-spec"
+version = "0.1.0"
+dependencies = [
+ "once_cell",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
