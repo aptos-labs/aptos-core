@@ -400,6 +400,7 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
+                observe_block(block.timestamp_usecs(), BlockStage::OUTPUT_PERSISTED);
                 // this needs to be done after creating the persisting request to avoid it being lost
                 if commit_proof.ledger_info().ends_epoch() {
                     self.commit_msg_tx

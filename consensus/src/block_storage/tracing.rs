@@ -18,6 +18,7 @@ impl BlockStage {
     pub const OC_ADDED: &'static str = "ordered_cert_created";
     pub const ORDERED: &'static str = "ordered";
     pub const ORDER_VOTED: &'static str = "order_voted";
+    pub const OUTPUT_PERSISTED: &'static str = "output_persisted";
     pub const QC_ADDED: &'static str = "qc_added";
     pub const QC_AGGREGATED: &'static str = "qc_aggregated";
     pub const RAND_ADD_DECISION: &'static str = "rand_add_decision";
