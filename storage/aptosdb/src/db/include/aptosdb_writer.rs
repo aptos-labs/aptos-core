@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::ledger_db::{transaction_db::TransactionDb, write_set_db::WriteSetDb};
+use crate::ledger_db::write_set_db::WriteSetDb;
 use aptos_types::proof::position::Position;
 
 impl DbWriter for AptosDB {
@@ -292,7 +292,7 @@ impl DbWriter for AptosDB {
             .set_version(version_to_revert - 1);
 
         // Update the latest ledger info if provided
-        self.commit_reversion_ledger_info(
+        self.commit_ledger_info(
             version_to_revert - 1,
             new_root_hash,
             Some(&ledger_info_with_sigs),
@@ -664,40 +664,6 @@ impl AptosDB {
                 new_root_hash,
                 expected_root_hash,
             );
-            self.ledger_db
-                .metadata_db()
-                .put_ledger_info(x, &ledger_batch)?;
-        }
-
-        ledger_batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::OverallCommitProgress,
-            &DbMetadataValue::Version(last_version),
-        )?;
-        self.ledger_db.metadata_db().write_schemas(ledger_batch)
-    }
-
-    fn commit_reversion_ledger_info(
-        &self,
-        last_version: Version,
-        new_root_hash: HashValue,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_ledger_info"])
-            .start_timer();
-
-        let ledger_batch = SchemaBatch::new();
-
-        // If expected ledger info is provided, verify result root hash and save the ledger info.
-        if let Some(x) = ledger_info_with_sigs {
-            let expected_root_hash = x.ledger_info().transaction_accumulator_hash();
-            ensure!(
-                new_root_hash == expected_root_hash,
-                "Root hash calculated doesn't match expected. {:?} vs {:?}",
-                new_root_hash,
-                expected_root_hash,
-            );
-
             self.ledger_db
                 .metadata_db()
                 .put_ledger_info(x, &ledger_batch)?;
