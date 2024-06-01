@@ -372,8 +372,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
             STD_ADDR,
             // TODO: come up with a suitable gas schedule
             move_stdlib::natives::GasParameters::zeros(),
-        ))
-        .unwrap();
+        ));
         let (mut session, mut gas_status) = {
             let gas_status = get_gas_status(
                 &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,

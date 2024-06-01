@@ -54,8 +54,7 @@ fn test_publish_module_with_nested_loops() {
             deserializer_config,
             verifier_config,
             vm_config,
-        )
-        .unwrap();
+        );
 
         let mut sess = vm.new_session(&storage);
         sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
@@ -80,8 +79,7 @@ fn test_publish_module_with_nested_loops() {
             deserializer_config,
             verifier_config,
             vm_config,
-        )
-        .unwrap();
+        );
 
         let mut sess = vm.new_session(&storage);
         sess.publish_module(m_blob, TEST_ADDR, &mut UnmeteredGasMeter)
@@ -133,8 +131,7 @@ fn test_run_script_with_nested_loops() {
             deserializer_config,
             verifier_config,
             vm_config,
-        )
-        .unwrap();
+        );
 
         let mut sess = vm.new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];
@@ -165,8 +162,7 @@ fn test_run_script_with_nested_loops() {
             deserializer_config,
             verifier_config,
             vm_config,
-        )
-        .unwrap();
+        );
 
         let mut sess = vm.new_session(&storage);
         let args: Vec<Vec<u8>> = vec![];

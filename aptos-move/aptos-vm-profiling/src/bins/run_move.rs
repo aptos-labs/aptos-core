@@ -150,7 +150,7 @@ fn main() -> Result<()> {
         &mut builder,
     ));
 
-    let vm = MoveVM::new(natives).unwrap();
+    let vm = MoveVM::new(natives);
     let mut storage = InMemoryStorage::new();
 
     let test_modules = compile_test_modules();

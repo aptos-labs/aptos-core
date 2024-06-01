@@ -116,8 +116,7 @@ fn instantiation_err() {
         paranoid_type_checks: false,
         ..VMConfig::default()
     };
-    let vm =
-        MoveVM::new_with_config(vec![], deserializer_config, verifier_config, vm_config).unwrap();
+    let vm = MoveVM::new_with_config(vec![], deserializer_config, verifier_config, vm_config);
 
     let storage: InMemoryStorage = InMemoryStorage::new();
     let mut session = vm.new_session(&storage);

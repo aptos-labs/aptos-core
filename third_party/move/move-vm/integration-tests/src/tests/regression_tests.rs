@@ -117,8 +117,7 @@ fn script_large_ty() {
     };
 
     let mut storage = InMemoryStorage::new();
-    let move_vm =
-        MoveVM::new_with_config(vec![], deserializer_config, verifier_config, vm_config).unwrap();
+    let move_vm = MoveVM::new_with_config(vec![], deserializer_config, verifier_config, vm_config);
 
     let module_address = AccountAddress::from_hex_literal("0x42").unwrap();
     let module_identifier = Identifier::new("pwn").unwrap();

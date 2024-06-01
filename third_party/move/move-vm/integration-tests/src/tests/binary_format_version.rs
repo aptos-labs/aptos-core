@@ -28,8 +28,7 @@ fn test_publish_module_with_custom_max_binary_format_version() {
         let vm = MoveVM::new(move_stdlib::natives::all_natives(
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
-        ))
-        .unwrap();
+        ));
         let mut sess = vm.new_session(&storage);
 
         sess.publish_module(
@@ -63,8 +62,7 @@ fn test_publish_module_with_custom_max_binary_format_version() {
             deserializer_config,
             verifier_config,
             vm_config,
-        )
-        .unwrap();
+        );
         let mut sess = vm.new_session(&storage);
 
         assert_eq!(
@@ -104,8 +102,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
         let vm = MoveVM::new(move_stdlib::natives::all_natives(
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
-        ))
-        .unwrap();
+        ));
         let mut sess = vm.new_session(&storage);
 
         let args: Vec<Vec<u8>> = vec![];
@@ -144,8 +141,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             deserializer_config,
             verifier_config,
             vm_config,
-        )
-        .unwrap();
+        );
         let mut sess = vm.new_session(&storage);
 
         let args: Vec<Vec<u8>> = vec![];

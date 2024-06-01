@@ -63,10 +63,12 @@ impl Adapter {
         let vm_config = VMConfig::default();
         Self {
             store,
-            vm: Arc::new(
-                MoveVM::new_with_config(vec![], deserializer_config, verifier_config, vm_config)
-                    .unwrap(),
-            ),
+            vm: Arc::new(MoveVM::new_with_config(
+                vec![],
+                deserializer_config,
+                verifier_config,
+                vm_config,
+            )),
             functions,
         }
     }
@@ -80,10 +82,12 @@ impl Adapter {
         let vm_config = VMConfig::default();
         Self {
             store: self.store,
-            vm: Arc::new(
-                MoveVM::new_with_config(vec![], deserializer_config, verifier_config, vm_config)
-                    .unwrap(),
-            ),
+            vm: Arc::new(MoveVM::new_with_config(
+                vec![],
+                deserializer_config,
+                verifier_config,
+                vm_config,
+            )),
             functions: self.functions,
         }
     }

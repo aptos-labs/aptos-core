@@ -93,7 +93,7 @@ impl WarmVmCache {
                 deserializer_config.clone(),
                 verifier_config.clone(),
                 vm_config.clone(),
-            )?;
+            );
             Self::warm_vm_up(&vm, resolver);
 
             // Not using LruCache because its `::get()` requires &mut self

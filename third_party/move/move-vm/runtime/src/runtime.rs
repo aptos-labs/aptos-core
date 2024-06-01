@@ -53,16 +53,17 @@ impl VMRuntime {
         deserializer_config: DeserializerConfig,
         verifier_config: VerifierConfig,
         vm_config: VMConfig,
-    ) -> PartialVMResult<Self> {
-        Ok(VMRuntime {
+    ) -> Self {
+        VMRuntime {
             loader: Loader::new(
-                NativeFunctions::new(natives)?,
+                NativeFunctions::new(natives)
+                    .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e)),
                 deserializer_config,
                 verifier_config,
                 vm_config,
             ),
             module_cache: Arc::new(ModuleCache::new()),
-        })
+        }
     }
 
     pub(crate) fn publish_module_bundle(

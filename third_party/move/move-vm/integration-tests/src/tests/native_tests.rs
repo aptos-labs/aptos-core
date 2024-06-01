@@ -70,8 +70,7 @@ fn test_publish_module_with_nested_loops() {
             Identifier::new("bar").unwrap(),
             make_failed_native(),
         )];
-        let vm = MoveVM::new_with_config(natives, deserializer_config, verifier_config, vm_config)
-            .unwrap();
+        let vm = MoveVM::new_with_config(natives, deserializer_config, verifier_config, vm_config);
 
         let mut sess = vm.new_session(&storage);
         sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)

@@ -13,7 +13,7 @@ use crate::{
 };
 use move_binary_format::{
     deserializer::DeserializerConfig,
-    errors::{Location, PartialVMError, VMResult},
+    errors::{PartialVMError, VMResult},
     CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
@@ -29,9 +29,11 @@ pub struct MoveVM {
 }
 
 impl MoveVM {
+    /// Creates a new VM instance, using default configurations. Panics if there are duplicated
+    /// natives.
     pub fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-    ) -> VMResult<Self> {
+    ) -> Self {
         let deserializer_config = DeserializerConfig::default();
         let verifier_config = VerifierConfig::default();
         let vm_config = VMConfig {
@@ -47,11 +49,10 @@ impl MoveVM {
         deserializer_config: DeserializerConfig,
         verifier_config: VerifierConfig,
         vm_config: VMConfig,
-    ) -> VMResult<Self> {
-        Ok(Self {
-            runtime: VMRuntime::new(natives, deserializer_config, verifier_config, vm_config)
-                .map_err(|err| err.finish(Location::Undefined))?,
-        })
+    ) -> Self {
+        Self {
+            runtime: VMRuntime::new(natives, deserializer_config, verifier_config, vm_config),
+        }
     }
 
     /// Create a new Session backed by the given storage.
