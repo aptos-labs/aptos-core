@@ -5,7 +5,6 @@
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
     module_traversal::TraversalContext, native_functions::NativeFunctions,
-    session::LoadedFunctionInstantiation,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -51,7 +50,8 @@ mod modules;
 mod script;
 mod type_loader;
 
-pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
+pub use function::LoadedFunction;
+pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, Scope};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
 pub(crate) use script::{Script, ScriptCache};
 use type_loader::intern_type;
@@ -294,14 +294,14 @@ impl Loader {
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-    ) -> VMResult<(Arc<Function>, LoadedFunctionInstantiation)> {
+    ) -> VMResult<LoadedFunction> {
         // Retrieve or load the script.
         let mut sha3_256 = Sha3_256::new();
         sha3_256.update(script_blob);
         let hash_value: [u8; 32] = sha3_256.finalize().into();
 
         let mut scripts = self.scripts.write();
-        let (main, param_tys, return_tys) = match scripts.get(&hash_value) {
+        let main = match scripts.get(&hash_value) {
             Some(cached) => cached,
             None => {
                 let ver_script = self.deserialize_and_verify_script(
@@ -334,7 +334,7 @@ impl Loader {
                 .finish(Location::Script));
         };
 
-        self.verify_ty_arg_abilities(main.ty_arg_abilities(), &ty_args)
+        self.verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args)
             .map_err(|e| {
                 e.with_message(format!(
                     "Failed to verify type arguments for script {}",
@@ -342,12 +342,11 @@ impl Loader {
                 ))
                 .finish(Location::Script)
             })?;
-        let instantiation = LoadedFunctionInstantiation {
+
+        Ok(LoadedFunction {
             ty_args,
-            param_tys,
-            return_tys,
-        };
-        Ok((main, instantiation))
+            function: main,
+        })
     }
 
     // The process of deserialization and verification is not and it must not be under lock.
@@ -363,39 +362,20 @@ impl Loader {
     ) -> VMResult<Arc<CompiledScript>> {
         let script = data_store.load_compiled_script_to_cache(script, hash_value)?;
 
-        match self.verify_script(&script) {
-            Ok(_) => {
-                // verify dependencies
-                let loaded_deps = script
-                    .immediate_dependencies()
-                    .into_iter()
-                    .map(|module_id| self.load_module(&module_id, data_store, module_store))
-                    .collect::<VMResult<_>>()?;
-                self.verify_script_dependencies(&script, loaded_deps)?;
-                Ok(script)
-            },
-            Err(err) => Err(err),
-        }
-    }
-
-    // Script verification steps.
-    // See `verify_module()` for module verification steps.
-    fn verify_script(&self, script: &CompiledScript) -> VMResult<()> {
-        fail::fail_point!("verifier-failpoint-3", |_| { Ok(()) });
-
-        move_bytecode_verifier::verify_script_with_config(&self.vm_config.verifier, script)
-    }
-
-    fn verify_script_dependencies(
-        &self,
-        script: &CompiledScript,
-        dependencies: Vec<Arc<Module>>,
-    ) -> VMResult<()> {
-        let mut deps = vec![];
-        for dep in &dependencies {
-            deps.push(dep.module());
-        }
-        dependencies::verify_script(script, deps)
+        // Verification:
+        //   - Local, using a bytecode verifier.
+        //   - Global, loading & verifying module dependencies.
+        move_bytecode_verifier::verify_script_with_config(
+            &self.vm_config.verifier_config,
+            script.as_ref(),
+        )?;
+        let loaded_deps = script
+            .immediate_dependencies()
+            .into_iter()
+            .map(|module_id| self.load_module(&module_id, data_store, module_store))
+            .collect::<VMResult<Vec<_>>>()?;
+        dependencies::verify_script(&script, loaded_deps.iter().map(|m| m.module()))?;
+        Ok(script)
     }
 
     //
@@ -409,15 +389,12 @@ impl Loader {
         function_name: &IdentStr,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-    ) -> VMResult<(Arc<Module>, Arc<Function>, Vec<Type>, Vec<Type>)> {
-        let module = self.load_module(module_id, data_store, module_store)?;
-        let func = module_store
+    ) -> VMResult<Arc<Function>> {
+        // Need to load the module first, before resolving the function.
+        self.load_module(module_id, data_store, module_store)?;
+        module_store
             .resolve_function_by_name(function_name, module_id)
-            .map_err(|err| err.finish(Location::Undefined))?;
-
-        let param_tys = func.param_tys().to_vec();
-        let return_tys = func.return_tys().to_vec();
-        Ok((module, func, param_tys, return_tys))
+            .map_err(|err| err.finish(Location::Undefined))
     }
 
     // Matches the actual returned type to the expected type, binding any type args to the
@@ -514,21 +491,21 @@ impl Loader {
         expected_return_type: &Type,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-    ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
-        let (module, func, param_tys, return_tys) = self.load_function_without_type_args(
+    ) -> VMResult<LoadedFunction> {
+        let function = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
             module_store,
         )?;
 
-        if return_tys.len() != 1 {
+        if function.return_tys().len() != 1 {
             // For functions that are marked constructor this should not happen.
             return Err(PartialVMError::new(StatusCode::ABORTED).finish(Location::Undefined));
         }
 
         let mut map = BTreeMap::new();
-        if !Self::match_return_type(&return_tys[0], expected_return_type, &mut map) {
+        if !Self::match_return_type(&function.return_tys()[0], expected_return_type, &mut map) {
             // For functions that are marked constructor this should not happen.
             return Err(
                 PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
@@ -538,7 +515,7 @@ impl Loader {
 
         // Construct the type arguments from the match
         let mut ty_args = vec![];
-        let num_ty_args = func.ty_arg_abilities().len();
+        let num_ty_args = function.ty_param_abilities().len();
         for i in 0..num_ty_args {
             if let Some(t) = map.get(&(i as u16)) {
                 ty_args.push((*t).clone());
@@ -552,24 +529,12 @@ impl Loader {
             }
         }
 
-        self.verify_ty_arg_abilities(func.ty_arg_abilities(), &ty_args)
+        self.verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
-        let loaded = LoadedFunctionInstantiation {
-            ty_args,
-            param_tys,
-            return_tys,
-        };
-        Ok((
-            LoadedFunction {
-                module,
-                function: func,
-            },
-            loaded,
-        ))
+        Ok(LoadedFunction { ty_args, function })
     }
 
-    // Entry point for function execution (`MoveVM::execute_function`).
     // Loading verifies the module if it was never loaded.
     // Type parameters are checked as well after every type is loaded.
     pub(crate) fn load_function(
@@ -579,8 +544,8 @@ impl Loader {
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-    ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
-        let (module, func, param_tys, return_tys) = self.load_function_without_type_args(
+    ) -> VMResult<LoadedFunction> {
+        let function = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
@@ -599,15 +564,10 @@ impl Loader {
                 err
             })?;
 
-        self.verify_ty_arg_abilities(func.ty_arg_abilities(), &ty_args)
+        self.verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
-        let loaded = LoadedFunctionInstantiation {
-            ty_args,
-            param_tys,
-            return_tys,
-        };
-        Ok((module, func, loaded))
+        Ok(LoadedFunction { ty_args, function })
     }
 
     // Entry point for module publishing (`MoveVM::publish_module_bundle`).
@@ -663,7 +623,7 @@ impl Loader {
         // module will NOT show up in `module_cache`. In the module republishing case, it means
         // that the old module is still in the `module_cache`, unless a new Loader is created,
         // which means that a new MoveVM instance needs to be created.
-        move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier, module)?;
+        move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier_config, module)?;
         self.check_natives(module)?;
 
         let mut visited = BTreeSet::new();
@@ -1007,8 +967,11 @@ impl Loader {
 
         // Verify the module if it hasn't been verified before.
         if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
-            move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier, &module)
-                .map_err(expect_no_verification_errors)?;
+            move_bytecode_verifier::verify_module_with_config(
+                &self.vm_config.verifier_config,
+                &module,
+            )
+            .map_err(expect_no_verification_errors)?;
 
             VERIFIED_MODULES.lock().put(hash_value, ());
         }

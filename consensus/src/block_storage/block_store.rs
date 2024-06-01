@@ -5,6 +5,7 @@
 use crate::{
     block_storage::{
         block_tree::BlockTree,
+        pending_blocks::PendingBlocks,
         tracing::{observe_block, BlockStage},
         BlockReader,
     },
@@ -20,10 +21,11 @@ use anyhow::{bail, ensure, format_err, Context};
 use aptos_consensus_types::{
     block::Block, common::Round, pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
     sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::StateComputeResult;
-use aptos_infallible::RwLock;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use futures::executor::block_on;
@@ -75,6 +77,8 @@ pub struct BlockStore {
     payload_manager: Arc<PayloadManager>,
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
+    order_vote_enabled: bool,
+    pending_blocks: Arc<Mutex<PendingBlocks>>,
 }
 
 impl BlockStore {
@@ -86,6 +90,8 @@ impl BlockStore {
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
         payload_manager: Arc<PayloadManager>,
+        order_vote_enabled: bool,
+        pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
@@ -101,6 +107,8 @@ impl BlockStore {
             time_service,
             vote_back_pressure_limit,
             payload_manager,
+            order_vote_enabled,
+            pending_blocks,
         ));
         block_on(block_store.try_send_for_execution());
         block_store
@@ -108,10 +116,8 @@ impl BlockStore {
 
     async fn try_send_for_execution(&self) {
         // reproduce the same batches (important for the commit phase)
-
         let mut certs = self.inner.read().get_all_quorum_certs_with_commit_info();
         certs.sort_unstable_by_key(|qc| qc.commit_info().round());
-
         for qc in certs {
             if qc.commit_info().round() > self.commit_root().round() {
                 info!(
@@ -120,7 +126,7 @@ impl BlockStore {
                     qc.ledger_info()
                 );
 
-                if let Err(e) = self.send_for_execution(qc.clone()).await {
+                if let Err(e) = self.send_for_execution(qc.into_wrapped_ledger_info()).await {
                     error!("Error in try-committing blocks. {}", e.to_string());
                 }
             }
@@ -139,6 +145,8 @@ impl BlockStore {
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
         payload_manager: Arc<PayloadManager>,
+        order_vote_enabled: bool,
+        pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
@@ -197,15 +205,14 @@ impl BlockStore {
             payload_manager,
             #[cfg(any(test, feature = "fuzzing"))]
             back_pressure_for_test: AtomicBool::new(false),
+            order_vote_enabled,
+            pending_blocks,
         };
 
         for block in blocks {
-            block_store
-                .insert_ordered_block(block)
-                .await
-                .unwrap_or_else(|e| {
-                    panic!("[BlockStore] failed to insert block during build {:?}", e)
-                });
+            block_store.insert_block(block).await.unwrap_or_else(|e| {
+                panic!("[BlockStore] failed to insert block during build {:?}", e)
+            });
         }
         for qc in quorum_certs {
             block_store
@@ -220,7 +227,10 @@ impl BlockStore {
     }
 
     /// Send an ordered block id with the proof for execution, returns () on success or error
-    pub async fn send_for_execution(&self, finality_proof: QuorumCert) -> anyhow::Result<()> {
+    pub async fn send_for_execution(
+        &self,
+        finality_proof: WrappedLedgerInfo,
+    ) -> anyhow::Result<()> {
         let block_id_to_commit = finality_proof.commit_info().id();
         let block_to_commit = self
             .get_block(block_id_to_commit)
@@ -240,7 +250,10 @@ impl BlockStore {
 
         let block_tree = self.inner.clone();
         let storage = self.storage.clone();
-
+        let finality_proof_clone = finality_proof.clone();
+        self.pending_blocks
+            .lock()
+            .gc(finality_proof.commit_info().round());
         // This callback is invoked synchronously with and could be used for multiple batches of blocks.
         self.execution_client
             .finalize_order(
@@ -262,6 +275,9 @@ impl BlockStore {
             .expect("Failed to persist commit");
 
         self.inner.write().update_ordered_root(block_to_commit.id());
+        self.inner
+            .write()
+            .insert_ordered_cert(finality_proof_clone.clone());
         update_counters_for_ordered_blocks(&blocks_to_commit);
 
         Ok(())
@@ -273,7 +289,17 @@ impl BlockStore {
         root_metadata: RootMetadata,
         blocks: Vec<Block>,
         quorum_certs: Vec<QuorumCert>,
+        order_vote_enabled: bool,
     ) {
+        info!(
+            "Rebuilding block tree. root {:?}, blocks {:?}, qcs {:?}",
+            root,
+            blocks.iter().map(|b| b.id()).collect::<Vec<_>>(),
+            quorum_certs
+                .iter()
+                .map(|qc| qc.certified_block().id())
+                .collect::<Vec<_>>()
+        );
         let max_pruned_blocks_in_mem = self.inner.read().max_pruned_blocks_in_mem();
         // Rollover the previous highest TC from the old tree to the new one.
         let prev_2chain_htc = self
@@ -291,6 +317,8 @@ impl BlockStore {
             Arc::clone(&self.time_service),
             self.vote_back_pressure_limit,
             self.payload_manager.clone(),
+            order_vote_enabled,
+            self.pending_blocks.clone(),
         )
         .await;
 
@@ -309,7 +337,7 @@ impl BlockStore {
     /// Duplicate inserts will return the previously inserted block (
     /// note that it is considered a valid non-error case, for example, it can happen if a validator
     /// receives a certificate for a block that is currently being added).
-    pub async fn insert_ordered_block(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
+    pub async fn insert_block(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
         if let Some(existing_block) = self.get_block(block.id()) {
             return Ok(existing_block);
         }
@@ -448,6 +476,10 @@ impl BlockStore {
         ordered_round > self.vote_back_pressure_limit + commit_round
     }
 
+    pub fn pending_blocks(&self) -> Arc<Mutex<PendingBlocks>> {
+        self.pending_blocks.clone()
+    }
+
     pub fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
         let ordered_root = self.ordered_root();
         let commit_root = self.commit_root();
@@ -558,11 +590,11 @@ impl BlockReader for BlockStore {
         self.inner.read().highest_quorum_cert()
     }
 
-    fn highest_ordered_cert(&self) -> Arc<QuorumCert> {
+    fn highest_ordered_cert(&self) -> Arc<WrappedLedgerInfo> {
         self.inner.read().highest_ordered_cert()
     }
 
-    fn highest_commit_cert(&self) -> Arc<QuorumCert> {
+    fn highest_commit_cert(&self) -> Arc<WrappedLedgerInfo> {
         self.inner.read().highest_commit_cert()
     }
 
@@ -610,8 +642,9 @@ impl BlockStore {
     pub async fn insert_block_with_qc(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
         self.insert_single_quorum_cert(block.quorum_cert().clone())?;
         if self.ordered_root().round() < block.quorum_cert().commit_info().round() {
-            self.send_for_execution(block.quorum_cert().clone()).await?;
+            self.send_for_execution(block.quorum_cert().into_wrapped_ledger_info())
+                .await?;
         }
-        self.insert_ordered_block(block).await
+        self.insert_block(block).await
     }
 }

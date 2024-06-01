@@ -88,7 +88,7 @@ impl Cmd {
         let state_kv_db = Arc::new(state_kv_db);
         let overall_version = ledger_db
             .metadata_db()
-            .get_latest_version()
+            .get_synced_version()
             .expect("Overall commit progress must exist.");
         let ledger_db_version = ledger_db
             .metadata_db()
@@ -273,7 +273,7 @@ mod test {
                 version += txns_to_commit.len() as u64;
             }
 
-            let db_version = db.get_latest_version().unwrap();
+            let db_version = db.get_synced_version().unwrap();
             prop_assert_eq!(db_version, version - 1);
 
             drop(db);
@@ -292,7 +292,7 @@ mod test {
             cmd.run().unwrap();
 
             let db = if input.1 { AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD) } else { AptosDB::new_for_test(&tmp_dir) };
-            let db_version = db.get_latest_version().unwrap();
+            let db_version = db.get_synced_version().unwrap();
             prop_assert!(db_version <= target_version);
             target_version = db_version;
 

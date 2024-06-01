@@ -45,6 +45,7 @@ whoami = { workspace = true }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
+move-stdlib = { path = "../../move-stdlib" }
 
 [[test]]
 name = "test_runner"

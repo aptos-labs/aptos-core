@@ -387,6 +387,10 @@ ConsensusMsg:
       BatchResponseV2:
         NEWTYPE:
           TYPENAME: BatchResponse
+    18:
+      OrderVoteMsg:
+        NEWTYPE:
+          TYPENAME: OrderVoteMsg
 ContractEvent:
   ENUM:
     0:
@@ -699,6 +703,12 @@ ProviderJWKs:
           TYPENAME: JWKMoveStruct
 PublicKey:
   NEWTYPESTRUCT: BYTES
+WrappedLedgerInfo:
+  STRUCT:
+    - vote_data:
+        TYPENAME: VoteData
+    - signed_ledger_info:
+        TYPENAME: LedgerInfoWithSignatures
 QuorumCert:
   STRUCT:
     - vote_data:
@@ -829,9 +839,9 @@ SyncInfo:
         TYPENAME: QuorumCert
     - highest_ordered_cert:
         OPTION:
-          TYPENAME: QuorumCert
+          TYPENAME: WrappedLedgerInfo
     - highest_commit_cert:
-        TYPENAME: QuorumCert
+        TYPENAME: WrappedLedgerInfo
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
@@ -1024,6 +1034,20 @@ ValidatorVerifier:
     - validator_infos:
         SEQ:
           TYPENAME: ValidatorConsensusInfo
+OrderVote:
+  STRUCT:
+    - author:
+        TYPENAME: AccountAddress
+    - ledger_info:
+        TYPENAME: LedgerInfo
+    - signature:
+        TYPENAME: Signature
+OrderVoteMsg:
+  STRUCT:
+    - order_vote:
+        TYPENAME: OrderVote
+    - quorum_cert:
+        TYPENAME: QuorumCert
 Vote:
   STRUCT:
     - vote_data:

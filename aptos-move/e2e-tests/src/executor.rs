@@ -1180,22 +1180,22 @@ impl FakeExecutor {
             false,
         )
         .unwrap();
+
         let mut session = vm.new_session(state_view, SessionId::void(), None);
-        let function =
+        let func =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             &mut session,
             senders,
             entry_fn.args().to_vec(),
-            &function,
+            &func,
             struct_constructors,
         )?;
+
         let storage = TraversalStorage::new();
         session
             .execute_entry_function(
-                entry_fn.module(),
-                entry_fn.function(),
-                entry_fn.ty_args().to_vec(),
+                func,
                 args,
                 &mut gas_meter,
                 &mut TraversalContext::new(&storage),

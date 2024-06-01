@@ -343,7 +343,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         return Ok(txns);
     }
 
-    async fn get_latest_version(&self) -> Result<Version> {
+    async fn get_latest_ledger_info_version(&self) -> Result<Version> {
         Ok(self.0.get_ledger_information().await?.into_inner().version)
     }
 

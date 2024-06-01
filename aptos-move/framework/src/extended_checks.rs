@@ -34,6 +34,8 @@ use std::{
 };
 use thiserror::Error;
 
+const ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE: &str = "lint::allow_unsafe_randomness";
+const FMT_SKIP_ATTRIBUTE: &str = "fmt::skip";
 const INIT_MODULE_FUN: &str = "init_module";
 const LEGACY_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
 const ERROR_PREFIX: &str = "E";
@@ -46,9 +48,13 @@ const RESOURCE_GROUP_NAME: &str = "group";
 const RESOURCE_GROUP_SCOPE: &str = "scope";
 const VIEW_FUN_ATTRIBUTE: &str = "view";
 
+const RANDOMNESS_MODULE_NAME: &str = "randomness";
+
 // top-level attribute names, only.
 pub fn get_all_attribute_names() -> &'static BTreeSet<String> {
-    const ALL_ATTRIBUTE_NAMES: [&str; 6] = [
+    const ALL_ATTRIBUTE_NAMES: [&str; 8] = [
+        ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE,
+        FMT_SKIP_ATTRIBUTE,
         LEGACY_ENTRY_FUN_ATTRIBUTE,
         RESOURCE_GROUP,
         RESOURCE_GROUP_MEMBER,
@@ -97,6 +103,8 @@ struct ExtendedChecker<'a> {
     output: BTreeMap<ModuleId, RuntimeModuleMetadataV1>,
     /// The id of the module defining error categories
     error_category_module: ModuleId,
+    /// A cache for functions which are known to call or not call randomness features
+    randomness_caller_cache: BTreeMap<QualifiedId<FunId>, bool>,
 }
 
 impl<'a> ExtendedChecker<'a> {
@@ -108,6 +116,7 @@ impl<'a> ExtendedChecker<'a> {
                 AccountAddress::ONE,
                 Identifier::new("error").unwrap(),
             ),
+            randomness_caller_cache: BTreeMap::new(),
         }
     }
 
@@ -119,6 +128,7 @@ impl<'a> ExtendedChecker<'a> {
                 self.check_and_record_view_functions(module);
                 self.check_entry_functions(module);
                 self.check_and_record_unbiasabale_entry_functions(module);
+                self.check_unsafe_randomness_usage(module);
                 self.check_and_record_events(module);
                 self.check_init_module(module);
                 self.build_error_map(module)
@@ -136,8 +146,10 @@ impl<'a> ExtendedChecker<'a> {
         let init_module_sym = self.env.symbol_pool().make(INIT_MODULE_FUN);
         if let Some(ref fun) = module.find_function(init_module_sym) {
             if fun.visibility() != Visibility::Private {
-                self.env
-                    .error(&fun.get_id_loc(), "`init_module` function must be private")
+                self.env.error(
+                    &fun.get_id_loc(),
+                    &format!("`{}` function must be private", INIT_MODULE_FUN),
+                )
             }
             for Parameter(_, ty, _) in fun.get_parameters() {
                 let ok = match ty {
@@ -148,14 +160,15 @@ impl<'a> ExtendedChecker<'a> {
                 if !ok {
                     self.env.error(
                         &fun.get_id_loc(),
-                        "`init_module` function can only take signers as parameters",
+                        &format!("`{}` function can only take values of type `signer` or `&signer` as parameters",
+                                 INIT_MODULE_FUN),
                     );
                 }
             }
             if fun.get_return_count() > 0 {
                 self.env.error(
                     &fun.get_id_loc(),
-                    "`init_module` function cannot return values",
+                    &format!("`{}` function cannot return values", INIT_MODULE_FUN),
                 )
             }
         }
@@ -177,7 +190,7 @@ impl<'a> ExtendedChecker<'a> {
                 continue;
             }
 
-            self.check_transaction_args(&fun.get_id_loc(), &fun.get_parameter_types());
+            self.check_transaction_args(&fun.get_id_loc(), &fun.get_parameters());
             if fun.get_return_count() > 0 {
                 self.env
                     .error(&fun.get_id_loc(), "entry function cannot return values")
@@ -185,9 +198,9 @@ impl<'a> ExtendedChecker<'a> {
         }
     }
 
-    fn check_transaction_args(&self, loc: &Loc, arg_tys: &[Type]) {
-        for ty in arg_tys {
-            self.check_transaction_input_type(loc, ty)
+    fn check_transaction_args(&self, _loc: &Loc, arg_tys: &[Parameter]) {
+        for Parameter(_sym, ty, param_loc) in arg_tys {
+            self.check_transaction_input_type(param_loc, ty)
         }
     }
 
@@ -214,7 +227,7 @@ impl<'a> ExtendedChecker<'a> {
                 self.env.error(
                     loc,
                     &format!(
-                        "type `{}` is not supported as a parameter type",
+                        "type `{}` is not supported as a transaction parameter type",
                         ty.display(&self.env.get_type_display_ctx())
                     ),
                 );
@@ -465,7 +478,7 @@ impl<'a> ExtendedChecker<'a> {
             let maybe_randomness_annotation = match self.get_randomness_max_gas_declaration(fun) {
                 Ok(x) => x,
                 Err(msg) => {
-                    self.env.error(&fun.get_loc(), msg.as_str());
+                    self.env.error(&fun.get_id_loc(), msg.as_str());
                     continue;
                 },
             };
@@ -552,6 +565,89 @@ impl<'a> ExtendedChecker<'a> {
 }
 
 // ----------------------------------------------------------------------------------
+// Checks for unsafe usage of randomness
+
+impl<'a> ExtendedChecker<'a> {
+    /// Checks unsafe usage of the randomness feature for the given module.
+    ///
+    /// 1. Checks that no public function in the module calls randomness features. An
+    ///    attribute can be used to override this check.
+    /// 2. Check that every private entry function which uses randomness
+    ///    features has the #[randomness] attribute
+    fn check_unsafe_randomness_usage(&mut self, module: &ModuleEnv) {
+        for ref fun in module.get_functions() {
+            let fun_id = fun.module_env.get_id().qualified(fun.get_id());
+            // Check condition (2)
+            if !fun.visibility().is_public() && fun.is_entry() {
+                if !self.has_attribute(fun, RANDOMNESS_ATTRIBUTE) && self.calls_randomness(fun_id) {
+                    self.env.error(
+                        &fun.get_id_loc(),
+                        "entry function calling randomness features must \
+                    use the `#[randomness]` attribute.",
+                    )
+                }
+                continue;
+            }
+            // Check condition (1) only if function is public and if the check is not disabled.
+            // Also, only check functions which are not declared in the framework.
+            if self.is_framework_function(fun_id)
+                || !fun.visibility().is_public()
+                || self.has_attribute(fun, ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE)
+            {
+                continue;
+            }
+            if self.calls_randomness(fun_id) {
+                self.env.error(
+                    &fun.get_id_loc(),
+                    &format!(
+                        "public function exposes functionality of the `randomness` module \
+                    which can be unsafe. Consult the randomness documentation for an explanation \
+                    of this error. To skip this check, add \
+                    attribute `#[{}]`.",
+                        ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE
+                    ),
+                )
+            }
+        }
+    }
+
+    /// Checks whether given function calls randomness functionality. This walks the call graph
+    /// recursively and stops as soon as a random call is found.
+    fn calls_randomness(&mut self, fun: QualifiedId<FunId>) -> bool {
+        if let Some(is_caller) = self.randomness_caller_cache.get(&fun) {
+            return *is_caller;
+        }
+        // For building a fixpoint on cycles, set the value initially to false
+        self.randomness_caller_cache.insert(fun, false);
+        let mut is_caller = false;
+        for callee in self
+            .env
+            .get_function(fun)
+            .get_called_functions()
+            .expect("callees defined")
+        {
+            if self.is_randomness_fun(*callee) || self.calls_randomness(*callee) {
+                is_caller = true;
+                break;
+            }
+        }
+        if is_caller {
+            // If we found a randomness call, update the cache
+            self.randomness_caller_cache.insert(fun, true);
+        }
+        is_caller
+    }
+
+    /// Check whether function belongs to the randomness feature. This is done by
+    /// checking the well-known module name.
+    fn is_randomness_fun(&self, fun: QualifiedId<FunId>) -> bool {
+        let module_name = self.env.get_function(fun).module_env.get_name().clone();
+        module_name.addr().expect_numerical() == AccountAddress::ONE
+            && *self.env.symbol_pool().string(module_name.name()) == RANDOMNESS_MODULE_NAME
+    }
+}
+
+// ----------------------------------------------------------------------------------
 // View Functions
 
 impl<'a> ExtendedChecker<'a> {
@@ -560,35 +656,42 @@ impl<'a> ExtendedChecker<'a> {
             if !self.has_attribute(fun, VIEW_FUN_ATTRIBUTE) {
                 continue;
             }
-            self.check_transaction_args(&fun.get_id_loc(), &fun.get_parameter_types());
+            self.check_transaction_args(&fun.get_id_loc(), &fun.get_parameters());
             if fun.get_return_count() == 0 {
                 self.env
-                    .error(&fun.get_id_loc(), "view function must return values")
+                    .error(&fun.get_id_loc(), "`#[view]` function must return values")
             }
 
-            fun.get_parameter_types()
+            fun.get_parameters()
                 .iter()
-                .for_each(|parameter_type| match parameter_type {
-                    Type::Primitive(inner) => {
-                        if inner == &PrimitiveType::Signer {
-                            self.env.error(
-                                &fun.get_id_loc(),
-                                "view function cannot use the signer paremter",
-                            )
-                        }
-                    },
-                    Type::Reference(_, inner) => {
-                        if let Type::Primitive(inner) = inner.as_ref() {
+                .for_each(
+                    |Parameter(_sym, parameter_type, param_loc)| match parameter_type {
+                        Type::Primitive(inner) => {
                             if inner == &PrimitiveType::Signer {
                                 self.env.error(
-                                    &fun.get_id_loc(),
-                                    "view function cannot use the & signer paremter",
+                                    param_loc,
+                                    "`#[view]` function cannot use a `signer` parameter",
                                 )
                             }
-                        }
+                        },
+                        Type::Reference(mutability, inner) => {
+                            if let Type::Primitive(inner) = inner.as_ref() {
+                                if inner == &PrimitiveType::Signer
+                                // Avoid a redundant error message for `&mut signer`, which is
+                                // always disallowed for transaction entries, not just for
+                                // `#[view]`.
+                                    && mutability == &ReferenceKind::Immutable
+                                {
+                                    self.env.error(
+                                        param_loc,
+                                        "`#[view]` function cannot use the `&signer` parameter",
+                                    )
+                                }
+                            }
+                        },
+                        _ => (),
                     },
-                    _ => (),
-                });
+                );
 
             // Remember the runtime info that this is a view function
             let module_id = self.get_runtime_module_id(module);
@@ -769,6 +872,16 @@ impl<'a> ExtendedChecker<'a> {
     fn is_function(&self, id: QualifiedId<FunId>, full_name_str: &str) -> bool {
         let fun = &self.env.get_function(id);
         fun.get_full_name_with_address() == full_name_str
+    }
+
+    fn is_framework_function(&self, id: QualifiedId<FunId>) -> bool {
+        self.env
+            .get_function(id)
+            .module_env
+            .get_name()
+            .addr()
+            .expect_numerical()
+            == AccountAddress::ONE
     }
 }
 
