@@ -197,10 +197,10 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
                 }
                 // For arguments, we also need to check the case that a src, even if not used after this program
                 // point, is again used in the argument list. Also, in difference to assign inference, we only need
-                // to copy the argument if its not primitive.
+                // to copy the argument if its not primitive or it is being borrowed.
                 for (i, src) in srcs.iter().enumerate() {
                     if (temp_needs_copy(src, instr) || srcs[i + 1..].contains(src))
-                        && type_needs_copy(src)
+                        && (lifetime.before.is_borrowed(*src) || type_needs_copy(src))
                     {
                         state.needs_copy.insert(*src);
                     } else {
@@ -301,7 +301,17 @@ impl<'a> Transformer<'a> {
                         let new_srcs = self.copy_args_if_needed(code_offset, id, srcs);
                         self.check_and_emit_bytecode(code_offset, Call(id, dests, op, new_srcs, ai))
                     },
-                    _ => self.check_and_emit_bytecode(code_offset, bc.clone()),
+                    _ => {
+                        if op.can_take_non_ref_primitive_as_args() {
+                            let new_srcs = self.copy_args_if_needed(code_offset, id, srcs);
+                            self.check_and_emit_bytecode(
+                                code_offset,
+                                Call(id, dests, op, new_srcs, ai),
+                            )
+                        } else {
+                            self.check_and_emit_bytecode(code_offset, bc.clone())
+                        }
+                    },
                 }
             },
             _ => self.check_and_emit_bytecode(code_offset, bc.clone()),
