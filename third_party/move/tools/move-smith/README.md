@@ -45,13 +45,25 @@ After running a fuzzing session, the coverage of all stored corpus can be genera
 ./scripts/coverage.sh gen <fuzz_target>
 ```
 
+This will create an HTML report at `coverage/<fuzz_target>/index.html`.
+
 ## Debugging
 
+## Compilation
+
 The script `./scripts/check_output.sh` is a helper for checking the generated programs.
-By default it generates 10 Move packages stored in `output/`, compiles them, and reports any error encountered.
+By default it generates 10 Move packages stored in `output/`, compiles them with compiler V1, and reports any error encountered.
 Use `./scripts/check_output.sh N` to generate `N` packages instead.
 
-This will create an HTML report at `coverage/<fuzz_target>/index.html`.
+## Transactional test
+
+To execute the generated Move programs as transactional tests, use the script:
+```
+./scripts/transactional-test.sh N
+```
+
+This script will generate `N` programs under `third_party/move/move-compiler-v2/transactional-tests/tests/move-smith`.
+It will than apply a patch to the test harness to only run with the newly generated files.
 
 # Dependencies
 
@@ -94,10 +106,14 @@ rustup component add --toolchain nightly llvm-tools-preview
 │   ├── corpus                    # The corpus of inputs for all fuzz targets (created after a fuzzing session starts)
 │   ├── coverage                  # Stores the aggregated raw coverage files (created after collecting coverage)
 │   └── fuzz_targets
-|       └── module_only.rs        # Basic fuzzer that only generates a module and tries to compile it
+│       ├── module_only.rs        # Basic fuzzer that only generates and compiles a module with compiler V1
+│       └── transactional.rs      # Generate Move programs and run them as transactional tests
 ├── scripts
 │   ├── check_output.sh           # Generate Move programs/packages and try to compile them
-│   └── coverage.sh               # Collect coverage and generate human-readable reports.
+│   ├── coverage.sh               # Collect coverage and generate human-readable reports.
+│   ├── coverage_graph.py         # Parses libfuzzer output and draw a coverage-over-time graph.
+│   ├── transactional-test.sh     # Generate Move programs and execute them as transactional tests.
+│   └── transactional-tests.patch # Disables all other tests and only run MoveSmith generated ones.
 ├── src
 │   ├── ast.rs                    # The AST for the Move language by the fuzzer
 │   ├── cli
@@ -107,12 +123,9 @@ rustup component add --toolchain nightly llvm-tools-preview
 │   ├── config.rs                 # Fuzzer configurations
 │   ├── lib.rs
 │   ├── move_smith.rs             # The core generation logic
-│   ├── names.rs
-│   ├── types.rs
-│   └── utils.rs
-├── target
-│   └── aarch64-apple-darwin
-│       └── coverage
+│   ├── names.rs                  # Manages identifiers and scoping
+│   ├── types.rs                  # Manages type mapping
+│   └── utils.rs                  # Connects to compilers & VM
 └── tests
     └── integration_test.rs
 ```
