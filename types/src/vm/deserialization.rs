@@ -6,6 +6,7 @@ use move_binary_format::{
     deserializer::DeserializerConfig, errors::PartialVMError, CompiledModule,
 };
 
+/// Anything implementing this trait can be deserialized, e.g., code (scripts or modules).
 pub trait Deserializable: Sized {
     type Error;
 
@@ -30,6 +31,7 @@ impl Deserializer for AptosEnvironment {
     }
 }
 
+// Dummy implementation for testing.
 impl Deserializer for () {
     fn deserialize<T: Deserializable<Error = E>, E>(&self, _bytes: &[u8]) -> Result<T, E> {
         unreachable!("Irrelevant for tests")

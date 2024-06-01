@@ -18,6 +18,7 @@ use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::config::VMConfig;
 use std::sync::Arc;
 
+/// A runtime environment which can be used for VM initialization and more.
 #[derive(Clone)]
 pub struct Environment {
     pub chain_id: ChainId,
