@@ -71,3 +71,48 @@ impl<Db: DbReader> DbReader for FinalityView<Db> {
 
     // TODO: override any other methods needed to maintain the illusion.
 }
+
+#[cfg(test)]
+mod tests {
+    use aptos_types::{aggregate_signature::AggregateSignature, ledger_info::LedgerInfo};
+
+    use super::*;
+    use crate::mock::MockDbReaderWriter;
+
+    #[test]
+    fn test_get_latest_ledger_info() {
+        let view = FinalityView::new(MockDbReaderWriter);
+        let ledger_info = view.get_latest_ledger_info_option().unwrap();
+        assert_eq!(ledger_info, None);
+        let fin_ledger_info =
+            LedgerInfoWithSignatures::new(LedgerInfo::dummy(), AggregateSignature::empty());
+        view.set_finalized_ledger_info(fin_ledger_info.clone())
+            .unwrap();
+        let ledger_info = view.get_latest_ledger_info().unwrap();
+        assert_eq!(ledger_info, fin_ledger_info);
+    }
+
+    #[test]
+    fn test_get_latest_version() {
+        let view = FinalityView::new(MockDbReaderWriter);
+        let res = view.get_latest_version();
+        assert!(res.is_err());
+        let fin_ledger_info =
+            LedgerInfoWithSignatures::new(LedgerInfo::dummy(), AggregateSignature::empty());
+        view.set_finalized_ledger_info(fin_ledger_info).unwrap();
+        let version = view.get_latest_version().unwrap();
+        assert_eq!(version, 0);
+    }
+
+    #[test]
+    fn test_get_latest_state_checkpoint_version() {
+        let view = FinalityView::new(MockDbReaderWriter);
+        let version = view.get_latest_state_checkpoint_version().unwrap();
+        assert_eq!(version, None);
+        let fin_ledger_info =
+            LedgerInfoWithSignatures::new(LedgerInfo::dummy(), AggregateSignature::empty());
+        view.set_finalized_ledger_info(fin_ledger_info).unwrap();
+        let version = view.get_latest_state_checkpoint_version().unwrap();
+        assert_eq!(version, Some(0));
+    }
+}
