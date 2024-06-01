@@ -11,28 +11,31 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-better_any = "0.1.1"
-bytes = "1.4.0"
-fail = "0.4.0"
+better_any = { workspace = true }
+bytes = { workspace = true }
+fail = { workspace = true }
+hashbrown = { workspace = true }
+lazy_static = { workspace = true }
+lru = { workspace = true }
 move-binary-format = { path = "../../move-binary-format" }
-once_cell = "1.7.2"
-parking_lot = "0.11.1"
-serde = "1.0.149"
-sha3 = "0.9.1"
-smallbitvec = "2.5.1"
-tracing = "0.1.26"
-triomphe = "0.1.9"
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+serde = { workspace = true }
+sha3 = { workspace = true }
+tracing = { workspace = true }
+triomphe = { workspace = true }
+typed-arena = { workspace = true }
 
 move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
 move-core-types = { path = "../../move-core/types" }
 move-vm-types = { path = "../types" }
 
 [dev-dependencies]
-anyhow = "1.0.52"
-hex = "0.4.3"
+anyhow = { workspace = true }
+hex = { workspace = true }
 move-compiler = { path = "../../move-compiler" }
 move-ir-compiler = { path = "../../move-ir-compiler" }
-proptest = "1.0.0"
+proptest = { workspace = true }
 
 [features]
 default = []

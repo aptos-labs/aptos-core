@@ -25,13 +25,13 @@ use aptos_config::{
     config::{NodeConfig, PeerMonitoringServiceConfig, PeerRole},
     network_id::NetworkId,
 };
-use aptos_infallible::RwLock;
 use aptos_peer_monitoring_service_types::{
     request::PeerMonitoringServiceRequest,
     response::{LatencyPingResponse, PeerMonitoringServiceResponse},
 };
 use aptos_time_service::TimeServiceTrait;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_peer_updater_loop_multiple_peers() {
@@ -42,7 +42,7 @@ async fn test_peer_updater_loop_multiple_peers() {
 
     // Verify peers and metadata is empty
     let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
-    assert!(peers_and_metadata.get_all_peers().unwrap().is_empty());
+    assert!(peers_and_metadata.get_all_peers().is_empty());
 
     // Add a connected validator peer
     let validator_peer =
@@ -283,8 +283,8 @@ async fn test_latency_ping() {
             // Verify that a latency ping is received for each peer
             for _ in 0..2 {
                 // Get the network request
+                let mut mock_monitoring_server = mock_monitoring_server.write().await;
                 let network_request = mock_monitoring_server
-                    .write()
                     .next_request(&NetworkId::Public)
                     .await
                     .unwrap();
@@ -403,8 +403,8 @@ async fn test_network_info() {
             // Verify that a network info request is received for each peer
             for _ in 0..3 {
                 // Get the network request
+                let mut mock_monitoring_server = mock_monitoring_server.write().await;
                 let network_request = mock_monitoring_server
-                    .write()
                     .next_request(&NetworkId::Validator)
                     .await
                     .unwrap();
@@ -522,8 +522,8 @@ async fn test_node_info() {
             // Verify that a node info request is received for each peer
             for _ in 0..3 {
                 // Get the node request
+                let mut mock_monitoring_server = mock_monitoring_server.write().await;
                 let network_request = mock_monitoring_server
-                    .write()
                     .next_request(&NetworkId::Validator)
                     .await
                     .unwrap();

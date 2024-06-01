@@ -2,16 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::AptosDB;
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use aptos_config::config::{NodeConfig, StorageDirPaths};
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter,
+    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter, Result,
     StateSnapshotReceiver,
 };
 use aptos_types::{
-    epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
     state_store::{state_key::StateKey, state_value::StateValue, ShardedStateUpdates},
     transaction::{TransactionOutputListWithProof, TransactionToCommit, Version},
@@ -60,7 +59,12 @@ impl FastSyncStorageWrapper {
             .state_sync_driver
             .bootstrapping_mode
             .is_fast_sync()
-            && (db_main.ledger_store.get_latest_version().map_or(0, |v| v) == 0)
+            && (db_main
+                .ledger_db
+                .metadata_db()
+                .get_synced_version()
+                .map_or(0, |v| v)
+                == 0)
         {
             db_dir.push(SECONDARY_DB_DIR);
             let secondary_db = AptosDB::open(
@@ -181,16 +185,5 @@ impl DbWriter for FastSyncStorageWrapper {
 impl DbReader for FastSyncStorageWrapper {
     fn get_read_delegatee(&self) -> &dyn DbReader {
         self.get_aptos_db_read_ref()
-    }
-
-    fn get_epoch_ending_ledger_infos(
-        &self,
-        start_epoch: u64,
-        end_epoch: u64,
-    ) -> Result<EpochChangeProof> {
-        let (ledger_info, flag) = self
-            .get_aptos_db_read_ref()
-            .get_epoch_ending_ledger_infos(start_epoch, end_epoch)?;
-        Ok(EpochChangeProof::new(ledger_info, flag))
     }
 }

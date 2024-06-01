@@ -1,7 +1,13 @@
+name: "Rust Setup"
+description: "Setup the rust toolchain and cache"
 inputs:
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git"
     required: false
+  ADDITIONAL_KEY:
+    description: "An optional additional key to pass to rust-cache"
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -15,6 +21,8 @@ runs:
     # https://github.com/Swatinem/rust-cache#cache-details
     - name: Run cargo cache
       uses: Swatinem/rust-cache@359a70e43a0bb8a13953b04a90f76428b4959bb6 # pin@v2.2.0
+      with:
+        key: ${{ inputs.ADDITIONAL_KEY }}
 
     - name: install protoc and related tools
       shell: bash

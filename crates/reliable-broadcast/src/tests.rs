@@ -3,6 +3,7 @@
 
 use crate::{BroadcastStatus, RBMessage, RBNetworkSender, ReliableBroadcast};
 use anyhow::bail;
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::common::Author;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_infallible::Mutex;
@@ -20,6 +21,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use tokio::runtime::Handle;
 use tokio_retry::strategy::FixedInterval;
 
 #[derive(Clone)]
@@ -38,23 +40,23 @@ impl RBMessage for TestRBMessage {}
 
 struct TestBroadcastStatus {
     threshold: usize,
-    received: HashSet<Author>,
+    received: Arc<Mutex<HashSet<Author>>>,
 }
 
-impl<M> BroadcastStatus<M> for TestBroadcastStatus
+impl<M> BroadcastStatus<M> for Arc<TestBroadcastStatus>
 where
     M: RBMessage,
     TestAck: TryFrom<M> + Into<M>,
     TestMessage: TryFrom<M> + Into<M>,
 {
-    type Ack = TestAck;
     type Aggregated = HashSet<Author>;
     type Message = TestMessage;
+    type Response = TestAck;
 
-    fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
-        self.received.insert(peer);
-        if self.received.len() == self.threshold {
-            Ok(Some(self.received.clone()))
+    fn add(&self, peer: Author, _ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
+        self.received.lock().insert(peer);
+        if self.received.lock().len() == self.threshold {
+            Ok(Some(self.received.lock().clone()))
         } else {
             Ok(None)
         }
@@ -122,12 +124,13 @@ async fn test_reliable_broadcast() {
         FixedInterval::from_millis(10),
         TimeService::real(),
         Duration::from_millis(500),
+        BoundedExecutor::new(2, Handle::current()),
     );
     let message = TestMessage(vec![42; validators.len() - 1]);
-    let aggregating = TestBroadcastStatus {
+    let aggregating = Arc::new(TestBroadcastStatus {
         threshold: validators.len(),
-        received: HashSet::new(),
-    };
+        received: Arc::new(Mutex::new(HashSet::new())),
+    });
     let fut = rb.broadcast(message, aggregating);
     assert_eq!(fut.await, validators.into_iter().collect());
 }
@@ -138,27 +141,29 @@ async fn test_chaining_reliable_broadcast() {
     let validators = validator_verifier.get_ordered_account_addresses();
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
-    let rb = ReliableBroadcast::new(
+    let rb = Arc::new(ReliableBroadcast::new(
         validators.clone(),
         sender,
         FixedInterval::from_millis(10),
         TimeService::real(),
         Duration::from_millis(500),
-    );
+        BoundedExecutor::new(2, Handle::current()),
+    ));
     let message = TestMessage(vec![42; validators.len()]);
     let expected = validators.iter().cloned().collect();
-    let aggregating = TestBroadcastStatus {
+    let aggregating = Arc::new(TestBroadcastStatus {
         threshold: validators.len(),
-        received: HashSet::new(),
-    };
-    let fut = rb
+        received: Arc::new(Mutex::new(HashSet::new())),
+    });
+    let rb1 = rb.clone();
+    let fut = rb1
         .broadcast(message.clone(), aggregating)
         .then(|aggregated| async move {
             assert_eq!(aggregated, expected);
-            let aggregating = TestBroadcastStatus {
+            let aggregating = Arc::new(TestBroadcastStatus {
                 threshold: validator_verifier.len(),
-                received: HashSet::new(),
-            };
+                received: Arc::new(Mutex::new(HashSet::new())),
+            });
             rb.broadcast(message, aggregating).await
         });
     assert_eq!(fut.await, validators.into_iter().collect());
@@ -170,27 +175,28 @@ async fn test_abort_reliable_broadcast() {
     let validators = validator_verifier.get_ordered_account_addresses();
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
-    let rb = ReliableBroadcast::new(
+    let rb = Arc::new(ReliableBroadcast::new(
         validators.clone(),
         sender,
         FixedInterval::from_millis(10),
         TimeService::real(),
         Duration::from_millis(500),
-    );
+        BoundedExecutor::new(2, Handle::current()),
+    ));
     let message = TestMessage(vec![42; validators.len()]);
     let (tx, rx) = oneshot::channel();
     let (abort_handle, abort_registration) = AbortHandle::new_pair();
-    let aggregating = TestBroadcastStatus {
+    let aggregating = Arc::new(TestBroadcastStatus {
         threshold: validators.len(),
-        received: HashSet::new(),
-    };
+        received: Arc::new(Mutex::new(HashSet::new())),
+    });
     let fut = Abortable::new(
         rb.broadcast(message.clone(), aggregating)
             .then(|_| async move {
-                let aggregating = TestBroadcastStatus {
+                let aggregating = Arc::new(TestBroadcastStatus {
                     threshold: validators.len(),
-                    received: HashSet::new(),
-                };
+                    received: Arc::new(Mutex::new(HashSet::new())),
+                });
                 let ret = rb.broadcast(message, aggregating).await;
                 tx.send(ret)
             }),

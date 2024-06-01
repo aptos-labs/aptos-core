@@ -1,4 +1,20 @@
 Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/functional/global_vars.move:120:9
+    │
+120 │         ensures sum_of_T2 == 2;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/global_vars.move:116: opaque_call_add_sub_invalid
+    =     at tests/sources/functional/global_vars.move:117: opaque_call_add_sub_invalid
+    =     at tests/sources/functional/global_vars.move:96: opaque_add (spec)
+    =     at tests/sources/functional/global_vars.move:117: opaque_call_add_sub_invalid
+    =     at tests/sources/functional/global_vars.move:106: opaque_sub (spec)
+    =     at tests/sources/functional/global_vars.move:117: opaque_call_add_sub_invalid
+    =     at tests/sources/functional/global_vars.move:96: opaque_add (spec)
+    =     at tests/sources/functional/global_vars.move:118: opaque_call_add_sub_invalid
+    =     at tests/sources/functional/global_vars.move:120: opaque_call_add_sub_invalid (spec)
+
 error: precondition does not hold at this call
     ┌─ tests/sources/functional/global_vars.move:145:9
     │
@@ -22,6 +38,18 @@ error: post-condition does not hold
     =     at tests/sources/functional/global_vars.move:179: expect_property_of_u64_invalid
     =     at tests/sources/functional/global_vars.move:181: expect_property_of_u64_invalid (spec)
 
+error: post-condition does not hold
+    ┌─ tests/sources/functional/global_vars.move:205:9
+    │
+205 │         ensures type_has_property<u64>;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/global_vars.move:201: opaque_expect_property_of_u64_invalid
+    =     at tests/sources/functional/global_vars.move:202: opaque_expect_property_of_u64_invalid
+    =     at tests/sources/functional/global_vars.move:191: opaque_give_property_to (spec)
+    =     at tests/sources/functional/global_vars.move:203: opaque_expect_property_of_u64_invalid
+    =     at tests/sources/functional/global_vars.move:205: opaque_expect_property_of_u64_invalid (spec)
+
 error: global memory invariant does not hold
     ┌─ tests/sources/functional/global_vars.move:218:5
     │
@@ -38,34 +66,6 @@ error: global memory invariant does not hold
     =     at tests/sources/functional/global_vars.move:230: limit_change_invalid
     =     at tests/sources/functional/global_vars.move:232: limit_change_invalid (spec)
     =     at tests/sources/functional/global_vars.move:218
-
-error: post-condition does not hold
-    ┌─ tests/sources/functional/global_vars.move:120:9
-    │
-120 │         ensures sum_of_T2 == 2;
-    │         ^^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at tests/sources/functional/global_vars.move:116: opaque_call_add_sub_invalid
-    =     at tests/sources/functional/global_vars.move:117: opaque_call_add_sub_invalid
-    =     at tests/sources/functional/global_vars.move:96: opaque_add (spec)
-    =     at tests/sources/functional/global_vars.move:117: opaque_call_add_sub_invalid
-    =     at tests/sources/functional/global_vars.move:106: opaque_sub (spec)
-    =     at tests/sources/functional/global_vars.move:117: opaque_call_add_sub_invalid
-    =     at tests/sources/functional/global_vars.move:96: opaque_add (spec)
-    =     at tests/sources/functional/global_vars.move:118: opaque_call_add_sub_invalid
-    =     at tests/sources/functional/global_vars.move:120: opaque_call_add_sub_invalid (spec)
-
-error: post-condition does not hold
-    ┌─ tests/sources/functional/global_vars.move:205:9
-    │
-205 │         ensures type_has_property<u64>;
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at tests/sources/functional/global_vars.move:201: opaque_expect_property_of_u64_invalid
-    =     at tests/sources/functional/global_vars.move:202: opaque_expect_property_of_u64_invalid
-    =     at tests/sources/functional/global_vars.move:191: opaque_give_property_to (spec)
-    =     at tests/sources/functional/global_vars.move:203: opaque_expect_property_of_u64_invalid
-    =     at tests/sources/functional/global_vars.move:205: opaque_expect_property_of_u64_invalid (spec)
 
 error: global memory invariant does not hold
     ┌─ tests/sources/functional/global_vars.move:218:5

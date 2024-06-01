@@ -4,7 +4,7 @@
 
 use super::{
     types::{
-        test::{arc_value_for, u128_for, value_for, KeyType, TestValue},
+        test::{arc_value_for, u128_for, KeyType, TestValue},
         MVDataError, MVDataOutput,
     },
     unsync_map::UnsyncMap,
@@ -42,16 +42,16 @@ fn unsync_map_data_basic() {
     assert_none!(map.fetch_data(&ap));
     // Ensure write registers the new value.
     //TODO[agg_v2](tests): Hardocoding layout to None. Test when layout is Some(.) as well.
-    map.write(ap.clone(), value_for(10, 1), None);
+    map.write(ap.clone(), arc_value_for(10, 1), None);
     assert_some_eq!(
         map.fetch_data(&ap),
-        ValueWithLayout::Exchanged(Arc::new(value_for(10, 1)), None)
+        ValueWithLayout::Exchanged(arc_value_for(10, 1), None)
     );
     // Ensure the next write overwrites the value.
-    map.write(ap.clone(), value_for(14, 1), None);
+    map.write(ap.clone(), arc_value_for(14, 1), None);
     assert_some_eq!(
         map.fetch_data(&ap),
-        ValueWithLayout::Exchanged(Arc::new(value_for(14, 1)), None)
+        ValueWithLayout::Exchanged(arc_value_for(14, 1), None)
     );
 }
 
@@ -74,7 +74,7 @@ fn create_write_read_placeholder_struct() {
     // Write by txn 10.
     mvtbl
         .data()
-        .write(ap1.clone(), 10, 1, (value_for(10, 1), None));
+        .write(ap1.clone(), 10, 1, arc_value_for(10, 1), None);
 
     // Reads that should go the DB return Err(Uninitialized)
     let r_db = mvtbl.data().fetch_data(&ap1, 9);
@@ -111,10 +111,10 @@ fn create_write_read_placeholder_struct() {
     // More writes.
     mvtbl
         .data()
-        .write(ap1.clone(), 12, 0, (value_for(12, 0), None));
+        .write(ap1.clone(), 12, 0, arc_value_for(12, 0), None);
     mvtbl
         .data()
-        .write(ap1.clone(), 8, 3, (value_for(8, 3), None));
+        .write(ap1.clone(), 8, 3, arc_value_for(8, 3), None);
 
     // Verify reads.
     let r_12 = mvtbl.data().fetch_data(&ap1, 15);
@@ -151,7 +151,7 @@ fn create_write_read_placeholder_struct() {
     mvtbl.data().remove(&ap1, 10);
     mvtbl
         .data()
-        .write(ap2.clone(), 10, 2, (value_for(10, 2), None));
+        .write(ap2.clone(), 10, 2, arc_value_for(10, 2), None);
 
     // Read by txn 11 no longer observes entry from txn 10.
     let r_8 = mvtbl.data().fetch_data(&ap1, 11);
@@ -166,10 +166,10 @@ fn create_write_read_placeholder_struct() {
     // Reads, writes for ap2 and ap3.
     mvtbl
         .data()
-        .write(ap2.clone(), 5, 0, (value_for(5, 0), None));
+        .write(ap2.clone(), 5, 0, arc_value_for(5, 0), None);
     mvtbl
         .data()
-        .write(ap3.clone(), 20, 4, (value_for(20, 4), None));
+        .write(ap3.clone(), 20, 4, arc_value_for(20, 4), None);
     let r_5 = mvtbl.data().fetch_data(&ap2, 10);
     assert_eq!(
         Ok(Versioned(
@@ -216,10 +216,10 @@ fn create_write_read_placeholder_struct() {
     let r_33 = mvtbl.data().fetch_data(&ap1, 33);
     assert_eq!(Err(DeltaApplicationFailure), r_33);
 
-    let val = value_for(10, 3);
+    let val = arc_value_for(10, 3);
     // sub base sub_for for which should underflow.
     let sub_base = val.as_u128().unwrap().unwrap();
-    mvtbl.data().write(ap2.clone(), 10, 3, (val, None));
+    mvtbl.data().write(ap2.clone(), 10, 3, val, None);
     mvtbl
         .data()
         .add_delta(ap2.clone(), 30, delta_sub(30 + sub_base, u128::MAX));

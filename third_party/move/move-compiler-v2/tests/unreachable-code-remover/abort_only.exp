@@ -1,0 +1,34 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+  0: $t0 := 0
+  1: abort($t0)
+  2: return ()
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+     # maybe
+  0: $t0 := 0
+     # maybe
+  1: abort($t0)
+     # no
+  2: return ()
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+  0: $t0 := 0
+  1: abort($t0)
+}
+
+
+============ bytecode verification succeeded ========

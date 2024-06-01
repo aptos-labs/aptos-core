@@ -13,10 +13,7 @@
 //! ```
 
 use serde::Serialize;
-use std::{
-    borrow::{Borrow, Cow},
-    fmt,
-};
+use std::{borrow::Cow, fmt};
 
 /// The key part of a logging key value pair e.g. `info!(key = value)`
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize)]
@@ -32,7 +29,7 @@ impl Key {
     }
 
     pub fn as_str(&self) -> &'_ Self {
-        self.borrow()
+        self
     }
 }
 

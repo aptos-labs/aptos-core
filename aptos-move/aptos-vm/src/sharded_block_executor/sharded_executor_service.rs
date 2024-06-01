@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     block_executor::BlockAptosVM,
@@ -16,15 +17,16 @@ use crate::{
     },
 };
 use aptos_logger::{info, trace};
-use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::{
-        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        config::{BlockExecutorConfig, BlockExecutorLocalConfig},
         partitioner::{ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies},
     },
+    state_store::StateView,
     transaction::{
         analyzed_transaction::AnalyzedTransaction,
-        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
+        TransactionOutput,
     },
 };
 use aptos_vm_logging::disable_speculative_logging;
@@ -71,8 +73,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         sub_block: SubBlock<AnalyzedTransaction>,
         round: usize,
         state_view: &S,
-        concurrency_level: usize,
-        onchain_config: BlockExecutorConfigFromOnchain,
+        config: BlockExecutorConfig,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         disable_speculative_logging();
         trace!(
@@ -90,8 +91,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             Some(cross_shard_commit_sender),
             round,
             state_view,
-            concurrency_level,
-            onchain_config,
+            config,
         )
     }
 
@@ -103,8 +103,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         cross_shard_commit_sender: Option<CrossShardCommitSender>,
         round: usize,
         state_view: &S,
-        concurrency_level: usize,
-        onchain_config: BlockExecutorConfigFromOnchain,
+        config: BlockExecutorConfig,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let (callback, callback_receiver) = oneshot::channel();
 
@@ -140,12 +139,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     executor_thread_pool,
                     &signature_verified_transactions,
                     aggr_overridden_state_view.as_ref(),
-                    BlockExecutorConfig {
-                        local: BlockExecutorLocalConfig { concurrency_level },
-                        onchain: onchain_config,
-                    },
+                    config,
                     cross_shard_commit_sender,
-                );
+                )
+                .map(BlockOutput::into_transaction_outputs_forced);
                 if let Some(shard_id) = shard_id {
                     trace!(
                         "executed sub block for shard {} and round {}",
@@ -178,8 +175,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         &self,
         transactions: SubBlocksForShard<AnalyzedTransaction>,
         state_view: &S,
-        concurrency_level: usize,
-        onchain_config: BlockExecutorConfigFromOnchain,
+        config: BlockExecutorConfig,
     ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         let mut result = vec![];
         for (round, sub_block) in transactions.into_sub_blocks().into_iter().enumerate() {
@@ -195,13 +191,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 round,
                 sub_block.transactions.len()
             );
-            result.push(self.execute_sub_block(
-                sub_block,
-                round,
-                state_view,
-                concurrency_level,
-                onchain_config.clone(),
-            )?);
+            result.push(self.execute_sub_block(sub_block, round, state_view, config.clone())?);
             trace!(
                 "Finished executing sub block for shard {} and round {}",
                 self.shard_id,
@@ -239,8 +229,14 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     let ret = self.execute_block(
                         transactions,
                         state_view.as_ref(),
-                        concurrency_level_per_shard,
-                        onchain_config,
+                        BlockExecutorConfig {
+                            local: BlockExecutorLocalConfig {
+                                concurrency_level: concurrency_level_per_shard,
+                                allow_fallback: true,
+                                discard_failed_blocks: false,
+                            },
+                            onchain: onchain_config,
+                        },
                     );
                     drop(state_view);
                     drop(exe_timer);

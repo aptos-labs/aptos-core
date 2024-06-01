@@ -19,23 +19,25 @@ error: post-condition does not hold
    =     at tests/sources/functional/trace.move:19: add_invalid (spec)
    =         `ensures result == a + b;` = <redacted>
 
-error: global memory invariant does not hold
-   ┌─ tests/sources/functional/trace.move:38:5
+error: post-condition does not hold
+   ┌─ tests/sources/functional/trace.move:26:9
    │
-38 │     invariant forall addr: address: exists<R>(addr) ==> global<R>(addr).x < 5;
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+26 │         ensures a == old(a) + b;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   = Related Global Memory:
-   =         Resource name: TestTracing_R
-   =         Values:  {Address(0): <redacted>, Default: TestTracing.R{x = 5}}
-   =     at tests/sources/functional/trace.move:29: publish_invalid
-   =     at tests/sources/functional/trace.move:33: publish_invalid (spec)
-   =         `let addr = signer::address_of(s);` = <redacted>
-   =     at tests/sources/functional/trace.move:29: publish_invalid
-   =         s = <redacted>
-   =         x = <redacted>
-   =     at tests/sources/functional/trace.move:30: publish_invalid
-   =     at tests/sources/functional/trace.move:38
+   = Related Bindings:
+   =         a = <redacted>
+   =         b = <redacted>
+   =         old(a) = <redacted>
+   = Execution Trace:
+   =     at tests/sources/functional/trace.move:22: update_invalid
+   =         a = <redacted>
+   =         b = <redacted>
+   =     at tests/sources/functional/trace.move:23: update_invalid
+   =         a = <redacted>
+   =     at tests/sources/functional/trace.move:24: update_invalid
+   =     at tests/sources/functional/trace.move:26: update_invalid (spec)
+   =         `ensures a == old(a) + b;` = <redacted>
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/trace.move:34:9
@@ -64,22 +66,20 @@ error: post-condition does not hold
    =     at tests/sources/functional/trace.move:34: publish_invalid (spec)
    =         `ensures exists<R>(addr) ==> global<R>(addr).x == x;` = <redacted>
 
-error: post-condition does not hold
-   ┌─ tests/sources/functional/trace.move:26:9
+error: global memory invariant does not hold
+   ┌─ tests/sources/functional/trace.move:38:5
    │
-26 │         ensures a == old(a) + b;
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+38 │     invariant forall addr: address: exists<R>(addr) ==> global<R>(addr).x < 5;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   = Related Bindings:
-   =         a = <redacted>
-   =         b = <redacted>
-   =         old(a) = <redacted>
-   = Execution Trace:
-   =     at tests/sources/functional/trace.move:22: update_invalid
-   =         a = <redacted>
-   =         b = <redacted>
-   =     at tests/sources/functional/trace.move:23: update_invalid
-   =         a = <redacted>
-   =     at tests/sources/functional/trace.move:24: update_invalid
-   =     at tests/sources/functional/trace.move:26: update_invalid (spec)
-   =         `ensures a == old(a) + b;` = <redacted>
+   = Related Global Memory:
+   =         Resource name: TestTracing_R
+   =         Values:  {Address(0): <redacted>, Default: TestTracing.R{x = 5}}
+   =     at tests/sources/functional/trace.move:29: publish_invalid
+   =     at tests/sources/functional/trace.move:33: publish_invalid (spec)
+   =         `let addr = signer::address_of(s);` = <redacted>
+   =     at tests/sources/functional/trace.move:29: publish_invalid
+   =         s = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/trace.move:30: publish_invalid
+   =     at tests/sources/functional/trace.move:38

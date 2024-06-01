@@ -72,6 +72,10 @@ pub fn move_stdlib_named_addresses() -> BTreeMap<String, NumericalAddress> {
         .collect()
 }
 
+pub fn move_stdlib_named_addresses_strings() -> Vec<String> {
+    vec!["std=0x1".to_string()]
+}
+
 pub fn build_doc(
     output_path: &str,
     doc_path: &str,

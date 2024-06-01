@@ -47,7 +47,7 @@
 use crate::{
     counters::{
         self, network_application_inbound_traffic, network_application_outbound_traffic,
-        CANCELED_LABEL, DECLINED_LABEL, FAILED_LABEL, INBOUND_LABEL, OUTBOUND_LABEL,
+        CANCELED_LABEL, DECLINED_LABEL, EXPIRED_LABEL, FAILED_LABEL, INBOUND_LABEL, OUTBOUND_LABEL,
         RECEIVED_LABEL, REQUEST_LABEL, RESPONSE_LABEL, SENT_LABEL,
     },
     logging::NetworkSchema,
@@ -703,7 +703,7 @@ impl OutboundRpcs {
         };
 
         if is_canceled {
-            info!(
+            debug!(
                 NetworkSchema::new(network_context).remote_peer(peer_id),
                 request_id = request_id,
                 "{} Received response for expired request_id {} from {}. Discarding.",
@@ -711,6 +711,13 @@ impl OutboundRpcs {
                 request_id,
                 peer_id.short_str(),
             );
+            counters::rpc_messages(
+                network_context,
+                RESPONSE_LABEL,
+                INBOUND_LABEL,
+                EXPIRED_LABEL,
+            )
+            .inc();
         } else {
             trace!(
                 NetworkSchema::new(network_context).remote_peer(peer_id),

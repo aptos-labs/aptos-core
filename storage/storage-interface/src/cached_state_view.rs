@@ -4,15 +4,14 @@
 use crate::{
     async_proof_fetcher::AsyncProofFetcher, metrics::TIMER, state_view::DbStateView, DbReader,
 };
-use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
-use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, StateViewId, TStateView,
     },
     transaction::Version,
     write_set::WriteSet,
@@ -36,6 +35,7 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
+type Result<T, E = StateviewError> = std::result::Result<T, E>;
 type StateCacheShard = DashMap<StateKey, (Option<Version>, Option<StateValue>)>;
 
 // Sharded by StateKey.get_shard_id(). The version in the value indicates there is an entry on that
@@ -159,7 +159,9 @@ impl CachedStateView {
         // due to a commit happening from another thread.
         let base_smt = reader.get_buffered_state_base()?;
         let speculative_state = speculative_state.freeze(&base_smt);
-        let snapshot = reader.get_state_snapshot_before(next_version)?;
+        let snapshot = reader
+            .get_state_snapshot_before(next_version)
+            .map_err(Into::<StateviewError>::into)?;
 
         Ok(Self::new_impl(
             id,
@@ -218,27 +220,47 @@ impl CachedStateView {
     ) -> Result<(Option<Version>, Option<StateValue>)> {
         // Do most of the work outside the write lock.
         let key_hash = state_key.hash();
-        Ok(match self.speculative_state.get(key_hash) {
-            StateStoreStatus::ExistsInScratchPad(value) => (None, Some(value)),
-            StateStoreStatus::DoesNotExist => (None, None),
-            // No matter it is in db or unknown, we have to query from db since even the
-            // former case, we don't have the blob data but only its hash.
-            StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => match self.snapshot {
-                Some((version, root_hash)) => {
-                    let version_and_value_opt = self
-                        .proof_fetcher
-                        .fetch_state_value_with_version_and_schedule_proof_read(
-                            state_key,
-                            version,
-                            Some(root_hash),
-                        )?;
-                    match version_and_value_opt {
-                        Some((version, value)) => (Some(version), Some(value)),
-                        None => (None, None),
-                    }
-                },
-                None => (None, None),
+        match self.speculative_state.get(key_hash) {
+            StateStoreStatus::ExistsInScratchPad(value) => Ok((None, Some(value))),
+            StateStoreStatus::DoesNotExist => Ok((None, None)),
+            // Part of the tree is unknown, need to request proof for later usage (updating the tree)
+            StateStoreStatus::UnknownSubtreeRoot {
+                hash: subtree_root_hash,
+                depth: subtree_root_depth,
+            } => self.fetch_value_and_maybe_proof_in_snapshot(
+                state_key,
+                Some((subtree_root_hash, subtree_root_depth)),
+            ),
+            // Tree is known, but we only know the hash of the value, need to request the actual
+            // StateValue.
+            StateStoreStatus::UnknownValue => {
+                self.fetch_value_and_maybe_proof_in_snapshot(state_key, None)
             },
+        }
+    }
+
+    fn fetch_value_and_maybe_proof_in_snapshot(
+        &self,
+        state_key: &StateKey,
+        fetch_proof: Option<(HashValue, usize)>,
+    ) -> Result<(Option<Version>, Option<StateValue>)> {
+        let version_and_value_opt = match self.snapshot {
+            None => None,
+            Some((version, _root_hash)) => match fetch_proof {
+                None => self.proof_fetcher.fetch_state_value(state_key, version)?,
+                Some((subtree_root_hash, subtree_depth)) => self
+                    .proof_fetcher
+                    .fetch_state_value_with_version_and_schedule_proof_read(
+                        state_key,
+                        version,
+                        subtree_depth,
+                        Some(subtree_root_hash),
+                    )?,
+            },
+        };
+        Ok(match version_and_value_opt {
+            None => (None, None),
+            Some((version, value)) => (Some(version), Some(value)),
         })
     }
 }

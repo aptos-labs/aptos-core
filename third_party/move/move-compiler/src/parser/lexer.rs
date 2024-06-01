@@ -345,6 +345,22 @@ impl<'input> Lexer<'input> {
         Ok((first, second))
     }
 
+    // Look ahead to the nth token after the current one and return it without advancing
+    // the state of the lexer.
+    pub fn lookahead_nth(&mut self, n: usize) -> Result<Tok, Box<Diagnostic>> {
+        let mut current_offset = self.cur_end;
+        let mut token = Tok::EOF;
+
+        for _ in 0..=n {
+            let text = self.trim_whitespace_and_comments(current_offset)?;
+            let offset = self.text.len() - text.len();
+            let (found_token, length) = find_token(self.file_hash, text, offset)?;
+            token = found_token;
+            current_offset = offset + length;
+        }
+        Ok(token)
+    }
+
     // Matches the doc comments after the last token (or the beginning of the file) to the position
     // of the current token. This moves the comments out of `doc_comments` and
     // into `matched_doc_comments`. At the end of parsing, if `doc_comments` is not empty, errors

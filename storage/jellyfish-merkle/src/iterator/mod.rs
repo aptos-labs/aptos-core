@@ -14,8 +14,8 @@ use crate::{
     node_type::{Child, InternalNode, Node, NodeKey},
     TreeReader,
 };
-use anyhow::{bail, ensure, Result};
 use aptos_crypto::HashValue;
+use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError, Result};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     transaction::Version,
@@ -252,7 +252,7 @@ where
             current_node = reader.get_node(&current_node_key)?;
         }
 
-        bail!("Bug: potential infinite loop.");
+        db_other_bail!("Bug: potential infinite loop.");
     }
 
     fn skip_leaves<'a>(
@@ -270,7 +270,7 @@ where
             }
         }
 
-        bail!("Bug: Internal node has less leaves than expected.");
+        db_other_bail!("Bug: Internal node has less leaves than expected.");
     }
 }
 

@@ -7,7 +7,7 @@ use crate::{
     network::MempoolSyncMsg,
 };
 use anyhow::{format_err, Result};
-use aptos_compression::metrics::CompressionClient;
+use aptos_compression::client::CompressionClient;
 use aptos_config::config::{NodeConfig, MAX_APPLICATION_MESSAGE_SIZE};
 use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
@@ -129,8 +129,18 @@ pub(crate) fn add_txns_to_mempool(
     transactions
 }
 
-pub(crate) fn add_txn(pool: &mut CoreMempool, transaction: TestTransaction) -> Result<()> {
-    add_signed_txn(pool, transaction.make_signed_transaction())
+pub(crate) fn txn_bytes_len(transaction: TestTransaction) -> u64 {
+    let txn = transaction.make_signed_transaction();
+    txn.txn_bytes_len() as u64
+}
+
+pub(crate) fn add_txn(
+    pool: &mut CoreMempool,
+    transaction: TestTransaction,
+) -> Result<SignedTransaction> {
+    let txn = transaction.make_signed_transaction();
+    add_signed_txn(pool, txn.clone())?;
+    Ok(txn)
 }
 
 pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransaction) -> Result<()> {
@@ -173,9 +183,10 @@ impl ConsensusMock {
         max_txns: u64,
         max_bytes: u64,
     ) -> Vec<SignedTransaction> {
-        let block = mempool.get_batch(max_txns, max_bytes, true, true, self.0.clone());
+        let block = mempool.get_batch(max_txns, max_bytes, true, self.0.clone());
         block.iter().for_each(|t| {
-            let txn_summary = TransactionSummary::new(t.sender(), t.sequence_number());
+            let txn_summary =
+                TransactionSummary::new(t.sender(), t.sequence_number(), t.committed_hash());
             let txn_info = TransactionInProgress::new(t.gas_unit_price());
             self.0.insert(txn_summary, txn_info);
         });

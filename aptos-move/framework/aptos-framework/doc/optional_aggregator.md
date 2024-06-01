@@ -29,6 +29,8 @@ aggregator (parallelizable) or via normal integers.
 -  [Function `read`](#0x1_optional_aggregator_read)
 -  [Function `is_parallelizable`](#0x1_optional_aggregator_is_parallelizable)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Struct `OptionalAggregator`](#@Specification_1_OptionalAggregator)
     -  [Function `new_integer`](#@Specification_1_new_integer)
     -  [Function `add_integer`](#@Specification_1_add_integer)
@@ -677,6 +679,49 @@ Returns true if optional aggregator uses parallelizable implementation.
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>When creating a new integer instance, it guarantees that the limit assigned is a value passed into the function as an argument, and the value field becomes zero.</td>
+<td>High</td>
+<td>The new_integer function sets the limit field to the argument passed in, and the value field is set to zero.</td>
+<td>Formally verified via <a href="#high-level-req-1">new_integer</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>For a given integer instance it should always be possible to: (1) return the limit value of the integer resource, (2) return the current value stored in that particular instance, and (3) destroy the integer instance.</td>
+<td>Low</td>
+<td>The following functions should not abort if the Integer instance exists: limit(), read_integer(), destroy_integer().</td>
+<td>Formally verified via: <a href="#high-level-req-2.1">read_integer</a>, <a href="#high-level-req-2.2">limit</a>, and <a href="#high-level-req-2.3">destroy_integer</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Every successful switch must end with the aggregator type changed from non-parallelizable to parallelizable or vice versa.</td>
+<td>High</td>
+<td>The switch function run, if successful, should always change the aggregator type.</td>
+<td>Formally verified via <a href="#high-level-req-3">switch_and_zero_out</a>.</td>
+</tr>
+
+</table>
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 </code></pre>
@@ -732,6 +777,7 @@ Returns true if optional aggregator uses parallelizable implementation.
 
 <pre><code><b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result.limit == limit;
+// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>ensures</b> result.value == 0;
 </code></pre>
 
@@ -785,7 +831,8 @@ Check for overflow.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-req-2.2" href="#high-level-req">high-level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -801,7 +848,8 @@ Check for overflow.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-req-2.1" href="#high-level-req">high-level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -817,7 +865,8 @@ Check for overflow.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-req-2.3" href="#high-level-req">high-level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -880,6 +929,7 @@ The AggregatorFactory is under the @aptos_framework when Option<Aggregator> does
 <b>aborts_if</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) && len(vec_ref) != 0;
 <b>aborts_if</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) && len(vec_ref) == 0;
 <b>aborts_if</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) && !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>&gt;(@aptos_framework);
+// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>ensures</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<b>old</b>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>)) ==&gt; !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);
 <b>ensures</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<b>old</b>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>)) ==&gt; <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);
 <b>ensures</b> <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) == 0;

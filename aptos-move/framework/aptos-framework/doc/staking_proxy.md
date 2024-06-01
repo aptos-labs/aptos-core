@@ -14,6 +14,8 @@
 -  [Function `set_staking_contract_voter`](#0x1_staking_proxy_set_staking_contract_voter)
 -  [Function `set_stake_pool_voter`](#0x1_staking_proxy_set_stake_pool_voter)
 -  [Specification](#@Specification_0)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `set_operator`](#@Specification_0_set_operator)
     -  [Function `set_voter`](#@Specification_0_set_voter)
     -  [Function `set_vesting_contract_operator`](#@Specification_0_set_vesting_contract_operator)
@@ -261,6 +263,66 @@
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>When updating the Vesting operator, it should be updated throughout all depending units.</td>
+<td>Medium</td>
+<td>The VestingContract contains a StakingInfo object that has an operator field, and this operator is mapped to a StakingContract object that in turn encompasses a StakePool object where the operator matches.</td>
+<td>Audited that it ensures the two operator fields hold the new value after the update.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>When updating the Vesting voter, it should be updated throughout all depending units.</td>
+<td>Medium</td>
+<td>The VestingContract contains a StakingInfo object that has an operator field, and this operator is mapped to a StakingContract object that in turn encompasses a StakePool object where the operator matches.</td>
+<td>Audited that it ensures the two operator fields hold the new value after the update.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>The operator and voter of a Vesting Contract should only be updated by the owner of the contract.</td>
+<td>High</td>
+<td>The owner-operator-voter model, as defined in the documentation, grants distinct abilities to each role. Therefore, it's crucial to ensure that only the owner has the authority to modify the operator or voter, to prevent the compromise of the StakePool.</td>
+<td>Audited that it ensures the signer owns the AdminStore resource and that the operator or voter intended for the update actually exists.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>The operator and voter of a Staking Contract should only be updated by the owner of the contract.</td>
+<td>High</td>
+<td>The owner-operator-voter model, as defined in the documentation, grants distinct abilities to each role. Therefore, it's crucial to ensure that only the owner has the authority to modify the operator or voter, to prevent the compromise of the StakePool.</td>
+<td>Audited the patterns of updating operators and voters in the staking contract.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>Staking Contract's operators should be unique inside a store.</td>
+<td>Medium</td>
+<td>Duplicates among operators could result in incorrectly updating the operator or voter associated with the incorrect StakingContract.</td>
+<td>Enforced via <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/staking_contract.move#L87">SimpleMap</a>.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 </code></pre>
@@ -334,7 +396,7 @@ Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf a
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>pragma</b> verify_duration_estimate = 120;
+<b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakingContractOperator">SetStakingContractOperator</a>;
 </code></pre>
 

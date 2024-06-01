@@ -6,7 +6,7 @@ use crate::common;
 use aptos_types::transaction::{
     ArgumentABI, EntryABI, EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
-use heck::{CamelCase, ShoutySnakeCase, SnakeCase};
+use heck::{ToShoutySnakeCase, ToSnakeCase, ToUpperCamelCase};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -41,6 +41,7 @@ pub fn output(out: &mut dyn Write, abis: &[EntryABI], local_types: bool) -> Resu
     writeln!(emitter.out, "#![allow(unused_imports)]")?;
     writeln!(emitter.out, "#![allow(clippy::too_many_arguments)]")?;
     writeln!(emitter.out, "#![allow(clippy::arc_with_non_send_sync)]")?;
+    writeln!(emitter.out, "#![allow(clippy::get_first)]")?;
 
     emitter.output_script_call_enum_with_imports(abis)?;
 
@@ -84,7 +85,7 @@ pub fn output(out: &mut dyn Write, abis: &[EntryABI], local_types: bool) -> Resu
 struct RustEmitter<T> {
     /// Writer.
     out: IndentedWriter<T>,
-    /// Whether we are targetting the Aptos repository itself (as opposed to generated Aptos types).
+    /// Whether we are targeting the Aptos repository itself (as opposed to generated Aptos types).
     local_types: bool,
 }
 
@@ -184,11 +185,11 @@ where
                             EntryABI::EntryFunction(sf) => {
                                 format!(
                                     "{}{}",
-                                    sf.module_name().name().to_string().to_camel_case(),
-                                    abi.name().to_camel_case()
+                                    sf.module_name().name().to_string().to_upper_camel_case(),
+                                    abi.name().to_upper_camel_case()
                                 )
                             },
-                            _ => abi.name().to_camel_case(),
+                            _ => abi.name().to_upper_camel_case(),
                         },
                     ],
                     common::prepare_doc_string(abi.doc()),
@@ -340,14 +341,14 @@ pub fn encode(self) -> TransactionPayload {{"#
             .join(", ");
 
         let prefix = if let EntryABI::EntryFunction(sf) = abi {
-            sf.module_name().name().to_string().to_camel_case()
+            sf.module_name().name().to_string().to_upper_camel_case()
         } else {
             String::new()
         };
         writeln!(
             self.out,
             "{5}{0}{{{2}}} => {3}{4}{1}({2}),",
-            abi.name().to_camel_case(),
+            abi.name().to_upper_camel_case(),
             abi.name(),
             params,
             prefix.to_snake_case(),
@@ -420,7 +421,7 @@ pub fn name(&self) -> &'static str {{"#
             writeln!(
                 self.out,
                 "{} {{ .. }} => \"{}\",",
-                abi.name().to_camel_case(),
+                abi.name().to_upper_camel_case(),
                 abi.name(),
             )?;
         }
@@ -574,8 +575,8 @@ TransactionPayload::EntryFunction(EntryFunction {{
         writeln!(
             self.out,
             "Some(EntryFunctionCall::{}{} {{",
-            abi.module_name().name().to_string().to_camel_case(),
-            abi.name().to_camel_case(),
+            abi.module_name().name().to_string().to_upper_camel_case(),
+            abi.name().to_upper_camel_case(),
         )?;
         self.out.indent();
         for (index, ty_arg) in abi.ty_args().iter().enumerate() {
@@ -627,7 +628,7 @@ TransactionPayload::EntryFunction(EntryFunction {{
         writeln!(
             self.out,
             "Some(ScriptCall::{} {{",
-            abi.name().to_camel_case(),
+            abi.name().to_upper_camel_case(),
         )?;
         self.out.indent();
         for (index, ty_arg) in abi.ty_args().iter().enumerate() {

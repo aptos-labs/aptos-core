@@ -26,7 +26,6 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_scratchpad::SparseMerkleTree;
-use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
 };
@@ -36,7 +35,7 @@ use aptos_types::{
         partitioner::{ExecutableBlock, ExecutableTransactions},
     },
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValue,
+    state_store::{state_value::StateValue, StateViewId},
 };
 use aptos_vm::AptosVM;
 use fail::fail_point;
@@ -253,10 +252,7 @@ where
                     .start_timer();
 
                 THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-                    chunk_output.into_state_checkpoint_output(
-                        parent_output.state(),
-                        onchain_config.has_any_block_gas_limit().then_some(block_id),
-                    )
+                    chunk_output.into_state_checkpoint_output(parent_output.state(), block_id)
                 })?
             };
 

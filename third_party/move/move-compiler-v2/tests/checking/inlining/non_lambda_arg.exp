@@ -1,25 +1,13 @@
-// ---- Model Dump
-module 0x42::sort {
-    use std::vector;
-    public fun incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool) {
-        {
-          let n: u64 = vector::length<T>(arr);
-          sort::incorrect_sort_recursive<T>(arr, 0, Sub<u64>(n, 1), a_less_b)
-        }
-    }
-    public fun incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool) {
-        if Lt<u64>(low, high) {
-          {
-            let pi: u64 = Add<u64>(low, Div<u64>(high, 2));
-            sort::incorrect_sort_recursive<T>(arr, low, Sub<u64>(pi, 1), a_less_b);
-            sort::incorrect_sort_recursive<T>(arr, Add<u64>(pi, 1), high, a_less_b);
-            Tuple()
-          }
-        } else {
-          Tuple()
-        };
-        Tuple()
-    }
-    spec fun $incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool);
-    spec fun $incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool);
-} // end 0x42::sort
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `sort::incorrect_sort` has a function parameter:
+  ┌─ tests/checking/inlining/non_lambda_arg.move:4:16
+  │
+4 │     public fun incorrect_sort<T: copy>(arr: &mut vector<T>, a_less_b: |T, T| bool) {
+  │                ^^^^^^^^^^^^^^                               -------- Parameter `a_less_b` has a function type.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `sort::incorrect_sort_recursive` has a function parameter:
+  ┌─ tests/checking/inlining/non_lambda_arg.move:9:16
+  │
+9 │     public fun incorrect_sort_recursive<T: copy>(arr: &mut vector<T>, low: u64, high: u64, a_less_b: |T, T| bool) {
+  │                ^^^^^^^^^^^^^^^^^^^^^^^^                                                    -------- Parameter `a_less_b` has a function type.

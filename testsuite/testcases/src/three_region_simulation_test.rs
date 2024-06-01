@@ -22,6 +22,8 @@ impl Test for ThreeRegionSameCloudSimulationTest {
 /// 2. Each region has minimal network delay amongst its nodes
 /// 3. Each region has a network delay to the other two regions, as estimated by https://www.cloudping.co/grid
 /// 4. Currently simulating a 50 percentile network delay between us-west <--> af-south <--> eu-north
+///
+/// This is deprecated and flawed. Use [crate::multi_region_network_test::MultiRegionNetworkEmulationTest] instead
 fn create_three_region_swarm_network_delay(swarm: &dyn Swarm) -> SwarmNetworkDelay {
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
@@ -85,18 +87,19 @@ impl NetworkLoadTest for ThreeRegionSameCloudSimulationTest {
         // inject network delay
         let delay = create_three_region_swarm_network_delay(ctx.swarm());
         let chaos = SwarmChaos::Delay(delay);
-        ctx.swarm().inject_chaos(chaos)?;
+        ctx.runtime.block_on(ctx.swarm.inject_chaos(chaos))?;
 
         // inject bandwidth limit
         let bandwidth = create_bandwidth_limit();
         let chaos = SwarmChaos::Bandwidth(bandwidth);
-        ctx.swarm().inject_chaos(chaos)?;
+        ctx.runtime.block_on(ctx.swarm.inject_chaos(chaos))?;
 
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
-    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-        swarm.remove_all_chaos()
+    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
+        ctx.runtime.block_on(ctx.swarm.remove_all_chaos())?;
+        Ok(())
     }
 }
 

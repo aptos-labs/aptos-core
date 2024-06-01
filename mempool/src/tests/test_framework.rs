@@ -171,7 +171,7 @@ impl MempoolNode {
             let block = self
                 .mempool
                 .lock()
-                .get_batch(100, 102400, true, false, btreemap![]);
+                .get_batch(100, 102400, true, btreemap![]);
 
             if block_contains_all_transactions(&block, txns) {
                 break;
@@ -224,7 +224,7 @@ impl MempoolNode {
         let block = self
             .mempool
             .lock()
-            .get_batch(100, 102400, true, false, btreemap![]);
+            .get_batch(100, 102400, true, btreemap![]);
         if !condition(&block, txns) {
             let actual: Vec<_> = block
                 .iter()
@@ -585,7 +585,7 @@ fn setup_mempool(
     let (ac_endpoint_sender, ac_endpoint_receiver) = mpsc_channel();
     let (quorum_store_sender, quorum_store_receiver) = mpsc_channel();
     let (mempool_notifier, mempool_listener) =
-        aptos_mempool_notifications::new_mempool_notifier_listener_pair();
+        aptos_mempool_notifications::new_mempool_notifier_listener_pair(100);
 
     let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
     let vm_validator = Arc::new(RwLock::new(MockVMValidator));

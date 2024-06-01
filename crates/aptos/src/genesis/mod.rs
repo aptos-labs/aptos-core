@@ -257,6 +257,9 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             consensus_config: OnChainConsensusConfig::default_for_genesis(),
             execution_config: OnChainExecutionConfig::default_for_genesis(),
             gas_schedule: default_gas_schedule(),
+            initial_features_override: None,
+            randomness_config_override: None,
+            jwk_consensus_config_override: None,
         },
     )?)
 }
@@ -297,6 +300,9 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             consensus_config: layout.on_chain_consensus_config,
             execution_config: layout.on_chain_execution_config,
             gas_schedule: default_gas_schedule(),
+            initial_features_override: None,
+            randomness_config_override: None,
+            jwk_consensus_config_override: layout.jwk_consensus_config_override.clone(),
         },
     )?)
 }
@@ -631,19 +637,19 @@ fn validate_validators(
 
         if !initialized_accounts.contains_key(&validator.owner_account_address.into()) {
             errors.push(CliError::UnexpectedError(format!(
-                "Owner {} in validator {} is is not in the balances.yaml file",
+                "Owner {} in validator {} is not in the balances.yaml file",
                 validator.owner_account_address, name
             )));
         }
         if !initialized_accounts.contains_key(&validator.operator_account_address.into()) {
             errors.push(CliError::UnexpectedError(format!(
-                "Operator {} in validator {} is is not in the balances.yaml file",
+                "Operator {} in validator {} is not in the balances.yaml file",
                 validator.operator_account_address, name
             )));
         }
         if !initialized_accounts.contains_key(&validator.voter_account_address.into()) {
             errors.push(CliError::UnexpectedError(format!(
-                "Voter {} in validator {} is is not in the balances.yaml file",
+                "Voter {} in validator {} is not in the balances.yaml file",
                 validator.voter_account_address, name
             )));
         }
@@ -899,25 +905,25 @@ fn validate_employee_accounts(
 
         if !initialized_accounts.contains_key(&pool.validator.validator.owner_address) {
             return Err(CliError::UnexpectedError(format!(
-                "Owner address {} in employee pool #{} is is not in the balances.yaml file",
+                "Owner address {} in employee pool #{} is not in the balances.yaml file",
                 pool.validator.validator.owner_address, i
             )));
         }
         if !initialized_accounts.contains_key(&pool.validator.validator.operator_address) {
             return Err(CliError::UnexpectedError(format!(
-                "Operator address {} in employee pool #{} is is not in the balances.yaml file",
+                "Operator address {} in employee pool #{} is not in the balances.yaml file",
                 pool.validator.validator.operator_address, i
             )));
         }
         if !initialized_accounts.contains_key(&pool.validator.validator.voter_address) {
             return Err(CliError::UnexpectedError(format!(
-                "Voter address {} in employee pool #{} is is not in the balances.yaml file",
+                "Voter address {} in employee pool #{} is not in the balances.yaml file",
                 pool.validator.validator.voter_address, i
             )));
         }
         if !initialized_accounts.contains_key(&pool.beneficiary_resetter) {
             return Err(CliError::UnexpectedError(format!(
-                "Beneficiary resetter {} in employee pool #{} is is not in the balances.yaml file",
+                "Beneficiary resetter {} in employee pool #{} is not in the balances.yaml file",
                 pool.beneficiary_resetter, i
             )));
         }

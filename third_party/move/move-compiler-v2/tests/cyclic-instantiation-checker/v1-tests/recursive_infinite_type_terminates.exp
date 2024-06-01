@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
+  ┌─ tests/cyclic-instantiation-checker/v1-tests/recursive_infinite_type_terminates.move:9:9
+  │
+9 │     fun f<T>(n: u64, x: T): T {
+  │         ^
+  │
+  = `f<T>` calls `f<M::Box<T>>` at tests/cyclic-instantiation-checker/v1-tests/recursive_infinite_type_terminates.move:11

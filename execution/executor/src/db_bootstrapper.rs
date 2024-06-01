@@ -9,26 +9,23 @@ use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutedChunk;
 use aptos_logger::prelude::*;
-use aptos_state_view::{StateViewId, TStateView};
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
     DbWriter, ExecutedTrees,
 };
 use aptos_types::{
-    access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
     aggregate_signature::AggregateSignature,
     block_executor::config::BlockExecutorConfigFromOnchain,
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ConfigurationResource,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, StateViewId, TStateView},
     timestamp::TimestampResource,
     transaction::{Transaction, Version},
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;
-use move_core_types::move_resource::MoveResource;
 use std::sync::Arc;
 
 pub fn generate_waypoint<V: VMExecutor>(
@@ -152,7 +149,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
     )?
-    .apply_to_ledger(&executed_trees, None, None)?;
+    .apply_to_ledger(&executed_trees, None)?;
     ensure!(
         !output.transactions_to_commit().is_empty(),
         "Genesis txn execution failed."
@@ -215,10 +212,9 @@ pub fn calculate_genesis<V: VMExecutor>(
 
 fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
-        .get_state_value_bytes(&StateKey::access_path(AccessPath::new(
-            CORE_CODE_ADDRESS,
-            TimestampResource::resource_path(),
-        )))?
+        .get_state_value_bytes(&StateKey::resource_typed::<TimestampResource>(
+            &CORE_CODE_ADDRESS,
+        )?)?
         .ok_or_else(|| format_err!("TimestampResource missing."))?;
     let rsrc = bcs::from_bytes::<TimestampResource>(rsrc_bytes)?;
     Ok(rsrc.timestamp.microseconds)
@@ -226,10 +222,7 @@ fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
 
 fn get_state_epoch(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
-        .get_state_value_bytes(&StateKey::access_path(AccessPath::new(
-            CORE_CODE_ADDRESS,
-            ConfigurationResource::resource_path(),
-        )))?
+        .get_state_value_bytes(&StateKey::on_chain_config::<ConfigurationResource>()?)?
         .ok_or_else(|| format_err!("ConfigurationResource missing."))?;
     let rsrc = bcs::from_bytes::<ConfigurationResource>(rsrc_bytes)?;
     Ok(rsrc.epoch())

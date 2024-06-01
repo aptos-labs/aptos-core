@@ -3,7 +3,7 @@
 Homebrew is a package manager that works for MacOS Silicon and Intel chips as well as Linux distributions like Debian
 and Ubuntu.
 
-The [Aptos command line interface (CLI)](https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli) may be installed
+The [Aptos command line interface (CLI)](https://aptos.dev/tools/aptos-cli/install-cli/) may be installed
 via [Homebrew](https://brew.sh/) for simplicity. This is an in-depth overview of Homebrew and the Aptos formula. In this
 guide, we go over each section of the Homebrew formula and steps to implement changes in the future.
 
@@ -47,7 +47,7 @@ aptos --help
 
 Note: This guide is for developers who are trying to update the Aptos homebrew formula.
 
-You can get the latest formula here: https://github.com/Homebrew/homebrew-core/blob/master/Formula/aptos.rb
+You can get the latest formula here: https://github.com/Homebrew/homebrew-core/blob/master/Formula/a/aptos.rb
 
 Copy the `aptos.rb` file to your `homebrew` `formula` directory. For example, on macOS with an M1, this will likely be:
 

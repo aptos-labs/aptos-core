@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: The function entry point to a `script` must have the return type `()`
+  ┌─ tests/checking/typing/main_return_type_not_unit.move:4:9
+  │
+4 │     fun main(): u64 {
+  │         ^^^^

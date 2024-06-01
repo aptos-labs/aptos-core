@@ -5,14 +5,9 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
 };
-use aptos_config::{
-    config::{AptosDataClientConfig, BaseConfig},
-    network_id::{NetworkId, PeerNetworkId},
-};
+use aptos_config::{config::AptosDataClientConfig, network_id::PeerNetworkId};
 use aptos_logger::{sample, sample::SampleRate, warn};
-use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::application::{metadata::PeerMetadata, storage::PeersAndMetadata};
-use itertools::Itertools;
 use maplit::hashset;
 use ordered_float::OrderedFloat;
 use rand::seq::{IteratorRandom, SliceRandom};
@@ -25,62 +20,14 @@ use std::{
 // Useful constants
 const ERROR_LOG_FREQ_SECS: u64 = 3;
 
-/// Returns true iff the given peer is high-priority.
-///
-/// TODO(joshlind): make this less hacky using network topological awareness.
-pub fn is_priority_peer(
-    base_config: Arc<BaseConfig>,
-    peers_and_metadata: Arc<PeersAndMetadata>,
-    peer: &PeerNetworkId,
-) -> bool {
-    // Validators should only prioritize other validators
-    let peer_network_id = peer.network_id();
-    if base_config.role.is_validator() {
-        return peer_network_id.is_validator_network();
-    }
-
-    // VFNs should only prioritize validators
-    if peers_and_metadata
-        .get_registered_networks()
-        .contains(&NetworkId::Vfn)
-    {
-        return peer_network_id.is_vfn_network();
-    }
-
-    // PFNs should only prioritize outbound connections (this targets seed peers and VFNs)
-    match peers_and_metadata.get_metadata_for_peer(*peer) {
-        Ok(peer_metadata) => {
-            if peer_metadata.get_connection_metadata().origin == ConnectionOrigin::Outbound {
-                return true;
-            }
-        },
-        Err(error) => {
-            warn!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::PriorityAndRegularPeers)
-                    .message(&format!(
-                        "Unable to locate metadata for peer! Error: {:?}",
-                        error
-                    ))
-                    .peer(peer))
-            );
-        },
-    }
-
-    false
-}
-
-/// Chooses a peer with the lowest distance from the validator set weighted by
-/// latency (from the given set of peers). We prioritize distance over latency
-/// as we want to avoid close but not up-to-date peers.
-///
-/// Peer selection is done by: (i) identifying all peers with the same lowest
-/// distance; and (ii) selecting a single peer weighted by latencies (i.e.,
-/// the lower the latency, the higher the probability of selection).
-pub fn choose_random_peer_by_distance_and_latency(
+/// Chooses peers weighted by distance from the validator set
+/// and latency. We prioritize distance over latency as we want
+/// to avoid close but not up-to-date peers.
+pub fn choose_random_peers_by_distance_and_latency(
     peers: HashSet<PeerNetworkId>,
     peers_and_metadata: Arc<PeersAndMetadata>,
-) -> Option<PeerNetworkId> {
+    num_peers_to_choose: usize,
+) -> HashSet<PeerNetworkId> {
     // Group peers and latency weights by validator distance, i.e., distance -> [(peer, latency weight)]
     let mut peers_and_latencies_by_distance = BTreeMap::new();
     for peer in peers {
@@ -95,15 +42,25 @@ pub fn choose_random_peer_by_distance_and_latency(
         }
     }
 
-    // Find the peers with the lowest distance and select a single peer.
-    // Note: BTreeMaps are sorted by key, so the first entry will be for the lowest distance.
-    if let Some((_, peers_and_latencies)) = peers_and_latencies_by_distance.into_iter().next() {
-        let random_peer_by_latency = choose_random_peers_by_weight(1, peers_and_latencies);
-        return random_peer_by_latency.into_iter().next(); // Return the randomly selected peer
+    // Select the peers by distance and latency weights. Note: BTreeMaps are
+    // sorted by key, so the entries will be sorted by distance in ascending order.
+    let mut selected_peers = HashSet::new();
+    for (_, peers_and_latencies) in peers_and_latencies_by_distance {
+        // Select the peers by latency weights
+        let num_peers_remaining = num_peers_to_choose.saturating_sub(selected_peers.len()) as u64;
+        let peers = choose_random_peers_by_weight(num_peers_remaining, peers_and_latencies);
+
+        // Add the peers to the entire set
+        selected_peers.extend(peers);
+
+        // If we have selected enough peers, return early
+        if selected_peers.len() >= num_peers_to_choose {
+            return selected_peers;
+        }
     }
 
-    // Otherwise, no peer was selected
-    None
+    // Return the selected peers
+    selected_peers
 }
 
 /// Selects the specified number of peers from the list of potential
@@ -140,12 +97,14 @@ pub fn choose_peers_by_latency(
     // number of peers, and there are enough potential peers for each request.
     let mut num_peers_to_consider = potential_peers_and_latency_weights.len() as u64;
     if ignore_high_latency_peers {
+        let latency_filtering_config = &data_client_config.latency_filtering_config;
         let peer_ratio_per_request = num_peers_to_consider / num_peers_to_choose;
-        if num_peers_to_consider >= data_client_config.min_peers_for_latency_filtering
-            && peer_ratio_per_request >= data_client_config.min_peer_ratio_for_latency_filtering
+        if num_peers_to_consider >= latency_filtering_config.min_peers_for_latency_filtering
+            && peer_ratio_per_request
+                >= latency_filtering_config.min_peer_ratio_for_latency_filtering
         {
             // Consider a subset of peers with the lowest latencies
-            num_peers_to_consider /= data_client_config.latency_filtering_reduction_factor
+            num_peers_to_consider /= latency_filtering_config.latency_filtering_reduction_factor
         }
     }
 
@@ -168,12 +127,12 @@ pub fn choose_random_peer(peers: HashSet<PeerNetworkId>) -> Option<PeerNetworkId
 
 /// Selects a set of peers randomly from the list of specified peers
 pub fn choose_random_peers(
-    num_peers_to_choose: u64,
+    num_peers_to_choose: usize,
     peers: HashSet<PeerNetworkId>,
 ) -> HashSet<PeerNetworkId> {
     let random_peers = peers
         .into_iter()
-        .choose_multiple(&mut rand::thread_rng(), num_peers_to_choose as usize);
+        .choose_multiple(&mut rand::thread_rng(), num_peers_to_choose);
     random_peers.into_iter().collect()
 }
 
@@ -221,6 +180,30 @@ fn convert_latency_to_weight(latency: f64) -> f64 {
 
     // Otherwise, invert the latency to get the weight
     1000.0 / latency
+}
+
+/// If the number of selected peers is less than the number of required peers,
+/// select remaining peers from the serviceable peers (at random).
+pub fn extend_with_random_peers(
+    mut selected_peers: HashSet<PeerNetworkId>,
+    serviceable_peers: HashSet<PeerNetworkId>,
+    num_required_peers: usize,
+) -> HashSet<PeerNetworkId> {
+    if selected_peers.len() < num_required_peers {
+        // Randomly select the remaining peers
+        let num_remaining_peers = num_required_peers.saturating_sub(selected_peers.len());
+        let remaining_serviceable_peers = serviceable_peers
+            .difference(&selected_peers)
+            .cloned()
+            .collect();
+        let remaining_peers = choose_random_peers(num_remaining_peers, remaining_serviceable_peers);
+
+        // Add the remaining peers to the selected peers
+        selected_peers.extend(remaining_peers);
+    }
+
+    // Return the selected peers
+    selected_peers
 }
 
 /// Gets the latency for the specified peer from the peer monitoring metadata
@@ -277,7 +260,7 @@ fn get_distance_and_latency_for_peer(
 
 /// Returns the metadata for the specified peer. If no metadata
 /// is found, an error is logged and None is returned.
-fn get_metadata_for_peer(
+pub fn get_metadata_for_peer(
     peers_and_metadata: &Arc<PeersAndMetadata>,
     peer: PeerNetworkId,
 ) -> Option<PeerMetadata> {
@@ -307,21 +290,11 @@ fn log_warning_with_sample(log: LogSchema) {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{
-        choose_random_peer, choose_random_peers, choose_random_peers_by_weight, is_priority_peer,
-    };
-    use aptos_config::{
-        config::{BaseConfig, PeerRole, RoleType},
-        network_id::{NetworkId, PeerNetworkId},
-    };
-    use aptos_netcore::transport::ConnectionOrigin;
-    use aptos_network::{application::storage::PeersAndMetadata, transport::ConnectionMetadata};
+    use crate::utils::{choose_random_peer, choose_random_peers, choose_random_peers_by_weight};
+    use aptos_config::network_id::{NetworkId, PeerNetworkId};
     use aptos_types::PeerId;
     use maplit::hashset;
-    use std::{
-        collections::{HashMap, HashSet},
-        sync::Arc,
-    };
+    use std::collections::{HashMap, HashSet};
 
     #[test]
     fn test_choose_random_peer() {
@@ -447,123 +420,6 @@ mod tests {
         let peer_count_3 = chosen_peers_and_counts.get(&peer_3).unwrap_or(&0);
         assert!(peer_count_1 > peer_count_2);
         assert!(peer_count_2 > peer_count_3);
-    }
-
-    #[test]
-    fn test_is_priority_peer_validator() {
-        // Create a base config for a validator node
-        let base_config = Arc::new(BaseConfig {
-            role: RoleType::Validator,
-            ..Default::default()
-        });
-
-        // Create a peers and metadata struct with all networks registered
-        let peers_and_metadata =
-            PeersAndMetadata::new(&[NetworkId::Validator, NetworkId::Vfn, NetworkId::Public]);
-
-        // Create a VFN peer and verify it is not prioritized
-        let vfn_peer = PeerNetworkId::new(NetworkId::Vfn, PeerId::random());
-        assert!(!is_priority_peer(
-            base_config.clone(),
-            peers_and_metadata.clone(),
-            &vfn_peer
-        ));
-
-        // Create a PFN peer and verify it is not prioritized
-        let pfn_peer = PeerNetworkId::new(NetworkId::Public, PeerId::random());
-        assert!(!is_priority_peer(
-            base_config.clone(),
-            peers_and_metadata.clone(),
-            &pfn_peer
-        ));
-
-        // Create a validator peer and verify it is prioritized
-        let validator_peer = PeerNetworkId::new(NetworkId::Validator, PeerId::random());
-        assert!(is_priority_peer(
-            base_config.clone(),
-            peers_and_metadata.clone(),
-            &validator_peer
-        ));
-    }
-
-    #[test]
-    fn test_is_priority_peer_vfn() {
-        // Create a base config for a VFN
-        let base_config = Arc::new(BaseConfig {
-            role: RoleType::FullNode,
-            ..Default::default()
-        });
-
-        // Create a peers and metadata struct with a VFN network
-        let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Vfn]);
-
-        // Create a PFN peer and verify it is not prioritized
-        let pfn_peer = PeerNetworkId::new(NetworkId::Public, PeerId::random());
-        assert!(!is_priority_peer(
-            base_config.clone(),
-            peers_and_metadata.clone(),
-            &pfn_peer
-        ));
-
-        // Create a validator peer and verify it is prioritized
-        let validator_peer = PeerNetworkId::new(NetworkId::Vfn, PeerId::random());
-        assert!(is_priority_peer(
-            base_config.clone(),
-            peers_and_metadata.clone(),
-            &validator_peer
-        ));
-    }
-
-    #[test]
-    fn test_is_priority_peer_pfn() {
-        // Create a base config for a PFN
-        let base_config = Arc::new(BaseConfig {
-            role: RoleType::FullNode,
-            ..Default::default()
-        });
-
-        // Create two PFN peers
-        let pfn_peer_1 = PeerNetworkId::new(NetworkId::Public, PeerId::random());
-        let pfn_peer_2 = PeerNetworkId::new(NetworkId::Public, PeerId::random());
-
-        // Create a peers and metadata struct with a PFN network
-        let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Public]);
-
-        // Insert the connection metadata for PFN 1 and
-        // mark it as having dialed us.
-        let connection_metadata = ConnectionMetadata::mock_with_role_and_origin(
-            pfn_peer_1.peer_id(),
-            PeerRole::Unknown,
-            ConnectionOrigin::Inbound,
-        );
-        peers_and_metadata
-            .insert_connection_metadata(pfn_peer_1, connection_metadata)
-            .unwrap();
-
-        // Insert the connection metadata for PFN 2 and
-        // mark it as having been dialed by us.
-        let connection_metadata = ConnectionMetadata::mock_with_role_and_origin(
-            pfn_peer_2.peer_id(),
-            PeerRole::Upstream,
-            ConnectionOrigin::Outbound,
-        );
-        peers_and_metadata
-            .insert_connection_metadata(pfn_peer_2, connection_metadata)
-            .unwrap();
-
-        // Verify that PFN 1 is not prioritized
-        assert!(!is_priority_peer(
-            base_config.clone(),
-            peers_and_metadata.clone(),
-            &pfn_peer_1
-        ));
-
-        // Verify that PFN 2 is prioritized
-        assert!(is_priority_peer(
-            base_config.clone(),
-            peers_and_metadata.clone(),
-            &pfn_peer_2
-        ));
     }
 
     /// Creates and returns a random peer network ID

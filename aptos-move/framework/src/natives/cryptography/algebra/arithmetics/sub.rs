@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
@@ -62,6 +63,41 @@ pub fn sub_internal(
             ark_bls12_381::Fq12,
             div,
             ALGEBRA_ARK_BLS12_381_FQ12_DIV
+        ),
+
+        Some(Structure::BN254Fr) => {
+            ark_binary_op_internal!(context, args, ark_bn254::Fr, sub, ALGEBRA_ARK_BN254_FR_SUB)
+        },
+        Some(Structure::BN254Fq) => {
+            ark_binary_op_internal!(context, args, ark_bn254::Fq, sub, ALGEBRA_ARK_BN254_FQ_SUB)
+        },
+        Some(Structure::BN254Fq12) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bn254::Fq12,
+            sub,
+            ALGEBRA_ARK_BN254_FQ12_SUB
+        ),
+        Some(Structure::BN254G1) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bn254::G1Projective,
+            sub,
+            ALGEBRA_ARK_BN254_G1_PROJ_SUB
+        ),
+        Some(Structure::BN254G2) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bn254::G2Projective,
+            sub,
+            ALGEBRA_ARK_BN254_G2_PROJ_SUB
+        ),
+        Some(Structure::BN254Gt) => ark_binary_op_internal!(
+            context,
+            args,
+            ark_bn254::Fq12,
+            div,
+            ALGEBRA_ARK_BN254_FQ12_DIV
         ),
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,

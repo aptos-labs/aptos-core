@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkPartition, Test};
+use aptos_forge::{NetworkContext, NetworkTest, SwarmChaos, SwarmNetworkPartition, Test};
 
+/// This is deprecated. Use [crate::multi_region_network_test::MultiRegionNetworkEmulationTest] instead
 pub struct NetworkPartitionTest;
 
 // Partition
@@ -17,10 +18,13 @@ impl Test for NetworkPartitionTest {
 
 impl NetworkLoadTest for NetworkPartitionTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
-        ctx.swarm()
-            .inject_chaos(SwarmChaos::Partition(SwarmNetworkPartition {
-                partition_percentage: PARTITION_PERCENTAGE,
-            }))?;
+        ctx.runtime
+            .block_on(
+                ctx.swarm
+                    .inject_chaos(SwarmChaos::Partition(SwarmNetworkPartition {
+                        partition_percentage: PARTITION_PERCENTAGE,
+                    })),
+            )?;
 
         let msg = format!(
             "Partitioned {}% validators in namespace",
@@ -30,17 +34,22 @@ impl NetworkLoadTest for NetworkPartitionTest {
         ctx.report.report_text(msg);
         // Just send the load to last validator which is not included in the partition
         Ok(LoadDestination::Peers(vec![ctx
-            .swarm()
+            .swarm
             .validators()
             .last()
             .map(|v| v.peer_id())
             .unwrap()]))
     }
 
-    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-        swarm.remove_chaos(SwarmChaos::Partition(SwarmNetworkPartition {
-            partition_percentage: PARTITION_PERCENTAGE,
-        }))
+    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
+        ctx.runtime
+            .block_on(
+                ctx.swarm
+                    .remove_chaos(SwarmChaos::Partition(SwarmNetworkPartition {
+                        partition_percentage: PARTITION_PERCENTAGE,
+                    })),
+            )?;
+        Ok(())
     }
 }
 

@@ -187,7 +187,6 @@ async fn test_gas_estimation_txns_limit() {
             conf.consensus.quorum_store_poll_time_ms = 200;
             conf.consensus.wait_for_full_blocks_above_pending_blocks = 0;
             conf.consensus.max_sending_block_txns = max_block_txns;
-            conf.consensus.max_sending_block_txns_quorum_store_override = max_block_txns;
             conf.consensus.quorum_store.sender_max_batch_txns = conf
                 .consensus
                 .quorum_store
@@ -226,7 +225,6 @@ async fn test_gas_estimation_gas_used_limit() {
             conf.consensus.quorum_store_poll_time_ms = 200;
             conf.consensus.wait_for_full_blocks_above_pending_blocks = 0;
             conf.consensus.max_sending_block_txns = max_block_txns;
-            conf.consensus.max_sending_block_txns_quorum_store_override = max_block_txns;
             conf.consensus.quorum_store.sender_max_batch_txns = conf
                 .consensus
                 .quorum_store
@@ -363,7 +361,7 @@ async fn test_bcs() {
             aptos_crypto::HashValue::from(expected_transaction.transaction_info().unwrap().hash);
 
         let bcs_hash = if let Transaction::UserTransaction(ref txn) = bcs_txn.transaction {
-            txn.clone().committed_hash()
+            txn.committed_hash()
         } else {
             panic!("BCS transaction is not a user transaction! {:?}", bcs_txn);
         };

@@ -4,32 +4,37 @@
 #![allow(dead_code)]
 
 use crate::{
-    db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     ledger_db::{LedgerDb, LedgerDbSchemaBatches},
     schema::{
-        epoch_by_version::EpochByVersionSchema, jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-        ledger_info::LedgerInfoSchema, stale_node_index::StaleNodeIndexSchema,
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        epoch_by_version::EpochByVersionSchema,
+        jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+        ledger_info::LedgerInfoSchema,
+        stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
-        stale_state_value_index::StaleStateValueIndexSchema, state_value::StateValueSchema,
-        transaction::TransactionSchema, transaction_accumulator::TransactionAccumulatorSchema,
-        transaction_info::TransactionInfoSchema, version_data::VersionDataSchema,
+        stale_state_value_index::StaleStateValueIndexSchema,
+        state_value::StateValueSchema,
+        transaction::TransactionSchema,
+        transaction_accumulator::TransactionAccumulatorSchema,
+        transaction_info::TransactionInfoSchema,
+        version_data::VersionDataSchema,
         write_set::WriteSetSchema,
     },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_store::MAX_COMMIT_PROGRESS_DIFFERENCE,
+    transaction_store::TransactionStore,
     utils::get_progress,
-    EventStore, TransactionStore, NUM_STATE_SHARDS,
 };
-use anyhow::Result;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{
     schema::{Schema, SeekKeyCodec},
     ReadOptions, SchemaBatch, DB,
 };
+use aptos_storage_interface::Result;
 use aptos_types::{proof::position::Position, transaction::Version};
-use claims::{assert_ge, assert_lt};
+use claims::assert_ge;
 use rayon::prelude::*;
 use status_line::StatusLine;
 use std::{
@@ -39,14 +44,6 @@ use std::{
         Arc,
     },
 };
-
-pub(crate) fn get_overall_commit_progress(ledger_metadata_db: &DB) -> Result<Option<Version>> {
-    get_progress(ledger_metadata_db, &DbMetadataKey::OverallCommitProgress)
-}
-
-pub(crate) fn get_ledger_commit_progress(ledger_metadata_db: &DB) -> Result<Option<Version>> {
-    get_progress(ledger_metadata_db, &DbMetadataKey::LedgerCommitProgress)
-}
 
 pub(crate) fn get_state_kv_commit_progress(state_kv_db: &StateKvDb) -> Result<Option<Version>> {
     get_progress(
@@ -65,11 +62,10 @@ pub(crate) fn get_state_merkle_commit_progress(
 }
 
 pub(crate) fn truncate_ledger_db(ledger_db: Arc<LedgerDb>, target_version: Version) -> Result<()> {
-    let event_store = EventStore::new(ledger_db.event_db_arc());
     let transaction_store = TransactionStore::new(Arc::clone(&ledger_db));
 
     let start_version = target_version + 1;
-    truncate_ledger_db_single_batch(&ledger_db, &event_store, &transaction_store, start_version)?;
+    truncate_ledger_db_single_batch(&ledger_db, &transaction_store, start_version)?;
     Ok(())
 }
 
@@ -79,20 +75,32 @@ pub(crate) fn truncate_state_kv_db(
     target_version: Version,
     batch_size: usize,
 ) -> Result<()> {
-    let status = StatusLine::new(Progress::new(target_version));
+    assert!(batch_size > 0);
+    let status = StatusLine::new(Progress::new("Truncating State KV DB", target_version));
+    status.set_current_version(current_version);
 
     let mut current_version = current_version;
-    while current_version > target_version {
-        let target_version_for_this_batch =
-            std::cmp::max(current_version - batch_size as u64, target_version);
+    // current_version can be the same with target_version while there is data written to the db before
+    // the progress is recorded -- we need to run the truncate for at least one batch
+    loop {
+        let target_version_for_this_batch = std::cmp::max(
+            current_version.saturating_sub(batch_size as Version),
+            target_version,
+        );
+        // By writing the progress first, we still maintain that it is less than or equal to the
+        // actual progress per shard, even if it dies in the middle of truncation.
         state_kv_db.write_progress(target_version_for_this_batch)?;
-        truncate_state_kv_db_shards(
-            state_kv_db,
-            target_version_for_this_batch,
-            Some(current_version),
-        )?;
+        // the first batch can actually delete more versions than the target batch size because
+        // we calculate the start version of this batch assuming the latest data is at
+        // `current_version`. Otherwise, we need to seek all shards to determine the
+        // actual latest version of data.
+        truncate_state_kv_db_shards(state_kv_db, target_version_for_this_batch)?;
         current_version = target_version_for_this_batch;
         status.set_current_version(current_version);
+
+        if current_version <= target_version {
+            break;
+        }
     }
     assert_eq!(current_version, target_version);
     Ok(())
@@ -101,17 +109,11 @@ pub(crate) fn truncate_state_kv_db(
 pub(crate) fn truncate_state_kv_db_shards(
     state_kv_db: &StateKvDb,
     target_version: Version,
-    expected_current_version: Option<Version>,
 ) -> Result<()> {
-    (0..NUM_STATE_SHARDS)
+    (0..state_kv_db.hack_num_real_shards())
         .into_par_iter()
         .try_for_each(|shard_id| {
-            truncate_state_kv_db_single_shard(
-                state_kv_db,
-                shard_id as u8,
-                target_version,
-                expected_current_version,
-            )
+            truncate_state_kv_db_single_shard(state_kv_db, shard_id as u8, target_version)
         })
 }
 
@@ -119,15 +121,9 @@ pub(crate) fn truncate_state_kv_db_single_shard(
     state_kv_db: &StateKvDb,
     shard_id: u8,
     target_version: Version,
-    expected_current_version: Option<Version>,
 ) -> Result<()> {
     let batch = SchemaBatch::new();
-    delete_state_value_and_index(
-        state_kv_db.db_shard(shard_id),
-        target_version + 1,
-        expected_current_version,
-        &batch,
-    )?;
+    delete_state_value_and_index(state_kv_db.db_shard(shard_id), target_version + 1, &batch)?;
     state_kv_db.commit_single_shard(target_version, shard_id, batch)
 }
 
@@ -135,7 +131,8 @@ pub(crate) fn truncate_state_merkle_db(
     state_merkle_db: &StateMerkleDb,
     target_version: Version,
 ) -> Result<()> {
-    let status = StatusLine::new(Progress::new(target_version));
+    let status = StatusLine::new(Progress::new("Truncating State Merkle DB.", target_version));
+
     loop {
         let current_version = get_current_version_in_state_merkle_db(state_merkle_db)?
             .expect("Current version of state merkle db must exist.");
@@ -169,7 +166,7 @@ pub(crate) fn truncate_state_merkle_db_shards(
     state_merkle_db: &StateMerkleDb,
     target_version: Version,
 ) -> Result<()> {
-    (0..NUM_STATE_SHARDS)
+    (0..state_merkle_db.hack_num_real_shards())
         .into_par_iter()
         .try_for_each(|shard_id| {
             truncate_state_merkle_db_single_shard(state_merkle_db, shard_id as u8, target_version)
@@ -240,28 +237,28 @@ fn truncate_transaction_accumulator(
 
 fn truncate_ledger_db_single_batch(
     ledger_db: &LedgerDb,
-    event_store: &EventStore,
     transaction_store: &TransactionStore,
     start_version: Version,
 ) -> Result<()> {
     let batch = LedgerDbSchemaBatches::new();
 
     delete_transaction_index_data(
+        ledger_db,
         transaction_store,
         start_version,
         &batch.transaction_db_batches,
     )?;
     delete_per_epoch_data(
-        ledger_db.metadata_db(),
+        &ledger_db.metadata_db_arc(),
         start_version,
         &batch.ledger_metadata_db_batches,
     )?;
     delete_per_version_data(ledger_db, start_version, &batch)?;
 
-    delete_event_data(event_store, start_version, &batch.event_db_batches)?;
+    delete_event_data(ledger_db, start_version, &batch.event_db_batches)?;
 
     truncate_transaction_accumulator(
-        ledger_db.transaction_accumulator_db(),
+        ledger_db.transaction_accumulator_db_raw(),
         start_version,
         &batch.transaction_accumulator_db_batches,
     )?;
@@ -277,11 +274,13 @@ fn truncate_ledger_db_single_batch(
 }
 
 fn delete_transaction_index_data(
+    ledger_db: &LedgerDb,
     transaction_store: &TransactionStore,
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let transactions = transaction_store
+    let transactions = ledger_db
+        .transaction_db()
         .get_transaction_iter(start_version, MAX_COMMIT_PROGRESS_DIFFERENCE as usize * 2)?
         .collect::<Result<Vec<_>>>()?;
     let num_txns = transactions.len();
@@ -292,7 +291,9 @@ fn delete_transaction_index_data(
             "Truncate transaction index data."
         );
         transaction_store.prune_transaction_by_account(&transactions, batch)?;
-        transaction_store.prune_transaction_by_hash(&transactions, batch)?;
+        ledger_db
+            .transaction_db()
+            .prune_transaction_by_hash_indices(&transactions, batch)?;
     }
 
     Ok(())
@@ -340,22 +341,22 @@ fn delete_per_version_data(
     batch: &LedgerDbSchemaBatches,
 ) -> Result<()> {
     delete_per_version_data_impl::<TransactionInfoSchema>(
-        ledger_db.transaction_info_db(),
+        ledger_db.transaction_info_db_raw(),
         start_version,
         &batch.transaction_info_db_batches,
     )?;
     delete_per_version_data_impl::<TransactionSchema>(
-        ledger_db.transaction_db(),
+        ledger_db.transaction_db_raw(),
         start_version,
         &batch.transaction_db_batches,
     )?;
     delete_per_version_data_impl::<VersionDataSchema>(
-        ledger_db.metadata_db(),
+        &ledger_db.metadata_db_arc(),
         start_version,
         &batch.ledger_metadata_db_batches,
     )?;
     delete_per_version_data_impl::<WriteSetSchema>(
-        ledger_db.write_set_db(),
+        ledger_db.write_set_db_raw(),
         start_version,
         &batch.write_set_db_batches,
     )?;
@@ -390,18 +391,20 @@ where
 }
 
 fn delete_event_data(
-    event_store: &EventStore,
+    ledger_db: &LedgerDb,
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    if let Some(latest_version) = event_store.latest_version()? {
+    if let Some(latest_version) = ledger_db.event_db().latest_version()? {
         if latest_version >= start_version {
             info!(
                 start_version = start_version,
                 latest_version = latest_version,
                 "Truncate event data."
             );
-            event_store.prune_events(start_version, latest_version + 1, batch)?;
+            ledger_db
+                .event_db()
+                .prune_events(start_version, latest_version + 1, batch)?;
         }
     }
     Ok(())
@@ -410,7 +413,6 @@ fn delete_event_data(
 fn delete_state_value_and_index(
     state_kv_db_shard: &DB,
     start_version: Version,
-    expected_current_version: Option<Version>,
     batch: &SchemaBatch,
 ) -> Result<()> {
     let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
@@ -418,9 +420,6 @@ fn delete_state_value_and_index(
 
     for item in iter {
         let (index, _) = item?;
-        if let Some(expected_current_version) = expected_current_version {
-            assert_lt!(index.stale_since_version, expected_current_version);
-        }
         batch.delete::<StaleStateValueIndexSchema>(&index)?;
         batch.delete::<StateValueSchema>(&(index.state_key, index.stale_since_version))?;
     }
@@ -469,13 +468,15 @@ fn delete_nodes_and_stale_indices_at_or_after_version(
 }
 
 struct Progress {
+    message: &'static str,
     current_version: AtomicU64,
     target_version: Version,
 }
 
 impl Progress {
-    pub fn new(target_version: Version) -> Self {
+    pub fn new(message: &'static str, target_version: Version) -> Self {
         Self {
+            message,
             current_version: 0.into(),
             target_version,
         }
@@ -491,7 +492,8 @@ impl Display for Progress {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "current: {}, target: {}",
+            "{}: current: {}, target: {}",
+            self.message,
             self.current_version.load(Ordering::Relaxed),
             self.target_version
         )

@@ -5,8 +5,9 @@
 use crate::protocols::wire::handshake::v1::ProtocolId;
 use aptos_config::network_id::NetworkContext;
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
-    Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    exponential_buckets, register_histogram_vec, register_int_counter_vec, register_int_gauge,
+    register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_short_hex_str::AsShortHexStr;
@@ -20,6 +21,7 @@ pub const RESPONSE_LABEL: &str = "response";
 // some state labels
 pub const CANCELED_LABEL: &str = "canceled";
 pub const DECLINED_LABEL: &str = "declined";
+pub const EXPIRED_LABEL: &str = "expired";
 pub const RECEIVED_LABEL: &str = "received";
 pub const SENT_LABEL: &str = "sent";
 pub const SUCCEEDED_LABEL: &str = "succeeded";
@@ -28,6 +30,10 @@ pub const FAILED_LABEL: &str = "failed";
 // Direction labels
 pub const INBOUND_LABEL: &str = "inbound";
 pub const OUTBOUND_LABEL: &str = "outbound";
+
+// Peer ping labels
+const CONNECTED_LABEL: &str = "connected";
+const PRE_DIAL_LABEL: &str = "pre_dial";
 
 // Serialization labels
 pub const SERIALIZATION_LABEL: &str = "serialization";
@@ -583,7 +589,8 @@ pub static NETWORK_APPLICATION_SERIALIZATION_METRIC: Lazy<HistogramVec> = Lazy::
     register_histogram_vec!(
         "aptos_network_serialization_metric",
         "Time it takes to perform message serialization and deserialization",
-        &["protocol_id", "operation"]
+        &["protocol_id", "operation"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()
 });
@@ -593,4 +600,31 @@ pub fn start_serialization_timer(protocol_id: ProtocolId, operation: &str) -> Hi
     NETWORK_APPLICATION_SERIALIZATION_METRIC
         .with_label_values(&[protocol_id.as_str(), operation])
         .start_timer()
+}
+
+/// Counters related to peer ping times (before and after dialing)
+pub static NETWORK_PEER_PING_TIMES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_peer_ping_times",
+        "Counters related to peer ping times (before and after dialing)",
+        &["network_id", "label"],
+    )
+    .unwrap()
+});
+
+/// Observes the ping time for a connected peer
+pub fn observe_connected_ping_time(network_context: &NetworkContext, ping_latency_secs: f64) {
+    observe_ping_time(network_context, ping_latency_secs, CONNECTED_LABEL);
+}
+
+/// Observes the ping time for a peer before dialing
+pub fn observe_pre_dial_ping_time(network_context: &NetworkContext, ping_latency_secs: f64) {
+    observe_ping_time(network_context, ping_latency_secs, PRE_DIAL_LABEL);
+}
+
+/// Observes the ping time for the given label
+fn observe_ping_time(network_context: &NetworkContext, ping_latency_secs: f64, label: &str) {
+    NETWORK_PEER_PING_TIMES
+        .with_label_values(&[network_context.network_id().as_str(), label])
+        .observe(ping_latency_secs);
 }

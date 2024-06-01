@@ -1,0 +1,16 @@
+[package]
+name = "move-examples"
+version = "0.1.1"
+edition = "2021"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Move examples"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+
+[dev-dependencies]
+move-cli = { path = "../tools/move-cli" }
+move-stdlib = { path = "../move-stdlib" }
+
+[features]

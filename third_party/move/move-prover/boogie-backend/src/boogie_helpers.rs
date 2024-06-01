@@ -31,9 +31,9 @@ pub const TABLE_NATIVE_SPEC_ERROR: &str =
 pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
     let mod_name = env.get_name();
     let mod_sym = env.symbol_pool().string(mod_name.name());
-    if mod_sym.as_str() == SCRIPT_MODULE_NAME {
+    if mod_sym.as_str().starts_with(SCRIPT_MODULE_NAME) {
         // <SELF> is not accepted by boogie as a symbol
-        "#SELF#".to_string()
+        mod_sym.to_string().replace(['<', '>'], "#")
     } else if let Address::Numerical(a) = mod_name.addr() {
         // qualify module by address.
         format!("{}_{}", a.short_str_lossless(), mod_sym)
@@ -573,6 +573,7 @@ pub fn boogie_value(env: &GlobalEnv, _options: &BoogieOptions, val: &Value) -> S
                 .map(|v| boogie_value(env, _options, v))
                 .collect_vec(),
         ),
+        Value::Tuple(vec) => format!("<<unsupported Tuple({:?})>>", vec),
     }
 }
 

@@ -781,7 +781,7 @@ impl<'env> BoogieWrapper<'env> {
                         kind: BoogieErrorKind::Inconclusive,
                         loc,
                         message: if msg.contains("out of resource") || msg.contains("timed out") {
-                            let timeout = self.options.adjust_timeout(self.options.vc_timeout);
+                            let timeout = self.options.vc_timeout;
                             format!(
                                 "verification out of resources/timeout (global timeout set to {}s)",
                                 timeout
@@ -867,7 +867,7 @@ fn create_domain_map(
     let mut default_domain = None;
 
     let mut insert_map = |elems: &Vec<ModelValue>, val: &ModelValue| -> Option<()> {
-        map.entry(elems[0].clone()).or_insert_with(BTreeMap::new);
+        map.entry(elems[0].clone()).or_default();
         map.get_mut(&elems[0])
             .unwrap()
             .insert(elems[1].extract_number()?, extract_bool(val)?);

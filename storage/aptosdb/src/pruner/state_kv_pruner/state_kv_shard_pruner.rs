@@ -9,9 +9,9 @@ use crate::{
         state_value::StateValueSchema,
     },
 };
-use anyhow::Result;
 use aptos_logger::info;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
 

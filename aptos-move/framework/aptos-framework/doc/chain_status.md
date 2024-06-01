@@ -17,6 +17,8 @@ which reflect that the system has been successfully initialized.
 -  [Function `assert_operating`](#0x1_chain_status_assert_operating)
 -  [Function `assert_genesis`](#0x1_chain_status_assert_genesis)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `set_genesis_end`](#@Specification_1_set_genesis_end)
     -  [Function `assert_operating`](#@Specification_1_assert_operating)
     -  [Function `assert_genesis`](#@Specification_1_assert_genesis)
@@ -217,8 +219,54 @@ Helper function to assert genesis state.
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>The end of genesis mark should persist throughout the entire life of the chain.</td>
+<td>Medium</td>
+<td>The Aptos framework account should never drop the GenesisEndMarker resource.</td>
+<td>Audited that GenesisEndMarker is published at the end of genesis and never removed. Formally verified via <a href="#high-level-req-1">set_genesis_end</a> that GenesisEndMarker is published.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The status of the chain should never be genesis and operating at the same time.</td>
+<td>Low</td>
+<td>The status of the chain is determined by the GenesisEndMarker resource.</td>
+<td>Formally verified via <a href="#high-level-req-2">global invariant</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>The status of the chain should only be changed once, from genesis to operating.</td>
+<td>Low</td>
+<td>Attempting to assign a resource type more than once will abort.</td>
+<td>Formally verified via <a href="#high-level-req-3">set_genesis_end</a>.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
+// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<b>invariant</b> <a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>() == !<a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>();
 </code></pre>
 
 
@@ -234,10 +282,13 @@ Helper function to assert genesis state.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> delegate_invariants_to_caller;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> addr != @aptos_framework;
+// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>aborts_if</b> <b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a>&gt;(@aptos_framework);
+// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>ensures</b> <b>global</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a>&gt;(@aptos_framework) == <a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a> {};
 </code></pre>
 

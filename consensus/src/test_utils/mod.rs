@@ -6,34 +6,48 @@ use crate::block_storage::{BlockReader, BlockStore};
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::{Author, Round},
-    executed_block::ExecutedBlock,
+    pipelined_block::PipelinedBlock,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{HashValue, PrivateKey, Uniform};
 use aptos_logger::Level;
 use aptos_types::{ledger_info::LedgerInfo, validator_signer::ValidatorSigner};
 use std::{future::Future, sync::Arc, time::Duration};
 use tokio::{runtime, time::timeout};
 
+#[cfg(test)]
+pub mod mock_execution_client;
 #[cfg(any(test, feature = "fuzzing"))]
 mod mock_payload_manager;
 pub mod mock_quorum_store_sender;
 mod mock_state_computer;
 mod mock_storage;
 
-use crate::{payload_manager::PayloadManager, util::mock_time_service::SimulatedTimeService};
-use aptos_consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
-use aptos_types::block_info::BlockInfo;
-pub use mock_payload_manager::MockPayloadManager;
-pub use mock_state_computer::{
-    EmptyStateComputer, MockStateComputer, RandomComputeResultStateComputer,
+use crate::{
+    block_storage::pending_blocks::PendingBlocks, payload_manager::PayloadManager,
+    pipeline::execution_client::DummyExecutionClient,
+    util::mock_time_service::SimulatedTimeService,
 };
-pub use mock_storage::{EmptyStorage, MockSharedStorage, MockStorage};
+use aptos_consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
+use aptos_infallible::Mutex;
+use aptos_types::{
+    block_info::BlockInfo,
+    chain_id::ChainId,
+    transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+};
+pub use mock_payload_manager::MockPayloadManager;
+#[cfg(test)]
+pub use mock_state_computer::EmptyStateComputer;
+#[cfg(test)]
+pub use mock_state_computer::RandomComputeResultStateComputer;
+pub use mock_storage::{EmptyStorage, MockStorage};
+use move_core_types::account_address::AccountAddress;
 
 pub const TEST_TIMEOUT: Duration = Duration::from_secs(60);
 
-pub async fn build_simple_tree() -> (Vec<Arc<ExecutedBlock>>, Arc<BlockStore>) {
+pub async fn build_simple_tree() -> (Vec<Arc<PipelinedBlock>>, Arc<BlockStore>) {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
     let genesis = block_store.ordered_root();
@@ -72,11 +86,13 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
     Arc::new(BlockStore::new(
         storage,
         initial_data,
-        Arc::new(EmptyStateComputer),
+        Arc::new(DummyExecutionClient),
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
         Arc::from(PayloadManager::DirectMempool),
+        false,
+        Arc::new(Mutex::new(PendingBlocks::new())),
     ))
 }
 
@@ -118,10 +134,10 @@ impl TreeInserter {
     /// `insert_block_with_qc`.
     pub async fn insert_block(
         &mut self,
-        parent: &ExecutedBlock,
+        parent: &PipelinedBlock,
         round: Round,
         committed_block: Option<BlockInfo>,
-    ) -> Arc<ExecutedBlock> {
+    ) -> Arc<PipelinedBlock> {
         // Node must carry a QC to its parent
         let parent_qc = self.create_qc_for_block(parent, committed_block);
         self.insert_block_with_qc(parent_qc, parent, round).await
@@ -130,15 +146,15 @@ impl TreeInserter {
     pub async fn insert_block_with_qc(
         &mut self,
         parent_qc: QuorumCert,
-        parent: &ExecutedBlock,
+        parent: &PipelinedBlock,
         round: Round,
-    ) -> Arc<ExecutedBlock> {
+    ) -> Arc<PipelinedBlock> {
         self.block_store
             .insert_block_with_qc(self.create_block_with_qc(
                 parent_qc,
                 parent.timestamp_usecs() + 1,
                 round,
-                Payload::empty(false),
+                Payload::empty(false, true),
                 vec![],
             ))
             .await
@@ -147,7 +163,7 @@ impl TreeInserter {
 
     pub fn create_qc_for_block(
         &self,
-        block: &ExecutedBlock,
+        block: &PipelinedBlock,
         committed_block: Option<BlockInfo>,
     ) -> QuorumCert {
         gen_test_certificate(
@@ -158,7 +174,7 @@ impl TreeInserter {
         )
     }
 
-    pub fn insert_qc_for_block(&self, block: &ExecutedBlock, committed_block: Option<BlockInfo>) {
+    pub fn insert_qc_for_block(&self, block: &PipelinedBlock, committed_block: Option<BlockInfo>) {
         self.block_store
             .insert_single_quorum_cert(self.create_qc_for_block(block, committed_block))
             .unwrap()
@@ -189,7 +205,11 @@ pub fn placeholder_ledger_info() -> LedgerInfo {
 }
 
 pub fn placeholder_sync_info() -> SyncInfo {
-    SyncInfo::new(certificate_for_genesis(), certificate_for_genesis(), None)
+    SyncInfo::new(
+        certificate_for_genesis(),
+        certificate_for_genesis().into_wrapped_ledger_info(),
+        None,
+    )
 }
 
 fn nocapture() -> bool {
@@ -211,4 +231,39 @@ where
     runtime
         .block_on(async { timeout(TEST_TIMEOUT, f).await })
         .expect("test timed out")
+}
+
+// Creates a single test transaction for a random account
+pub(crate) fn create_signed_transaction(gas_unit_price: u64) -> SignedTransaction {
+    let private_key = Ed25519PrivateKey::generate_for_testing();
+    let public_key = private_key.public_key();
+
+    let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
+    let raw_transaction = RawTransaction::new(
+        AccountAddress::random(),
+        0,
+        transaction_payload,
+        0,
+        gas_unit_price,
+        0,
+        ChainId::new(10),
+    );
+    SignedTransaction::new(
+        raw_transaction,
+        public_key,
+        Ed25519Signature::dummy_signature(),
+    )
+}
+
+pub(crate) fn create_vec_signed_transactions(size: u64) -> Vec<SignedTransaction> {
+    (0..size).map(|_| create_signed_transaction(1)).collect()
+}
+
+pub(crate) fn create_vec_signed_transactions_with_gas(
+    size: u64,
+    gas_unit_price: u64,
+) -> Vec<SignedTransaction> {
+    (0..size)
+        .map(|_| create_signed_transaction(gas_unit_price))
+        .collect()
 }

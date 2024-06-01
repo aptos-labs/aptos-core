@@ -20,7 +20,7 @@ permissions:
 # cancel redundant builds
 concurrency:
   # cancel redundant builds on PRs (only on PR, not on branches)
-  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request_target' && github.ref) || github.sha }}
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request_target' && github.event.pull_request.head.sha) || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -29,7 +29,6 @@ jobs:
   # triggered the workflow or on 'pull_request's which have set auto_merge=true
   # or have the label "CICD:run-e2e-tests".
   permission-check:
-    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow
@@ -73,6 +72,6 @@ jobs:
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           BRANCH: main
-          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
       - run: echo "Skipping the tests on the main branch! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'

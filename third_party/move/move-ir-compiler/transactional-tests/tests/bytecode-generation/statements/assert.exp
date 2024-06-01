@@ -5,7 +5,7 @@ task 0 'print-bytecode'. lines 1-8:
 script {
 
 
-main() {
+main() /* def_idx: 0 */ {
 L0:	loc0: u64
 B0:
 	0: LdU64(3)

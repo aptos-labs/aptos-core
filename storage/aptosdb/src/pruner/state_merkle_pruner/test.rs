@@ -2,13 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    new_sharded_kv_schema_batch,
-    stale_node_index::StaleNodeIndexSchema,
-    stale_state_value_index::StaleStateValueIndexSchema,
+    common::NUM_STATE_SHARDS,
+    db::{
+        test_helper::{arb_state_kv_sets, update_store},
+        AptosDB,
+    },
+    pruner::{PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
+    schema::{
+        stale_node_index::StaleNodeIndexSchema, stale_state_value_index::StaleStateValueIndexSchema,
+    },
     state_merkle_db::StateMerkleDb,
     state_store::StateStore,
-    test_helper::{arb_state_kv_sets, update_store},
-    AptosDB, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager, NUM_STATE_SHARDS,
+    utils::new_sharded_kv_schema_batch,
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::HashValue;
@@ -106,7 +111,7 @@ fn create_state_merkle_pruner_manager(
 
 #[test]
 fn test_state_store_pruner() {
-    let key = StateKey::raw(String::from("test_key1").into_bytes());
+    let key = StateKey::raw(b"test_key1");
 
     let prune_batch_size = 10;
     let num_versions = 25;
@@ -183,9 +188,9 @@ fn test_state_store_pruner_partial_version() {
     // ```
     // On version 1, there are two entries, one changes address2 and the other changes the root node.
     // On version 2, there are two entries, one changes address3 and the other changes the root node.
-    let key1 = StateKey::raw(String::from("test_key1").into_bytes());
-    let key2 = StateKey::raw(String::from("test_key2").into_bytes());
-    let key3 = StateKey::raw(String::from("test_key3").into_bytes());
+    let key1 = StateKey::raw(b"test_key1");
+    let key2 = StateKey::raw(b"test_key2");
+    let key3 = StateKey::raw(b"test_key3");
 
     let value1 = StateValue::from(String::from("test_val1").into_bytes());
     let value2 = StateValue::from(String::from("test_val2").into_bytes());
@@ -293,7 +298,7 @@ fn test_state_store_pruner_partial_version() {
 
 #[test]
 fn test_state_store_pruner_disabled() {
-    let key = StateKey::raw(String::from("test_key1").into_bytes());
+    let key = StateKey::raw(b"test_key1");
 
     let prune_batch_size = 10;
     let num_versions = 25;

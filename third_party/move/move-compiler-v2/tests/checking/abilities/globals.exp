@@ -1,0 +1,33 @@
+
+Diagnostics:
+error: type `R` is missing required ability `key` (type was inferred)
+  ┌─ tests/checking/abilities/globals.move:6:9
+  │
+6 │         move_to(s, R{f: 1});
+  │         ^^^^^^^
+  │
+  = required by instantiating type parameter `T:key` of function `move_to`
+
+error: type `R` is missing required ability `key`
+   ┌─ tests/checking/abilities/globals.move:10:16
+   │
+10 │         exists<R>(a)
+   │                ^
+   │
+   = required by instantiating type parameter `T:key` of function `exists`
+
+error: type `R` is missing required ability `key`
+   ┌─ tests/checking/abilities/globals.move:14:31
+   │
+14 │         let r = borrow_global<R>(a);
+   │                               ^
+   │
+   = required by instantiating type parameter `T:key` of function `borrow_global`
+
+error: type `R` is missing required ability `key`
+   ┌─ tests/checking/abilities/globals.move:19:35
+   │
+19 │         let r = borrow_global_mut<R>(a);
+   │                                   ^
+   │
+   = required by instantiating type parameter `T:key` of function `borrow_global_mut`

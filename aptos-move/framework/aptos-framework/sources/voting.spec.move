@@ -1,4 +1,43 @@
 spec aptos_framework::voting {
+    /// <high-level-req>
+    /// No.: 1
+    /// Requirement: The proposal ID in a voting forum is unique and always increases monotonically with each new proposal
+    /// created for that voting forum.
+    /// Criticality: High
+    /// Implementation: The create_proposal and create_proposal_v2 create a new proposal with a unique ID derived from
+    /// the voting_forum's next_proposal_id incrementally.
+    /// Enforcement: Formally verified via [high-level-req-1](create_proposal).
+    ///
+    /// No.: 2
+    /// Requirement: While voting, it ensures that only the governance module that defines ProposalType may initiate voting
+    /// and that the proposal under vote exists in the specified voting forum.
+    /// Criticality: Critical
+    /// Implementation: The vote function verifies the eligibility and validity of a proposal before allowing voting. It
+    /// ensures that only the correct governance module initiates voting. The function checks if the proposal is
+    /// currently eligible for voting by confirming it has not resolved and the voting period has not ended.
+    /// Enforcement: Formally verified via [high-level-req-2](vote).
+    ///
+    /// No.: 3
+    /// Requirement: After resolving a single-step proposal, the corresponding proposal is guaranteed to be marked as
+    /// successfully resolved.
+    /// Criticality: High
+    /// Implementation: Upon invoking the resolve function on a proposal, it undergoes a series of checks to ensure its
+    /// validity. These include verifying if the proposal exists, is a single-step proposal, and meets the criteria for
+    /// resolution. If the checks pass, the proposal's is_resolved flag becomes true, indicating a successful
+    /// resolution.
+    /// Enforcement: Formally verified via [high-level-req-3](resolve).
+    ///
+    /// No.: 4
+    /// Requirement: In the context of v2 proposal resolving, both single-step and multi-step proposals are accurately
+    /// handled. It ensures that for single-step proposals, the next execution hash is empty and resolves the proposal,
+    /// while for multi-step proposals, it guarantees that the next execution hash corresponds to the hash of the next
+    /// step, maintaining the integrity of the proposal execution sequence.
+    /// Criticality: Medium
+    /// Implementation: The function resolve_proposal_v2 correctly handles both single-step and multi-step proposals.
+    /// For single-step proposals, it ensures that the next_execution_hash parameter is empty and resolves the proposal.
+    /// For multi-step proposals, it ensures that the next_execution_hash parameter contains the hash of the next step.
+    /// Enforcement: Formally verified via [high-level-req-4](resolve_proposal_v2).
+    /// </high-level-req>
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
@@ -35,6 +74,7 @@ spec aptos_framework::voting {
         requires chain_status::is_operating();
         include CreateProposalAbortsIfAndEnsures<ProposalType>{is_multi_step_proposal: false};
         // property 1: Verify the proposal_id of the newly created proposal.
+        /// [high-level-req-1]
         ensures result == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id;
     }
 
@@ -78,7 +118,7 @@ spec aptos_framework::voting {
         aborts_if len(early_resolution_vote_threshold.vec) != 0 && min_vote_threshold > early_resolution_vote_threshold.vec[0];
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
-        aborts_if len(execution_hash) <= 0;
+        aborts_if len(execution_hash) == 0;
         let execution_key = std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
         aborts_if simple_map::spec_contains_key(metadata, execution_key);
         aborts_if voting_forum.next_proposal_id + 1 > MAX_U64;
@@ -110,6 +150,7 @@ spec aptos_framework::voting {
 
         // property 2: While voting, it ensures that only the governance module that defines ProposalType may initiate voting
         // and that the proposal under vote exists in the specified voting forum.
+        /// [high-level-req-2]
         aborts_if !exists<VotingForum<ProposalType>>(voting_forum_address);
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
@@ -192,6 +233,7 @@ spec aptos_framework::voting {
         let post post_proposal = table::spec_get(post_voting_forum.proposals, proposal_id);
         aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         // property 3: Ensure that proposal is successfully resolved.
+        /// [high-level-req-3]
         ensures post_proposal.is_resolved == true;
         ensures post_proposal.resolution_time_secs == timestamp::spec_now_seconds();
 
@@ -206,6 +248,7 @@ spec aptos_framework::voting {
         next_execution_hash: vector<u8>,
     ) {
         use aptos_framework::chain_status;
+        pragma verify_duration_estimate = 300;
         // Ensures existence of Timestamp
         requires chain_status::is_operating();
 
@@ -233,6 +276,7 @@ spec aptos_framework::voting {
         aborts_if len(next_execution_hash) == 0 && !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         aborts_if len(next_execution_hash) == 0 && is_multi_step && !simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key);
         // property 4: For single-step proposals, it ensures that the next_execution_hash parameter is empty and resolves the proposal.
+        /// [high-level-req-4]
         ensures len(next_execution_hash) == 0 ==> post_proposal.resolution_time_secs == timestamp::spec_now_seconds();
         ensures len(next_execution_hash) == 0 ==> post_proposal.is_resolved == true;
         ensures (len(next_execution_hash) == 0 && is_multi_step) ==> simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key) == std::bcs::serialize(false);

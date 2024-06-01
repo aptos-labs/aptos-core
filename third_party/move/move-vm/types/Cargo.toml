@@ -10,21 +10,24 @@ publish = false
 edition = "2021"
 
 [dependencies]
-derivative = "2.2.0"
-once_cell = "1.7.2"
-proptest = { version = "1.0.0", optional = true }
-serde = { version = "1.0.124", features = ["derive", "rc"] }
-smallbitvec = "2.5.1"
-smallvec = "1.6.1"
-triomphe = "0.1.9"
+derivative = { workspace = true }
+itertools = { workspace = true }
+proptest = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive", "rc"] }
+smallbitvec = { workspace = true }
+smallvec = { workspace = true }
+triomphe = { workspace = true }
 
 bcs = { workspace = true }
-move-binary-format = { path = "../../move-binary-format" }
 
+move-binary-format = { path = "../../move-binary-format" }
 move-core-types = { path = "../../move-core/types" }
 
 [dev-dependencies]
-proptest = "1.0.0"
+claims = { workspace = true }
+move-binary-format = { path = "../../move-binary-format", features = ["fuzzing"] }
+proptest = { workspace = true }
+rand = { workspace = true }
 
 [features]
 default = []

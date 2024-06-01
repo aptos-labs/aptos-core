@@ -3,14 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
-use anyhow::Result;
-use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    block_executor::config::BlockExecutorConfigFromOnchain,
     bytes::NumToBytes,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        Result, TStateView,
     },
     transaction::signature_verified_transaction::into_signature_verified_block,
     write_set::WriteOp,
@@ -44,10 +42,9 @@ fn test_mock_vm_different_senders() {
         txns.push(encode_mint_transaction(gen_address(i), amount));
     }
 
-    let outputs = MockVM::execute_block(
+    let outputs = MockVM::execute_block_no_limit(
         &into_signature_verified_block(txns.clone()),
         &MockStateView,
-        BlockExecutorConfigFromOnchain::new_no_block_limit(),
     )
     .expect("MockVM should not fail to start");
 
@@ -61,12 +58,12 @@ fn test_mock_vm_different_senders() {
                 .collect::<BTreeMap<_, _>>(),
             [
                 (
-                    StateKey::access_path(balance_ap(sender)),
-                    WriteOp::Modification(amount.le_bytes()),
+                    StateKey::raw(&balance_ap(sender)),
+                    WriteOp::legacy_modification(amount.le_bytes()),
                 ),
                 (
-                    StateKey::access_path(seqnum_ap(sender)),
-                    WriteOp::Modification(1u64.le_bytes()),
+                    StateKey::raw(&seqnum_ap(sender)),
+                    WriteOp::legacy_modification(1u64.le_bytes()),
                 ),
             ]
             .into_iter()
@@ -84,12 +81,9 @@ fn test_mock_vm_same_sender() {
         txns.push(encode_mint_transaction(sender, amount));
     }
 
-    let outputs = MockVM::execute_block(
-        &into_signature_verified_block(txns),
-        &MockStateView,
-        BlockExecutorConfigFromOnchain::new_no_block_limit(),
-    )
-    .expect("MockVM should not fail to start");
+    let outputs =
+        MockVM::execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView)
+            .expect("MockVM should not fail to start");
 
     for (i, output) in outputs.iter().enumerate() {
         assert_eq!(
@@ -100,12 +94,12 @@ fn test_mock_vm_same_sender() {
                 .collect::<BTreeMap<_, _>>(),
             [
                 (
-                    StateKey::access_path(balance_ap(sender)),
-                    WriteOp::Modification((amount * (i as u64 + 1)).le_bytes()),
+                    StateKey::raw(&balance_ap(sender)),
+                    WriteOp::legacy_modification((amount * (i as u64 + 1)).le_bytes()),
                 ),
                 (
-                    StateKey::access_path(seqnum_ap(sender)),
-                    WriteOp::Modification((i as u64 + 1).le_bytes()),
+                    StateKey::raw(&seqnum_ap(sender)),
+                    WriteOp::legacy_modification((i as u64 + 1).le_bytes()),
                 ),
             ]
             .into_iter()
@@ -122,12 +116,9 @@ fn test_mock_vm_payment() {
         encode_transfer_transaction(gen_address(0), gen_address(1), 50),
     ];
 
-    let output = MockVM::execute_block(
-        &into_signature_verified_block(txns),
-        &MockStateView,
-        BlockExecutorConfigFromOnchain::new_no_block_limit(),
-    )
-    .expect("MockVM should not fail to start");
+    let output =
+        MockVM::execute_block_no_limit(&into_signature_verified_block(txns), &MockStateView)
+            .expect("MockVM should not fail to start");
 
     let mut output_iter = output.iter();
     output_iter.next();
@@ -142,16 +133,16 @@ fn test_mock_vm_payment() {
             .collect::<BTreeMap<_, _>>(),
         [
             (
-                StateKey::access_path(balance_ap(gen_address(0))),
-                WriteOp::Modification(50u64.le_bytes())
+                StateKey::raw(&balance_ap(gen_address(0))),
+                WriteOp::legacy_modification(50u64.le_bytes())
             ),
             (
-                StateKey::access_path(seqnum_ap(gen_address(0))),
-                WriteOp::Modification(2u64.le_bytes())
+                StateKey::raw(&seqnum_ap(gen_address(0))),
+                WriteOp::legacy_modification(2u64.le_bytes())
             ),
             (
-                StateKey::access_path(balance_ap(gen_address(1))),
-                WriteOp::Modification(150u64.le_bytes())
+                StateKey::raw(&balance_ap(gen_address(1))),
+                WriteOp::legacy_modification(150u64.le_bytes())
             ),
         ]
         .into_iter()

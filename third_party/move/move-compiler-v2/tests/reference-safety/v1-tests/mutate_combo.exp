@@ -1,10 +1,2 @@
 
-Diagnostics:
-error: implicit copy of mutable reference in local `s` which is used later
-   ┌─ tests/reference-safety/v1-tests/mutate_combo.move:31:19
-   │
-31 │         if (cond) f = s else f = other; // error in v2 because s is copied
-   │                   ^^^^^ implicitly copied here
-32 │         *f;
-33 │         *s = S { f: 0, g: 0 };
-   │         --------------------- used here
+============ bytecode verification succeeded ========

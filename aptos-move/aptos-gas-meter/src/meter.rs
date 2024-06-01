@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::traits::{AptosGasMeter, GasAlgebra};
-use aptos_gas_algebra::{Fee, FeePerGasUnit};
-use aptos_gas_schedule::gas_params::{instr::*, txn::*};
+use aptos_gas_algebra::{Fee, FeePerGasUnit, NumTypeNodes};
+use aptos_gas_schedule::{
+    gas_feature_versions::*,
+    gas_params::{instr::*, txn::*},
+};
 use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -14,6 +17,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumArgs, NumBytes},
+    identifier::IdentStr,
     language_storage::ModuleId,
     vm_status::StatusCode,
 };
@@ -161,8 +165,7 @@ where
             return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message("in legacy versions, number of bytes loaded must be zero when the resource does not exist ".to_string()));
         }
         let cost = self
-            .storage_gas_params()
-            .pricing
+            .io_pricing()
             .calculate_read_gas(val.is_some(), bytes_loaded);
         self.algebra.charge_io(cost)
     }
@@ -461,6 +464,39 @@ where
     ) -> PartialVMResult<()> {
         Ok(())
     }
+
+    #[inline]
+    fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()> {
+        if self.feature_version() < 14 {
+            return Ok(());
+        }
+
+        let cost = SUBST_TY_PER_NODE * num_nodes;
+
+        self.algebra.charge_execution(cost)
+    }
+
+    #[inline]
+    fn charge_dependency(
+        &mut self,
+        _is_new: bool,
+        addr: &AccountAddress,
+        _name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
+        // Modules under special addresses are considered system modules that should always
+        // be loaded, and are therefore excluded from gas charging.
+        //
+        // TODO: 0xA550C18 is a legacy system address we used, but it is currently not covered by
+        //       `.is_special()`. We should double check if this address still needs special
+        //       treatment.
+        if self.feature_version() >= 15 && !addr.is_special() {
+            self.algebra
+                .charge_execution(DEPENDENCY_PER_MODULE + DEPENDENCY_PER_BYTE * size)?;
+            self.algebra.count_dependency(size)?;
+        }
+        Ok(())
+    }
 }
 
 impl<A> AptosGasMeter for StandardGasMeter<A>
@@ -488,58 +524,28 @@ where
         self.algebra.charge_storage_fee(amount, gas_unit_price)
     }
 
-    fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()> {
-        let cost = self.storage_gas_params().pricing.io_gas_per_write(key, op);
+    fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
+        let cost = self.io_pricing().io_gas_per_transaction(txn_size);
 
         self.algebra
             .charge_io(cost)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    fn charge_io_gas_for_group_write(
-        &mut self,
-        key: &StateKey,
-        _metadata_op: &WriteOp,
-        maybe_group_size: Option<u64>,
-    ) -> VMResult<()> {
-        let cost = self
-            .storage_gas_params()
-            .pricing
-            .io_gas_per_group_write(key, maybe_group_size);
+    fn charge_io_gas_for_event(&mut self, event: &ContractEvent) -> VMResult<()> {
+        let cost = self.io_pricing().io_gas_per_event(event);
 
         self.algebra
             .charge_io(cost)
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    fn storage_fee_for_state_slot(&self, op: &WriteOp) -> Fee {
-        self.vm_gas_params().txn.storage_fee_for_slot(op)
-    }
+    fn charge_io_gas_for_write(&mut self, key: &StateKey, op_size: &WriteOpSize) -> VMResult<()> {
+        let cost = self.io_pricing().io_gas_per_write(key, op_size);
 
-    fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee {
-        self.vm_gas_params().txn.storage_fee_refund_for_slot(op)
-    }
-
-    fn storage_fee_for_state_bytes(&self, key: &StateKey, maybe_value_size: Option<u64>) -> Fee {
-        self.vm_gas_params()
-            .txn
-            .storage_fee_for_bytes(key, maybe_value_size)
-    }
-
-    fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee {
-        self.vm_gas_params().txn.storage_fee_per_event(event)
-    }
-
-    fn storage_discount_for_events(&self, total_cost: Fee) -> Fee {
-        self.vm_gas_params()
-            .txn
-            .storage_discount_for_events(total_cost)
-    }
-
-    fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee {
-        self.vm_gas_params()
-            .txn
-            .storage_fee_for_transaction_storage(txn_size)
+        self.algebra
+            .charge_io(cost)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
@@ -549,6 +555,16 @@ where
 
         self.algebra
             .charge_execution(MIN_TRANSACTION_GAS_UNITS + INTRINSIC_GAS_PER_BYTE * excess)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    fn charge_keyless(&mut self) -> VMResult<()> {
+        if self.feature_version() < RELEASE_V1_12 {
+            return Ok(());
+        }
+
+        self.algebra
+            .charge_execution(KEYLESS_BASE_COST)
             .map_err(|e| e.finish(Location::Undefined))
     }
 }

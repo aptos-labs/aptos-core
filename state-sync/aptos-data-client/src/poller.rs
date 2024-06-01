@@ -9,9 +9,8 @@ use crate::{
     latency_monitor::LatencyMonitor,
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
-    metrics::{set_gauge, start_request_timer, DataType, PRIORITIZED_PEER, REGULAR_PEER},
+    metrics::{set_gauge, DataType, PRIORITIZED_PEER, REGULAR_PEER},
     utils,
-    utils::choose_peers_by_latency,
 };
 use aptos_config::{
     config::{AptosDataClientConfig, AptosDataPollerConfig},
@@ -117,7 +116,7 @@ impl DataSummaryPoller {
         );
 
         // Select a subset of the priority peers to poll
-        self.select_peers_to_poll(all_priority_peers, num_peers_to_poll)
+        self.select_peers_to_poll(all_priority_peers, num_peers_to_poll as usize)
     }
 
     /// Identifies the next set of regular peers to poll from
@@ -146,7 +145,7 @@ impl DataSummaryPoller {
         );
 
         // Select a subset of the regular peers to poll
-        self.select_peers_to_poll(all_regular_peers, num_peers_to_poll)
+        self.select_peers_to_poll(all_regular_peers, num_peers_to_poll as usize)
     }
 
     /// Selects the peers to poll from the given peer
@@ -154,7 +153,7 @@ impl DataSummaryPoller {
     fn select_peers_to_poll(
         &self,
         mut potential_peers: HashSet<PeerNetworkId>,
-        num_peers_to_poll: u64,
+        num_peers_to_poll: usize,
     ) -> HashSet<PeerNetworkId> {
         // Filter out the peers that have an in-flight request
         let peers_with_in_flight_polls = self.all_peers_with_in_flight_polls();
@@ -186,9 +185,9 @@ impl DataSummaryPoller {
                     .collect();
 
                 // Select the latency weighted peers
-                let peers_to_poll_by_latency = choose_peers_by_latency(
+                let peers_to_poll_by_latency = utils::choose_peers_by_latency(
                     self.data_client_config.clone(),
-                    num_peers_to_poll_by_latency,
+                    num_peers_to_poll_by_latency as u64,
                     potential_peers,
                     self.peers_and_metadata.clone(),
                     false,
@@ -303,8 +302,8 @@ pub async fn start_poller(poller: DataSummaryPoller) {
             );
         }
 
-        // Update the logs and metrics for the peer request distributions
-        poller.data_client.update_peer_request_logs_and_metrics();
+        // Update the metrics and logs for the peer states
+        poller.data_client.update_peer_metrics_and_logs();
 
         // Determine the peers to poll this round. If the round is even, poll
         // the priority peers. Otherwise, poll the regular peers. This allows
@@ -408,13 +407,6 @@ pub(crate) fn poll_peer(
         let use_compression = data_summary_poller.data_client_config.use_compression;
         let storage_request = StorageServiceRequest::new(data_request, use_compression);
 
-        // Start the peer polling timer
-        let timer = start_request_timer(
-            &metrics::REQUEST_LATENCIES,
-            &storage_request.get_label(),
-            peer,
-        );
-
         // Fetch the storage summary for the peer and stop the timer
         let request_timeout = data_summary_poller.data_client_config.response_timeout_ms;
         let result: crate::error::Result<StorageServerSummary> = data_summary_poller
@@ -422,7 +414,6 @@ pub(crate) fn poll_peer(
             .send_request_to_peer_and_decode(peer, storage_request, request_timeout)
             .await
             .map(Response::into_payload);
-        drop(timer);
 
         // Mark the in-flight poll as now complete
         data_summary_poller.in_flight_request_complete(&peer);

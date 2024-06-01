@@ -8,18 +8,15 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
-anyhow = "1.0.52"
-clap = { version = "4.3.9", features = ["derive"] }
-codespan-reporting = "0.11.1"
-difference = "2.0.0"
-hex = "0.4.3"
-num-bigint = "0.4.0"
-once_cell = "1.7.2"
-petgraph = "0.5.1"
-regex = "1.5.5"
-sha3 = "0.9.1"
-tempfile = "3.2.0"
-walkdir = "2.3.1"
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+codespan-reporting = { workspace = true }
+hex = { workspace = true }
+once_cell = { workspace = true }
+petgraph = { workspace = true }
+regex = { workspace = true }
+sha3 = { workspace = true }
+tempfile = { workspace = true }
 
 bcs = { workspace = true }
 
@@ -34,7 +31,7 @@ move-ir-types = { path = "../move-ir/types" }
 move-symbol-pool = { path = "../move-symbol-pool" }
 
 [dev-dependencies]
-datatest-stable = "0.1.1"
+datatest-stable = { workspace = true }
 move-stdlib = { path = "../move-stdlib" }
 
 [[test]]

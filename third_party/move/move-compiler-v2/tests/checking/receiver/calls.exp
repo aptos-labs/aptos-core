@@ -1,0 +1,27 @@
+// -- Model dump before bytecode pipeline
+module 0x42::m {
+    struct S {
+        x: u64,
+    }
+    private inline fun inline_receiver_ref_mut(self: &mut m::S,y: u64): u64 {
+        Add<u64>(select m::S.x<&mut m::S>(self), y)
+    }
+    private fun receiver(self: m::S,y: u64): u64 {
+        Add<u64>(select m::S.x<m::S>(self), y)
+    }
+    private fun receiver_ref(self: &m::S,y: u64): u64 {
+        Add<u64>(select m::S.x<&m::S>(self), y)
+    }
+    private fun receiver_ref_mut(self: &mut m::S,y: u64): u64 {
+        Add<u64>(select m::S.x<&mut m::S>(self), y)
+    }
+    private fun test_call_styles(s: m::S): u64 {
+        m::receiver(s, 1);
+        m::receiver_ref(Borrow(Immutable)(s), 1);
+        m::receiver_ref_mut(Borrow(Mutable)(s), 1);
+        {
+          let (self: &mut m::S, y: u64): (&mut m::S, u64) = Tuple(Borrow(Mutable)(s), 1);
+          Add<u64>(select m::S.x<&mut m::S>(self), 1)
+        }
+    }
+} // end 0x42::m

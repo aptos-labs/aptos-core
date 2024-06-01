@@ -14,9 +14,8 @@ use crate::{
 };
 use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
-use aptos_state_view::StateView;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue, StateView},
     transaction::signature_verified_transaction::SignatureVerifiedTransaction,
     write_set::TransactionWrite,
 };
@@ -236,7 +235,10 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
         // TODO(ptx): maybe warm up vm like done in AptosExecutorTask
         let vm = {
             let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "vm_init"]);
-            AptosVM::new(&self.base_view.as_move_resolver())
+            AptosVM::new(
+                &self.base_view.as_move_resolver(),
+                /*override_is_delayed_field_optimization_capable=*/ None,
+            )
         };
 
         loop {
@@ -271,12 +273,16 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     };
                     let _post = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_post_vm"]);
                     // TODO(ptx): error handling
-                    let (_vm_status, vm_output, _msg) = vm_output.expect("VM execution failed.");
+                    let (_vm_status, vm_output) = vm_output.expect("VM execution failed.");
 
                     // inform output state values to the manager
-                    for (key, op) in vm_output.change_set().write_set_iter() {
-                        self.scheduler
-                            .try_inform_state_value((key.clone(), txn_idx), op.as_state_value());
+                    // TODO use try_into_storage_change_set() instead, and ChangeSet it returns, instead of VMOutput.
+                    for (key, op) in vm_output.change_set().concrete_write_set_iter() {
+                        self.scheduler.try_inform_state_value(
+                            (key.clone(), txn_idx),
+                            op.expect("PTX executor currently doesn't support non-concrete writes")
+                                .as_state_value(),
+                        );
                     }
 
                     self.finalizer.add_vm_output(txn_idx, vm_output);

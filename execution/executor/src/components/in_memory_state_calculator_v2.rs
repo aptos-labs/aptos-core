@@ -13,39 +13,42 @@ use aptos_storage_interface::{
     state_delta::StateDelta,
 };
 use aptos_types::{
-    account_address::AccountAddress,
-    account_config::CORE_CODE_ADDRESS,
-    account_view::AccountView,
     epoch_state::EpochState,
+    on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::{
         create_empty_sharded_state_updates, state_key::StateKey,
         state_storage_usage::StateStorageUsage, state_value::StateValue, ShardedStateUpdates,
+        TStateView,
     },
     transaction::Version,
     write_set::{TransactionWrite, WriteSet},
 };
 use arr_macro::arr;
-use bytes::Bytes;
 use dashmap::DashMap;
 use itertools::zip_eq;
 use rayon::prelude::*;
 use std::collections::HashMap;
 
-struct CoreAccountStateView<'a> {
+struct StateCacheView<'a> {
     base: &'a ShardedStateCache,
     updates: &'a ShardedStateUpdates,
 }
 
-impl<'a> CoreAccountStateView<'a> {
+impl<'a> StateCacheView<'a> {
     pub fn new(base: &'a ShardedStateCache, updates: &'a ShardedStateUpdates) -> Self {
         Self { base, updates }
     }
 }
 
-impl<'a> AccountView for CoreAccountStateView<'a> {
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Bytes>> {
+impl<'a> TStateView for StateCacheView<'a> {
+    type Key = StateKey;
+
+    fn get_state_value(
+        &self,
+        state_key: &Self::Key,
+    ) -> aptos_types::state_store::Result<Option<StateValue>> {
         if let Some(v_opt) = self.updates[state_key.get_shard_id() as usize].get(state_key) {
-            return Ok(v_opt.as_ref().map(StateValue::bytes).cloned());
+            return Ok(v_opt.clone());
         }
         if let Some(entry) = self
             .base
@@ -54,13 +57,13 @@ impl<'a> AccountView for CoreAccountStateView<'a> {
             .as_ref()
         {
             let state_value = entry.value().1.as_ref();
-            return Ok(state_value.map(StateValue::bytes).cloned());
+            return Ok(state_value.cloned());
         }
         Ok(None)
     }
 
-    fn get_account_address(&self) -> Result<Option<AccountAddress>> {
-        Ok(Some(CORE_CODE_ADDRESS))
+    fn get_usage(&self) -> aptos_types::state_store::Result<StateStorageUsage> {
+        unreachable!("not supposed to be used.")
     }
 }
 
@@ -71,7 +74,7 @@ impl InMemoryStateCalculatorV2 {
     pub fn calculate_for_transactions(
         base: &StateDelta,
         state_cache: StateCache,
-        to_keep: &TransactionsWithParsedOutput,
+        to_commit: &TransactionsWithParsedOutput,
         new_epoch: bool,
         is_block: bool,
     ) -> Result<(
@@ -83,17 +86,17 @@ impl InMemoryStateCalculatorV2 {
         ShardedStateCache,
     )> {
         if is_block {
-            Self::validate_input_for_block(base, to_keep)?;
+            Self::validate_input_for_block(base, to_commit)?;
         }
 
         let state_updates_vec =
-            Self::get_sharded_state_updates(to_keep.parsed_outputs(), |txn_output| {
+            Self::get_sharded_state_updates(to_commit.parsed_outputs(), |txn_output| {
                 txn_output.write_set()
             });
 
         // If there are multiple checkpoints in the chunk, we only calculate the SMT (and its root
         // hash) for the last one.
-        let last_checkpoint_index = to_keep.get_last_checkpoint_index();
+        let last_checkpoint_index = to_commit.get_last_checkpoint_index();
 
         Self::calculate_impl(
             base,
@@ -420,12 +423,10 @@ impl InMemoryStateCalculatorV2 {
         base: &ShardedStateCache,
         updates: &ShardedStateUpdates,
     ) -> Result<EpochState> {
-        let core_account_view = CoreAccountStateView::new(base, updates);
-        let validator_set = core_account_view
-            .get_validator_set()?
+        let state_cache_view = StateCacheView::new(base, updates);
+        let validator_set = ValidatorSet::fetch_config(&state_cache_view)
             .ok_or_else(|| anyhow!("ValidatorSet not touched on epoch change"))?;
-        let configuration = core_account_view
-            .get_configuration_resource()?
+        let configuration = ConfigurationResource::fetch_config(&state_cache_view)
             .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
 
         Ok(EpochState {
@@ -436,9 +437,9 @@ impl InMemoryStateCalculatorV2 {
 
     fn validate_input_for_block(
         base: &StateDelta,
-        to_keep: &TransactionsWithParsedOutput,
+        to_commit: &TransactionsWithParsedOutput,
     ) -> Result<()> {
-        let num_txns = to_keep.len();
+        let num_txns = to_commit.len();
         ensure!(num_txns != 0, "Empty block is not allowed.");
         ensure!(
             base.base_version == base.current_version,
@@ -451,7 +452,7 @@ impl InMemoryStateCalculatorV2 {
             "Base state is corrupted, updates_since_base is not empty at a checkpoint."
         );
 
-        for (i, (txn, txn_output)) in to_keep.iter().enumerate() {
+        for (i, (txn, txn_output)) in to_commit.iter().enumerate() {
             ensure!(
                 TransactionsWithParsedOutput::need_checkpoint(txn, txn_output) ^ (i != num_txns - 1),
                 "Checkpoint is allowed iff it's the last txn in the block. index: {i}, num_txns: {num_txns}, is_last: {}, txn: {txn:?}, is_reconfig: {}",

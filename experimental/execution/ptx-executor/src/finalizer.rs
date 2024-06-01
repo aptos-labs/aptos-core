@@ -10,9 +10,10 @@ use crate::{
 };
 use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
-use aptos_state_view::StateView;
 use aptos_types::{
-    state_store::state_key::StateKey, transaction::TransactionOutput, write_set::TransactionWrite,
+    state_store::{state_key::StateKey, StateView},
+    transaction::TransactionOutput,
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::output::VMOutput;
 use once_cell::sync::Lazy;
@@ -24,10 +25,10 @@ use std::{
 
 pub static TOTAL_SUPPLY_STATE_KEY: Lazy<StateKey> = Lazy::new(|| {
     StateKey::table_item(
-        "1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca"
+        &"1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca"
             .parse()
             .unwrap(),
-        vec![
+        &[
             6, 25, 220, 41, 160, 170, 200, 250, 20, 103, 20, 5, 142, 141, 214, 210, 208, 243, 189,
             245, 246, 51, 25, 7, 191, 145, 243, 172, 216, 30, 105, 53,
         ],
@@ -119,7 +120,7 @@ impl<'view> Worker<'view> {
     fn finalize_one(&mut self) {
         let vm_output = self.buffer.pop_front().unwrap().unwrap();
         let txn_out = vm_output
-            .try_into_transaction_output(&self.state_view)
+            .try_materialize_into_transaction_output(&self.state_view)
             .unwrap();
         for (key, op) in txn_out.write_set() {
             // TODO(ptx): hack: deal only with the total supply

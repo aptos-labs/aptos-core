@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use clap::ValueEnum;
 use codespan::{ByteIndex, Span};
 use itertools::Itertools;
 #[allow(unused_imports)]
@@ -20,7 +21,7 @@ use move_model::{
     ty::TypeDisplayContext,
 };
 use once_cell::sync::Lazy;
-use regex::Regex;
+use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
@@ -35,6 +36,37 @@ use std::{
 
 /// The maximum number of subheadings that are allowed
 const MAX_SUBSECTIONS: usize = 6;
+
+/// Regexp for generating code doc
+static REGEX_CODE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        "(?P<ident>(\\b\\w+\\b\\s*::\\s*)*\\b\\w+\\b)(?P<call>\\s*[(<])?|(?P<lt><)|(?P<gt>>)|(?P<nl>\n)|(?P<lb>\\{)|(?P<rb>\\})|(?P<amper>\\&)|(?P<squote>')|(?P<dquote>\")|(?P<sharp>#)|(?P<mul>\\*)|(?P<plus>\\+)|(?P<minus>\\-)|(?P<eq>\\=)|(?P<bar>\\|)|(?P<tilde>\\~)",
+    )
+        .unwrap()
+});
+
+/// Regexp for replacing html entities
+static REGEX_HTML_ENTITY: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        "(?P<lt><)|(?P<gt>>)|(?P<lb>\\{)|(?P<rb>\\})|(?P<amper>\\&)|(?P<squote>')|(?P<dquote>\")|(?P<mul>\\*)|(?P<plus>\\+)|(?P<minus>\\-)|(?P<eq>\\=)|(?P<bar>\\|)|(?P<tilde>\\~)",
+    )
+        .unwrap()
+});
+
+/// Regexp of html elements which are not encoded and left untouched
+static REGEX_HTML_ELEMENTS_TO_SKIP: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"</?(h[1-6]|p|span|div|a|em|strong|br|hr|pre|blockquote|ul|ol|li|dl|dt|dd|table|tr|th|td|thead|tbody|tfoot|code)(\s*|(\s+\b\w+\b\s*=[^>]*))>"
+    ).unwrap()
+});
+
+/// The output format of the docgen
+/// If the format is MDX, generated doc is mdx-compatible
+#[derive(ValueEnum, Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub enum OutputFormat {
+    MD,
+    MDX,
+}
 
 /// Options passed into the documentation generator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,6 +125,7 @@ pub struct DocgenOptions {
     pub include_call_diagrams: bool,
     /// If this is being compiled relative to a different place where it will be stored (output directory).
     pub compile_relative_to_output_dir: bool,
+    pub output_format: Option<OutputFormat>,
 }
 
 impl Default for DocgenOptions {
@@ -112,7 +145,14 @@ impl Default for DocgenOptions {
             references_file: None,
             include_dep_diagrams: false,
             include_call_diagrams: false,
+            output_format: None,
         }
+    }
+}
+
+impl DocgenOptions {
+    fn is_mdx_compatible(&self) -> bool {
+        self.output_format.is_some_and(|o| o == OutputFormat::MDX)
     }
 }
 
@@ -234,7 +274,7 @@ impl<'env> Docgen<'env> {
         // Generate documentation for standalone modules which are not included in the templates.
         for (id, info) in self.infos.clone() {
             let m = self.env.get_module(id);
-            if !info.is_included && m.is_target() {
+            if !info.is_included && m.is_primary_target() {
                 self.gen_module(&m, &info);
                 let path = self.make_file_in_out_dir(&info.target_file);
                 match self.output.get_mut(&path) {
@@ -402,7 +442,7 @@ impl<'env> Docgen<'env> {
                 m.get_name().display_full(m.env),
                 out_dir,
                 i.target_file,
-                if !m.is_target() {
+                if !m.is_primary_target() {
                     "exists"
                 } else {
                     "will be generated"
@@ -467,7 +507,7 @@ impl<'env> Docgen<'env> {
             .file_name()
             .expect("file name")
             .to_os_string();
-        if !module_env.is_target() {
+        if !module_env.is_primary_target() {
             // Try to locate the file in the provided search path.
             self.options.doc_path.iter().find_map(|dir| {
                 let mut path = PathBuf::from(dir);
@@ -697,14 +737,19 @@ impl<'env> Docgen<'env> {
         if !self.options.specs_inlined {
             self.gen_spec_section(module_env, &spec_block_map);
         } else {
-            match spec_block_map.get(&SpecBlockTarget::Module) {
+            match spec_block_map.get(&SpecBlockTarget::Module(module_env.get_id())) {
                 Some(blocks) if !blocks.is_empty() => {
                     self.section_header(
                         "Module Specification",
                         &self.label_for_section("Module Specification"),
                     );
                     self.increment_section_nest();
-                    self.gen_spec_blocks(module_env, "", &SpecBlockTarget::Module, &spec_block_map);
+                    self.gen_spec_blocks(
+                        module_env,
+                        "",
+                        &SpecBlockTarget::Module(module_env.get_id()),
+                        &spec_block_map,
+                    );
                     self.decrement_section_nest();
                 },
                 _ => {},
@@ -717,6 +762,145 @@ impl<'env> Docgen<'env> {
         if let Some(label) = toc_label {
             self.gen_toc(label);
         }
+    }
+
+    #[allow(clippy::format_collect)]
+    fn gen_html_table(&self, input: &str, column_names: Vec<&str>) {
+        let row_blocks = input.split("\n\n").collect::<Vec<_>>();
+
+        let header_row = column_names
+            .iter()
+            .map(|name| format!("<th>{}</th>", name))
+            .collect::<String>();
+        self.doc_text(&format!("<table>\n<tr>\n{}\n</tr>\n", header_row));
+
+        for row_block in row_blocks {
+            if !row_block.trim().is_empty() {
+                self.gen_table_rows(row_block, column_names.clone());
+            }
+        }
+        self.doc_text("</table>\n");
+    }
+
+    fn gen_table_rows(&self, row_block: &str, column_names: Vec<&str>) {
+        let lines = row_block.lines().collect::<Vec<_>>();
+        let mut row_data = vec![String::new(); column_names.len()];
+        let mut current_key: Option<usize> = None;
+
+        for line in lines {
+            let trimmed_line = line.trim();
+            if trimmed_line.is_empty() {
+                continue;
+            }
+
+            let parts = trimmed_line.splitn(2, ':').collect::<Vec<_>>();
+            if parts.len() == 2 {
+                let key = parts[0].trim();
+
+                if let Some(index) = column_names.iter().position(|&name| name == key) {
+                    let value = self.convert_to_anchor(parts[1].trim());
+                    row_data[index] = value;
+                    current_key = Some(index);
+                    continue;
+                }
+            }
+            if let Some(key_index) = current_key {
+                row_data[key_index].push(' ');
+                row_data[key_index].push_str(&self.convert_to_anchor(trimmed_line));
+            }
+        }
+
+        self.doc_text(&format!(
+            "<tr>\n{}\n</tr>\n",
+            row_data
+                .iter()
+                .map(|data| format!("<td>{}</td>", data))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ));
+    }
+
+    fn gen_req_tags(&self, tags: Vec<&str>) {
+        let mut links = Vec::new();
+
+        for &tag in tags.iter() {
+            let (req_tag, module_link, suffix) = if tag.contains("::") {
+                let parts = tag.split("::").collect::<Vec<_>>();
+                let module_name = *parts.first().unwrap_or(&"");
+                let req_tag = *parts.get(1).unwrap_or(&"");
+                let label_link = self
+                    .resolve_to_label(module_name, false)
+                    .unwrap_or_default();
+                let module_link = label_link.split('#').next().unwrap_or("").to_string();
+                let suffix = format!(
+                    " of the <a href=\"{}\">{}</a> module",
+                    module_link, module_name
+                );
+                (req_tag, module_link, suffix)
+            } else {
+                (tag, String::new(), String::new())
+            };
+
+            let req_number = req_tag
+                .split('-')
+                .nth(3)
+                .unwrap_or_default()
+                .split('.')
+                .next()
+                .unwrap_or_default();
+
+            let href = format!("href=\"{}#high-level-req\"", module_link);
+            let link = format!(
+                "<a id=\"{}\" {}>high-level requirement {}</a>{}",
+                req_tag, href, req_number, suffix
+            );
+            links.push(link);
+        }
+
+        match links.len() {
+            0 => {
+                self.doc_text_general(false, "");
+            },
+            1 => {
+                self.doc_text_general(false, &format!("// This enforces {}:", links[0]));
+            },
+            _ => {
+                let last_link = links.pop().unwrap();
+                let links_str = links.join(", ");
+                self.doc_text_general(
+                    false,
+                    &format!("// This enforces {} and {}:", links_str, last_link),
+                );
+            },
+        }
+    }
+
+    fn convert_to_anchor(&self, input: &str) -> String {
+        // Regular expression to match Markdown link format [text](link)
+        let re = Regex::new(r"\[(.*?)\]\((.*?)\)").unwrap();
+        re.replace_all(input, |caps: &regex::Captures| {
+            let tag = &caps[1];
+            let text = &caps[2];
+
+            if tag.starts_with("http://") || tag.starts_with("https://") {
+                format!("<a href=\"{}\">{}</a>", tag, text)
+            } else if tag.contains("::") {
+                let parts = tag.split("::").collect::<Vec<_>>();
+                if let Some(module_name) = parts.first() {
+                    let label_link = self
+                        .resolve_to_label(module_name, false)
+                        .unwrap_or_default();
+                    let module_link = label_link.split('#').next().unwrap_or("").to_string();
+                    let spec_tag = parts.get(1).unwrap_or(&"");
+                    format!("<a href=\"{}#{}\">{}</a>", module_link, spec_tag, text)
+                } else {
+                    format!("<a href=\"#t{}\">{}</a>", tag, text)
+                }
+            } else {
+                format!("<a href=\"#{}\">{}</a>", tag, text)
+            }
+        })
+        .to_string()
     }
 
     /// Generate a static call diagram (.svg) starting from the given function.
@@ -958,7 +1142,7 @@ impl<'env> Docgen<'env> {
         self.begin_items();
         for (id, _) in sorted_infos {
             let module_env = self.env.get_module(*id);
-            if !module_env.is_target() {
+            if !module_env.is_primary_target() {
                 // Do not include modules which are not target (outside of the package)
                 // into the index.
                 continue;
@@ -1147,7 +1331,9 @@ impl<'env> Docgen<'env> {
         let params = func_env
             .get_parameters()
             .iter()
-            .map(|Parameter(name, ty)| format!("{}: {}", self.name_string(*name), ty.display(tctx)))
+            .map(|Parameter(name, ty, _)| {
+                format!("{}: {}", self.name_string(*name), ty.display(tctx))
+            })
             .join(", ");
         let return_types = func_env.get_result_type().flatten();
         let return_str = match return_types.len() {
@@ -1197,7 +1383,31 @@ impl<'env> Docgen<'env> {
             self.begin_collapsed(title);
         }
         for block in blocks {
-            self.doc_text(self.env.get_doc(&block.loc));
+            let text = self.env.get_doc(&block.loc);
+            let start_tag = "<high-level-req>";
+            let end_tag = "</high-level-req>";
+
+            if let Some(start) = text.find(start_tag) {
+                if let Some(end) = text.find(end_tag) {
+                    let table_text = text[start + start_tag.len()..end].trim();
+                    self.doc_text(&text[0..start]);
+                    self.section_header("High-level Requirements", "high-level-req");
+                    let column_names = vec![
+                        "No.",
+                        "Requirement",
+                        "Criticality",
+                        "Implementation",
+                        "Enforcement",
+                    ];
+                    self.gen_html_table(table_text, column_names);
+                    self.doc_text(&text[end + end_tag.len()..text.len()]);
+                    self.section_header("Module-level Specification", "module-level-spec");
+                } else {
+                    self.doc_text("");
+                }
+            } else {
+                self.doc_text(text);
+            }
             let mut in_code = false;
             let (is_schema, schema_header) =
                 if let SpecBlockTarget::Schema(_, sid, type_params) = &block.target {
@@ -1238,10 +1448,24 @@ impl<'env> Docgen<'env> {
                 }
             };
             for loc in &block.member_locs {
+                let mut tags = Vec::new();
                 let doc = self.env.get_doc(loc);
                 if !doc.is_empty() {
-                    end_code(&mut in_code);
-                    self.doc_text(doc);
+                    let mut start = 0;
+
+                    while let (Some(open), Some(close)) =
+                        (doc[start..].find('['), doc[start..].find(']'))
+                    {
+                        if open < close {
+                            tags.push(&doc[start + open + 1..start + close]);
+                        }
+                        start += close + 1;
+                    }
+
+                    if tags.is_empty() {
+                        end_code(&mut in_code);
+                        self.doc_text(doc);
+                    }
                 }
                 // Inject label for spec item definition.
                 if let Some(item) = self.loc_to_spec_item_map.get(loc) {
@@ -1257,6 +1481,7 @@ impl<'env> Docgen<'env> {
                     }
                 }
                 begin_code(&mut in_code);
+                self.gen_req_tags(tags);
                 self.code_text(&self.get_source_with_indent(loc));
             }
             end_code(&mut in_code);
@@ -1270,12 +1495,12 @@ impl<'env> Docgen<'env> {
     /// are associated with the context they appear in.
     fn organize_spec_blocks(&self, module_env: &'env ModuleEnv<'env>) -> SpecBlockMap<'env> {
         let mut result = BTreeMap::new();
-        let mut current_target = SpecBlockTarget::Module;
+        let mut current_target = SpecBlockTarget::Module(module_env.get_id());
         let mut last_block_end: Option<ByteIndex> = None;
         for block in module_env.get_spec_block_infos() {
             let may_merge_with_current = match &block.target {
                 SpecBlockTarget::Schema(..) => true,
-                SpecBlockTarget::Module
+                SpecBlockTarget::Module(_)
                     if !block.member_locs.is_empty() || !self.is_single_liner(&block.loc) =>
                 {
                     // This is a bit of a hack: if spec module is on a single line,
@@ -1336,7 +1561,12 @@ impl<'env> Docgen<'env> {
         let section_label = self.label_for_section("Specification");
         self.section_header("Specification", &section_label);
         self.increment_section_nest();
-        self.gen_spec_blocks(module_env, "", &SpecBlockTarget::Module, spec_block_map);
+        self.gen_spec_blocks(
+            module_env,
+            "",
+            &SpecBlockTarget::Module(module_env.get_id()),
+            spec_block_map,
+        );
         for struct_env in module_env
             .get_structs()
             .filter(|s| !s.is_test_only())
@@ -1405,7 +1635,7 @@ impl<'env> Docgen<'env> {
         let type_param_names = func_env
             .get_type_parameters()
             .iter()
-            .map(|TypeParameter(name, _)| *name)
+            .map(|TypeParameter(name, _, _)| *name)
             .collect_vec();
         TypeDisplayContext::new_with_params(self.env, type_param_names)
     }
@@ -1418,7 +1648,7 @@ impl<'env> Docgen<'env> {
         let type_param_names = struct_env
             .get_type_parameters()
             .iter()
-            .map(|TypeParameter(name, _)| *name)
+            .map(|TypeParameter(name, _, _)| *name)
             .collect_vec();
         TypeDisplayContext::new_with_params(self.env, type_param_names)
     }
@@ -1518,16 +1748,16 @@ impl<'env> Docgen<'env> {
                 emitln!(self.writer, line)
             }
         }
-        // Always be sure to have an empty line at the end of block.
-        emitln!(self.writer);
     }
 
     fn doc_text_for_root(&self, text: &str) {
-        self.doc_text_general(true, text)
+        self.doc_text_general(true, text);
+        emitln!(self.writer);
     }
 
     fn doc_text(&self, text: &str) {
-        self.doc_text_general(false, text)
+        self.doc_text_general(false, text);
+        emitln!(self.writer);
     }
 
     /// Makes a label from a string.
@@ -1537,10 +1767,13 @@ impl<'env> Docgen<'env> {
 
     /// Decorates documentation text, identifying code fragments and decorating them
     /// as code. Code blocks in comments are untouched.
+    /// When generating mdx-compatible doc, need to encode html entities
     fn decorate_text(&self, text: &str) -> String {
         let mut decorated_text = String::new();
-        let mut chars = text.chars();
+        let mut chars = text.chars().peekable();
         let non_code_filter = |chr: &char| *chr != '`';
+        let non_code_or_rb_filter = |chr: &char| *chr != '`' && *chr != '>';
+        let non_code_or_lb_filter = |chr: &char| *chr != '`' && *chr != '<';
 
         while let Some(chr) = chars.next() {
             if chr == '`' {
@@ -1553,11 +1786,7 @@ impl<'env> Docgen<'env> {
                     // inside inline code section. Eagerly consume/match this '`'
                     let code = chars.take_while_ref(non_code_filter).collect::<String>();
                     // consume the remaining '`'. Report an error if we find an unmatched '`'.
-                    assert!(
-                       chars.next() == Some('`'),
-                       "Missing backtick found in {} while generating documentation for the following text: \"{}\"",
-                       self.current_module.as_ref().unwrap().get_name().display_full(self.env), text,
-                   );
+                    assert_eq!(chars.next(), Some('`'), "Missing backtick found in {} while generating documentation for the following text: \"{}\"", self.current_module.as_ref().unwrap().get_name().display_full(self.env), text);
 
                     write!(
                         &mut decorated_text,
@@ -1565,6 +1794,35 @@ impl<'env> Docgen<'env> {
                         self.decorate_code(&code)
                     )
                     .unwrap()
+                }
+            } else if self.options.is_mdx_compatible() {
+                if chr == '<' {
+                    let str = chars
+                        .take_while_ref(non_code_or_rb_filter)
+                        .collect::<String>();
+                    if chars.peek().is_some_and(|c| *c == '>') {
+                        let rb = chars.next().unwrap();
+                        let full_str = format!("{}{}{}", chr, str, rb);
+                        // skip encoding if `str` is a html element
+                        if REGEX_HTML_ELEMENTS_TO_SKIP.is_match(&full_str) {
+                            decorated_text.push_str(&full_str);
+                        } else {
+                            decorated_text.push_str(
+                                &self.encode_html_entities_in_text(&full_str.to_string()),
+                            );
+                        }
+                    } else {
+                        decorated_text
+                            .push_str(&self.encode_html_entities_in_text(&chr.to_string()));
+                        decorated_text
+                            .push_str(&self.encode_html_entities_in_text(&str.to_string()));
+                    }
+                } else {
+                    decorated_text.push_str(&self.encode_html_entities_in_text(&chr.to_string()));
+                    let str = chars
+                        .take_while_ref(non_code_or_lb_filter)
+                        .collect::<String>();
+                    decorated_text.push_str(&self.encode_html_entities_in_text(&str));
                 }
             } else {
                 decorated_text.push(chr);
@@ -1592,21 +1850,51 @@ impl<'env> Docgen<'env> {
 
     /// Outputs decorated code text in context of a module.
     fn code_text(&self, code: &str) {
-        emitln!(self.writer, &self.decorate_code(code));
+        if self.options.is_mdx_compatible() {
+            emit!(self.writer, "{}<br />", &self.decorate_code(code));
+        } else {
+            emitln!(self.writer, &self.decorate_code(code));
+        }
+    }
+
+    /// Replace html entities if the output format needs to be mdx compatible
+    fn replace_for_mdx(&self, cap: &Captures) -> String {
+        static MDX: Lazy<Vec<(&str, &str)>> = Lazy::new(|| {
+            vec![
+                ("lt", "&lt;"),
+                ("gt", "&gt;"),
+                ("lb", "&#123;"),
+                ("rb", "&#125;"),
+                ("amper", "&amp;"),
+                ("dquote", "&quot;"),
+                ("squote", "&apos;"),
+                ("sharp", "&#35;"),
+                ("mul", "&#42;"),
+                ("plus", "&#43;"),
+                ("minus", "&#45;"),
+                ("eq", "&#61;"),
+                ("bar", "&#124;"),
+                ("tilde", "&#126;"),
+                ("nl", "<br />"),
+            ]
+        });
+        let mut r = "".to_string();
+        for (group_name, replacement) in MDX.iter() {
+            if cap.name(group_name).is_some() {
+                r = replacement.to_string();
+                break;
+            }
+        }
+        r
     }
 
     /// Decorates a code fragment, for use in an html block. Replaces < and >, bolds keywords and
     /// tries to resolve and cross-link references.
+    /// If the output format is MDX, replace all html entities to make the doc mdx compatible
     fn decorate_code(&self, code: &str) -> String {
-        static REX: Lazy<Regex> = Lazy::new(|| {
-            Regex::new(
-                r"(?P<ident>(\b\w+\b\s*::\s*)*\b\w+\b)(?P<call>\s*[(<])?|(?P<lt><)|(?P<gt>>)",
-            )
-            .unwrap()
-        });
         let mut r = String::new();
         let mut at = 0;
-        while let Some(cap) = REX.captures(&code[at..]) {
+        while let Some(cap) = REGEX_CODE.captures(&code[at..]) {
             let replacement = {
                 if cap.name("lt").is_some() {
                     "&lt;".to_owned()
@@ -1625,6 +1913,8 @@ impl<'env> Docgen<'env> {
                     } else {
                         "".to_owned()
                     }
+                } else if self.options.is_mdx_compatible() {
+                    self.replace_for_mdx(&cap)
                 } else {
                     "".to_owned()
                 }
@@ -1640,6 +1930,25 @@ impl<'env> Docgen<'env> {
                     // replace the `<` as well.
                     r += &m.as_str().replace('<', "&lt;");
                 }
+            }
+            at += cap.get(0).unwrap().end();
+        }
+        r += &code[at..];
+        r
+    }
+
+    /// Encodes html entities during decoration of a text fragment
+    /// Only called when the output is mdx-compatible
+    fn encode_html_entities_in_text(&self, code: &str) -> String {
+        let mut r = String::new();
+        let mut at = 0;
+        while let Some(cap) = REGEX_HTML_ENTITY.captures(&code[at..]) {
+            let replacement = self.replace_for_mdx(&cap);
+            if replacement.is_empty() {
+                r += &code[at..at + cap.get(0).unwrap().end()];
+            } else {
+                r += &code[at..at + cap.get(0).unwrap().start()];
+                r += &replacement;
             }
             at += cap.get(0).unwrap().end();
         }

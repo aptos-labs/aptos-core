@@ -10,7 +10,10 @@ use aptos_types::{
     executable::ExecutableDescriptor,
     write_set::{TransactionWrite, WriteOpKind},
 };
+use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
+use derivative::Derivative;
+use move_binary_format::errors::PartialVMError;
 use move_core_types::value::MoveTypeLayout;
 use std::sync::{atomic::AtomicU32, Arc};
 
@@ -33,7 +36,8 @@ pub(crate) enum Flag {
     Estimate,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Derivative)]
+#[derivative(PartialEq, Eq)]
 pub enum MVGroupError {
     /// The base group contents are not initialized.
     Uninitialized,
@@ -42,7 +46,7 @@ pub enum MVGroupError {
     /// A dependency on other transaction has been found during the read.
     Dependency(TxnIndex),
     /// Tag serialization is needed for group size computation.
-    TagSerializationError,
+    TagSerializationError(#[derivative(PartialEq = "ignore")] PartialVMError),
 }
 
 /// Returned as Err(..) when failed to read from the multi-version data-structure.
@@ -69,7 +73,7 @@ pub enum MVModulesError {
 #[derive(Debug, Eq, PartialEq)]
 pub enum GroupReadResult {
     Value(Option<Bytes>, Option<Arc<MoveTypeLayout>>),
-    Size(u64),
+    Size(ResourceGroupSize),
     Uninitialized,
 }
 
@@ -81,7 +85,7 @@ impl GroupReadResult {
         }
     }
 
-    pub fn into_size(self) -> u64 {
+    pub fn into_size(self) -> ResourceGroupSize {
         match self {
             GroupReadResult::Size(size) => size,
             _ => unreachable!("Expected size"),
@@ -360,17 +364,10 @@ pub(crate) mod test {
         fn set_bytes(&mut self, bytes: Bytes) {
             self.bytes = bytes;
         }
-
-        fn convert_read_to_modification(&self) -> Option<Self>
-        where
-            Self: Sized,
-        {
-            Some(self.clone())
-        }
     }
 
     // Generate a Vec deterministically based on txn_idx and incarnation.
-    pub(crate) fn value_for(txn_idx: TxnIndex, incarnation: Incarnation) -> TestValue {
+    fn value_for(txn_idx: TxnIndex, incarnation: Incarnation) -> TestValue {
         TestValue::new(vec![txn_idx * 5, txn_idx + incarnation, incarnation * 5])
     }
 

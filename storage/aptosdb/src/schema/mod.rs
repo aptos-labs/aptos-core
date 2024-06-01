@@ -6,7 +6,8 @@
 //!
 //! All schemas are `pub(crate)` so not shown in rustdoc, refer to the source code to see details.
 
-pub(crate) mod block_index;
+pub(crate) mod block_by_version;
+pub(crate) mod block_info;
 pub(crate) mod db_metadata;
 pub(crate) mod epoch_by_version;
 pub(crate) mod event;
@@ -22,6 +23,7 @@ pub(crate) mod state_value;
 pub(crate) mod state_value_index;
 pub(crate) mod transaction;
 pub(crate) mod transaction_accumulator;
+pub(crate) mod transaction_auxiliary_data;
 pub(crate) mod transaction_by_account;
 pub(crate) mod transaction_by_hash;
 pub(crate) mod transaction_info;
@@ -31,7 +33,8 @@ pub(crate) mod write_set;
 use anyhow::{ensure, Result};
 use aptos_schemadb::ColumnFamilyName;
 
-pub const BLOCK_INDEX_CF_NAME: ColumnFamilyName = "block_index";
+pub const BLOCK_BY_VERSION_CF_NAME: ColumnFamilyName = "block_by_version";
+pub const BLOCK_INFO_CF_NAME: ColumnFamilyName = "block_info";
 pub const DB_METADATA_CF_NAME: ColumnFamilyName = "db_metadata";
 pub const EPOCH_BY_VERSION_CF_NAME: ColumnFamilyName = "epoch_by_version";
 pub const EVENT_ACCUMULATOR_CF_NAME: ColumnFamilyName = "event_accumulator";
@@ -47,6 +50,7 @@ pub const STATE_VALUE_CF_NAME: ColumnFamilyName = "state_value";
 pub const STATE_VALUE_INDEX_CF_NAME: ColumnFamilyName = "state_value_index";
 pub const TRANSACTION_CF_NAME: ColumnFamilyName = "transaction";
 pub const TRANSACTION_ACCUMULATOR_CF_NAME: ColumnFamilyName = "transaction_accumulator";
+pub const TRANSACTION_AUXILIARY_DATA_CF_NAME: ColumnFamilyName = "transaction_auxiliary_data";
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
 pub const TRANSACTION_BY_HASH_CF_NAME: ColumnFamilyName = "transaction_by_hash";
 pub const TRANSACTION_INFO_CF_NAME: ColumnFamilyName = "transaction_info";
@@ -80,7 +84,8 @@ pub mod fuzzing {
     pub fn fuzz_decode(data: &[u8]) {
         #[allow(unused_must_use)]
         {
-            assert_no_panic_decoding::<super::block_index::BlockIndexSchema>(data);
+            assert_no_panic_decoding::<super::block_by_version::BlockByVersionSchema>(data);
+            assert_no_panic_decoding::<super::block_info::BlockInfoSchema>(data);
             assert_no_panic_decoding::<super::epoch_by_version::EpochByVersionSchema>(data);
             assert_no_panic_decoding::<super::event::EventSchema>(data);
             assert_no_panic_decoding::<super::event_accumulator::EventAccumulatorSchema>(data);
@@ -104,6 +109,9 @@ pub mod fuzzing {
             assert_no_panic_decoding::<super::transaction_accumulator::TransactionAccumulatorSchema>(
                 data,
             );
+            assert_no_panic_decoding::<
+                super::transaction_auxiliary_data::TransactionAuxiliaryDataSchema,
+            >(data);
             assert_no_panic_decoding::<super::transaction_by_account::TransactionByAccountSchema>(
                 data,
             );

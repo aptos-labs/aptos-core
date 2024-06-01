@@ -17,7 +17,6 @@ aptos-crypto = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-speculative-state-helper = { workspace = true }
-aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 arc-swap = { workspace = true }
 once_cell = { workspace = true }

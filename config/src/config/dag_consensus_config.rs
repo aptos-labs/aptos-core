@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, ChainHealthBackoffValues,
-    Error, NodeConfig, QuorumStoreConfig,
+    Error, NodeConfig, PipelineBackpressureValues, QuorumStoreConfig,
 };
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
@@ -83,6 +84,7 @@ pub struct DagFetcherConfig {
     pub rpc_timeout_ms: u64,
     pub min_concurrent_responders: u32,
     pub max_concurrent_responders: u32,
+    pub max_concurrent_fetches: usize,
 }
 
 impl Default for DagFetcherConfig {
@@ -92,6 +94,7 @@ impl Default for DagFetcherConfig {
             rpc_timeout_ms: 1000,
             min_concurrent_responders: 1,
             max_concurrent_responders: 4,
+            max_concurrent_fetches: 4,
         }
     }
 }
@@ -122,15 +125,31 @@ impl Default for ReliableBroadcastConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DagRoundStateConfig {
-    pub round_event_channel_size: usize,
     pub adaptive_responsive_minimum_wait_time_ms: u64,
 }
 
 impl Default for DagRoundStateConfig {
     fn default() -> Self {
         Self {
-            round_event_channel_size: 1024,
             adaptive_responsive_minimum_wait_time_ms: 500,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DagHealthConfig {
+    pub chain_backoff_config: Vec<ChainHealthBackoffValues>,
+    pub voter_pipeline_latency_limit_ms: u64,
+    pub pipeline_backpressure_config: Vec<PipelineBackpressureValues>,
+}
+
+impl Default for DagHealthConfig {
+    fn default() -> Self {
+        Self {
+            chain_backoff_config: Vec::new(),
+            voter_pipeline_latency_limit_ms: 30_000,
+            pipeline_backpressure_config: Vec::new(),
         }
     }
 }
@@ -142,7 +161,7 @@ pub struct DagConsensusConfig {
     pub rb_config: ReliableBroadcastConfig,
     pub fetcher_config: DagFetcherConfig,
     pub round_state_config: DagRoundStateConfig,
-    pub chain_backoff_config: Vec<ChainHealthBackoffValues>,
+    pub health_config: DagHealthConfig,
     #[serde(default = "QuorumStoreConfig::default_for_dag")]
     pub quorum_store: QuorumStoreConfig,
 }

@@ -1,42 +1,42 @@
 
 Diagnostics:
-error: expected `u8` but found `vector<u8>`
+error: cannot return `vector<u8>` from a function with result type `u8`
    ┌─ tests/checking/typing/constant_invalid_usage.move:11:20
    │
 11 │     fun t1(): u8 { C6 }
    │                    ^^
 
-error: expected `u64` but found `vector<u8>`
+error: cannot return `vector<u8>` from a function with result type `u64`
    ┌─ tests/checking/typing/constant_invalid_usage.move:12:21
    │
 12 │     fun t2(): u64 { C7 }
    │                     ^^
 
-error: expected `u128` but found `u8`
+error: cannot return `u8` from a function with result type `u128`
    ┌─ tests/checking/typing/constant_invalid_usage.move:13:22
    │
 13 │     fun t3(): u128 { C1 }
    │                      ^^
 
-error: expected `bool` but found `u64`
+error: cannot return `u64` from a function with result type `bool`
    ┌─ tests/checking/typing/constant_invalid_usage.move:14:22
    │
 14 │     fun t4(): bool { C2 }
    │                      ^^
 
-error: expected `address` but found `u128`
+error: cannot return `u128` from a function with result type `address`
    ┌─ tests/checking/typing/constant_invalid_usage.move:15:25
    │
 15 │     fun t5(): address { C3 }
    │                         ^^
 
-error: expected `vector<u8>` but found `bool`
+error: cannot return `bool` from a function with result type `vector<u8>`
    ┌─ tests/checking/typing/constant_invalid_usage.move:16:28
    │
 16 │     fun t6(): vector<u8> { C4 }
    │                            ^^
 
-error: expected `vector<u8>` but found `address`
+error: cannot return `address` from a function with result type `vector<u8>`
    ┌─ tests/checking/typing/constant_invalid_usage.move:17:28
    │
 17 │     fun t7(): vector<u8> { C5 }

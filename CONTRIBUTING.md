@@ -17,11 +17,14 @@ For development environment setup and first build, see [Building Aptos From Sour
 
 ### Code Style, Hints, and Testing
 
-Refer to our Coding Guidelines for the [Move](./developer-docs-site/docs/move/book/coding-conventions.md) and [Rust](./developer-docs-site/docs/contribute/rust-coding-guidelines.md) programming languages for detailed guidance about how to contribute to the project.
+Refer to our Coding Guidelines for the [Move](https://aptos.dev/move/book/coding-conventions/) and [Rust](./RUST_CODING_STYLE.md) programming languages for detailed guidance about how to contribute to the project.
+
+Also, please ensure you follow our [Secure Coding Guidelines](./RUST_SECURE_CODING.md) to contribute to Aptos securely. 
+
 
 ### Documentation
 
-Aptos Core's developer website is also open source (the code can be found in this [repository](https://github.com/aptos-labs/aptos-core/tree/main/developers-docs-site/).  It is built using [Docusaurus](https://docusaurus.io/):
+Aptos Core's developer website is also open source (the code can be found in this [repository](https://github.com/aptos-labs/developer-docs).  It is built using [Docusaurus](https://docusaurus.io/):
 
 If you know Markdown, you can already contribute!
 

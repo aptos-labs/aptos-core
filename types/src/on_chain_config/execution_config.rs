@@ -17,6 +17,7 @@ pub enum OnChainExecutionConfig {
     /// to previous behavior (before OnChainExecutionConfig was registered) in case of Missing.
     Missing,
     // Reminder: Add V4 and future versions here, after Missing (order matters for enums).
+    V4(ExecutionConfigV4),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -28,6 +29,7 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V1(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
+            OnChainExecutionConfig::V4(config) => config.transaction_shuffler_type.clone(),
         }
     }
 
@@ -42,6 +44,7 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V3(config) => config
                 .block_gas_limit
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
+            OnChainExecutionConfig::V4(config) => config.block_gas_limit_type.clone(),
         }
     }
 
@@ -59,15 +62,30 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V1(_config) => TransactionDeduperType::NoDedup,
             OnChainExecutionConfig::V2(_config) => TransactionDeduperType::NoDedup,
             OnChainExecutionConfig::V3(config) => config.transaction_deduper_type.clone(),
+            OnChainExecutionConfig::V4(config) => config.transaction_deduper_type.clone(),
         }
     }
 
     /// The default values to use for new networks, e.g., devnet, forge.
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
-        OnChainExecutionConfig::V3(ExecutionConfigV3 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
-            block_gas_limit: Some(35000),
+        OnChainExecutionConfig::V4(ExecutionConfigV4 {
+            transaction_shuffler_type: TransactionShufflerType::Fairness {
+                sender_conflict_window_size: 32,
+                module_conflict_window_size: 1,
+                entry_fun_conflict_window_size: 2,
+            },
+            block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
+                effective_block_gas_limit: 30000,
+                execution_gas_effective_multiplier: 1,
+                io_gas_effective_multiplier: 1,
+                conflict_penalty_window: 9,
+                use_granular_resource_group_conflicts: false,
+                use_module_publishing_block_conflict: true,
+                block_output_limit: Some(5 * 1024 * 1024),
+                include_user_txn_size_in_block_output: true,
+                add_block_limit_outcome_onchain: false,
+            },
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         })
     }
@@ -115,12 +133,24 @@ pub struct ExecutionConfigV3 {
     pub transaction_deduper_type: TransactionDeduperType,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ExecutionConfigV4 {
+    pub transaction_shuffler_type: TransactionShufflerType,
+    pub block_gas_limit_type: BlockGasLimitType,
+    pub transaction_deduper_type: TransactionDeduperType,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum TransactionShufflerType {
     NoShuffling,
     DeprecatedSenderAwareV1(u32),
     SenderAwareV2(u32),
+    Fairness {
+        sender_conflict_window_size: u32,
+        module_conflict_window_size: u32,
+        entry_fun_conflict_window_size: u32,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -131,9 +161,46 @@ pub enum TransactionDeduperType {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum BlockGasLimitType {
     NoLimit,
     Limit(u64),
+    /// Provides two separate block limits:
+    /// 1. effective_block_gas_limit
+    /// 2. block_output_limit
+    ComplexLimitV1 {
+        /// Formula for effective block gas limit:
+        /// effective_block_gas_limit <
+        /// (execution_gas_effective_multiplier * execution_gas_used +
+        ///  io_gas_effective_multiplier * io_gas_used
+        /// ) * (1 + num conflicts in conflict_penalty_window)
+        effective_block_gas_limit: u64,
+        execution_gas_effective_multiplier: u64,
+        io_gas_effective_multiplier: u64,
+        conflict_penalty_window: u32,
+
+        /// If true we look at granular resource group conflicts (i.e. if same Tag
+        /// within a resource group has a conflict)
+        /// If false, we treat any conclicts inside of resource groups (even across
+        /// non-overlapping tags) as conflicts).
+        use_granular_resource_group_conflicts: bool,
+        /// Module publishing today fallbacks to sequential execution,
+        /// even though there is no read-write conflict.
+        /// When enabled, this flag allows us to account for that conflict.
+        /// NOTE: Currently not supported.
+        use_module_publishing_block_conflict: bool,
+
+        /// Block limit on the total (approximate) txn output size in bytes.
+        block_output_limit: Option<u64>,
+        /// When set, we include the user txn size in the approximate computation
+        /// of block output size, which is compared against the block_output_limit above.
+        include_user_txn_size_in_block_output: bool,
+
+        /// When set, we create BlockEpilogue (instead of StateCheckpint) transaction,
+        /// which contains BlockEndInfo
+        /// NOTE: Currently not supported.
+        add_block_limit_outcome_onchain: bool,
+    },
 }
 
 impl BlockGasLimitType {
@@ -141,6 +208,103 @@ impl BlockGasLimitType {
         match self {
             BlockGasLimitType::NoLimit => None,
             BlockGasLimitType::Limit(limit) => Some(*limit),
+            BlockGasLimitType::ComplexLimitV1 {
+                effective_block_gas_limit,
+                ..
+            } => Some(*effective_block_gas_limit),
+        }
+    }
+
+    pub fn execution_gas_effective_multiplier(&self) -> u64 {
+        match self {
+            BlockGasLimitType::NoLimit => 1,
+            BlockGasLimitType::Limit(_) => 1,
+            BlockGasLimitType::ComplexLimitV1 {
+                execution_gas_effective_multiplier,
+                ..
+            } => *execution_gas_effective_multiplier,
+        }
+    }
+
+    pub fn io_gas_effective_multiplier(&self) -> u64 {
+        match self {
+            BlockGasLimitType::NoLimit => 1,
+            BlockGasLimitType::Limit(_) => 1,
+            BlockGasLimitType::ComplexLimitV1 {
+                io_gas_effective_multiplier,
+                ..
+            } => *io_gas_effective_multiplier,
+        }
+    }
+
+    pub fn block_output_limit(&self) -> Option<u64> {
+        match self {
+            BlockGasLimitType::NoLimit => None,
+            BlockGasLimitType::Limit(_) => None,
+            BlockGasLimitType::ComplexLimitV1 {
+                block_output_limit, ..
+            } => *block_output_limit,
+        }
+    }
+
+    pub fn conflict_penalty_window(&self) -> Option<u32> {
+        match self {
+            BlockGasLimitType::NoLimit => None,
+            BlockGasLimitType::Limit(_) => None,
+            BlockGasLimitType::ComplexLimitV1 {
+                conflict_penalty_window,
+                ..
+            } => {
+                if *conflict_penalty_window > 1 {
+                    Some(*conflict_penalty_window)
+                } else {
+                    None
+                }
+            },
+        }
+    }
+
+    pub fn use_module_publishing_block_conflict(&self) -> bool {
+        match self {
+            BlockGasLimitType::NoLimit => false,
+            BlockGasLimitType::Limit(_) => false,
+            BlockGasLimitType::ComplexLimitV1 {
+                use_module_publishing_block_conflict,
+                ..
+            } => *use_module_publishing_block_conflict,
+        }
+    }
+
+    pub fn include_user_txn_size_in_block_output(&self) -> bool {
+        match self {
+            BlockGasLimitType::NoLimit => false,
+            BlockGasLimitType::Limit(_) => false,
+            BlockGasLimitType::ComplexLimitV1 {
+                include_user_txn_size_in_block_output,
+                ..
+            } => *include_user_txn_size_in_block_output,
+        }
+    }
+
+    pub fn add_block_limit_outcome_onchain(&self) -> bool {
+        match self {
+            BlockGasLimitType::NoLimit => false,
+            BlockGasLimitType::Limit(_) => false,
+            BlockGasLimitType::ComplexLimitV1 {
+                add_block_limit_outcome_onchain,
+                ..
+            } => *add_block_limit_outcome_onchain,
+        }
+    }
+
+    pub fn use_granular_resource_group_conflicts(&self) -> bool {
+        match self {
+            BlockGasLimitType::NoLimit => false,
+            BlockGasLimitType::Limit(_) => false,
+            BlockGasLimitType::ComplexLimitV1 {
+                use_granular_resource_group_conflicts,
+                ..
+            } => *use_granular_resource_group_conflicts,
         }
     }
 }

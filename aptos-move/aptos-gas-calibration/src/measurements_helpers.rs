@@ -5,7 +5,10 @@ use crate::measurements::GasMeasurements;
 use anyhow::{anyhow, Result};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
-use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
+use aptos_language_e2e_tests::{
+    account::Account,
+    executor::{ExecFuncTimerDynamicArgs, FakeExecutor, GasMeterType},
+};
 use aptos_types::transaction::TransactionPayload;
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use move_core_types::{
@@ -16,7 +19,7 @@ use move_core_types::{
 };
 use std::{fs::ReadDir, path::PathBuf, string::String, time::Instant};
 
-//// CONSTANTS
+// CONSTANTS
 const PREFIX: &str = "calibrate_";
 
 /// Generate a TransactionPayload for modules
@@ -97,6 +100,8 @@ pub fn execute_user_txn(
         vec![],
         args,
         iterations,
+        ExecFuncTimerDynamicArgs::NoArgs,
+        GasMeterType::UnmeteredGasMeter,
     );
     println!("running time (microseconds): {}", elapsed);
     elapsed

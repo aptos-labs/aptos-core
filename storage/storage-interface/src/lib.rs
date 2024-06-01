@@ -3,19 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::cached_state_view::ShardedStateCache;
-use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
-    access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{NewBlockEvent, CORE_CODE_ADDRESS},
+    account_config::NewBlockEvent,
     contract_event::{ContractEvent, EventWithVersion},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
-    move_resource::MoveStorage,
-    on_chain_config::{access_path_for_config, ConfigID},
     proof::{
         AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleProofExt,
         SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
@@ -23,15 +19,15 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
-        state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
         ShardedStateUpdates,
     },
     transaction::{
-        AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
+        AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        TransactionListWithProof, TransactionOutputListWithProof, TransactionToCommit,
+        TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -40,7 +36,9 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 pub mod async_proof_fetcher;
+pub mod block_info;
 pub mod cached_state_view;
+pub mod errors;
 mod executed_trees;
 mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -50,11 +48,15 @@ pub mod state_view;
 
 use crate::state_delta::StateDelta;
 use aptos_scratchpad::SparseMerkleTree;
+pub use aptos_types::block_info::BlockHeight;
+use aptos_types::state_store::state_key::prefix::StateKeyPrefix;
+pub use errors::AptosDbError;
 pub use executed_trees::ExecutedTrees;
 
+pub type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 // This is last line of defense against large queries slipping through external facing interfaces,
 // like the API and State Sync, etc.
-pub const MAX_REQUEST_LIMIT: u64 = 10000;
+pub const MAX_REQUEST_LIMIT: u64 = 20_000;
 
 pub trait StateSnapshotReceiver<K, V>: Send {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()>;
@@ -165,15 +167,20 @@ pub trait DbReader: Send + Sync {
             fetch_events: bool,
         ) -> Result<TransactionWithProof>;
 
+        fn get_transaction_auxiliary_data_by_version(
+            &self,
+            version: Version,
+        ) -> Result<TransactionAuxiliaryData>;
+
         /// See [AptosDB::get_first_txn_version].
         ///
         /// [AptosDB::get_first_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_txn_version
         fn get_first_txn_version(&self) -> Result<Option<Version>>;
 
-        /// See [AptosDB::get_first_viable_txn_version].
+        /// See [AptosDB::get_first_viable_block].
         ///
-        /// [AptosDB::get_first_viable_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_txn_version
-        fn get_first_viable_txn_version(&self) -> Result<Version>;
+        /// [AptosDB::get_first_viable_block]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_block
+        fn get_first_viable_block(&self) -> Result<(Version, BlockHeight)>;
 
         /// See [AptosDB::get_first_write_set_version].
         ///
@@ -237,9 +244,7 @@ pub trait DbReader: Send + Sync {
         /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
         fn get_block_timestamp(&self, version: Version) -> Result<u64>;
 
-        fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)>;
-
-        /// See [AptosDB::get_latest_block_events].
+        /// See `AptosDB::get_latest_block_events`.
         fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>>;
 
         /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
@@ -281,8 +286,8 @@ pub trait DbReader: Send + Sync {
         /// Returns the latest ledger info, if any.
         fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
 
-        /// Returns the latest committed version, error on on non-bootstrapped/empty DB.
-        fn get_latest_version(&self) -> Result<Version>;
+        /// Returns the latest "synced" transaction version, potentially not "committed" yet.
+        fn get_synced_version(&self) -> Result<Version>;
 
         /// Returns the latest state checkpoint version if any.
         fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>>;
@@ -355,6 +360,7 @@ pub trait DbReader: Send + Sync {
             &self,
             state_key: &StateKey,
             version: Version,
+            root_depth: usize,
         ) -> Result<SparseMerkleProofExt>;
 
         /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
@@ -369,6 +375,7 @@ pub trait DbReader: Send + Sync {
             &self,
             state_key: &StateKey,
             version: Version,
+            root_depth: usize,
         ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
 
         /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
@@ -452,8 +459,16 @@ pub trait DbReader: Send + Sync {
 
     /// Returns the latest ledger info.
     fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
-        self.get_latest_ledger_info_option()
-            .and_then(|opt| opt.ok_or_else(|| format_err!("Latest LedgerInfo not found.")))
+        self.get_latest_ledger_info_option().and_then(|opt| {
+            opt.ok_or_else(|| AptosDbError::Other("Latest LedgerInfo not found.".to_string()))
+        })
+    }
+
+    /// Returns the latest committed version, error on on non-bootstrapped/empty DB.
+    /// N.b. different from `get_synced_version()`.
+    fn get_latest_ledger_info_version(&self) -> Result<Version> {
+        self.get_latest_ledger_info()
+            .map(|li| li.ledger_info().version())
     }
 
     /// Returns the latest version and committed block timestamp
@@ -468,45 +483,8 @@ pub trait DbReader: Send + Sync {
         state_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        self.get_state_value_with_proof_by_version_ext(state_key, version)
+        self.get_state_value_with_proof_by_version_ext(state_key, version, 0)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
-    }
-}
-
-impl MoveStorage for &dyn DbReader {
-    fn fetch_resource_by_version(
-        &self,
-        access_path: AccessPath,
-        version: Version,
-    ) -> Result<Vec<u8>> {
-        let state_value =
-            self.get_state_value_by_version(&StateKey::access_path(access_path), version)?;
-
-        state_value
-            .ok_or_else(|| format_err!("no value found in DB"))
-            .map(|value| value.bytes().to_vec())
-    }
-
-    fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
-        let config_value_option = self.get_state_value_by_version(
-            &StateKey::access_path(AccessPath::new(
-                CORE_CODE_ADDRESS,
-                access_path_for_config(config_id)?.path,
-            )),
-            version,
-        )?;
-        config_value_option
-            .map(|x| x.bytes().to_vec())
-            .ok_or_else(|| anyhow!("no config {} found in aptos root account state", config_id))
-    }
-
-    fn fetch_synced_version(&self) -> Result<u64> {
-        self.get_latest_version()
-    }
-
-    fn fetch_latest_state_checkpoint_version(&self) -> Result<Version> {
-        self.get_latest_state_checkpoint_version()?
-            .ok_or_else(|| format_err!("[MoveStorage] Latest state checkpoint not found."))
     }
 }
 
@@ -646,4 +624,34 @@ pub fn jmt_update_refs<K>(
     jmt_updates: &[(HashValue, Option<(HashValue, K)>)],
 ) -> Vec<(HashValue, Option<&(HashValue, K)>)> {
     jmt_updates.iter().map(|(x, y)| (*x, y.as_ref())).collect()
+}
+
+#[macro_export]
+macro_rules! db_anyhow {
+    ($($arg:tt)*) => {
+        AptosDbError::Other(format!($($arg)*))
+    };
+}
+
+#[macro_export]
+macro_rules! db_not_found_bail {
+    ($($arg:tt)*) => {
+        return Err(AptosDbError::NotFound(format!($($arg)*)))
+    };
+}
+
+#[macro_export]
+macro_rules! db_other_bail {
+    ($($arg:tt)*) => {
+        return Err(AptosDbError::Other(format!($($arg)*)))
+    };
+}
+
+#[macro_export]
+macro_rules! db_ensure {
+    ($cond:expr, $($arg:tt)*) => {
+        if !$cond {
+            return Err(AptosDbError::Other(format!($($arg)*)));
+        }
+    };
 }

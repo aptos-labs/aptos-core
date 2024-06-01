@@ -269,7 +269,7 @@ impl SoliditySignature {
     pub(crate) fn create_default_sig_for_decode_fun(ctx: &Context, fun: &FunctionEnv<'_>) -> Self {
         let fun_name = fun.symbol_pool().string(fun.get_name()).to_string();
         let mut para_type_lst = vec![];
-        for Parameter(para_name, move_ty) in fun.get_parameters() {
+        for Parameter(para_name, move_ty, _) in fun.get_parameters() {
             let solidity_ty = SolidityType::translate_from_move(ctx, &move_ty, true);
             para_type_lst.push((
                 solidity_ty,
@@ -294,7 +294,7 @@ impl SoliditySignature {
     pub(crate) fn create_default_sig_for_encode_fun(ctx: &Context, fun: &FunctionEnv<'_>) -> Self {
         let fun_name = fun.symbol_pool().string(fun.get_name()).to_string();
         let mut para_type_lst = vec![];
-        for Parameter(para_name, move_ty) in fun.get_parameters() {
+        for Parameter(para_name, move_ty, _) in fun.get_parameters() {
             let solidity_ty = SolidityType::translate_from_move(ctx, &move_ty, false);
             para_type_lst.push((
                 solidity_ty,

@@ -130,7 +130,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         let code = std::mem::take(&mut self.code);
         for bytecode in code.into_iter() {
             if let Bytecode::Label(attr_id, label) = bytecode {
-                if !self.code.is_empty() && !self.code[self.code.len() - 1].is_branch() {
+                if !self.code.is_empty() && !self.code[self.code.len() - 1].is_branching() {
                     self.code.push(Bytecode::Jump(attr_id, label));
                 }
             }
@@ -240,7 +240,12 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 ));
                 global_env
                     .find_module(&vec_module)
-                    .expect("unexpected reference to module not found in global env")
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "unexpected reference to module: `{}` not found in global env",
+                            vec_module.display_full(global_env)
+                        )
+                    })
                     .get_id()
             });
 
@@ -262,7 +267,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             MoveBytecode::Pop => {
                 let temp_index = self.temp_stack.pop().unwrap();
                 self.code
-                    .push(mk_call(Operation::Destroy, vec![], vec![temp_index]));
+                    .push(mk_call(Operation::Drop, vec![], vec![temp_index]));
             },
             MoveBytecode::BrTrue(target) => {
                 let temp_index = self.temp_stack.pop().unwrap();
@@ -347,7 +352,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                         self.local_types
                             .push(Type::Reference(ReferenceKind::Immutable, signature));
                         self.code.push(mk_call(
-                            Operation::FreezeRef,
+                            Operation::FreezeRef(true),
                             vec![immutable_ref_index],
                             vec![mutable_ref_index],
                         ));

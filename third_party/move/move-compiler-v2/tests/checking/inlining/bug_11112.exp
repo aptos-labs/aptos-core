@@ -1,0 +1,39 @@
+// -- Model dump before bytecode pipeline
+module 0xcafe::vectors {
+    use std::vector;
+    private fun test_for_each_mut() {
+        {
+          let v: vector<u64> = [Number(1), Number(2), Number(3)];
+          {
+            let s: u64 = 2;
+            {
+              let (v: &mut vector<u64>): (&mut vector<u64>) = Tuple(Borrow(Mutable)(v));
+              {
+                let i: u64 = 0;
+                loop {
+                  if Lt<u64>(i, vector::length<u64>(Freeze(false)(v))) {
+                    {
+                      let (e: &mut u64): (&mut u64) = Tuple(vector::borrow_mut<u64>(v, i));
+                      e = s;
+                      s: u64 = Add<u64>(s, 1)
+                    };
+                    i: u64 = Add<u64>(i, 1)
+                  } else {
+                    break
+                  }
+                }
+              }
+            };
+            if Eq<vector<u64>>(v, [Number(2), Number(3), Number(4)]) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0xcafe::vectors
+
+
+============ bytecode verification succeeded ========

@@ -4,7 +4,9 @@
 
 use crate::transaction_validation::APTOS_TRANSACTION_VALIDATION;
 use aptos_logger::{enabled, Level};
+use aptos_types::transaction::TransactionStatus;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use aptos_vm_types::output::VMOutput;
 use move_binary_format::errors::VMError;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
@@ -33,6 +35,8 @@ pub const ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
 pub const ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
 // Gas payer account missing in gas payer tx
 pub const EGAS_PAYER_ACCOUNT_MISSING: u64 = 1010;
+// Insufficient balance to cover the required deposit.
+pub const EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT: u64 = 1011;
 
 // Specified account is not a multisig account.
 const EACCOUNT_NOT_MULTISIG: u64 = 2002;
@@ -49,6 +53,7 @@ const INVALID_ARGUMENT: u8 = 0x1;
 const LIMIT_EXCEEDED: u8 = 0x2;
 const INVALID_STATE: u8 = 0x3;
 const PERMISSION_DENIED: u8 = 0x5;
+const NOT_FOUND: u8 = 0x6;
 
 fn error_split(code: u64) -> (u8, u64) {
     let reason = code & 0xFFFF;
@@ -74,7 +79,7 @@ pub fn convert_prologue_error(
                 // in the Move repo.
                 (INVALID_STATE, EACCOUNT_NOT_MULTISIG) => StatusCode::ACCOUNT_NOT_MULTISIG,
                 (PERMISSION_DENIED, ENOT_MULTISIG_OWNER) => StatusCode::NOT_MULTISIG_OWNER,
-                (INVALID_ARGUMENT, EMULTISIG_TRANSACTION_NOT_FOUND) => {
+                (NOT_FOUND, EMULTISIG_TRANSACTION_NOT_FOUND) => {
                     StatusCode::MULTISIG_TRANSACTION_NOT_FOUND
                 },
                 (INVALID_ARGUMENT, EMULTISIG_NOT_ENOUGH_APPROVALS) => {
@@ -120,6 +125,9 @@ pub fn convert_prologue_error(
                 },
                 (INVALID_ARGUMENT, EGAS_PAYER_ACCOUNT_MISSING) => {
                     StatusCode::GAS_PAYER_ACCOUNT_MISSING
+                },
+                (INVALID_STATE, EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT) => {
+                    StatusCode::INSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT
                 },
                 (category, reason) => {
                     let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
@@ -210,9 +218,7 @@ pub fn expect_only_successful_execution(
         e @ VMStatus::Error {
             status_code:
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
-                | StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR
-                // TODO[agg_v2](fix) remove special handling of storage errors here
-                | StatusCode::STORAGE_ERROR,
+                | StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
             ..
         } => e,
         status => {
@@ -230,4 +236,8 @@ pub fn expect_only_successful_execution(
             }
         },
     })
+}
+
+pub(crate) fn discarded_output(status_code: StatusCode) -> VMOutput {
+    VMOutput::empty_with_status(TransactionStatus::Discard(status_code))
 }

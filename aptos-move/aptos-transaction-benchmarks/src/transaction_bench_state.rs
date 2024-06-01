@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{transactions, transactions::RAYON_EXEC_POOL};
 use aptos_bitvec::BitVec;
@@ -221,7 +222,8 @@ where
             BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
             None,
         )
-        .expect("VM should not fail to start");
+        .expect("VM should not fail to start")
+        .into_transaction_outputs_forced();
         let exec_time = timer.elapsed().as_millis();
 
         (output, block_size * 1000 / exec_time as usize)
@@ -272,7 +274,8 @@ where
             ),
             None,
         )
-        .expect("VM should not fail to start");
+        .expect("VM should not fail to start")
+        .into_transaction_outputs_forced();
         let exec_time = timer.elapsed().as_millis();
 
         (output, block_size * 1000 / exec_time as usize)

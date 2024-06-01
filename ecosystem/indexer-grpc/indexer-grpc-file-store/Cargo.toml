@@ -16,16 +16,16 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
-aptos-metrics-core  =   { workspace = true }
+aptos-metrics-core = { workspace = true }
 aptos-moving-average = { workspace = true }
-aptos-runtimes = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
-cloud-storage = { workspace = true }
-futures-util = { workspace = true }
+futures = { workspace = true }
 once_cell = { workspace = true }
 redis = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }

@@ -1,0 +1,39 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: &u64
+     var $t1: bool
+     var $t2: &u64
+     var $t3: u64
+  0: $t3 := 5
+  1: $t2 := borrow_local($t3)
+  2: $t1 := ==($t0, $t2)
+  3: return ()
+}
+
+
+Diagnostics:
+error: use of unassigned local `ref`
+  ┌─ tests/uninit-use-checker/v1-borrows/eq_unassigned_local.move:5:9
+  │
+5 │         ref == &x;
+  │         ^^^^^^^^^
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: &u64
+     var $t1: bool
+     var $t2: &u64
+     var $t3: u64
+     # before: { no: $t0, $t1, $t2, $t3 }, after: { no: $t0, $t1, $t2 }
+  0: $t3 := 5
+     # before: { no: $t0, $t1, $t2 }, after: { no: $t0, $t1 }
+  1: $t2 := borrow_local($t3)
+     # before: { no: $t0, $t1 }, after: { no: $t0 }
+  2: $t1 := ==($t0, $t2)
+     # before: { no: $t0 }, after: { no: $t0 }
+  3: return ()
+}

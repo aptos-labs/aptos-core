@@ -8,7 +8,10 @@ use aptos_config::{
     config::{NodeConfig, SECURE_STORAGE_FILENAME},
     keys::ConfigKey,
 };
-use aptos_db::{fast_sync_storage_wrapper::SECONDARY_DB_DIR, LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
+use aptos_db::{
+    common::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME},
+    fast_sync_storage_wrapper::SECONDARY_DB_DIR,
+};
 use aptos_logger::{debug, info};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
@@ -363,6 +366,10 @@ impl Node for LocalNode {
     // local node does not need to expose metric end point
     fn expose_metric(&self) -> Result<u64> {
         Ok(0)
+    }
+
+    fn service_name(&self) -> Option<String> {
+        None
     }
 }
 

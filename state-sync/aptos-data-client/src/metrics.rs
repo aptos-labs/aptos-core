@@ -9,6 +9,7 @@ use aptos_metrics_core::{
 };
 
 // Useful metric constants and labels
+pub const BLOCK_TIMESTAMP_LAG_LABEL: &str = "block_timestamp_lag";
 pub const PRIORITIZED_PEER: &str = "prioritized_peer";
 pub const PROPOSE_TO_SEEN_LATENCY_LABEL: &str = "propose_to_seen_latency";
 pub const PROPOSE_TO_SYNC_LATENCY_LABEL: &str = "propose_to_sync_latency";
@@ -48,6 +49,22 @@ pub static ERROR_RESPONSES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+// Buckets for tracking the number of multi-fetches sent per request
+const MULTI_FETCH_BUCKETS: &[f64] = &[
+    1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 15.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0,
+    80.0, 90.0, 100.0, 150.0, 200.0, 300.0, 400.0, 500.0,
+];
+
+/// Counter for tracking the number of multi-fetches sent per request
+pub static MULTI_FETCHES_PER_REQUEST: Lazy<HistogramVec> = Lazy::new(|| {
+    let histogram_opts = histogram_opts!(
+        "aptos_data_client_multi_fetches_per_request",
+        "Counters related to the number of multi-fetches sent per request",
+        MULTI_FETCH_BUCKETS.to_vec()
+    );
+    register_histogram_vec!(histogram_opts, &["label"]).unwrap()
+});
+
 // Latency buckets for network latencies (seconds)
 const REQUEST_LATENCY_BUCKETS_SECS: &[f64] = &[
     0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 40.0,
@@ -84,12 +101,32 @@ pub static CONNECTED_PEERS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Gauge for tracking the number of connected peers by priority
+pub static CONNECTED_PEERS_AND_PRIORITIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_data_client_connected_peers_and_priorities",
+        "Gauge related to the number of connected peers by priority",
+        &["peer_type"]
+    )
+    .unwrap()
+});
+
 /// Gauge for the highest advertised data
 pub static HIGHEST_ADVERTISED_DATA: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_data_client_highest_advertised_data",
         "Gauge related to the highest advertised data",
         &["data_type"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking the ignored peers (by network)
+pub static IGNORED_PEERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_data_client_ignored_peers",
+        "Gauge related to the number of ignored peers",
+        &["network"]
     )
     .unwrap()
 });
@@ -119,7 +156,7 @@ pub static OPTIMAL_CHUNK_SIZES: Lazy<IntGaugeVec> = Lazy::new(|| {
 const SYNC_LATENCY_BUCKETS_SECS: &[f64] = &[
     0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8,
     1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 3.0, 5.0, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0, 120.0, 180.0,
-    240.0, 300.0, 360.0, 420.0, 480.0, 540.0, 600.0, 1200.0, 1800.0,
+    240.0, 300.0, 360.0, 420.0, 480.0, 540.0, 600.0, 1200.0, 1800.0, 3600.0, 7200.0, 14400.0,
 ];
 
 /// Counter for tracking various sync latencies

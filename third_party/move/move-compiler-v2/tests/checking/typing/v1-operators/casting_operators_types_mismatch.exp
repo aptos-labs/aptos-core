@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: expected `integer` but found a value of type `S`
+  ┌─ tests/checking/typing/v1-operators/casting_operators_types_mismatch.move:4:9
+  │
+4 │         (S { x: true } as u8);
+  │         ^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `integer` but found a value of type `S`
+  ┌─ tests/checking/typing/v1-operators/casting_operators_types_mismatch.move:5:9
+  │
+5 │         (S { x: true } as u64);
+  │         ^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `integer` but found a value of type `S`
+  ┌─ tests/checking/typing/v1-operators/casting_operators_types_mismatch.move:6:9
+  │
+6 │         (S { x: true } as u128);
+  │         ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `integer` but found a value of type `bool`
+  ┌─ tests/checking/typing/v1-operators/casting_operators_types_mismatch.move:7:9
+  │
+7 │         (true as u8);
+  │         ^^^^^^^^^^^^
+
+error: expected `integer` but found a value of type `bool`
+  ┌─ tests/checking/typing/v1-operators/casting_operators_types_mismatch.move:8:9
+  │
+8 │         (true as u64);
+  │         ^^^^^^^^^^^^^
+
+error: expected `integer` but found a value of type `bool`
+  ┌─ tests/checking/typing/v1-operators/casting_operators_types_mismatch.move:9:9
+  │
+9 │         (true as u128);
+  │         ^^^^^^^^^^^^^^
+
+error: expected `integer` but found a value of type `address`
+   ┌─ tests/checking/typing/v1-operators/casting_operators_types_mismatch.move:10:9
+   │
+10 │         (@0x0 as u64);
+   │         ^^^^^^^^^^^^^
+
+error: expected `integer` but found a value of type `address`
+   ┌─ tests/checking/typing/v1-operators/casting_operators_types_mismatch.move:11:9
+   │
+11 │         (@0x0 as u128);
+   │         ^^^^^^^^^^^^^^

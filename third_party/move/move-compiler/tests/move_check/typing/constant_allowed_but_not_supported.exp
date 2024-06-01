@@ -1,18 +1,18 @@
 error[E03009]: unbound variable
-  ┌─ tests/move_check/typing/constant_allowed_but_not_supported.move:4:9
+  ┌─ tests/move_check/typing/constant_allowed_but_not_supported.move:7:9
   │
-4 │         move x;
-  │         ^^^^^^ Invalid move. Unbound variable 'x'
+7 │         move X;
+  │         ^^^^^^ Invalid move. Unbound variable 'X'
 
 error[E03009]: unbound variable
-  ┌─ tests/move_check/typing/constant_allowed_but_not_supported.move:5:9
+  ┌─ tests/move_check/typing/constant_allowed_but_not_supported.move:8:9
   │
-5 │         copy y;
-  │         ^^^^^^ Invalid copy. Unbound variable 'y'
+8 │         copy Y;
+  │         ^^^^^^ Invalid copy. Unbound variable 'Y'
 
-error[E03009]: unbound variable
-  ┌─ tests/move_check/typing/constant_allowed_but_not_supported.move:6:9
+error[E04013]: invalid statement or expression in constant
+  ┌─ tests/move_check/typing/constant_allowed_but_not_supported.move:9:9
   │
-6 │         z;
-  │         ^ Invalid variable usage. Unbound variable 'z'
+9 │         Z;
+  │         ^ Other constants are not supported in constants
 

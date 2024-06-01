@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     error::MempoolError, payload_manager::PayloadManager, state_computer::ExecutionProxy,
@@ -8,7 +9,7 @@ use crate::{
 };
 use aptos_config::config::transaction_filter_type::Filter;
 use aptos_consensus_notifications::{ConsensusNotificationSender, Error};
-use aptos_consensus_types::{block::Block, block_data::BlockData, executed_block::ExecutedBlock};
+use aptos_consensus_types::{block::Block, block_data::BlockData, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
     state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorResult,
@@ -21,15 +22,15 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    system_txn::SystemTransaction,
     transaction::{ExecutionStatus, SignedTransaction, Transaction, TransactionStatus},
+    validator_txn::ValidatorTransaction,
 };
 use futures_channel::oneshot;
 use std::sync::Arc;
 use tokio::runtime::Handle;
 
 struct DummyStateSyncNotifier {
-    invocations: Mutex<Vec<Vec<Transaction>>>,
+    invocations: Mutex<Vec<(Vec<Transaction>, Vec<ContractEvent>)>>,
 }
 
 impl DummyStateSyncNotifier {
@@ -45,9 +46,11 @@ impl ConsensusNotificationSender for DummyStateSyncNotifier {
     async fn notify_new_commit(
         &self,
         transactions: Vec<Transaction>,
-        _reconfiguration_events: Vec<ContractEvent>,
+        subscribable_events: Vec<ContractEvent>,
     ) -> Result<(), Error> {
-        self.invocations.lock().push(transactions);
+        self.invocations
+            .lock()
+            .push((transactions, subscribable_events));
         Ok(())
     }
 
@@ -62,9 +65,8 @@ struct DummyTxnNotifier {}
 impl TxnNotifier for DummyTxnNotifier {
     async fn notify_failed_txn(
         &self,
-        _txns: Vec<SignedTransaction>,
-        _compute_results: &StateComputeResult,
-        _block_gas_limit_enabled: bool,
+        _txns: &[SignedTransaction],
+        _statuses: &[TransactionStatus],
     ) -> anyhow::Result<(), MempoolError> {
         Ok(())
     }
@@ -133,7 +135,7 @@ impl BlockExecutorTrait for DummyBlockExecutor {
 
 #[tokio::test]
 #[cfg(test)]
-async fn schedule_compute_should_discover_sys_txns() {
+async fn schedule_compute_should_discover_validator_txns() {
     let executor = Arc::new(DummyBlockExecutor::new());
 
     let execution_policy = ExecutionProxy::new(
@@ -144,12 +146,15 @@ async fn schedule_compute_should_discover_sys_txns() {
         TransactionFilter::new(Filter::empty()),
     );
 
-    let sys_txn_0 = SystemTransaction::dummy(vec![0xFF; 99]);
-    let sys_txn_1 = SystemTransaction::dummy(vec![0xFF; 999]);
+    let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);
+    let validator_txn_1 = ValidatorTransaction::dummy(vec![0xFF; 999]);
 
     let block = Block::new_for_testing(
         HashValue::zero(),
-        BlockData::dummy_with_system_txns(vec![sys_txn_0.clone(), sys_txn_1.clone()]),
+        BlockData::dummy_with_validator_txns(vec![
+            validator_txn_0.clone(),
+            validator_txn_1.clone(),
+        ]),
         None,
     );
 
@@ -161,11 +166,12 @@ async fn schedule_compute_should_discover_sys_txns() {
         Arc::new(NoOpShuffler {}),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
+        false,
     );
 
     // Ensure the dummy executor has received the txns.
     let _ = execution_policy
-        .schedule_compute(&block, HashValue::zero())
+        .schedule_compute(&block, HashValue::zero(), None)
         .await
         .await;
 
@@ -175,14 +181,14 @@ async fn schedule_compute_should_discover_sys_txns() {
         .clone()
         .into_txns();
 
-    let supposed_sys_txn_0 = txns[1].expect_valid().try_as_system_txn().unwrap();
-    let supposed_sys_txn_1 = txns[2].expect_valid().try_as_system_txn().unwrap();
-    assert_eq!(&sys_txn_0, supposed_sys_txn_0);
-    assert_eq!(&sys_txn_1, supposed_sys_txn_1);
+    let supposed_validator_txn_0 = txns[1].expect_valid().try_as_validator_txn().unwrap();
+    let supposed_validator_txn_1 = txns[2].expect_valid().try_as_validator_txn().unwrap();
+    assert_eq!(&validator_txn_0, supposed_validator_txn_0);
+    assert_eq!(&validator_txn_1, supposed_validator_txn_1);
 }
 
 #[tokio::test]
-async fn commit_should_discover_sys_txns() {
+async fn commit_should_discover_validator_txns() {
     let state_sync_notifier = Arc::new(DummyStateSyncNotifier::new());
 
     let execution_policy = ExecutionProxy::new(
@@ -193,24 +199,31 @@ async fn commit_should_discover_sys_txns() {
         TransactionFilter::new(Filter::empty()),
     );
 
-    let sys_txn_0 = SystemTransaction::dummy(vec![0xFF; 99]);
-    let sys_txn_1 = SystemTransaction::dummy(vec![0xFF; 999]);
+    let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);
+    let validator_txn_1 = ValidatorTransaction::dummy(vec![0xFF; 999]);
 
     let block = Block::new_for_testing(
         HashValue::zero(),
-        BlockData::dummy_with_system_txns(vec![sys_txn_0.clone(), sys_txn_1.clone()]),
+        BlockData::dummy_with_validator_txns(vec![
+            validator_txn_0.clone(),
+            validator_txn_1.clone(),
+        ]),
         None,
     );
 
-    // Eventually 4 txns: block metadata, sys txn 0, sys txn 1, state checkpoint.
+    // Eventually 3 txns: block metadata, validator txn 0, validator txn 1.
     let state_compute_result = StateComputeResult::new_dummy_with_compute_status(vec![
             TransactionStatus::Keep(
                 ExecutionStatus::Success
             );
-            4
+            3
         ]);
 
-    let blocks = vec![Arc::new(ExecutedBlock::new(block, state_compute_result))];
+    let blocks = vec![Arc::new(PipelinedBlock::new(
+        block,
+        vec![],
+        state_compute_result,
+    ))];
     let epoch_state = EpochState::empty();
 
     execution_policy.new_epoch(
@@ -219,12 +232,13 @@ async fn commit_should_discover_sys_txns() {
         Arc::new(NoOpShuffler {}),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
+        false,
     );
 
     let (tx, rx) = oneshot::channel::<()>();
 
     let callback = Box::new(
-        move |_a: &[Arc<ExecutedBlock>], _b: LedgerInfoWithSignatures| {
+        move |_a: &[Arc<PipelinedBlock>], _b: LedgerInfoWithSignatures| {
             tx.send(()).unwrap();
         },
     );
@@ -241,10 +255,10 @@ async fn commit_should_discover_sys_txns() {
     let _ = rx.await;
 
     // Get all txns that state sync was notified with.
-    let txns = state_sync_notifier.invocations.lock()[0].clone();
+    let (txns, _) = state_sync_notifier.invocations.lock()[0].clone();
 
-    let supposed_sys_txn_0 = txns[1].try_as_system_txn().unwrap();
-    let supposed_sys_txn_1 = txns[2].try_as_system_txn().unwrap();
-    assert_eq!(&sys_txn_0, supposed_sys_txn_0);
-    assert_eq!(&sys_txn_1, supposed_sys_txn_1);
+    let supposed_validator_txn_0 = txns[1].try_as_validator_txn().unwrap();
+    let supposed_validator_txn_1 = txns[2].try_as_validator_txn().unwrap();
+    assert_eq!(&validator_txn_0, supposed_validator_txn_0);
+    assert_eq!(&validator_txn_1, supposed_validator_txn_1);
 }

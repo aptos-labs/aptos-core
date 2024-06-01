@@ -1,4 +1,4 @@
-//#publish --print-bytecode
+//#publish
 module 0xcafe::vectors {
     use std::vector;
     public entry fun guess_flips(flips: vector<u8>) {

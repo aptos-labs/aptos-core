@@ -15,6 +15,8 @@ use crate::{
     },
     peer_states::{ErrorType, PeerStates},
     poller::DataSummaryPoller,
+    priority,
+    priority::PeerPriority,
     utils,
 };
 use aptos_config::{
@@ -23,7 +25,7 @@ use aptos_config::{
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::Mutex;
-use aptos_logger::{debug, info, sample, sample::SampleRate, trace, warn};
+use aptos_logger::{info, sample, sample::SampleRate, trace, warn};
 use aptos_network::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
     protocols::network::RpcError,
@@ -52,12 +54,20 @@ use aptos_types::{
 };
 use arc_swap::ArcSwap;
 use async_trait::async_trait;
+use futures::{stream::FuturesUnordered, StreamExt};
 use maplit::hashset;
-use std::{collections::HashSet, fmt, ops::Deref, sync::Arc, time::Duration};
+use std::{
+    cmp::min,
+    collections::{BTreeMap, HashSet},
+    fmt,
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::runtime::Handle;
 
 // Useful constants
-const PEER_LOG_FREQ_SECS: u64 = 10;
+const PEER_METRICS_FREQ_SECS: u64 = 5; // The frequency to update peer metrics and logs
 
 /// An [`AptosDataClientInterface`] that fulfills requests from remote peers' Storage Service
 /// over AptosNet.
@@ -145,9 +155,47 @@ impl AptosDataClient {
         self.storage_service_client.get_peers_and_metadata()
     }
 
-    /// Updates the logs and metrics for the peer request distributions
-    pub fn update_peer_request_logs_and_metrics(&self) {
+    /// Updates the metrics and logs for peer states. This includes
+    /// peer priorities and request distributions.
+    pub fn update_peer_metrics_and_logs(&self) {
+        // Update the peer request logs and metrics
         self.peer_states.update_peer_request_logs_and_metrics();
+
+        // Update the peer priority metrics and logs (infrequently)
+        sample!(
+            SampleRate::Duration(Duration::from_secs(PEER_METRICS_FREQ_SECS)),
+            {
+                // Update the priority and regular peer metrics
+                match self.get_priority_and_regular_peers() {
+                    Ok((priority_peers, regular_peers)) => {
+                        update_priority_and_regular_peer_metrics(&priority_peers, &regular_peers);
+                    },
+                    Err(error) => {
+                        warn!(
+                            (LogSchema::new(LogEntry::PeerStates)
+                                .event(LogEvent::PriorityAndRegularPeers)
+                                .message("Unable to update priority and regular peer metrics!")
+                                .error(&error))
+                        );
+                    },
+                };
+
+                // Update the fine-grained peer priority metrics
+                match self.get_peers_by_priorities() {
+                    Ok(peers_by_priorities) => {
+                        update_peer_priority_metrics(&peers_by_priorities);
+                    },
+                    Err(error) => {
+                        warn!(
+                            (LogSchema::new(LogEntry::PeerStates)
+                                .event(LogEvent::PriorityPeerCategories)
+                                .message("Unable to update peer priority metrics!")
+                                .error(&error))
+                        );
+                    },
+                };
+            }
+        );
     }
 
     /// Update a peer's storage summary
@@ -183,60 +231,218 @@ impl AptosDataClient {
         Ok(())
     }
 
-    /// Chooses a peer randomly weighted by distance and
+    /// Chooses peers randomly weighted by distance and
     /// latency from the given set of serviceable peers.
-    fn choose_random_peer_by_distance_and_latency(
+    fn choose_random_peers_by_distance_and_latency(
         &self,
-        request: &StorageServiceRequest,
         serviceable_peers: HashSet<PeerNetworkId>,
-    ) -> Result<PeerNetworkId, Error> {
-        // Choose a peer weighted by distance and latency
-        if let Some(peer) = utils::choose_random_peer_by_distance_and_latency(
+        num_peers_to_choose: usize,
+    ) -> HashSet<PeerNetworkId> {
+        // Choose peers weighted by distance and latency
+        let selected_peers = utils::choose_random_peers_by_distance_and_latency(
             serviceable_peers.clone(),
             self.get_peers_and_metadata(),
-        ) {
-            return Ok(peer); // Return the peer if we found one
-        }
+            num_peers_to_choose,
+        );
 
-        // Otherwise, simply select a peer at random
-        self.choose_random_peer(request, serviceable_peers)
+        // Extend the selected peers with random peers (if necessary)
+        utils::extend_with_random_peers(selected_peers, serviceable_peers, num_peers_to_choose)
     }
 
-    /// Choose a connected peer that can service the given request.
-    /// Returns an error if no such peer can be found.
-    pub(crate) fn choose_peer_for_request(
+    /// Chooses several connected peers to service the given request.
+    /// Returns an error if no single peer can service the request.
+    pub(crate) fn choose_peers_for_request(
         &self,
         request: &StorageServiceRequest,
-    ) -> crate::error::Result<PeerNetworkId, Error> {
-        // All requests should be sent to prioritized peers (if possible).
-        // If none can handle the request, fall back to the regular peers.
-        let (priority_peers, regular_peers) = self.get_priority_and_regular_peers()?;
-        let priority_serviceable = self.identify_serviceable(priority_peers, request);
-        let serviceable_peers = if !priority_serviceable.is_empty() {
-            priority_serviceable
+    ) -> crate::error::Result<HashSet<PeerNetworkId>, Error> {
+        // Get all peers grouped by priorities
+        let peers_by_priorities = self.get_peers_by_priorities()?;
+
+        // Identify the peers that can service the request (ordered by priority)
+        let mut serviceable_peers_by_priorities = vec![];
+        for priority in PeerPriority::get_all_ordered_priorities() {
+            // Identify the serviceable peers for the priority
+            let peers = self.identify_serviceable(&peers_by_priorities, priority, request);
+
+            // Add the serviceable peers to the ordered list
+            serviceable_peers_by_priorities.push(peers);
+        }
+
+        // If the request is a subscription request, select a single
+        // peer (as we can only subscribe to a single peer at a time).
+        if request.data_request.is_subscription_request() {
+            return self
+                .choose_peer_for_subscription_request(request, serviceable_peers_by_priorities);
+        }
+
+        // Otherwise, determine the number of peers to select for the request
+        let multi_fetch_config = self.data_client_config.data_multi_fetch_config;
+        let num_peers_for_request = if multi_fetch_config.enable_multi_fetch {
+            // Calculate the total number of priority serviceable peers
+            let mut num_serviceable_peers = 0;
+            for (index, peers) in serviceable_peers_by_priorities.iter().enumerate() {
+                // Only include the lowest priority peers if no other peers are
+                // available (the lowest priority peers are generally unreliable).
+                if (num_serviceable_peers == 0)
+                    || (index < serviceable_peers_by_priorities.len() - 1)
+                {
+                    num_serviceable_peers += peers.len();
+                }
+            }
+
+            // Calculate the number of peers to select for the request
+            let peer_ratio_for_request =
+                num_serviceable_peers / multi_fetch_config.multi_fetch_peer_bucket_size;
+            let mut num_peers_for_request = multi_fetch_config.min_peers_for_multi_fetch
+                + (peer_ratio_for_request * multi_fetch_config.additional_requests_per_peer_bucket);
+
+            // Bound the number of peers by the number of serviceable peers
+            num_peers_for_request = min(num_peers_for_request, num_serviceable_peers);
+
+            // Ensure the number of peers is no larger than the maximum
+            min(
+                num_peers_for_request,
+                multi_fetch_config.max_peers_for_multi_fetch,
+            )
         } else {
-            self.identify_serviceable(regular_peers, request)
+            1 // Multi-fetch is disabled (only select a single peer)
         };
 
-        // Identify the peer based on the request type
-        if request.data_request.is_subscription_request() {
-            // Choose a peer to handle the subscription request
-            self.choose_peer_for_subscription_request(request, serviceable_peers)
-        } else if request.data_request.is_optimistic_fetch() {
-            // Choose a peer to handle the optimistic fetch request
-            self.choose_random_peer_by_distance_and_latency(request, serviceable_peers)
+        // Verify that we have at least one peer to service the request
+        if num_peers_for_request == 0 {
+            return Err(Error::DataIsUnavailable(format!(
+                "No peers are available to service the given request: {:?}",
+                request
+            )));
+        }
+
+        // Choose the peers based on the request type
+        if request.data_request.is_optimistic_fetch() {
+            self.choose_peers_for_optimistic_fetch(
+                request,
+                serviceable_peers_by_priorities,
+                num_peers_for_request,
+            )
         } else {
-            // Choose the peer randomly weighted by latency
-            self.choose_random_peer_by_latency(request, serviceable_peers)
+            self.choose_peers_for_specific_data_request(
+                request,
+                serviceable_peers_by_priorities,
+                num_peers_for_request,
+            )
         }
     }
 
-    /// Choose a peer that can service the given subscription request
+    /// Chooses several peers to service the given optimistic fetch
+    /// request. Peers are selected first by priority, and then by
+    /// validator distance and latency (within priority groups).
+    fn choose_peers_for_optimistic_fetch(
+        &self,
+        request: &StorageServiceRequest,
+        serviceable_peers_by_priorities: Vec<HashSet<PeerNetworkId>>,
+        num_peers_for_request: usize,
+    ) -> crate::error::Result<HashSet<PeerNetworkId>, Error> {
+        // Select peers by priority (starting with the highest priority first)
+        let mut selected_peers = HashSet::new();
+        for serviceable_peers in serviceable_peers_by_priorities {
+            // Select peers by distance and latency
+            let num_peers_remaining = num_peers_for_request.saturating_sub(selected_peers.len());
+            let peers = self.choose_random_peers_by_distance_and_latency(
+                serviceable_peers,
+                num_peers_remaining,
+            );
+
+            // Add the peers to the entire set
+            selected_peers.extend(peers);
+
+            // If we have selected enough peers, return early
+            if selected_peers.len() >= num_peers_for_request {
+                return Ok(selected_peers);
+            }
+        }
+
+        // If selected peers is empty, return an error
+        if !selected_peers.is_empty() {
+            Ok(selected_peers)
+        } else {
+            Err(Error::DataIsUnavailable(format!(
+                "Unable to select peers for optimistic fetch request: {:?}",
+                request
+            )))
+        }
+    }
+
+    /// Chooses several peers to service the specific data request.
+    /// Peers are selected first by priority, and then by latency
+    /// (within priority groups).
+    fn choose_peers_for_specific_data_request(
+        &self,
+        request: &StorageServiceRequest,
+        serviceable_peers_by_priorities: Vec<HashSet<PeerNetworkId>>,
+        num_peers_for_request: usize,
+    ) -> crate::error::Result<HashSet<PeerNetworkId>, Error> {
+        // Select peers by priority (starting with the highest priority first)
+        let mut selected_peers = HashSet::new();
+        for serviceable_peers in serviceable_peers_by_priorities {
+            // Select peers by distance and latency
+            let num_peers_remaining = num_peers_for_request.saturating_sub(selected_peers.len());
+            let peers = self.choose_random_peers_by_latency(serviceable_peers, num_peers_remaining);
+
+            // Add the peers to the entire set
+            selected_peers.extend(peers);
+
+            // If we have selected enough peers, return early
+            if selected_peers.len() >= num_peers_for_request {
+                return Ok(selected_peers);
+            }
+        }
+
+        // If selected peers is empty, return an error
+        if !selected_peers.is_empty() {
+            Ok(selected_peers)
+        } else {
+            Err(Error::DataIsUnavailable(format!(
+                "Unable to select peers for specific data request: {:?}",
+                request
+            )))
+        }
+    }
+
+    /// Chooses a single peer to service the given subscription request.
+    /// Peers are selected first by priority, and then by validator
+    /// distance and latency (within priority groups).
     fn choose_peer_for_subscription_request(
         &self,
         request: &StorageServiceRequest,
+        serviceable_peers_by_priorities: Vec<HashSet<PeerNetworkId>>,
+    ) -> crate::error::Result<HashSet<PeerNetworkId>, Error> {
+        // Prioritize peer selection by choosing the highest priority peer first
+        for serviceable_peers in serviceable_peers_by_priorities {
+            if let Some(selected_peer) =
+                self.choose_serviceable_peer_for_subscription_request(request, serviceable_peers)?
+            {
+                return Ok(hashset![selected_peer]); // A peer was found!
+            }
+        }
+
+        // Otherwise, no peer was selected, return an error
+        Err(Error::DataIsUnavailable(format!(
+            "Unable to select peers for subscription request: {:?}",
+            request
+        )))
+    }
+
+    /// Chooses a peer that can service the given subscription request.
+    /// If not peer can service the request, None is returned.
+    fn choose_serviceable_peer_for_subscription_request(
+        &self,
+        request: &StorageServiceRequest,
         serviceable_peers: HashSet<PeerNetworkId>,
-    ) -> crate::error::Result<PeerNetworkId, Error> {
+    ) -> crate::error::Result<Option<PeerNetworkId>, Error> {
+        // If there are no serviceable peers, return None
+        if serviceable_peers.is_empty() {
+            return Ok(None);
+        }
+
         // Get the stream ID from the request
         let request_stream_id = match &request.data_request {
             DataRequest::SubscribeTransactionsWithProof(request) => {
@@ -265,74 +471,71 @@ impl AptosDataClient {
             if subscription_state.subscription_stream_id == request_stream_id {
                 // The stream IDs match. Verify that the request is still serviceable.
                 let peer_network_id = subscription_state.peer_network_id;
-                if serviceable_peers.contains(&peer_network_id) {
+                return if serviceable_peers.contains(&peer_network_id) {
                     // The previously chosen peer can still service the request
                     *active_subscription_state = Some(subscription_state);
-                    return Ok(peer_network_id);
+                    Ok(Some(peer_network_id))
                 } else {
-                    // The previously chosen peer can no longer service
-                    // the request, so we need to return an error.
-                    return Err(Error::DataIsUnavailable(format!(
-                        "The peer that we were previously subscribing to can no longer service \
-                         the subscriptions! Peer: {:?}, request: {:?}",
+                    // The previously chosen peer is either: (i) unable to service
+                    // the request; or (ii) no longer the highest priority peer. So
+                    // we need to return an error so the stream will be terminated.
+                    Err(Error::DataIsUnavailable(format!(
+                        "The peer that we were previously subscribing to should no \
+                        longer service the subscriptions! Peer: {:?}, request: {:?}",
                         peer_network_id, request
-                    )));
-                }
+                    )))
+                };
             }
         }
 
-        // Otherwise, we need to choose a new peer and update the subscription state
-        let peer_network_id =
-            self.choose_random_peer_by_distance_and_latency(request, serviceable_peers)?;
-        let subscription_state = SubscriptionState::new(peer_network_id, request_stream_id);
-        *active_subscription_state = Some(subscription_state);
+        // Otherwise, choose a new peer to handle the subscription request
+        let selected_peer = self
+            .choose_random_peers_by_distance_and_latency(serviceable_peers, 1)
+            .into_iter()
+            .next();
 
-        Ok(peer_network_id)
+        // If a peer was selected, update the active subscription state
+        if let Some(selected_peer) = selected_peer {
+            let subscription_state = SubscriptionState::new(selected_peer, request_stream_id);
+            *active_subscription_state = Some(subscription_state);
+        }
+
+        Ok(selected_peer)
     }
 
-    /// Chooses a peer at random from the given set of serviceable peers
-    fn choose_random_peer(
+    /// Chooses peers randomly weighted by latency from the given set of serviceable peers
+    fn choose_random_peers_by_latency(
         &self,
-        request: &StorageServiceRequest,
         serviceable_peers: HashSet<PeerNetworkId>,
-    ) -> Result<PeerNetworkId, Error> {
-        utils::choose_random_peer(serviceable_peers).ok_or_else(|| {
-            Error::DataIsUnavailable(format!(
-                "Unable to select random peer for request: {:?}",
-                request
-            ))
-        })
-    }
-
-    /// Chooses a peer randomly weighted by latency from the given set of serviceable peers
-    fn choose_random_peer_by_latency(
-        &self,
-        request: &StorageServiceRequest,
-        serviceable_peers: HashSet<PeerNetworkId>,
-    ) -> Result<PeerNetworkId, Error> {
-        // Choose a peer weighted by latency
-        let peer_set = utils::choose_peers_by_latency(
+        num_peers_to_choose: usize,
+    ) -> HashSet<PeerNetworkId> {
+        // Choose peers weighted by latency
+        let selected_peers = utils::choose_peers_by_latency(
             self.data_client_config.clone(),
-            1,
+            num_peers_to_choose as u64,
             serviceable_peers.clone(),
             self.get_peers_and_metadata(),
             true,
         );
-        if let Some(peer) = peer_set.into_iter().next() {
-            return Ok(peer); // Return the peer if we found one
-        }
 
-        // Otherwise, simply select a peer at random
-        self.choose_random_peer(request, serviceable_peers)
+        // Extend the selected peers with random peers (if necessary)
+        utils::extend_with_random_peers(selected_peers, serviceable_peers, num_peers_to_choose)
     }
 
-    /// Identifies the peers in the given set of prospective peers
-    /// that can service the specified request.
+    /// Identifies the peers with the specified priority that can service the given request
     fn identify_serviceable(
         &self,
-        prospective_peers: HashSet<PeerNetworkId>,
+        peers_by_priorities: &BTreeMap<PeerPriority, HashSet<PeerNetworkId>>,
+        priority: PeerPriority,
         request: &StorageServiceRequest,
     ) -> HashSet<PeerNetworkId> {
+        // Get the peers for the specified priority
+        let prospective_peers = peers_by_priorities
+            .get(&priority)
+            .unwrap_or(&hashset![])
+            .clone();
+
+        // Identify and return the serviceable peers
         prospective_peers
             .into_iter()
             .filter(|peer| {
@@ -346,26 +549,54 @@ impl AptosDataClient {
     fn get_all_connected_peers(&self) -> crate::error::Result<HashSet<PeerNetworkId>, Error> {
         let connected_peers = self.storage_service_client.get_available_peers()?;
         if connected_peers.is_empty() {
-            return Err(Error::DataIsUnavailable(
-                "No connected AptosNet peers!".to_owned(),
+            return Err(Error::NoConnectedPeers(
+                "No available peers found!".to_owned(),
             ));
         }
 
         Ok(connected_peers)
     }
 
-    /// Returns all priority and regular peers
+    /// Returns all peers grouped by priorities
+    fn get_peers_by_priorities(
+        &self,
+    ) -> crate::error::Result<BTreeMap<PeerPriority, HashSet<PeerNetworkId>>, Error> {
+        // Get all connected peers
+        let all_connected_peers = self.get_all_connected_peers()?;
+
+        // Group the peers by priority
+        let mut peers_by_priorities = BTreeMap::new();
+        for peer in all_connected_peers {
+            // Get the priority for the peer
+            let priority = priority::get_peer_priority(
+                self.base_config.clone(),
+                self.get_peers_and_metadata(),
+                &peer,
+            );
+
+            // Insert the peer into the priority map
+            peers_by_priorities
+                .entry(priority)
+                .or_insert_with(HashSet::new)
+                .insert(peer);
+        }
+
+        Ok(peers_by_priorities)
+    }
+
+    /// Returns all priority and regular peers. We define "priority peers" as
+    /// high-priority peers only, and "regular peers" as all other priority categories.
     pub fn get_priority_and_regular_peers(
         &self,
     ) -> crate::error::Result<(HashSet<PeerNetworkId>, HashSet<PeerNetworkId>), Error> {
         // Get all connected peers
         let all_connected_peers = self.get_all_connected_peers()?;
 
-        // Filter the peers based on priority
+        // Gather the priority and regular peers
         let mut priority_peers = hashset![];
         let mut regular_peers = hashset![];
         for peer in all_connected_peers {
-            if utils::is_priority_peer(
+            if priority::is_high_priority_peer(
                 self.base_config.clone(),
                 self.get_peers_and_metadata(),
                 &peer,
@@ -376,37 +607,84 @@ impl AptosDataClient {
             }
         }
 
-        // Log the peers, periodically.
-        sample!(
-            SampleRate::Duration(Duration::from_secs(PEER_LOG_FREQ_SECS)),
-            update_connected_peer_metrics(priority_peers.len(), regular_peers.len());
-        );
-
         Ok((priority_peers, regular_peers))
     }
 
-    /// Sends a request (to an undecided peer) and decodes the response
+    /// Sends the specified storage request to a number of peers
+    /// in the network and decodes the first successful response.
     async fn send_request_and_decode<T, E>(
         &self,
         request: StorageServiceRequest,
         request_timeout_ms: u64,
     ) -> crate::error::Result<Response<T>>
     where
-        T: TryFrom<StorageServiceResponse, Error = E>,
+        T: TryFrom<StorageServiceResponse, Error = E> + Send + Sync + 'static,
         E: Into<Error>,
     {
-        let peer = self.choose_peer_for_request(&request).map_err(|error| {
-            debug!(
-                (LogSchema::new(LogEntry::StorageServiceRequest)
-                    .event(LogEvent::PeerSelectionError)
-                    .message("Unable to select peer for request!")
-                    .error(&error))
-            );
-            error
-        })?;
-        let _timer = start_request_timer(&metrics::REQUEST_LATENCIES, &request.get_label(), peer);
-        self.send_request_to_peer_and_decode(peer, request, request_timeout_ms)
-            .await
+        // Select the peers to service the request
+        let peers = self.choose_peers_for_request(&request)?;
+
+        // If peers is empty, return an error
+        if peers.is_empty() {
+            return Err(Error::DataIsUnavailable(format!(
+                "No peers were chosen to service the given request: {:?}",
+                request
+            )));
+        }
+
+        // Update the metrics for the number of selected peers (for the request)
+        metrics::observe_value_with_label(
+            &metrics::MULTI_FETCHES_PER_REQUEST,
+            &request.get_label(),
+            peers.len() as f64,
+        );
+
+        // Send the requests to the peers (and gather abort handles for the tasks)
+        let mut sent_requests = FuturesUnordered::new();
+        let mut abort_handles = vec![];
+        for peer in peers {
+            // Send the request to the peer
+            let aptos_data_client = self.clone();
+            let request = request.clone();
+            let sent_request = tokio::spawn(async move {
+                aptos_data_client
+                    .send_request_to_peer_and_decode(peer, request, request_timeout_ms)
+                    .await
+            });
+            let abort_handle = sent_request.abort_handle();
+
+            // Gather the tasks and abort handles
+            sent_requests.push(sent_request);
+            abort_handles.push(abort_handle);
+        }
+
+        // Wait for the first successful response and abort all other tasks.
+        // If all requests fail, gather the errors and return them.
+        let num_sent_requests = sent_requests.len();
+        let mut sent_request_errors = vec![];
+        for _ in 0..num_sent_requests {
+            if let Ok(response_result) = sent_requests.select_next_some().await {
+                match response_result {
+                    Ok(response) => {
+                        // We received a valid response. Abort all pending tasks.
+                        for abort_handle in abort_handles {
+                            abort_handle.abort();
+                        }
+                        return Ok(response); // Return the response
+                    },
+                    Err(error) => {
+                        // Gather the error and continue waiting for a response
+                        sent_request_errors.push(error)
+                    },
+                }
+            }
+        }
+
+        // Otherwise, all requests failed and we should return an error
+        Err(Error::DataIsUnavailable(format!(
+            "All {} attempts failed for the given request: {:?}. Errors: {:?}",
+            num_sent_requests, request, sent_request_errors
+        )))
     }
 
     /// Sends a request to a specific peer and decodes the response
@@ -417,16 +695,32 @@ impl AptosDataClient {
         request_timeout_ms: u64,
     ) -> crate::error::Result<Response<T>>
     where
-        T: TryFrom<StorageServiceResponse, Error = E>,
+        T: TryFrom<StorageServiceResponse, Error = E> + Send + 'static,
         E: Into<Error>,
     {
+        // Start the timer for the request
+        let timer = start_request_timer(&metrics::REQUEST_LATENCIES, &request.get_label(), peer);
+
+        // Get the response from the peer
         let response = self
             .send_request_to_peer(peer, request.clone(), request_timeout_ms)
-            .await?;
+            .await;
 
-        let (context, storage_response) = response.into_parts();
+        // If an error occurred, stop the timer (without updating the metrics)
+        // and return the error. Otherwise, stop the timer and update the metrics.
+        let storage_response = match response {
+            Ok(storage_response) => {
+                timer.stop_and_record(); // Update the latency metrics
+                storage_response
+            },
+            Err(error) => {
+                timer.stop_and_discard(); // Discard the timer without updating the metrics
+                return Err(error);
+            },
+        };
 
         // Ensure the response obeys the compression requirements
+        let (context, storage_response) = storage_response.into_parts();
         if request.use_compression && !storage_response.is_compressed() {
             return Err(Error::InvalidResponse(format!(
                 "Requested compressed data, but the response was uncompressed! Response: {:?}",
@@ -439,17 +733,22 @@ impl AptosDataClient {
             )));
         }
 
-        // try to convert the storage service enum into the exact variant we're expecting.
-        match T::try_from(storage_response) {
-            Ok(new_payload) => Ok(Response::new(context, new_payload)),
-            // if the variant doesn't match what we're expecting, report the issue.
-            Err(err) => {
-                context
-                    .response_callback
-                    .notify_bad_response(ResponseError::InvalidPayloadDataType);
-                Err(err.into())
-            },
-        }
+        // Try to convert the storage service enum into the exact variant we're expecting.
+        // We do this using spawn_blocking because it involves serde and compression.
+        tokio::task::spawn_blocking(move || {
+            match T::try_from(storage_response) {
+                Ok(new_payload) => Ok(Response::new(context, new_payload)),
+                // If the variant doesn't match what we're expecting, report the issue
+                Err(err) => {
+                    context
+                        .response_callback
+                        .notify_bad_response(ResponseError::InvalidPayloadDataType);
+                    Err(err.into())
+                },
+            }
+        })
+        .await
+        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?
     }
 
     /// Sends a request to a specific peer
@@ -511,10 +810,7 @@ impl AptosDataClient {
                     peer,
                     request,
                 };
-                let context = ResponseContext {
-                    id,
-                    response_callback: Box::new(response_callback),
-                };
+                let context = ResponseContext::new(id, Box::new(response_callback));
                 Ok(Response::new(context, response))
             },
             Err(error) => {
@@ -577,7 +873,7 @@ impl AptosDataClient {
         data_request: DataRequest,
     ) -> crate::error::Result<Response<T>>
     where
-        T: TryFrom<StorageServiceResponse, Error = E>,
+        T: TryFrom<StorageServiceResponse, Error = E> + Send + Sync + 'static,
         E: Into<Error>,
     {
         let storage_request =
@@ -884,8 +1180,13 @@ impl SubscriptionState {
 }
 
 /// Updates the metrics for the number of connected peers (priority and regular)
-fn update_connected_peer_metrics(num_priority_peers: usize, num_regular_peers: usize) {
+fn update_priority_and_regular_peer_metrics(
+    priority_peers: &HashSet<PeerNetworkId>,
+    regular_peers: &HashSet<PeerNetworkId>,
+) {
     // Log the number of connected peers
+    let num_priority_peers = priority_peers.len();
+    let num_regular_peers = regular_peers.len();
     info!(
         (LogSchema::new(LogEntry::PeerStates)
             .event(LogEvent::PriorityAndRegularPeers)
@@ -906,4 +1207,34 @@ fn update_connected_peer_metrics(num_priority_peers: usize, num_regular_peers: u
         REGULAR_PEER,
         num_regular_peers as u64,
     );
+}
+
+/// Updates the metrics for the number of connected peers by priority
+fn update_peer_priority_metrics(
+    peers_by_priority: &BTreeMap<PeerPriority, HashSet<PeerNetworkId>>,
+) {
+    // Calculate the number of peers by priority
+    let mut num_peers_by_priority = BTreeMap::new();
+    for (priority, peers) in peers_by_priority {
+        num_peers_by_priority.insert(priority, peers.len());
+    }
+
+    // Log the number of connected peers by priority
+    info!(
+        (LogSchema::new(LogEntry::PeerStates)
+            .event(LogEvent::PriorityPeerCategories)
+            .message(&format!(
+                "Number of connected peers by priority: {:?}",
+                num_peers_by_priority,
+            )))
+    );
+
+    // Update the connected peer priority metrics
+    for (priority, num_peers) in num_peers_by_priority {
+        set_gauge(
+            &metrics::CONNECTED_PEERS_AND_PRIORITIES,
+            &priority.get_label(),
+            num_peers as u64,
+        );
+    }
 }

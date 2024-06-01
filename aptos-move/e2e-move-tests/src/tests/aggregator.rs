@@ -84,7 +84,8 @@ proptest! {
     #![proptest_config(ProptestConfig {
         // Cases are expensive, few cases is enough.
         cases: 5,
-        result_cache: prop::test_runner::basic_result_cache,
+        // TODO: result cache breaks with proptest v1.1 and above because of this change: https://github.com/proptest-rs/proptest/pull/295.
+        // result_cache: prop::test_runner::basic_result_cache,
         .. ProptestConfig::default()
     })]
 

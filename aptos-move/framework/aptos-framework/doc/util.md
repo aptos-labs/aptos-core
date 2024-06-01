@@ -10,6 +10,8 @@ Utility functions used by the framework modules.
 -  [Function `address_from_bytes`](#0x1_util_address_from_bytes)
 -  [Specification](#@Specification_0)
     -  [Function `from_bytes`](#@Specification_0_from_bytes)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `address_from_bytes`](#@Specification_0_address_from_bytes)
 
 
@@ -84,6 +86,34 @@ owned.
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>The address input bytes should be exactly 32 bytes long.</td>
+<td>Low</td>
+<td>The address_from_bytes function should assert if the length of the input bytes is 32.</td>
+<td>Verified via <a href="#high-level-req-1">address_from_bytes</a>.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="util.md#0x1_util_spec_from_bytes">spec_from_bytes</a>&lt;T&gt;(bytes);
@@ -111,7 +141,8 @@ owned.
 
 
 
-<pre><code><b>aborts_if</b> [abstract] len(bytes) != 32;
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<b>aborts_if</b> [abstract] len(bytes) != 32;
 </code></pre>
 
 

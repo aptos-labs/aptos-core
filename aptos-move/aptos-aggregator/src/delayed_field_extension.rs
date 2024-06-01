@@ -7,21 +7,23 @@ use crate::{
     delta_change_set::DeltaWithMax,
     resolver::DelayedFieldResolver,
     types::{
-        code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
-        DelayedFieldsSpeculativeError, PanicOr, ReadPosition, SnapshotToStringFormula,
-        SnapshotValue,
+        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
+        ReadPosition,
     },
 };
+use aptos_types::delayed_fields::{
+    calculate_width_for_constant_string, calculate_width_for_integer_embedded_string,
+    SnapshotToStringFormula,
+};
 use move_binary_format::errors::PartialVMResult;
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{btree_map::Entry, BTreeMap};
 
 fn get_delayed_field_value_from_storage(
     id: &DelayedFieldID,
     resolver: &dyn DelayedFieldResolver,
 ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
-    resolver
-        .get_delayed_field_value(id)
-        .map_err(|_err| PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(*id)))
+    resolver.get_delayed_field_value(id)
 }
 
 /// Stores all information about aggregators (how many have been created or
@@ -40,6 +42,17 @@ impl DelayedFieldData {
         input: SignedU128,
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<bool> {
+        self.try_add_or_check_delta(id, max_value, input, resolver, true)
+    }
+
+    pub fn try_add_or_check_delta(
+        &mut self,
+        id: DelayedFieldID,
+        max_value: u128,
+        input: SignedU128,
+        resolver: &dyn DelayedFieldResolver,
+        apply_delta: bool,
+    ) -> PartialVMResult<bool> {
         // No need to record or check or try, if input value exceeds the bound.
         if input.abs() > max_value {
             return Ok(false);
@@ -53,7 +66,7 @@ impl DelayedFieldData {
                     &input,
                     max_value,
                 )?;
-                if result {
+                if result && apply_delta {
                     entry.insert(DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
                         delta: DeltaWithMax::new(input, max_value),
                     }));
@@ -66,7 +79,9 @@ impl DelayedFieldData {
                     DelayedChange::Create(DelayedFieldValue::Aggregator(value)) => {
                         match math.unsigned_add_delta(*value, &input) {
                             Ok(new_value) => {
-                                *value = new_value;
+                                if apply_delta {
+                                    *value = new_value;
+                                }
                                 Ok(true)
                             },
                             Err(_) => Ok(false),
@@ -81,7 +96,7 @@ impl DelayedFieldData {
                             &input,
                             previous_delta.max_value,
                         )?;
-                        if result {
+                        if result && apply_delta {
                             *previous_delta = expect_ok(DeltaWithMax::create_merged_delta(
                                 previous_delta,
                                 &DeltaWithMax::new(input, max_value),
@@ -162,6 +177,7 @@ impl DelayedFieldData {
         &mut self,
         aggregator_id: DelayedFieldID,
         max_value: u128,
+        width: u32,
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<DelayedFieldID> {
         let aggregator = self.delayed_fields.get(&aggregator_id);
@@ -198,36 +214,62 @@ impl DelayedFieldData {
             },
         };
 
-        let snapshot_id = resolver.generate_delayed_field_id();
+        let snapshot_id = resolver.generate_delayed_field_id(width);
         self.delayed_fields.insert(snapshot_id, change);
         Ok(snapshot_id)
     }
 
     pub fn create_new_snapshot(
         &mut self,
-        value: SnapshotValue,
+        value: u128,
+        width: u32,
         resolver: &dyn DelayedFieldResolver,
     ) -> DelayedFieldID {
-        let change = DelayedChange::Create(value.into());
-        let snapshot_id = resolver.generate_delayed_field_id();
+        let change = DelayedChange::Create(DelayedFieldValue::Snapshot(value));
+        let snapshot_id = resolver.generate_delayed_field_id(width);
 
         self.delayed_fields.insert(snapshot_id, change);
         snapshot_id
+    }
+
+    pub fn create_new_derived(
+        &mut self,
+        value: Vec<u8>,
+        resolver: &dyn DelayedFieldResolver,
+    ) -> PartialVMResult<DelayedFieldID> {
+        // cast shouldn't fail because we assert on low limit for value before this call.
+        let width =
+            u32::try_from(calculate_width_for_constant_string(value.len())).map_err(|_| {
+                code_invariant_error("Calculated DerivedStringSnapshot width exceeds u32")
+            })?;
+        let change = DelayedChange::Create(DelayedFieldValue::Derived(value));
+        let snapshot_id = resolver.generate_delayed_field_id(width);
+
+        self.delayed_fields.insert(snapshot_id, change);
+        Ok(snapshot_id)
     }
 
     pub fn read_snapshot(
         &mut self,
         snapshot_id: DelayedFieldID,
         resolver: &dyn DelayedFieldResolver,
-    ) -> PartialVMResult<SnapshotValue> {
-        Ok(SnapshotValue::try_from(self.read_value(
-            snapshot_id,
-            resolver,
-            ReadPosition::AfterCurrentTxn,
-        )?)?)
+    ) -> PartialVMResult<u128> {
+        Ok(self
+            .read_value(snapshot_id, resolver, ReadPosition::AfterCurrentTxn)?
+            .into_snapshot_value()?)
     }
 
-    pub fn string_concat(
+    pub fn read_derived(
+        &mut self,
+        snapshot_id: DelayedFieldID,
+        resolver: &dyn DelayedFieldResolver,
+    ) -> PartialVMResult<Vec<u8>> {
+        Ok(self
+            .read_value(snapshot_id, resolver, ReadPosition::AfterCurrentTxn)?
+            .into_derived_value()?)
+    }
+
+    pub fn derive_string_concat(
         &mut self,
         snapshot_id: DelayedFieldID,
         prefix: Vec<u8>,
@@ -235,6 +277,12 @@ impl DelayedFieldData {
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<DelayedFieldID> {
         let snapshot = self.delayed_fields.get(&snapshot_id);
+        // cast shouldn't fail because we assert on low limit for prefix and suffix before this call.
+        let width = u32::try_from(calculate_width_for_integer_embedded_string(
+            prefix.len() + suffix.len(),
+            snapshot_id,
+        )?)
+        .map_err(|_| code_invariant_error("Calculated DerivedStringSnapshot width exceeds u32"))?;
         let formula = SnapshotToStringFormula::Concat { prefix, suffix };
 
         let change = match snapshot {
@@ -256,7 +304,7 @@ impl DelayedFieldData {
             },
         };
 
-        let new_id = resolver.generate_delayed_field_id();
+        let new_id = resolver.generate_delayed_field_id(width);
         self.delayed_fields.insert(new_id, change);
         Ok(new_id)
     }
@@ -273,13 +321,13 @@ impl DelayedFieldData {
 mod test {
     use super::*;
     use crate::FakeAggregatorView;
-    use claims::{assert_err, assert_ok, assert_ok_eq};
+    use claims::{assert_err, assert_none, assert_ok_eq};
 
     #[test]
     fn test_aggregator_not_in_storage() {
         let resolver = FakeAggregatorView::default();
         let mut data = DelayedFieldData::default();
-        let id = DelayedFieldID::new(200);
+        let id = DelayedFieldID::new_for_test_for_u64(200);
         let max_value = 700;
 
         assert_err!(data.read_aggregator(id, &resolver));
@@ -298,7 +346,7 @@ mod test {
     fn test_operations_on_new_aggregator() {
         let resolver = FakeAggregatorView::default();
         let mut data = DelayedFieldData::default();
-        let id = DelayedFieldID::new(200);
+        let id = DelayedFieldID::new_for_test_for_u64(200);
         let max_value = 200;
 
         data.create_new_aggregator(id);
@@ -307,28 +355,53 @@ mod test {
             get_agg(&data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(0))
         );
-        assert_ok!(data.try_add_delta(id, max_value, SignedU128::Positive(100), &resolver));
+        assert_ok_eq!(
+            data.try_add_or_check_delta(id, max_value, SignedU128::Positive(100), &resolver, false),
+            true
+        );
+        assert_eq!(
+            get_agg(&data, &id),
+            &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(0))
+        );
+
+        assert_ok_eq!(
+            data.try_add_delta(id, max_value, SignedU128::Positive(100), &resolver),
+            true
+        );
         assert_eq!(
             get_agg(&data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(100))
         );
-        assert!(data
-            .try_add_delta(id, max_value, SignedU128::Negative(50), &resolver)
-            .unwrap());
+
+        assert_ok_eq!(
+            data.try_add_or_check_delta(id, max_value, SignedU128::Positive(120), &resolver, false),
+            false
+        );
+        assert_eq!(
+            get_agg(&data, &id),
+            &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(100))
+        );
+
+        assert_ok_eq!(
+            data.try_add_delta(id, max_value, SignedU128::Negative(50), &resolver),
+            true
+        );
         assert_eq!(
             get_agg(&data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(50))
         );
-        assert!(!data
-            .try_add_delta(id, max_value, SignedU128::Negative(70), &resolver)
-            .unwrap());
+        assert_ok_eq!(
+            data.try_add_delta(id, max_value, SignedU128::Negative(70), &resolver),
+            false
+        );
         assert_eq!(
             get_agg(&data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(50))
         );
-        assert!(!data
-            .try_add_delta(id, max_value, SignedU128::Positive(170), &resolver)
-            .unwrap());
+        assert_ok_eq!(
+            data.try_add_delta(id, max_value, SignedU128::Positive(170), &resolver),
+            false
+        );
         assert_eq!(
             get_agg(&data, &id),
             &DelayedChange::Create(DelayedFieldValue::Aggregator(50))
@@ -353,10 +426,24 @@ mod test {
     fn test_successful_operations_in_delta_mode() {
         let mut resolver = FakeAggregatorView::default();
         let mut data = DelayedFieldData::default();
-        let id = DelayedFieldID::new(200);
+        let id = DelayedFieldID::new_for_test_for_u64(200);
         let max_value = 600;
 
         resolver.set_from_aggregator_id(id, 100);
+
+        assert_ok_eq!(
+            data.try_add_or_check_delta(id, max_value, SignedU128::Positive(400), &resolver, false),
+            true
+        );
+        // checks only add to captured reads, not to writes
+        assert_none!(data.delayed_fields.get(&id));
+
+        assert_ok_eq!(
+            data.try_add_or_check_delta(id, max_value, SignedU128::Positive(550), &resolver, false),
+            false
+        );
+        // checks only add to captured reads, not to writes
+        assert_none!(data.delayed_fields.get(&id));
 
         assert_ok_eq!(
             data.try_add_delta(id, max_value, SignedU128::Positive(400), &resolver),
@@ -366,6 +453,16 @@ mod test {
             get_agg(&data, &id),
             &aggregator_delta_change(400, max_value)
         );
+
+        assert_ok_eq!(
+            data.try_add_or_check_delta(id, max_value, SignedU128::Negative(100), &resolver, false),
+            true
+        );
+        assert_eq!(
+            get_agg(&data, &id),
+            &aggregator_delta_change(400, max_value)
+        );
+
         assert_ok_eq!(
             data.try_add_delta(id, max_value, SignedU128::Negative(470), &resolver),
             true
@@ -382,7 +479,7 @@ mod test {
     fn test_aggregator_overflows() {
         let mut resolver = FakeAggregatorView::default();
         let mut data = DelayedFieldData::default();
-        let id = DelayedFieldID::new(600);
+        let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
 
         resolver.set_from_aggregator_id(id, 100);
@@ -417,7 +514,7 @@ mod test {
     fn test_aggregator_underflows() {
         let mut resolver = FakeAggregatorView::default();
         let mut data = DelayedFieldData::default();
-        let id = DelayedFieldID::new(600);
+        let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
 
         resolver.set_from_aggregator_id(id, 200);

@@ -9,6 +9,7 @@
 // multiple, publishable module.
 module 0xABCD::simple {
     use std::error;
+    use std::bcs;
     use std::signer;
     use std::string::{Self, String, utf8};
     use std::vector;
@@ -57,8 +58,51 @@ module 0xABCD::simple {
     // Test simple CPU usage. Loop as defined by the input `count`.
     // Not a true test of CPU usage given the number of instructions
     // used, but a simple reference to computation with no data access.
-    public entry fun loopy(_s: &signer, count: u64) {
+    public entry fun loop_nop(_s: &signer, count: u64) {
         while (count > 0) {
+            count = count - 1;
+        }
+    }
+
+    public entry fun loop_arithmetic(_s: &signer, count: u64) {
+        let a;
+        let b = 0;
+        let c;
+        let d = 0;
+        while (count > 0) {
+            count = count - 1;
+
+            a = b + 1;
+            c = d + 1;
+            b = a + 1;
+            d = b - a;
+            b = c + 1;
+            a = b - c;
+            b = a + 1;
+
+            // can never be true
+            if (a > b && b > c && c > d && d > a) {
+                count = count + 1;
+            }
+        }
+    }
+
+    // Test simple CPU usage. Loop as defined by the input `count`.
+    // Not a true test of CPU usage given the number of instructions
+    // used, but a simple reference to computation with no data access.
+    public entry fun loop_bcs(_s: &signer, count: u64, len: u64) {
+        let vec = vector::empty<u64>();
+        let i = 0;
+        while (i < len) {
+            vector::push_back(&mut vec, i);
+            i = i + 1;
+        };
+
+        let sum: u64 = 0;
+
+        while (count > 0) {
+            let val = bcs::to_bytes(&vec);
+            sum = sum + ((*vector::borrow(&val, 0)) as u64);
             count = count - 1;
         }
     }
@@ -70,7 +114,7 @@ module 0xABCD::simple {
     // There are 2 usages to verify that change:
     // - simply call `get_counter` to see that is the value expected
     // - call `step` as many times as desiered on different version and
-    //   then check the the stores Counter value is the expected one
+    //   then check the stores Counter value is the expected one
     //  (more cumbersome, but with some information about correctness
     //  over time: if `Counter` is the proper sum of all `steps` called
     //  at the different versions).
@@ -94,30 +138,18 @@ module 0xABCD::simple {
     // The idea is that `COUNTER_STEP` is one of the few values (if not the only
     // one) that changes across versions.
     public entry fun step_signer(s: &signer) acquires Counter {
-        let counter = borrow_global_mut<Counter>(signer::address_of(s));
+        let addr = signer::address_of(s);
+        assert!(exists<Counter>(addr), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
+        let counter = borrow_global_mut<Counter>(addr);
         *(&mut counter.count) = counter.count + COUNTER_STEP;
     }
 
     // Get the value behind `Counter`.
     public entry fun get_counter(s: &signer) acquires Counter {
-        let counter = borrow_global<Counter>(signer::address_of(s));
+        let addr = signer::address_of(s);
+        assert!(exists<Counter>(addr), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
+        let counter = borrow_global<Counter>(addr);
         counter.count;
-    }
-
-    public entry fun step_destination(owner: &signer, destination: address) acquires Counter {
-        let value = {
-            assert!(exists<Counter>(destination), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
-
-            let counter = borrow_global_mut<Counter>(destination);
-            *(&mut counter.count) = counter.count + COUNTER_STEP;
-            counter.count
-        };
-        if (exists<Counter>(signer::address_of(owner))) {
-            let counter_owner = borrow_global_mut<Counter>(signer::address_of(owner));
-            *(&mut counter_owner.count) = value;
-        } else {
-            move_to<Counter>(owner, Counter { count: value });
-        }
     }
 
     //
@@ -192,7 +224,7 @@ module 0xABCD::simple {
 
     // Given an `other` address with `Resource` (if `Resource` does not exist on `other`,
     // this funtion returns immediately) it appends the bigger `Resource.data`- between
-    // `other` and `owner` (`signer`) - to the the smaller.
+    // `other` and `owner` (`signer`) - to the smaller.
     // On return the owner of the smaller `Resource` will have its value bigger than
     // the other (the bigger value get appended to the smaller one) or at least 1K.
     // Read is size of 2 rousources/addresses. Write is 1 resource/address (bigger than what was there).

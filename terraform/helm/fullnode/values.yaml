@@ -32,6 +32,7 @@ fullnode:
     full_node_networks:
       # The first item in the array `full_node_networks` must always refer to the public fullnode network
       - network_id: "public"
+        seeds: {}
         identity: {}
         inbound_rate_limit_config:
         outbound_rate_limit_config:
@@ -50,10 +51,10 @@ image:
 resources:
   limits:
     cpu: 14
-    memory: 26Gi
+    memory: 56Gi
   requests:
     cpu: 14
-    memory: 26Gi
+    memory: 56Gi
 
 nodeSelector: {}
 tolerations: []
@@ -70,6 +71,10 @@ service:
   type: ClusterIP
   # -- Whether to expose the node REST API
   exposeApi: true
+  # -- Whether to expose the metrics port on fullnodes
+  exposeMetrics: false
+  # -- Whether to expose the admin port on fullnodes
+  exposeAdmin: false
   # -- The externalTrafficPolicy for the fullnode service
   externalTrafficPolicy:
   # -- If set and if the ServiceType is LoadBalancer, allow traffic to fullnode from these CIDRs
@@ -106,11 +111,11 @@ backup:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 1
-      memory: 1Gi
+      cpu: 4
+      memory: 8Gi
     requests:
-      cpu: 1
-      memory: 1Gi
+      cpu: 4
+      memory: 8Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -137,11 +142,11 @@ backup_verify:
   schedule: "@daily"
   resources:
     limits:
-      cpu: 4
-      memory: 8Gi
+      cpu: 8
+      memory: 32Gi
     requests:
       cpu: 4
-      memory: 8Gi
+      memory: 16Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -151,11 +156,11 @@ backup_compaction:
   schedule: "@daily"
   resources:
     limits:
-      cpu: 1
-      memory: 1Gi
+      cpu: 8
+      memory: 32Gi
     requests:
-      cpu: 1
-      memory: 1Gi
+      cpu: 4
+      memory: 16Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -170,14 +175,15 @@ restore:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 6
-      memory: 15Gi
+      cpu: 16
+      memory: 120Gi
     requests:
-      cpu: 6
-      memory: 15Gi
+      cpu: 16
+      memory: 120Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  enabled: false
   config:
     # -- Which of the below backup configurations to use
     location:
@@ -192,6 +198,12 @@ restore:
     # -- List of trusted waypoints for restore
     trusted_waypoints: []
     # -- Number of concurrent downloads for restore
-    concurrent_downloads: 2
+    concurrent_downloads: 16
     # -- If set, specifies a different era to restore other than the default era set in chain.era
     restore_era:
+    # -- Increase this value to trigger a restore from scratch, wiping the DB.
+    restore_epoch: 0
+    # -- Start from genesis.
+    start_version: 0
+    # -- Restore to the latest version.
+    target_version:

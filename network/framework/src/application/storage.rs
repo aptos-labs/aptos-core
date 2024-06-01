@@ -11,7 +11,7 @@ use crate::{
     ProtocolId,
 };
 use aptos_config::{
-    config::PeerSet,
+    config::{Peer, PeerSet},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_infallible::RwLock;
@@ -76,7 +76,7 @@ impl PeersAndMetadata {
     /// Returns all peers. Note: this will return disconnected and unhealthy peers, so
     /// it is not recommended for applications to use this interface. Instead,
     /// `get_connected_peers_and_metadata()` should be used.
-    pub fn get_all_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
+    pub fn get_all_peers(&self) -> Vec<PeerNetworkId> {
         // Get the cached peers and metadata
         let cached_peers_and_metadata = self.cached_peers_and_metadata.load();
 
@@ -88,7 +88,7 @@ impl PeersAndMetadata {
                 all_peers.push(peer_network_id);
             }
         }
-        Ok(all_peers)
+        all_peers
     }
 
     /// Returns metadata for all peers currently connected to the node
@@ -319,6 +319,19 @@ impl PeersAndMetadata {
                 network_id
             ))
         })
+    }
+
+    /// Returns the trusted peer state for the given peer (if one exists)
+    pub fn get_trusted_peer_state(
+        &self,
+        peer_network_id: &PeerNetworkId,
+    ) -> Result<Option<Peer>, Error> {
+        let trusted_peers = self.get_trusted_peer_set_for_network(&peer_network_id.network_id())?;
+        let trusted_peer_state = trusted_peers
+            .load()
+            .get(&peer_network_id.peer_id())
+            .cloned();
+        Ok(trusted_peer_state)
     }
 
     /// Updates the trusted peer set for the given network ID

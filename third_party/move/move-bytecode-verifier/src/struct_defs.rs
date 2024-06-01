@@ -127,7 +127,7 @@ impl<'a> StructDefGraphBuilder<'a> {
                 if let Some(struct_def_idx) = self.handle_to_def.get(sh_idx) {
                     neighbors
                         .entry(cur_idx)
-                        .or_insert_with(BTreeSet::new)
+                        .or_default()
                         .insert(*struct_def_idx);
                 }
             },
@@ -135,7 +135,7 @@ impl<'a> StructDefGraphBuilder<'a> {
                 if let Some(struct_def_idx) = self.handle_to_def.get(sh_idx) {
                     neighbors
                         .entry(cur_idx)
-                        .or_insert_with(BTreeSet::new)
+                        .or_default()
                         .insert(*struct_def_idx);
                 }
                 for t in inners {

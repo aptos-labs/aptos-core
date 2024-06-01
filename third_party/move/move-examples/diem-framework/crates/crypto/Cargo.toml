@@ -1,0 +1,62 @@
+[package]
+name = "diem-crypto"
+version = "0.0.3"
+authors = ["Diem Association <opensource@diem.com>"]
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+aes-gcm = { workspace = true }
+anyhow = { workspace = true }
+bytes = { workspace = true }
+curve25519-dalek = { workspace = true, package = "curve25519-dalek-fiat", features = ["std"] }
+diem-crypto-derive = { path = "../crypto-derive" }
+digest = { workspace = true }
+ed25519-dalek = { workspace = true, package = "ed25519-dalek-fiat", features = ["std", "serde"] }
+hex = { workspace = true }
+hkdf = { workspace = true }
+mirai-annotations = { workspace = true }
+once_cell = { workspace = true }
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
+rand = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde-name = { workspace = true }
+serde_bytes = { workspace = true }
+sha2 = { workspace = true }
+static_assertions = { workspace = true }
+thiserror = { workspace = true }
+tiny-keccak = { workspace = true, features = ["sha3"] }
+x25519-dalek = { workspace = true, package = "x25519-dalek-fiat", features = ["std"] }
+
+bcs = { workspace = true }
+
+[dev-dependencies]
+bitvec = { workspace = true }
+byteorder = { workspace = true }
+criterion = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+ripemd160 = { workspace = true }
+serde_json = { workspace = true }
+sha3 = { workspace = true }
+# TODO: some tests will fail if this is set to 1.0.63
+trybuild = "=1.0.53"
+
+[features]
+default = ["fiat"]
+assert-private-keys-not-cloneable = []
+cloneable-private-keys = []
+fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys"]
+fiat = ["curve25519-dalek/fiat_u64_backend", "ed25519-dalek/fiat_u64_backend", "x25519-dalek/fiat_u64_backend"]
+u64 = ["curve25519-dalek/u64_backend", "ed25519-dalek/u64_backend", "x25519-dalek/u64_backend"]
+u32 = ["curve25519-dalek/u32_backend", "ed25519-dalek/u32_backend", "x25519-dalek/u32_backend"]
+
+[[bench]]
+name = "noise"
+harness = false
+
+[[bench]]
+name = "ed25519"
+harness = false

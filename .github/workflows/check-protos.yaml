@@ -26,18 +26,29 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    if: | # Only run on each PR once an appropriate event occurs
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null
+      )
     steps:
       - uses: actions/checkout@v3
 
       # Install buf, which we use to generate code from the protos for Rust and TS.
       - name: Install buf
         uses: bufbuild/buf-setup-action@v1.24.0
+        with:
+          version: 1.28.1
 
       - uses: pre-commit/action@v3.0.0
 
       # Install protoc itself.
       - name: Install Protoc
         uses: arduino/setup-protoc@v2
+        with:
+          version: "25.x"
 
       # Set up pnpm.
       - uses: pnpm/action-setup@v2

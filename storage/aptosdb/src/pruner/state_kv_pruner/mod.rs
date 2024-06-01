@@ -6,7 +6,7 @@ pub(crate) mod state_kv_pruner_manager;
 mod state_kv_shard_pruner;
 
 use crate::{
-    metrics::PRUNER_VERSIONS,
+    metrics::{OTHER_TIMERS_SECONDS, PRUNER_VERSIONS},
     pruner::{
         db_pruner::DBPruner,
         state_kv_pruner::{
@@ -15,11 +15,11 @@ use crate::{
         },
     },
     state_kv_db::StateKvDb,
-    OTHER_TIMERS_SECONDS,
 };
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
+use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use rayon::prelude::*;
 use std::{

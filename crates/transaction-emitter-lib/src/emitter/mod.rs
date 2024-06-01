@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod account_minter;
+pub mod local_account_generator;
 pub mod stats;
 pub mod submission_worker;
 pub mod transaction_executor;
 
 use crate::emitter::{
-    account_minter::AccountMinter,
+    account_minter::{AccountMinter, SourceAccountManager},
+    local_account_generator::{create_account_generator, LocalAccountGenerator},
     stats::{DynamicStatsTracking, TxnStats},
     submission_worker::SubmissionWorker,
     transaction_executor::RestApiReliableTransactionSubmitter,
@@ -22,7 +24,9 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use aptos_transaction_generator_lib::{create_txn_generator_creator, TransactionType};
+use aptos_transaction_generator_lib::{
+    create_txn_generator_creator, AccountType, ReliableTransactionSubmitter, TransactionType,
+};
 use futures::future::{try_join_all, FutureExt};
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, seq::IteratorRandom, Rng};
@@ -44,6 +48,10 @@ const MAX_TXNS: u64 = 1_000_000_000;
 
 const MAX_RETRIES: usize = 12;
 
+// TODO Transfer cost increases during Coin => FA migration, we can reduce back later.
+const EXPECTED_GAS_PER_TRANSFER: u64 = 10;
+const EXPECTED_GAS_PER_ACCOUNT_CREATE: u64 = 2000 + 8;
+
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
 // account sequence numbers). If these fail, the whole test fails. We do not use
@@ -60,9 +68,7 @@ pub struct EmitModeParams {
     pub txn_expiration_time_secs: u64,
 
     pub endpoints: usize,
-    pub workers_per_endpoint: usize,
-    pub accounts_per_worker: usize,
-
+    pub num_accounts: usize,
     /// Max transactions per account in mempool
     pub transactions_per_account: usize,
     pub max_submit_batch_size: usize,
@@ -113,6 +119,26 @@ impl EmitJobMode {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum NumAccountsMode {
+    NumAccounts(usize),
+    TransactionsPerAccount(usize),
+}
+
+impl NumAccountsMode {
+    pub fn create(num_accounts: Option<usize>, transactions_per_account: Option<usize>) -> Self {
+        match (num_accounts, transactions_per_account) {
+            (Some(num_accounts), None) => Self::NumAccounts(num_accounts),
+            (None, Some(transactions_per_account)) => {
+                Self::TransactionsPerAccount(transactions_per_account)
+            },
+            _ => panic!(
+                "Either num_accounts or transactions_per_account should be set, but not both"
+            ),
+        }
+    }
+}
+
 /// total coins consumed are less than 2 * max_txns * expected_gas_per_txn * gas_price,
 /// which is by default 100000000000 * 100000, but can be overriden.
 #[derive(Clone, Debug)]
@@ -121,22 +147,29 @@ pub struct EmitJobRequest {
     mode: EmitJobMode,
 
     transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
-
+    account_type: AccountType,
     max_gas_per_txn: u64,
+    init_max_gas_per_txn: Option<u64>,
+
+    expected_max_txns: u64,
+
+    expected_gas_per_txn: Option<u64>,
+    expected_gas_per_transfer: u64,
+    expected_gas_per_account_create: u64,
+
+    coins_per_account_override: Option<u64>,
+
     gas_price: u64,
     init_gas_price_multiplier: u64,
 
     mint_to_root: bool,
+    skip_minting_accounts: bool,
 
     txn_expiration_time_secs: u64,
     init_expiration_multiplier: f64,
 
     init_retry_interval: Duration,
-
-    max_transactions_per_account: usize,
-
-    expected_max_txns: u64,
-    expected_gas_per_txn: u64,
+    num_accounts_mode: NumAccountsMode,
     prompt_before_spending: bool,
 
     coordination_delay_between_instances: Duration,
@@ -144,7 +177,6 @@ pub struct EmitJobRequest {
     latency_polling_interval: Duration,
 
     account_minter_seed: Option<[u8; 32]>,
-    coins_per_account_override: Option<u64>,
 }
 
 impl Default for EmitJobRequest {
@@ -155,16 +187,21 @@ impl Default for EmitJobRequest {
                 mempool_backlog: 3000,
             },
             transaction_mix_per_phase: vec![vec![(TransactionType::default(), 1)]],
+            account_type: AccountType::Local,
             max_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             gas_price: aptos_global_constants::GAS_UNIT_PRICE,
-            init_gas_price_multiplier: 10,
+            init_max_gas_per_txn: None,
+            init_gas_price_multiplier: 2,
             mint_to_root: false,
+            skip_minting_accounts: false,
             txn_expiration_time_secs: 60,
             init_expiration_multiplier: 3.0,
             init_retry_interval: Duration::from_secs(10),
-            max_transactions_per_account: 20,
+            num_accounts_mode: NumAccountsMode::TransactionsPerAccount(20),
             expected_max_txns: MAX_TXNS,
-            expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
+            expected_gas_per_txn: None,
+            expected_gas_per_transfer: EXPECTED_GAS_PER_TRANSFER,
+            expected_gas_per_account_create: EXPECTED_GAS_PER_ACCOUNT_CREATE,
             prompt_before_spending: false,
             coordination_delay_between_instances: Duration::from_secs(0),
             latency_polling_interval: Duration::from_millis(300),
@@ -194,6 +231,11 @@ impl EmitJobRequest {
         self
     }
 
+    pub fn init_max_gas_per_txn(mut self, init_max_gas_per_txn: u64) -> Self {
+        self.init_max_gas_per_txn = Some(init_max_gas_per_txn);
+        self
+    }
+
     pub fn init_gas_price_multiplier(mut self, init_gas_price_multiplier: u64) -> Self {
         self.init_gas_price_multiplier = init_gas_price_multiplier;
         self
@@ -205,7 +247,17 @@ impl EmitJobRequest {
     }
 
     pub fn expected_gas_per_txn(mut self, expected_gas_per_txn: u64) -> Self {
-        self.expected_gas_per_txn = expected_gas_per_txn;
+        self.expected_gas_per_txn = Some(expected_gas_per_txn);
+        self
+    }
+
+    pub fn expected_gas_per_transfer(mut self, expected_gas_per_transfer: u64) -> Self {
+        self.expected_gas_per_transfer = expected_gas_per_transfer;
+        self
+    }
+
+    pub fn expected_gas_per_account_create(mut self, expected_gas_per_account_create: u64) -> Self {
+        self.expected_gas_per_account_create = expected_gas_per_account_create;
         self
     }
 
@@ -232,6 +284,11 @@ impl EmitJobRequest {
         self
     }
 
+    pub fn account_type(mut self, account_type: AccountType) -> Self {
+        self.account_type = account_type;
+        self
+    }
+
     pub fn get_num_phases(&self) -> usize {
         self.transaction_mix_per_phase.len()
     }
@@ -246,8 +303,8 @@ impl EmitJobRequest {
         self
     }
 
-    pub fn max_transactions_per_account(mut self, max_transactions_per_account: usize) -> Self {
-        self.max_transactions_per_account = max_transactions_per_account;
+    pub fn num_accounts_mode(mut self, num_accounts: NumAccountsMode) -> Self {
+        self.num_accounts_mode = num_accounts;
         self
     }
 
@@ -279,18 +336,62 @@ impl EmitJobRequest {
         self
     }
 
+    pub fn skip_minting_accounts(mut self) -> Self {
+        self.skip_minting_accounts = true;
+        self
+    }
+
+    pub fn get_init_max_gas_per_txn(&self) -> u64 {
+        self.init_max_gas_per_txn.unwrap_or(self.max_gas_per_txn)
+    }
+
+    pub fn get_expected_gas_per_txn(&self) -> u64 {
+        self.expected_gas_per_txn.unwrap_or(self.max_gas_per_txn)
+    }
+
+    pub fn get_expected_gas_per_transfer(&self) -> u64 {
+        self.expected_gas_per_transfer
+    }
+
+    pub fn get_expected_gas_per_account_create(&self) -> u64 {
+        self.expected_gas_per_account_create
+    }
+
+    pub fn get_init_gas_price(&self) -> u64 {
+        self.gas_price * self.init_gas_price_multiplier
+    }
+
     pub fn calculate_mode_params(&self) -> EmitModeParams {
         let clients_count = self.rest_clients.len();
+        assert!(clients_count > 0, "No rest clients provided");
 
         match self.mode {
             EmitJobMode::MaxLoad { mempool_backlog } => {
                 // The target mempool backlog is set to be 3x of the target TPS because of the on an average,
                 // we can ~3 blocks in consensus queue. As long as we have 3x the target TPS as backlog,
                 // it should be enough to produce the target TPS.
-                let transactions_per_account = self.max_transactions_per_account;
-                let num_workers_per_endpoint = max(
-                    mempool_backlog / (clients_count * transactions_per_account),
-                    1,
+                let (transactions_per_account, num_accounts) = match self.num_accounts_mode {
+                    NumAccountsMode::NumAccounts(num_accounts) => {
+                        assert_eq!(
+                            mempool_backlog % num_accounts,
+                            0,
+                            "mempool_backlog should be a multiple of num_accounts"
+                        );
+                        (mempool_backlog / num_accounts, num_accounts)
+                    },
+                    NumAccountsMode::TransactionsPerAccount(transactions_per_account) => (
+                        transactions_per_account,
+                        mempool_backlog / transactions_per_account,
+                    ),
+                };
+
+                assert!(
+                    transactions_per_account > 0,
+                    "mempool_backlog smaller than num_accounts"
+                );
+                assert!(
+                    num_accounts > 0,
+                    "mempool_backlog smaller than transactions_per_account"
                 );
 
                 info!(
@@ -299,21 +400,19 @@ impl EmitJobRequest {
                 );
 
                 info!(
-                    " Will use {} clients and {} workers per client",
-                    clients_count, num_workers_per_endpoint
+                    " Will use {} clients and {} total number of accounts",
+                    clients_count, num_accounts
                 );
 
                 EmitModeParams {
                     wait_millis: 0,
                     txn_expiration_time_secs: self.txn_expiration_time_secs,
-                    transactions_per_account: transactions_per_account
-                        .min(num_workers_per_endpoint * clients_count),
+                    num_accounts,
+                    transactions_per_account,
                     max_submit_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
                     worker_offset_mode: WorkerOffsetMode::Jitter {
                         jitter_millis: 5000,
                     },
-                    accounts_per_worker: 1,
-                    workers_per_endpoint: num_workers_per_endpoint,
                     endpoints: clients_count,
                     check_account_sequence_only_once_fraction: 0.0,
                     check_account_sequence_sleep: self.latency_polling_interval,
@@ -342,27 +441,32 @@ impl EmitJobRequest {
                 // In case we set a very low TPS, we need to still be able to spread out
                 // transactions, at least to the seconds granularity, so we reduce transactions_per_account
                 // if needed.
-                let transactions_per_account = min(self.max_transactions_per_account, tps);
+                let transactions_per_account = match self.num_accounts_mode {
+                    NumAccountsMode::TransactionsPerAccount(transactions_per_account) => {
+                        transactions_per_account
+                    },
+                    _ => 10,
+                };
+                let transactions_per_account = min(transactions_per_account, tps);
                 assert!(
                     transactions_per_account > 0,
                     "TPS ({}) needs to be larger than 0",
                     tps,
                 );
-
-                // compute num_workers_per_endpoint, so that target_tps is achieved.
-                let num_workers_per_endpoint =
-                    (tps * wait_seconds as usize) / clients_count / transactions_per_account;
-                assert!(
-                    num_workers_per_endpoint > 0,
-                    "Requested too small TPS: {}",
-                    tps
-                );
+                let num_accounts = match self.num_accounts_mode {
+                    NumAccountsMode::NumAccounts(num_accounts) => num_accounts,
+                    NumAccountsMode::TransactionsPerAccount(_) => {
+                        let total_txns = tps * wait_seconds as usize;
+                        let num_accounts = total_txns / transactions_per_account;
+                        assert!(num_accounts > 0, "Requested too small TPS: {}", tps);
+                        num_accounts
+                    },
+                };
 
                 info!(
-                    " Transaction emitter targetting {} TPS, expecting {} TPS",
+                    " Transaction emitter targeting {} TPS, expecting {} TPS",
                     tps,
-                    clients_count * num_workers_per_endpoint * transactions_per_account
-                        / wait_seconds as usize
+                    num_accounts * transactions_per_account / wait_seconds as usize
                 );
 
                 info!(
@@ -371,20 +475,18 @@ impl EmitJobRequest {
                 );
 
                 // sample latency on 2% of requests, or at least once every 5s.
-                let sample_latency_fraction = 1.0_f32.min(0.02_f32.max(
-                    wait_seconds as f32
-                        / (clients_count * num_workers_per_endpoint) as f32
-                        / 5.0_f32,
-                ));
+                let sample_latency_fraction =
+                    1.0_f32.min(0.02_f32.max(wait_seconds as f32 / num_accounts as f32 / 5.0_f32));
 
                 info!(
-                    " Will use {} clients and {} workers per client, sampling latency on {}",
-                    clients_count, num_workers_per_endpoint, sample_latency_fraction
+                    " Will use {} clients and {} accounts, sampling latency on {}",
+                    clients_count, num_accounts, sample_latency_fraction
                 );
 
                 EmitModeParams {
                     wait_millis: wait_seconds * 1000,
                     txn_expiration_time_secs: self.txn_expiration_time_secs,
+                    num_accounts,
                     transactions_per_account,
                     max_submit_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
                     worker_offset_mode: if let EmitJobMode::WaveTps {
@@ -400,8 +502,6 @@ impl EmitJobRequest {
                     } else {
                         WorkerOffsetMode::Spread
                     },
-                    accounts_per_worker: 1,
-                    workers_per_endpoint: num_workers_per_endpoint,
                     endpoints: clients_count,
                     check_account_sequence_only_once_fraction: 1.0 - sample_latency_fraction,
                     check_account_sequence_sleep: self.latency_polling_interval,
@@ -413,7 +513,7 @@ impl EmitJobRequest {
 
 impl EmitModeParams {
     pub fn get_all_start_sleep_durations(&self, mut rng: ::rand::rngs::StdRng) -> Vec<Duration> {
-        let index_range = 0..self.endpoints * self.workers_per_endpoint;
+        let index_range = 0..self.num_accounts;
         match self.worker_offset_mode {
             WorkerOffsetMode::NoOffset => index_range.map(|_i| 0).collect(),
             WorkerOffsetMode::Jitter { jitter_millis } => index_range
@@ -427,8 +527,8 @@ impl EmitModeParams {
                 .collect(),
             WorkerOffsetMode::Spread => index_range
                 .map(|i| {
-                    let start_offset_multiplier_millis = self.wait_millis as f64
-                        / (self.workers_per_endpoint * self.endpoints) as f64;
+                    let start_offset_multiplier_millis =
+                        self.wait_millis as f64 / (self.num_accounts) as f64;
                     (start_offset_multiplier_millis * i as f64) as u64
                 })
                 .collect(),
@@ -448,7 +548,7 @@ impl EmitModeParams {
                         / time_scale
                 };
 
-                let workers = self.endpoints * self.workers_per_endpoint;
+                let workers = self.num_accounts;
                 let multiplier = workers as f64 / integral(self.wait_millis as f64);
 
                 let mut result = Vec::new();
@@ -534,7 +634,12 @@ impl EmitJob {
                     .map(|p| &p[cur_phase])
                     .unwrap_or(&default_stats);
             prev_stats = Some(stats);
-            info!("phase {}: {}", cur_phase, delta.rate());
+            info!(
+                "[{:?}s stat] phase {}: {}",
+                window.as_secs(),
+                cur_phase,
+                delta.rate()
+            );
         }
     }
 
@@ -568,19 +673,18 @@ impl TxnEmitter {
 
     pub async fn start_job(
         &mut self,
-        root_account: &mut LocalAccount,
+        root_account: &LocalAccount,
         req: EmitJobRequest,
         stats_tracking_phases: usize,
     ) -> Result<EmitJob> {
         ensure!(req.gas_price > 0, "gas_price is required to be non zero");
 
         let mode_params = req.calculate_mode_params();
-        let workers_per_endpoint = mode_params.workers_per_endpoint;
-        let num_workers = req.rest_clients.len() * workers_per_endpoint;
-        let num_accounts = num_workers * mode_params.accounts_per_worker;
+        let num_accounts = mode_params.num_accounts;
+
         info!(
-            "Will use {} workers per endpoint for a total of {} endpoint clients and {} accounts",
-            workers_per_endpoint, num_workers, num_accounts
+            "Will use total of {} endpoint clients and {} accounts",
+            num_accounts, num_accounts
         );
 
         let txn_factory = self
@@ -594,21 +698,28 @@ impl TxnEmitter {
             (mode_params.txn_expiration_time_secs as f64 * req.init_expiration_multiplier) as u64;
         let init_txn_factory = txn_factory
             .clone()
-            .with_gas_unit_price(req.gas_price * req.init_gas_price_multiplier)
+            .with_max_gas_amount(req.get_init_max_gas_per_txn())
+            .with_gas_unit_price(req.get_init_gas_price())
             .with_transaction_expiration_time(init_expiration_time);
         let init_retries: usize =
             usize::try_from(init_expiration_time / req.init_retry_interval.as_secs()).unwrap();
         let seed = req.account_minter_seed.unwrap_or_else(|| self.rng.gen());
+
+        let account_generator = create_account_generator(req.account_type);
+
         let mut all_accounts = create_accounts(
             root_account,
             &init_txn_factory,
+            account_generator,
             &req,
             mode_params.max_submit_batch_size,
+            req.skip_minting_accounts,
             seed,
             num_accounts,
             init_retries,
         )
         .await?;
+
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(DynamicStatsTracking::new(stats_tracking_phases));
         let tokio_handle = Handle::current();
@@ -618,8 +729,15 @@ impl TxnEmitter {
             max_retries: init_retries,
             retry_after: req.init_retry_interval,
         };
+        let source_account_manager = SourceAccountManager {
+            source_account: root_account,
+            txn_executor: &txn_executor,
+            req: &req,
+            txn_factory: init_txn_factory.clone(),
+        };
         let (txn_generator_creator, _, _) = create_txn_generator_creator(
             &req.transaction_mix_per_phase,
+            source_account_manager,
             &mut all_accounts,
             vec![],
             &txn_executor,
@@ -637,12 +755,10 @@ impl TxnEmitter {
             tokio::time::sleep(req.coordination_delay_between_instances).await;
         }
 
-        let total_workers = req.rest_clients.len() * workers_per_endpoint;
-
-        let check_account_sequence_only_once_for = (0..total_workers)
+        let check_account_sequence_only_once_for = (0..num_accounts)
             .choose_multiple(
                 &mut self.from_rng(),
-                (mode_params.check_account_sequence_only_once_fraction * total_workers as f32)
+                (mode_params.check_account_sequence_only_once_fraction * num_accounts as f32)
                     as usize,
             )
             .into_iter()
@@ -650,8 +766,8 @@ impl TxnEmitter {
 
         info!(
             "Checking account sequence and counting latency for {} out of {} total_workers",
-            total_workers - check_account_sequence_only_once_for.len(),
-            total_workers
+            num_accounts - check_account_sequence_only_once_for.len(),
+            num_accounts
         );
 
         let all_start_sleep_durations = mode_params.get_all_start_sleep_durations(self.from_rng());
@@ -660,32 +776,27 @@ impl TxnEmitter {
         // so we create them all first, before starting them - so they start at the right time for
         // traffic pattern to be correct.
         info!("Tx emitter creating workers");
-        let mut submission_workers =
-            Vec::with_capacity(workers_per_endpoint * req.rest_clients.len());
-        for _ in 0..workers_per_endpoint {
-            for client in &req.rest_clients {
-                let accounts =
-                    all_accounts.split_off(all_accounts.len() - mode_params.accounts_per_worker);
-                assert!(accounts.len() == mode_params.accounts_per_worker);
+        let mut submission_workers = Vec::with_capacity(num_accounts);
+        for index in 0..num_accounts {
+            let client = &req.rest_clients[index % req.rest_clients.len()];
+            let accounts = all_accounts.split_off(all_accounts.len() - 1);
+            let stop = stop.clone();
+            let stats = Arc::clone(&stats);
+            let txn_generator = txn_generator_creator.create_transaction_generator();
+            let worker_index = submission_workers.len();
 
-                let stop = stop.clone();
-                let stats = Arc::clone(&stats);
-                let txn_generator = txn_generator_creator.create_transaction_generator();
-                let worker_index = submission_workers.len();
-
-                let worker = SubmissionWorker::new(
-                    accounts,
-                    client.clone(),
-                    stop,
-                    mode_params.clone(),
-                    stats,
-                    txn_generator,
-                    all_start_sleep_durations[worker_index],
-                    check_account_sequence_only_once_for.contains(&worker_index),
-                    self.from_rng(),
-                );
-                submission_workers.push(worker);
-            }
+            let worker = SubmissionWorker::new(
+                accounts,
+                client.clone(),
+                stop,
+                mode_params.clone(),
+                stats,
+                txn_generator,
+                all_start_sleep_durations[worker_index],
+                check_account_sequence_only_once_for.contains(&worker_index),
+                self.from_rng(),
+            );
+            submission_workers.push(worker);
         }
 
         info!("Tx emitter workers created");
@@ -708,7 +819,7 @@ impl TxnEmitter {
 
     async fn emit_txn_for_impl(
         mut self,
-        source_account: &mut LocalAccount,
+        source_account: &LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         print_stats_interval: Option<u64>,
@@ -754,7 +865,7 @@ impl TxnEmitter {
 
     pub async fn emit_txn_for_with_stats(
         self,
-        source_account: &mut LocalAccount,
+        source_account: &LocalAccount,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         interval_secs: u64,
@@ -810,12 +921,15 @@ async fn wait_for_accounts_sequence(
                     let prev_sequence_number = latest_fetched_counts
                         .insert(address, sequence_number)
                         .unwrap_or(*start_seq_num);
-                    assert!(prev_sequence_number <= sequence_number);
-                    sum_of_completion_timestamps_millis +=
-                        millis_elapsed * (sequence_number - prev_sequence_number) as u128;
+                    // fetched sequence number that is older than one we already fetched.
+                    // client connection probably moved to a different server.
+                    if prev_sequence_number <= sequence_number {
+                        sum_of_completion_timestamps_millis +=
+                            millis_elapsed * (sequence_number - prev_sequence_number) as u128;
 
-                    if *end_seq_num == sequence_number {
-                        pending_addresses.remove(&address);
+                        if *end_seq_num == sequence_number {
+                            pending_addresses.remove(&address);
+                        }
                     }
                 }
 
@@ -912,12 +1026,22 @@ fn update_seq_num_and_get_num_expired(
         .map(
             |(address, (start_seq_num, end_seq_num))| match latest_fetched_counts.get(address) {
                 Some(count) => {
-                    assert!(*count <= *end_seq_num);
-                    assert!(*count >= *start_seq_num);
-                    (
-                        (*count - *start_seq_num) as usize,
-                        (*end_seq_num - *count) as usize,
-                    )
+                    assert!(
+                        *count <= *end_seq_num,
+                        "{address} :: {count} > {end_seq_num}"
+                    );
+                    if *count >= *start_seq_num {
+                        (
+                            (*count - *start_seq_num) as usize,
+                            (*end_seq_num - *count) as usize,
+                        )
+                    } else {
+                        debug!(
+                            "Stale sequence_number fetched for {}, start_seq_num {}, fetched {}",
+                            address, start_seq_num, *count
+                        );
+                        (0, (*end_seq_num - *start_seq_num) as usize)
+                    }
                 },
                 None => (0, (end_seq_num - start_seq_num) as usize),
             },
@@ -1009,10 +1133,12 @@ pub fn parse_seed(seed_string: &str) -> [u8; 32] {
 }
 
 pub async fn create_accounts(
-    root_account: &mut LocalAccount,
+    root_account: &LocalAccount,
     txn_factory: &TransactionFactory,
+    account_generator: Box<dyn LocalAccountGenerator>,
     req: &EmitJobRequest,
     max_submit_batch_size: usize,
+    skip_minting_accounts: bool,
     seed: [u8; 32],
     num_accounts: usize,
     retries: usize,
@@ -1027,14 +1153,82 @@ pub async fn create_accounts(
         "AccountMinter Seed (reuse accounts by passing into --account-minter-seed): {:?}",
         seed
     );
-    let mut account_minter =
-        AccountMinter::new(root_account, txn_factory.clone(), StdRng::from_seed(seed));
     let txn_executor = RestApiReliableTransactionSubmitter {
         rest_clients: req.rest_clients.clone(),
         max_retries: retries,
         retry_after: req.init_retry_interval,
     };
-    account_minter
-        .create_accounts(&txn_executor, req, max_submit_batch_size, num_accounts)
-        .await
+    let source_account_manager = SourceAccountManager {
+        source_account: root_account,
+        txn_executor: &txn_executor,
+        req,
+        txn_factory: txn_factory.clone(),
+    };
+
+    let mut rng = StdRng::from_seed(seed);
+
+    let accounts = account_generator
+        .gen_local_accounts(&txn_executor, num_accounts, &mut rng)
+        .await?;
+
+    info!("Generated re-usable accounts for seed {:?}", seed);
+
+    let all_accounts_already_exist = accounts.iter().all(|account| account.sequence_number() > 0);
+    let send_money_gas = if all_accounts_already_exist {
+        req.get_expected_gas_per_transfer()
+    } else {
+        req.get_expected_gas_per_account_create()
+    };
+
+    let mut account_minter = AccountMinter::new(
+        &source_account_manager,
+        txn_factory.clone().with_max_gas_amount(send_money_gas),
+        StdRng::from_seed(seed),
+    );
+
+    if !skip_minting_accounts {
+        let accounts: Vec<_> = accounts.into_iter().map(Arc::new).collect();
+        account_minter
+            .create_and_fund_accounts(
+                &txn_executor,
+                req,
+                account_generator,
+                max_submit_batch_size,
+                accounts.clone(),
+            )
+            .await?;
+        let accounts: Vec<_> = accounts
+            .into_iter()
+            .map(|a| Arc::try_unwrap(a).unwrap())
+            .collect();
+        info!("Accounts created and funded");
+        Ok(accounts)
+    } else {
+        info!(
+            "Account reuse plan created for {} accounts and {} txns:",
+            accounts.len(),
+            req.expected_max_txns,
+        );
+
+        let needed_min_balance = account_minter.get_needed_balance_per_account(req, accounts.len());
+        let balance_futures = accounts
+            .iter()
+            .map(|account| txn_executor.get_account_balance(account.address()));
+        let balances: Vec<_> = try_join_all(balance_futures).await?;
+        accounts
+            .iter()
+            .zip(balances)
+            .for_each(|(account, balance)| {
+                assert!(
+                    balance >= needed_min_balance,
+                    "Account {} has balance {} < needed_min_balance {}",
+                    account.address(),
+                    balance,
+                    needed_min_balance
+                );
+            });
+
+        info!("Skipping minting accounts");
+        Ok(accounts)
+    }
 }

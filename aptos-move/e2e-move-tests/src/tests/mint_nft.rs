@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     SigningKey, ValidCryptoMaterialStringExt,
@@ -64,7 +64,7 @@ fn mint_nft_e2e() {
         .insert("source_addr".to_string(), *acc.address());
 
     // build the package from our example code
-    let package = aptos_framework::BuiltPackage::build(
+    let package = build_package(
         common::test_dir_path("../../../move-examples/mint_nft/4-Getting-Production-Ready"),
         build_options,
     )
@@ -145,7 +145,7 @@ fn mint_nft_e2e() {
 
     // assert that the token id exists in the nft receiver's token store
     // read_state_value() will only be successful if the nft receiver's token store has this token id
-    let state_key = &StateKey::table_item(token_store_table, bcs::to_bytes(&token_id).unwrap());
+    let state_key = &StateKey::table_item(&token_store_table, &bcs::to_bytes(&token_id).unwrap());
     h.read_state_value_bytes(state_key).unwrap();
 }
 

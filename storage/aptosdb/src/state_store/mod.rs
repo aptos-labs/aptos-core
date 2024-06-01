@@ -5,13 +5,19 @@
 //! This file defines state store APIs that are related account state Merkle tree.
 
 use crate::{
-    db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    epoch_by_version::EpochByVersionSchema,
+    common::NUM_STATE_SHARDS,
     ledger_db::LedgerDb,
-    metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
-    new_sharded_kv_schema_batch,
-    schema::{state_value::StateValueSchema, state_value_index::StateValueIndexSchema},
-    stale_state_value_index::StaleStateValueIndexSchema,
+    metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
+    pruner::{StateKvPrunerManager, StateMerklePrunerManager},
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        stale_node_index::StaleNodeIndexSchema,
+        stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
+        stale_state_value_index::StaleStateValueIndexSchema,
+        state_value::StateValueSchema,
+        state_value_index::StateValueIndexSchema,
+        version_data::VersionDataSchema,
+    },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_restore::{
@@ -20,14 +26,12 @@ use crate::{
     state_store::buffered_state::BufferedState,
     utils::{
         iterators::PrefixedStateValueIterator,
+        new_sharded_kv_schema_batch,
         truncation_helper::{truncate_ledger_db, truncate_state_kv_db},
+        ShardedStateKvSchemaBatch,
     },
-    version_data::VersionDataSchema,
-    AptosDbError, LedgerStore, ShardedStateKvSchemaBatch, StaleNodeIndexCrossEpochSchema,
-    StaleNodeIndexSchema, StateKvPrunerManager, StateMerklePrunerManager, TransactionStore,
-    NUM_STATE_SHARDS, OTHER_TIMERS_SECONDS,
 };
-use anyhow::{ensure, format_err, Context, Result};
+use anyhow::Context;
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -39,22 +43,21 @@ use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
 use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_scratchpad::{SmtAncestors, SparseMerkleTree};
-use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher,
     cached_state_view::{CachedStateView, ShardedStateCache},
+    db_ensure as ensure,
     state_delta::StateDelta,
-    DbReader, StateSnapshotReceiver,
+    AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
         create_empty_sharded_state_updates,
-        state_key::StateKey,
-        state_key_prefix::StateKeyPrefix,
+        state_key::{prefix::StateKeyPrefix, StateKey},
         state_storage_usage::StateStorageUsage,
         state_value::{StaleStateValueIndex, StateValue, StateValueChunkWithProof},
-        ShardedStateUpdates,
+        ShardedStateUpdates, StateViewId,
     },
     transaction::Version,
     write_set::{TransactionWrite, WriteSet},
@@ -162,10 +165,11 @@ impl DbReader for StateDb {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         let (_, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(state_key, version)?;
+            .get_with_proof_ext(state_key, version, root_depth)?;
         Ok(proof)
     }
 
@@ -174,10 +178,11 @@ impl DbReader for StateDb {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         let (leaf_data, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(state_key, version)?;
+            .get_with_proof_ext(state_key, version, root_depth)?;
         Ok((
             match leaf_data {
                 Some((_, (key, version))) => Some(self.expect_value_by_version(&key, version)?),
@@ -189,39 +194,14 @@ impl DbReader for StateDb {
 
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         version.map_or(Ok(StateStorageUsage::zero()), |version| {
-            Ok(
-                match self
-                    .ledger_db
-                    .metadata_db()
-                    .get::<VersionDataSchema>(&version)?
-                {
-                    Some(data) => data.get_state_storage_usage(),
-                    None => {
-                        ensure!(self.skip_usage, "VersionData at {version} is missing.");
-                        StateStorageUsage::new_untracked()
-                    },
+            Ok(match self.ledger_db.metadata_db().get_usage(version) {
+                Ok(data) => data,
+                _ => {
+                    ensure!(self.skip_usage, "VersionData at {version} is missing.");
+                    StateStorageUsage::new_untracked()
                 },
-            )
+            })
         })
-    }
-}
-
-impl StateDb {
-    /// Get the latest ended epoch strictly before required version, i.e. if the passed in version
-    /// ends an epoch, return one epoch early than that.
-    pub fn get_previous_epoch_ending(&self, version: Version) -> Result<Option<(u64, Version)>> {
-        if version == 0 {
-            return Ok(None);
-        }
-        let prev_version = version - 1;
-
-        let mut iter = self
-            .ledger_db
-            .metadata_db()
-            .iter::<EpochByVersionSchema>(ReadOptions::default())?;
-        // Search for the end of the previous epoch.
-        iter.seek_for_prev(&prev_version)?;
-        iter.next().transpose()
     }
 }
 
@@ -265,9 +245,10 @@ impl DbReader for StateStore {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         self.deref()
-            .get_state_proof_by_version_ext(state_key, version)
+            .get_state_proof_by_version_ext(state_key, version, root_depth)
     }
 
     /// Get the state value with proof extension given the state key and version
@@ -275,9 +256,10 @@ impl DbReader for StateStore {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         self.deref()
-            .get_state_value_with_proof_by_version_ext(state_key, version)
+            .get_state_value_with_proof_by_version_ext(state_key, version, root_depth)
     }
 }
 
@@ -290,11 +272,10 @@ impl StateDb {
         self.get_state_value_by_version(state_key, version)
             .and_then(|opt| {
                 opt.ok_or_else(|| {
-                    format_err!(
+                    AptosDbError::NotFound(format!(
                         "State Value is missing for key {:?} by version {}",
-                        state_key,
-                        version
-                    )
+                        state_key, version
+                    ))
                 })
             })
     }
@@ -361,19 +342,14 @@ impl StateStore {
         crash_if_difference_is_too_large: bool,
     ) {
         let ledger_metadata_db = ledger_db.metadata_db();
-        if let Some(DbMetadataValue::Version(overall_commit_progress)) = ledger_metadata_db
-            .get::<DbMetadataSchema>(&DbMetadataKey::OverallCommitProgress)
-            .expect("Failed to read overall commit progress.")
-        {
+        if let Ok(overall_commit_progress) = ledger_metadata_db.get_synced_version() {
             info!(
                 overall_commit_progress = overall_commit_progress,
                 "Start syncing databases..."
             );
             let ledger_commit_progress = ledger_metadata_db
-                .get::<DbMetadataSchema>(&DbMetadataKey::LedgerCommitProgress)
-                .expect("Failed to read ledger commit progress.")
-                .expect("Ledger commit progress cannot be None.")
-                .expect_version();
+                .get_ledger_commit_progress()
+                .expect("Failed to read ledger commit progress.");
             assert_ge!(ledger_commit_progress, overall_commit_progress);
 
             let state_kv_commit_progress = state_kv_db
@@ -397,23 +373,23 @@ impl StateStore {
             truncate_ledger_db(ledger_db, overall_commit_progress)
                 .expect("Failed to truncate ledger db.");
 
-            if state_kv_commit_progress != overall_commit_progress {
-                info!(
-                    state_kv_commit_progress = state_kv_commit_progress,
-                    "Start state KV truncation..."
-                );
-                let difference = state_kv_commit_progress - overall_commit_progress;
-                if crash_if_difference_is_too_large {
-                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
-                }
-                truncate_state_kv_db(
-                    &state_kv_db,
-                    state_kv_commit_progress,
-                    overall_commit_progress,
-                    difference as usize,
-                )
-                .expect("Failed to truncate state K/V db.");
+            // State K/V commit progress isn't (can't be) written atomically with the data,
+            // because there are shards, so we have to attempt truncation anyway.
+            info!(
+                state_kv_commit_progress = state_kv_commit_progress,
+                "Start state KV truncation..."
+            );
+            let difference = state_kv_commit_progress - overall_commit_progress;
+            if crash_if_difference_is_too_large {
+                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
             }
+            truncate_state_kv_db(
+                &state_kv_db,
+                state_kv_commit_progress,
+                overall_commit_progress,
+                std::cmp::max(difference as usize, 1), /* batch_size */
+            )
+            .expect("Failed to truncate state K/V db.");
         } else {
             info!("No overall commit progress was found!");
         }
@@ -461,8 +437,11 @@ impl StateStore {
         hack_for_tests: bool,
         check_max_versions_after_snapshot: bool,
     ) -> Result<(BufferedState, SmtAncestors<StateValue>)> {
-        let ledger_store = LedgerStore::new(Arc::clone(&state_db.ledger_db));
-        let num_transactions = ledger_store.get_latest_version().map_or(0, |v| v + 1);
+        let num_transactions = state_db
+            .ledger_db
+            .metadata_db()
+            .get_synced_version()
+            .map_or(0, |v| v + 1);
 
         let latest_snapshot_version = state_db
             .state_merkle_db
@@ -531,10 +510,14 @@ impl StateStore {
                 speculative_state,
                 Arc::new(AsyncProofFetcher::new(state_db.clone())),
             );
-            let write_sets = TransactionStore::new(Arc::clone(&state_db.ledger_db))
+            let write_sets = state_db
+                .ledger_db
+                .write_set_db()
                 .get_write_sets(snapshot_next_version, num_transactions)?;
-            let txn_info_iter =
-                ledger_store.get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
+            let txn_info_iter = state_db
+                .ledger_db
+                .transaction_info_db()
+                .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
             let last_checkpoint_index = txn_info_iter
                 .into_iter()
                 .collect::<Result<Vec<_>>>()?
@@ -1008,6 +991,7 @@ impl StateStore {
             version,
             start_hashed_key,
         )?
+        .map(|it| it.map_err(Into::into))
         .map(move |res| match res {
             Ok((_hashed_key, (key, version))) => {
                 Ok((key.clone(), store.expect_value_by_version(&key, version)?))
@@ -1027,7 +1011,8 @@ impl StateStore {
             version,
             first_index,
         )?
-        .take(chunk_size);
+        .take(chunk_size)
+        .map(|it| it.map_err(Into::into));
         let state_key_values: Vec<(StateKey, StateValue)> = result_iter
             .into_iter()
             .map(|res| {
@@ -1038,7 +1023,8 @@ impl StateStore {
             .collect::<Result<Vec<_>>>()?;
         ensure!(
             !state_key_values.is_empty(),
-            AptosDbError::NotFound(format!("State chunk starting at {}", first_index)),
+            "State chunk starting at {}",
+            first_index,
         );
         let last_index = (state_key_values.len() - 1 + first_index) as u64;
         let first_key = state_key_values.first().expect("checked to exist").0.hash();
@@ -1081,6 +1067,7 @@ impl StateStore {
     ) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
         aptos_jellyfish_merkle::JellyfishMerkleTree::new(self.state_merkle_db.as_ref())
             .get_all_nodes_referenced(version)
+            .map_err(Into::into)
     }
 
     #[cfg(test)]
@@ -1089,7 +1076,7 @@ impl StateStore {
             .state_db
             .state_merkle_db
             .metadata_db()
-            .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
+            .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
             Default::default(),
         )?;
         iter.seek_to_first();
@@ -1103,7 +1090,7 @@ impl StateStore {
                 let mut iter = self
                     .state_merkle_db
                     .db_shard(i)
-                    .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
+                    .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
                     Default::default(),
                 )?;
                 iter.seek_to_first();
@@ -1178,9 +1165,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
     }
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
-        self.ledger_db
-            .metadata_db()
-            .put::<VersionDataSchema>(&version, &usage.into())
+        self.ledger_db.metadata_db().put_usage(version, usage)
     }
 
     fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {

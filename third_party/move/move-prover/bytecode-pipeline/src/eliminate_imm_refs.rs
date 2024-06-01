@@ -93,7 +93,7 @@ impl<'a> EliminateImmRefs<'a> {
                     self.builder
                         .emit(Assign(attr_id, dests[0], srcs[0], AssignKind::Move));
                 },
-                FreezeRef => self.builder.emit(Call(attr_id, dests, ReadRef, srcs, None)),
+                FreezeRef(_) => self.builder.emit(Call(attr_id, dests, ReadRef, srcs, None)),
                 BorrowLoc if self.is_imm_ref(dests[0]) => {
                     self.builder
                         .emit(Assign(attr_id, dests[0], srcs[0], AssignKind::Copy));
@@ -116,8 +116,8 @@ impl<'a> EliminateImmRefs<'a> {
                         aa,
                     ));
                 },
-                Destroy if self.is_imm_ref(srcs[0]) => {
-                    // skip the destroy on an immutable ref
+                Drop if self.is_imm_ref(srcs[0]) => {
+                    // skip the drop on an immutable ref
                 },
                 _ => self.builder.emit(Call(attr_id, dests, op, srcs, aa)),
             },

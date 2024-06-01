@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkLoss, Test};
+use aptos_forge::{NetworkContext, NetworkTest, SwarmChaos, SwarmNetworkLoss, Test};
 
+/// This is deprecated. Use [crate::multi_region_network_test::MultiRegionNetworkEmulationTest] instead
 pub struct NetworkLossTest;
 
 // Loss parameters
@@ -18,11 +19,11 @@ impl Test for NetworkLossTest {
 
 impl NetworkLoadTest for NetworkLossTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
-        ctx.swarm()
-            .inject_chaos(SwarmChaos::Loss(SwarmNetworkLoss {
+        ctx.runtime
+            .block_on(ctx.swarm.inject_chaos(SwarmChaos::Loss(SwarmNetworkLoss {
                 loss_percentage: LOSS_PERCENTAGE,
                 correlation_percentage: CORRELATION_PERCENTAGE,
-            }))?;
+            })))?;
 
         let msg = format!(
             "Injected {}% loss with {}% correlation loss to namespace",
@@ -33,11 +34,13 @@ impl NetworkLoadTest for NetworkLossTest {
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
-    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-        swarm.remove_chaos(SwarmChaos::Loss(SwarmNetworkLoss {
-            loss_percentage: LOSS_PERCENTAGE,
-            correlation_percentage: CORRELATION_PERCENTAGE,
-        }))
+    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
+        ctx.runtime
+            .block_on(ctx.swarm.remove_chaos(SwarmChaos::Loss(SwarmNetworkLoss {
+                loss_percentage: LOSS_PERCENTAGE,
+                correlation_percentage: CORRELATION_PERCENTAGE,
+            })))?;
+        Ok(())
     }
 }
 

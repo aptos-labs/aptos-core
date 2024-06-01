@@ -19,6 +19,7 @@ mod string_resource_test;
 mod transaction_vector_test;
 mod transactions_test;
 mod view_function;
+mod webauthn_secp256r1_ecdsa;
 
 use aptos_api_test_context::{new_test_context as super_new_test_context, TestContext};
 use aptos_config::config::NodeConfig;

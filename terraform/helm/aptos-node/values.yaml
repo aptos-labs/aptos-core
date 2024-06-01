@@ -39,11 +39,11 @@ haproxy:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 4
-      memory: 8Gi
+      cpu: 3
+      memory: 6Gi
     requests:
-      cpu: 4
-      memory: 8Gi
+      cpu: 3
+      memory: 6Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -74,11 +74,11 @@ validator:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 15.5
-      memory: 26Gi
+      cpu: 14
+      memory: 56Gi
     requests:
-      cpu: 15
-      memory: 26Gi
+      cpu: 14
+      memory: 56Gi
   storage:
     # -- Kubernetes storage class to use for validator persistent storage
     class:
@@ -86,8 +86,6 @@ validator:
     size: 2048Gi
   # -- Log level for the validator
   rust_log: info
-  # -- Address for remote logging. See `logger` helm chart
-  remoteLogAddress:
   # -- Flag to force enable telemetry service (useful for forge tests)
   force_enable_telemetry: false
   nodeSelector: {}
@@ -103,14 +101,15 @@ fullnode:
   # -- Specify fullnode groups by `name` and number of `replicas`
   groups:
     - name: fullnode
+      dns_name: vfn
       replicas: 1
   resources:
     limits:
-      cpu: 15.5
-      memory: 26Gi
+      cpu: 14
+      memory: 56Gi
     requests:
-      cpu: 15
-      memory: 26Gi
+      cpu: 14
+      memory: 56Gi
   storage:
     # -- Kubernetes storage class to use for fullnode persistent storage
     class:
@@ -131,6 +130,7 @@ fullnode:
     full_node_networks:
       # The first item in the array `full_node_networks` must always refer to the public fullnode network
       - network_id: "public"
+        seeds: {}
 
 service:
   # -- If set, the base domain name to use for External DNS
@@ -151,6 +151,8 @@ service:
     enableRestApi: true
     # -- Enable the metrics port on the validator
     enableMetricsPort: false
+    # -- Enable the admin port on the validator
+    enableAdminPort: false
   fullnode:
     external:
       # -- The Kubernetes ServiceType to use for fullnodes' HAProxy
@@ -167,6 +169,8 @@ service:
     enableRestApi: true
     # -- Enable the metrics port on fullnodes
     enableMetricsPort: false
+    # -- Enable the admin port on fullnodes
+    enableAdminPort: false
 
 serviceAccount:
   # -- Specifies whether a service account should be created
@@ -180,5 +184,14 @@ loadTestGenesis: false
 # -- TEST ONLY: Enable running as root for profiling
 enablePrivilegedMode: false
 
+genesis_blob_upload_url: https://us-west1-aptos-forge-gcp-0.cloudfunctions.net/signed-url?cluster_name=unknown&era=1
+cluster_name: unknown
+
 # Additional labels
 labels:
+
+# Infra migrations
+migrations:
+  # -- Explicitly define a PVC for VFNs.
+  # -- See templates/fullnode.yaml
+  enable_vfn_explicit_pvc: false

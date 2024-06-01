@@ -27,8 +27,9 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     transaction::{
+        authenticator::AccountAuthenticator,
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
-        ExecutionStatus, Transaction, TransactionOutput, TransactionOutputProvider,
+        BlockOutput, ExecutionStatus, Transaction, TransactionOutput, TransactionOutputProvider,
         TransactionStatus,
     },
 };
@@ -69,9 +70,10 @@ impl ChunkOutput {
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Self> {
-        let transaction_outputs =
-            Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
+        let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
 
+        let transaction_outputs = block_output.into_inner();
+        // TODO add block_limit_info to ChunkOutput, to add it to StateCheckpoint
         Ok(Self {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
@@ -135,23 +137,17 @@ impl ChunkOutput {
         self,
         base_view: &ExecutedTrees,
         known_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
-        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
         fail_point!("executor::apply_to_ledger", |_| {
             Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
         });
-        ApplyChunkOutput::apply_chunk(
-            self,
-            base_view,
-            known_state_checkpoint_hashes,
-            append_state_checkpoint_to_block,
-        )
+        ApplyChunkOutput::apply_chunk(self, base_view, known_state_checkpoint_hashes)
     }
 
     pub fn into_state_checkpoint_output(
         self,
         parent_state: &StateDelta,
-        append_state_checkpoint_to_block: Option<HashValue>,
+        block_id: HashValue,
     ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
         fail_point!("executor::into_state_checkpoint_output", |_| {
             Err(anyhow::anyhow!(
@@ -164,7 +160,7 @@ impl ChunkOutput {
         ApplyChunkOutput::calculate_state_checkpoint(
             self,
             parent_state,
-            append_state_checkpoint_to_block,
+            Some(block_id),
             None,
             /*is_block=*/ true,
         )
@@ -199,7 +195,7 @@ impl ChunkOutput {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>> {
+    ) -> Result<BlockOutput<TransactionOutput>> {
         Ok(V::execute_block(transactions, state_view, onchain_config)?)
     }
 
@@ -212,26 +208,32 @@ impl ChunkOutput {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>> {
-        use aptos_state_view::{StateViewId, TStateView};
-        use aptos_types::write_set::WriteSet;
+    ) -> Result<BlockOutput<TransactionOutput>> {
+        use aptos_types::{
+            state_store::{StateViewId, TStateView},
+            transaction::TransactionAuxiliaryData,
+            write_set::WriteSet,
+        };
 
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
             StateViewId::Miscellaneous => {
                 V::execute_block(transactions, state_view, onchain_config)?
             },
-            _ => transactions
-                .iter()
-                .map(|_| {
-                    TransactionOutput::new(
-                        WriteSet::default(),
-                        Vec::new(),
-                        0, // Keep gas zero to match with StateCheckpoint txn output
-                        TransactionStatus::Keep(ExecutionStatus::Success),
-                    )
-                })
-                .collect::<Vec<_>>(),
+            _ => BlockOutput::new(
+                transactions
+                    .iter()
+                    .map(|_| {
+                        TransactionOutput::new(
+                            WriteSet::default(),
+                            Vec::new(),
+                            0, // Keep gas zero to match with StateCheckpoint txn output
+                            TransactionStatus::Keep(ExecutionStatus::Success),
+                            TransactionAuxiliaryData::None,
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            ),
         };
         Ok(transaction_outputs)
     }
@@ -258,7 +260,9 @@ pub fn update_counters_for_processed_chunk<T, O>(
     for (txn, output) in transactions.iter().zip(transaction_outputs.iter()) {
         if detailed_counters {
             if let Ok(size) = bcs::serialized_size(output.get_transaction_output()) {
-                metrics::APTOS_PROCESSED_TXNS_OUTPUT_SIZE.observe(size as f64);
+                metrics::APTOS_PROCESSED_TXNS_OUTPUT_SIZE
+                    .with_label_values(&[process_type])
+                    .observe(size as f64);
             }
         }
 
@@ -321,8 +325,9 @@ pub fn update_counters_for_processed_chunk<T, O>(
             Some(Transaction::UserTransaction(_)) => "user_transaction",
             Some(Transaction::GenesisTransaction(_)) => "genesis",
             Some(Transaction::BlockMetadata(_)) => "block_metadata",
+            Some(Transaction::BlockMetadataExt(_)) => "block_metadata_ext",
             Some(Transaction::StateCheckpoint(_)) => "state_checkpoint",
-            Some(Transaction::SystemTransaction(_)) => "system_transaction",
+            Some(Transaction::ValidatorTransaction(_)) => "validator_transaction",
             None => "unknown",
         };
 
@@ -343,6 +348,52 @@ pub fn update_counters_for_processed_chunk<T, O>(
         }
 
         if let Some(Transaction::UserTransaction(user_txn)) = txn.get_transaction() {
+            if detailed_counters {
+                let mut signature_count = 0;
+                let account_authenticators = user_txn.authenticator_ref().all_signers();
+                for account_authenticator in account_authenticators {
+                    match account_authenticator {
+                        AccountAuthenticator::Ed25519 { .. } => {
+                            signature_count += 1;
+                            metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                                .with_label_values(&[process_type, "Ed25519"])
+                                .inc();
+                        },
+                        AccountAuthenticator::MultiEd25519 { signature, .. } => {
+                            let count = signature.signatures().len();
+                            signature_count += count;
+                            metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                                .with_label_values(&[process_type, "Ed25519_in_MultiEd25519"])
+                                .inc_by(count as u64);
+                        },
+                        AccountAuthenticator::SingleKey { authenticator } => {
+                            signature_count += 1;
+                            metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                                .with_label_values(&[
+                                    process_type,
+                                    &format!("{}_in_SingleKey", authenticator.signature().name()),
+                                ])
+                                .inc();
+                        },
+                        AccountAuthenticator::MultiKey { authenticator } => {
+                            for (_, signature) in authenticator.signatures() {
+                                signature_count += 1;
+                                metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                                    .with_label_values(&[
+                                        process_type,
+                                        &format!("{}_in_MultiKey", signature.name()),
+                                    ])
+                                    .inc();
+                            }
+                        },
+                    };
+                }
+
+                metrics::APTOS_PROCESSED_TXNS_NUM_AUTHENTICATORS
+                    .with_label_values(&[process_type])
+                    .observe(signature_count as f64);
+            }
+
             match user_txn.payload() {
                 aptos_types::transaction::TransactionPayload::Script(_script) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
@@ -387,10 +438,10 @@ pub fn update_counters_for_processed_chunk<T, O>(
                         .inc();
                 },
 
-                // Deprecated. Will be removed in the future.
-                aptos_types::transaction::TransactionPayload::ModuleBundle(_module) => {
+                // Deprecated.
+                aptos_types::transaction::TransactionPayload::ModuleBundle(_) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
-                        .with_label_values(&[process_type, "module", state])
+                        .with_label_values(&[process_type, "deprecated_module_bundle", state])
                         .inc();
                 },
             }

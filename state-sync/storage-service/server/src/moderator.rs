@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::Error, logging::LogEntry, metrics, LogSchema};
+use crate::{error::Error, logging::LogEntry, metrics, utils, LogSchema};
 use aptos_config::{
     config::{AptosDataClientConfig, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
@@ -136,60 +136,63 @@ impl RequestModerator {
         peer_network_id: &PeerNetworkId,
         request: &StorageServiceRequest,
     ) -> Result<(), Error> {
-        // Time the request validation
-        let _timer = metrics::start_timer(
-            &metrics::STORAGE_REQUEST_VALIDATION_LATENCY,
-            peer_network_id.network_id(),
-            request.get_label(),
-        );
+        // Validate the request and time the operation
+        let validate_request = || {
+            // If the peer is being ignored, return an error
+            if let Some(peer_state) = self.unhealthy_peer_states.get(peer_network_id) {
+                if peer_state.is_ignored() {
+                    return Err(Error::TooManyInvalidRequests(format!(
+                        "Peer is temporarily ignored. Unable to handle request: {:?}",
+                        request
+                    )));
+                }
+            }
 
-        // If the peer is being ignored, return an error
-        if let Some(peer_state) = self.unhealthy_peer_states.get(peer_network_id) {
-            if peer_state.is_ignored() {
-                return Err(Error::TooManyInvalidRequests(format!(
-                    "Peer is temporarily ignored. Unable to handle request: {:?}",
-                    request
+            // Get the latest storage server summary
+            let storage_server_summary = self.cached_storage_server_summary.load();
+
+            // Verify the request is serviceable using the current storage server summary
+            if !storage_server_summary.can_service(
+                &self.aptos_data_client_config,
+                self.time_service.clone(),
+                request,
+            ) {
+                // Increment the invalid request count for the peer
+                let mut unhealthy_peer_state = self
+                    .unhealthy_peer_states
+                    .entry(*peer_network_id)
+                    .or_insert_with(|| {
+                        // Create a new unhealthy peer state (this is the first invalid request)
+                        let max_invalid_requests =
+                            self.storage_service_config.max_invalid_requests_per_peer;
+                        let min_time_to_ignore_peers_secs =
+                            self.storage_service_config.min_time_to_ignore_peers_secs;
+                        let time_service = self.time_service.clone();
+
+                        UnhealthyPeerState::new(
+                            max_invalid_requests,
+                            min_time_to_ignore_peers_secs,
+                            time_service,
+                        )
+                    });
+                unhealthy_peer_state.increment_invalid_request_count(peer_network_id);
+
+                // Return the validation error
+                return Err(Error::InvalidRequest(format!(
+                    "The given request cannot be satisfied. Request: {:?}, storage summary: {:?}",
+                    request, storage_server_summary
                 )));
             }
-        }
 
-        // Get the latest storage server summary
-        let storage_server_summary = self.cached_storage_server_summary.load();
-
-        // Verify the request is serviceable using the current storage server summary
-        if !storage_server_summary.can_service(
-            &self.aptos_data_client_config,
-            self.time_service.clone(),
-            request,
-        ) {
-            // Increment the invalid request count for the peer
-            let mut unhealthy_peer_state = self
-                .unhealthy_peer_states
-                .entry(*peer_network_id)
-                .or_insert_with(|| {
-                    // Create a new unhealthy peer state (this is the first invalid request)
-                    let max_invalid_requests =
-                        self.storage_service_config.max_invalid_requests_per_peer;
-                    let min_time_to_ignore_peers_secs =
-                        self.storage_service_config.min_time_to_ignore_peers_secs;
-                    let time_service = self.time_service.clone();
-
-                    UnhealthyPeerState::new(
-                        max_invalid_requests,
-                        min_time_to_ignore_peers_secs,
-                        time_service,
-                    )
-                });
-            unhealthy_peer_state.increment_invalid_request_count(peer_network_id);
-
-            // Return the validation error
-            return Err(Error::InvalidRequest(format!(
-                "The given request cannot be satisfied. Request: {:?}, storage summary: {:?}",
-                request, storage_server_summary
-            )));
-        }
-
-        Ok(()) // The request is valid
+            Ok(()) // The request is valid
+        };
+        utils::execute_and_time_duration(
+            &metrics::STORAGE_REQUEST_VALIDATION_LATENCY,
+            Some((peer_network_id, request)),
+            None,
+            validate_request,
+            None,
+        )
     }
 
     /// Refresh the unhealthy peer states and garbage collect disconnected peers

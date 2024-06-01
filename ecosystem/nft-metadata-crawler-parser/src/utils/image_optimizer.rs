@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     get_uri_metadata,
@@ -18,7 +19,11 @@ use image::{
     DynamicImage, GenericImageView, ImageBuffer, ImageFormat, ImageOutputFormat,
 };
 use reqwest::Client;
-use std::{io::Cursor, time::Duration};
+use std::{
+    cmp::{max, min},
+    io::Cursor,
+    time::Duration,
+};
 use tracing::{info, warn};
 
 pub struct ImageOptimizer;
@@ -27,12 +32,13 @@ impl ImageOptimizer {
     /// Resizes and optimizes image from input URI.
     /// Returns new image as a byte array and its format.
     pub async fn optimize(
-        uri: String,
+        uri: &str,
         max_file_size_bytes: u32,
         image_quality: u8,
+        max_image_dimensions: u32,
     ) -> anyhow::Result<(Vec<u8>, ImageFormat)> {
         OPTIMIZE_IMAGE_INVOCATION_COUNT.inc();
-        let (_, size) = get_uri_metadata(uri.clone()).await?;
+        let (_, size) = get_uri_metadata(uri).await?;
         if size > max_file_size_bytes {
             FAILED_TO_OPTIMIZE_IMAGE_COUNT
                 .with_label_values(&["Image file too large"])
@@ -71,8 +77,11 @@ impl ImageOptimizer {
                     _ => {
                         let img = image::load_from_memory(&img_bytes)
                             .context(format!("Failed to load image from memory: {} bytes", size))?;
-                        let (nwidth, nheight) =
-                            Self::calculate_dimensions_with_ration(512, img.width(), img.height());
+                        let (nwidth, nheight) = Self::calculate_dimensions_with_ration(
+                            min(max(img.width(), img.height()), max_image_dimensions),
+                            img.width(),
+                            img.height(),
+                        );
                         let resized_image =
                             resize(&img.to_rgba8(), nwidth, nheight, FilterType::Gaussian);
                         Ok(Self::to_image_bytes(resized_image, image_quality)?)

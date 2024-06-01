@@ -3,15 +3,15 @@
 
 use crate::{
     db_debugger::common::{parse_nibble_path, DbDir},
-    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+    schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     state_merkle_db::StateMerkleDb,
 };
-use anyhow::{ensure, Result};
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_jellyfish_merkle::{
     node_type::{Child, Node, NodeKey, NodeType},
     TreeReader,
 };
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
     transaction::Version,
@@ -34,7 +34,7 @@ pub struct Cmd {
 
 impl Cmd {
     pub fn run(self) -> Result<()> {
-        ensure!(self.before_version > 0);
+        ensure!(self.before_version > 0, "version must be greater than 0.");
         println!(
             "{}",
             format!(
@@ -171,7 +171,12 @@ impl Cmd {
                 }
             },
             Some(Node::Leaf(leaf_node)) => {
-                println!("           state key: {:?}\n", leaf_node.value_index().0);
+                let state_key = leaf_node.value_index().0.clone();
+                assert_eq!(state_key.hash(), leaf_node.account_key());
+
+                let serialized = hex::encode(bcs::to_bytes(&state_key).unwrap());
+                println!("           state key: {:?}\n", state_key);
+                println!("          serialized: {}\n", serialized);
                 println!("    full nibble path: {:x}", leaf_node.account_key());
                 println!("          value hash: {:x}", leaf_node.value_hash());
             },

@@ -43,8 +43,11 @@ impl TransactionGenerator for PublishPackageGenerator {
         let package = self
             .package_handler
             .write()
-            .pick_package(&mut self.rng, account);
-        let txn = package.publish_transaction(account, &self.txn_factory);
+            .pick_package(&mut self.rng, account.address());
+        let txn = account.sign_with_transaction_builder(
+            self.txn_factory
+                .payload(package.publish_transaction_payload()),
+        );
         requests.push(txn);
         // use module published
         // for _ in 1..transactions_per_account - 1 {
@@ -56,7 +59,7 @@ impl TransactionGenerator for PublishPackageGenerator {
         // let package = self
         //     .package_handler
         //     .write()
-        //     .pick_package(&mut self.rng, account);
+        //     .pick_package(&mut self.rng, account.address());
         // let txn = package.publish_transaction(account, &self.txn_factory);
         // requests.push(txn);
         requests

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics::TIMER, pipeline::ExecuteBlockMessage};
 use aptos_block_partitioner::{BlockPartitioner, PartitionerConfig};
@@ -53,25 +54,22 @@ impl BlockPreparationStage {
             txns.len()
         );
         let block_id = HashValue::random();
-        let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> =
-            SIG_VERIFY_POOL.install(|| {
-                let num_txns = txns.len();
-                txns.into_par_iter()
-                    .with_min_len(optimal_min_len(num_txns, 32))
-                    .map(|t| t.into())
-                    .collect::<Vec<_>>()
-            });
+        let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
+            let num_txns = txns.len();
+            txns.into_par_iter()
+                .with_min_len(optimal_min_len(num_txns, 32))
+                .map(|t| t.into())
+                .collect::<Vec<_>>()
+        });
         let block: ExecutableBlock = match &self.maybe_partitioner {
             None => (block_id, sig_verified_txns).into(),
             Some(partitioner) => {
-                let last_txn = sig_verified_txns.pop().unwrap();
                 let analyzed_transactions =
                     sig_verified_txns.into_iter().map(|t| t.into()).collect();
                 let timer = TIMER.with_label_values(&["partition"]).start_timer();
-                let mut partitioned_txns =
+                let partitioned_txns =
                     partitioner.partition(analyzed_transactions, self.num_executor_shards);
                 timer.stop_and_record();
-                partitioned_txns.add_checkpoint_txn(last_txn);
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(partitioned_txns))
             },
         };

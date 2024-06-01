@@ -1,8 +1,11 @@
-# See https://pre-commit.com for more information
-# See https://pre-commit.com/hooks.html for more hooks
+# TODO: identify if we can move away from using pre-commit hooks for these checks.
+#
+# See also:
+#  - https://pre-commit.com for more information.
+#  - https://pre-commit.com/hooks.html for more hooks.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.2.0
+    rev: v4.5.0
     hooks:
       - id: trailing-whitespace
         files: \.(rs|move)$
@@ -11,14 +14,36 @@ repos:
       - id: check-added-large-files
         args:
           - --maxkb=2000
-  # Once this issue is resolved, we can add the full license check: https://github.com/Lucas-C/pre-commit-hooks/issues/68
-  - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.3.0
+  - repo: https://github.com/aptos-labs/pre-commit-hooks
+    rev: a30f0d816e5062a67d87c8de753cfe499672b959 # Fix the revision to the v1.5.5 release commit. See: https://github.com/Lucas-C/pre-commit-hooks/releases/tag/v1.5.5
     hooks:
       - id: insert-license
         files: ^(?!third_party/).*\.rs$
         args:
           - --license-filepath
           - devtools/assets/license_header.txt
+          - --license-filepath
+          - devtools/assets/shared_license_header.txt
+          - --license-filepath
+          - devtools/assets/license_header_utf8.txt
+          - --license-filepath
+          - devtools/assets/shared_license_header_utf8.txt
+          - --comment-style
+          - //
+      - id: insert-license
+        files: ^(?=third_party/).*\.rs$
+        args:
+          - --license-filepath
+          - devtools/assets/license_header.txt
+          - --license-filepath
+          - devtools/assets/shared_license_header.txt
+          - --license-filepath
+          - devtools/assets/third_party_license_header.txt
+          - --license-filepath
+          - devtools/assets/third_party_license_header_2.txt
+          - --license-filepath
+          - devtools/assets/license_header_utf8.txt
+          - --license-filepath
+          - devtools/assets/shared_license_header_utf8.txt
           - --comment-style
           - //

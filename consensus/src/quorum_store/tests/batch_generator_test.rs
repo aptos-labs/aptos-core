@@ -1,11 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{
-    batch_coordinator::BatchCoordinatorCommand,
-    batch_generator::BatchGenerator,
-    quorum_store_db::MockQuorumStoreDB,
-    tests::utils::{
+use crate::{
+    quorum_store::{
+        batch_coordinator::BatchCoordinatorCommand, batch_generator::BatchGenerator,
+        batch_store::BatchWriter, quorum_store_db::MockQuorumStoreDB, types::PersistedValue,
+    },
+    test_utils::{
         create_signed_transaction, create_vec_signed_transactions,
         create_vec_signed_transactions_with_gas,
     },
@@ -13,7 +14,7 @@ use crate::quorum_store::{
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::BatchId,
+    proof_of_store::{BatchId, SignedBatchInfo},
 };
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
@@ -25,6 +26,20 @@ use move_core_types::account_address::AccountAddress;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::channel as TokioChannel, time::timeout};
 
+struct MockBatchWriter {}
+
+impl MockBatchWriter {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl BatchWriter for MockBatchWriter {
+    fn persist(&self, _persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo> {
+        vec![]
+    }
+}
+
 #[allow(clippy::needless_collect)]
 async fn queue_mempool_batch_response(
     txns: Vec<SignedTransaction>,
@@ -35,7 +50,6 @@ async fn queue_mempool_batch_response(
         _max_batch_size,
         _max_bytes,
         _return_non_full,
-        _include_gas_upgraded,
         exclude_txns,
         callback,
     ) = timeout(
@@ -52,7 +66,7 @@ async fn queue_mempool_batch_response(
             .into_iter()
             .rev()
             .take_while(|txn| {
-                size += txn.raw_txn_bytes_len();
+                size += txn.txn_bytes_len();
                 size <= max_size
             })
             .collect();
@@ -71,11 +85,11 @@ async fn test_batch_creation() {
     let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
-    let txn_size = 69;
-    let max_size = 9 * txn_size + 1;
+    let txn_size = 168;
+    let max_size = 9 * txn_size;
 
     let config = QuorumStoreConfig {
-        sender_max_batch_bytes: max_size,
+        sender_max_total_bytes: max_size,
         ..Default::default()
     };
 
@@ -85,6 +99,7 @@ async fn test_batch_creation() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -93,6 +108,7 @@ async fn test_batch_creation() {
         let mut num_txns = 0;
 
         let signed_txns = create_vec_signed_transactions(1);
+        assert_eq!(signed_txns[0].txn_bytes_len(), txn_size);
         queue_mempool_batch_response(
             signed_txns.clone(),
             max_size,
@@ -178,11 +194,11 @@ async fn test_bucketed_batch_creation() {
     let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
-    let txn_size = 69;
-    let max_size = 9 * txn_size + 1;
+    let txn_size = 168;
+    let max_size = 9 * txn_size;
 
     let config = QuorumStoreConfig {
-        sender_max_batch_bytes: max_size,
+        sender_max_total_bytes: max_size,
         ..Default::default()
     };
     let buckets = config.batch_buckets.clone();
@@ -193,6 +209,7 @@ async fn test_bucketed_batch_creation() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -201,6 +218,7 @@ async fn test_bucketed_batch_creation() {
 
     let join_handle = tokio::spawn(async move {
         let signed_txns = create_vec_signed_transactions_with_gas(1, buckets[1]);
+        assert_eq!(signed_txns[0].txn_bytes_len(), txn_size);
         queue_mempool_batch_response(
             signed_txns.clone(),
             max_size,
@@ -323,6 +341,7 @@ async fn test_max_batch_txns() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -364,6 +383,125 @@ async fn test_max_batch_txns() {
 }
 
 #[tokio::test]
+async fn test_max_batch_bytes() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+    let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
+
+    let txn_bytes_len = 168;
+    assert_eq!(
+        create_vec_signed_transactions(1)[0].txn_bytes_len(),
+        txn_bytes_len
+    );
+    let config = QuorumStoreConfig {
+        sender_max_batch_bytes: txn_bytes_len * 10,
+        ..Default::default()
+    };
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let join_handle = tokio::spawn(async move {
+        let signed_txns = create_vec_signed_transactions(25);
+        queue_mempool_batch_response(
+            signed_txns.clone(),
+            txn_bytes_len * 25,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+
+        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
+        if let BatchCoordinatorCommand::NewBatches(_, result) = quorum_store_command {
+            assert_eq!(result.len(), 3);
+            assert_eq!(result[0].num_txns(), 10);
+            assert_eq!(result[1].num_txns(), 10);
+            assert_eq!(result[2].num_txns(), 5);
+
+            assert_eq!(&result[0].clone().into_transactions(), &signed_txns[0..10]);
+            assert_eq!(&result[1].clone().into_transactions(), &signed_txns[10..20]);
+            assert_eq!(&result[2].clone().into_transactions(), &signed_txns[20..]);
+        } else {
+            panic!("Unexpected variant")
+        }
+    });
+
+    let result = batch_generator.handle_scheduled_pull(300).await;
+    batch_coordinator_cmd_tx
+        .send(BatchCoordinatorCommand::NewBatches(author, result))
+        .await
+        .unwrap();
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_max_num_batches() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+    let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
+
+    let config = QuorumStoreConfig {
+        sender_max_batch_txns: 10,
+        sender_max_num_batches: 2,
+        ..Default::default()
+    };
+    let max_batch_bytes = config.sender_max_batch_bytes;
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let join_handle = tokio::spawn(async move {
+        let signed_txns = create_vec_signed_transactions(25);
+        queue_mempool_batch_response(
+            signed_txns.clone(),
+            max_batch_bytes,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+
+        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
+        if let BatchCoordinatorCommand::NewBatches(_, result) = quorum_store_command {
+            assert_eq!(result.len(), 2);
+            assert_eq!(result[0].num_txns(), 10);
+            assert_eq!(result[1].num_txns(), 10);
+
+            assert_eq!(&result[0].clone().into_transactions(), &signed_txns[0..10]);
+            assert_eq!(&result[1].clone().into_transactions(), &signed_txns[10..20]);
+        } else {
+            panic!("Unexpected variant")
+        }
+    });
+
+    let result = batch_generator.handle_scheduled_pull(300).await;
+    batch_coordinator_cmd_tx
+        .send(BatchCoordinatorCommand::NewBatches(author, result))
+        .await
+        .unwrap();
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
 async fn test_last_bucketed_batch() {
     let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
@@ -381,6 +519,7 @@ async fn test_last_bucketed_batch() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -444,6 +583,7 @@ async fn test_sender_max_num_batches_single_bucket() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -502,6 +642,7 @@ async fn test_sender_max_num_batches_multi_buckets() {
         author,
         config,
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -559,6 +700,7 @@ async fn test_batches_in_progress_same_txn_across_batches() {
         author,
         QuorumStoreConfig::default(),
         Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
         quorum_store_to_mempool_tx,
         1000,
     );
@@ -570,9 +712,9 @@ async fn test_batches_in_progress_same_txn_across_batches() {
         let first_three: Vec<_> = signed_txns.iter().take(3).cloned().collect();
 
         // Add multiple of the same txns across batches (txn1: 3 times, txn2: 2 times, txn3: 1 time)
-        queue_mempool_batch_response(first_one, 100, &mut quorum_store_to_mempool_rx).await;
-        queue_mempool_batch_response(first_two, 100, &mut quorum_store_to_mempool_rx).await;
-        queue_mempool_batch_response(first_three, 100, &mut quorum_store_to_mempool_rx).await;
+        queue_mempool_batch_response(first_one, 1024, &mut quorum_store_to_mempool_rx).await;
+        queue_mempool_batch_response(first_two, 1024, &mut quorum_store_to_mempool_rx).await;
+        queue_mempool_batch_response(first_three, 1024, &mut quorum_store_to_mempool_rx).await;
     });
 
     let first_one_result = batch_generator.handle_scheduled_pull(300).await;
@@ -594,12 +736,52 @@ async fn test_batches_in_progress_same_txn_across_batches() {
 
     // After all batches are complete, txns_in_progress_sorted will be empty.
     batch_generator
-        .remove_batch_in_progress_for_test(&first_three_result.first().unwrap().batch_id());
+        .remove_batch_in_progress_for_test(author, first_three_result.first().unwrap().batch_id());
     assert_eq!(batch_generator.txns_in_progress_sorted_len(), 2);
     batch_generator
-        .remove_batch_in_progress_for_test(&first_two_result.first().unwrap().batch_id());
+        .remove_batch_in_progress_for_test(author, first_two_result.first().unwrap().batch_id());
     assert_eq!(batch_generator.txns_in_progress_sorted_len(), 1);
     batch_generator
-        .remove_batch_in_progress_for_test(&first_one_result.first().unwrap().batch_id());
+        .remove_batch_in_progress_for_test(author, first_one_result.first().unwrap().batch_id());
     assert_eq!(batch_generator.txns_in_progress_sorted_len(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_remote_batches_in_progress() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        QuorumStoreConfig::default(),
+        Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let signed_txns = create_vec_signed_transactions(3);
+    let first_two: Vec<_> = signed_txns.iter().take(2).cloned().collect();
+    let cloned_txns = signed_txns.clone();
+
+    let join_handle = tokio::spawn(async move {
+        queue_mempool_batch_response(cloned_txns, 1024, &mut quorum_store_to_mempool_rx).await;
+    });
+
+    batch_generator.handle_remote_batch(
+        AccountAddress::random(),
+        BatchId::new_for_test(1),
+        first_two,
+    );
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 2);
+
+    let result = batch_generator.handle_scheduled_pull(300).await;
+    assert_eq!(result.len(), 1);
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 3);
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
 }

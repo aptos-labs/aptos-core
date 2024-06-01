@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
-use move_command_line_common::testing::EXP_EXT;
+use move_command_line_common::testing::get_compiler_exp_extension;
 use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
 use move_model::{options::ModelBuilderOptions, run_model_builder_with_options};
 use move_prover_test_utils::baseline_test::verify_or_update_baseline;
@@ -18,6 +18,7 @@ fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Re
     let env = run_model_builder_with_options(
         targets,
         vec![],
+        vec![],
         options,
         false,
         KnownAttribute::get_all_attribute_names(),
@@ -29,7 +30,7 @@ fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Re
     } else {
         "All good, no errors!".to_string()
     };
-    let baseline_path = path.with_extension(EXP_EXT);
+    let baseline_path = path.with_extension(get_compiler_exp_extension());
     verify_or_update_baseline(baseline_path.as_path(), &diags)?;
     Ok(())
 }
@@ -45,4 +46,4 @@ fn runner(path: &Path) -> datatest_stable::Result<()> {
     }
 }
 
-datatest_stable::harness!(runner, "tests/sources", r".*\.move");
+datatest_stable::harness!(runner, "tests/sources", r".*\.move$");

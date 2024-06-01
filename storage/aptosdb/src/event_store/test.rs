@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::{AptosDB, EventStore};
+use crate::{db::AptosDB, event_store::EventStore};
 use aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
@@ -23,14 +23,6 @@ use proptest::{
 use rand::Rng;
 use std::collections::HashMap;
 
-fn save(store: &EventStore, version: Version, events: &[ContractEvent]) {
-    let batch = SchemaBatch::new();
-    store
-        .put_events(version, events, /*skip_index=*/ true, &batch)
-        .unwrap();
-    store.event_db.write_schemas(batch).unwrap();
-}
-
 #[test]
 fn test_error_on_get_from_empty() {
     let tmp_dir = TempPath::new();
@@ -38,65 +30,6 @@ fn test_error_on_get_from_empty() {
     let store = &db.event_store;
 
     assert!(store.get_event_by_version_and_index(100, 0).is_err());
-}
-
-proptest! {
-    #![proptest_config(ProptestConfig::with_cases(10))]
-
-    #[test]
-    fn test_put_get(events in vec(any::<ContractEvent>().no_shrink(), 1..100)) {
-        let tmp_dir = TempPath::new();
-        let db = AptosDB::new_for_test(&tmp_dir);
-        let store = &db.event_store;
-
-        save(store, 100, &events);
-
-        for (idx, expected_event) in events.iter().enumerate() {
-            let event = store
-                .get_event_by_version_and_index(100, idx as u64)
-                .unwrap();
-            prop_assert_eq!(&event, expected_event);
-        }
-        // error on index >= num_events
-        prop_assert!(store
-            .get_event_by_version_and_index(100, events.len() as u64)
-            .is_err());
-    }
-
-}
-
-proptest! {
-    #![proptest_config(ProptestConfig::with_cases(1))]
-
-    #[test]
-    fn test_get_all_events_by_version(
-        events1 in vec(any::<ContractEvent>().no_shrink(), 1..100),
-        events2 in vec(any::<ContractEvent>().no_shrink(), 1..100),
-        events3 in vec(any::<ContractEvent>().no_shrink(), 1..100),
-    ) {
-
-        let tmp_dir = TempPath::new();
-        let db = AptosDB::new_for_test(&tmp_dir);
-        let store = &db.event_store;
-        // Save 3 chunks at different versions
-        save(store, 99 /*version*/, &events1);
-        save(store, 100 /*version*/, &events2);
-        save(store, 101 /*version*/, &events3);
-
-        // Now get all events at each version and verify that it matches what is expected.
-        let events_99 = store.get_events_by_version(99 /*version*/).unwrap();
-        prop_assert_eq!(events_99, events1);
-
-        let events_100 = store.get_events_by_version(100 /*version*/).unwrap();
-        prop_assert_eq!(events_100, events2);
-
-        let events_101 = store.get_events_by_version(101 /*version*/).unwrap();
-        prop_assert_eq!(events_101, events3);
-
-        // Now query a version that doesn't exist and verify that no results come back
-        let events_102 = store.get_events_by_version(102 /*version*/).unwrap();
-        prop_assert_eq!(events_102.len(), 0);
-    }
 }
 
 fn traverse_events_by_key(
@@ -165,18 +98,19 @@ fn test_index_get_impl(event_batches: Vec<Vec<ContractEvent>>) {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.event_store;
+    let event_db = &db.ledger_db.event_db();
 
     let batch = SchemaBatch::new();
     event_batches.iter().enumerate().for_each(|(ver, events)| {
-        store
+        event_db
             .put_events(ver as u64, events, /*skip_index=*/ false, &batch)
             .unwrap();
     });
-    store.event_db.write_schemas(batch);
+    event_db.write_schemas(batch);
     let ledger_version_plus_one = event_batches.len() as u64;
 
     assert_eq!(
-        store
+        event_db
             .get_events_by_version_iter(0, event_batches.len())
             .unwrap()
             .collect::<Result<Vec<_>>>()
@@ -294,17 +228,18 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.event_store;
+    let event_db = &db.ledger_db.event_db();
     // error on no blocks
     assert!(store.get_last_version_before_timestamp(1000, 2000).is_err());
 
     // save events to db
     let batch = SchemaBatch::new();
     new_block_events.iter().for_each(|(ver, event)| {
-        store
+        event_db
             .put_events(*ver, &[event.clone()], /*skip_index=*/ false, &batch)
             .unwrap();
     });
-    store.event_db.write_schemas(batch);
+    event_db.write_schemas(batch);
 
     let ledger_version = new_block_events.last().unwrap().0;
 

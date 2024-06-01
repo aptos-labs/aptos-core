@@ -1,0 +1,49 @@
+name: Rust Targeted Unit Tests
+description: Runs only the targeted rust unit tests
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # The source code must be checked out by the workflow that invokes this action.
+    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      with:
+        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+
+    # Install nextest
+    - uses: taiki-e/install-action@v1.5.6
+      with:
+        tool: nextest
+
+    # Run a postgres database
+    - name: Run postgres database
+      run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      shell: bash
+
+    # Output the changed files
+    - name: Output the changed files
+      run: cargo x changed-files -vv
+      shell: bash
+
+    # Output the affected packages
+    - name: Output the affected packages
+      run: cargo x affected-packages -vv
+      shell: bash
+
+    # Run only the targeted rust unit tests
+    - name: Run only the targeted unit tests
+      run: |
+        cargo x targeted-unit-tests -vv --profile ci --cargo-profile ci --locked --no-fail-fast --retries 3
+      shell: bash
+      env:
+        INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+        RUST_MIN_STACK: "4297152"
+        MVP_TEST_ON_CI: "true"
+        SOLC_EXE: /home/runner/bin/solc
+        Z3_EXE: /home/runner/bin/z3
+        CVC5_EXE: /home/runner/bin/cvc5
+        DOTNET_ROOT: /home/runner/.dotnet
+        BOOGIE_EXE: /home/runner/.dotnet/tools/boogie

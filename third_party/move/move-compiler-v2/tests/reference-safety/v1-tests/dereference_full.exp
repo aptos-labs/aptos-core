@@ -1,7 +1,2 @@
 
-Diagnostics:
-error: cannot copy mutable reference in local `x`
-   ┌─ tests/reference-safety/v1-tests/dereference_full.move:12:17
-   │
-12 │         let y = copy x; // error in v2
-   │                 ^^^^^^ copied here
+============ bytecode verification succeeded ========

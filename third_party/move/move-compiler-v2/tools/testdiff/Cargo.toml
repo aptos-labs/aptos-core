@@ -1,0 +1,17 @@
+[package]
+name = "testdiff"
+version = "0.1.0"
+edition = "2021"
+authors = ["Aptos Labs"]
+description = "A tool to analyze v1 to v2 compiler test coverage"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptosfoundation.org/"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive", "env"] }
+once_cell = { workspace = true }
+regex = { workspace = true }
+walkdir = { workspace = true }

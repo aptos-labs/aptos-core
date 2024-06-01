@@ -1,11 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, MoveHarness};
+use crate::MoveHarness;
 use aptos_types::{
-    account_address::AccountAddress,
-    move_utils::MemberId,
-    transaction::{ExecutionStatus, ModuleBundle, TransactionPayload},
+    account_address::AccountAddress, move_utils::MemberId, transaction::ExecutionStatus,
 };
 use move_binary_format::{
     file_format::{
@@ -99,11 +97,7 @@ fn access_path_panic() {
 
     let mut h = MoveHarness::new();
     let acc = h.new_account_at(addr);
-    let publish_tx_res = h.create_transaction_payload(
-        &acc,
-        TransactionPayload::ModuleBundle(ModuleBundle::singleton(module_bytes)),
-    );
-    assert_success!(h.run(publish_tx_res));
+    h.executor.add_module(&cm.self_id(), module_bytes);
 
     let res = h.run_entry_function(
         &acc,
@@ -117,6 +111,6 @@ fn access_path_panic() {
 
     assert_eq!(
         res.status().unwrap(),
-        ExecutionStatus::MiscellaneousError(Some(StatusCode::STORAGE_ERROR))
+        ExecutionStatus::MiscellaneousError(Some(StatusCode::VALUE_SERIALIZATION_ERROR))
     );
 }

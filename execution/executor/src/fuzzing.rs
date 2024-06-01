@@ -9,7 +9,6 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_state_view::StateView;
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, ShardedStateCache},
     state_delta::StateDelta,
@@ -21,13 +20,13 @@ use aptos_types::{
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
     ledger_info::LedgerInfoWithSignatures,
-    state_store::ShardedStateUpdates,
+    state_store::{ShardedStateUpdates, StateView},
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        Transaction, TransactionOutput, TransactionToCommit, Version,
+        BlockOutput, Transaction, TransactionOutput, TransactionToCommit, Version,
     },
     vm_status::VMStatus,
 };
@@ -93,8 +92,8 @@ impl VMExecutor for FakeVM {
         _transactions: &[SignatureVerifiedTransaction],
         _state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        Ok(Vec::new())
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+        Ok(BlockOutput::new(vec![]))
     }
 }
 
@@ -102,11 +101,11 @@ impl VMExecutor for FakeVM {
 pub struct FakeDb;
 
 impl DbReader for FakeDb {
-    fn get_latest_version(&self) -> Result<Version> {
+    fn get_latest_ledger_info_version(&self) -> aptos_storage_interface::Result<Version> {
         Ok(self.get_latest_ledger_info()?.ledger_info().version())
     }
 
-    fn get_latest_commit_metadata(&self) -> Result<(Version, u64)> {
+    fn get_latest_commit_metadata(&self) -> aptos_storage_interface::Result<(Version, u64)> {
         let ledger_info_with_sig = self.get_latest_ledger_info()?;
         let ledger_info = ledger_info_with_sig.ledger_info();
         Ok((ledger_info.version(), ledger_info.timestamp_usecs()))
@@ -124,7 +123,7 @@ impl DbWriter for FakeDb {
         _in_memory_state: StateDelta,
         _block_state_updates: Option<ShardedStateUpdates>,
         _sharded_state_cache: Option<&ShardedStateCache>,
-    ) -> Result<()> {
+    ) -> aptos_storage_interface::Result<()> {
         Ok(())
     }
 }

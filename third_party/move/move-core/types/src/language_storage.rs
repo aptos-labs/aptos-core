@@ -102,14 +102,16 @@ impl FromStr for TypeTag {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 pub struct StructTag {
     pub address: AccountAddress,
     pub module: Identifier,
     pub name: Identifier,
     // alias for compatibility with old json serialized data.
     #[serde(rename = "type_args", alias = "type_params")]
-    pub type_params: Vec<TypeTag>,
+    pub type_args: Vec<TypeTag>,
 }
 
 impl StructTag {
@@ -157,10 +159,10 @@ impl StructTag {
     /// to change and should not be used inside stable code.
     pub fn to_canonical_string(&self) -> String {
         let mut generics = String::new();
-        if let Some(first_ty) = self.type_params.first() {
+        if let Some(first_ty) = self.type_args.first() {
             generics.push('<');
             generics.push_str(&first_ty.to_canonical_string());
-            for ty in self.type_params.iter().skip(1) {
+            for ty in self.type_args.iter().skip(1) {
                 generics.push_str(&ty.to_canonical_string())
             }
             generics.push('>');
@@ -208,14 +210,14 @@ impl ResourceKey {
 }
 
 /// Represents the initial key into global storage where we first index by the address, and then
-/// the struct tag
+/// the struct tag. The struct fields are public to support pattern matching.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 pub struct ModuleId {
-    address: AccountAddress,
-    name: Identifier,
+    pub address: AccountAddress,
+    pub name: Identifier,
 }
 
 impl From<ModuleId> for (AccountAddress, Identifier) {
@@ -242,6 +244,22 @@ impl ModuleId {
         key.append(&mut bcs::to_bytes(self).unwrap());
         key
     }
+
+    pub fn as_refs(&self) -> (&AccountAddress, &IdentStr) {
+        (&self.address, self.name.as_ident_str())
+    }
+}
+
+impl<'a> hashbrown::Equivalent<(&'a AccountAddress, &'a IdentStr)> for ModuleId {
+    fn equivalent(&self, other: &(&'a AccountAddress, &'a IdentStr)) -> bool {
+        &self.address == other.0 && self.name.as_ident_str() == other.1
+    }
+}
+
+impl<'a> hashbrown::Equivalent<ModuleId> for (&'a AccountAddress, &'a IdentStr) {
+    fn equivalent(&self, other: &ModuleId) -> bool {
+        self.0 == &other.address && self.1 == other.name.as_ident_str()
+    }
 }
 
 impl Display for ModuleId {
@@ -267,10 +285,10 @@ impl Display for StructTag {
             self.module,
             self.name
         )?;
-        if let Some(first_ty) = self.type_params.first() {
+        if let Some(first_ty) = self.type_args.first() {
             write!(f, "<")?;
             write!(f, "{}", first_ty)?;
-            for ty in self.type_params.iter().skip(1) {
+            for ty in self.type_args.iter().skip(1) {
                 write!(f, ", {}", ty)?;
             }
             write!(f, ">")?;
@@ -313,10 +331,18 @@ impl From<StructTag> for TypeTag {
 mod tests {
     use super::TypeTag;
     use crate::{
-        account_address::AccountAddress, identifier::Identifier, language_storage::StructTag,
+        account_address::AccountAddress,
+        identifier::Identifier,
+        language_storage::{ModuleId, StructTag},
         safe_serialize::MAX_TYPE_TAG_NESTING,
     };
-    use std::mem;
+    use hashbrown::Equivalent;
+    use proptest::prelude::*;
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+        mem,
+    };
 
     #[test]
     fn test_type_tag_serde() {
@@ -324,11 +350,11 @@ mod tests {
             address: AccountAddress::ONE,
             module: Identifier::new("abc").unwrap(),
             name: Identifier::new("abc").unwrap(),
-            type_params: vec![TypeTag::U8],
+            type_args: vec![TypeTag::U8],
         }));
         let b = serde_json::to_string(&a).unwrap();
         let c: TypeTag = serde_json::from_str(&b).unwrap();
-        assert!(a.eq(&c), "Typetag serde error");
+        assert!(a.eq(&c), "Type tag serde error");
         assert_eq!(mem::size_of::<TypeTag>(), 16);
     }
 
@@ -384,12 +410,35 @@ mod tests {
         TypeTag::Vector(Box::new(type_param))
     }
 
-    fn make_type_tag_struct(type_param: TypeTag) -> TypeTag {
+    fn make_type_tag_struct(type_arg: TypeTag) -> TypeTag {
         TypeTag::Struct(Box::new(StructTag {
             address: AccountAddress::ONE,
             module: Identifier::new("a").unwrap(),
             name: Identifier::new("a").unwrap(),
-            type_params: vec![type_param],
+            type_args: vec![type_arg],
         }))
+    }
+
+    proptest! {
+        #[test]
+        fn module_id_ref_equivalence(module_id in any::<ModuleId>()) {
+            let module_id_ref = module_id.as_refs();
+
+            assert!(module_id.equivalent(&module_id_ref));
+            assert!(module_id_ref.equivalent(&module_id));
+        }
+
+        #[test]
+        fn module_id_ref_hash_equivalence(module_id in any::<ModuleId>()) {
+            fn calculate_hash<T: Hash>(t: &T) -> u64 {
+                let mut s = DefaultHasher::new();
+                t.hash(&mut s);
+                s.finish()
+            }
+
+            let module_id_ref = module_id.as_refs();
+
+            assert_eq!(calculate_hash(&module_id), calculate_hash(&module_id_ref))
+        }
     }
 }

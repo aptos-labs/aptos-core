@@ -15,21 +15,17 @@ use aptos_executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_temppath::TempPath;
 use aptos_types::{
-    access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{
         aptos_test_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
-        CORE_CODE_ADDRESS,
     },
-    account_view::AccountView,
     contract_event::ContractEvent,
     event::EventHandle,
-    on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
-    state_store::state_key::StateKey,
+    on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
+    state_store::{state_key::StateKey, MoveResourceExt},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     trusted_state::TrustedState,
@@ -38,10 +34,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSetMut},
 };
 use aptos_vm::AptosVM;
-use move_core_types::{
-    language_storage::TypeTag,
-    move_resource::{MoveResource, MoveStructType},
-};
+use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use rand::SeedableRng;
 
 #[test]
@@ -89,7 +82,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let executor = BlockExecutor::<AptosVM>::new(db.clone());
     let output = executor
         .execute_block(
-            (block_id, block(txns, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG)).into(),
+            (block_id, block(txns)).into(),
             executor.committed_block_id(),
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
@@ -173,9 +166,7 @@ fn get_aptos_coin_transfer_transaction(
 
 fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-    let account_state_view = db_state_view.as_account_with_state_view(account);
-    account_state_view
-        .get_coin_store_resource()
+    CoinStoreResource::fetch_move_resource(&db_state_view, account)
         .unwrap()
         .unwrap()
         .coin()
@@ -183,12 +174,7 @@ fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
 
 fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-    let aptos_framework_account_state_view =
-        db_state_view.as_account_with_state_view(&CORE_CODE_ADDRESS);
-    aptos_framework_account_state_view
-        .get_configuration_resource()
-        .unwrap()
-        .unwrap()
+    ConfigurationResource::fetch_config(&db_state_view).unwrap()
 }
 
 #[test]
@@ -226,28 +212,22 @@ fn test_new_genesis() {
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
         WriteSetMut::new(vec![
             (
-                StateKey::access_path(
-                    access_path_for_config(ValidatorSet::CONFIG_ID).expect("access path in test"),
+                StateKey::on_chain_config::<ValidatorSet>().unwrap(),
+                WriteOp::legacy_modification(
+                    bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap().into(),
                 ),
-                WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap().into()),
             ),
             (
-                StateKey::access_path(AccessPath::new(
-                    CORE_CODE_ADDRESS,
-                    ConfigurationResource::resource_path(),
-                )),
-                WriteOp::Modification(
+                StateKey::on_chain_config::<ConfigurationResource>().unwrap(),
+                WriteOp::legacy_modification(
                     bcs::to_bytes(&configuration.bump_epoch_for_test())
                         .unwrap()
                         .into(),
                 ),
             ),
             (
-                StateKey::access_path(AccessPath::new(
-                    account1,
-                    CoinStoreResource::resource_path(),
-                )),
-                WriteOp::Modification(
+                StateKey::resource_typed::<CoinStoreResource>(&account1).unwrap(),
+                WriteOp::legacy_modification(
                     bcs::to_bytes(&CoinStoreResource::new(
                         100_000_000,
                         false,

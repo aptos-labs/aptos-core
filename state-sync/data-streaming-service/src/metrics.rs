@@ -3,10 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    histogram_opts, register_histogram_vec, register_int_counter, register_int_counter_vec,
-    register_int_gauge, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    exponential_buckets, histogram_opts, register_histogram_vec, register_int_counter,
+    register_int_counter_vec, register_int_gauge, HistogramTimer, HistogramVec, IntCounter,
+    IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
+use std::time::Instant;
 
 // Subscription stream termination labels
 pub const MAX_CONSECUTIVE_REQUESTS_LABEL: &str = "max_consecutive_requests";
@@ -132,11 +134,29 @@ pub static RETRIED_DATA_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for the number of max concurrent prefetching requests
+pub static MAX_CONCURRENT_PREFETCHING_REQUESTS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_data_streaming_service_max_concurrent_prefetching_requests",
+        "The number of max concurrent prefetching requests",
+    )
+    .unwrap()
+});
+
 /// Counter for the number of pending data responses
 pub static PENDING_DATA_RESPONSES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_data_streaming_service_pending_data_responses",
         "Counters related to the number of pending data responses",
+    )
+    .unwrap()
+});
+
+/// Counter for the number of complete pending data responses
+pub static COMPLETE_PENDING_DATA_RESPONSES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_data_streaming_service_complete_pending_data_responses",
+        "Counters related to the number of complete pending data responses",
     )
     .unwrap()
 });
@@ -190,6 +210,17 @@ pub static DATA_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(histogram_opts, &["request_type"]).unwrap()
 });
 
+/// Time it takes to send a data notification after a successful data response
+pub static DATA_NOTIFICATION_SEND_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_data_streaming_service_data_notification_send_latency",
+        "Counters related to the data notification send latency",
+        &["label"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Increments the given counter with the single label value.
 pub fn increment_counter(counter: &Lazy<IntCounterVec>, label: &str) {
     counter.with_label_values(&[label]).inc();
@@ -206,8 +237,15 @@ pub fn increment_counter_multiple_labels(
         .inc();
 }
 
+/// Adds a new observation for the given histogram and label
+pub fn observe_duration(histogram: &Lazy<HistogramVec>, label: &str, start_time: Instant) {
+    histogram
+        .with_label_values(&[label])
+        .observe(start_time.elapsed().as_secs_f64());
+}
+
 /// Adds a new observation for the given histogram, labels and value
-pub fn observe_value(
+pub fn observe_values(
     histogram: &Lazy<HistogramVec>,
     first_label: &str,
     second_label: &str,
@@ -223,8 +261,18 @@ pub fn set_active_data_streams(value: usize) {
     ACTIVE_DATA_STREAMS.set(value as i64);
 }
 
+/// Sets the number of max concurrent requests
+pub fn set_max_concurrent_requests(value: u64) {
+    MAX_CONCURRENT_PREFETCHING_REQUESTS.set(value as i64);
+}
+
+/// Sets the number of complete pending data responses
+pub fn set_complete_pending_data_responses(value: u64) {
+    COMPLETE_PENDING_DATA_RESPONSES.set(value as i64);
+}
+
 /// Sets the number of pending data responses
-pub fn set_pending_data_responses(value: usize) {
+pub fn set_pending_data_responses(value: u64) {
     PENDING_DATA_RESPONSES.set(value as i64);
 }
 

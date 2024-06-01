@@ -30,11 +30,6 @@ pub fn build_consensus_only_node() -> bool {
     option_env!("CONSENSUS_ONLY_PERF_TEST").is_some()
 }
 
-/// at _forge_ compile time, decide to build `aptos-node` with extra network perf tests
-pub fn build_network_perf_test() -> bool {
-    option_env!("NETWORK_PERF_TEST").is_some()
-}
-
 /// at forge _run_ time, compile `aptos-node` without indexer
 pub fn build_aptos_node_without_indexer() -> bool {
     std::env::var("FORGE_BUILD_WITHOUT_INDEXER").is_ok()
@@ -171,15 +166,12 @@ pub fn git_merge_base<R: AsRef<str>>(rev: R) -> Result<String> {
 
 pub fn cargo_build_common_args() -> Vec<&'static str> {
     let mut args = if build_aptos_node_without_indexer() {
-        vec!["build", "--features=failpoints"]
+        vec!["build", "--features=failpoints,smoke-test"]
     } else {
-        vec!["build", "--features=failpoints,indexer"]
+        vec!["build", "--features=failpoints,indexer,smoke-test"]
     };
     if build_consensus_only_node() {
         args.push("--features=consensus-only-perf-test");
-    }
-    if build_network_perf_test() {
-        args.push("--features=network-perf-test");
     }
     if use_release() {
         args.push("--release");

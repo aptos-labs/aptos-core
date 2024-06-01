@@ -330,7 +330,7 @@ impl<'a> Analyzer<'a> {
                     // make sure these two types unify before trying to instantiate them
                     let adapter = TypeUnificationAdapter::new_pair(&lhs_ty, &rhs_ty, true, true);
                     if adapter
-                        .unify(&NoUnificationContext, Variance::SpecVariance, false)
+                        .unify(&mut NoUnificationContext, Variance::SpecVariance, false)
                         .is_none()
                     {
                         continue;
@@ -456,7 +456,7 @@ impl<'a> Analyzer<'a> {
     fn analyze_spec_fun(&mut self, fun: QualifiedId<SpecFunId>) {
         let module_env = self.env.get_module(fun.module_id);
         let decl = module_env.get_spec_fun(fun.id);
-        for Parameter(_, ty) in &decl.params {
+        for Parameter(_, ty, _) in &decl.params {
             self.add_type_root(ty)
         }
         self.add_type_root(&decl.result_type);
@@ -466,7 +466,7 @@ impl<'a> Analyzer<'a> {
     }
 
     fn analyze_exp(&mut self, exp: &ExpData) {
-        exp.visit(&mut |e| {
+        exp.visit_post_order(&mut |e| {
             let node_id = e.node_id();
             self.add_type_root(&self.env.get_node_type(node_id));
             for ref ty in self.env.get_node_instantiation(node_id) {
@@ -517,6 +517,7 @@ impl<'a> Analyzer<'a> {
                     }
                 }
             }
+            true // keep going
         });
     }
 

@@ -8,8 +8,11 @@
 /// dependency.
 /// However, reading the aggregator value (i.e. calling `read(X)`) is a resource-intensive
 /// operation that also reduced parallelism, and should be avoided as much as possible.
+/// If you need to capture the value, without revealing it, use snapshot function instead,
+/// which has no parallelism impact.
 module aptos_framework::aggregator_v2 {
     use std::error;
+    use std::features;
     use std::string::String;
 
     /// The value of aggregator overflows. Raised by uncoditional add() call
@@ -46,8 +49,13 @@ module aptos_framework::aggregator_v2 {
     /// Represents a constant value, that was derived from an aggregator at given instant in time.
     /// Unlike read() and storing the value directly, this enables parallel execution of transactions,
     /// while storing snapshot of aggregator state elsewhere.
-    struct AggregatorSnapshot<Element> has store, drop {
-        value: Element,
+    struct AggregatorSnapshot<IntElement> has store, drop {
+        value: IntElement,
+    }
+
+    struct DerivedStringSnapshot has store, drop {
+        value: String,
+        padding: vector<u8>,
     }
 
     /// Returns `max_value` exceeding which aggregator overflows.
@@ -61,12 +69,24 @@ module aptos_framework::aggregator_v2 {
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
     public native fun create_aggregator<IntElement: copy + drop>(max_value: IntElement): Aggregator<IntElement>;
 
+    public fun create_aggregator_with_value<IntElement: copy + drop>(start_value: IntElement, max_value: IntElement): Aggregator<IntElement> {
+        let aggregator = create_aggregator(max_value);
+        add(&mut aggregator, start_value);
+        aggregator
+    }
+
     /// Creates new aggregator, without any 'max_value' on top of the implicit bound restriction
     /// due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).
     ///
     /// Currently supported types for IntElement are u64 and u128.
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
     public native fun create_unbounded_aggregator<IntElement: copy + drop>(): Aggregator<IntElement>;
+
+    public fun create_unbounded_aggregator_with_value<IntElement: copy + drop>(start_value: IntElement): Aggregator<IntElement> {
+        let aggregator = create_unbounded_aggregator();
+        add(&mut aggregator, start_value);
+        aggregator
+    }
 
     /// Adds `value` to aggregator.
     /// If addition would exceed the max_value, `false` is returned, and aggregator value is left unchanged.
@@ -88,10 +108,21 @@ module aptos_framework::aggregator_v2 {
         assert!(try_sub(aggregator, value), error::out_of_range(EAGGREGATOR_UNDERFLOW));
     }
 
+    native fun is_at_least_impl<IntElement>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool;
+
+    public fun is_at_least<IntElement>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool {
+        assert!(features::aggregator_v2_is_at_least_api_enabled(), EAGGREGATOR_API_V2_NOT_ENABLED);
+        is_at_least_impl(aggregator, min_amount)
+    }
+
     /// Returns a value stored in this aggregator.
     /// Note: This operation is resource-intensive, and reduces parallelism.
-    /// (Especially if called in a transaction that also modifies the aggregator,
-    /// or has other read/write conflicts)
+    /// If you need to capture the value, without revealing it, use snapshot function instead,
+    /// which has no parallelism impact.
+    /// If called in a transaction that also modifies the aggregator, or has other read/write conflicts,
+    /// it will sequentialize that transaction. (i.e. up to concurrency_level times slower)
+    /// If called in a separate transaction (i.e. after transaction that modifies aggregator), it might be
+    /// up to two times slower.
     public native fun read<IntElement>(aggregator: &Aggregator<IntElement>): IntElement;
 
     /// Returns a wrapper of a current value of an aggregator
@@ -100,22 +131,41 @@ module aptos_framework::aggregator_v2 {
 
     /// Creates a snapshot of a given value.
     /// Useful for when object is sometimes created via snapshot() or string_concat(), and sometimes directly.
-    public native fun create_snapshot<Element: copy + drop>(value: Element): AggregatorSnapshot<Element>;
-
-    /// NOT YET IMPLEMENTED, always raises EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED.
-    public native fun copy_snapshot<Element: copy + drop>(snapshot: &AggregatorSnapshot<Element>): AggregatorSnapshot<Element>;
+    public native fun create_snapshot<IntElement: copy + drop>(value: IntElement): AggregatorSnapshot<IntElement>;
 
     /// Returns a value stored in this snapshot.
     /// Note: This operation is resource-intensive, and reduces parallelism.
     /// (Especially if called in a transaction that also modifies the aggregator,
     /// or has other read/write conflicts)
-    public native fun read_snapshot<Element>(snapshot: &AggregatorSnapshot<Element>): Element;
+    public native fun read_snapshot<IntElement>(snapshot: &AggregatorSnapshot<IntElement>): IntElement;
+
+    /// Returns a value stored in this DerivedStringSnapshot.
+    /// Note: This operation is resource-intensive, and reduces parallelism.
+    /// (Especially if called in a transaction that also modifies the aggregator,
+    /// or has other read/write conflicts)
+    public native fun read_derived_string(snapshot: &DerivedStringSnapshot): String;
+
+    /// Creates a DerivedStringSnapshot of a given value.
+    /// Useful for when object is sometimes created via string_concat(), and sometimes directly.
+    public native fun create_derived_string(value: String): DerivedStringSnapshot;
 
     /// Concatenates `before`, `snapshot` and `after` into a single string.
     /// snapshot passed needs to have integer type - currently supported types are u64 and u128.
     /// Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
     /// If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
+    public native fun derive_string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<IntElement>, after: String): DerivedStringSnapshot;
+
+    // ===== DEPRECATE/NOT YET IMPLEMENTED ====
+
+    #[deprecated]
+    /// NOT YET IMPLEMENTED, always raises EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED.
+    public native fun copy_snapshot<IntElement: copy + drop>(snapshot: &AggregatorSnapshot<IntElement>): AggregatorSnapshot<IntElement>;
+
+    #[deprecated]
+    /// DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED.
     public native fun string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<IntElement>, after: String): AggregatorSnapshot<String>;
+
+    // ========================================
 
     #[test]
     fun test_aggregator() {
@@ -139,8 +189,8 @@ module aptos_framework::aggregator_v2 {
         let snapshot = create_snapshot(42);
         assert!(read_snapshot(&snapshot) == 42, 0);
 
-        let snapshot = create_snapshot(std::string::utf8(b"42"));
-        assert!(read_snapshot(&snapshot) == std::string::utf8(b"42"), 0);
+        let derived = create_derived_string(std::string::utf8(b"42"));
+        assert!(read_derived_string(&derived) == std::string::utf8(b"42"), 0);
     }
 
     #[test]
@@ -153,15 +203,8 @@ module aptos_framework::aggregator_v2 {
     #[test]
     fun test_string_concat1() {
         let snapshot = create_snapshot(42);
-        let snapshot2 = string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
-        assert!(read_snapshot(&snapshot2) == std::string::utf8(b"before42after"), 0);
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x030005, location = Self)]
-    fun test_string_concat_from_string_not_supported() {
-        let snapshot = create_snapshot<String>(std::string::utf8(b"42"));
-        string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
+        let derived = derive_string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
+        assert!(read_derived_string(&derived) == std::string::utf8(b"before42after"), 0);
     }
 
     // Tests commented out, as flag used in rust cannot be disabled.

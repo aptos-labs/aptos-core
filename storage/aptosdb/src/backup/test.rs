@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
+use crate::db::{
     test_helper::{arb_blocks_to_commit, update_in_memory_state},
     AptosDB,
 };

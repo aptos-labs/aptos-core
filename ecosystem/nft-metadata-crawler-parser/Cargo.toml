@@ -18,10 +18,9 @@ aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-metrics-core = { workspace = true }
 async-trait = { workspace = true }
 backoff = { workspace = true }
-base64 = { workspace = true }
+bytes = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
-csv = { workspace = true }
 diesel = { workspace = true, features = [
     "chrono",
     "postgres",
@@ -32,7 +31,6 @@ diesel = { workspace = true, features = [
 diesel_migrations = { workspace = true }
 field_count = { workspace = true }
 futures = { workspace = true }
-google-cloud-pubsub = { workspace = true }
 google-cloud-storage = { workspace = true }
 image = { workspace = true }
 once_cell = { workspace = true }
@@ -40,6 +38,8 @@ regex = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha256 = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
+warp = { workspace = true }

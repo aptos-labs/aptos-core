@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalTestnet};
+use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalnet};
 use crate::node::local_testnet::utils::socket_addr_to_url;
 use anyhow::{anyhow, Context, Result};
 use aptos_config::config::{NodeConfig, DEFAULT_GRPC_STREAM_PORT};
@@ -20,12 +20,12 @@ use std::{
 };
 
 /// Args specific to running a node (and its components, e.g. the txn stream) in the
-/// local testnet.
+/// localnet.
 #[derive(Debug, Parser)]
 pub struct NodeArgs {
     /// An overridable config template for the test node
     ///
-    /// If provided, the config will be used, and any needed configuration for the local testnet
+    /// If provided, the config will be used, and any needed configuration for the localnet
     /// will override the config's values
     #[clap(long, value_parser)]
     pub config_path: Option<PathBuf>,
@@ -36,6 +36,12 @@ pub struct NodeArgs {
     /// Cannot be used with --config-path
     #[clap(long, value_parser, conflicts_with("config_path"))]
     pub test_config_override: Option<PathBuf>,
+
+    /// Optimize the node for higher performance.
+    ///
+    /// Note: This is only useful for e2e performance testing, and should not be used in production.
+    #[clap(long)]
+    pub performance: bool,
 
     /// Random seed for key generation in test mode
     ///
@@ -54,16 +60,38 @@ pub struct NodeArgs {
     /// The port at which to expose the grpc transaction stream.
     #[clap(long, default_value_t = DEFAULT_GRPC_STREAM_PORT)]
     txn_stream_port: u16,
+
+    /// If set we won't run the node at all.
+    //
+    // Note: I decided that since running multiple partial localnets is a rare
+    // case that only core devs would ever really want, it wasn't worth making the code
+    // much more complex to support that case "first class". Instead, we have this flag
+    // that does everything else to set up running the node, but never actually runs
+    // it. This is useful if you want to invoke the CLI once to run a node + txn stream
+    // and invoke it again to run processors + indexer API. You might want to do this
+    // for compatibility testing. If you use this flag and there _isn't_ a node already
+    // running at the expected port, the processors will fail to connect to the txn
+    // stream (since there isn't one) and the localnet will crash.
+    //
+    // If we do change our minds on this one day, the correct way to do this would be
+    // to let the user instead pass in a bunch of flags that declare where an existing
+    // node is running, separate service configs from their manager, return a config
+    // instead of a manager, etc.
+    //
+    // Because this flag is a bit of a footgun we hide it from regular users.
+    #[clap(long, hide = true)]
+    pub no_node: bool,
 }
 
 #[derive(Clone, Debug)]
 pub struct NodeManager {
     config: NodeConfig,
     test_dir: PathBuf,
+    no_node: bool,
 }
 
 impl NodeManager {
-    pub fn new(args: &RunLocalTestnet, bind_to: Ipv4Addr, test_dir: PathBuf) -> Result<Self> {
+    pub fn new(args: &RunLocalnet, bind_to: Ipv4Addr, test_dir: PathBuf) -> Result<Self> {
         let rng = args
             .node_args
             .seed
@@ -79,6 +107,7 @@ impl NodeManager {
             &test_dir,
             false,
             false,
+            args.node_args.performance,
             aptos_cached_packages::head_release_bundle(),
             rng,
         )
@@ -108,6 +137,7 @@ impl NodeManager {
         Ok(NodeManager {
             config: node_config,
             test_dir,
+            no_node: args.node_args.no_node,
         })
     }
 
@@ -150,6 +180,13 @@ impl ServiceManager for NodeManager {
     /// exit (which should never happen) forever. This is necessary because there is
     /// no async function we can use to run the node.
     async fn run_service(self: Box<Self>) -> Result<()> {
+        // Don't actually run the node, just idle.
+        if self.no_node {
+            loop {
+                tokio::time::sleep(Duration::from_millis(10000)).await;
+            }
+        }
+
         let node_thread_handle = thread::spawn(move || {
             let result = start_test_environment_node(self.config, self.test_dir, false);
             eprintln!("Node stopped unexpectedly {:#?}", result);

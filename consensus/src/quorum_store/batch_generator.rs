@@ -4,6 +4,7 @@ use crate::{
     monitor,
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
+        batch_store::BatchWriter,
         counters,
         quorum_store_db::QuorumStoreStorage,
         types::Batch,
@@ -13,12 +14,14 @@ use crate::{
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::BatchId,
+    proof_of_store::{BatchId, BatchInfo},
 };
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
+use rayon::prelude::*;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     sync::Arc,
@@ -28,8 +31,9 @@ use tokio::time::Interval;
 
 #[derive(Debug)]
 pub enum BatchGeneratorCommand {
-    CommitNotification(u64),
+    CommitNotification(u64, Vec<BatchInfo>),
     ProofExpiration(Vec<BatchId>),
+    RemoteBatch(Batch),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
@@ -39,16 +43,31 @@ pub struct BackPressure {
     pub proof_count: bool,
 }
 
+struct BatchInProgress {
+    txns: Vec<TransactionSummary>,
+    expiry_time_usecs: u64,
+}
+
+impl BatchInProgress {
+    fn new(txns: Vec<TransactionSummary>, expiry_time_usecs: u64) -> Self {
+        Self {
+            txns,
+            expiry_time_usecs,
+        }
+    }
+}
+
 pub struct BatchGenerator {
     epoch: u64,
     my_peer_id: PeerId,
     batch_id: BatchId,
     db: Arc<dyn QuorumStoreStorage>,
+    batch_writer: Arc<dyn BatchWriter>,
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
-    batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
+    batches_in_progress: HashMap<(PeerId, BatchId), BatchInProgress>,
     txns_in_progress_sorted: BTreeMap<TransactionSummary, TransactionInProgress>,
-    batch_expirations: TimeExpirations<BatchId>,
+    batch_expirations: TimeExpirations<(PeerId, BatchId)>,
     latest_block_timestamp: u64,
     last_end_batch_time: Instant,
     // quorum store back pressure, get updated from proof manager
@@ -61,6 +80,7 @@ impl BatchGenerator {
         my_peer_id: PeerId,
         config: QuorumStoreConfig,
         db: Arc<dyn QuorumStoreStorage>,
+        batch_writer: Arc<dyn BatchWriter>,
         mempool_tx: Sender<QuorumStoreRequest>,
         mempool_txn_pull_timeout_ms: u64,
     ) -> Self {
@@ -85,6 +105,7 @@ impl BatchGenerator {
             my_peer_id,
             batch_id,
             db,
+            batch_writer,
             config,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             batches_in_progress: HashMap::new(),
@@ -99,6 +120,56 @@ impl BatchGenerator {
         }
     }
 
+    fn insert_batch(
+        &mut self,
+        author: PeerId,
+        batch_id: BatchId,
+        txns: Vec<SignedTransaction>,
+        expiry_time_usecs: u64,
+    ) {
+        if self.batches_in_progress.contains_key(&(author, batch_id)) {
+            return;
+        }
+
+        let txns_in_progress: Vec<_> = txns
+            .par_iter()
+            .with_min_len(optimal_min_len(txns.len(), 32))
+            .map(|txn| {
+                (
+                    TransactionSummary::new(
+                        txn.sender(),
+                        txn.sequence_number(),
+                        txn.committed_hash(),
+                    ),
+                    TransactionInProgress::new(txn.gas_unit_price()),
+                )
+            })
+            .collect();
+
+        let mut txns = vec![];
+        for (summary, info) in txns_in_progress {
+            let txn_info = self
+                .txns_in_progress_sorted
+                .entry(summary)
+                .or_insert_with(|| TransactionInProgress::new(info.gas_unit_price));
+            txn_info.increment();
+            txn_info.gas_unit_price = info.gas_unit_price.max(txn_info.gas_unit_price);
+            txns.push(summary);
+        }
+        let updated_expiry_time_usecs = self
+            .batches_in_progress
+            .get(&(author, batch_id))
+            .map_or(expiry_time_usecs, |batch_in_progress| {
+                expiry_time_usecs.max(batch_in_progress.expiry_time_usecs)
+            });
+        self.batches_in_progress.insert(
+            (author, batch_id),
+            BatchInProgress::new(txns, updated_expiry_time_usecs),
+        );
+        self.batch_expirations
+            .add_item((author, batch_id), updated_expiry_time_usecs);
+    }
+
     fn create_new_batch(
         &mut self,
         txns: Vec<SignedTransaction>,
@@ -111,18 +182,7 @@ impl BatchGenerator {
             .save_batch_id(self.epoch, self.batch_id)
             .expect("Could not save to db");
 
-        let txns_in_progress: Vec<_> = txns
-            .iter()
-            .map(|txn| {
-                (
-                    TransactionSummary::new(txn.sender(), txn.sequence_number()),
-                    TransactionInProgress::new(txn.gas_unit_price()),
-                )
-            })
-            .collect();
-
-        self.insert_batch_in_progress(batch_id, txns_in_progress);
-        self.batch_expirations.add_item(batch_id, expiry_time);
+        self.insert_batch(self.my_peer_id, batch_id, txns.clone(), expiry_time);
 
         counters::CREATED_BATCHES_COUNT.inc();
         counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len());
@@ -146,19 +206,36 @@ impl BatchGenerator {
         num_txns_in_bucket: usize,
         expiry_time: u64,
         bucket_start: u64,
-    ) -> bool {
-        let mut remaining_txns = num_txns_in_bucket;
-        while remaining_txns > 0 {
-            if batches.len() == self.config.sender_max_num_batches {
-                return false;
+        total_batches_remaining: &mut u64,
+    ) {
+        let mut txns_remaining = num_txns_in_bucket;
+        while txns_remaining > 0 {
+            if *total_batches_remaining == 0 {
+                return;
             }
-            let num_batch_txns = std::cmp::min(self.config.sender_max_batch_txns, remaining_txns);
-            let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
-            let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
-            batches.push(batch);
-            remaining_txns -= num_batch_txns;
+            let num_take_txns = std::cmp::min(self.config.sender_max_batch_txns, txns_remaining);
+            let mut batch_bytes_remaining = self.config.sender_max_batch_bytes as u64;
+            let num_batch_txns = txns
+                .iter()
+                .take(num_take_txns)
+                .take_while(|txn| {
+                    let txn_bytes = txn.txn_bytes_len() as u64;
+                    if batch_bytes_remaining.checked_sub(txn_bytes).is_some() {
+                        batch_bytes_remaining -= txn_bytes;
+                        true
+                    } else {
+                        false
+                    }
+                })
+                .count();
+            if num_batch_txns > 0 {
+                let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
+                let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
+                batches.push(batch);
+                *total_batches_remaining = total_batches_remaining.saturating_sub(1);
+                txns_remaining -= num_batch_txns;
+            }
         }
-        true
     }
 
     fn bucket_into_batches(
@@ -178,10 +255,12 @@ impl BatchGenerator {
             .rev()
             .cloned()
             .collect();
+
+        let mut max_batches_remaining = self.config.sender_max_num_batches as u64;
         let mut batches = vec![];
         for bucket_start in &reverse_buckets_excluding_zero {
-            if pulled_txns.is_empty() {
-                break;
+            if pulled_txns.is_empty() || max_batches_remaining == 0 {
+                return batches;
             }
 
             // Search for key in descending gas order
@@ -196,52 +275,33 @@ impl BatchGenerator {
                 continue;
             }
 
-            let batches_space_remaining = self.push_bucket_to_batches(
+            self.push_bucket_to_batches(
                 &mut batches,
                 pulled_txns,
                 num_txns_in_bucket,
                 expiry_time,
                 *bucket_start,
+                &mut max_batches_remaining,
             );
-            if !batches_space_remaining {
-                return batches;
-            }
         }
-        if !pulled_txns.is_empty() {
+        if !pulled_txns.is_empty() && max_batches_remaining > 0 {
             self.push_bucket_to_batches(
                 &mut batches,
                 pulled_txns,
                 pulled_txns.len(),
                 expiry_time,
                 0,
+                &mut max_batches_remaining,
             );
         }
         batches
     }
 
-    fn insert_batch_in_progress(
-        &mut self,
-        batch_id: BatchId,
-        txns_in_progress: Vec<(TransactionSummary, TransactionInProgress)>,
-    ) {
-        let mut txns = vec![];
-        for (summary, info) in txns_in_progress {
-            let txn_info = self
-                .txns_in_progress_sorted
-                .entry(summary)
-                .or_insert_with(|| TransactionInProgress::new(info.gas_unit_price));
-            txn_info.increment();
-            txn_info.gas_unit_price = info.gas_unit_price.max(txn_info.gas_unit_price);
-            txns.push(summary);
-        }
-        self.batches_in_progress.insert(batch_id, txns);
-    }
-
-    fn remove_batch_in_progress(&mut self, batch_id: &BatchId) -> bool {
-        let removed = self.batches_in_progress.remove(batch_id);
+    fn remove_batch_in_progress(&mut self, author: PeerId, batch_id: BatchId) -> bool {
+        let removed = self.batches_in_progress.remove(&(author, batch_id));
         match removed {
-            Some(txns) => {
-                for txn in txns {
+            Some(batch_in_progress) => {
+                for txn in batch_in_progress.txns {
                     if let Entry::Occupied(mut o) = self.txns_in_progress_sorted.entry(txn) {
                         let info = o.get_mut();
                         if info.decrement() == 0 {
@@ -256,8 +316,8 @@ impl BatchGenerator {
     }
 
     #[cfg(test)]
-    pub fn remove_batch_in_progress_for_test(&mut self, batch_id: &BatchId) -> bool {
-        self.remove_batch_in_progress(batch_id)
+    pub fn remove_batch_in_progress_for_test(&mut self, author: PeerId, batch_id: BatchId) -> bool {
+        self.remove_batch_in_progress(author, batch_id)
     }
 
     #[cfg(test)]
@@ -276,7 +336,7 @@ impl BatchGenerator {
             .mempool_proxy
             .pull_internal(
                 max_count,
-                self.config.mempool_txn_pull_max_bytes,
+                self.config.sender_max_batch_bytes as u64,
                 self.txns_in_progress_sorted.clone(),
             )
             .await
@@ -310,6 +370,17 @@ impl BatchGenerator {
         counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
 
         batches
+    }
+
+    pub(crate) fn handle_remote_batch(
+        &mut self,
+        author: PeerId,
+        batch_id: BatchId,
+        txns: Vec<SignedTransaction>,
+    ) {
+        let expiry_time_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64
+            + self.config.remote_batch_expiry_gap_when_init_usecs;
+        self.insert_batch(author, batch_id, txns, expiry_time_usecs);
     }
 
     pub async fn start(
@@ -383,9 +454,22 @@ impl BatchGenerator {
 
                         let dynamic_pull_max_txn = std::cmp::max(
                             (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
-                        let batches = self.handle_scheduled_pull(dynamic_pull_max_txn).await;
+                        let pull_max_txn = std::cmp::min(
+                            dynamic_pull_max_txn,
+                            self.config.sender_max_total_txns as u64,
+                        );
+                        let batches = self.handle_scheduled_pull(pull_max_txn).await;
                         if !batches.is_empty() {
                             last_non_empty_pull = tick_start;
+
+                            let persist_start = Instant::now();
+                            let mut persist_requests = vec![];
+                            for batch in batches.clone().into_iter() {
+                                persist_requests.push(batch.into());
+                            }
+                            self.batch_writer.persist(persist_requests);
+                            counters::BATCH_CREATION_PERSIST_LATENCY.observe_duration(persist_start.elapsed());
+
                             network_sender.broadcast_batch_msg(batches).await;
                         } else if tick_start.elapsed() > interval.period().checked_div(2).unwrap_or(Duration::ZERO) {
                             // If the pull takes too long, it's also accounted as a non-empty pull to avoid pulling too often.
@@ -402,7 +486,7 @@ impl BatchGenerator {
                 }),
                 Some(cmd) = cmd_rx.recv() => monitor!("batch_generator_handle_command", {
                     match cmd {
-                        BatchGeneratorCommand::CommitNotification(block_timestamp) => {
+                        BatchGeneratorCommand::CommitNotification(block_timestamp, batches) => {
                             trace!(
                                 "QS: got clean request from execution, block timestamp {}",
                                 block_timestamp
@@ -413,10 +497,24 @@ impl BatchGenerator {
                             );
                             self.latest_block_timestamp = block_timestamp;
 
+                            for (author, batch_id) in batches.iter().map(|b| (b.author(), b.batch_id())) {
+                                if self.remove_batch_in_progress(author, batch_id) {
+                                    counters::BATCH_IN_PROGRESS_COMMITTED.inc();
+                                }
+                            }
+
                             // Cleans up all batches that expire in timestamp <= block_timestamp. This is
                             // safe since clean request must occur only after execution result is certified.
-                            for batch_id in self.batch_expirations.expire(block_timestamp) {
-                                if self.remove_batch_in_progress(&batch_id) {
+                            for (author, batch_id) in self.batch_expirations.expire(block_timestamp) {
+                                if let Some(batch_in_progress) = self.batches_in_progress.get(&(author, batch_id)) {
+                                    // If there is an identical batch with higher expiry time, re-insert it.
+                                    if batch_in_progress.expiry_time_usecs > block_timestamp {
+                                        self.batch_expirations.add_item((author, batch_id), batch_in_progress.expiry_time_usecs);
+                                        continue;
+                                    }
+                                }
+                                if self.remove_batch_in_progress(author, batch_id) {
+                                    counters::BATCH_IN_PROGRESS_EXPIRED.inc();
                                     debug!(
                                         "QS: logical time based expiration batch w. id {} from batches_in_progress, new size {}",
                                         batch_id,
@@ -427,14 +525,18 @@ impl BatchGenerator {
                         },
                         BatchGeneratorCommand::ProofExpiration(batch_ids) => {
                             for batch_id in batch_ids {
+                                counters::BATCH_IN_PROGRESS_TIMEOUT.inc();
                                 debug!(
                                     "QS: received timeout for proof of store, batch id = {}",
                                     batch_id
                                 );
                                 // Not able to gather the proof, allow transactions to be polled again.
-                                self.remove_batch_in_progress(&batch_id);
+                                self.remove_batch_in_progress(self.my_peer_id, batch_id);
                             }
-                        }
+                        },
+                        BatchGeneratorCommand::RemoteBatch(batch) => {
+                            self.handle_remote_batch(batch.author(), batch.batch_id(), batch.into_transactions());
+                        },
                         BatchGeneratorCommand::Shutdown(ack_tx) => {
                             ack_tx
                                 .send(())

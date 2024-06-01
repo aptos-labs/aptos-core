@@ -1,13 +1,14 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{Author, Payload, Round};
-use aptos_types::system_txn::SystemTransaction;
+use aptos_types::validator_txn::ValidatorTransaction;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum ProposalExt {
     V0 {
-        sys_txns: Vec<SystemTransaction>,
+        validator_txns: Vec<ValidatorTransaction>,
         /// T of the block (e.g. one or more transaction(s)
         payload: Payload,
         /// Author of the block that can be validated by the author's public key and the signature
@@ -32,9 +33,9 @@ impl ProposalExt {
         }
     }
 
-    pub fn sys_txns(&self) -> Option<&Vec<SystemTransaction>> {
+    pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         match self {
-            ProposalExt::V0 { sys_txns, .. } => Some(sys_txns),
+            ProposalExt::V0 { validator_txns, .. } => Some(validator_txns),
         }
     }
 

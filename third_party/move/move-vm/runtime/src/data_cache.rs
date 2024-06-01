@@ -2,9 +2,16 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::loader::Loader;
+use crate::{
+    loader::{Loader, ModuleStorageAdapter},
+    logging::expect_no_verification_errors,
+};
 use bytes::Bytes;
-use move_binary_format::errors::*;
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    errors::*,
+    file_format::{CompiledModule, CompiledScript},
+};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChanges, ChangeSet, Changes, Op},
@@ -18,9 +25,14 @@ use move_core_types::{
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    value_serde::deserialize_and_allow_delayed_values,
     values::{GlobalValue, Value},
 };
-use std::collections::btree_map::BTreeMap;
+use sha3::{Digest, Sha3_256};
+use std::{
+    collections::btree_map::{self, BTreeMap},
+    sync::Arc,
+};
 
 pub struct AccountDataCache {
     // The bool flag in the `data_map` indicates whether the resource contains
@@ -38,6 +50,22 @@ impl AccountDataCache {
     }
 }
 
+fn load_module_impl(
+    remote: &dyn MoveResolver<PartialVMError>,
+    account_map: &BTreeMap<AccountAddress, AccountDataCache>,
+    module_id: &ModuleId,
+) -> PartialVMResult<Bytes> {
+    if let Some(account_cache) = account_map.get(module_id.address()) {
+        if let Some((blob, _is_republishing)) = account_cache.module_map.get(module_id.name()) {
+            return Ok(blob.clone());
+        }
+    }
+    remote.get_module(module_id)?.ok_or_else(|| {
+        PartialVMError::new(StatusCode::LINKER_ERROR)
+            .with_message(format!("Linker Error: Module {} doesn't exist", module_id))
+    })
+}
+
 /// Transaction data cache. Keep updates within a transaction so they can all be published at
 /// once when the transaction succeeds.
 ///
@@ -52,17 +80,29 @@ impl AccountDataCache {
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
 pub(crate) struct TransactionDataCache<'r> {
-    remote: &'r dyn MoveResolver,
+    remote: &'r dyn MoveResolver<PartialVMError>,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
+
+    deserializer_config: DeserializerConfig,
+
+    // Caches to help avoid duplicate deserialization calls.
+    compiled_scripts: BTreeMap<[u8; 32], Arc<CompiledScript>>,
+    compiled_modules: BTreeMap<ModuleId, (Arc<CompiledModule>, usize, [u8; 32])>,
 }
 
 impl<'r> TransactionDataCache<'r> {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
-    pub(crate) fn new(remote: &'r dyn MoveResolver) -> Self {
+    pub(crate) fn new(
+        deserializer_config: DeserializerConfig,
+        remote: &'r impl MoveResolver<PartialVMError>,
+    ) -> Self {
         TransactionDataCache {
             remote,
             account_map: BTreeMap::new(),
+            deserializer_config,
+            compiled_scripts: BTreeMap::new(),
+            compiled_modules: BTreeMap::new(),
         }
     }
 
@@ -162,6 +202,7 @@ impl<'r> TransactionDataCache<'r> {
         loader: &Loader,
         addr: AccountAddress,
         ty: &Type,
+        module_store: &ModuleStorageAdapter,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         let account_cache = Self::get_mut_or_insert_with(&mut self.account_map, &addr, || {
             (addr, AccountDataCache::new())
@@ -179,9 +220,9 @@ impl<'r> TransactionDataCache<'r> {
             };
             // TODO(Gas): Shall we charge for this?
             let (ty_layout, has_aggregator_lifting) =
-                loader.type_to_type_layout_with_identifier_mappings(ty)?;
+                loader.type_to_type_layout_with_identifier_mappings(ty, module_store)?;
 
-            let module = loader.get_module(&ty_tag.module_id());
+            let module = module_store.module_at(&ty_tag.module_id());
             let metadata: &[Metadata] = match &module {
                 Some(module) => &module.module().metadata,
                 None => &[],
@@ -190,7 +231,7 @@ impl<'r> TransactionDataCache<'r> {
             // If we need to process aggregator lifting, we pass type layout to remote.
             // Remote, in turn ensures that all aggregator values are lifted if the resolved
             // resource comes from storage.
-            let resolved_result = self.remote.get_resource_bytes_with_metadata_and_layout(
+            let (data, bytes_loaded) = self.remote.get_resource_bytes_with_metadata_and_layout(
                 &addr,
                 &ty_tag,
                 metadata,
@@ -199,19 +240,12 @@ impl<'r> TransactionDataCache<'r> {
                 } else {
                     None
                 },
-            );
-
-            // TODO[agg_v2](fix) We need to propagate errors better, and handle them differently based on:
-            // - DELAYED_FIELDS_CODE_INVARIANT_ERROR, SPECULATIVE_EXECUTION_ABORT_ERROR or other.
-            let (data, bytes_loaded) = resolved_result.map_err(|err| {
-                let msg = format!("Unexpected storage error: {:?}", err);
-                PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
-            })?;
+            )?;
             load_res = Some(NumBytes::new(bytes_loaded as u64));
 
             let gv = match data {
                 Some(blob) => {
-                    let val = match Value::simple_deserialize(&blob, &ty_layout) {
+                    let val = match deserialize_and_allow_delayed_values(&blob, &ty_layout) {
                         Some(val) => val,
                         None => {
                             let msg =
@@ -243,25 +277,75 @@ impl<'r> TransactionDataCache<'r> {
         ))
     }
 
-    pub(crate) fn load_module(&self, module_id: &ModuleId) -> VMResult<Bytes> {
-        if let Some(account_cache) = self.account_map.get(module_id.address()) {
-            if let Some((blob, _is_republishing)) = account_cache.module_map.get(module_id.name()) {
-                return Ok(blob.clone());
-            }
+    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<Bytes> {
+        load_module_impl(self.remote, &self.account_map, module_id)
+    }
+
+    pub(crate) fn load_compiled_script_to_cache(
+        &mut self,
+        script_blob: &[u8],
+        hash_value: [u8; 32],
+    ) -> VMResult<Arc<CompiledScript>> {
+        let cache = &mut self.compiled_scripts;
+        match cache.entry(hash_value) {
+            btree_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
+            btree_map::Entry::Vacant(entry) => {
+                let script = match CompiledScript::deserialize_with_config(
+                    script_blob,
+                    &self.deserializer_config,
+                ) {
+                    Ok(script) => script,
+                    Err(err) => {
+                        let msg = format!("[VM] deserializer for script returned error: {:?}", err);
+                        return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                            .with_message(msg)
+                            .finish(Location::Script));
+                    },
+                };
+                Ok(entry.insert(Arc::new(script)).clone())
+            },
         }
-        match self.remote.get_module(module_id) {
-            Ok(Some(bytes)) => Ok(bytes),
-            Ok(None) => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
-                .with_message(format!(
-                    "Linker Error: Cannot find {:?} in data cache",
-                    module_id
-                ))
-                .finish(Location::Undefined)),
-            Err(err) => {
-                let msg = format!("Unexpected storage error: {:?}", err);
-                Err(PartialVMError::new(StatusCode::STORAGE_ERROR)
-                    .with_message(msg)
-                    .finish(Location::Undefined))
+    }
+
+    pub(crate) fn load_compiled_module_to_cache(
+        &mut self,
+        id: ModuleId,
+        allow_loading_failure: bool,
+    ) -> VMResult<(Arc<CompiledModule>, usize, [u8; 32])> {
+        let cache = &mut self.compiled_modules;
+        match cache.entry(id) {
+            btree_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
+            btree_map::Entry::Vacant(entry) => {
+                // bytes fetching, allow loading to fail if the flag is set
+                let bytes = match load_module_impl(self.remote, &self.account_map, entry.key())
+                    .map_err(|err| err.finish(Location::Undefined))
+                {
+                    Ok(bytes) => bytes,
+                    Err(err) if allow_loading_failure => return Err(err),
+                    Err(err) => {
+                        return Err(expect_no_verification_errors(err));
+                    },
+                };
+
+                let mut sha3_256 = Sha3_256::new();
+                sha3_256.update(&bytes);
+                let hash_value: [u8; 32] = sha3_256.finalize().into();
+
+                // for bytes obtained from the data store, they should always deserialize and verify.
+                // It is an invariant violation if they don't.
+                let module =
+                    CompiledModule::deserialize_with_config(&bytes, &self.deserializer_config)
+                        .map_err(|err| {
+                            let msg = format!("Deserialization error: {:?}", err);
+                            PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                                .with_message(msg)
+                                .finish(Location::Module(entry.key().clone()))
+                        })
+                        .map_err(expect_no_verification_errors)?;
+
+                Ok(entry
+                    .insert((Arc::new(module), bytes.len(), hash_value))
+                    .clone())
             },
         }
     }
@@ -293,9 +377,7 @@ impl<'r> TransactionDataCache<'r> {
         Ok(self
             .remote
             .get_module(module_id)
-            .map_err(|_| {
-                PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
-            })?
+            .map_err(|e| e.finish(Location::Undefined))?
             .is_some())
     }
 }

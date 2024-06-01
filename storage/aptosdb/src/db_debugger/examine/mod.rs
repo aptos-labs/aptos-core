@@ -3,7 +3,7 @@
 
 mod print_db_versions;
 
-use anyhow::Result;
+use aptos_storage_interface::Result;
 
 #[derive(clap::Subcommand)]
 #[clap(about = "Examine databases.")]

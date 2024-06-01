@@ -5,7 +5,8 @@ variable "region" {
 
 variable "kubernetes_version" {
   description = "Version of Kubernetes to use for EKS cluster"
-  default     = "1.22"
+  type        = string
+  default     = "1.27"
 }
 
 variable "eks_cluster_name" {
@@ -15,6 +16,7 @@ variable "eks_cluster_name" {
 
 variable "k8s_api_sources" {
   description = "List of CIDR subnets which can access the Kubernetes API endpoint"
+  type        = list(string)
   default     = ["0.0.0.0/0"]
 }
 
@@ -55,32 +57,37 @@ variable "k8s_debugger_roles" {
 }
 
 variable "iam_path" {
-  default     = "/"
   description = "Path to use when naming IAM objects"
+  type        = string
+  default     = "/"
 }
 
 variable "permissions_boundary_policy" {
-  default     = ""
   description = "ARN of IAM policy to set as permissions boundary on created roles"
+  type        = string
 }
 
 variable "vpc_cidr_block" {
-  default     = "192.168.0.0/16"
   description = "VPC CIDR Block"
+  type        = string
+  default     = "192.168.0.0/16"
 }
 
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
+  type        = string
   default     = "t3.medium"
 }
 
 variable "fullnode_instance_type" {
   description = "Instance type used for validator and fullnodes"
+  type        = string
   default     = "c6i.8xlarge"
 }
 
 variable "num_fullnodes" {
   description = "Number of fullnodes to deploy"
+  type        = number
   default     = 1
 }
 
@@ -92,10 +99,12 @@ variable "node_pool_sizes" {
 
 variable "workspace_name_override" {
   description = "If specified, overrides the usage of Terraform workspace for naming purposes"
+  type        = string
   default     = ""
 }
 
 variable "num_extra_instance" {
-  default     = 0
   description = "Number of extra instances to add into node pool"
+  type        = number
+  default     = 0
 }

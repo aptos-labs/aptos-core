@@ -177,7 +177,7 @@ async fn warn_detailed_error(
     let balance = rest_client
         .get_account_balance(sender)
         .await
-        .map_or(-1, |v| v.into_inner().get() as i64);
+        .map_or(-1, |v| v.into_inner().get() as i128);
 
     warn!(
         "[{:?}] Failed {} transaction: {:?}, seq num: {}, gas: unit {} and max {}, for account {}, last seq_num {:?}, balance of {} and last transaction for account: {:?}",
@@ -218,7 +218,7 @@ async fn submit_and_check(
     }
     match rest_client
         .wait_for_transaction_by_hash_bcs(
-            txn.clone().committed_hash(),
+            txn.committed_hash(),
             txn.expiration_timestamp_secs(),
             None,
             Some(wait_duration.saturating_sub(start.elapsed())),
@@ -252,6 +252,25 @@ async fn submit_and_check(
     Ok(())
 }
 
+pub async fn query_sequence_number_with_client(
+    rest_client: &RestClient,
+    account_address: AccountAddress,
+) -> Result<u64> {
+    let result = RETRY_POLICY
+        .retry_if(
+            move || rest_client.get_account_bcs(account_address),
+            |error: &RestError| !is_account_not_found(error),
+        )
+        .await;
+    match result {
+        Ok(account) => Ok(account.into_inner().sequence_number()),
+        Err(error) => match is_account_not_found(&error) {
+            true => Ok(0),
+            false => Err(error.into()),
+        },
+    }
+}
+
 fn is_account_not_found(error: &RestError) -> bool {
     match error {
         RestError::Api(error) => matches!(error.error.error_code, AptosErrorCode::AccountNotFound),
@@ -273,19 +292,7 @@ impl ReliableTransactionSubmitter for RestApiReliableTransactionSubmitter {
     }
 
     async fn query_sequence_number(&self, account_address: AccountAddress) -> Result<u64> {
-        let result = RETRY_POLICY
-            .retry_if(
-                move || self.random_rest_client().get_account_bcs(account_address),
-                |error: &RestError| !is_account_not_found(error),
-            )
-            .await;
-        match result {
-            Ok(account) => Ok(account.into_inner().sequence_number()),
-            Err(error) => match is_account_not_found(&error) {
-                true => Ok(0),
-                false => Err(error.into()),
-            },
-        }
+        query_sequence_number_with_client(self.random_rest_client(), account_address).await
     }
 
     async fn execute_transactions_with_counter(

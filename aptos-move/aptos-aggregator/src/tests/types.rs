@@ -7,16 +7,19 @@ use crate::{
     delta_change_set::serialize,
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{
-        code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
-        DelayedFieldsSpeculativeError, PanicOr,
+        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
     },
 };
 use aptos_types::{
-    aggregator::PanicError,
-    state_store::{state_key::StateKey, state_value::StateValue},
-    write_set::WriteOp,
+    delayed_fields::PanicError,
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+    },
 };
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
+use move_vm_types::delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
@@ -28,7 +31,7 @@ pub fn aggregator_v1_id_for_test(key: u128) -> AggregatorID {
 }
 
 pub fn aggregator_v1_state_key_for_test(key: u128) -> StateKey {
-    StateKey::raw(key.to_le_bytes().to_vec())
+    StateKey::raw(&key.to_le_bytes())
 }
 
 pub const FAKE_AGGREGATOR_VIEW_GEN_ID_START: u32 = 87654321;
@@ -73,7 +76,7 @@ impl TAggregatorV1View for FakeAggregatorView {
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         Ok(self.v1_store.get(state_key).cloned())
     }
 }
@@ -82,7 +85,6 @@ impl TDelayedFieldView for FakeAggregatorView {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         true
@@ -111,41 +113,34 @@ impl TDelayedFieldView for FakeAggregatorView {
         Ok(math.unsigned_add_delta(base, delta).is_ok())
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
+    fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
         let mut counter = self.counter.borrow_mut();
-        let id = Self::Identifier::new(*counter as u64);
+        let id = *counter;
         *counter += 1;
-        id
+        DelayedFieldID::new_with_width(id, width)
     }
 
-    fn validate_and_convert_delayed_field_id(
-        &self,
-        id: u64,
-    ) -> Result<Self::Identifier, PanicError> {
-        if id < self.start_counter as u64 {
+    fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        let index = id.extract_unique_index();
+        let current_counter = *self.counter.borrow();
+
+        if index < self.start_counter || index >= current_counter {
             return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {}, we've started from {}",
-                id, self.start_counter
+                "Invalid delayed field id: {:?} with index {} (started from {} and reached {})",
+                id, index, self.start_counter, current_counter
             )));
         }
-
-        let current = *self.counter.borrow();
-        if id > current as u64 {
-            return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {}, we've only reached to {}",
-                id, current
-            )));
-        }
-
-        Ok(Self::Identifier::new(id))
+        Ok(())
     }
 
     fn get_reads_needing_exchange(
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         unimplemented!();
     }
 
@@ -153,7 +148,7 @@ impl TDelayedFieldView for FakeAggregatorView {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         unimplemented!();
     }
 }

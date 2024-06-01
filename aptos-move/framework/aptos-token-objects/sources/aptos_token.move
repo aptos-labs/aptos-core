@@ -1,4 +1,4 @@
-/// This defines a minimally viable token for no-code solutions akin the the original token at
+/// This defines a minimally viable token for no-code solutions akin to the original token at
 /// 0x3::token module.
 /// The key features are:
 /// * Base token and collection features
@@ -8,7 +8,6 @@
 /// * Metadata property type
 module aptos_token_objects::aptos_token {
     use std::error;
-    use std::features;
     use std::option::{Self, Option};
     use std::string::String;
     use std::signer;
@@ -282,25 +281,7 @@ module aptos_token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
     ): ConstructorRef acquires AptosCollection {
-        let constructor_ref = if (features::auids_enabled()) {
-            token::create(
-                creator,
-                collection,
-                description,
-                name,
-                option::none(),
-                uri,
-            )
-        } else {
-            token::create_from_account(
-                creator,
-                collection,
-                description,
-                name,
-                option::none(),
-                uri,
-            )
-        };
+        let constructor_ref = token::create(creator, collection, description, name, option::none(), uri);
 
         let object_signer = object::generate_signer(&constructor_ref);
 

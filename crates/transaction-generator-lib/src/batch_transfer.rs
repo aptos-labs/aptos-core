@@ -1,13 +1,13 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
-use crate::{TransactionGenerator, TransactionGeneratorCreator};
-use aptos_infallible::RwLock;
+use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
+use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
 
 pub struct BatchTransferTransactionGenerator {
@@ -15,7 +15,7 @@ pub struct BatchTransferTransactionGenerator {
     batch_size: usize,
     send_amount: u64,
     txn_factory: TransactionFactory,
-    all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+    all_addresses: Arc<ObjectPool<AccountAddress>>,
 }
 
 impl BatchTransferTransactionGenerator {
@@ -24,7 +24,7 @@ impl BatchTransferTransactionGenerator {
         batch_size: usize,
         send_amount: u64,
         txn_factory: TransactionFactory,
-        all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+        all_addresses: Arc<ObjectPool<AccountAddress>>,
     ) -> Self {
         Self {
             rng,
@@ -46,10 +46,7 @@ impl TransactionGenerator for BatchTransferTransactionGenerator {
         for _ in 0..num_to_create {
             let receivers = self
                 .all_addresses
-                .read()
-                .choose_multiple(&mut self.rng, self.batch_size)
-                .cloned()
-                .collect::<Vec<_>>();
+                .clone_from_pool(self.batch_size, &mut self.rng);
             requests.push(
                 account.sign_with_transaction_builder(self.txn_factory.payload(
                     aptos_stdlib::aptos_account_batch_transfer(receivers, vec![
@@ -67,7 +64,7 @@ impl TransactionGenerator for BatchTransferTransactionGenerator {
 pub struct BatchTransferTransactionGeneratorCreator {
     txn_factory: TransactionFactory,
     amount: u64,
-    all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+    all_addresses: Arc<ObjectPool<AccountAddress>>,
     batch_size: usize,
 }
 
@@ -75,7 +72,7 @@ impl BatchTransferTransactionGeneratorCreator {
     pub fn new(
         txn_factory: TransactionFactory,
         amount: u64,
-        all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+        all_addresses: Arc<ObjectPool<AccountAddress>>,
         batch_size: usize,
     ) -> Self {
         Self {

@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
+use crate::{
+    assert_abort, assert_success, assert_vm_status, build_package, tests::common, MoveHarness,
+};
 use aptos_framework::natives::code::{PackageRegistry, UpgradePolicy};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
@@ -180,10 +182,17 @@ fn code_publishing_upgrade_loader_cache_consistency() {
             |_| {},
         ),
     ];
-    let result = h.run_block(txns);
-    assert_success!(result[0]);
-    assert_success!(result[1]);
-    assert_vm_status!(result[2], StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
+    let result = h.run_block_get_output(txns);
+    assert_success!(result[0].status().to_owned());
+    assert_success!(result[1].status().to_owned());
+    assert_eq!(
+        result[2]
+            .auxiliary_data()
+            .get_detail_error_message()
+            .unwrap()
+            .status_code(),
+        StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE
+    )
 }
 
 #[test]
@@ -228,7 +237,7 @@ fn code_publishing_using_resource_account() {
         ),
     );
     let pack_dir = pack.write_to_temp().unwrap();
-    let package = aptos_framework::BuiltPackage::build(
+    let package = build_package(
         pack_dir.path().to_owned(),
         aptos_framework::BuildOptions::default(),
     )

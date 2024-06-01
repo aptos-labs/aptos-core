@@ -1,4 +1,4 @@
-//# publish --print-bytecode
+//# publish
 module 0x42::Test {
 
     public inline fun add(x: u64, y: u64): u64 {

@@ -4,11 +4,10 @@
 //! This file defines the state merkle snapshot committer running in background thread.
 
 use crate::{
-    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    metrics::LATEST_SNAPSHOT_VERSION,
+    metrics::{LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
+    pruner::PrunerManager,
+    schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     state_store::{buffered_state::CommitMessage, StateDb},
-    version_data::VersionDataSchema,
-    PrunerManager, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
@@ -18,7 +17,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::SmtAncestors;
 use aptos_storage_interface::state_delta::StateDelta;
-use aptos_types::state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue};
+use aptos_types::state_store::state_value::StateValue;
 use std::sync::{mpsc::Receiver, Arc};
 
 pub struct StateMerkleBatch {
@@ -117,13 +116,7 @@ impl StateMerkleBatchCommitter {
             .current_version
             .ok_or_else(|| anyhow!("Committing without version."))?;
 
-        let usage_from_ledger_db: StateStorageUsage = self
-            .state_db
-            .ledger_db
-            .metadata_db()
-            .get::<VersionDataSchema>(&version)?
-            .ok_or_else(|| anyhow!("VersionData missing for version {}", version))?
-            .get_state_storage_usage();
+        let usage_from_ledger_db = self.state_db.ledger_db.metadata_db().get_usage(version)?;
         let leaf_count_from_jmt = self
             .state_db
             .state_merkle_db

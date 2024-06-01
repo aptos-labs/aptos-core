@@ -33,7 +33,7 @@ use smallvec::smallvec;
 use std::{
     cell::RefCell,
     collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
-    fmt::Display,
+    fmt::{Debug, Display},
     sync::Arc,
 };
 
@@ -94,7 +94,7 @@ pub trait TableResolver {
         handle: &TableHandle,
         key: &[u8],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, anyhow::Error>;
+    ) -> Result<Option<Bytes>, PartialVMError>;
 }
 
 /// The native table context extension. This needs to be attached to the NativeContextExtensions
@@ -145,7 +145,7 @@ const HANDLE_FIELD_INDEX: usize = 0;
 impl<'a> NativeTableContext<'a> {
     /// Create a new instance of a native table context. This must be passed in via an
     /// extension into VM session functions.
-    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn TableResolver) -> Self {
+    pub fn new(txn_hash: [u8; 32], resolver: &'a impl TableResolver) -> Self {
         Self {
             resolver,
             txn_hash,
@@ -236,12 +236,11 @@ impl Table {
     ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
         Ok(match self.content.entry(key) {
             Entry::Vacant(entry) => {
-                let (gv, loaded) = match context
-                    .resolver
-                    .resolve_table_entry_bytes_with_layout(&self.handle, entry.key(), None)
-                    .map_err(|err| {
-                        partial_extension_error(format!("remote table resolver failure: {}", err))
-                    })? {
+                let (gv, loaded) = match context.resolver.resolve_table_entry_bytes_with_layout(
+                    &self.handle,
+                    entry.key(),
+                    None,
+                )? {
                     Some(val_bytes) => {
                         let val = deserialize(&self.value_layout, &val_bytes)?;
                         (

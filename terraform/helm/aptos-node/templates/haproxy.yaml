@@ -26,7 +26,7 @@ metadata:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
     {{- if $.Values.service.domain }}
-    external-dns.alpha.kubernetes.io/hostname: val{{$i}}.{{ $.Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: vn{{$i}}.{{ $.Values.service.domain }},val{{$i}}.{{ $.Values.service.domain }}
     {{- end }}
 spec:
   selector:
@@ -40,6 +40,11 @@ spec:
   - name: metrics
     port: 9101
     targetPort: 9102
+  {{- end }}
+  {{- if $.Values.service.validator.enableAdminPort }}
+  - name: admin
+    port: 9102
+    targetPort: 9202
   {{- end }}
   {{- if $.Values.service.validator.enableRestApi }}
   - name: api
@@ -69,7 +74,7 @@ metadata:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
     {{- if $.Values.service.domain }}
-    external-dns.alpha.kubernetes.io/hostname: {{ $config.name }}{{$i}}.{{ $.Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: {{ $config.dns_name }}{{$i}}.{{ $.Values.service.domain }},{{ $config.name }}{{$i}}.{{ $.Values.service.domain }}
     {{- end }}
 spec:
   selector:
@@ -84,6 +89,11 @@ spec:
   - name: metrics
     port: 9101
     targetPort: {{ add 9103 $index }}
+  {{- end }}
+  {{- if $.Values.service.fullnode.enableAdminPort }}
+  - name: admin
+    port: 9102
+    targetPort: {{ add 9203 $index }}
   {{- end }}
   {{- if $.Values.service.fullnode.enableRestApi }}
   - name: api
@@ -135,7 +145,6 @@ spec:
         app.kubernetes.io/name: haproxy
         app.kubernetes.io/instance: haproxy-{{$i}}
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: runtime/default
         checksum/haproxy.cfg: {{ tpl ($.Files.Get "files/haproxy.cfg") $ | sha256sum }}
     spec:
       {{- with $.Values.haproxy }}
@@ -146,14 +155,24 @@ spec:
         imagePullPolicy: {{ .image.pullPolicy }}
         resources:
           {{- toYaml .resources | nindent 10 }}
+        # These ports are exposed by HAProxy. See haproxy.cfg for more details
+        # Fullnode ports are dynamically assigned based on the number of fullnode groups
         ports:
-        - containerPort: 6180
-        - containerPort: 6182
+        # Aptosnet
+        - containerPort: 6180 # validator
+        - containerPort: 6182 # fullnode
+        # Fullnode API
         - containerPort: 8080
+        # Validator API
         - containerPort: 8180
+        # HAProxy metrics port
         - containerPort: 9101
+        # Node ports
         - containerPort: 9102
         - containerPort: 9103
+        # AdminService ports
+        - containerPort: 9202 # validator admin
+        - containerPort: 9203 # fullnode admin
         volumeMounts:
         - name: haproxy-config
           mountPath: /usr/local/etc/haproxy
@@ -185,6 +204,8 @@ spec:
         runAsNonRoot: false
         runAsUser: 0
         runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
       {{- end }}
       volumes:
       - name: haproxy-config

@@ -26,8 +26,8 @@ use aptos_sdk::{
     bcs,
     transaction_builder::TransactionFactory,
     types::{
-        account_config::aptos_test_root_address, transaction::SignedTransaction, AccountKey,
-        LocalAccount,
+        account_config::aptos_test_root_address, get_apt_primary_store_address,
+        transaction::SignedTransaction, AccountKey, LocalAccount,
     },
 };
 use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
@@ -51,7 +51,7 @@ use bytes::Bytes;
 use hyper::{HeaderMap, Response};
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, iter::once, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{boxed::Box, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
 
@@ -145,6 +145,7 @@ pub fn new_test_context(
         db.clone(),
         mempool.ac_client.clone(),
         node_config.clone(),
+        None, /* table info reader */
     );
 
     // Configure the testing depending on which API version we're testing.
@@ -396,6 +397,7 @@ impl TestContext {
                 "type": "multisig_payload",
                 "multisig_address": multisig_account.to_hex_literal(),
                 "transaction_payload": {
+                    "type": "entry_function_payload",
                     "function": function,
                     "type_arguments": type_args,
                     "arguments": args
@@ -604,7 +606,6 @@ impl TestContext {
                     .cloned()
                     .map(Transaction::UserTransaction),
             )
-            .chain(once(Transaction::StateCheckpoint(metadata.id())))
             .collect();
 
         // Check that txn execution was successful.
@@ -617,14 +618,10 @@ impl TestContext {
                 BlockExecutorConfigFromOnchain::new_no_block_limit(),
             )
             .unwrap();
-        let mut compute_status = result.compute_status().clone();
+        let compute_status = result.compute_status_for_input_txns().clone();
         assert_eq!(compute_status.len(), txns.len(), "{:?}", result);
-        if matches!(compute_status.last(), Some(TransactionStatus::Retry)) {
-            // a state checkpoint txn can be Retry if prefixed by a write set txn
-            compute_status.pop();
-        }
         // But the rest of the txns must be Kept.
-        for st in result.compute_status() {
+        for st in compute_status {
             match st {
                 TransactionStatus::Discard(st) => panic!("transaction is discarded: {:?}", st),
                 TransactionStatus::Retry => panic!("should not retry"),
@@ -635,13 +632,14 @@ impl TestContext {
         self.executor
             .commit_blocks(
                 vec![metadata.id()],
-                self.new_ledger_info(&metadata, result.root_hash(), txns.len()),
+                // StateCheckpoint/BlockEpilogue is added on top of the input transactions.
+                self.new_ledger_info(&metadata, result.root_hash(), txns.len() + 1),
             )
             .unwrap();
 
         self.mempool
             .mempool_notifier
-            .notify_new_commit(txns, timestamp, 1000)
+            .notify_new_commit(txns, timestamp)
             .await
             .unwrap();
     }
@@ -659,19 +657,42 @@ impl TestContext {
     }
 
     pub async fn get_apt_balance(&self, account: AccountAddress) -> u64 {
-        let coin_balance = self
-            .api_get_account_resource(
+        let coin_balance_option = self
+            .try_api_get_account_resource(
                 account,
                 "0x1",
                 "coin",
                 "CoinStore<0x1::aptos_coin::AptosCoin>",
             )
             .await;
-        coin_balance["data"]["coin"]["value"]
-            .as_str()
-            .unwrap()
-            .parse::<u64>()
-            .unwrap()
+        let coin = coin_balance_option.map(|x| {
+            x["data"]["coin"]["value"]
+                .as_str()
+                .unwrap()
+                .parse::<u64>()
+                .unwrap()
+        });
+        if let Some(v) = coin {
+            v
+        } else {
+            let fungible_store_option = self
+                .try_api_get_account_resource(
+                    get_apt_primary_store_address(account),
+                    "0x1",
+                    "fungible_asset",
+                    "FungibleStore",
+                )
+                .await;
+            fungible_store_option
+                .map(|x| {
+                    x["data"]["balance"]
+                        .as_str()
+                        .unwrap()
+                        .parse::<u64>()
+                        .unwrap()
+                })
+                .unwrap_or(0)
+        }
     }
 
     pub async fn gen_events_by_handle(
@@ -719,29 +740,27 @@ impl TestContext {
     }
 
     // TODO: Add support for generic_type_params if necessary.
+    pub async fn try_api_get_account_resource(
+        &self,
+        account: AccountAddress,
+        resource_account_address: &str,
+        module: &str,
+        name: &str,
+    ) -> Option<Value> {
+        let resource = format!("{}::{}::{}", resource_account_address, module, name);
+        self.gen_resource(&account, &resource).await
+    }
+
     pub async fn api_get_account_resource(
         &self,
         account: AccountAddress,
         resource_account_address: &str,
         module: &str,
         name: &str,
-    ) -> serde_json::Value {
-        let resource = format!("{}::{}::{}", resource_account_address, module, name);
-        self.gen_resource(&account, &resource).await.unwrap()
-    }
-
-    // TODO: remove the helper function since we don't publish module directly anymore
-    pub async fn api_publish_module(&mut self, account: &mut LocalAccount, code: HexEncodedBytes) {
-        self.api_execute_txn(
-            account,
-            json!({
-                "type": "module_bundle_payload",
-                "modules" : [
-                    {"bytecode": code},
-                ],
-            }),
-        )
-        .await;
+    ) -> Value {
+        self.try_api_get_account_resource(account, resource_account_address, module, name)
+            .await
+            .unwrap()
     }
 
     pub async fn api_execute_entry_function(
@@ -825,6 +844,7 @@ impl TestContext {
                 "type": "multisig_payload",
                 "multisig_address": multisig_account.to_hex_literal(),
                 "transaction_payload": {
+                    "type": "entry_function_payload",
                     "function": function,
                     "type_arguments": type_args,
                     "arguments": args

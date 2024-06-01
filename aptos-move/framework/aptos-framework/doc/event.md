@@ -19,6 +19,8 @@ events emitted to a handle and emit events to the event store.
 -  [Function `write_to_event_store`](#0x1_event_write_to_event_store)
 -  [Function `destroy_handle`](#0x1_event_destroy_handle)
 -  [Specification](#@Specification_0)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `emit`](#@Specification_0_emit)
     -  [Function `write_module_event_to_store`](#@Specification_0_write_module_event_to_store)
     -  [Function `emit_event`](#@Specification_0_emit_event)
@@ -286,6 +288,65 @@ Destroy a unique handle.
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>Each event handle possesses a distinct and unique GUID.</td>
+<td>Critical</td>
+<td>The new_event_handle function creates an EventHandle object with a unique GUID, ensuring distinct identification.</td>
+<td>Audited: GUIDs are created in guid::create. Each time the function is called, it increments creation_num_ref. Multiple calls to the function will result in distinct GUID values.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>Unable to publish two events with the same GUID & sequence number.</td>
+<td>Critical</td>
+<td>Two events may either have the same GUID with a different counter or the same counter with a different GUID.</td>
+<td>This is implied by <a href="#high-level-req">high-level requirement 1</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Event native functions respect normal Move rules around object creation and destruction.</td>
+<td>Critical</td>
+<td>Must follow the same rules and principles that apply to object creation and destruction in Move when using event native functions.</td>
+<td>The native functions of this module have been manually audited.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>Counter increases monotonically between event emissions</td>
+<td>Medium</td>
+<td>With each event emission, the emit_event function increments the counter of the EventHandle by one.</td>
+<td>Formally verified in the post condition of <a href="#high-level-req-4">emit_event</a>.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>For a given EventHandle, it should always be possible to: (1) return the GUID associated with this EventHandle, (2) return the current counter associated with this EventHandle, and (3) destroy the handle.</td>
+<td>Low</td>
+<td>The following functions should not abort if EventHandle exists: guid(), counter(), destroy_handle().</td>
+<td>Formally verified via <a href="#high-level-req-5.1">guid</a>, <a href="#high-level-req-5.2">counter</a> and <a href="#high-level-req-5.3">destroy_handle</a>.</td>
+</tr>
+
+</table>
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 </code></pre>
@@ -339,6 +400,7 @@ Native function use opaque.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
+// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
 <b>ensures</b> [concrete] handle_ref.counter == <b>old</b>(handle_ref.counter) + 1;
 </code></pre>
 
@@ -356,7 +418,8 @@ Native function use opaque.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-req-5.1" href="#high-level-req">high-level requirement 5</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -373,7 +436,8 @@ Native function use opaque.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-req-5.2" href="#high-level-req">high-level requirement 5</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -408,7 +472,8 @@ Native function use opaque.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-req-5.3" href="#high-level-req">high-level requirement 5</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

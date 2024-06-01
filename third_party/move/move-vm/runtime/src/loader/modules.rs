@@ -22,6 +22,7 @@ use move_binary_format::{
     },
 };
 use move_core_types::{
+    account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
     vm_status::StatusCode,
@@ -29,102 +30,99 @@ use move_core_types::{
 use move_vm_types::loaded_data::runtime_types::{
     StructIdentifier, StructNameIndex, StructType, Type,
 };
+use parking_lot::RwLock;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
     sync::Arc,
 };
 
-// A ModuleCache is the core structure in the Loader.
-// It holds all Modules, Types and Functions loaded.
-// Types and Functions are pushed globally to the ModuleCache.
-// All accesses to the ModuleCache are under lock (exclusive).
-#[derive(Clone)]
-pub(crate) struct ModuleCache {
-    pub(crate) modules: BinaryCache<ModuleId, Module>,
+/// This trait provides an additional api for the Session to decide where the resolved modules should be stored.
+///
+/// The default api will store the modules inside MoveVM structure but the caller can also choose to store it
+/// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the caller, i.e: the
+/// adapter layer, to freely decide when to drop or persist the cache as well as determining its own eviction policy.
+pub trait ModuleStorage {
+    fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module>;
+    fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>>;
+    fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>>;
 }
 
+pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, Module>>);
+
 impl ModuleCache {
-    pub(crate) fn new() -> Self {
-        Self {
-            modules: BinaryCache::new(),
-        }
+    pub fn new() -> Self {
+        ModuleCache(RwLock::new(BinaryCache::new()))
+    }
+
+    pub fn flush(&self) {
+        *self.0.write() = BinaryCache::new();
+    }
+}
+
+impl Clone for ModuleCache {
+    fn clone(&self) -> Self {
+        ModuleCache(RwLock::new(self.0.read().clone()))
+    }
+}
+
+impl ModuleStorage for ModuleCache {
+    fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module> {
+        self.0.write().insert(module_id.clone(), binary).clone()
+    }
+
+    fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>> {
+        self.0.read().get(module_id).map(Arc::clone)
+    }
+
+    fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>> {
+        self.0.read().get(&(addr, name)).map(Arc::clone)
+    }
+}
+
+pub(crate) struct ModuleStorageAdapter {
+    modules: Arc<dyn ModuleStorage>,
+}
+
+impl ModuleStorageAdapter {
+    pub(crate) fn new(modules: Arc<dyn ModuleStorage>) -> Self {
+        Self { modules }
     }
 
     // Retrieve a module by `ModuleId`. The module may have not been loaded yet in which
     // case `None` is returned
     pub(crate) fn module_at(&self, id: &ModuleId) -> Option<Arc<Module>> {
-        self.modules.get(id).map(Arc::clone)
+        self.modules.fetch_module(id)
+    }
+
+    pub(crate) fn module_at_by_ref(
+        &self,
+        addr: &AccountAddress,
+        name: &IdentStr,
+    ) -> Option<Arc<Module>> {
+        self.modules.fetch_module_by_ref(addr, name)
     }
 
     pub(crate) fn insert(
-        &mut self,
+        &self,
         natives: &NativeFunctions,
         id: ModuleId,
-        module: CompiledModule,
+        module_size: usize,
+        module: Arc<CompiledModule>,
         name_cache: &StructNameCache,
     ) -> VMResult<Arc<Module>> {
         if let Some(cached) = self.module_at(&id) {
             return Ok(cached);
         }
 
-        match Module::new(natives, module, self, name_cache) {
-            Ok(module) => Ok(Arc::clone(self.modules.insert(id, module))),
+        match Module::new(natives, module_size, module, self, name_cache) {
+            Ok(module) => Ok(self.modules.store_module(&id, module)),
             Err((err, _)) => Err(err.finish(Location::Undefined)),
         }
     }
 
-    fn make_struct_type(
-        &self,
-        module: &CompiledModule,
-        struct_def: &StructDefinition,
-        struct_name_table: &[StructNameIndex],
-    ) -> PartialVMResult<StructType> {
-        let struct_handle = module.struct_handle_at(struct_def.struct_handle);
-        let field_names = match &struct_def.field_information {
-            StructFieldInformation::Native => vec![],
-            StructFieldInformation::Declared(field_info) => field_info
-                .iter()
-                .map(|f| module.identifier_at(f.name).to_owned())
-                .collect(),
-        };
-        let abilities = struct_handle.abilities;
-        let name = module.identifier_at(struct_handle.name).to_owned();
-        let type_parameters = struct_handle.type_parameters.clone();
-        let fields = match &struct_def.field_information {
-            StructFieldInformation::Native => unreachable!("native structs have been removed"),
-            StructFieldInformation::Declared(fields) => fields,
-        };
-
-        let mut field_tys = vec![];
-        for field in fields {
-            let ty = intern_type(
-                BinaryIndexedView::Module(module),
-                &field.signature.0,
-                struct_name_table,
-            )?;
-            debug_assert!(field_tys.len() < usize::max_value());
-            field_tys.push(ty);
-        }
-
-        Ok(StructType {
-            fields: field_tys,
-            phantom_ty_args_mask: struct_handle
-                .type_parameters
-                .iter()
-                .map(|ty| ty.is_phantom)
-                .collect(),
-            field_names,
-            abilities,
-            type_parameters,
-            idx: struct_name_table[struct_def.struct_handle.0 as usize],
-            module: module.self_id(),
-            name,
-        })
-    }
-
     pub(crate) fn has_module(&self, module_id: &ModuleId) -> bool {
-        self.modules.id_map.contains_key(module_id)
+        self.modules.fetch_module(module_id).is_some()
     }
 
     // Given a ModuleId::struct_name, retrieve the `StructType` and the index associated.
@@ -135,7 +133,7 @@ impl ModuleCache {
         module_id: &ModuleId,
     ) -> PartialVMResult<Arc<StructType>> {
         self.modules
-            .get(module_id)
+            .fetch_module(module_id)
             .and_then(|module| {
                 let idx = module.struct_map.get(struct_name)?;
                 Some(module.structs.get(*idx)?.definition_struct_type.clone())
@@ -155,17 +153,36 @@ impl ModuleCache {
         func_name: &IdentStr,
         module_id: &ModuleId,
     ) -> PartialVMResult<Arc<Function>> {
-        match self.modules.get(module_id).and_then(|module| {
+        match self.modules.fetch_module(module_id).and_then(|module| {
             let idx = module.function_map.get(func_name)?;
-            module.function_defs.get(*idx)
+            module.function_defs.get(*idx).map(Arc::clone)
         }) {
-            Some(func) => Ok(func.clone()),
+            Some(func) => Ok(func),
             None => Err(
                 PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
                     "Cannot find {:?}::{:?} in cache",
                     module_id, func_name
                 )),
             ),
+        }
+    }
+
+    pub(crate) fn function_at(&self, handle: &FunctionHandle) -> PartialVMResult<Arc<Function>> {
+        match handle {
+            FunctionHandle::Local(func) => Ok(func.clone()),
+            FunctionHandle::Remote { module, name } => {
+                self.modules
+                    .fetch_module(module)
+                    .and_then(|module| {
+                        let idx = module.function_map.get(name)?;
+                        module.function_defs.get(*idx).cloned()
+                    })
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(
+                            format!("Failed to resolve function: {:?}::{:?}", module, name),
+                        )
+                    })
+            },
         }
     }
 }
@@ -175,9 +192,13 @@ impl ModuleCache {
 // When code executes indexes in instructions are resolved against those runtime structure
 // so that any data needed for execution is immediately available
 #[derive(Clone, Debug)]
-pub(crate) struct Module {
+pub struct Module {
     #[allow(dead_code)]
     id: ModuleId,
+
+    // size in bytes
+    pub(crate) size: usize,
+
     // primitive pools
     pub(crate) module: Arc<CompiledModule>,
 
@@ -250,10 +271,11 @@ pub(crate) struct FieldInstantiation {
 impl Module {
     pub(crate) fn new(
         natives: &NativeFunctions,
-        module: CompiledModule,
-        cache: &ModuleCache,
+        size: usize,
+        module: Arc<CompiledModule>,
+        cache: &ModuleStorageAdapter,
         name_cache: &StructNameCache,
-    ) -> Result<Self, (PartialVMError, CompiledModule)> {
+    ) -> Result<Self, (PartialVMError, Arc<CompiledModule>)> {
         let id = module.self_id();
 
         let mut structs = vec![];
@@ -270,6 +292,7 @@ impl Module {
 
         let mut create = || {
             let mut struct_idxs = vec![];
+            let mut struct_names = vec![];
             // validate the correctness of struct handle references.
             for struct_handle in module.struct_handles() {
                 let struct_name = module.identifier_at(struct_handle.name);
@@ -281,10 +304,12 @@ impl Module {
                         .get_struct_type_by_identifier(struct_name, &module_id)?
                         .check_compatibility(struct_handle)?;
                 }
-                struct_idxs.push(name_cache.insert_or_get(StructIdentifier {
+                let name = StructIdentifier {
                     module: module_id,
                     name: struct_name.to_owned(),
-                }));
+                };
+                struct_idxs.push(name_cache.insert_or_get(name.clone()));
+                struct_names.push(name)
             }
 
             // Build signature table
@@ -302,9 +327,9 @@ impl Module {
 
             for (idx, struct_def) in module.struct_defs().iter().enumerate() {
                 let definition_struct_type =
-                    Arc::new(cache.make_struct_type(&module, struct_def, &struct_idxs)?);
+                    Arc::new(Self::make_struct_type(&module, struct_def, &struct_idxs)?);
                 structs.push(StructDef {
-                    field_count: definition_struct_type.fields.len() as u16,
+                    field_count: definition_struct_type.field_tys.len() as u16,
                     definition_struct_type,
                 });
                 let name =
@@ -325,7 +350,13 @@ impl Module {
 
             for (idx, func) in module.function_defs().iter().enumerate() {
                 let findex = FunctionDefinitionIndex(idx as TableIndex);
-                let function = Function::new(natives, findex, &module, signature_table.as_slice());
+                let function = Function::new(
+                    natives,
+                    findex,
+                    &module,
+                    signature_table.as_slice(),
+                    &struct_names,
+                )?;
 
                 function_map.insert(function.name.to_owned(), idx);
                 function_defs.push(Arc::new(function));
@@ -342,7 +373,7 @@ impl Module {
                             | Bytecode::VecUnpack(si, _)
                             | Bytecode::VecSwap(si) => {
                                 if !single_signature_token_map.contains_key(si) {
-                                    let ty = match module.signature_at(*si).0.get(0) {
+                                    let ty = match module.signature_at(*si).0.first() {
                                         None => {
                                             return Err(PartialVMError::new(
                                                 StatusCode::VERIFIER_INVARIANT_VIOLATION,
@@ -429,7 +460,8 @@ impl Module {
         match create() {
             Ok(_) => Ok(Self {
                 id,
-                module: Arc::new(module),
+                size,
+                module,
                 structs,
                 struct_instantiations,
                 function_refs,
@@ -443,6 +475,54 @@ impl Module {
             }),
             Err(err) => Err((err, module)),
         }
+    }
+
+    fn make_struct_type(
+        module: &CompiledModule,
+        struct_def: &StructDefinition,
+        struct_name_table: &[StructNameIndex],
+    ) -> PartialVMResult<StructType> {
+        let struct_handle = module.struct_handle_at(struct_def.struct_handle);
+        let field_names = match &struct_def.field_information {
+            StructFieldInformation::Native => vec![],
+            StructFieldInformation::Declared(field_info) => field_info
+                .iter()
+                .map(|f| module.identifier_at(f.name).to_owned())
+                .collect(),
+        };
+        let abilities = struct_handle.abilities;
+        let name = module.identifier_at(struct_handle.name).to_owned();
+        let ty_params = struct_handle.type_parameters.clone();
+        let fields = match &struct_def.field_information {
+            StructFieldInformation::Native => unreachable!("native structs have been removed"),
+            StructFieldInformation::Declared(fields) => fields,
+        };
+
+        let mut field_tys = vec![];
+        for field in fields {
+            let ty = intern_type(
+                BinaryIndexedView::Module(module),
+                &field.signature.0,
+                struct_name_table,
+            )?;
+            debug_assert!(field_tys.len() < usize::max_value());
+            field_tys.push(ty);
+        }
+
+        Ok(StructType {
+            field_tys,
+            phantom_ty_params_mask: struct_handle
+                .type_parameters
+                .iter()
+                .map(|ty| ty.is_phantom)
+                .collect(),
+            field_names,
+            abilities,
+            ty_params,
+            idx: struct_name_table[struct_def.struct_handle.0 as usize],
+            module: module.self_id(),
+            name,
+        })
     }
 
     pub(crate) fn struct_at(&self, idx: StructDefinitionIndex) -> Arc<StructType> {

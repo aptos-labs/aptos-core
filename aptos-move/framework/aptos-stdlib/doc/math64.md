@@ -10,6 +10,7 @@ Standard math utilities missing in the Move Language.
 -  [Function `max`](#0x1_math64_max)
 -  [Function `min`](#0x1_math64_min)
 -  [Function `average`](#0x1_math64_average)
+-  [Function `gcd`](#0x1_math64_gcd)
 -  [Function `mul_div`](#0x1_math64_mul_div)
 -  [Function `clamp`](#0x1_math64_clamp)
 -  [Function `pow`](#0x1_math64_pow)
@@ -120,6 +121,37 @@ Return the average of two.
     } <b>else</b> {
         b + (a - b) / 2
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_math64_gcd"></a>
+
+## Function `gcd`
+
+Return greatest common divisor of <code>a</code> & <code>b</code>, via the Euclidean algorithm.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_gcd">gcd</a>(a: u64, b: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="math64.md#0x1_math64_gcd">gcd</a>(a: u64, b: u64): u64 {
+    <b>let</b> (large, small) = <b>if</b> (a &gt; b) (a, b) <b>else</b> (b, a);
+    <b>while</b> (small != 0) {
+        <b>let</b> tmp = small;
+        small = large % small;
+        large = tmp;
+    };
+    large
 }
 </code></pre>
 

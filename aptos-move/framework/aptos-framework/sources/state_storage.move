@@ -14,7 +14,7 @@ module aptos_framework::state_storage {
         bytes: u64,
     }
 
-    /// This is updated at the beginning of each opoch, reflecting the storage
+    /// This is updated at the beginning of each epoch, reflecting the storage
     /// usage after the last txn of the previous epoch is committed.
     struct StateStorageUsage has key, store {
         epoch: u64,

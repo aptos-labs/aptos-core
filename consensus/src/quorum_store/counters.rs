@@ -35,6 +35,8 @@ static BYTE_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     .unwrap()
 });
 
+const INLINE_BATCH_COUNT_BUCKETS: &[f64] = &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+
 // Histogram buckets that expand DEFAULT_BUCKETS with more granularity between 100-2000 ms
 const QUORUM_STORE_LATENCY_BUCKETS: &[f64] = &[
     0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.65, 0.7,
@@ -134,6 +136,42 @@ pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static NUM_INLINE_BATCHES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "num_inline_batches_in_block_proposal",
+        "Histogram for the number of inline batches in a block proposed by proof manager",
+        INLINE_BATCH_COUNT_BUCKETS.to_vec(),
+    )
+    .unwrap()
+});
+
+pub static NUM_INLINE_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "num_inline_transactions_in_block_proposal",
+        "Histogram for the number of inline transactions in a block proposed by proof manager",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static NUM_BATCHES_WITHOUT_PROOF_OF_STORE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "num_batches_without_proof_of_store",
+        "Histogram for the number of batches without proof of store in proof manager",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static PROOF_QUEUE_FULLY_UTILIZED: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "proof_queue_utilized_fully_in_proposal",
+        "Histogram for whether the proof queue is fully utilized when creating block proposal",
+        [0.0, 1.0].to_vec(),
+    )
+    .unwrap()
+});
+
 /// Histogram for the total size of transactions per block when pulled for consensus.
 pub static BLOCK_BYTES_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
@@ -161,6 +199,38 @@ pub static EXCLUDED_TXNS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
         TRANSACTION_COUNT_BUCKETS.clone(),
     )
         .unwrap()
+});
+
+pub static BATCH_IN_PROGRESS_COMMITTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_in_progress_committed",
+        "Number of batches that are removed from in progress by a commit."
+    )
+    .unwrap()
+});
+
+pub static NUM_CORRUPT_BATCHES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "corrupt_batches_in_proof_manager",
+        "Number of batches in proof manager for which the digest does not match"
+    )
+    .unwrap()
+});
+
+pub static BATCH_IN_PROGRESS_EXPIRED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_in_progress_expired",
+        "Number of batches that are removed from in progress by a block timestamp expiration."
+    )
+    .unwrap()
+});
+
+pub static BATCH_IN_PROGRESS_TIMEOUT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_in_progress_timeout",
+        "Number of batches that are removed from in progress by a proof collection timeout."
+    )
+    .unwrap()
 });
 
 pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_SAVE: Lazy<Histogram> = Lazy::new(
@@ -400,6 +470,15 @@ pub static RECEIVED_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the received batches that failed max limit check.
+pub static RECEIVED_BATCH_MAX_LIMIT_FAILED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_max_limit_failed",
+        "Count of the received batches that failed max limit check."
+    )
+    .unwrap()
+});
+
 /// Count of the missed batches when execute.
 pub static MISSED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
@@ -500,6 +579,33 @@ pub static RECEIVED_BATCH_RESPONSE_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the number of batch not found responses received from other nodes.
+pub static RECEIVED_BATCH_NOT_FOUND_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_not_found_count",
+        "Count of the number of batch not found responses received from other nodes."
+    )
+    .unwrap()
+});
+
+/// Count of the number of batch expired responses received from other nodes.
+pub static RECEIVED_BATCH_EXPIRED_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_expired_count",
+        "Count of the number of batch expired responses received from other nodes."
+    )
+    .unwrap()
+});
+
+/// Count of the number of error batches received from other nodes.
+pub static RECEIVED_BATCH_RESPONSE_ERROR_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_response_error_count",
+        "Count of the number of error batches received from other nodes."
+    )
+    .unwrap()
+});
+
 pub static QS_BACKPRESSURE_TXN_COUNT: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "quorum_store_backpressure_txn_count",
@@ -558,6 +664,17 @@ pub static BATCH_CREATION_COMPUTE_LATENCY: Lazy<DurationHistogram> = Lazy::new(|
     )
 });
 
+/// Histogram of the time it takes to persist batches generated locally to the DB.
+pub static BATCH_CREATION_PERSIST_LATENCY: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_batch_creation_persist_latency",
+            "Histogram of the time it takes to persist batches generated locally to the DB.",
+        )
+        .unwrap(),
+    )
+});
+
 /// Histogram of the time durations from created batch to created PoS.
 pub static BATCH_TO_POS_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(
@@ -593,6 +710,14 @@ pub static BATCH_RECEIVED_REPLIES_VOTING_POWER: Lazy<Histogram> = Lazy::new(|| {
         "quorum_store_batch_received_replies_voting_power",
         "Voting power of validators for which we received signed replies.",
         TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static BATCH_RECEIVED_LATE_REPLIES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_received_late_replies",
+        "Number of votes that came late."
     )
     .unwrap()
 });

@@ -348,10 +348,12 @@ impl NoiseUpgrader {
         }
 
         // verify that this is indeed our public key
-        if self_expected_public_key != self.noise_config.public_key().as_slice() {
+        let actual_public_key = self.noise_config.public_key();
+        if self_expected_public_key != actual_public_key.as_slice() {
             return Err(NoiseHandshakeError::ClientExpectingDifferentPubkey(
                 remote_peer_short,
                 hex::encode(self_expected_public_key),
+                hex::encode(actual_public_key.as_slice()),
             ));
         }
 

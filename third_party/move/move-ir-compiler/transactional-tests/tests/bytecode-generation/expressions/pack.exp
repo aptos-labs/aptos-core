@@ -7,7 +7,7 @@ struct T {
 	u: u64
 }
 
-f(): T {
+f(): T /* def_idx: 0 */ {
 B0:
 	0: LdU64(0)
 	1: Pack[0](T)

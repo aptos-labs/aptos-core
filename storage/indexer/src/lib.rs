@@ -1,9 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+/// TODO(jill): deprecate Indexer once Indexer Async V2 is ready
 mod db;
+pub mod db_ops;
+pub mod db_v2;
 mod metadata;
 mod schema;
+pub mod table_info_reader;
 
 use crate::{
     db::INDEX_DB_NAME,
@@ -12,35 +16,36 @@ use crate::{
         column_families, indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema,
     },
 };
-use anyhow::{bail, ensure, Result};
 use aptos_config::config::RocksdbConfig;
 use aptos_logger::warn;
+use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
-use aptos_storage_interface::{state_view::DbStateView, DbReader};
+use aptos_storage_interface::{
+    db_ensure, db_other_bail, state_view::DbStateViewAtVersion, AptosDbError, DbReader, Result,
+};
 use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
     state_store::{
-        state_key::{StateKey, StateKeyInner},
+        state_key::{inner::StateKeyInner, StateKey},
         table::{TableHandle, TableInfo},
+        StateView,
     },
     transaction::{AtomicVersion, Version},
     write_set::{WriteOp, WriteSet},
 };
-use aptos_vm::data_cache::AsMoveResolver;
 use bytes::Bytes;
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
-    resolver::MoveResolver,
 };
-use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryInto,
     sync::{atomic::Ordering, Arc},
 };
+
 #[derive(Debug)]
 pub struct Indexer {
     db: DB,
@@ -78,23 +83,19 @@ impl Indexer {
         write_sets: &[&WriteSet],
     ) -> Result<()> {
         let last_version = first_version + write_sets.len() as Version;
-        let state_view = DbStateView {
-            db: db_reader,
-            version: Some(last_version),
-        };
-        let resolver = state_view.as_move_resolver();
-        let annotator = MoveValueAnnotator::new(&resolver);
+        let state_view = db_reader.state_view_at_version(Some(last_version))?;
+        let annotator = AptosValueAnnotator::new(&state_view);
         self.index_with_annotator(&annotator, first_version, write_sets)
     }
 
-    pub fn index_with_annotator<R: MoveResolver>(
+    pub fn index_with_annotator<R: StateView>(
         &self,
-        annotator: &MoveValueAnnotator<R>,
+        annotator: &AptosValueAnnotator<R>,
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
         let next_version = self.next_version();
-        ensure!(
+        db_ensure!(
             first_version <= next_version,
             "Indexer expects to see continuous transaction versions. Expecting: {}, got: {}",
             next_version,
@@ -129,7 +130,7 @@ impl Indexer {
                     .for_each(|(i, write_set)| {
                         aptos_logger::error!(version = first_version as usize + i, write_set = ?write_set);
                     });
-                bail!(err);
+                db_other_bail!("Failed to parse table info: {:?}", err);
             },
         };
         batch.put::<IndexerMetadataSchema>(
@@ -153,13 +154,13 @@ impl Indexer {
 
 struct TableInfoParser<'a, R> {
     indexer: &'a Indexer,
-    annotator: &'a MoveValueAnnotator<'a, R>,
+    annotator: &'a AptosValueAnnotator<'a, R>,
     result: HashMap<TableHandle, TableInfo>,
     pending_on: HashMap<TableHandle, Vec<Bytes>>,
 }
 
-impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
-    pub fn new(indexer: &'a Indexer, annotator: &'a MoveValueAnnotator<R>) -> Self {
+impl<'a, R: StateView> TableInfoParser<'a, R> {
+    pub fn new(indexer: &'a Indexer, annotator: &'a AptosValueAnnotator<R>) -> Self {
         Self {
             indexer,
             annotator,
@@ -211,7 +212,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
             None => {
                 self.pending_on
                     .entry(handle)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(bytes.clone());
             },
         }
@@ -226,19 +227,19 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
                 }
             },
             AnnotatedMoveValue::Struct(struct_value) => {
-                let struct_tag = &struct_value.type_;
+                let struct_tag = &struct_value.ty_tag;
                 if Self::is_table(struct_tag) {
-                    assert_eq!(struct_tag.type_params.len(), 2);
+                    assert_eq!(struct_tag.type_args.len(), 2);
                     let table_info = TableInfo {
-                        key_type: struct_tag.type_params[0].clone(),
-                        value_type: struct_tag.type_params[1].clone(),
+                        key_type: struct_tag.type_args[0].clone(),
+                        value_type: struct_tag.type_args[1].clone(),
                     };
                     let table_handle = match &struct_value.value[0] {
                         (name, AnnotatedMoveValue::Address(handle)) => {
                             assert_eq!(name.as_ref(), ident_str!("handle"));
                             TableHandle(*handle)
                         },
-                        _ => bail!("Table struct malformed. {:?}", struct_value),
+                        _ => db_other_bail!("Table struct malformed. {:?}", struct_value),
                     };
                     self.save_table_info(table_handle, table_info)?;
                 } else {
@@ -288,7 +289,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
     }
 
     fn finish(self, batch: &mut SchemaBatch) -> Result<bool> {
-        ensure!(
+        db_ensure!(
             self.pending_on.is_empty(),
             "There is still pending table items to parse due to unknown table info for table handles: {:?}",
             self.pending_on.keys(),

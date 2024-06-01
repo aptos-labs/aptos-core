@@ -11,8 +11,8 @@ variable "fullnode_helm_values" {
 }
 
 variable "do_token" {
-  type        = string
   description = "Digital Notion API token"
+  type        = string
 }
 
 variable "region" {
@@ -27,41 +27,49 @@ variable "fullnode_helm_values_list" {
 }
 
 variable "k8s_namespace" {
-  default     = "aptos"
   description = "Kubernetes namespace that the fullnode will be deployed into"
+  type        = string
+  default     = "aptos"
 }
 
 variable "k8s_api_sources" {
   description = "List of CIDR subnets which can access the Kubernetes API endpoint"
+  type        = list(string)
   default     = ["0.0.0.0/0"]
 }
 
 variable "num_fullnodes" {
-  default     = 1
   description = "Number of fullnodes"
+  type        = number
+  default     = 1
 }
 
 variable "image_tag" {
-  default     = "devnet"
   description = "Docker image tag to use for the fullnode"
+  type        = string
+  default     = "devnet"
 }
 
 variable "era" {
   description = "Chain era, used to start a clean chain"
+  type        = number
   default     = 1
 }
 
 variable "chain_id" {
-  description = "aptos chain ID"
+  description = "Aptos chain ID"
+  type        = string
   default     = "DEVNET"
 }
 
 variable "chain_name" {
   description = "Aptos chain name"
+  type        = string
   default     = "devnet"
 }
 
 variable "machine_type" {
   description = "Machine type for running fullnode"
+  type        = string
   default     = "s-16vcpu-32gb"
 }

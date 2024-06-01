@@ -27,7 +27,7 @@ pub use account::AccountData;
 pub use address::Address;
 pub use block::{BcsBlock, Block};
 pub use bytecode::Bytecode;
-pub use convert::{new_vm_utf8_string, AsConverter, ExplainVMStatus, MoveConverter};
+pub use convert::{new_vm_utf8_string, AsConverter, MoveConverter};
 pub use error::{AptosError, AptosErrorCode};
 pub use hash::HashValue;
 pub use headers::*;
@@ -48,10 +48,10 @@ pub use transaction::{
     AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem,
     DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest, EntryFunctionPayload, Event,
     FeePayerSignature, GasEstimation, GasEstimationBcs, GenesisPayload, GenesisTransaction,
-    ModuleBundlePayload, MultiAgentSignature, MultiEd25519Signature, MultiKeySignature,
-    MultisigPayload, MultisigTransactionPayload, PendingTransaction, PublicKey, ScriptPayload,
-    ScriptWriteSet, Signature, SingleKeySignature, SubmitTransactionRequest, Transaction,
-    TransactionData, TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
+    MultiAgentSignature, MultiEd25519Signature, MultiKeySignature, MultisigPayload,
+    MultisigTransactionPayload, PendingTransaction, PublicKey, ScriptPayload, ScriptWriteSet,
+    Signature, SingleKeySignature, SubmitTransactionRequest, Transaction, TransactionData,
+    TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
     TransactionSignature, TransactionSigningMessage, TransactionsBatchSingleSubmissionFailure,
     TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
     UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,

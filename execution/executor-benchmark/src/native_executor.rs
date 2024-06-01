@@ -17,7 +17,10 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     state_store::state_key::StateKey,
-    transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
+    transaction::{
+        ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionOutput,
+        TransactionStatus,
+    },
     vm_status::AbortLocation,
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -42,6 +45,7 @@ impl IncrementalOutput {
             self.events,
             /*gas_used=*/ 1,
             TransactionStatus::Keep(ExecutionStatus::Success),
+            TransactionAuxiliaryData::default(),
         ))
     }
 
@@ -51,7 +55,13 @@ impl IncrementalOutput {
     }
 
     fn to_abort(status: TransactionStatus) -> TransactionOutput {
-        TransactionOutput::new(Default::default(), vec![], 0, status)
+        TransactionOutput::new(
+            Default::default(),
+            vec![],
+            0,
+            status,
+            TransactionAuxiliaryData::default(),
+        )
     }
 }
 
@@ -117,15 +127,15 @@ impl NativeExecutor {
         let write_set = vec![
             (
                 sender_account_key,
-                WriteOp::Modification(bcs::to_bytes(&sender_account)?.into()),
+                WriteOp::legacy_modification(bcs::to_bytes(&sender_account)?.into()),
             ),
             (
                 sender_coin_store_key,
-                WriteOp::Modification(bcs::to_bytes(&sender_coin_store)?.into()),
+                WriteOp::legacy_modification(bcs::to_bytes(&sender_coin_store)?.into()),
             ),
             // (
             //     TOTAL_SUPPLY_STATE_KEY.clone(),
-            //     WriteOp::Modification(bcs::to_bytes(&total_supply)?),
+            //     WriteOp::legacy_modification(bcs::to_bytes(&total_supply)?),
             // ),
         ];
 
@@ -179,7 +189,7 @@ impl NativeExecutor {
 
                 write_set.push((
                     recipient_coin_store_key,
-                    WriteOp::Modification(bcs::to_bytes(&recipient_coin_store)?.into()),
+                    WriteOp::legacy_modification(bcs::to_bytes(&recipient_coin_store)?.into()),
                 ));
             }
         } else {
@@ -215,11 +225,11 @@ impl NativeExecutor {
 
             write_set.push((
                 recipient_account_key,
-                WriteOp::Creation(bcs::to_bytes(&recipient_account)?.into()),
+                WriteOp::legacy_creation(bcs::to_bytes(&recipient_account)?.into()),
             ));
             write_set.push((
                 recipient_coin_store_key,
-                WriteOp::Creation(bcs::to_bytes(&recipient_coin_store)?.into()),
+                WriteOp::legacy_creation(bcs::to_bytes(&recipient_coin_store)?.into()),
             ));
         }
 
@@ -331,6 +341,7 @@ impl NativeExecutor {
             vec![],
             /*gas_used=*/ 0,
             TransactionStatus::Keep(ExecutionStatus::Success),
+            TransactionAuxiliaryData::default(),
         ))
     }
 }

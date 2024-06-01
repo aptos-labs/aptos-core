@@ -35,6 +35,7 @@ impl ConnectivityManagerBuilder {
         connection_notifs_rx: conn_notifs_channel::Receiver,
         outbound_connection_limit: Option<usize>,
         mutual_authentication: bool,
+        enable_latency_aware_dialing: bool,
     ) -> Self {
         let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new(
             channel_size,
@@ -56,6 +57,7 @@ impl ConnectivityManagerBuilder {
                 Duration::from_millis(max_connection_delay_ms),
                 outbound_connection_limit,
                 mutual_authentication,
+                enable_latency_aware_dialing,
             )),
         }
     }

@@ -451,7 +451,7 @@ impl SoliditySignature {
                 "external function must have at least one argument",
             );
         } else {
-            for Parameter(para_name, move_ty) in fun.get_parameters().into_iter().skip(1) {
+            for Parameter(para_name, move_ty, _) in fun.get_parameters().into_iter().skip(1) {
                 let solidity_ty = SolidityType::translate_from_move(ctx, &move_ty, false); // implicit mapping from a move type to a solidity type
                 para_type_lst.push((
                     solidity_ty,

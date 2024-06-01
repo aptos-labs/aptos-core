@@ -3,23 +3,32 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{monitor, state_computer::StateComputeResultFut};
+use crate::{
+    block_preparer::BlockPreparer,
+    monitor,
+    state_computer::{PipelineExecutionResult, StateComputeResultFut},
+};
+use aptos_consensus_types::block::Block;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
     state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
-    ExecutorResult, StateComputeResult,
+    ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::{debug, error};
 use aptos_types::{
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
-    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
+    block_metadata_ext::BlockMetadataExt,
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+    },
 };
 use fail::fail_point;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
+
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -54,18 +63,21 @@ impl ExecutionPipeline {
 
     pub async fn queue(
         &self,
-        block_id: HashValue,
+        block: Block,
+        metadata: BlockMetadataExt,
         parent_block_id: HashValue,
-        txns_to_execute: Vec<Transaction>,
+        txn_generator: BlockPreparer,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     ) -> StateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
+        let block_id = block.id();
         self.prepare_block_tx
             .send(PrepareBlockCommand {
-                block_id,
-                txns_to_execute,
+                block,
+                metadata,
                 block_executor_onchain_config,
                 parent_block_id,
+                block_preparer: txn_generator,
                 result_tx,
             })
             .expect("Failed to send block to execution pipeline.");
@@ -82,47 +94,71 @@ impl ExecutionPipeline {
         })
     }
 
-    async fn prepare_block_stage(
-        mut prepare_block_rx: mpsc::UnboundedReceiver<PrepareBlockCommand>,
+    async fn prepare_block(
         execute_block_tx: mpsc::UnboundedSender<ExecuteBlockCommand>,
+        command: PrepareBlockCommand,
     ) {
-        while let Some(PrepareBlockCommand {
-            block_id,
-            txns_to_execute,
+        let PrepareBlockCommand {
+            block,
+            metadata,
             block_executor_onchain_config,
             parent_block_id,
+            block_preparer,
             result_tx,
-        }) = prepare_block_rx.recv().await
-        {
-            debug!("prepare_block received block {}.", block_id);
-            let execute_block_tx = execute_block_tx.clone();
-            let sig_verified_txns = monitor!(
-                "prepare_block",
-                tokio::task::spawn_blocking(move || {
-                    let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL
-                        .install(|| {
-                            let num_txns = txns_to_execute.len();
-                            txns_to_execute
-                                .into_par_iter()
-                                .with_min_len(optimal_min_len(num_txns, 32))
-                                .map(|t| t.into())
-                                .collect::<Vec<_>>()
-                        });
-                    sig_verified_txns
-                })
-                .await
-            )
-            .expect("Failed to spawn_blocking.");
+        } = command;
 
+        debug!("prepare_block received block {}.", block.id());
+        let input_txns = block_preparer.prepare_block(&block).await;
+        if let Err(e) = input_txns {
+            result_tx.send(Err(e)).unwrap_or_else(|err| {
+                error!(
+                    block_id = block.id(),
+                    "Failed to send back execution result for block {}: {:?}.",
+                    block.id(),
+                    err,
+                );
+            });
+            return;
+        }
+        let validator_txns = block.validator_txns().cloned().unwrap_or_default();
+        let input_txns = input_txns.unwrap();
+        tokio::task::spawn_blocking(move || {
+            let txns_to_execute =
+                Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
+            let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
+                SIG_VERIFY_POOL.install(|| {
+                    let num_txns = txns_to_execute.len();
+                    txns_to_execute
+                        .into_par_iter()
+                        .with_min_len(optimal_min_len(num_txns, 32))
+                        .map(|t| t.into())
+                        .collect::<Vec<_>>()
+                });
             execute_block_tx
                 .send(ExecuteBlockCommand {
-                    block: (block_id, sig_verified_txns).into(),
+                    input_txns,
+                    block: (block.id(), sig_verified_txns).into(),
                     parent_block_id,
                     block_executor_onchain_config,
                     result_tx,
                 })
                 .expect("Failed to send block to execution pipeline.");
+        })
+        .await
+        .expect("Failed to spawn_blocking.");
+    }
+
+    async fn prepare_block_stage(
+        mut prepare_block_rx: mpsc::UnboundedReceiver<PrepareBlockCommand>,
+        execute_block_tx: mpsc::UnboundedSender<ExecuteBlockCommand>,
+    ) {
+        while let Some(command) = prepare_block_rx.recv().await {
+            monitor!(
+                "prepare_block",
+                Self::prepare_block(execute_block_tx.clone(), command).await
+            );
         }
+        debug!("prepare_block_stage quitting.");
     }
 
     async fn execute_stage(
@@ -131,6 +167,7 @@ impl ExecutionPipeline {
         executor: Arc<dyn BlockExecutorTrait>,
     ) {
         while let Some(ExecuteBlockCommand {
+            input_txns,
             block,
             parent_block_id,
             block_executor_onchain_config,
@@ -160,6 +197,7 @@ impl ExecutionPipeline {
 
             ledger_apply_tx
                 .send(LedgerApplyCommand {
+                    input_txns,
                     block_id,
                     parent_block_id,
                     state_checkpoint_output,
@@ -175,6 +213,7 @@ impl ExecutionPipeline {
         executor: Arc<dyn BlockExecutorTrait>,
     ) {
         while let Some(LedgerApplyCommand {
+            input_txns,
             block_id,
             parent_block_id,
             state_checkpoint_output,
@@ -194,7 +233,8 @@ impl ExecutionPipeline {
                 .expect("Failed to spawn_blocking().")
             }
             .await;
-            result_tx.send(res).unwrap_or_else(|err| {
+            let pipe_line_res = res.map(|output| PipelineExecutionResult::new(input_txns, output));
+            result_tx.send(pipe_line_res).unwrap_or_else(|err| {
                 error!(
                     block_id = block_id,
                     "Failed to send back execution result for block {}: {:?}", block_id, err,
@@ -206,24 +246,27 @@ impl ExecutionPipeline {
 }
 
 struct PrepareBlockCommand {
-    block_id: HashValue,
-    txns_to_execute: Vec<Transaction>,
+    block: Block,
+    metadata: BlockMetadataExt,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     // The parent block id.
     parent_block_id: HashValue,
-    result_tx: oneshot::Sender<ExecutorResult<StateComputeResult>>,
+    block_preparer: BlockPreparer,
+    result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
 }
 
 struct ExecuteBlockCommand {
+    input_txns: Vec<SignedTransaction>,
     block: ExecutableBlock,
     parent_block_id: HashValue,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
-    result_tx: oneshot::Sender<ExecutorResult<StateComputeResult>>,
+    result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
 }
 
 struct LedgerApplyCommand {
+    input_txns: Vec<SignedTransaction>,
     block_id: HashValue,
     parent_block_id: HashValue,
     state_checkpoint_output: ExecutorResult<StateCheckpointOutput>,
-    result_tx: oneshot::Sender<ExecutorResult<StateComputeResult>>,
+    result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
 }

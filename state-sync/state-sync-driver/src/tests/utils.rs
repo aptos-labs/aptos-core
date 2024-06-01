@@ -31,10 +31,11 @@ use aptos_types::{
     },
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction, TransactionInfo,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionPayload, TransactionStatus, Version,
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionPayload, TransactionStatus, Version,
     },
+    validator_verifier::ValidatorVerifier,
     waypoint::Waypoint,
     write_set::WriteSet,
 };
@@ -145,14 +146,15 @@ pub fn create_random_epoch_ending_ledger_info(
     version: Version,
     epoch: Epoch,
 ) -> LedgerInfoWithSignatures {
+    let next_epoch_state = EpochState::new(epoch + 1, ValidatorVerifier::new(vec![]));
     let block_info = BlockInfo::new(
         epoch,
         0,
         HashValue::zero(),
         HashValue::random(),
         version,
-        0,
-        Some(EpochState::empty()),
+        version,
+        Some(next_epoch_state),
     );
     let ledger_info = LedgerInfo::new(block_info, HashValue::random());
     LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
@@ -255,6 +257,7 @@ pub fn create_transaction_output() -> TransactionOutput {
         vec![create_event(None)],
         0,
         TransactionStatus::Keep(ExecutionStatus::Success),
+        TransactionAuxiliaryData::default(),
     )
 }
 
@@ -269,7 +272,7 @@ pub async fn verify_commit_notification(
     expected_events: Vec<ContractEvent>,
     expected_highest_synced_version: u64,
 ) {
-    // Verify mempool is notified and ack the notification
+    // Verify mempool is notified
     let mempool_notification = mempool_notification_listener.select_next_some().await;
     let committed_transactions: Vec<CommittedTransaction> = expected_transactions
         .into_iter()
@@ -279,7 +282,6 @@ pub async fn verify_commit_notification(
         })
         .collect();
     assert_eq!(mempool_notification.transactions, committed_transactions);
-    let _ = mempool_notification_listener.ack_commit_notification(mempool_notification);
 
     // Verify the event listener is notified about the specified events
     if let Some(event_listener) = event_listener {

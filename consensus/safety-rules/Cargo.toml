@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+anyhow = { workspace = true }
 aptos-config = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -20,10 +21,8 @@ aptos-global-constants = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
-aptos-proptest-helpers = { workspace = true, optional = true }
 aptos-secure-net = { workspace = true }
 aptos-secure-storage = { workspace = true }
-aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vault-client = { workspace = true }
 once_cell = { workspace = true }
@@ -38,6 +37,7 @@ aptos-config = { workspace = true, features = ["fuzzing"] }
 aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
 aptos-proptest-helpers = { workspace = true }
 aptos-secure-storage = { workspace = true, features = ["testing"] }
+claims = { workspace = true }
 criterion = { workspace = true }
 proptest = { workspace = true }
 rusty-fork = { workspace = true }
@@ -50,5 +50,5 @@ required-features = ["testing"]
 
 [features]
 default = []
-fuzzing = ["aptos-consensus-types/fuzzing", "aptos-config/fuzzing", "proptest", "aptos-proptest-helpers"]
+fuzzing = ["aptos-consensus-types/fuzzing", "aptos-config/fuzzing", "proptest"]
 testing = ["aptos-secure-storage/testing"]

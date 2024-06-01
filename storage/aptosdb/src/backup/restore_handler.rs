@@ -4,17 +4,14 @@
 
 use crate::{
     backup::restore_utils,
-    db_metadata::{DbMetadataKey, DbMetadataSchema},
-    event_store::EventStore,
-    ledger_store::LedgerStore,
+    ledger_db::LedgerDb,
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode},
     state_store::StateStore,
-    transaction_store::TransactionStore,
     AptosDB,
 };
-use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::{DbReader, Result};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -29,26 +26,16 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct RestoreHandler {
     pub aptosdb: Arc<AptosDB>,
-    ledger_store: Arc<LedgerStore>,
-    transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
-    event_store: Arc<EventStore>,
+    ledger_db: Arc<LedgerDb>,
 }
 
 impl RestoreHandler {
-    pub(crate) fn new(
-        aptosdb: Arc<AptosDB>,
-        ledger_store: Arc<LedgerStore>,
-        transaction_store: Arc<TransactionStore>,
-        state_store: Arc<StateStore>,
-        event_store: Arc<EventStore>,
-    ) -> Self {
+    pub(crate) fn new(aptosdb: Arc<AptosDB>, state_store: Arc<StateStore>) -> Self {
         Self {
+            ledger_db: Arc::clone(&aptosdb.ledger_db),
             aptosdb,
-            ledger_store,
-            transaction_store,
             state_store,
-            event_store,
         }
     }
 
@@ -73,12 +60,7 @@ impl RestoreHandler {
     }
 
     pub fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
-        restore_utils::save_ledger_infos(
-            self.aptosdb.ledger_db.metadata_db(),
-            self.ledger_store.clone(),
-            ledger_infos,
-            None,
-        )
+        restore_utils::save_ledger_infos(self.aptosdb.ledger_db.metadata_db(), ledger_infos, None)
     }
 
     pub fn confirm_or_save_frozen_subtrees(
@@ -87,7 +69,7 @@ impl RestoreHandler {
         frozen_subtrees: &[HashValue],
     ) -> Result<()> {
         restore_utils::confirm_or_save_frozen_subtrees(
-            self.aptosdb.ledger_db.transaction_accumulator_db(),
+            self.aptosdb.ledger_db.transaction_accumulator_db_raw(),
             num_leaves,
             frozen_subtrees,
             None,
@@ -103,10 +85,8 @@ impl RestoreHandler {
         write_sets: Vec<WriteSet>,
     ) -> Result<()> {
         restore_utils::save_transactions(
-            self.ledger_store.clone(),
-            self.transaction_store.clone(),
-            self.event_store.clone(),
             self.state_store.clone(),
+            self.ledger_db.clone(),
             first_version,
             txns,
             txn_infos,
@@ -126,10 +106,8 @@ impl RestoreHandler {
         write_sets: Vec<WriteSet>,
     ) -> Result<()> {
         restore_utils::save_transactions(
-            self.ledger_store.clone(),
-            self.transaction_store.clone(),
-            self.event_store.clone(),
             self.state_store.clone(),
+            self.ledger_db.clone(),
             first_version,
             txns,
             txn_infos,
@@ -141,22 +119,21 @@ impl RestoreHandler {
     }
 
     pub fn get_next_expected_transaction_version(&self) -> Result<Version> {
-        Ok(self.aptosdb.get_latest_version().map_or(0, |ver| ver + 1))
+        Ok(self.aptosdb.get_synced_version().map_or(0, |ver| ver + 1))
     }
 
     pub fn get_state_snapshot_before(
         &self,
         version: Version,
     ) -> Result<Option<(Version, HashValue)>> {
-        self.aptosdb.get_state_snapshot_before(version)
+        self.aptosdb
+            .get_state_snapshot_before(version)
+            .map_err(Into::into)
     }
 
     pub fn get_in_progress_state_kv_snapshot_version(&self) -> Result<Option<Version>> {
-        let mut iter = self
-            .aptosdb
-            .ledger_db
-            .metadata_db()
-            .iter::<DbMetadataSchema>(Default::default())?;
+        let db = self.aptosdb.ledger_db.metadata_db_arc();
+        let mut iter = db.iter::<DbMetadataSchema>(Default::default())?;
         iter.seek_to_first();
         while let Some((k, _v)) = iter.next().transpose()? {
             if let DbMetadataKey::StateSnapshotRestoreProgress(version) = k {

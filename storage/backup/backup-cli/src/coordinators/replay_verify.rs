@@ -16,6 +16,7 @@ use anyhow::Result;
 use aptos_db::backup::restore_handler::RestoreHandler;
 use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::AptosDbError;
 use aptos_types::{on_chain_config::TimedFeatureOverride, transaction::Version};
 use aptos_vm::AptosVM;
 use std::sync::Arc;
@@ -31,6 +32,12 @@ pub enum ReplayError {
 
 impl From<anyhow::Error> for ReplayError {
     fn from(error: anyhow::Error) -> Self {
+        ReplayError::OtherError(error.to_string())
+    }
+}
+
+impl From<AptosDbError> for ReplayError {
+    fn from(error: AptosDbError) -> Self {
         ReplayError::OtherError(error.to_string())
     }
 }

@@ -1,14 +1,15 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::dag_test;
 use crate::{
     dag::{bootstrap::bootstrap_dag_for_test, dag_state_sync::SyncOutcome},
-    experimental::buffer_manager::OrderedBlocks,
-    network::{IncomingDAGRequest, NetworkSender},
+    network::{IncomingDAGRequest, NetworkSender, RpcResponder},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
-    test_utils::{consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage},
+    pipeline::{buffer_manager::OrderedBlocks, execution_client::DummyExecutionClient},
+    test_utils::{consensus_runtime, MockPayloadManager, MockStorage},
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
@@ -45,8 +46,9 @@ struct DagBootstrapUnit {
     nh_task_handle: JoinHandle<SyncOutcome>,
     df_task_handle: JoinHandle<()>,
     dag_rpc_tx: aptos_channel::Sender<Author, IncomingDAGRequest>,
-    network_events:
-        Box<Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>>,
+    network_events: Box<
+        Select<NetworkEvents<ConsensusMsg>, aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>>,
+    >,
 }
 
 impl DagBootstrapUnit {
@@ -58,29 +60,33 @@ impl DagBootstrapUnit {
         network: NetworkSender,
         time_service: TimeService,
         network_events: Box<
-            Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>,
+            Select<
+                NetworkEvents<ConsensusMsg>,
+                aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
+            >,
         >,
         all_signers: Vec<ValidatorSigner>,
     ) -> (Self, UnboundedReceiver<OrderedBlocks>) {
-        let epoch_state = EpochState {
+        let epoch_state = Arc::new(EpochState {
             epoch,
             verifier: storage.get_validator_set().into(),
-        };
+        });
         let ledger_info = generate_ledger_info_with_sig(&all_signers, storage.get_ledger_info());
-        let dag_storage = dag_test::MockStorage::new_with_ledger_info(ledger_info);
+        let dag_storage =
+            dag_test::MockStorage::new_with_ledger_info(ledger_info, epoch_state.clone());
 
         let network = Arc::new(network);
 
         let payload_client = Arc::new(MockPayloadManager::new(None));
         let payload_manager = Arc::new(PayloadManager::DirectMempool);
 
-        let state_computer = Arc::new(EmptyStateComputer {});
+        let execution_client = Arc::new(DummyExecutionClient);
 
         let (nh_abort_handle, df_abort_handle, dag_rpc_tx, ordered_nodes_rx) =
             bootstrap_dag_for_test(
                 self_peer,
                 signer,
-                Arc::new(epoch_state),
+                epoch_state,
                 Arc::new(dag_storage),
                 network.clone(),
                 network.clone(),
@@ -88,7 +94,7 @@ impl DagBootstrapUnit {
                 time_service,
                 payload_manager,
                 payload_client,
-                state_computer,
+                execution_client,
             );
 
         (
@@ -111,8 +117,10 @@ impl DagBootstrapUnit {
                         self.dag_rpc_tx.push(sender, IncomingDAGRequest {
                             req: msg,
                             sender,
-                            protocol,
-                            response_sender,
+                            responder: RpcResponder {
+                                protocol,
+                                response_sender,
+                            },
                         })
                     },
                     _ => unreachable!("expected only DAG-related messages"),
@@ -131,7 +139,9 @@ fn create_network(
     validators: ValidatorVerifier,
 ) -> (
     NetworkSender,
-    Box<Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>>,
+    Box<
+        Select<NetworkEvents<ConsensusMsg>, aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>>,
+    >,
 ) {
     let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
@@ -151,7 +161,7 @@ fn create_network(
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
     let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
 
-    let (self_sender, self_receiver) = aptos_channels::new_test(1000);
+    let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
     let network = NetworkSender::new(author, consensus_network_client, self_sender, validators);
 
     let twin_id = TwinId { id, author };
@@ -211,12 +221,11 @@ async fn test_dag_e2e() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     let (signers, validators) = random_validator_verifier(num_nodes, None, false);
-
     let (nodes, mut ordered_node_receivers) = bootstrap_nodes(&mut playground, signers, validators);
-    for node in nodes {
-        runtime.spawn(node.start());
-    }
-
+    let tasks: Vec<_> = nodes
+        .into_iter()
+        .map(|node| runtime.spawn(node.start()))
+        .collect();
     runtime.spawn(playground.start());
 
     for _ in 1..10 {
@@ -227,11 +236,14 @@ async fn test_dag_e2e() {
         }
         let first = all_ordered.first().unwrap();
         assert_gt!(first.len(), 0, "must order nodes");
-        debug!("Nodes: {:?}", first);
         for a in all_ordered.iter() {
             assert_eq!(a.len(), first.len(), "length should match");
             assert_eq!(a, first);
         }
+    }
+    for task in tasks {
+        task.abort();
+        let _ = task.await;
     }
     runtime.shutdown_background();
 }

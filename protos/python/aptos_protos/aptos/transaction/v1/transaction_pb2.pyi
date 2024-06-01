@@ -89,6 +89,8 @@ class Transaction(_message.Message):
         "genesis",
         "state_checkpoint",
         "user",
+        "validator",
+        "size_info",
     ]
 
     class TransactionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -98,11 +100,13 @@ class Transaction(_message.Message):
         TRANSACTION_TYPE_BLOCK_METADATA: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_STATE_CHECKPOINT: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_USER: _ClassVar[Transaction.TransactionType]
+        TRANSACTION_TYPE_VALIDATOR: _ClassVar[Transaction.TransactionType]
     TRANSACTION_TYPE_UNSPECIFIED: Transaction.TransactionType
     TRANSACTION_TYPE_GENESIS: Transaction.TransactionType
     TRANSACTION_TYPE_BLOCK_METADATA: Transaction.TransactionType
     TRANSACTION_TYPE_STATE_CHECKPOINT: Transaction.TransactionType
     TRANSACTION_TYPE_USER: Transaction.TransactionType
+    TRANSACTION_TYPE_VALIDATOR: Transaction.TransactionType
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     VERSION_FIELD_NUMBER: _ClassVar[int]
     INFO_FIELD_NUMBER: _ClassVar[int]
@@ -113,6 +117,8 @@ class Transaction(_message.Message):
     GENESIS_FIELD_NUMBER: _ClassVar[int]
     STATE_CHECKPOINT_FIELD_NUMBER: _ClassVar[int]
     USER_FIELD_NUMBER: _ClassVar[int]
+    VALIDATOR_FIELD_NUMBER: _ClassVar[int]
+    SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
     timestamp: _timestamp_pb2.Timestamp
     version: int
     info: TransactionInfo
@@ -123,6 +129,8 @@ class Transaction(_message.Message):
     genesis: GenesisTransaction
     state_checkpoint: StateCheckpointTransaction
     user: UserTransaction
+    validator: ValidatorTransaction
+    size_info: TransactionSizeInfo
     def __init__(
         self,
         timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...,
@@ -135,6 +143,8 @@ class Transaction(_message.Message):
         genesis: _Optional[_Union[GenesisTransaction, _Mapping]] = ...,
         state_checkpoint: _Optional[_Union[StateCheckpointTransaction, _Mapping]] = ...,
         user: _Optional[_Union[UserTransaction, _Mapping]] = ...,
+        validator: _Optional[_Union[ValidatorTransaction, _Mapping]] = ...,
+        size_info: _Optional[_Union[TransactionSizeInfo, _Mapping]] = ...,
     ) -> None: ...
 
 class BlockMetadataTransaction(_message.Message):
@@ -181,6 +191,10 @@ class GenesisTransaction(_message.Message):
     ) -> None: ...
 
 class StateCheckpointTransaction(_message.Message):
+    __slots__ = []
+    def __init__(self) -> None: ...
+
+class ValidatorTransaction(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
 
@@ -547,7 +561,6 @@ class TransactionPayload(_message.Message):
         "type",
         "entry_function_payload",
         "script_payload",
-        "module_bundle_payload",
         "write_set_payload",
         "multisig_payload",
     ]
@@ -557,25 +570,21 @@ class TransactionPayload(_message.Message):
         TYPE_UNSPECIFIED: _ClassVar[TransactionPayload.Type]
         TYPE_ENTRY_FUNCTION_PAYLOAD: _ClassVar[TransactionPayload.Type]
         TYPE_SCRIPT_PAYLOAD: _ClassVar[TransactionPayload.Type]
-        TYPE_MODULE_BUNDLE_PAYLOAD: _ClassVar[TransactionPayload.Type]
         TYPE_WRITE_SET_PAYLOAD: _ClassVar[TransactionPayload.Type]
         TYPE_MULTISIG_PAYLOAD: _ClassVar[TransactionPayload.Type]
     TYPE_UNSPECIFIED: TransactionPayload.Type
     TYPE_ENTRY_FUNCTION_PAYLOAD: TransactionPayload.Type
     TYPE_SCRIPT_PAYLOAD: TransactionPayload.Type
-    TYPE_MODULE_BUNDLE_PAYLOAD: TransactionPayload.Type
     TYPE_WRITE_SET_PAYLOAD: TransactionPayload.Type
     TYPE_MULTISIG_PAYLOAD: TransactionPayload.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     ENTRY_FUNCTION_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     SCRIPT_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
-    MODULE_BUNDLE_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     WRITE_SET_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     MULTISIG_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     type: TransactionPayload.Type
     entry_function_payload: EntryFunctionPayload
     script_payload: ScriptPayload
-    module_bundle_payload: ModuleBundlePayload
     write_set_payload: WriteSetPayload
     multisig_payload: MultisigPayload
     def __init__(
@@ -583,7 +592,6 @@ class TransactionPayload(_message.Message):
         type: _Optional[_Union[TransactionPayload.Type, str]] = ...,
         entry_function_payload: _Optional[_Union[EntryFunctionPayload, _Mapping]] = ...,
         script_payload: _Optional[_Union[ScriptPayload, _Mapping]] = ...,
-        module_bundle_payload: _Optional[_Union[ModuleBundlePayload, _Mapping]] = ...,
         write_set_payload: _Optional[_Union[WriteSetPayload, _Mapping]] = ...,
         multisig_payload: _Optional[_Union[MultisigPayload, _Mapping]] = ...,
     ) -> None: ...
@@ -664,14 +672,6 @@ class MultisigTransactionPayload(_message.Message):
         self,
         type: _Optional[_Union[MultisigTransactionPayload.Type, str]] = ...,
         entry_function_payload: _Optional[_Union[EntryFunctionPayload, _Mapping]] = ...,
-    ) -> None: ...
-
-class ModuleBundlePayload(_message.Message):
-    __slots__ = ["modules"]
-    MODULES_FIELD_NUMBER: _ClassVar[int]
-    modules: _containers.RepeatedCompositeFieldContainer[MoveModuleBytecode]
-    def __init__(
-        self, modules: _Optional[_Iterable[_Union[MoveModuleBytecode, _Mapping]]] = ...
     ) -> None: ...
 
 class MoveModuleBytecode(_message.Message):
@@ -1019,9 +1019,13 @@ class AnyPublicKey(_message.Message):
         TYPE_UNSPECIFIED: _ClassVar[AnyPublicKey.Type]
         TYPE_ED25519: _ClassVar[AnyPublicKey.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AnyPublicKey.Type]
+        TYPE_SECP256R1_ECDSA: _ClassVar[AnyPublicKey.Type]
+        TYPE_KEYLESS: _ClassVar[AnyPublicKey.Type]
     TYPE_UNSPECIFIED: AnyPublicKey.Type
     TYPE_ED25519: AnyPublicKey.Type
     TYPE_SECP256K1_ECDSA: AnyPublicKey.Type
+    TYPE_SECP256R1_ECDSA: AnyPublicKey.Type
+    TYPE_KEYLESS: AnyPublicKey.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     PUBLIC_KEY_FIELD_NUMBER: _ClassVar[int]
     type: AnyPublicKey.Type
@@ -1033,25 +1037,72 @@ class AnyPublicKey(_message.Message):
     ) -> None: ...
 
 class AnySignature(_message.Message):
-    __slots__ = ["type", "signature"]
+    __slots__ = [
+        "type",
+        "signature",
+        "ed25519",
+        "secp256k1_ecdsa",
+        "webauthn",
+        "keyless",
+    ]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = []
         TYPE_UNSPECIFIED: _ClassVar[AnySignature.Type]
         TYPE_ED25519: _ClassVar[AnySignature.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AnySignature.Type]
+        TYPE_WEBAUTHN: _ClassVar[AnySignature.Type]
+        TYPE_KEYLESS: _ClassVar[AnySignature.Type]
     TYPE_UNSPECIFIED: AnySignature.Type
     TYPE_ED25519: AnySignature.Type
     TYPE_SECP256K1_ECDSA: AnySignature.Type
+    TYPE_WEBAUTHN: AnySignature.Type
+    TYPE_KEYLESS: AnySignature.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    ED25519_FIELD_NUMBER: _ClassVar[int]
+    SECP256K1_ECDSA_FIELD_NUMBER: _ClassVar[int]
+    WEBAUTHN_FIELD_NUMBER: _ClassVar[int]
+    KEYLESS_FIELD_NUMBER: _ClassVar[int]
     type: AnySignature.Type
     signature: bytes
+    ed25519: Ed25519
+    secp256k1_ecdsa: Secp256k1Ecdsa
+    webauthn: WebAuthn
+    keyless: Keyless
     def __init__(
         self,
         type: _Optional[_Union[AnySignature.Type, str]] = ...,
         signature: _Optional[bytes] = ...,
+        ed25519: _Optional[_Union[Ed25519, _Mapping]] = ...,
+        secp256k1_ecdsa: _Optional[_Union[Secp256k1Ecdsa, _Mapping]] = ...,
+        webauthn: _Optional[_Union[WebAuthn, _Mapping]] = ...,
+        keyless: _Optional[_Union[Keyless, _Mapping]] = ...,
     ) -> None: ...
+
+class Ed25519(_message.Message):
+    __slots__ = ["signature"]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    signature: bytes
+    def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
+
+class Secp256k1Ecdsa(_message.Message):
+    __slots__ = ["signature"]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    signature: bytes
+    def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
+
+class WebAuthn(_message.Message):
+    __slots__ = ["signature"]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    signature: bytes
+    def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
+
+class Keyless(_message.Message):
+    __slots__ = ["signature"]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    signature: bytes
+    def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
 
 class SingleKeySignature(_message.Message):
     __slots__ = ["public_key", "signature"]
@@ -1138,4 +1189,41 @@ class AccountSignature(_message.Message):
         multi_ed25519: _Optional[_Union[MultiEd25519Signature, _Mapping]] = ...,
         single_key_signature: _Optional[_Union[SingleKeySignature, _Mapping]] = ...,
         multi_key_signature: _Optional[_Union[MultiKeySignature, _Mapping]] = ...,
+    ) -> None: ...
+
+class TransactionSizeInfo(_message.Message):
+    __slots__ = ["transaction_bytes", "event_size_info", "write_op_size_info"]
+    TRANSACTION_BYTES_FIELD_NUMBER: _ClassVar[int]
+    EVENT_SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
+    WRITE_OP_SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
+    transaction_bytes: int
+    event_size_info: _containers.RepeatedCompositeFieldContainer[EventSizeInfo]
+    write_op_size_info: _containers.RepeatedCompositeFieldContainer[WriteOpSizeInfo]
+    def __init__(
+        self,
+        transaction_bytes: _Optional[int] = ...,
+        event_size_info: _Optional[_Iterable[_Union[EventSizeInfo, _Mapping]]] = ...,
+        write_op_size_info: _Optional[
+            _Iterable[_Union[WriteOpSizeInfo, _Mapping]]
+        ] = ...,
+    ) -> None: ...
+
+class EventSizeInfo(_message.Message):
+    __slots__ = ["type_tag_bytes", "total_bytes"]
+    TYPE_TAG_BYTES_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_BYTES_FIELD_NUMBER: _ClassVar[int]
+    type_tag_bytes: int
+    total_bytes: int
+    def __init__(
+        self, type_tag_bytes: _Optional[int] = ..., total_bytes: _Optional[int] = ...
+    ) -> None: ...
+
+class WriteOpSizeInfo(_message.Message):
+    __slots__ = ["key_bytes", "value_bytes"]
+    KEY_BYTES_FIELD_NUMBER: _ClassVar[int]
+    VALUE_BYTES_FIELD_NUMBER: _ClassVar[int]
+    key_bytes: int
+    value_bytes: int
+    def __init__(
+        self, key_bytes: _Optional[int] = ..., value_bytes: _Optional[int] = ...
     ) -> None: ...

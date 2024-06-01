@@ -13,12 +13,12 @@ use std::{
 
 extern crate itertools;
 use crate::metrics::{REMOTE_EXECUTOR_REMOTE_KV_COUNT, REMOTE_EXECUTOR_TIMER};
-use anyhow::Result;
 use aptos_logger::trace;
-use aptos_state_view::TStateView;
 use aptos_types::{
     block_executor::partitioner::ShardId,
-    state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
+    state_store::{
+        state_storage_usage::StateStorageUsage, state_value::StateValue, Result, TStateView,
+    },
 };
 use dashmap::DashMap;
 use rayon::ThreadPool;

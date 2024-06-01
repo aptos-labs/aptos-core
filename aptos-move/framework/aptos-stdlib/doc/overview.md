@@ -17,6 +17,7 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::big_vector`](big_vector.md#0x1_big_vector)
 -  [`0x1::bls12381`](bls12381.md#0x1_bls12381)
 -  [`0x1::bls12381_algebra`](bls12381_algebra.md#0x1_bls12381_algebra)
+-  [`0x1::bn254_algebra`](bn254_algebra.md#0x1_bn254_algebra)
 -  [`0x1::capability`](capability.md#0x1_capability)
 -  [`0x1::comparator`](comparator.md#0x1_comparator)
 -  [`0x1::copyable_any`](copyable_any.md#0x1_copyable_any)

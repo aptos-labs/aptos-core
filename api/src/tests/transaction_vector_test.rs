@@ -52,7 +52,7 @@ impl Formatter for NumberToStringFormatter {
     }
 
     // Formats u128 as a string
-    fn write_number_str<W>(&mut self, writer: &mut W, value: &str) -> io::Result<()>
+    fn write_u128<W>(&mut self, writer: &mut W, value: u128) -> io::Result<()>
     where
         W: ?Sized + io::Write,
     {
@@ -99,7 +99,7 @@ fn type_tag_strategy() -> impl Strategy<Value = TypeTag> {
                     address: addr,
                     module: Identifier::new(module).unwrap(),
                     name: Identifier::new(name).unwrap(),
-                    type_params: t_vec,
+                    type_args: t_vec,
                 }))}),
         ]
     })
@@ -199,11 +199,6 @@ fn gen_entry_function(gen: &mut ValueGenerator) -> EntryFunction {
 #[cfg(test)]
 fn gen_script(gen: &mut ValueGenerator) -> Script {
     gen.generate(script_strategy())
-}
-
-#[cfg(test)]
-fn gen_module_code(gen: &mut ValueGenerator) -> Vec<u8> {
-    gen.generate(bytes_strategy())
 }
 
 #[cfg(test)]
@@ -313,46 +308,6 @@ async fn test_script_payload() {
         let transaction_factory = context.transaction_factory();
         let raw_txn = transaction_factory
             .script(gen_script(&mut value_gen))
-            .sender(gen_address(&mut value_gen))
-            .sequence_number(gen_u64(&mut value_gen))
-            .expiration_timestamp_secs(gen_u64(&mut value_gen))
-            .max_gas_amount(gen_u64(&mut value_gen))
-            .gas_unit_price(gen_u64(&mut value_gen))
-            .chain_id(ChainId::new(gen_chain_id(&mut value_gen)))
-            .build();
-        let mut signed_txn = sign_transaction(raw_txn);
-        patch(&mut signed_txn);
-        txns.push(signed_txn);
-    }
-
-    context.check_golden_output(json!(txns));
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_module_payload() {
-    fn patch(raw_txn_json: &mut serde_json::Value) {
-        let codes = visit_json_field(raw_txn_json, &[
-            "raw_txn",
-            "payload",
-            "ModuleBundle",
-            "codes",
-        ]);
-
-        for code_element in codes.as_array_mut().unwrap() {
-            let code_obj = code_element.as_object_mut().unwrap();
-            let code = code_obj.get_mut("code").unwrap();
-            *code = byte_array_to_hex(code);
-        }
-    }
-
-    let mut context = new_test_context(current_function_name!());
-
-    let mut value_gen = ValueGenerator::deterministic();
-    let mut txns = vec![];
-    for _ in 0..100 {
-        let transaction_factory = context.transaction_factory();
-        let raw_txn = transaction_factory
-            .module(gen_module_code(&mut value_gen))
             .sender(gen_address(&mut value_gen))
             .sequence_number(gen_u64(&mut value_gen))
             .expiration_timestamp_secs(gen_u64(&mut value_gen))

@@ -5,7 +5,7 @@ use aptos_framework::extended_checks;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
-    on_chain_config::{Features, TimedFeaturesBuilder},
+    on_chain_config::{aptos_test_feature_flags_genesis, Features, TimedFeaturesBuilder},
 };
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
@@ -44,6 +44,7 @@ pub fn run_tests_for_pkg(
         UnitTestingConfig::default_with_bound(Some(100_000)),
         // TODO(Gas): we may want to switch to non-zero costs in the future
         aptos_test_natives(),
+        aptos_test_feature_flags_genesis(),
         /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
@@ -119,6 +120,11 @@ fn test_hello_blockchain() {
 #[test]
 fn test_drand_lottery() {
     test_common("drand");
+}
+
+#[test]
+fn test_raffle() {
+    test_common("raffle");
 }
 
 #[test]

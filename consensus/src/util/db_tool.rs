@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use anyhow::{bail, Result};
-use aptos_consensus_types::{block::Block, common::Payload};
+use aptos_consensus_types::{block::Block, common::Payload, proof_of_store::ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_types::transaction::{SignedTransaction, Transaction};
 use clap::Parser;
@@ -65,26 +65,42 @@ pub fn extract_txns_from_block<'a>(
     match block.payload().as_ref() {
         Some(payload) => {
             let mut block_txns = Vec::new();
+
+            let extract_txns_from_proof_stores = move |proofs: &Vec<ProofOfStore>| {
+                for proof in proofs {
+                    let digest = proof.digest();
+                    if let Some(batch) = all_batches.get(digest) {
+                        if let Some(txns) = batch.payload() {
+                            block_txns.extend(txns);
+                        } else {
+                            bail!("Payload is not found for batch ({digest}).");
+                        }
+                    } else {
+                        bail!("Batch ({digest}) is not found.");
+                    }
+                }
+                Ok(block_txns)
+            };
+
             match payload {
                 Payload::DirectMempool(_) => {
                     bail!("DirectMempool is not supported.");
                 },
                 Payload::InQuorumStore(proof_with_data) => {
-                    for proof in &proof_with_data.proofs {
-                        let digest = proof.digest();
-                        if let Some(batch) = all_batches.get(digest) {
-                            if let Some(txns) = batch.payload() {
-                                block_txns.extend(txns);
-                            } else {
-                                bail!("Payload is not found for batch ({digest}).");
-                            }
-                        } else {
-                            bail!("Batch ({digest}) is not found.");
-                        }
+                    extract_txns_from_proof_stores(&proof_with_data.proofs)
+                },
+                Payload::InQuorumStoreWithLimit(proof_with_data) => {
+                    extract_txns_from_proof_stores(&proof_with_data.proof_with_data.proofs)
+                },
+                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                    let mut all_txns =
+                        extract_txns_from_proof_stores(&proof_with_data.proofs).unwrap();
+                    for (_, txns) in inline_batches {
+                        all_txns.extend(txns);
                     }
+                    Ok(all_txns)
                 },
             }
-            Ok(block_txns)
         },
         None => Ok(vec![]),
     }

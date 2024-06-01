@@ -4,18 +4,18 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+    common::NUM_STATE_SHARDS,
     db_options::{gen_state_kv_cfds, state_kv_db_column_families},
     metrics::OTHER_TIMERS_SECONDS,
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     utils::truncation_helper::{get_state_kv_commit_progress, truncate_state_kv_db_shards},
-    NUM_STATE_SHARDS,
 };
-use anyhow::Result;
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use arr_macro::arr;
 use std::{
@@ -89,7 +89,7 @@ impl StateKvDb {
         };
 
         if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
-            truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress, None)?;
+            truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
         }
 
         Ok(state_kv_db)
@@ -194,6 +194,14 @@ impl StateKvDb {
 
     pub(crate) fn num_shards(&self) -> u8 {
         NUM_STATE_SHARDS as u8
+    }
+
+    pub(crate) fn hack_num_real_shards(&self) -> usize {
+        if self.enabled_sharding {
+            NUM_STATE_SHARDS
+        } else {
+            1
+        }
     }
 
     pub(crate) fn commit_single_shard(

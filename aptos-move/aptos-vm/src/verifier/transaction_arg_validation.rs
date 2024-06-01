@@ -20,7 +20,10 @@ use move_core_types::{
     value::MoveValue,
     vm_status::StatusCode,
 };
-use move_vm_runtime::session::LoadedFunctionInstantiation;
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    LoadedFunction,
+};
 use move_vm_types::{
     gas::{GasMeter, UnmeteredGasMeter},
     loaded_data::runtime_types::Type,
@@ -98,15 +101,15 @@ pub(crate) fn get_allowed_structs(
 /// 3. check arg types are allowed after signers
 ///
 /// after validation, add senders and non-signer arguments to generate the final args
-pub(crate) fn validate_combine_signer_and_txn_args(
+pub fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
     senders: Vec<AccountAddress>,
     args: Vec<Vec<u8>>,
-    func: &LoadedFunctionInstantiation,
+    func: &LoadedFunction,
     are_struct_constructors_enabled: bool,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
-    // entry function should not return
-    if !func.return_.is_empty() {
+    // Entry function should not return.
+    if !func.return_tys().is_empty() {
         return Err(VMStatus::error(
             StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
             None,
@@ -114,7 +117,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     }
     let mut signer_param_cnt = 0;
     // find all signer params at the beginning
-    for ty in func.parameters.iter() {
+    for ty in func.param_tys() {
         match ty {
             Type::Signer => signer_param_cnt += 1,
             Type::Reference(inner_type) => {
@@ -128,12 +131,8 @@ pub(crate) fn validate_combine_signer_and_txn_args(
 
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
     // Need to keep this here to ensure we return the historic correct error code for replay
-    for ty in func.parameters[signer_param_cnt..].iter() {
-        let valid = is_valid_txn_arg(
-            session,
-            &ty.subst(&func.type_arguments).unwrap(),
-            allowed_structs,
-        );
+    for ty in func.param_tys()[signer_param_cnt..].iter() {
+        let valid = is_valid_txn_arg(session, &ty.subst(func.ty_args()).unwrap(), allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -142,7 +141,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
         }
     }
 
-    if (signer_param_cnt + args.len()) != func.parameters.len() {
+    if (signer_param_cnt + args.len()) != func.param_tys().len() {
         return Err(VMStatus::error(
             StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
             None,
@@ -165,9 +164,9 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     // FAILED_TO_DESERIALIZE_ARGUMENT error.
     let args = construct_args(
         session,
-        &func.parameters[signer_param_cnt..],
+        &func.param_tys()[signer_param_cnt..],
         args,
-        &func.type_arguments,
+        func.ty_args(),
         allowed_structs,
         false,
     )?;
@@ -188,12 +187,12 @@ pub(crate) fn validate_combine_signer_and_txn_args(
 // Return whether the argument is valid/allowed and whether it needs construction.
 pub(crate) fn is_valid_txn_arg(
     session: &SessionExt,
-    typ: &Type,
+    ty: &Type,
     allowed_structs: &ConstructorMap,
 ) -> bool {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
-    match typ {
+    match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
         Vector(inner) => is_valid_txn_arg(session, inner, allowed_structs),
         Struct { idx, .. } | StructInstantiation { idx, .. } => {
@@ -253,6 +252,7 @@ fn construct_arg(
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => Ok(arg),
         Vector(_) | Struct { .. } | StructInstantiation { .. } => {
+            let initial_cursor_len = arg.len();
             let mut cursor = Cursor::new(&arg[..]);
             let mut new_arg = vec![];
             let mut max_invocations = 10; // Read from config in the future
@@ -261,13 +261,14 @@ fn construct_arg(
                 ty,
                 allowed_structs,
                 &mut cursor,
+                initial_cursor_len,
                 gas_meter,
                 &mut max_invocations,
                 &mut new_arg,
             )?;
             // Check cursor has parsed everything
             // Unfortunately, is_empty is only enabled in nightly, so we check this way.
-            if cursor.position() != arg.len() as u64 {
+            if cursor.position() != initial_cursor_len as u64 {
                 return Err(VMStatus::error(
                     StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
                     Some(String::from(
@@ -296,6 +297,7 @@ pub(crate) fn recursively_construct_arg(
     ty: &Type,
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
+    initial_cursor_len: usize,
     gas_meter: &mut impl GasMeter,
     max_invocations: &mut u64,
     arg: &mut Vec<u8>,
@@ -313,6 +315,7 @@ pub(crate) fn recursively_construct_arg(
                     inner,
                     allowed_structs,
                     cursor,
+                    initial_cursor_len,
                     gas_meter,
                     max_invocations,
                     arg,
@@ -337,6 +340,7 @@ pub(crate) fn recursively_construct_arg(
                 constructor,
                 allowed_structs,
                 cursor,
+                initial_cursor_len,
                 gas_meter,
                 max_invocations,
             )?);
@@ -362,6 +366,7 @@ fn validate_and_construct(
     constructor: &FunctionId,
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
+    initial_cursor_len: usize,
     gas_meter: &mut impl GasMeter,
     max_invocations: &mut u64,
 ) -> Result<Vec<u8>, VMStatus> {
@@ -391,8 +396,21 @@ fn validate_and_construct(
                 VMStatus::error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None)
             }
         };
-        // short cut for the utf8 constructor, which is a special case
+        // Short cut for the utf8 constructor, which is a special case.
         let len = get_len(cursor)?;
+        if !cursor
+            .position()
+            .checked_add(len as u64)
+            .is_some_and(|l| l <= initial_cursor_len as u64)
+        {
+            // We need to make sure we do not allocate more bytes than
+            // needed.
+            return Err(VMStatus::error(
+                StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                Some("String argument is too long".to_string()),
+            ));
+        }
+
         let mut arg = vec![];
         read_n_bytes(len, cursor, &mut arg)?;
         std::str::from_utf8(&arg).map_err(|_| constructor_error())?;
@@ -402,27 +420,33 @@ fn validate_and_construct(
         *max_invocations -= 1;
     }
 
-    let (function, instantiation) = session.load_function_with_type_arg_inference(
+    let function = session.load_function_with_type_arg_inference(
         &constructor.module_id,
         constructor.func_name,
         expected_type,
     )?;
     let mut args = vec![];
-    for param_type in &instantiation.parameters {
+    for param_ty in function.param_tys() {
         let mut arg = vec![];
         recursively_construct_arg(
             session,
-            &param_type.subst(&instantiation.type_arguments).unwrap(),
+            &param_ty.subst(function.ty_args()).unwrap(),
             allowed_structs,
             cursor,
+            initial_cursor_len,
             gas_meter,
             max_invocations,
             &mut arg,
         )?;
         args.push(arg);
     }
-    let serialized_result =
-        session.execute_instantiated_function(function, instantiation, args, gas_meter)?;
+    let storage = TraversalStorage::new();
+    let serialized_result = session.execute_loaded_function(
+        function,
+        args,
+        gas_meter,
+        &mut TraversalContext::new(&storage),
+    )?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
     let deserialize_error = VMStatus::error(
@@ -454,12 +478,28 @@ fn serialize_uleb128(mut x: usize, dest: &mut Vec<u8>) {
 }
 
 fn read_n_bytes(n: usize, src: &mut Cursor<&[u8]>, dest: &mut Vec<u8>) -> Result<(), VMStatus> {
-    let len = dest.len();
-    dest.resize(len + n, 0);
-    src.read_exact(&mut dest[len..]).map_err(|_| {
+    let deserialization_error = |msg: &str| -> VMStatus {
         VMStatus::error(
             StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-            Some(String::from("Couldn't read bytes")),
+            Some(msg.to_string()),
         )
-    })
+    };
+    let len = dest.len();
+
+    // It is safer to limit the length under some big (but still reasonable
+    // number).
+    const MAX_NUM_BYTES: usize = 1_000_000;
+    if !len.checked_add(n).is_some_and(|s| s <= MAX_NUM_BYTES) {
+        return Err(deserialization_error(&format!(
+            "Couldn't read bytes: maximum limit of {} bytes exceeded",
+            MAX_NUM_BYTES
+        )));
+    }
+
+    // Ensure we have enough capacity for resizing.
+    dest.try_reserve(len + n)
+        .map_err(|e| deserialization_error(&format!("Couldn't read bytes: {}", e)))?;
+    dest.resize(len + n, 0);
+    src.read_exact(&mut dest[len..])
+        .map_err(|_| deserialization_error("Couldn't read bytes"))
 }

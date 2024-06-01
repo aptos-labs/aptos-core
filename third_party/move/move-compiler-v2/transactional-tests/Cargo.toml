@@ -6,9 +6,18 @@ publish = false
 edition = "2021"
 license = "Apache-2.0"
 
+[dependencies]
+move-command-line-common = { path = "../../move-command-line-common" }
+once_cell = { workspace = true }
+
 [dev-dependencies]
-datatest-stable = "0.1.1"
+aptos-vm = { workspace = true, features = ["testing"] }
+datatest-stable = { workspace = true }
+itertools = { workspace = true }
+move-compiler-v2 = { path = ".." }
+move-model = { path = "../../move-model" }
 move-transactional-test-runner = { path = "../../testing-infra/transactional-test-runner" }
+walkdir = { workspace = true }
 
 [[test]]
 name = "tests"

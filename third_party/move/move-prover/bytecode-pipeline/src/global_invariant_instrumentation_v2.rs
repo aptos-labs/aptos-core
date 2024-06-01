@@ -153,7 +153,7 @@ impl Analyzer {
                 let adapter =
                     TypeUnificationAdapter::new_vec(&fun_mem.inst, &inv_mem.inst, true, true);
                 let rel = adapter.unify(
-                    &NoUnificationContext,
+                    &mut NoUnificationContext,
                     Variance::SpecVariance,
                     /* shallow_subst */ false,
                 );
@@ -174,7 +174,7 @@ impl Analyzer {
         for inst in func_insts {
             self.func_insts
                 .entry(inst)
-                .or_insert_with(BTreeSet::new)
+                .or_default()
                 .insert(invariant.id);
         }
         if is_generic {
@@ -490,7 +490,7 @@ impl<'a> Instrumenter<'a> {
         // Add invariant assertions after function call when invariant holds in the
         // body of the current function, but the called function does not assert
         // invariants.
-        // The asserted invariant ensures the the invariant
+        // The asserted invariant ensures the invariant
         // holds in the body of the current function, as is required.
         let fun_id = self.builder.fun_env.get_qualified_id();
         if !disabled_inv_fun_set.contains(&fun_id)
@@ -753,7 +753,7 @@ impl<'a> Instrumenter<'a> {
                     inv.loc.display(self.builder.global_env())
                 );
                 let rel = adapter.unify(
-                    &NoUnificationContext,
+                    &mut NoUnificationContext,
                     Variance::SpecVariance,
                     /* shallow_subst */ false,
                 );

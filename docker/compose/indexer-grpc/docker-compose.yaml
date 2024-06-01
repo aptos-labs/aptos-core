@@ -75,7 +75,7 @@ services:
       - '--config-path'
       - '/opt/aptos/file-store-config.yaml'
     depends_on:
-      - indexer-grpc-cache-worker
+      - redis
 
   indexer-grpc-data-service:
     image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-main}"
@@ -106,6 +106,7 @@ services:
       - "18084:8084" # health
     depends_on:
       - indexer-grpc-cache-worker
+      - indexer-grpc-file-store
       - redis-replica
 
 # This joins the indexer-grpc compose with the validator-testnet compose using a shared docker network

@@ -2,23 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    ledger_db::LedgerDb,
     pruner::{db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_subpruner_progress},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction::TransactionSchema,
     },
-    TransactionStore,
+    transaction_store::TransactionStore,
 };
-use anyhow::{ensure, Result};
 use aptos_logger::info;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::transaction::{Transaction, Version};
 use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct TransactionPruner {
     transaction_store: Arc<TransactionStore>,
-    transaction_db: Arc<DB>,
+    ledger_db: Arc<LedgerDb>,
 }
 
 impl DBSubPruner for TransactionPruner {
@@ -30,11 +31,12 @@ impl DBSubPruner for TransactionPruner {
         let batch = SchemaBatch::new();
         let candidate_transactions =
             self.get_pruning_candidate_transactions(current_progress, target_version)?;
-        self.transaction_store
-            .prune_transaction_by_hash(&candidate_transactions, &batch)?;
+        self.ledger_db
+            .transaction_db()
+            .prune_transaction_by_hash_indices(&candidate_transactions, &batch)?;
         self.transaction_store
             .prune_transaction_by_account(&candidate_transactions, &batch)?;
-        self.transaction_store.prune_transaction_schema(
+        self.ledger_db.transaction_db().prune_transactions(
             current_progress,
             target_version,
             &batch,
@@ -43,25 +45,25 @@ impl DBSubPruner for TransactionPruner {
             &DbMetadataKey::TransactionPrunerProgress,
             &DbMetadataValue::Version(target_version),
         )?;
-        self.transaction_db.write_schemas(batch)
+        self.ledger_db.transaction_db().write_schemas(batch)
     }
 }
 
 impl TransactionPruner {
     pub(in crate::pruner) fn new(
         transaction_store: Arc<TransactionStore>,
-        transaction_db: Arc<DB>,
+        ledger_db: Arc<LedgerDb>,
         metadata_progress: Version,
     ) -> Result<Self> {
         let progress = get_or_initialize_subpruner_progress(
-            &transaction_db,
+            ledger_db.transaction_db_raw(),
             &DbMetadataKey::TransactionPrunerProgress,
             metadata_progress,
         )?;
 
         let myself = TransactionPruner {
             transaction_store,
-            transaction_db,
+            ledger_db,
         };
 
         info!(
@@ -79,10 +81,11 @@ impl TransactionPruner {
         start: Version,
         end: Version,
     ) -> Result<Vec<Transaction>> {
-        ensure!(end >= start);
+        ensure!(end >= start, "{} must be >= {}", end, start);
 
         let mut iter = self
-            .transaction_db
+            .ledger_db
+            .transaction_db_raw()
             .iter::<TransactionSchema>(ReadOptions::default())?;
         iter.seek(&start)?;
 

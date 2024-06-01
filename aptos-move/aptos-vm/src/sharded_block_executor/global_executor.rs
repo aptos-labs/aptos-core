@@ -5,12 +5,12 @@ use crate::sharded_block_executor::{
     local_executor_shard::GlobalCrossShardClient, sharded_executor_service::ShardedExecutorService,
 };
 use aptos_logger::trace;
-use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain,
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
         partitioner::{TransactionWithDependencies, GLOBAL_ROUND_ID},
     },
+    state_store::StateView,
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
 use move_core_types::vm_status::VMStatus;
@@ -59,8 +59,14 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             None,
             GLOBAL_ROUND_ID,
             state_view,
-            self.concurrency_level,
-            onchain_config,
+            BlockExecutorConfig {
+                local: BlockExecutorLocalConfig {
+                    concurrency_level: self.concurrency_level,
+                    allow_fallback: true,
+                    discard_failed_blocks: false,
+                },
+                onchain: onchain_config,
+            },
         )
     }
 

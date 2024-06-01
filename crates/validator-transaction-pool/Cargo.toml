@@ -1,0 +1,27 @@
+[package]
+name = "aptos-validator-transaction-pool"
+description = "Aptos Validator Transaction Pool"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-channels = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-types = { workspace = true }
+futures-util = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+aptos-types = { workspace = true, features = ["fuzzing"] }
+
+[features]
+fuzzing = []

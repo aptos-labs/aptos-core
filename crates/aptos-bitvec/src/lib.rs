@@ -204,6 +204,12 @@ impl From<BitVec> for Vec<u8> {
 
 impl From<Vec<bool>> for BitVec {
     fn from(bits: Vec<bool>) -> Self {
+        BitVec::from(&bits)
+    }
+}
+
+impl From<&Vec<bool>> for BitVec {
+    fn from(bits: &Vec<bool>) -> Self {
         assert!(bits.len() <= MAX_BUCKETS * BUCKET_SIZE);
         let mut bitvec = Self::with_num_bits(bits.len() as u16);
         for (index, b) in bits.iter().enumerate() {
