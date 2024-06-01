@@ -15,13 +15,13 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
     const INITIAL_NEW_FA_RESERVE_u64: u64 = 8_003_000_000_000;
     const INITIAL_NEW_FA_RESERVE: u128 = 8_003_000_000_000;
 
-    /// FA name and symbol already exists on platform.
+    /// FA's name and symbol already exist on the launchpad.
     const EFA_EXISTS_ALREADY: u64 = 10;
     /// Unknown FA. Not recognized on platform.
     const EFA_DOES_NOT_EXIST: u64 = 11;
     /// FA is globally frozen for transfers.
     const EFA_FROZEN: u64 = 13;
-    /// Swap amount_in is non-postive.
+    /// Swap amount_in is non-positive.
     const ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID: u64 = 110;
 
     //---------------------------Events---------------------------
@@ -56,19 +56,70 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         // Create and store the permissioned_withdraw function (global freezing based on FA status) while access to
         // the account signer is available.
         let permissioned_withdraw =
-            function_info::new_function_info(account,
-                string::utf8(b"bonding_curve_launchpad"), string::utf8(b"withdraw"));
+            function_info::new_function_info(
+                account,
+                string::utf8(b"bonding_curve_launchpad"),
+                string::utf8(b"withdraw")
+            );
         // Since the account signer can't be placed in storage, we'll use an object and it's retrievable signer for any
         // required signer usage. Primarily, when generating new Fungible Assets.
         let fa_generator_extend_ref =
-            object::generate_extend_ref(&object::create_named_object(account,
-                    b"FA Generator"));
-        move_to(account,
+            object::generate_extend_ref(
+                &object::create_named_object(account, b"FA Generator")
+            );
+        move_to(
+            account,
             LaunchPad {
                 key_to_fa_controller: smart_table::new(),
                 permissioned_withdraw,
                 fa_generator_extend_ref
-            });
+            }
+        );
+    }
+
+    //---------------------------Views---------------------------
+    // Calculate the deterministic address of an FA using it's unique name and symbol combination within the
+    // "FA Generator" object.
+    #[view]
+    public fun get_fa_obj_address(
+        name: String,
+        symbol: String
+    ): address acquires LaunchPad {
+        let fa_smart_table = borrow_global<LaunchPad>(@bonding_curve_launchpad);
+        let fa_generator_address = object::address_from_extend_ref(&fa_smart_table.fa_generator_extend_ref);
+        let fa_key_seed = *string::bytes(&name);
+        vector::append(&mut fa_key_seed, b"-");
+        vector::append(&mut fa_key_seed, *string::bytes(&symbol));
+        object::create_object_address(&fa_generator_address, fa_key_seed)
+    }
+
+    // Retrieve the FA balance of a given user's address.
+    #[view]
+    public fun get_balance(
+        name: String,
+        symbol: String,
+        user: address
+    ): u64 acquires LaunchPad {
+        let fa_metadata_obj: Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
+        primary_fungible_store::balance(user, fa_metadata_obj)
+    }
+
+    // Retrieve the Metadata object of a given FA's unique name and symbol.
+    #[view]
+    public fun get_metadata(
+        name: String,
+        symbol: String
+    ): Object<Metadata> acquires LaunchPad {
+        object::address_to_object(get_fa_obj_address(name, symbol))
+    }
+
+    // Retrieve frozen status of a given FA's unique name and symbol, from associated `liquidity_pair` state.
+    #[view]
+    public fun get_is_frozen(
+        name: String,
+        symbol: String
+    ): bool {
+        liquidity_pairs::get_is_frozen_metadata(name, symbol)
     }
 
     //---------------------------Dispatchable Standard---------------------------
@@ -79,12 +130,13 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
     /// - Since `transfer_ref` is only available to our permissioned/explicit actions, participants will initially only
     ///   have the capability to either: Hold the FA, Swap within the `bonding_curve_launchpad` context.
     public fun withdraw<T: key>(
-        store: Object<T>, amount: u64, transfer_ref: &TransferRef
+        store: Object<T>, amount: u64,
+        transfer_ref: &TransferRef
     ): FungibleAsset {
         let metadata = fungible_asset::transfer_ref_metadata(transfer_ref);
-        assert!(!liquidity_pairs::get_is_frozen_metadata(fungible_asset::name(metadata),
-                fungible_asset::symbol(metadata)),
-            EFA_FROZEN);
+        let name = fungible_asset::name(metadata);
+        let symbol = fungible_asset::symbol(metadata);
+        assert!(!liquidity_pairs::get_is_frozen_metadata(name, symbol), EFA_FROZEN);
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
     }
 
@@ -112,13 +164,15 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         let transfer_ref =
             &smart_table::borrow(&fa_smart_table.key_to_fa_controller, fa_key).transfer_ref;
         // Create the liquidity pair between APT and the new FA. Include the initial creator swap, if needed.
-        liquidity_pairs::register_liquidity_pair(name,
+        liquidity_pairs::register_liquidity_pair(
+            name,
             symbol,
             transfer_ref,
             creator,
             fa_metadata_obj,
             apt_amount_in,
-            max_supply);
+            max_supply
+        );
     }
 
     /// Swap from FA to APT, or vice versa, through `liquidity_pair`.
@@ -135,19 +189,16 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         let fa_metadata_obj = object::address_to_object(get_fa_obj_address(name, symbol));
         let fa_key = FAKey { name, symbol };
         let fa_smart_table = borrow_global<LaunchPad>(@bonding_curve_launchpad);
-        assert!(smart_table::contains(&fa_smart_table.key_to_fa_controller, fa_key),
-            EFA_DOES_NOT_EXIST);
+        assert!(smart_table::contains(&fa_smart_table.key_to_fa_controller, fa_key), EFA_DOES_NOT_EXIST);
         // `transfer_ref` is used to bypass the `is_frozen` status of the FA. Without this, the defined dispatchable
         // withdraw function would prevent the ability to transfer the participant's FA onto the liquidity pair.
         let transfer_ref =
             &smart_table::borrow(&fa_smart_table.key_to_fa_controller, fa_key).transfer_ref;
         // Initiate the swap on the associated liquidity pair.
         if (swap_to_apt) {
-            liquidity_pairs::internal_swap_fa_to_apt(name, symbol, transfer_ref, account,
-                fa_metadata_obj, amount_in);
+            liquidity_pairs::internal_swap_fa_to_apt(name, symbol, transfer_ref, account, fa_metadata_obj, amount_in);
         } else {
-            liquidity_pairs::internal_swap_apt_to_fa(name, symbol, transfer_ref, account,
-                fa_metadata_obj, amount_in);
+            liquidity_pairs::internal_swap_apt_to_fa(name, symbol, transfer_ref, account, fa_metadata_obj, amount_in);
         }
     }
 
@@ -163,11 +214,9 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
     ): address acquires LaunchPad {
         // Only unique entries of the FA key (name and symbol) can be launched.
         let fa_smart_table = borrow_global_mut<LaunchPad>(@bonding_curve_launchpad);
-        assert!(!smart_table::contains(&fa_smart_table.key_to_fa_controller, fa_key),
-            EFA_EXISTS_ALREADY);
+        assert!(!smart_table::contains(&fa_smart_table.key_to_fa_controller, fa_key), EFA_EXISTS_ALREADY);
         // Obtain the signer from the "FA Generator" object, to create the FA.
-        let fa_generator_signer =
-            object::generate_signer_for_extending(&fa_smart_table.fa_generator_extend_ref);
+        let fa_generator_signer = object::generate_signer_for_extending(&fa_smart_table.fa_generator_extend_ref);
         // The FA's name and symbol is combined, to create a seed for deterministic object creation.
         // Beneficial for retrieving the FA's object address, after the initial creation,
         // like during `get_fa_obj_address(...)`.
@@ -186,84 +235,55 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
             symbol,
             decimals,
             icon_uri,
-            project_uri);
+            project_uri
+        );
         let mint_ref = fungible_asset::generate_mint_ref(fa_obj_constructor_ref);
         let transfer_ref = fungible_asset::generate_transfer_ref(fa_obj_constructor_ref);
-        primary_fungible_store::mint(&mint_ref, @bonding_curve_launchpad,
-            INITIAL_NEW_FA_RESERVE_u64);
+        primary_fungible_store::mint(&mint_ref, @bonding_curve_launchpad, INITIAL_NEW_FA_RESERVE_u64);
         // Define the dispatchable FA's withdraw as a conditionally global freezing effect.
-        dispatchable_fungible_asset::register_dispatch_functions(fa_obj_constructor_ref,
+        dispatchable_fungible_asset::register_dispatch_functions(
+            fa_obj_constructor_ref,
             option::some(fa_smart_table.permissioned_withdraw),
             option::none(),
-            option::none(),);
+            option::none()
+        );
         // Store `transfer_ref` for later usage, using the FA's name and symbol as the key.
         // `tranfer_ref` will be required to allow the smart contract's modules to ignore the dispatchable
         // withdraw's frozen status for each swap of an FA on `liquidity_pair`.
-        smart_table::add(&mut fa_smart_table.key_to_fa_controller, fa_key, FAController {
-                transfer_ref
-            });
-        event::emit(FungibleAssetCreated {
+        smart_table::add(&mut fa_smart_table.key_to_fa_controller, fa_key, FAController { transfer_ref });
+        event::emit(
+            FungibleAssetCreated {
                 name,
                 symbol,
                 max_supply: INITIAL_NEW_FA_RESERVE,
                 decimals,
                 icon_uri,
                 project_uri
-            });
-
+            }
+        );
         get_fa_obj_address(name, symbol)
-    }
-
-    //---------------------------Views---------------------------
-    // Calculate the deterministic address of an FA using it's unique name and symbol combination within the
-    // "FA Generator" object.
-    #[view]
-    public fun get_fa_obj_address(name: String, symbol: String): address acquires LaunchPad {
-        let fa_smart_table = borrow_global<LaunchPad>(@bonding_curve_launchpad);
-        let fa_generator_address =
-            object::address_from_extend_ref(&fa_smart_table.fa_generator_extend_ref);
-        let fa_key_seed = *string::bytes(&name);
-        vector::append(&mut fa_key_seed, b"-");
-        vector::append(&mut fa_key_seed, *string::bytes(&symbol));
-
-        object::create_object_address(&fa_generator_address, fa_key_seed)
-    }
-
-    // Retrieve the FA balance of a given user's address.
-    #[view]
-    public fun get_balance(name: String, symbol: String, user: address): u64 acquires LaunchPad {
-        let fa_metadata_obj: Object<Metadata> = object::address_to_object(
-            get_fa_obj_address(name, symbol));
-
-        primary_fungible_store::balance(user, fa_metadata_obj)
-    }
-
-    // Retrieve the Metadata object of a given FA's unique name and symbol.
-    #[view]
-    public fun get_metadata(name: String, symbol: String): Object<Metadata> acquires LaunchPad {
-        object::address_to_object(get_fa_obj_address(name, symbol))
-    }
-
-    // Retrieve frozen status of a given FA's unique name and symbol, from associated `liquidity_pair` state.
-    #[view]
-    public fun get_is_frozen(name: String, symbol: String): bool {
-        liquidity_pairs::get_is_frozen_metadata(name, symbol)
     }
 
     //---------------------------Tests---------------------------
     #[test_only]
     public fun initialize_for_test(deployer: &signer) {
         let permissioned_withdraw =
-            function_info::new_function_info(deployer,
-                string::utf8(b"bonding_curve_launchpad"), string::utf8(b"withdraw"));
+            function_info::new_function_info(
+                deployer,
+                string::utf8(b"bonding_curve_launchpad"),
+                string::utf8(b"withdraw")
+            );
         let fa_generator_extend_ref =
-            object::generate_extend_ref(&object::create_named_object(deployer,
-                    b"FA Generator"));
-        move_to(deployer,
+            object::generate_extend_ref(
+                &object::create_named_object(deployer, b"FA Generator")
+            );
+        move_to(
+            deployer,
             LaunchPad {
                 key_to_fa_controller: smart_table::new(),
                 permissioned_withdraw,
                 fa_generator_extend_ref
-            });
+            }
+        );
     }
 }

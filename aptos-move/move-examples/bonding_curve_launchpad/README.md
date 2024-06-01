@@ -99,7 +99,9 @@ One style could encompass sublinear functions to reward early adopters more heav
 
 
 ## How to test:
-`aptos move test`
+```console
+aptos move test --dev
+```
 
 ## How to deploy:
 0. **Note:** Since the `swap` module we're relying on as a third party DEX isn't on-chain, you'll need to first:
