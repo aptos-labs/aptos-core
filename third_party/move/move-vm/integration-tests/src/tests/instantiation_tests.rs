@@ -1,12 +1,17 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::file_format::{
-    AbilitySet, AddressIdentifierIndex, Bytecode::*, CodeUnit, CompiledModule, FieldDefinition,
-    FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
-    ModuleHandleIndex, Signature, SignatureIndex, SignatureToken::*, StructDefinition,
-    StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter, TypeSignature,
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    file_format::{
+        AbilitySet, AddressIdentifierIndex, Bytecode::*, CodeUnit, CompiledModule, FieldDefinition,
+        FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
+        ModuleHandleIndex, Signature, SignatureIndex, SignatureToken::*, StructDefinition,
+        StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter,
+        TypeSignature,
+    },
 };
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -15,6 +20,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
+    config::VMConfig,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
 };
@@ -103,7 +109,15 @@ fn instantiation_err() {
     };
 
     move_bytecode_verifier::verify_module(&cm).expect("verify failed");
-    let vm = MoveVM::new(vec![]).unwrap();
+
+    let deserializer_config = DeserializerConfig::default();
+    let verifier_config = VerifierConfig::default();
+    let vm_config = VMConfig {
+        paranoid_type_checks: false,
+        ..VMConfig::default()
+    };
+    let vm =
+        MoveVM::new_with_config(vec![], deserializer_config, verifier_config, vm_config).unwrap();
 
     let storage: InMemoryStorage = InMemoryStorage::new();
     let mut session = vm.new_session(&storage);

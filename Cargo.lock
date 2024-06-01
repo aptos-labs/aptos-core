@@ -4335,20 +4335,14 @@ name = "aptos-writeset-generator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-cached-packages",
  "aptos-crypto",
- "aptos-framework",
  "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-types",
- "handlebars",
- "move-compiler",
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",
- "serde",
- "tempfile",
 ]
 
 [[package]]
