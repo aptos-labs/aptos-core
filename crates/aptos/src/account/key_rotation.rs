@@ -133,12 +133,13 @@ impl CliCommand<RotateSummary> for RotateKey {
             if let Some(stale_name) = self.rename_stale_profile_to {
                 if self.save_to_profile == self.rename_stale_profile_to {
                     return Err(CliError::CommandArgumentError(
-                        "Stale profile and new profile may not have same name".to_string(),
+                        "New stale profile name and new profile name may not be the same"
+                            .to_string(),
                     ));
                 };
                 if stale_name.is_empty() {
                     return Err(CliError::CommandArgumentError(
-                        "Stale profile name may not be empty".to_string(),
+                        "New stale profile name may not be empty".to_string(),
                     ));
                 }
             };
@@ -153,9 +154,9 @@ impl CliCommand<RotateSummary> for RotateKey {
             // Verify that config exists.
             let mut config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
 
-            // Verify that the stale profile name does not already exist in the config, and that the
-            // new profile name does not already exist in the config unless it is the same as the
-            // stale profile's original name (in which case it will be overwritten).
+            // Verify that the new stale profile name does not already exist in the config, and that
+            // the new profile name does not already exist in the config (unless it is the same as
+            // the name of a stale profile that will be renamed).
             if let Some(profiles) = config.profiles {
                 if let Some(stale_name) = self.rename_stale_profile_to {
                     if profiles.contains_key(&stale_name) {
@@ -168,11 +169,10 @@ impl CliCommand<RotateSummary> for RotateKey {
                 if let Some(new_name) = self.save_to_profile {
                     if profiles.contains_key(&new_name) {
                         if self.rename_stale_profile_to.is_some()
-                            && self.rename_stale_profile_to
-                                == self.txn_options.profile_options.profile
+                            && self.save_to_profile == self.txn_options.profile_options.profile
                         {
-                            // Do nothing, since new profile will overwrite stale profile and stale
-                            // profile will be renamed.
+                            // Do nothing, since new profile is taking the name of a stale profile
+                            // that will be renamed.
                         } else {
                             return Err(CliError::CommandArgumentError(format!(
                                 "Profile {} already exists",
