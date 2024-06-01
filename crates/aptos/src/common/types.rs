@@ -683,8 +683,8 @@ pub struct HardwareWalletOptions {
 
     /// Index of your account in hardware wallet
     ///
-    /// This is the simpler version of derivation path e.g format - [0]
-    /// we will translate this index into [m/44'/637'/0'/0'/0]
+    /// This is the simpler version of derivation path e.g `format - [0]`
+    /// we will translate this index into `[m/44'/637'/0'/0'/0]`
     #[clap(long, conflicts_with = "derivation_path")]
     pub derivation_index: Option<String>,
 }
