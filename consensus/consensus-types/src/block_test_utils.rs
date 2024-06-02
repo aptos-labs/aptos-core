@@ -191,14 +191,10 @@ pub fn gen_test_certificate(
     parent_block: BlockInfo,
     committed_block: Option<BlockInfo>,
 ) -> QuorumCert {
-    let vote_data = VoteData::new(block, parent_block);
+    let vote_data = VoteData::new(block, parent_block.clone());
     let ledger_info = match committed_block {
         Some(info) => LedgerInfo::new(info, vote_data.hash()),
-        None => {
-            let mut placeholder = placeholder_ledger_info();
-            placeholder.set_consensus_data_hash(vote_data.hash());
-            placeholder
-        },
+        None => LedgerInfo::new(parent_block, vote_data.hash()),
     };
 
     QuorumCert::new(

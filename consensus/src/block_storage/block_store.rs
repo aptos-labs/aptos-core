@@ -29,8 +29,6 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use futures::executor::block_on;
-#[cfg(test)]
-use std::collections::VecDeque;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{sync::Arc, time::Duration};
@@ -274,7 +272,6 @@ impl BlockStore {
             .await
             .expect("Failed to persist commit");
 
-        self.inner.write().update_ordered_root(block_to_commit.id());
         self.inner
             .write()
             .insert_ordered_cert(finality_proof_clone.clone());
@@ -422,36 +419,15 @@ impl BlockStore {
         Ok(())
     }
 
-    /// Prune the tree up to next_root_id (keep next_root_id's block).  Any branches not part of
-    /// the next_root_id's tree should be removed as well.
-    ///
-    /// For example, root = B0
-    /// B0--> B1--> B2
-    ///        ╰--> B3--> B4
-    ///
-    /// prune_tree(B3) should be left with
-    /// B3--> B4, root = B3
-    ///
-    /// Returns the block ids of the blocks removed.
     #[cfg(test)]
-    fn prune_tree(&self, next_root_id: HashValue) -> VecDeque<HashValue> {
-        let id_to_remove = self.inner.read().find_blocks_to_prune(next_root_id);
-        if let Err(e) = self
-            .storage
-            .prune_tree(id_to_remove.clone().into_iter().collect())
-        {
-            // it's fine to fail here, as long as the commit succeeds, the next restart will clean
-            // up dangling blocks, and we need to prune the tree to keep the root consistent with
-            // executor.
-            warn!(error = ?e, "fail to delete block");
-        }
-
-        // synchronously update both root_id and commit_root_id
-        let mut wlock = self.inner.write();
-        wlock.update_ordered_root(next_root_id);
-        wlock.update_commit_root(next_root_id);
-        wlock.process_pruned_blocks(id_to_remove.clone());
-        id_to_remove
+    fn commit(&self, committed_blocks: &[Arc<PipelinedBlock>], finality_proof: WrappedLedgerInfo) {
+        let commit_proof = finality_proof.ledger_info().clone();
+        self.inner.write().commit_callback(
+            self.storage.clone(),
+            committed_blocks,
+            finality_proof,
+            commit_proof,
+        );
     }
 
     #[cfg(any(test, feature = "fuzzing"))]

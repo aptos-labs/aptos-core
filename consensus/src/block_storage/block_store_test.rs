@@ -156,62 +156,56 @@ proptest! {
 }
 
 #[tokio::test]
-async fn test_block_store_prune() {
+async fn test_block_store_commit() {
     let (blocks, block_store) = build_simple_tree().await;
     // Attempt to prune genesis block (should be no-op)
-    assert_eq!(block_store.prune_tree(blocks[0].id()).len(), 0);
-    assert_eq!(block_store.len(), 7);
+    block_store.commit(
+        &[blocks[0].clone()],
+        blocks[2].quorum_cert().into_wrapped_ledger_info(),
+    );
+    assert_eq!(block_store.len(), 9);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
     assert_eq!(block_store.pruned_blocks_in_mem(), 0);
 
     let (blocks, block_store) = build_simple_tree().await;
-    // Prune up to block A1
-    assert_eq!(block_store.prune_tree(blocks[1].id()).len(), 4);
-    assert_eq!(block_store.len(), 3);
-    assert_eq!(block_store.child_links(), block_store.len() - 1);
-    assert_eq!(block_store.pruned_blocks_in_mem(), 4);
-
-    let (blocks, block_store) = build_simple_tree().await;
-    // Prune up to block A2
-    assert_eq!(block_store.prune_tree(blocks[2].id()).len(), 5);
-    assert_eq!(block_store.len(), 2);
+    // Commit block A1
+    block_store.commit(
+        &[blocks[1].clone()],
+        blocks[3].quorum_cert().into_wrapped_ledger_info(),
+    );
+    assert_eq!(block_store.len(), 4);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
     assert_eq!(block_store.pruned_blocks_in_mem(), 5);
 
     let (blocks, block_store) = build_simple_tree().await;
-    // Prune up to block A3
-    assert_eq!(block_store.prune_tree(blocks[3].id()).len(), 6);
-    assert_eq!(block_store.len(), 1);
-    assert_eq!(block_store.child_links(), block_store.len() - 1);
-
-    let (blocks, block_store) = build_simple_tree().await;
-    // Prune up to block B1
-    assert_eq!(block_store.prune_tree(blocks[4].id()).len(), 4);
+    // Commit block A2
+    block_store.commit(
+        &[blocks[2].clone()],
+        blocks[4].quorum_cert().into_wrapped_ledger_info(),
+    );
     assert_eq!(block_store.len(), 3);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
+    assert_eq!(block_store.pruned_blocks_in_mem(), 6);
 
     let (blocks, block_store) = build_simple_tree().await;
-    // Prune up to block B2
-    assert_eq!(block_store.prune_tree(blocks[5].id()).len(), 6);
-    assert_eq!(block_store.len(), 1);
+    // Commit block B1
+    block_store.commit(
+        &[blocks[5].clone()],
+        blocks[7].quorum_cert().into_wrapped_ledger_info(),
+    );
+    assert_eq!(block_store.len(), 4);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
+    assert_eq!(block_store.pruned_blocks_in_mem(), 5);
 
     let (blocks, block_store) = build_simple_tree().await;
-    // Prune up to block C1
-    assert_eq!(block_store.prune_tree(blocks[6].id()).len(), 6);
-    assert_eq!(block_store.len(), 1);
-    assert_eq!(block_store.child_links(), block_store.len() - 1);
-
-    // Prune the chain of Genesis -> B1 -> B2
-    let (blocks, block_store) = build_simple_tree().await;
-    // Prune up to block B1
-    assert_eq!(block_store.prune_tree(blocks[4].id()).len(), 4);
+    // Commit blocks [A1, A2]
+    block_store.commit(
+        &[blocks[1].clone(), blocks[2].clone()],
+        blocks[4].quorum_cert().into_wrapped_ledger_info(),
+    );
     assert_eq!(block_store.len(), 3);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
-    // Prune up to block B2
-    assert_eq!(block_store.prune_tree(blocks[5].id()).len(), 2);
-    assert_eq!(block_store.len(), 1);
-    assert_eq!(block_store.child_links(), block_store.len() - 1);
+    assert_eq!(block_store.pruned_blocks_in_mem(), 6);
 }
 
 #[tokio::test]
@@ -234,10 +228,13 @@ async fn test_block_tree_gc() {
         added_blocks.push(cur_node.clone());
     }
 
-    for (i, block) in added_blocks.iter().enumerate() {
+    for i in 0..added_blocks.len() - 3 {
         assert_eq!(block_store.len(), 100 - i);
         assert_eq!(block_store.pruned_blocks_in_mem(), min(i, 10));
-        block_store.prune_tree(block.id());
+        block_store.commit(
+            &[added_blocks[i].clone()],
+            added_blocks[i + 2].quorum_cert().into_wrapped_ledger_info(),
+        );
     }
 }
 
@@ -253,23 +250,40 @@ async fn test_path_from_root() {
         .await;
     let b2 = inserter.insert_block(&b1, 2, None).await;
     let b3 = inserter.insert_block(&b2, 3, None).await;
-
     assert_eq!(
         block_store.path_from_ordered_root(b3.id()),
-        Some(vec![b1, b2.clone(), b3.clone()])
+        Some(vec![b2.clone(), b3.clone()])
     );
-    assert_eq!(
-        block_store.path_from_ordered_root(genesis.id()),
-        Some(vec![])
-    );
+    assert_eq!(block_store.path_from_ordered_root(genesis.id()), None);
 
-    block_store.prune_tree(b2.id());
-
+    let b4 = inserter.insert_block(&b3, 4, None).await;
     assert_eq!(
         block_store.path_from_ordered_root(b3.id()),
         Some(vec![b3.clone()])
     );
-    assert_eq!(block_store.path_from_ordered_root(genesis.id()), None);
+    assert_eq!(
+        block_store.path_from_ordered_root(b4.id()),
+        Some(vec![b3.clone(), b4.clone()])
+    );
+    assert_eq!(
+        block_store.path_from_commit_root(b4.id()),
+        Some(vec![b1.clone(), b2.clone(), b3.clone(), b4.clone()])
+    );
+    assert_eq!(
+        block_store.path_from_commit_root(b1.id()),
+        Some(vec![b1.clone()])
+    );
+
+    block_store.commit(&[b2.clone()], b4.quorum_cert().into_wrapped_ledger_info());
+    assert_eq!(
+        block_store.path_from_ordered_root(b4.id()),
+        Some(vec![b3.clone(), b4.clone()])
+    );
+    assert_eq!(block_store.path_from_commit_root(b1.id()), None);
+    assert_eq!(
+        block_store.path_from_commit_root(b4.id()),
+        Some(vec![b3.clone(), b4.clone()])
+    );
 }
 
 #[tokio::test]
@@ -394,14 +408,15 @@ async fn test_need_fetch_for_qc() {
     let block_store = inserter.block_store();
 
     // build a tree of the following form
-    // genesis <- a1 <- a2 <- a3
+    // genesis <- a1 <- a2 <- a3 <- a4
     let genesis = block_store.ordered_root();
     let a1 = inserter
         .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
         .await;
     let a2 = inserter.insert_block(&a1, 2, None).await;
     let a3 = inserter.insert_block(&a2, 3, None).await;
-    block_store.prune_tree(a2.id());
+    let a4 = inserter.insert_block(&a3, 4, None).await;
+    block_store.commit(&[a2.clone()], a4.quorum_cert().into_wrapped_ledger_info());
     let need_fetch_qc = placeholder_certificate_for_block(
         &[inserter.signer().clone()],
         HashValue::zero(),
@@ -412,10 +427,10 @@ async fn test_need_fetch_for_qc() {
     let too_old_qc = certificate_for_genesis();
     let can_insert_qc = placeholder_certificate_for_block(
         &[inserter.signer().clone()],
+        a4.id(),
+        a4.round(),
         a3.id(),
         a3.round(),
-        a2.id(),
-        a2.round(),
     );
     let duplicate_qc = block_store.get_quorum_cert_for_block(a2.id()).unwrap();
     assert_eq!(
