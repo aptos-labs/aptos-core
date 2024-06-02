@@ -36,7 +36,7 @@ use aptos_types::{
     state_store::StateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
-        TransactionOutput,
+        TransactionOutput, WriteSetPayload,
     },
 };
 use aptos_vm::{
@@ -49,6 +49,13 @@ use std::sync::{mpsc::channel, Arc};
 pub struct PtxBlockExecutor;
 
 impl VMExecutor for PtxBlockExecutor {
+    fn execute_write_set_payload(
+        _state_view: &impl StateView,
+        _write_set_payload: &WriteSetPayload,
+    ) -> Result<TransactionOutput, VMStatus> {
+        todo!()
+    }
+
     fn execute_block(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),

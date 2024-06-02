@@ -66,6 +66,7 @@ impl ExecutorTask for AptosExecutorTask {
                         format!("Transaction discarded, status: {:?}", vm_status),
                     );
                 }
+
                 if vm_status.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
                     ExecutionStatus::SpeculativeExecutionAbortError(
                         vm_status.message().cloned().unwrap_or_default(),
@@ -83,10 +84,6 @@ impl ExecutorTask for AptosExecutorTask {
                     );
                     ExecutionStatus::SkipRest(AptosTransactionOutput::new(vm_output))
                 } else {
-                    assert!(
-                        Self::is_transaction_dynamic_change_set_capable(txn),
-                        "DirectWriteSet should always create SkipRest transaction, validate_waypoint_change_set provides this guarantee"
-                    );
                     ExecutionStatus::Success(AptosTransactionOutput::new(vm_output))
                 }
             },
@@ -108,17 +105,5 @@ impl ExecutorTask for AptosExecutorTask {
                 }
             },
         }
-    }
-
-    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool {
-        if txn.is_valid() {
-            if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
-            {
-                // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization or
-                // resource_groups_split_in_change_set is enabled.
-                return false;
-            }
-        }
-        true
     }
 }

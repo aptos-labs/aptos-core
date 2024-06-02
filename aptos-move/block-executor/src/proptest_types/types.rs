@@ -1014,10 +1014,6 @@ where
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }
-
-    fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
-        true
-    }
 }
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {

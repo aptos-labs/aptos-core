@@ -444,15 +444,6 @@ pub enum WriteSetPayload {
     },
 }
 
-impl WriteSetPayload {
-    pub fn should_trigger_reconfiguration_by_default(&self) -> bool {
-        match self {
-            Self::Direct(_) => true,
-            Self::Script { .. } => false,
-        }
-    }
-}
-
 /// A transaction that has been signed.
 ///
 /// A `SignedTransaction` is a single transaction that can be atomically executed. Clients submit

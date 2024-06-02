@@ -86,8 +86,6 @@ pub trait ExecutorTask: Sync {
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
-
-    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;
 }
 
 /// Trait for execution result of a single transaction.

@@ -67,7 +67,6 @@ use aptos_types::{
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
-    abstract_write_op::AbstractResourceWriteOp,
     change_set::VMChangeSet,
     environment::Environment,
     output::VMOutput,
@@ -1858,151 +1857,6 @@ impl AptosVM {
         }
     }
 
-    fn execute_write_set(
-        &self,
-        resolver: &impl AptosMoveResolver,
-        write_set_payload: &WriteSetPayload,
-        txn_sender: Option<AccountAddress>,
-        session_id: SessionId,
-    ) -> Result<VMChangeSet, VMStatus> {
-        let change_set_configs =
-            ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version);
-
-        match write_set_payload {
-            WriteSetPayload::Direct(change_set) => {
-                // this transaction is never delayed field capable.
-                // it requires restarting execution afterwards,
-                // which allows it to be used as last transaction in delayed_field_enabled context.
-                let change = VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
-                    change_set.clone(),
-                    &change_set_configs,
-                )
-                .map_err(|e| e.into_vm_status())?;
-
-                // validate_waypoint_change_set checks that this is true, so we only log here.
-                if !Self::should_restart_execution(&change) {
-                    // This invariant needs to hold irrespectively, so we log error always.
-                    // but if we are in delayed_field_optimization_capable context, we cannot execute any transaction after this.
-                    // as transaction afterwards would be executed assuming delayed fields are exchanged and
-                    // resource groups are split, but WriteSetPayload::Direct has materialized writes,
-                    // and so after executing this transaction versioned state is inconsistent.
-                    error!(
-                        "[aptos_vm] direct write set finished without requiring should_restart_execution");
-                }
-
-                Ok(change)
-            },
-            WriteSetPayload::Script { script, execute_as } => {
-                let mut tmp_session = self.new_session(resolver, session_id, None);
-                let senders = match txn_sender {
-                    None => vec![*execute_as],
-                    Some(sender) => vec![sender, *execute_as],
-                };
-
-                let traversal_storage = TraversalStorage::new();
-                let mut traversal_context = TraversalContext::new(&traversal_storage);
-
-                self.validate_and_execute_script(
-                    &mut tmp_session,
-                    &mut UnmeteredGasMeter,
-                    &mut traversal_context,
-                    senders,
-                    script,
-                )?;
-                Ok(tmp_session.finish(&change_set_configs)?)
-            },
-        }
-    }
-
-    fn read_change_set(
-        &self,
-        executor_view: &dyn ExecutorView,
-        resource_group_view: &dyn ResourceGroupView,
-        change_set: &VMChangeSet,
-    ) -> PartialVMResult<()> {
-        assert!(
-            change_set.aggregator_v1_write_set().is_empty(),
-            "Waypoint change set should not have any aggregator writes."
-        );
-
-        // All Move executions satisfy the read-before-write property. Thus we need to read each
-        // access path that the write set is going to update.
-        for state_key in change_set.module_write_set().keys() {
-            executor_view.get_module_state_value(state_key)?;
-        }
-        for (state_key, write_op) in change_set.resource_write_set().iter() {
-            executor_view.get_resource_state_value(state_key, None)?;
-            if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write_op {
-                for (tag, (_, maybe_layout)) in group_write.inner_ops() {
-                    resource_group_view.get_resource_from_group(
-                        state_key,
-                        tag,
-                        maybe_layout.as_deref(),
-                    )?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn validate_waypoint_change_set(
-        change_set: &VMChangeSet,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(), VMStatus> {
-        let has_new_block_event = change_set
-            .events()
-            .iter()
-            .any(|(e, _)| e.event_key() == Some(&new_block_event_key()));
-        let has_new_epoch_event = change_set
-            .events()
-            .iter()
-            .any(|(e, _)| e.event_key() == Some(&new_epoch_event_key()));
-        if has_new_block_event && has_new_epoch_event {
-            Ok(())
-        } else {
-            error!(
-                *log_context,
-                "[aptos_vm] waypoint txn needs to emit new epoch and block"
-            );
-            Err(VMStatus::error(StatusCode::INVALID_WRITE_SET, None))
-        }
-    }
-
-    pub(crate) fn process_waypoint_change_set(
-        &self,
-        resolver: &impl AptosMoveResolver,
-        write_set_payload: WriteSetPayload,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        // TODO: user specified genesis id to distinguish different genesis write sets
-        let genesis_id = HashValue::zero();
-        let change_set = self.execute_write_set(
-            resolver,
-            &write_set_payload,
-            Some(account_config::reserved_vm_address()),
-            SessionId::genesis(genesis_id),
-        )?;
-
-        Self::validate_waypoint_change_set(&change_set, log_context)?;
-        self.read_change_set(
-            resolver.as_executor_view(),
-            resolver.as_resource_group_view(),
-            &change_set,
-        )
-        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-
-        SYSTEM_TRANSACTIONS_EXECUTED.inc();
-
-        let output = VMOutput::new(
-            change_set,
-            FeeStatement::zero(),
-            TransactionStatus::from_executed_vm_status(VMStatus::Executed),
-            TransactionAuxiliaryData::default(),
-        );
-        Ok((VMStatus::Executed, output))
-    }
-
     fn process_block_prologue(
         &self,
         resolver: &impl AptosMoveResolver,
@@ -2336,12 +2190,11 @@ impl AptosVM {
                 )?;
                 (vm_status, output)
             },
-            Transaction::GenesisTransaction(write_set_payload) => {
-                let (vm_status, output) = self.process_waypoint_change_set(
-                    resolver,
-                    write_set_payload.clone(),
-                    log_context,
-                )?;
+            Transaction::GenesisTransaction(_) => {
+                // Genesis transaction is special and is processed separately via a dedicated method.
+                let status_code = StatusCode::FEATURE_UNDER_GATING;
+                let output = discarded_output(status_code);
+                let vm_status = VMStatus::error(status_code, None);
                 (vm_status, output)
             },
             Transaction::UserTransaction(txn) => {
@@ -2485,6 +2338,99 @@ impl AptosVM {
 
 // Executor external API
 impl VMExecutor for AptosVM {
+    fn execute_write_set_payload(
+        state_view: &impl StateView,
+        write_set_payload: &WriteSetPayload,
+    ) -> Result<TransactionOutput, VMStatus> {
+        let change_set = match write_set_payload {
+            WriteSetPayload::Direct(change_set) => {
+                // All Move executions satisfy the read-before-write property.
+                // Thus, we need to read each state key that the write set is
+                // going to update.
+                for (key, _) in change_set.write_set() {
+                    state_view.get_state_value(key).map_err(|e| {
+                        PartialVMError::new(StatusCode::STORAGE_ERROR)
+                            .with_message(format!("Storage error: {}", e))
+                            .finish(Location::Undefined)
+                            .into_vm_status()
+                    })?;
+                }
+
+                change_set.clone()
+            },
+            WriteSetPayload::Script { script, execute_as } => {
+                let resolver = state_view.as_move_resolver();
+                let vm = Self::new(&resolver, Some(false));
+
+                // There is no gas metering involved for write set payloads.
+                let mut gas_meter = UnmeteredGasMeter;
+                let change_set_configs =
+                    ChangeSetConfigs::unlimited_at_gas_feature_version(vm.gas_feature_version);
+                let senders = vec![account_config::reserved_vm_address(), *execute_as];
+
+                let traversal_storage = TraversalStorage::new();
+                let mut traversal_context = TraversalContext::new(&traversal_storage);
+
+                // TODO: user specified genesis id to distinguish different genesis write sets
+                let session_id = SessionId::genesis(HashValue::zero());
+                let mut session = vm.new_session(&resolver, session_id, None);
+                vm.validate_and_execute_script(
+                    &mut session,
+                    &mut gas_meter,
+                    &mut traversal_context,
+                    senders,
+                    script,
+                )?;
+
+                let mut change_set = session.finish(&change_set_configs)?;
+                change_set
+                    .try_materialize_aggregator_v1_delta_set(&resolver)
+                    .expect("Aggregator V1 deltas can always be materialized");
+
+                // Conversion to storage change set representation should not
+                // fail, due to:
+                //  1) aggregators V1 being materialized,
+                //  2) disabled abstract resource writes.
+                change_set
+                    .try_into_storage_change_set()
+                    .expect("Must be able to create the storage change set")
+            },
+        };
+
+        // Validate the emitted change set.
+        let has_new_block_event = change_set
+            .events()
+            .iter()
+            .any(|e| e.event_key() == Some(&new_block_event_key()));
+        let has_new_epoch_event = change_set
+            .events()
+            .iter()
+            .any(|e| e.event_key() == Some(&new_epoch_event_key()));
+        if !has_new_block_event || !has_new_epoch_event {
+            let log_context = AdapterLogSchema::new(state_view.id(), 0);
+            error!(
+                log_context,
+                "[aptos_vm] waypoint txn needs to emit new epoch and block"
+            );
+            return Err(VMStatus::error(StatusCode::INVALID_WRITE_SET, None));
+        }
+
+        SYSTEM_TRANSACTIONS_EXECUTED.inc();
+
+        let gas_used = 0;
+        let status = TransactionStatus::from_executed_vm_status(VMStatus::Executed);
+        let auxiliary_data = TransactionAuxiliaryData::default();
+        let (write_set, events) = change_set.into_inner();
+
+        Ok(TransactionOutput::new(
+            write_set,
+            events,
+            gas_used,
+            status,
+            auxiliary_data,
+        ))
+    }
+
     /// Execute a block of `transactions`. The output vector will have the exact same length as the
     /// input vector. The discarded transactions will be marked as `TransactionStatus::Discard` and
     /// have an empty `WriteSet`. Also `state_view` is immutable, and does not have interior

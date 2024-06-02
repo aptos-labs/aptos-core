@@ -5,7 +5,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
@@ -53,6 +53,23 @@ pub struct ChunkOutput {
 }
 
 impl ChunkOutput {
+    pub fn genesis<V: VMExecutor>(
+        transaction: &Transaction,
+        state_view: CachedStateView,
+    ) -> Result<Self> {
+        match transaction {
+            Transaction::GenesisTransaction(write_set_payload) => {
+                let output = V::execute_write_set_payload(&state_view, write_set_payload)?;
+                Ok(Self {
+                    transactions: vec![transaction.clone()],
+                    transaction_outputs: vec![output],
+                    state_cache: state_view.into_state_cache(),
+                })
+            },
+            txn => bail!("Expected a genesis transaction, but got {:?}", txn),
+        }
+    }
+
     pub fn by_transaction_execution<V: VMExecutor>(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,

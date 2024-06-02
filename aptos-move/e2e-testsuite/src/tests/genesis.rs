@@ -24,6 +24,7 @@ fn execute_genesis_write_set() {
     println!("{:#?}", *GENESIS_CHANGE_SET_HEAD);
     let txn =
         Transaction::GenesisTransaction(WriteSetPayload::Direct(GENESIS_CHANGE_SET_HEAD.clone()));
+    // FIXME! Use new function + add a test that this returns an error.
     let mut output = executor.execute_transaction_block(vec![txn]).unwrap();
 
     // Executing the genesis transaction should succeed
@@ -33,6 +34,7 @@ fn execute_genesis_write_set() {
 
 #[test]
 fn execute_genesis_and_drop_other_transaction() {
+    // FIXME! Delete this test
     let mut executor = FakeExecutor::no_genesis();
     let txn =
         Transaction::GenesisTransaction(WriteSetPayload::Direct(GENESIS_CHANGE_SET_HEAD.clone()));
@@ -59,6 +61,7 @@ fn fail_no_epoch_change_write_set() {
     let receiver = executor.create_raw_account_data(100_000, 10);
     let txn2 = peer_to_peer_txn(sender.account(), receiver.account(), 11, 1000, 0);
 
+    // FIXME! Re-write
     let output_err = executor
         .execute_transaction_block(vec![txn, Transaction::UserTransaction(txn2)])
         .unwrap_err();
