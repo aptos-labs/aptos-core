@@ -27,7 +27,7 @@ impl ConsensusAlgorithmConfig {
         Self::JolteonV2 {
             main: ConsensusConfigV1::default(),
             quorum_store_enabled: true,
-            order_vote_enabled: false,
+            order_vote_enabled: true,
         }
     }
 
@@ -35,7 +35,7 @@ impl ConsensusAlgorithmConfig {
         Self::JolteonV2 {
             main: ConsensusConfigV1::default(),
             quorum_store_enabled: true,
-            order_vote_enabled: false,
+            order_vote_enabled: true,
         }
     }
 
