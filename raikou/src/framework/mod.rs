@@ -1,5 +1,5 @@
 use crate::framework::context::{Context, Event, SimpleContext};
-use std::future::Future;
+use std::{future::Future, sync::Arc};
 
 pub mod context;
 pub mod network;
@@ -49,24 +49,31 @@ pub trait Protocol: Send + Sync {
     where
         Ctx: ContextFor<Self>;
 
-    fn run_ctx<Ctx>(&mut self, ctx: &mut Ctx) -> impl Future<Output = ()> + Send
+    fn run_ctx<Ctx>(
+        protocol: &tokio::sync::Mutex<Self>,
+        ctx: &mut Ctx,
+    ) -> impl Future<Output = ()> + Send
     where
         Ctx: ContextFor<Self>,
     {
         async move {
-            self.start_handler(ctx).await;
+            protocol.lock().await.start_handler(ctx).await;
 
             while !ctx.halted() {
                 // Run the condition handlers
-                self.condition_handler(ctx).await;
+                protocol.lock().await.condition_handler(ctx).await;
 
                 // Listen for incoming events
                 match ctx.next_event().await {
                     Event::Message(from, message) => {
-                        self.message_handler(ctx, from, message).await;
+                        protocol
+                            .lock()
+                            .await
+                            .message_handler(ctx, from, message)
+                            .await;
                     },
                     Event::Timer(event) => {
-                        self.timer_event_handler(ctx, event).await;
+                        protocol.lock().await.timer_event_handler(ctx, event).await;
                     },
                 }
             }
@@ -74,7 +81,7 @@ pub trait Protocol: Send + Sync {
     }
 
     fn run<NS, TS>(
-        &mut self,
+        protocol: &tokio::sync::Mutex<Self>,
         node_id: NodeId,
         network_service: NS,
         timer: TS,
@@ -85,7 +92,7 @@ pub trait Protocol: Send + Sync {
     {
         async move {
             let mut context = SimpleContext::new(node_id, network_service, timer);
-            self.run_ctx(&mut context).await;
+            Protocol::run_ctx(protocol, &mut context).await;
         }
     }
 }

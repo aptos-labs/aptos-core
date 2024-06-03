@@ -158,7 +158,7 @@ async fn test_multichain(
             // network_service.clear_inbox().await;
 
             // println!("Spawning node {node_id}");
-            let mut node = MultiChainBft::new_node(
+            let node = tokio::sync::Mutex::new(MultiChainBft::new_node(
                 node_id,
                 config,
                 start_time,
@@ -169,10 +169,10 @@ async fn test_multichain(
                     batch_commit_time: batch_commit_time_sender,
                     indirectly_committed_slots: indirectly_committed_slots_sender,
                 },
-            );
+            ));
 
             semaphore.add_permits(1);
-            node.run(node_id, network_service, timer).await
+            Protocol::run(&node, node_id, network_service, timer).await
         }));
     }
 
@@ -377,16 +377,16 @@ async fn test_jolteon(
             let (_, txns_receiver) = mpsc::channel::<()>(100);
 
             // println!("Spawning node {node_id}");
-            let mut node = jolteon::JolteonNode::new(
+            let node = tokio::sync::Mutex::new(jolteon::JolteonNode::new(
                 node_id,
                 config,
                 txns_receiver,
                 start_time,
                 node_id == monitored_node,
-            );
+            ));
 
             semaphore.add_permits(1);
-            node.run(node_id, network_service, timer).await
+            Protocol::run(&node, node_id, network_service, timer).await
         }));
     }
 
@@ -532,7 +532,7 @@ async fn test_jolteon_with_fast_qs(
             let next_txn = || ();
 
             // println!("Spawning node {node_id}");
-            let mut node = jolteon_fast_qs::JolteonNode::new(
+            let node = tokio::sync::Mutex::new(jolteon_fast_qs::JolteonNode::new(
                 node_id,
                 config,
                 next_txn,
@@ -544,10 +544,10 @@ async fn test_jolteon_with_fast_qs(
                     batch_commit_time: batch_commit_time_sender,
                     // indirectly_committed_slots: indirectly_committed_slots_sender,
                 },
-            );
+            ));
 
             semaphore.add_permits(1);
-            node.run(node_id, network_service, timer).await
+            Protocol::run(&node, node_id, network_service, timer).await
         }));
     }
 
@@ -699,7 +699,7 @@ async fn test_raikou(
             // network_service.clear_inbox().await;
 
             // println!("Spawning node {node_id}");
-            let mut node = raikou::RaikouNode::new(
+            let node = tokio::sync::Mutex::new(raikou::RaikouNode::new(
                 node_id,
                 config,
                 start_time,
@@ -710,10 +710,10 @@ async fn test_raikou(
                     batch_commit_time: batch_commit_time_sender,
                     // indirectly_committed_slots: indirectly_committed_slots_sender,
                 },
-            );
+            ));
 
             semaphore.add_permits(1);
-            node.run(node_id, network_service, timer).await
+            Protocol::run(&node, node_id, network_service, timer).await
         }));
     }
 
