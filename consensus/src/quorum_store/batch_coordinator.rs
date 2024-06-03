@@ -20,6 +20,8 @@ use tokio::sync::{
     oneshot,
 };
 
+use super::proof_queue::ProofQueueCommand;
+
 #[derive(Debug)]
 pub enum BatchCoordinatorCommand {
     Shutdown(oneshot::Sender<()>),
@@ -32,6 +34,7 @@ pub struct BatchCoordinator {
     network_sender: Arc<NetworkSender>,
     sender_to_proof_manager: Arc<Sender<ProofManagerCommand>>,
     sender_to_batch_generator: Arc<Sender<BatchGeneratorCommand>>,
+    sender_to_proof_queue: Arc<Sender<ProofQueueCommand>>,
     batch_store: Arc<BatchStore>,
     max_batch_txns: u64,
     max_batch_bytes: u64,
@@ -45,6 +48,7 @@ impl BatchCoordinator {
         network_sender: NetworkSender,
         sender_to_proof_manager: Sender<ProofManagerCommand>,
         sender_to_batch_generator: Sender<BatchGeneratorCommand>,
+        sender_to_proof_queue: Arc<Sender<ProofQueueCommand>>,
         batch_store: Arc<BatchStore>,
         max_batch_txns: u64,
         max_batch_bytes: u64,
@@ -56,6 +60,7 @@ impl BatchCoordinator {
             network_sender: Arc::new(network_sender),
             sender_to_proof_manager: Arc::new(sender_to_proof_manager),
             sender_to_batch_generator: Arc::new(sender_to_batch_generator),
+            sender_to_proof_queue,
             batch_store,
             max_batch_txns,
             max_batch_bytes,
@@ -134,6 +139,7 @@ impl BatchCoordinator {
         }
 
         let mut persist_requests = vec![];
+        let batches_summary = batches.iter().map(|batch| (batch.batch_info(), batch.summary())).collect();
         for batch in batches.into_iter() {
             // TODO: maybe don't message batch generator if the persist is unsuccessful?
             if let Err(e) = self

@@ -172,6 +172,10 @@ impl Batch {
         self.payload.into_transactions()
     }
 
+    pub fn summary(&self) -> Vec<(PeerId, BatchId)> {
+        self.payload.txns().iter().map(|txn| (txn.sender(), txn.sequence_number())).collect()
+    }
+
     pub fn batch_info(&self) -> &BatchInfo {
         &self.batch_info
     }
