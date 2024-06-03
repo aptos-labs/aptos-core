@@ -604,9 +604,6 @@ pub fn setup_environment_and_start_node(
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
-    // Set the observer mode for state sync
-    node_config.state_sync.state_sync_driver.observer_enabled =
-        node_config.consensus_observer.observer_enabled;
     // Log the node config at node startup
     node_config.log_all_configs();
 

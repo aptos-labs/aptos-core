@@ -20,7 +20,7 @@ use crate::{
     utils,
     utils::{OutputFallbackHandler, PENDING_DATA_LOG_FREQ_SECS},
 };
-use aptos_config::config::{RoleType, StateSyncDriverConfig};
+use aptos_config::config::{ObserverConfig, RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
 };
@@ -53,6 +53,9 @@ pub struct DriverConfiguration {
     // The config file of the driver
     pub config: StateSyncDriverConfig,
 
+    // The config for consensus observer
+    pub consensus_observer_config: ObserverConfig,
+
     // The role of the node
     pub role: RoleType,
 
@@ -61,9 +64,15 @@ pub struct DriverConfiguration {
 }
 
 impl DriverConfiguration {
-    pub fn new(config: StateSyncDriverConfig, role: RoleType, waypoint: Waypoint) -> Self {
+    pub fn new(
+        config: StateSyncDriverConfig,
+        consensus_observer_config: ObserverConfig,
+        role: RoleType,
+        waypoint: Waypoint,
+    ) -> Self {
         Self {
             config,
+            consensus_observer_config,
             role,
             waypoint,
         }
@@ -538,7 +547,10 @@ impl<
     /// Returns true iff this node enables consensus
     fn is_consensus_enabled(&self) -> bool {
         self.driver_configuration.role == RoleType::Validator
-            || self.driver_configuration.config.observer_enabled
+            || self
+                .driver_configuration
+                .consensus_observer_config
+                .observer_enabled
     }
 
     /// Returns true iff consensus is currently executing
