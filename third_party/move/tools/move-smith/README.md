@@ -13,7 +13,11 @@ To start fuzzing, run
 cargo fuzz run <fuzz_target>
 ```
 
-All fuzz targets live in `fuzz/fuzz_targets`.
+Currently we have two fuzz targets in `fuzz/fuzz_targets`:
+
+* `compile_v1_only`: compiles the generated Move programs using compiler V1
+* `transactional`: run the generated Move programs as transactional tests so that we can cover compiler V1, V2, and the VM
+
 
 If some unwanted crash stopped the fuzzer and you want to ignore it, use:
 ```bash
@@ -106,8 +110,8 @@ rustup component add --toolchain nightly llvm-tools-preview
 │   ├── corpus                    # The corpus of inputs for all fuzz targets (created after a fuzzing session starts)
 │   ├── coverage                  # Stores the aggregated raw coverage files (created after collecting coverage)
 │   └── fuzz_targets
-│       ├── module_only.rs        # Basic fuzzer that only generates and compiles a module with compiler V1
-│       └── transactional.rs      # Generate Move programs and run them as transactional tests
+│       ├── compile_v1_only.rs    # Basic fuzzer that only generates and compiles a module with compiler V1
+│       └── transactional.rs      # Run the generated Move programs as transactional tests to cover V1, V2, and the VM
 ├── scripts
 │   ├── check_output.sh           # Generate Move programs/packages and try to compile them
 │   ├── coverage.sh               # Collect coverage and generate human-readable reports.
