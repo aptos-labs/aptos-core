@@ -38,7 +38,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use std::ops::DerefMut;
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 
 const WARMUP_DURATION_FRACTION: f32 = 0.07;
 const COOLDOWN_DURATION_FRACTION: f32 = 0.04;
@@ -117,13 +117,18 @@ pub fn generate_traffic(
     ctx: &mut NetworkContext<'_>,
     nodes: &[PeerId],
     duration: Duration,
+    rt: Option<Handle>,
 ) -> Result<TxnStats> {
     let emit_job_request = ctx.emit_job.clone();
     let rng = SeedableRng::from_rng(ctx.core().rng())?;
     let (emitter, emit_job_request) =
         create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng)?;
 
-    let rt = traffic_emitter_runtime()?;
+    let rt = match rt {
+        Some(x) => x,
+        None => traffic_emitter_runtime()?.handle().clone()
+    };
+    // let rt = traffic_emitter_runtime()?;
     let stats = rt.block_on(emitter.emit_txn_for(
         ctx.swarm().chain_info().root_account,
         emit_job_request,

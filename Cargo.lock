@@ -1647,6 +1647,7 @@ dependencies = [
  "aptos-logger",
  "aptos-rest-client",
  "aptos-retrier",
+ "aptos-runtimes",
  "aptos-sdk",
  "aptos-short-hex-str",
  "aptos-state-sync-driver",

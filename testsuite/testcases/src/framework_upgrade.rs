@@ -57,7 +57,7 @@ impl FrameworkUpgrade {
 
         // Generate some traffic
         let duration = Duration::from_secs(30);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
+        let txn_stat = generate_traffic(ctx, &all_validators, duration, Some(ctx.runtime.handle().clone()))?;
         ctx.report.report_txn_stats(
             format!("{}::full-framework-upgrade", self.name()),
             &txn_stat,
@@ -127,7 +127,7 @@ impl FrameworkUpgrade {
 
         // Generate some traffic
         let duration = Duration::from_secs(30);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
+        let txn_stat = generate_traffic(ctx, &all_validators, duration, Some(ctx.runtime.handle().clone()))?;
         ctx.report.report_txn_stats(
             format!("{}::full-framework-upgrade", self.name()),
             &txn_stat,
@@ -152,7 +152,7 @@ impl FrameworkUpgrade {
         runtime.block_on(batch_update(ctx, second_half, &new_version))?;
 
         let duration = Duration::from_secs(30);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
+        let txn_stat = generate_traffic(ctx, &all_validators, duration, Some(ctx.runtime.handle().clone()))?;
         ctx.report.report_txn_stats(
             format!("{}::full-framework-upgrade", self.name()),
             &txn_stat,

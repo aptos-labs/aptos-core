@@ -229,7 +229,7 @@ impl SimpleValidatorUpgrade {
         {
             let mut ctx_locker = ctxa.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();
-            let txn_stat_prior = generate_traffic(ctx, &all_validators, duration)?;
+            let txn_stat_prior = generate_traffic(ctx, &all_validators, duration, Some(ctx.runtime.handle().clone()))?;
             ctx.report
                 .report_txn_stats(format!("{}::liveness-check", self.name()), &txn_stat_prior);
         }
@@ -263,7 +263,7 @@ impl SimpleValidatorUpgrade {
         {
             let mut ctx_locker = ctxa.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();
-            let txn_stat_one = generate_traffic(ctx, &[first_node], duration)?;
+            let txn_stat_one = generate_traffic(ctx, &[first_node], duration, Some(ctx.runtime.handle().clone()))?;
             ctx.report.report_txn_stats(
                 format!("{}::single-validator-upgrade", self.name()),
                 &txn_stat_one,
@@ -301,7 +301,7 @@ impl SimpleValidatorUpgrade {
             let ctx = ctx_locker.deref_mut();
 
             // Generate some traffic
-            let txn_stat_half = generate_traffic(ctx, &first_batch, duration)?;
+            let txn_stat_half = generate_traffic(ctx, &first_batch, duration, Some(ctx.runtime.handle().clone()))?;
             ctx.report.report_txn_stats(
                 format!("{}::half-validator-upgrade", self.name()),
                 &txn_stat_half,
@@ -336,7 +336,7 @@ impl SimpleValidatorUpgrade {
             let ctx = ctx_locker.deref_mut();
 
             // Generate some traffic
-            let txn_stat_all = generate_traffic(ctx, &second_batch, duration)?;
+            let txn_stat_all = generate_traffic(ctx, &second_batch, duration, Some(ctx.runtime.handle().clone()))?;
             ctx.report.report_txn_stats(
                 format!("{}::rest-validator-upgrade", self.name()),
                 &txn_stat_all,

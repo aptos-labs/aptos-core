@@ -68,7 +68,7 @@ impl<'t> NetworkContext<'t> {
             global_duration,
             emit_job,
             success_criteria,
-            runtime: Runtime::new().unwrap(),
+            runtime: aptos_runtimes::spawn_named_runtime("emitter".into(), Some(64)),
         }
     }
 
