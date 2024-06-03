@@ -484,6 +484,12 @@ pub trait DbReader: Send + Sync {
     }
 }
 
+impl<T: ?Sized + DbReader> DbReader for Arc<T> {
+    fn get_read_delegatee(&self) -> &dyn DbReader {
+        self
+    }
+}
+
 impl MoveStorage for &dyn DbReader {
     fn fetch_resource_by_version(
         &self,
