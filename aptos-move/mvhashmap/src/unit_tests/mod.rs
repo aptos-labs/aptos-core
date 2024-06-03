@@ -16,7 +16,6 @@ use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, DeltaOp},
     delta_math::DeltaHistory,
 };
-use aptos_types::executable::ExecutableTestType;
 use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
 use std::sync::Arc;
 mod proptest_types;
@@ -63,8 +62,7 @@ fn create_write_read_placeholder_struct() {
     let ap2 = KeyType(b"/foo/c".to_vec());
     let ap3 = KeyType(b"/foo/d".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()> =
-        MVHashMap::new();
+    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ()> = MVHashMap::new();
 
     // Reads that should go the DB return Err(Uninitialized)
     let r_db = mvtbl.data().fetch_data(&ap1, 5);

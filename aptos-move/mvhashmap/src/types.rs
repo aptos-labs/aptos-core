@@ -6,7 +6,6 @@ use aptos_aggregator::{
     types::{DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_types::{
-    executable::ExecutableDescriptor,
     vm::modules::OnChainUnverifiedModule,
     write_set::{TransactionWrite, WriteOpKind},
 };
@@ -107,10 +106,7 @@ pub enum MVDataOutput<V> {
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
 #[derive(Debug, PartialEq, Eq)]
-pub enum MVModulesOutput<X> {
-    /// Arc to the executable corresponding to the latest module, and a descriptor
-    /// with either the module hash or indicator that the module is from storage.
-    Executable((Arc<X>, ExecutableDescriptor)),
+pub enum MVModulesOutput {
     Module(OnChainUnverifiedModule),
 }
 

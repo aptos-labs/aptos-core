@@ -21,7 +21,6 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::ContractEvent,
     delayed_fields::PanicError,
-    executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
     transaction::{
@@ -424,13 +423,11 @@ impl BlockAptosVM {
         }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
-        let executor = BlockExecutor::<
-            SignatureVerifiedTransaction,
-            AptosExecutorTask,
-            S,
-            L,
-            ExecutableTestType,
-        >::new(config, executor_thread_pool, transaction_commit_listener);
+        let executor = BlockExecutor::<SignatureVerifiedTransaction, AptosExecutorTask, S, L>::new(
+            config,
+            executor_thread_pool,
+            transaction_commit_listener,
+        );
 
         let environment = Environment::new(state_view).try_enable_delayed_field_optimization();
         let ret = executor.execute_block(

@@ -13,10 +13,7 @@ use crate::{
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_types::{
-    block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
-    executable::ExecutableTestType,
-};
+use aptos_types::{block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent};
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
 use proptest::{
@@ -134,7 +131,6 @@ where
             MockTask<KeyType<K>, E>,
             EmptyDataView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
-            ExecutableTestType,
         >::new(config, executor_thread_pool, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 

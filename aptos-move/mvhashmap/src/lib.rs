@@ -6,10 +6,7 @@ use crate::{
     versioned_data::VersionedData, versioned_delayed_fields::VersionedDelayedFields,
     versioned_group_data::VersionedGroupData, versioned_modules::VersionedModules,
 };
-use aptos_types::{
-    executable::{Executable, ModulePath},
-    write_set::TransactionWrite,
-};
+use aptos_types::{executable::ModulePath, write_set::TransactionWrite};
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash};
 
@@ -29,28 +26,24 @@ mod unit_tests;
 /// Concurrency is managed by DashMap, i.e. when a method accesses a BTreeMap at a
 /// given key, it holds exclusive access and doesn't need to explicitly synchronize
 /// with other reader/writers.
-///
-/// TODO: separate V into different generic types for data and code modules with specialized
-/// traits (currently both WriteOp for executor).
-pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
+pub struct MVHashMap<K, T, V: TransactionWrite, I: Clone> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
-    modules: VersionedModules<K, X>,
+    modules: VersionedModules<K>,
 }
 
 impl<
         K: ModulePath + Hash + Clone + Eq + Debug,
         T: Hash + Clone + Eq + Debug + Serialize,
         V: TransactionWrite,
-        X: Executable,
         I: Copy + Clone + Eq + Hash + Debug,
-    > MVHashMap<K, T, V, X, I>
+    > MVHashMap<K, T, V, I>
 {
     // -----------------------------------
     // Functions shared for data and modules.
 
-    pub fn new() -> MVHashMap<K, T, V, X, I> {
+    pub fn new() -> MVHashMap<K, T, V, I> {
         MVHashMap {
             data: VersionedData::new(),
             group_data: VersionedGroupData::new(),
@@ -85,7 +78,7 @@ impl<
         &self.delayed_fields
     }
 
-    pub fn modules(&self) -> &VersionedModules<K, X> {
+    pub fn modules(&self) -> &VersionedModules<K> {
         &self.modules
     }
 }
@@ -94,9 +87,8 @@ impl<
         K: ModulePath + Hash + Clone + Debug + Eq,
         T: Hash + Clone + Debug + Eq + Serialize,
         V: TransactionWrite,
-        X: Executable,
         I: Copy + Clone + Eq + Hash + Debug,
-    > Default for MVHashMap<K, T, V, X, I>
+    > Default for MVHashMap<K, T, V, I>
 {
     fn default() -> Self {
         Self::new()

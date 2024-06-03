@@ -4,15 +4,15 @@
 use crate::view::{LatestView, ViewState};
 use aptos_mvhashmap::types::{MVModulesError, MVModulesOutput};
 use aptos_types::{
-    executable::{Executable, ModulePath},
+    executable::ModulePath,
     state_store::TStateView,
     transaction::BlockExecutableTransaction as Transaction,
     vm::{deserialization::WithDeserializerConfig, modules::OnChainUnverifiedModule},
 };
 use move_binary_format::errors::PartialVMResult;
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
-    LatestView<'a, T, S, X, E>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, E: WithDeserializerConfig>
+    LatestView<'a, T, S, E>
 {
     pub(crate) fn get_onchain_module_impl(
         &self,
@@ -37,7 +37,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDese
 
                 let modules = state.versioned_map.modules();
                 match modules.fetch_module(key, self.txn_idx) {
-                    Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
                     Ok(Module(v)) => Ok(Some(v)),
                     Err(Dependency(_)) => {
                         // Return anything (e.g. module does not exist) to avoid waiting,
