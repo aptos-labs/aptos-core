@@ -12,7 +12,7 @@ use aptos_types::{
     executable::Executable,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
-    vm::deserialization::Deserializer,
+    vm::deserialization::WithDeserializerConfig,
     write_set::TransactionWrite,
 };
 use bytes::Bytes;
@@ -31,7 +31,7 @@ pub(crate) struct TemporaryValueToIdentifierMapping<
     T: Transaction,
     S: TStateView<Key = T::Key>,
     X: Executable,
-    E: Deserializer,
+    E: WithDeserializerConfig,
 > {
     latest_view: &'a LatestView<'a, T, S, X, E>,
     txn_idx: TxnIndex,
@@ -40,7 +40,7 @@ pub(crate) struct TemporaryValueToIdentifierMapping<
     delayed_field_ids: RefCell<HashSet<T::Identifier>>,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
     TemporaryValueToIdentifierMapping<'a, T, S, X, E>
 {
     pub fn new(latest_view: &'a LatestView<'a, T, S, X, E>, txn_idx: TxnIndex) -> Self {
@@ -63,7 +63,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserial
 // For aggregators V2, values are replaced with identifiers at deserialization time,
 // and are replaced back when the value is serialized. The "lifted" values are cached
 // by the `LatestView` in the aggregators multi-version data structure.
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
     ValueToIdentifierMapping for TemporaryValueToIdentifierMapping<'a, T, S, X, E>
 {
     type Identifier = T::Identifier;
