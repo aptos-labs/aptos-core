@@ -649,12 +649,12 @@ pub fn setup_environment_and_start_node(
     let (
         network_runtimes,
         consensus_network_interfaces,
+        consensus_observer_network_interfaces,
         dkg_network_interfaces,
         jwk_consensus_network_interfaces,
         mempool_network_interfaces,
         peer_monitoring_service_network_interfaces,
         storage_service_network_interfaces,
-        consensus_observer_network_interfaces,
     ) = network::setup_networks_and_get_interfaces(
         &node_config,
         chain_id,
