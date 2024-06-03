@@ -1,25 +1,35 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use arbitrary::Arbitrary;
 use std::collections::HashMap;
 
-// #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-// pub struct Identifier {
-//     pub name: String,
-// }
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Identifier(pub String);
 
-pub type Identifier = String;
-pub type Scope = Option<String>;
+impl Identifier {
+    pub fn to_scope(&self) -> Scope {
+        Scope(Some(self.0.clone()))
+    }
+}
+
+// pub type Scope = Option<String>;
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Scope(pub Option<String>);
+
+pub const ROOT_SCOPE: Scope = Scope(None);
 
 pub fn merge_scopes(parent: &Scope, child: &Scope) -> Scope {
-    match (parent, child) {
+    Scope(match (&parent.0, &child.0) {
         (Some(p), Some(c)) => Some(format!("{}::{}", p, c)),
         (Some(p), None) => Some(p.clone()),
         (None, Some(c)) => Some(c.clone()),
         (None, None) => None,
-    }
+    })
 }
 
 pub fn is_in_scope(child: &Scope, parent: &Scope) -> bool {
-    match (child, parent) {
+    match (&child.0, &parent.0) {
         (Some(c), Some(p)) => c == p || c.starts_with(&format!("{}::", p)),
         (Some(_), None) => true,
         (None, Some(_)) => false,
@@ -71,10 +81,11 @@ impl IdentifierPool {
     pub fn next_identifier(&mut self, typ: IdentifierType, scope: &Scope) -> (Identifier, Scope) {
         let cnt = self.identifier_count(&typ);
         let name = self.construct_name(&typ, cnt);
-        self.insert_new_identifier(&typ, name.clone());
-        self.scopes.insert(name.clone(), scope.clone());
-        let scope = merge_scopes(scope, &Some(name.clone()));
-        (name, scope)
+        self.insert_new_identifier(&typ, Identifier(name.clone()));
+        self.scopes.insert(Identifier(name.clone()), scope.clone());
+        let child_scope = Scope(Some(name.clone()));
+        let scope = merge_scopes(scope, &child_scope);
+        (Identifier(name), scope)
     }
 
     pub fn get_parent_scope_of(&self, id: &Identifier) -> Option<Scope> {
@@ -83,13 +94,16 @@ impl IdentifierPool {
 
     pub fn get_scope_for_children(&self, id: &Identifier) -> Scope {
         match self.scopes.get(id) {
-            Some(scope) => merge_scopes(scope, &Some(id.clone())),
-            None => Some(id.clone()),
+            Some(scope) => merge_scopes(scope, &id.to_scope()),
+            None => id.to_scope(),
         }
     }
 
     pub fn flatten_access(&self, id: &Identifier) -> Option<Identifier> {
-        self.get_scope_for_children(id)
+        match self.get_scope_for_children(id) {
+            Scope(Some(scope)) => Some(Identifier(scope)),
+            Scope(None) => None,
+        }
     }
 
     pub fn filter_identifier_in_scope(
@@ -99,7 +113,7 @@ impl IdentifierPool {
     ) -> Vec<Identifier> {
         let mut in_scope = Vec::new();
         for id in identifiers {
-            let id_scope = self.scopes.get(id).unwrap_or(&None);
+            let id_scope = self.scopes.get(id).unwrap_or(&ROOT_SCOPE);
             if is_in_scope(id_scope, parent_scope) {
                 in_scope.push(id.clone());
             }

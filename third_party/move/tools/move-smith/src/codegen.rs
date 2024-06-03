@@ -25,7 +25,7 @@ fn append_code_lines_with_indentation(
 
 impl CodeGenerator for Identifier {
     fn emit_code_lines(&self) -> Vec<String> {
-        vec![self.clone()]
+        vec![self.0.clone()]
     }
 }
 
@@ -53,7 +53,7 @@ impl CodeGenerator for Script {
                 return_type: None,
             },
             visibility: Visibility { public: false },
-            name: "main".to_string(),
+            name: Identifier("main".to_string()),
             body: Some(FunctionBody {
                 stmts: self
                     .main
