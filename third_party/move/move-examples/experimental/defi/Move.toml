@@ -1,10 +1,10 @@
 [package]
-name = "RoundingError"
+name = "DeFi"
 version = "0.0.0"
 
 [addresses]
 std = "0x1"
-NamedAddr = "0xCAFE"
+defi = "0xDEF1"
 
 [dependencies]
 MoveStdlib = { local = "../../../move-stdlib" }
