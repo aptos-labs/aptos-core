@@ -59,7 +59,6 @@ token are:
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/string_utils.md#0x1_string_utils">0x1::string_utils</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 <b>use</b> <a href="collection.md#0x4_collection">0x4::collection</a>;
 <b>use</b> <a href="royalty.md#0x4_royalty">0x4::royalty</a>;
@@ -96,7 +95,7 @@ Represents the common fields to all tokens.
 </dt>
 <dd>
  Deprecated in favor of <code>index</code> inside TokenIdentifiers.
- Will be populated until concurrent_token_v2_enabled feature flag is enabled.
+ Was populated until concurrent_token_v2_enabled feature flag was enabled.
 
  Unique identifier within the collection, optional, 0 means unassigned
 </dd>
@@ -111,7 +110,7 @@ Represents the common fields to all tokens.
 </dt>
 <dd>
  Deprecated in favor of <code>name</code> inside TokenIdentifiers.
- Will be populated until concurrent_token_v2_enabled feature flag is enabled.
+ Was populated until concurrent_token_v2_enabled feature flag was enabled.
 
  The name of the token, which should be unique within the collection; the length of name
  should be smaller than 128, characters, eg: "Aptos Animal #1234"
@@ -139,7 +138,7 @@ Represents the common fields to all tokens.
 ## Resource `TokenIdentifiers`
 
 Represents first addition to the common fields for all tokens
-Starts being populated once aggregator_v2_api_enabled is enabled.
+Started being populated once aggregator_v2_api_enabled was enabled.
 
 
 <pre><code>#[resource_group_member(#[group = <a href="../../aptos-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
@@ -556,65 +555,26 @@ The token name is over the maximum length
 
     <b>let</b> object_signer = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
 
-    // TODO[agg_v2](cleanup) once this flag is enabled, cleanup <a href="../../aptos-framework/doc/code.md#0x1_code">code</a> for aggregator_api_enabled = <b>false</b>.
-    // Flag which controls whether <a href="../../aptos-framework/../aptos-stdlib/doc/any.md#0x1_any">any</a> functions from <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2">aggregator_v2</a> <b>module</b> can be called.
-    <b>let</b> aggregator_api_enabled = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_aggregator_v2_api_enabled">features::aggregator_v2_api_enabled</a>();
-    // Flag which controls whether we are going <b>to</b> still <b>continue</b> writing <b>to</b> deprecated fields.
-    <b>let</b> concurrent_token_v2_enabled = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_token_v2_enabled">features::concurrent_token_v2_enabled</a>();
+    <b>let</b> index = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_with_default">option::destroy_with_default</a>(
+        <a href="collection.md#0x4_collection_increment_supply">collection::increment_supply</a>(&<a href="collection.md#0x4_collection">collection</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&object_signer)),
+        <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>&lt;u64&gt;(0)
+    );
 
-    <b>let</b> (deprecated_index, deprecated_name) = <b>if</b> (aggregator_api_enabled) {
-        <b>let</b> index = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_with_default">option::destroy_with_default</a>(
-            <a href="collection.md#0x4_collection_increment_concurrent_supply">collection::increment_concurrent_supply</a>(&<a href="collection.md#0x4_collection">collection</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&object_signer)),
-            <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>&lt;u64&gt;(0)
-        );
-
-        // If create_numbered_token called us, add index <b>to</b> the name.
-        <b>let</b> name = <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&name_with_index_suffix)) {
-            <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_derive_string_concat">aggregator_v2::derive_string_concat</a>(name_prefix, &index, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> name_with_index_suffix))
-        } <b>else</b> {
-            <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_derived_string">aggregator_v2::create_derived_string</a>(name_prefix)
-        };
-
-        // Until concurrent_token_v2_enabled is enabled, we still need <b>to</b> write <b>to</b> deprecated fields.
-        // Otherwise we put empty values there.
-        // (we need <b>to</b> do these calls before creating token_concurrent, <b>to</b> avoid copying objects)
-        <b>let</b> deprecated_index = <b>if</b> (concurrent_token_v2_enabled) {
-            0
-        } <b>else</b> {
-            <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&index)
-        };
-        <b>let</b> deprecated_name = <b>if</b> (concurrent_token_v2_enabled) {
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"")
-        } <b>else</b> {
-            <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_derived_string">aggregator_v2::read_derived_string</a>(&name)
-        };
-
-        // If aggregator_api_enabled, we always populate newly added fields
-        <b>let</b> token_concurrent = <a href="token.md#0x4_token_TokenIdentifiers">TokenIdentifiers</a> {
-            index,
-            name,
-        };
-        <b>move_to</b>(&object_signer, token_concurrent);
-
-        (deprecated_index, deprecated_name)
+    // If create_numbered_token called us, add index <b>to</b> the name.
+    <b>let</b> name = <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&name_with_index_suffix)) {
+        <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_derive_string_concat">aggregator_v2::derive_string_concat</a>(name_prefix, &index, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> name_with_index_suffix))
     } <b>else</b> {
-        // If aggregator_api_enabled is disabled, we cannot <b>use</b> increment_concurrent_supply or
-        // create <a href="token.md#0x4_token_TokenIdentifiers">TokenIdentifiers</a>, so we fallback <b>to</b> the <b>old</b> behavior.
-        <b>let</b> id = <a href="collection.md#0x4_collection_increment_supply">collection::increment_supply</a>(&<a href="collection.md#0x4_collection">collection</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&object_signer));
-        <b>let</b> index = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_get_with_default">option::get_with_default</a>(&<b>mut</b> id, 0);
-
-        // If create_numbered_token called us, add index <b>to</b> the name.
-        <b>let</b> name = <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&name_with_index_suffix)) {
-            <b>let</b> name = name_prefix;
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_append">string::append</a>(&<b>mut</b> name, to_string&lt;u64&gt;(&index));
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_append">string::append</a>(&<b>mut</b> name, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> name_with_index_suffix));
-            name
-        } <b>else</b> {
-            name_prefix
-        };
-
-        (index, name)
+        <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_derived_string">aggregator_v2::create_derived_string</a>(name_prefix)
     };
+
+    <b>let</b> deprecated_index = 0;
+    <b>let</b> deprecated_name = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"");
+
+    <b>let</b> token_concurrent = <a href="token.md#0x4_token_TokenIdentifiers">TokenIdentifiers</a> {
+        index,
+        name,
+    };
+    <b>move_to</b>(&object_signer, token_concurrent);
 
     <b>let</b> <a href="token.md#0x4_token">token</a> = <a href="token.md#0x4_token_Token">Token</a> {
         <a href="collection.md#0x4_collection">collection</a>,
@@ -734,8 +694,8 @@ for additional specialization.
 Creates a new token object with a unique address and returns the ConstructorRef
 for additional specialization.
 The name is created by concatenating the (name_prefix, index, name_suffix).
-After flag concurrent_token_v2_enabled is enabled, this function will allow
-creating tokens in parallel, from the same collection, while providing sequential names.
+This function allows creating tokens in parallel, from the same collection,
+while providing sequential names.
 
 This takes in the collection object instead of the collection name.
 This function must be called if the collection name has been previously changed.
@@ -785,8 +745,8 @@ This function must be called if the collection name has been previously changed.
 Creates a new token object with a unique address and returns the ConstructorRef
 for additional specialization.
 The name is created by concatenating the (name_prefix, index, name_suffix).
-After flag concurrent_token_v2_enabled is enabled, this function will allow
-creating tokens in parallel, from the same collection, while providing sequential names.
+This function will allow creating tokens in parallel, from the same collection,
+while providing sequential names.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create_numbered_token">create_numbered_token</a>(creator: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, collection_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, description: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name_with_index_prefix: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name_with_index_suffix: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;, uri: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>

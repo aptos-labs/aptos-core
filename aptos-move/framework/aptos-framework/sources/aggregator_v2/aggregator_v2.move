@@ -207,30 +207,6 @@ module aptos_framework::aggregator_v2 {
         assert!(read_derived_string(&derived) == std::string::utf8(b"before42after"), 0);
     }
 
-    // Tests commented out, as flag used in rust cannot be disabled.
-
-    // #[test(fx = @std)]
-    // #[expected_failure(abort_code = 0x030006, location = Self)]
-    // fun test_snapshot_feature_not_enabled(fx: &signer) {
-    //     use std::features;
-    //     use aptos_framework::reconfiguration;
-    //     let feature = features::get_aggregator_v2_api_feature();
-    //     features::change_feature_flags(fx, vector[], vector[feature]);
-    //     reconfiguration::reconfigure_for_test();
-    //     create_snapshot(42);
-    // }
-
-    // #[test(fx = @std)]
-    // #[expected_failure(abort_code = 0x030006, location = Self)]
-    // fun test_aggregator_feature_not_enabled(fx: &signer) {
-    //     use std::features;
-    //     use aptos_framework::reconfiguration;
-    //     let feature = features::get_aggregator_v2_api_feature();
-    //     features::change_feature_flags(fx, vector[], vector[feature]);
-    //     reconfiguration::reconfigure_for_test();
-    //     create_aggregator(42);
-    // }
-
     #[test]
     #[expected_failure(abort_code = 0x030007, location = Self)]
     fun test_aggregator_invalid_type1() {
