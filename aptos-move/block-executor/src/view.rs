@@ -44,7 +44,7 @@ use aptos_types::{
         StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
-    vm::{deserialization::Deserializer, modules::OnChainUnverifiedModule},
+    vm::{deserialization::WithDeserializerConfig, modules::OnChainUnverifiedModule},
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
@@ -950,7 +950,7 @@ pub(crate) struct LatestView<
     T: Transaction,
     S: TStateView<Key = T::Key>,
     X: Executable,
-    E: Deserializer,
+    E: WithDeserializerConfig,
 > {
     base_view: &'a S,
     #[allow(dead_code)]
@@ -959,7 +959,7 @@ pub(crate) struct LatestView<
     pub(crate) txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
     LatestView<'a, T, S, X, E>
 {
     pub(crate) fn new(
@@ -1384,8 +1384,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserial
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer> TResourceView
-    for LatestView<'a, T, S, X, E>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
+    TResourceView for LatestView<'a, T, S, X, E>
 {
     type Key = T::Key;
     type Layout = MoveTypeLayout;
@@ -1429,7 +1429,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserial
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
     TResourceGroupView for LatestView<'a, T, S, X, E>
 {
     type GroupKey = T::Key;
@@ -1522,8 +1522,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserial
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer> TModuleView
-    for LatestView<'a, T, S, X, E>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
+    TModuleView for LatestView<'a, T, S, X, E>
 {
     type Key = T::Key;
 
@@ -1535,7 +1535,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserial
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
     StateStorageView for LatestView<'a, T, S, X, E>
 {
     fn id(&self) -> StateViewId {
@@ -1547,7 +1547,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserial
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
     TAggregatorV1View for LatestView<'a, T, S, X, E>
 {
     type Identifier = T::Key;
@@ -1565,7 +1565,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserial
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
     TDelayedFieldView for LatestView<'a, T, S, X, E>
 {
     type Identifier = T::Identifier;

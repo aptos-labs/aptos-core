@@ -8,7 +8,7 @@ use aptos_mvhashmap::types::ValueWithLayout;
 use aptos_types::{
     contract_event::TransactionEvent, delayed_fields::PanicError, executable::Executable,
     state_store::TStateView, transaction::BlockExecutableTransaction as Transaction,
-    vm::deserialization::Deserializer, write_set::TransactionWrite,
+    vm::deserialization::WithDeserializerConfig, write_set::TransactionWrite,
 };
 use aptos_vm_logging::{alert, prelude::*};
 use bytes::Bytes;
@@ -166,7 +166,7 @@ pub(crate) fn map_id_to_values_in_group_writes<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
-    E: Deserializer,
+    E: WithDeserializerConfig,
 >(
     finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>,
     latest_view: &LatestView<T, S, X, E>,
@@ -195,7 +195,7 @@ pub(crate) fn map_id_to_values_in_write_set<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
-    E: Deserializer,
+    E: WithDeserializerConfig,
 >(
     resource_write_set: Vec<(T::Key, Arc<T::Value>, Arc<MoveTypeLayout>)>,
     latest_view: &LatestView<T, S, X, E>,
@@ -216,7 +216,7 @@ pub(crate) fn map_id_to_values_events<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
-    E: Deserializer,
+    E: WithDeserializerConfig,
 >(
     events: Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>>,
     latest_view: &LatestView<T, S, X, E>,
@@ -250,7 +250,7 @@ fn replace_ids_with_values<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
-    E: Deserializer,
+    E: WithDeserializerConfig,
 >(
     value: &Arc<T::Value>,
     layout: &MoveTypeLayout,
