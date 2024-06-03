@@ -72,8 +72,9 @@ pub enum ProofQueueCommand {
     // Proof manager sends this command to add the proofs to the proof queue
     // We send back (remaining_txns, remaining_proofs) to the proof manager
     AddProofs(Vec<ProofOfStore>, oneshot::Sender<(u64, u64)>),
-    // Batch coordinator sends this command to add the received batches to the proof queue
-    // AddBatches(Vec<BatchInfo>),
+    // Batch coordinator sends this command to add the received batches to the proof queue.
+    // For each transaction, the proof queue stores the list of batches containing the transaction.
+    AddBatches(Vec<(BatchInfo, Vec<(PeerId, u64)>)>),
     // Proof manager sends this command to pull proofs from the proof queue to
     // include in the block proposal.
     PullProofs {
@@ -95,6 +96,9 @@ pub struct ProofQueue {
     author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
     // ProofOfStore and insertion_time. None if committed
     batch_to_proof: HashMap<BatchKey, Option<(ProofOfStore, Instant)>>,
+    // Map of txn_summary = (sender, sequence number) to all the batches that contain
+    // the transaction. This helps in counting the number of unique transactions in the pipeline.
+    txn_summary_to_batches: HashMap<(PeerId, u64), HashSet<BatchKey>>,
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
@@ -110,6 +114,7 @@ impl ProofQueue {
             my_peer_id,
             author_to_batches: HashMap::new(),
             batch_to_proof: HashMap::new(),
+            txn_summary_to_batches: HashMap::new(),
             expirations: TimeExpirations::new(),
             latest_block_timestamp: 0,
             remaining_txns: 0,
@@ -345,14 +350,18 @@ impl ProofQueue {
                         if let Err(e) = response_sender.send(self.remaining_txns_and_proofs()) {
                             error!("Failed to send response to MarkCommitted: {:?}", e);
                         }
-                    }, // ProofQueueCommand::AddBatches(batches) => {
-                       //     for batch in batches {
-                       //         let batch_key = BatchKey::from_info(&batch);
-                       //         if self.batch_to_proof.get(&batch_key).is_none() {
-                       //             self.inc_remaining(&batch.author(), batch.num_txns());
-                       //         }
-                       //     }
-                       // }
+                    },
+                    ProofQueueCommand::AddBatches(batch_summaries) => {
+                        for (batch_info, txn_summaries) in batch_summaries {
+                            let batch_key = BatchKey::from_info(&batch_info);
+                            for txn_summary in txn_summaries {
+                                self.txn_summary_to_batches
+                                    .entry(txn_summary)
+                                    .or_default()
+                                    .insert(batch_key.clone());
+                            }
+                        }
+                    },
                 }
             }
         }

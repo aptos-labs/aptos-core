@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::proof_queue::ProofQueueCommand;
 use crate::{
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
@@ -19,8 +20,6 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
-
-use super::proof_queue::ProofQueueCommand;
 
 #[derive(Debug)]
 pub enum BatchCoordinatorCommand {
@@ -139,7 +138,10 @@ impl BatchCoordinator {
         }
 
         let mut persist_requests = vec![];
-        let batches_summary = batches.iter().map(|batch| (batch.batch_info(), batch.summary())).collect();
+        let batches_summary = batches
+            .iter()
+            .map(|batch| (batch.batch_info().clone(), batch.summary()))
+            .collect();
         for batch in batches.into_iter() {
             // TODO: maybe don't message batch generator if the persist is unsuccessful?
             if let Err(e) = self
@@ -151,6 +153,10 @@ impl BatchCoordinator {
             }
             persist_requests.push(batch.into());
         }
+        self.sender_to_proof_queue
+            .send(ProofQueueCommand::AddBatches(batches_summary))
+            .await
+            .expect("Failed to send NewBatches to ProofQueue");
         counters::RECEIVED_BATCH_COUNT.inc_by(persist_requests.len() as u64);
         if author != self.my_peer_id {
             counters::RECEIVED_REMOTE_BATCH_COUNT.inc_by(persist_requests.len() as u64);
