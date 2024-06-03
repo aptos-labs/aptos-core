@@ -99,6 +99,8 @@ pub struct ProofQueue {
     // Map of txn_summary = (sender, sequence number) to all the batches that contain
     // the transaction. This helps in counting the number of unique transactions in the pipeline.
     txn_summary_to_batches: HashMap<(PeerId, u64), HashSet<BatchKey>>,
+    // List of batches for which we received txn summaries from the batch coordinator
+    batches_with_txn_summary: HashSet<BatchKey>,
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
@@ -115,6 +117,7 @@ impl ProofQueue {
             author_to_batches: HashMap::new(),
             batch_to_proof: HashMap::new(),
             txn_summary_to_batches: HashMap::new(),
+            batches_with_txn_summary: HashSet::new(),
             expirations: TimeExpirations::new(),
             latest_block_timestamp: 0,
             remaining_txns: 0,
@@ -144,15 +147,43 @@ impl ProofQueue {
         }
     }
 
-    pub(crate) fn push(&mut self, proof: ProofOfStore) {
+    fn remaining_txns(&self) -> u64 {
+        // All the bath keys for which batch_to_proof is not None
+        let batch_keys = self
+            .batch_to_proof
+            .iter()
+            .filter_map(|(batch_key, proof)| proof.as_ref().map(|_| batch_key))
+            .collect::<HashSet<_>>();
+        let mut remaining_txns = self
+            .txn_summary_to_batches
+            .iter()
+            .filter(|(_, batches)| batches.iter().any(|batch_key| batch_keys.contains(batch_key)))
+            .count() as u64;
+        // If a batch_key is not in batches_with_txn_summary, then add the number of txns in the batch to remaining_txns
+        remaining_txns += self
+            .batch_to_proof
+            .iter()
+            .filter_map(|(batch_key, proof)| {
+                if proof.is_some() && !self.batches_with_txn_summary.contains(batch_key) {
+                    Some(proof.as_ref().unwrap().0.num_txns())
+                } else {
+                    None
+                }
+            })
+            .sum::<u64>();
+        remaining_txns
+    }
+
+    /// Add the ProofOfStore to proof queue. Return true if the proof is added successfully.
+    fn push(&mut self, proof: ProofOfStore) -> bool {
         if proof.expiration() < self.latest_block_timestamp {
             counters::inc_rejected_pos_count(counters::POS_EXPIRED_LABEL);
-            return;
+            return false;
         }
         let batch_key = BatchKey::from_info(proof.info());
         if self.batch_to_proof.get(&batch_key).is_some() {
             counters::inc_rejected_pos_count(counters::POS_DUPLICATE_LABEL);
-            return;
+            return false;
         }
 
         let author = proof.author();
@@ -174,6 +205,7 @@ impl ProofQueue {
         }
 
         self.inc_remaining(&author, num_txns);
+        return true;
     }
 
     // gets excluded and iterates over the vector returning non excluded or expired entries.
@@ -181,7 +213,7 @@ impl ProofQueue {
     // The flag in the second return argument is true iff the entire proof queue is fully utilized
     // when pulling the proofs. If any proof from proof queue cannot be included due to size limits,
     // this flag is set false.
-    pub(crate) fn pull_proofs(
+    fn pull_proofs(
         &mut self,
         excluded_batches: &HashSet<BatchInfo>,
         max_txns: u64,
@@ -256,7 +288,7 @@ impl ProofQueue {
         }
     }
 
-    pub(crate) fn handle_updated_block_timestamp(&mut self, block_timestamp: u64) {
+    fn handle_updated_block_timestamp(&mut self, block_timestamp: u64) {
         assert!(
             self.latest_block_timestamp <= block_timestamp,
             "Decreasing block timestamp"
@@ -300,7 +332,7 @@ impl ProofQueue {
     }
 
     // Mark in the hashmap committed PoS, but keep them until they expire
-    pub(crate) fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
+    fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
         for batch in batches {
             let batch_key = BatchKey::from_info(&batch);
             if let Some(Some((proof, insertion_time))) = self.batch_to_proof.get(&batch_key) {
