@@ -37,7 +37,6 @@ fn metadata_validation_error(msg: &str) -> VMError {
 pub(crate) fn validate_module_events(
     session: &mut SessionExt,
     modules: &[CompiledModule],
-    deserializer_config: &DeserializerConfig,
 ) -> VMResult<()> {
     for module in modules {
         let mut new_event_structs =
@@ -51,7 +50,7 @@ pub(crate) fn validate_module_events(
         validate_emit_calls(&new_event_structs, module)?;
 
         let original_event_structs =
-            extract_event_metadata_from_module(session, &module.self_id(), deserializer_config)?;
+            extract_event_metadata_from_module(session, &module.self_id())?;
 
         for member in original_event_structs {
             // Fail if we see a removal of an event attribute.
@@ -121,7 +120,6 @@ pub(crate) fn validate_emit_calls(
 pub(crate) fn extract_event_metadata_from_module(
     session: &mut SessionExt,
     module_id: &ModuleId,
-    _deserializer_config: &DeserializerConfig,
 ) -> VMResult<HashSet<String>> {
     let metadata = session
         .load_module(module_id)

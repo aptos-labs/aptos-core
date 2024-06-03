@@ -1524,13 +1524,8 @@ impl AptosVM {
             modules,
             self.features()
                 .is_enabled(FeatureFlag::SAFER_RESOURCE_GROUPS),
-            self.deserializer_config(),
         )?;
-        verifier::event_validation::validate_module_events(
-            session,
-            modules,
-            self.deserializer_config(),
-        )?;
+        verifier::event_validation::validate_module_events(session, modules)?;
 
         if !expected_modules.is_empty() {
             return Err(Self::metadata_validation_error(
