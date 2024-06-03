@@ -20,7 +20,7 @@ use crate::{
     utils,
     utils::{OutputFallbackHandler, PENDING_DATA_LOG_FREQ_SECS},
 };
-use aptos_config::config::{ObserverConfig, RoleType, StateSyncDriverConfig};
+use aptos_config::config::{ConsensusObserverConfig, RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
 };
@@ -54,7 +54,7 @@ pub struct DriverConfiguration {
     pub config: StateSyncDriverConfig,
 
     // The config for consensus observer
-    pub consensus_observer_config: ObserverConfig,
+    pub consensus_observer_config: ConsensusObserverConfig,
 
     // The role of the node
     pub role: RoleType,
@@ -66,7 +66,7 @@ pub struct DriverConfiguration {
 impl DriverConfiguration {
     pub fn new(
         config: StateSyncDriverConfig,
-        consensus_observer_config: ObserverConfig,
+        consensus_observer_config: ConsensusObserverConfig,
         role: RoleType,
         waypoint: Waypoint,
     ) -> Self {

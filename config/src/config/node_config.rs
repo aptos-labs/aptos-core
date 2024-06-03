@@ -4,9 +4,9 @@
 use super::{DagConsensusConfig, IndexerTableInfoConfig};
 use crate::{
     config::{
-        dkg_config::DKGConfig, jwk_consensus_config::JWKConsensusConfig,
-        netbench_config::NetbenchConfig, node_config_loader::NodeConfigLoader,
-        node_startup_config::NodeStartupConfig, observer_config::ObserverConfig,
+        consensus_observer_config::ConsensusObserverConfig, dkg_config::DKGConfig,
+        jwk_consensus_config::JWKConsensusConfig, netbench_config::NetbenchConfig,
+        node_config_loader::NodeConfigLoader, node_startup_config::NodeStartupConfig,
         persistable_config::PersistableConfig, utils::RootPath, AdminServiceConfig, ApiConfig,
         BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
         InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
@@ -42,7 +42,7 @@ pub struct NodeConfig {
     #[serde(default)]
     pub consensus: ConsensusConfig,
     #[serde(default)]
-    pub consensus_observer: ObserverConfig,
+    pub consensus_observer: ConsensusObserverConfig,
     #[serde(default)]
     pub dag_consensus: DagConsensusConfig,
     #[serde(default)]
