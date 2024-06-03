@@ -2483,7 +2483,7 @@ fn pfn_const_tps(
                 config.execution.concurrency_level = 58;
             }
         }))
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 10000 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 8000 }))
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
