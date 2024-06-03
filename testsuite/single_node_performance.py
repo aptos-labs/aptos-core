@@ -58,7 +58,7 @@ class RunGroupConfig:
     waived: bool = field(default=False)
 
 
-SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
+SELECTED_FLOW = Flow[os.environ.get("FLOW", default="AGG_V2")]
 IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
 
 DEFAULT_NUM_INIT_ACCOUNTS = (
@@ -119,7 +119,11 @@ TESTS = [
     RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
     RunGroupConfig(expected_tps=12070, key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
-    RunGroupConfig(expected_tps=19320, key=RunGroupKey("modify-global-milestone-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=19320, key=RunGroupKey("modify-global-milestone10-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=19320, key=RunGroupKey("modify-global-milestone100-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=19320, key=RunGroupKey("modify-global-milestone1000-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=19320, key=RunGroupKey("modify-global-milestone10000-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=19320, key=RunGroupKey("modify-global-milestone100000000-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
 
     RunGroupConfig(expected_tps=3530, key=RunGroupKey("resource-groups-global-write-tag1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
