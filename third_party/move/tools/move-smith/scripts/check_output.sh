@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Usage: check_output.sh [NUM_PROG]
+#
+# This script runs the static generator to generate NUM_PROG Move packages
+# and checks if they can compile with compiler V1.
+# The generated packages are stored under `output`.
+
 NUM_PROG=${1:-10}
 PARENT_DIR=$(realpath $(dirname $0)/..)
 OUTPUT_DIR="$PARENT_DIR/output"
