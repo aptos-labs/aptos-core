@@ -2,23 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use arbitrary::Unstructured;
-use move_smith::{ast::*, codegen::*, move_smith::*, types::*, utils::*};
+use move_smith::{ast::*, codegen::*, move_smith::*, names::Identifier, types::*, utils::*};
 use num_bigint::BigUint;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 fn simple_module() -> Module {
     Module {
-        name: String::from("SimpleModule"),
+        name: Identifier(String::from("SimpleModule")),
         functions: vec![Function {
             signature: FunctionSignature {
                 parameters: vec![
-                    (String::from("param1"), Type::U64),
-                    (String::from("param2"), Type::U8),
+                    (Identifier(String::from("param1")), Type::U64),
+                    (Identifier(String::from("param2")), Type::U8),
                 ],
                 return_type: Some(Type::U32),
             },
             visibility: Visibility { public: true },
-            name: String::from("fun1"),
+            name: Identifier(String::from("fun1")),
             body: Some(FunctionBody {
                 stmts: vec![Statement::Expr(Expression::NumberLiteral(NumberLiteral {
                     value: BigUint::from(42u32),
@@ -37,7 +37,7 @@ fn simple_module() -> Module {
 fn simple_script() -> Script {
     Script {
         main: vec![FunctionCall {
-            name: String::from("0xCAFE::SimpleModule::fun1"),
+            name: Identifier(String::from("0xCAFE::SimpleModule::fun1")),
             args: vec![
                 Expression::NumberLiteral(NumberLiteral {
                     value: BigUint::from(555u64),

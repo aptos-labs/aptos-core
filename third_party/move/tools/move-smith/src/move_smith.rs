@@ -4,7 +4,7 @@
 use crate::{
     ast::*,
     config::Config,
-    names::{is_in_scope, Identifier, IdentifierPool, IdentifierType, Scope},
+    names::{is_in_scope, Identifier, IdentifierPool, IdentifierType, Scope, ROOT_SCOPE},
     types::{Type, TypePool},
 };
 use arbitrary::{Arbitrary, Result, Unstructured};
@@ -81,7 +81,7 @@ impl MoveSmith {
 
         for _ in 0..u.int_in_range(1..=self.config.max_num_calls_in_script)? {
             let func = u.choose(&all_funcs)?;
-            let mut call = self.generate_call_to_function(u, &None, func, false)?;
+            let mut call = self.generate_call_to_function(u, &ROOT_SCOPE, func, false)?;
             call.name = self.id_pool.flatten_access(&call.name).unwrap();
             script.main.push(call);
         }
@@ -93,7 +93,7 @@ impl MoveSmith {
     pub fn generate_module_skeleton(&mut self, u: &mut Unstructured) -> Result<Module> {
         let (name, scope) = self
             .id_pool
-            .next_identifier(IdentifierType::Module, &Some("0xCAFE".to_string()));
+            .next_identifier(IdentifierType::Module, &Scope(Some("0xCAFE".to_string())));
 
         // Struct names
         let mut structs = Vec::new();
@@ -162,7 +162,7 @@ impl MoveSmith {
         for _ in 0..u.int_in_range(0..=self.config.max_num_fields_in_struct)? {
             let (name, _) = self
                 .id_pool
-                .next_identifier(IdentifierType::Var, &Some(st.name.clone()));
+                .next_identifier(IdentifierType::Var, &st.name.to_scope());
 
             let typ = loop {
                 match u.int_in_range(0..=2)? {
