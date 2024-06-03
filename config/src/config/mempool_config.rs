@@ -46,6 +46,8 @@ pub struct MempoolConfig {
     pub shared_mempool_peer_update_interval_ms: u64,
     /// Interval to update peer priorities in shared mempool (seconds).
     pub shared_mempool_priority_update_interval_secs: u64,
+    /// The amount of time to wait after transaction insertion to broadcast to a failover peer.
+    pub shared_mempool_failover_delay_ms: u64,
     /// Number of seconds until the transaction will be removed from the Mempool ignoring if the transaction has expired.
     ///
     /// This ensures that the Mempool isn't just full of non-expiring transactions that are way off into the future.
@@ -79,6 +81,7 @@ impl Default for MempoolConfig {
             enable_intelligent_peer_prioritization: true,
             shared_mempool_peer_update_interval_ms: 1_000,
             shared_mempool_priority_update_interval_secs: 600, // 10 minutes (frequent reprioritization is expensive)
+            shared_mempool_failover_delay_ms: 200,
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
             broadcast_buckets: DEFAULT_BUCKETS.to_vec(),

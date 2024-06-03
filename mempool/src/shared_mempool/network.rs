@@ -412,9 +412,12 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                     // Fresh broadcast
                     let before = match peer_priority {
                         BroadcastPeerPriority::Primary => None,
-                        BroadcastPeerPriority::Failover => {
-                            Some(Instant::now() - Duration::from_millis(200))
-                        },
+                        BroadcastPeerPriority::Failover => Some(
+                            Instant::now()
+                                - Duration::from_millis(
+                                    self.mempool_config.shared_mempool_failover_delay_ms,
+                                ),
+                        ),
                     };
                     let (txns, new_timeline_id) = mempool.read_timeline(
                         &state.timeline_id,
