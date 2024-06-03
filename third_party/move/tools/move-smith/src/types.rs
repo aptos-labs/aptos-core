@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::names::Identifier;
 use arbitrary::{Result, Unstructured};
 use std::collections::HashMap;
