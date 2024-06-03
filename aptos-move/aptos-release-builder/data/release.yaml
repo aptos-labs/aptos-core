@@ -22,3 +22,5 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
+      - DefaultGasWithOverride:
+          feature_version: 18
