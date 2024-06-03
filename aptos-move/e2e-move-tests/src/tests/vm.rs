@@ -3,11 +3,9 @@
 
 use crate::MoveHarness;
 use aptos_cached_packages::aptos_stdlib::aptos_account_transfer;
-use aptos_types::{
-    state_store::state_key::StateKey, transaction::ExecutionStatus, write_set::WriteOp,
-};
+use aptos_types::transaction::ExecutionStatus;
 use aptos_vm::AptosVM;
-use claims::{assert_ok_eq, assert_some};
+use claims::assert_ok_eq;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 use test_case::test_case;
 

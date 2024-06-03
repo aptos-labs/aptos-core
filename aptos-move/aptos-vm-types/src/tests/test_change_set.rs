@@ -403,7 +403,7 @@ fn test_roundtrip_to_storage_change_set() {
     let storage_change_set_before = StorageChangeSet::new(write_set, vec![]);
     let change_set = assert_ok!(
         VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
-            &aptos_prod_deserializer_config(&Features::default(), 0),
+            &aptos_prod_deserializer_config(&Features::default()),
             storage_change_set_before.clone(),
             &MockChangeSetChecker,
         )

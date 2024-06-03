@@ -84,7 +84,7 @@ impl MoveVM {
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,
-            data_cache: TransactionDataCache::new(
+            data_cache: TransactionDataCache::empty(
                 self.runtime.loader().deserializer_config.clone(),
                 remote,
             ),
@@ -102,7 +102,7 @@ impl MoveVM {
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,
-            data_cache: TransactionDataCache::new(
+            data_cache: TransactionDataCache::empty(
                 self.runtime.loader().deserializer_config.clone(),
                 remote,
             ),
@@ -121,7 +121,7 @@ impl MoveVM {
             .loader()
             .load_module(
                 module_id,
-                &mut TransactionDataCache::new(
+                &mut TransactionDataCache::empty(
                     self.runtime.loader().deserializer_config.clone(),
                     remote,
                 ),

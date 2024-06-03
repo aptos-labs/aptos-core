@@ -12,7 +12,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
-    vm::deserialization::Deserializer,
+    vm::{deserialization::Deserializer, modules::OnChainUnverifiedModule},
     write_set::WriteOp,
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};

@@ -81,6 +81,7 @@ use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
+    deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
     CompiledModule,
 };
@@ -1888,7 +1889,7 @@ impl AptosVM {
                 // it requires restarting execution afterwards,
                 // which allows it to be used as last transaction in delayed_field_enabled context.
                 let change = VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
-                    &aptos_prod_deserializer_config(self.move_vm.features(), self.gas_feature_version),
+                    self.deserializer_config(),
                     change_set.clone(),
                     &change_set_configs,
                 )

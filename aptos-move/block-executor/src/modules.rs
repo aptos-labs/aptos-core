@@ -7,7 +7,7 @@ use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::TStateView,
     transaction::BlockExecutableTransaction as Transaction,
-    vm::modules::OnChainUnverifiedModule,
+    vm::{deserialization::Deserializer, modules::OnChainUnverifiedModule},
 };
 use move_binary_format::{
     deserializer::DeserializerConfig,
@@ -15,7 +15,9 @@ use move_binary_format::{
     file_format_common::{LEGACY_IDENTIFIER_SIZE_MAX, VERSION_MAX},
 };
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer>
+    LatestView<'a, T, S, X, E>
+{
     pub(crate) fn get_onchain_module_impl(
         &self,
         key: &T::Key,

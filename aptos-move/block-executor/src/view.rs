@@ -44,8 +44,7 @@ use aptos_types::{
         StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
-    vm::deserialization::Deserializer,
-    vm::modules::OnChainUnverifiedModule,
+    vm::{deserialization::Deserializer, modules::OnChainUnverifiedModule},
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};

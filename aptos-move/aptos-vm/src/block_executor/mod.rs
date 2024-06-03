@@ -28,7 +28,10 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput, TransactionStatus,
     },
-    vm::environment::{AptosEnvironment, Environment},
+    vm::{
+        environment::{AptosEnvironment, Environment},
+        modules::OnChainUnverifiedModule,
+    },
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
