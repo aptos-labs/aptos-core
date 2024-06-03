@@ -3,6 +3,7 @@
 
 use aptos_aggregator::resolver::{TAggregatorV1View, TDelayedFieldView};
 use aptos_types::{
+    on_chain_config::{Features, OnChainConfig},
     serde_helper::bcs_utils::size_u32_as_uleb128,
     state_store::{
         errors::StateviewError,
@@ -11,15 +12,11 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
-    vm::modules::OnChainUnverifiedModule,
+    vm::{configs::aptos_prod_deserializer_config, modules::OnChainUnverifiedModule},
     write_set::WriteOp,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    deserializer::DeserializerConfig,
-    errors::{PartialVMError, PartialVMResult},
-    file_format_common::{LEGACY_IDENTIFIER_SIZE_MAX, VERSION_MAX},
-};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, HashMap};
@@ -273,15 +270,13 @@ where
             ))
         })?;
 
-        // FIXME(George): This function should also fetch deserializer config!
-        //  Use default for now.
-        let dummy_deserializer_config =
-            DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX);
+        let features = Features::fetch_config(self).unwrap_or_default();
+        let deserializer_config = aptos_prod_deserializer_config(&features);
 
         Ok(match maybe_state_value {
             Some(state_value) => Some(OnChainUnverifiedModule::from_state_value(
                 state_value,
-                &dummy_deserializer_config,
+                &deserializer_config,
             )?),
             None => None,
         })

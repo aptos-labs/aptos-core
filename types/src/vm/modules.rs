@@ -126,6 +126,10 @@ impl ModuleWriteOp {
 
 /// A representation of an entry in code cache, which stores information about
 /// the module such as its size in bytes or its hash.
+/// TODO: This representation is not stable and will evolve, in particular
+///   - modules will become verified,
+///   - hashes most likely disappear,
+///   - ...
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct OnChainUnverifiedModule {
     pub module: Arc<CompiledModule>,
