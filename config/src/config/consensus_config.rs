@@ -182,66 +182,66 @@ impl Default for ConsensusConfig {
             // in the pipline very low, we can keep this limit pretty low, too.
             vote_back_pressure_limit: 7,
             pipeline_backpressure: vec![
+                // PipelineBackpressureValues {
+                //     // pipeline_latency looks how long has the oldest block still in pipeline
+                //     // been in the pipeline.
+                //     // Block enters the pipeline after consensus orders it, and leaves the
+                //     // pipeline once quorum on execution result among validators has been reached
+                //     // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
+                //     back_pressure_pipeline_latency_limit_ms: 800,
+                //     max_sending_block_txns_override: MAX_SENDING_BLOCK_TXNS,
+                //     max_sending_block_bytes_override: 5 * 1024 * 1024,
+                //     backpressure_proposal_delay_ms: 100,
+                //     max_txns_from_block_to_execute: None,
+                // },
+                // PipelineBackpressureValues {
+                //     back_pressure_pipeline_latency_limit_ms: 1100,
+                //     max_sending_block_txns_override: MAX_SENDING_BLOCK_TXNS,
+                //     max_sending_block_bytes_override: 5 * 1024 * 1024,
+                //     backpressure_proposal_delay_ms: 200,
+                //     max_txns_from_block_to_execute: None,
+                // },
                 PipelineBackpressureValues {
-                    // pipeline_latency looks how long has the oldest block still in pipeline
-                    // been in the pipeline.
-                    // Block enters the pipeline after consensus orders it, and leaves the
-                    // pipeline once quorum on execution result among validators has been reached
-                    // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
-                    back_pressure_pipeline_latency_limit_ms: 800,
+                    back_pressure_pipeline_latency_limit_ms: 1400,
                     max_sending_block_txns_override: MAX_SENDING_BLOCK_TXNS,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 100,
                     max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1100,
+                    back_pressure_pipeline_latency_limit_ms: 1700,
                     max_sending_block_txns_override: MAX_SENDING_BLOCK_TXNS,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 200,
                     max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1400,
-                    max_sending_block_txns_override: 2000,
+                    back_pressure_pipeline_latency_limit_ms: 2000,
+                    max_sending_block_txns_override: 5000,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 300,
                     max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1700,
-                    max_sending_block_txns_override: 1000,
+                    back_pressure_pipeline_latency_limit_ms: 2300,
+                    max_sending_block_txns_override: 5000,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backpressure_proposal_delay_ms: 400,
+                    backpressure_proposal_delay_ms: 500,
                     max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2000,
-                    max_sending_block_txns_override: 1000,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: Some(400),
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2300,
-                    max_sending_block_txns_override: 1000,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: Some(150),
-                },
-                PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2700,
-                    max_sending_block_txns_override: 1000,
+                    max_sending_block_txns_override: 3000,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: Some(50),
+                    max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 3100,
                     max_sending_block_txns_override: 1000,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: Some(20),
+                    max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 3500,
@@ -252,7 +252,7 @@ impl Default for ConsensusConfig {
                     // meaning that most aggressively we limit to ~10 TPS
                     // For transactions that are more expensive than that, we should
                     // instead rely on max gas per block to limit latency.
-                    max_txns_from_block_to_execute: Some(5),
+                    max_txns_from_block_to_execute: None,
                 },
             ],
             window_for_chain_health: 100,
