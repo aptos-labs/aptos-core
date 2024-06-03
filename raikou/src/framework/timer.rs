@@ -1,8 +1,4 @@
-use std::collections::BTreeMap;
-use std::future::Future;
-use std::task;
-use std::time::Duration;
-
+use std::{collections::BTreeMap, future::Future, task, time::Duration};
 use tokio::time::{sleep_until, Instant};
 
 pub trait TimerService: Send + Sync {

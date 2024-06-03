@@ -1,18 +1,20 @@
-use std::cmp::{max, max_by, max_by_key, Ordering};
-use std::collections::{BTreeSet, HashSet};
-use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
-use std::time::Duration;
-
+use crate::{
+    framework::{NodeId, Protocol},
+    leader_schedule::LeaderSchedule,
+    metrics,
+    metrics::Sender,
+    protocol, Slot,
+};
 use bitvec::vec::BitVec;
 use defaultmap::DefaultBTreeMap;
-use tokio::sync::mpsc;
-use tokio::time::Instant;
-
-use crate::framework::{NodeId, Protocol};
-use crate::leader_schedule::LeaderSchedule;
-use crate::metrics::Sender;
-use crate::{metrics, protocol, Slot};
+use std::{
+    cmp::{max, max_by, max_by_key, Ordering},
+    collections::{BTreeSet, HashSet},
+    fmt::{Debug, Formatter},
+    sync::Arc,
+    time::Duration,
+};
+use tokio::{sync::mpsc, time::Instant};
 
 pub type Round = i64; // Round number.
 

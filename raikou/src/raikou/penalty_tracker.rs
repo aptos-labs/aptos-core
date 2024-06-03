@@ -1,13 +1,19 @@
-use crate::framework::NodeId;
-use crate::raikou::types::{BatchSN, Round};
-use crate::raikou::{Batch, BatchRef, Block, Config};
+use crate::{
+    framework::NodeId,
+    raikou::{
+        types::{BatchSN, Round},
+        Batch, BatchRef, Block, Config,
+    },
+};
 use bitvec::prelude::BitVec;
 use defaultmap::DefaultBTreeMap;
 use itertools::Itertools;
 use log::warn;
-use std::cmp::{max, min};
-use std::collections::{BTreeMap, BTreeSet};
-use std::time::Duration;
+use std::{
+    cmp::{max, min},
+    collections::{BTreeMap, BTreeSet},
+    time::Duration,
+};
 use tokio::time::Instant;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -15,7 +21,6 @@ use tokio::time::Instant;
 pub enum PenaltyTrackerReportEntry {
     // TODO: it should be probably compressed to a single i8 or i16 or f32.
     //       We don't need a lot of precision here.
-
     /// `Advantage(x)` means that the sender of the report had all the optimistically proposed
     /// batches issued by the node `x` time units before the sender of the report received
     /// the block from the leader.

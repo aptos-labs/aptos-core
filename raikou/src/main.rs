@@ -1,20 +1,16 @@
-use std::collections::BTreeMap;
-use std::iter;
-use std::sync::Arc;
-use std::time::Duration;
-
-use rand::seq::SliceRandom;
-use rand::{thread_rng, Rng};
-use tokio::sync::mpsc;
-use tokio::time::Instant;
-use tokio::{spawn, time};
-
-use crate::delays::{heterogeneous_symmetric_delay, spacial_delay_2d, DelayFunction};
-use crate::framework::network::{InjectedLocalNetwork, Network, NetworkInjection};
-use crate::framework::timer::InjectedTimerService;
-use crate::framework::{NodeId, Protocol};
-use crate::leader_schedule::round_robin;
-use crate::multichain::{Config, MultiChainBft};
+use crate::{
+    delays::{heterogeneous_symmetric_delay, spacial_delay_2d, DelayFunction},
+    framework::{
+        network::{InjectedLocalNetwork, Network, NetworkInjection},
+        timer::InjectedTimerService,
+        NodeId, Protocol,
+    },
+    leader_schedule::round_robin,
+    multichain::{Config, MultiChainBft},
+};
+use rand::{seq::SliceRandom, thread_rng, Rng};
+use std::{collections::BTreeMap, iter, sync::Arc, time::Duration};
+use tokio::{spawn, sync::mpsc, time, time::Instant};
 
 pub mod delays;
 pub mod framework;
@@ -22,8 +18,8 @@ pub mod jolteon;
 pub mod jolteon_fast_qs;
 pub mod leader_schedule;
 pub mod metrics;
-pub mod raikou;
 pub mod multichain;
+pub mod raikou;
 pub mod utils;
 
 type Slot = i64;

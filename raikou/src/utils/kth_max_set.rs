@@ -40,13 +40,13 @@ where
         match self.kth_max() {
             Some(kth_max) if value < *kth_max => {
                 self.rest.insert(value);
-            }
+            },
             _ => {
                 self.max_k.insert(value);
                 if self.max_k.len() > self.k {
                     self.rest.insert(self.max_k.pop_last().unwrap());
                 }
-            }
+            },
         }
     }
 }

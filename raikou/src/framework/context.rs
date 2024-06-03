@@ -1,9 +1,5 @@
-use crate::framework::network::NetworkService;
-use crate::framework::timer::TimerService;
-use crate::framework::NodeId;
-use std::future::Future;
-use std::marker::PhantomData;
-use std::time::Duration;
+use crate::framework::{network::NetworkService, timer::TimerService, NodeId};
+use std::{future::Future, marker::PhantomData, time::Duration};
 use tokio::select;
 
 pub enum Event<M, TE> {
@@ -171,7 +167,9 @@ where
     }
 
     async fn unicast(&self, message: Self::Message, target: NodeId) {
-        self.inner.unicast((self.wrap_message)(message), target).await;
+        self.inner
+            .unicast((self.wrap_message)(message), target)
+            .await;
     }
 
     async fn multicast(&self, message: Self::Message) {
@@ -179,7 +177,8 @@ where
     }
 
     fn set_timer(&mut self, duration: Duration, event: Self::TimerEvent) {
-        self.inner.set_timer(duration, (self.wrap_timer_event)(event));
+        self.inner
+            .set_timer(duration, (self.wrap_timer_event)(event));
     }
 
     fn halt(&mut self) {

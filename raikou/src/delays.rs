@@ -1,13 +1,12 @@
-use crate::framework::NodeId;
-use crate::multichain;
-use rand::rngs::SmallRng;
-use rand::{thread_rng, Rng, SeedableRng};
-use std::cmp::{max, min};
-use std::collections::{BTreeMap, BTreeSet};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use std::sync::Arc;
+use crate::{framework::NodeId, multichain};
+use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use rand_distr::Distribution;
+use std::{
+    cmp::{max, min},
+    collections::{hash_map::DefaultHasher, BTreeMap, BTreeSet},
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 
 pub trait DelayFunction<M>: Fn(NodeId, NodeId, &M) -> f64 + Clone + Send + Sync + 'static {}
 

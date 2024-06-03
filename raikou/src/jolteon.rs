@@ -1,12 +1,15 @@
-use crate::framework::{NodeId, Protocol};
-use crate::leader_schedule::LeaderSchedule;
-use crate::protocol;
+use crate::{
+    framework::{NodeId, Protocol},
+    leader_schedule::LeaderSchedule,
+    protocol,
+};
 use defaultmap::DefaultBTreeMap;
-use std::cmp::{max, max_by, max_by_key, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::mpsc;
-use tokio::time::Instant;
+use std::{
+    cmp::{max, max_by, max_by_key, Ordering},
+    sync::Arc,
+    time::Duration,
+};
+use tokio::{sync::mpsc, time::Instant};
 
 pub type Round = i64; // Round number.
 

@@ -1,6 +1,4 @@
-use std::cmp::min;
-use std::sync::Arc;
-use std::{cmp, ops};
+use std::{cmp, cmp::min, ops, sync::Arc};
 use tokio::sync::{Mutex, OwnedMutexGuard};
 
 /// Allows async concurrent *unordered* metric recording.

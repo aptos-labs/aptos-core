@@ -1,21 +1,26 @@
-use std::cmp::{max, max_by, max_by_key, min, Ordering};
-use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
-use std::time::Duration;
-
+use crate::{
+    framework::{ContextFor, NodeId, Protocol},
+    leader_schedule::LeaderSchedule,
+    metrics,
+    metrics::Sender,
+    protocol,
+    raikou::{
+        penalty_tracker::{PenaltyTracker, PenaltyTrackerReportEntry},
+        types::*,
+    },
+    utils::kth_max_set::KthMaxSet,
+};
 use bitvec::vec::BitVec;
 use defaultmap::DefaultBTreeMap;
 use itertools::Itertools;
+use std::{
+    cmp::{max, max_by, max_by_key, min, Ordering},
+    collections::{BTreeMap, BTreeSet},
+    fmt::{Debug, Formatter},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::time::Instant;
-
-use crate::framework::{ContextFor, NodeId, Protocol};
-use crate::leader_schedule::LeaderSchedule;
-use crate::metrics::Sender;
-use crate::raikou::penalty_tracker::{PenaltyTracker, PenaltyTrackerReportEntry};
-use crate::raikou::types::*;
-use crate::{metrics, protocol};
-use crate::utils::kth_max_set::KthMaxSet;
 
 #[derive(Clone)]
 pub struct Batch {
@@ -56,7 +61,7 @@ pub struct Block {
     pub round: Round,
     pub acs: Vec<AC>,
     pub batches: Vec<BatchRef>,
-    pub parent_qc: Option<QC>,  // `None` only for the genesis block.
+    pub parent_qc: Option<QC>, // `None` only for the genesis block.
     pub reason: RoundEnterReason,
 }
 
@@ -92,16 +97,16 @@ impl Block {
         };
 
         match &self.reason {
-            RoundEnterReason::Genesis => false,  // Should not be used in a non-genesis block.
+            RoundEnterReason::Genesis => false, // Should not be used in a non-genesis block.
             RoundEnterReason::FullPrefixQC => {
                 parent_qc.round == self.round - 1 && parent_qc.prefix == parent_qc.n_opt_batches
             },
             RoundEnterReason::CC(cc) => {
-               cc.round == self.round - 1 && parent_qc.sub_block_id() >= cc.highest_qc_id()
-            }
+                cc.round == self.round - 1 && parent_qc.sub_block_id() >= cc.highest_qc_id()
+            },
             RoundEnterReason::TC(tc) => {
                 tc.round == self.round - 1 && parent_qc.sub_block_id() >= tc.highest_qc_id()
-            }
+            },
         }
     }
 }
@@ -369,11 +374,11 @@ pub struct RaikouNode<S> {
     batch_stored_votes: DefaultBTreeMap<BatchSN, BitVec>,
 
     // Protocol state for the pseudocode
-    r_ready: Round,  // The highest round the node is ready to enter.
-    enter_reason: RoundEnterReason,  // The justification for entering the round r_read.
-    r_allowed: Round,  // The highest round the node is allowed to enter.
-    r_cur: Round,  // The current round the node is in.
-    r_timeout: Round,  // The highest round the node has voted to time out.
+    r_ready: Round,                 // The highest round the node is ready to enter.
+    enter_reason: RoundEnterReason, // The justification for entering the round r_read.
+    r_allowed: Round,               // The highest round the node is allowed to enter.
+    r_cur: Round,                   // The current round the node is in.
+    r_timeout: Round,               // The highest round the node has voted to time out.
     last_qc_vote: SubBlockId,
     last_commit_vote: SubBlockId,
     qc_high: QC,
@@ -470,7 +475,8 @@ impl<S: LeaderSchedule> RaikouNode<S> {
         if new_qc.prefix == new_qc.n_opt_batches {
             // If form or receive a qc for the largest possible prefix of a round,
             // advance to the next round after that.
-            self.advance_r_ready(new_qc.round + 1, RoundEnterReason::FullPrefixQC, ctx).await;
+            self.advance_r_ready(new_qc.round + 1, RoundEnterReason::FullPrefixQC, ctx)
+                .await;
         }
     }
 
@@ -490,7 +496,8 @@ impl<S: LeaderSchedule> RaikouNode<S> {
             ctx.unicast(
                 Message::AdvanceRound(round, self.qc_high.clone(), reason),
                 self.config.leader(round),
-            ).await;
+            )
+            .await;
         }
     }
 

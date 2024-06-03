@@ -1,14 +1,13 @@
-use std::cmp::max;
-use std::sync::Arc;
-use std::time::Duration;
-
+use crate::{
+    framework::{ContextFor, NodeId, Protocol},
+    leader_schedule::LeaderSchedule,
+    metrics,
+    metrics::Sender,
+    protocol, Slot,
+};
 use defaultmap::DefaultBTreeMap;
+use std::{cmp::max, sync::Arc, time::Duration};
 use tokio::time::Instant;
-
-use crate::framework::{ContextFor, NodeId, Protocol};
-use crate::leader_schedule::LeaderSchedule;
-use crate::metrics::Sender;
-use crate::{metrics, protocol, Slot};
 
 type BatchDepth = Slot;
 type ChainId = usize;

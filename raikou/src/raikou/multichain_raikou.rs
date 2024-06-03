@@ -1,17 +1,15 @@
-use std::cmp::max;
-use std::sync::Arc;
-use std::time::Duration;
-
+use crate::{
+    framework::{context::WrappedContext, ContextFor, NodeId, Protocol},
+    leader_schedule::LeaderSchedule,
+    metrics,
+    metrics::Sender,
+    protocol, raikou,
+    raikou::{types::Txn, RaikouNode},
+    Slot,
+};
 use defaultmap::DefaultBTreeMap;
+use std::{cmp::max, sync::Arc, time::Duration};
 use tokio::time::Instant;
-
-use crate::framework::{ContextFor, NodeId, Protocol};
-use crate::leader_schedule::LeaderSchedule;
-use crate::metrics::Sender;
-use crate::{metrics, protocol, raikou, Slot};
-use crate::framework::context::WrappedContext;
-use crate::raikou::RaikouNode;
-use crate::raikou::types::Txn;
 
 type ChainId = usize;
 
@@ -79,7 +77,7 @@ pub struct MultiChainRaikou<S> {
     fixed_timer_elapsed: DefaultBTreeMap<Slot, bool>,
     adaptive_timer_elapsed: DefaultBTreeMap<Slot, bool>,
     slot_enter_time: DefaultBTreeMap<Slot, Instant>,
-    
+
     committed_prefix_of_slots: Slot,
 }
 
@@ -92,15 +90,17 @@ impl<S: LeaderSchedule> MultiChainRaikou<S> {
         metrics: Metrics,
     ) -> Self {
         let chains = (1..=config.n_chains())
-            .map(|_| RaikouNode::new(
-                node_id,
-                config.raikou_config.clone(),
-                start_time,
-                detailed_logging,
-                raikou::Metrics {
-                    batch_commit_time: None,
-                },
-            ))
+            .map(|_| {
+                RaikouNode::new(
+                    node_id,
+                    config.raikou_config.clone(),
+                    start_time,
+                    detailed_logging,
+                    raikou::Metrics {
+                        batch_commit_time: None,
+                    },
+                )
+            })
             .collect();
 
         MultiChainRaikou {

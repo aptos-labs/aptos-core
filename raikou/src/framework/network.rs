@@ -1,10 +1,7 @@
 use crate::framework::NodeId;
 use futures::poll;
-use rand::distributions::Distribution;
-use rand::Rng;
-use std::future::Future;
-use std::task::Poll::Ready;
-use std::time::Duration;
+use rand::{distributions::Distribution, Rng};
+use std::{future::Future, task::Poll::Ready, time::Duration};
 use tokio::sync::mpsc;
 
 pub trait NetworkService: Send + Sync + 'static {

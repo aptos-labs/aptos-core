@@ -1,5 +1,4 @@
-use crate::framework::NodeId;
-use crate::Slot;
+use crate::{framework::NodeId, Slot};
 
 pub trait LeaderSchedule: Fn(Slot) -> NodeId + Clone + Send + Sync + 'static {}
 
