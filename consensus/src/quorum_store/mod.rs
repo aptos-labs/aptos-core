@@ -12,6 +12,7 @@ pub(crate) mod batch_store;
 pub(crate) mod network_listener;
 pub(crate) mod proof_coordinator;
 pub(crate) mod proof_manager;
+pub(crate) mod proof_queue;
 pub(crate) mod quorum_store_builder;
 pub(crate) mod quorum_store_coordinator;
 pub mod quorum_store_db;

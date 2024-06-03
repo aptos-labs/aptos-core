@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{
-    proof_manager::ProofManager, tests::batch_store_test::batch_store_for_test,
+    proof_manager::ProofManager, proof_queue::ProofQueue,
+    tests::batch_store_test::batch_store_for_test,
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
@@ -12,11 +13,14 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_types::{aggregate_signature::AggregateSignature, PeerId};
 use futures::channel::oneshot;
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
-fn create_proof_manager() -> ProofManager {
+async fn create_proof_manager() -> ProofManager {
+    let (proof_cmd_tx, proof_cmd_rx) = tokio::sync::mpsc::channel(100);
+    let proof_queue = ProofQueue::new(PeerId::random());
+    tokio::spawn(proof_queue.start(proof_cmd_rx));
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(PeerId::random(), 10, 10, batch_store, true)
+    ProofManager::new(10, 10, batch_store, true, Arc::new(proof_cmd_tx))
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {
@@ -62,7 +66,7 @@ async fn get_proposal(
         PayloadFilter::InQuorumStore(filter_set),
         callback_tx,
     );
-    proof_manager.handle_proposal_request(req);
+    proof_manager.handle_proposal_request(req).await;
     let GetPayloadResponse::GetPayloadResponse(payload) = callback_rx.await.unwrap().unwrap();
     payload
 }
@@ -113,20 +117,20 @@ async fn get_proposal_and_assert(
 
 #[tokio::test]
 async fn test_block_request() {
-    let mut proof_manager = create_proof_manager();
+    let mut proof_manager = create_proof_manager().await;
 
     let proof = create_proof(PeerId::random(), 10, 1);
-    proof_manager.receive_proofs(vec![proof.clone()]);
+    proof_manager.receive_proofs(vec![proof.clone()]).await;
 
     get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof]).await;
 }
 
 #[tokio::test]
 async fn test_max_txns_from_block_to_execute() {
-    let mut proof_manager = create_proof_manager();
+    let mut proof_manager = create_proof_manager().await;
 
     let proof = create_proof(PeerId::random(), 10, 1);
-    proof_manager.receive_proofs(vec![proof.clone()]);
+    proof_manager.receive_proofs(vec![proof.clone()]).await;
 
     let payload = get_proposal(&mut proof_manager, 100, &[]).await;
     // convert payload to v2 format and assert
@@ -140,45 +144,53 @@ async fn test_max_txns_from_block_to_execute() {
 
 #[tokio::test]
 async fn test_block_timestamp_expiration() {
-    let mut proof_manager = create_proof_manager();
+    let mut proof_manager = create_proof_manager().await;
 
     let proof = create_proof(PeerId::random(), 10, 1);
-    proof_manager.receive_proofs(vec![proof.clone()]);
+    proof_manager.receive_proofs(vec![proof.clone()]).await;
 
-    proof_manager.handle_commit_notification(1, vec![]);
+    proof_manager.handle_commit_notification(1, vec![]).await;
     get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof]).await;
 
-    proof_manager.handle_commit_notification(20, vec![]);
+    proof_manager.handle_commit_notification(20, vec![]).await;
     get_proposal_and_assert(&mut proof_manager, 100, &[], &[]).await;
 }
 
 #[tokio::test]
 async fn test_batch_commit() {
-    let mut proof_manager = create_proof_manager();
+    let mut proof_manager = create_proof_manager().await;
 
     let proof0 = create_proof(PeerId::random(), 10, 1);
-    proof_manager.receive_proofs(vec![proof0.clone()]);
+    proof_manager.receive_proofs(vec![proof0.clone()]).await;
 
     let proof1 = create_proof(PeerId::random(), 11, 2);
-    proof_manager.receive_proofs(vec![proof1.clone()]);
+    proof_manager.receive_proofs(vec![proof1.clone()]).await;
 
-    proof_manager.handle_commit_notification(1, vec![proof1.info().clone()]);
+    proof_manager
+        .handle_commit_notification(1, vec![proof1.info().clone()])
+        .await;
     get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof0]).await;
 }
 
 #[tokio::test]
 async fn test_proposal_priority() {
-    let mut proof_manager = create_proof_manager();
+    let mut proof_manager = create_proof_manager().await;
     let peer0 = PeerId::random();
 
     let peer0_proof0 = create_proof_with_gas(peer0, 10, 2, 1000);
     let peer0_proof1 = create_proof_with_gas(peer0, 10, 1, 0);
-    proof_manager.receive_proofs(vec![peer0_proof1.clone(), peer0_proof0.clone()]);
+    proof_manager
+        .receive_proofs(vec![peer0_proof1.clone(), peer0_proof0.clone()])
+        .await;
 
     let peer0_proof2 = create_proof_with_gas(peer0, 10, 4, 500);
-    proof_manager.receive_proofs(vec![peer0_proof2.clone()]);
+    proof_manager
+        .receive_proofs(vec![peer0_proof2.clone()])
+        .await;
     let peer0_proof3 = create_proof_with_gas(peer0, 10, 3, 500);
-    proof_manager.receive_proofs(vec![peer0_proof3.clone()]);
+    proof_manager
+        .receive_proofs(vec![peer0_proof3.clone()])
+        .await;
 
     // Gas bucket is the most significant prioritization
     let expected = vec![peer0_proof0.clone()];
@@ -197,19 +209,21 @@ async fn test_proposal_priority() {
 
 #[tokio::test]
 async fn test_proposal_fairness() {
-    let mut proof_manager = create_proof_manager();
+    let mut proof_manager = create_proof_manager().await;
     let peer0 = PeerId::random();
     let peer1 = PeerId::random();
 
     let mut peer0_proofs = vec![];
     for i in 0..4 {
         let proof = create_proof(peer0, 10 + i, 1 + i);
-        proof_manager.receive_proofs(vec![proof.clone()]);
+        proof_manager.receive_proofs(vec![proof.clone()]).await;
         peer0_proofs.push(proof);
     }
 
     let peer1_proof_0 = create_proof(peer1, 7, 1);
-    proof_manager.receive_proofs(vec![peer1_proof_0.clone()]);
+    proof_manager
+        .receive_proofs(vec![peer1_proof_0.clone()])
+        .await;
 
     // Without filter, and large max size, all proofs are retrieved
     let mut expected = peer0_proofs.clone();
@@ -237,7 +251,7 @@ async fn test_proposal_fairness() {
 
 #[tokio::test]
 async fn test_duplicate_batches_on_commit() {
-    let mut proof_manager = create_proof_manager();
+    let mut proof_manager = create_proof_manager().await;
 
     let author = PeerId::random();
     let digest = HashValue::random();
@@ -247,30 +261,32 @@ async fn test_duplicate_batches_on_commit() {
     let proof1 = ProofOfStore::new(batch.clone(), AggregateSignature::empty());
     let proof2 = ProofOfStore::new(batch.clone(), AggregateSignature::empty());
 
-    proof_manager.receive_proofs(vec![proof0.clone()]);
-    proof_manager.receive_proofs(vec![proof1.clone()]);
+    proof_manager.receive_proofs(vec![proof0.clone()]).await;
+    proof_manager.receive_proofs(vec![proof1.clone()]).await;
 
     // Only one copy of the batch exists
     get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
 
     // Nothing goes wrong on commits
-    proof_manager.handle_commit_notification(4, vec![batch.clone()]);
+    proof_manager
+        .handle_commit_notification(4, vec![batch.clone()])
+        .await;
     get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
 
     // Before expiration, still marked as committed
-    proof_manager.receive_proofs(vec![proof2.clone()]);
+    proof_manager.receive_proofs(vec![proof2.clone()]).await;
     get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
 
     // Nothing goes wrong on expiration
-    proof_manager.handle_commit_notification(5, vec![]);
+    proof_manager.handle_commit_notification(5, vec![]).await;
     get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
-    proof_manager.handle_commit_notification(12, vec![]);
+    proof_manager.handle_commit_notification(12, vec![]).await;
     get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
 }
 
 #[tokio::test]
 async fn test_duplicate_batches_on_expiration() {
-    let mut proof_manager = create_proof_manager();
+    let mut proof_manager = create_proof_manager().await;
 
     let author = PeerId::random();
     let digest = HashValue::random();
@@ -279,15 +295,15 @@ async fn test_duplicate_batches_on_expiration() {
     let proof0 = ProofOfStore::new(batch.clone(), AggregateSignature::empty());
     let proof1 = ProofOfStore::new(batch.clone(), AggregateSignature::empty());
 
-    proof_manager.receive_proofs(vec![proof0.clone()]);
-    proof_manager.receive_proofs(vec![proof1.clone()]);
+    proof_manager.receive_proofs(vec![proof0.clone()]).await;
+    proof_manager.receive_proofs(vec![proof1.clone()]).await;
 
     // Only one copy of the batch exists
     get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
 
     // Nothing goes wrong on expiration
-    proof_manager.handle_commit_notification(5, vec![]);
+    proof_manager.handle_commit_notification(5, vec![]).await;
     get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
-    proof_manager.handle_commit_notification(12, vec![]);
+    proof_manager.handle_commit_notification(12, vec![]).await;
     get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
 }

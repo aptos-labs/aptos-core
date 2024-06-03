@@ -18,6 +18,7 @@ use crate::{
         network_listener::NetworkListener,
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
         proof_manager::{ProofManager, ProofManagerCommand},
+        proof_queue::{ProofQueue, ProofQueueCommand},
         quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
         types::{Batch, BatchResponse},
     },
@@ -136,6 +137,8 @@ pub struct InnerBuilder {
     proof_coordinator_cmd_rx: Option<tokio::sync::mpsc::Receiver<ProofCoordinatorCommand>>,
     proof_manager_cmd_tx: tokio::sync::mpsc::Sender<ProofManagerCommand>,
     proof_manager_cmd_rx: Option<tokio::sync::mpsc::Receiver<ProofManagerCommand>>,
+    proof_queue_cmd_tx: Arc<tokio::sync::mpsc::Sender<ProofQueueCommand>>,
+    proof_queue_cmd_rx: Option<tokio::sync::mpsc::Receiver<ProofQueueCommand>>,
     back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
     back_pressure_rx: Option<tokio::sync::mpsc::Receiver<BackPressure>>,
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
@@ -179,6 +182,7 @@ impl InnerBuilder {
                 config.channel_size,
                 None,
             );
+        let (proof_queue_tx, proof_queue_rx) = tokio::sync::mpsc::channel(config.channel_size);
         let mut remote_batch_coordinator_cmd_tx = Vec::new();
         let mut remote_batch_coordinator_cmd_rx = Vec::new();
         for _ in 0..config.num_workers_for_remote_batches {
@@ -209,6 +213,8 @@ impl InnerBuilder {
             proof_coordinator_cmd_rx: Some(proof_coordinator_cmd_rx),
             proof_manager_cmd_tx,
             proof_manager_cmd_rx: Some(proof_manager_cmd_rx),
+            proof_queue_cmd_tx: Arc::new(proof_queue_tx),
+            proof_queue_cmd_rx: Some(proof_queue_rx),
             back_pressure_tx,
             back_pressure_rx: Some(back_pressure_rx),
             quorum_store_storage,
@@ -312,6 +318,10 @@ impl InnerBuilder {
             )
         );
 
+        let proof_queue = ProofQueue::new(self.author);
+        let proof_queue_cmd_rx = self.proof_queue_cmd_rx.take().unwrap();
+        spawn_named!("proof_queue", proof_queue.start(proof_queue_cmd_rx));
+
         for (i, remote_batch_coordinator_cmd_rx) in
             self.remote_batch_coordinator_cmd_rx.into_iter().enumerate()
         {
@@ -354,7 +364,6 @@ impl InnerBuilder {
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
         let proof_manager = ProofManager::new(
-            self.author,
             self.config.back_pressure.backlog_txn_limit_count,
             self.config
                 .back_pressure
@@ -362,6 +371,7 @@ impl InnerBuilder {
                 * self.num_validators,
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
+            self.proof_queue_cmd_tx.clone(),
         );
         spawn_named!(
             "proof_manager",

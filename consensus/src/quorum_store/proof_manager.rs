@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::batch_store::BatchStore;
+use super::proof_queue::BatchSortKey;
 use crate::{
     monitor,
     quorum_store::{
-        batch_generator::BackPressure,
-        counters,
-        utils::{BatchSortKey, ProofQueue},
+        batch_generator::BackPressure, batch_store::BatchStore, counters,
+        proof_queue::ProofQueueCommand,
     },
 };
 use aptos_consensus_types::{
@@ -18,7 +17,7 @@ use aptos_consensus_types::{
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures::StreamExt;
-use futures_channel::mpsc::Receiver;
+use futures_channel::{mpsc::Receiver, oneshot};
 use rand::{seq::SliceRandom, thread_rng};
 use std::{
     cmp::min,
@@ -129,41 +128,57 @@ impl BatchQueue {
 }
 
 pub struct ProofManager {
-    proofs_for_consensus: ProofQueue,
     batch_queue: BatchQueue,
     back_pressure_total_txn_limit: u64,
     remaining_total_txn_num: u64,
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
     allow_batches_without_pos_in_proposal: bool,
+    proof_queue_tx: Arc<tokio::sync::mpsc::Sender<ProofQueueCommand>>,
 }
 
 impl ProofManager {
     pub fn new(
-        my_peer_id: PeerId,
         back_pressure_total_txn_limit: u64,
         back_pressure_total_proof_limit: u64,
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
+        proof_queue_tx: Arc<tokio::sync::mpsc::Sender<ProofQueueCommand>>,
     ) -> Self {
         Self {
-            proofs_for_consensus: ProofQueue::new(my_peer_id),
             batch_queue: BatchQueue::new(batch_store),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
             allow_batches_without_pos_in_proposal,
+            proof_queue_tx,
         }
     }
 
-    pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore>) {
+    pub(crate) async fn receive_proofs(&mut self, proofs: Vec<ProofOfStore>) {
+        if !proofs.is_empty() {
+            let (response_tx, response_rx) = oneshot::channel();
+            if self
+                .proof_queue_tx
+                .send(ProofQueueCommand::AddProofs(proofs.clone(), response_tx))
+                .await
+                .is_ok()
+            {
+                if let Ok((remaining_total_txn_num, remaining_total_proof_num)) = response_rx.await
+                {
+                    self.remaining_total_txn_num = remaining_total_txn_num;
+                    self.remaining_total_proof_num = remaining_total_proof_num;
+                } else {
+                    warn!("Failed to get response from proof queue after adding proofs");
+                }
+            } else {
+                warn!("Failed to add proofs to proof queue");
+            }
+        }
         for proof in proofs.into_iter() {
             self.batch_queue.remove_batch(proof.info());
-            self.proofs_for_consensus.push(proof);
         }
-        (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-            self.proofs_for_consensus.remaining_txns_and_proofs();
     }
 
     pub(crate) fn receive_batches(&mut self, batches: Vec<BatchInfo>) {
@@ -172,7 +187,7 @@ impl ProofManager {
         }
     }
 
-    pub(crate) fn handle_commit_notification(
+    pub(crate) async fn handle_commit_notification(
         &mut self,
         block_timestamp: u64,
         batches: Vec<BatchInfo>,
@@ -185,14 +200,30 @@ impl ProofManager {
         for batch in &batches {
             self.batch_queue.remove_batch(batch);
         }
-        self.proofs_for_consensus.mark_committed(batches);
-        self.proofs_for_consensus
-            .handle_updated_block_timestamp(block_timestamp);
-        (self.remaining_total_txn_num, self.remaining_total_proof_num) =
-            self.proofs_for_consensus.remaining_txns_and_proofs();
+
+        let (response_tx, response_rx) = oneshot::channel();
+        if self
+            .proof_queue_tx
+            .send(ProofQueueCommand::MarkCommitted(
+                batches,
+                block_timestamp,
+                response_tx,
+            ))
+            .await
+            .is_ok()
+        {
+            if let Ok((remaining_total_txn_num, remaining_total_proof_num)) = response_rx.await {
+                self.remaining_total_txn_num = remaining_total_txn_num;
+                self.remaining_total_proof_num = remaining_total_proof_num;
+            } else {
+                warn!("Failed to get response from proof queue after marking proofs as committed");
+            }
+        } else {
+            warn!("Failed to mark proofs as committed in proof queue");
+        }
     }
 
-    pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
+    pub(crate) async fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
         match msg {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
@@ -211,63 +242,87 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let (proof_block, proof_queue_fully_utilized) = self
-                    .proofs_for_consensus
-                    .pull_proofs(&excluded_batches, max_txns, max_bytes, return_non_full);
+                let (response_tx, response_rx) = oneshot::channel();
+                if self
+                    .proof_queue_tx
+                    .send(ProofQueueCommand::PullProofs {
+                        excluded_batches: excluded_batches.clone(),
+                        max_txns,
+                        max_bytes,
+                        return_non_full,
+                        response_sender: response_tx,
+                    })
+                    .await
+                    .is_ok()
+                {
+                    match response_rx.await {
+                        Ok((proof_block, proof_queue_fully_utilized)) => {
+                            counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE
+                                .observe(self.batch_queue.len() as f64);
+                            counters::PROOF_QUEUE_FULLY_UTILIZED
+                                .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
-                counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE.observe(self.batch_queue.len() as f64);
-                counters::PROOF_QUEUE_FULLY_UTILIZED
-                    .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
+                            let mut inline_block: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
+                            let cur_txns: u64 = proof_block.iter().map(|p| p.num_txns()).sum();
+                            let cur_bytes: u64 = proof_block.iter().map(|p| p.num_bytes()).sum();
 
-                let mut inline_block: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
-                let cur_txns: u64 = proof_block.iter().map(|p| p.num_txns()).sum();
-                let cur_bytes: u64 = proof_block.iter().map(|p| p.num_bytes()).sum();
+                            if self.allow_batches_without_pos_in_proposal
+                                && proof_queue_fully_utilized
+                            {
+                                inline_block = self.batch_queue.pull_batches(
+                                    min(max_txns - cur_txns, max_inline_txns),
+                                    min(max_bytes - cur_bytes, max_inline_bytes),
+                                    excluded_batches
+                                        .iter()
+                                        .cloned()
+                                        .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                                        .collect(),
+                                );
+                            }
+                            let inline_txns = inline_block
+                                .iter()
+                                .map(|(_, txns)| txns.len())
+                                .sum::<usize>();
+                            counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
+                            counters::NUM_INLINE_TXNS.observe(inline_txns as f64);
 
-                if self.allow_batches_without_pos_in_proposal && proof_queue_fully_utilized {
-                    inline_block = self.batch_queue.pull_batches(
-                        min(max_txns - cur_txns, max_inline_txns),
-                        min(max_bytes - cur_bytes, max_inline_bytes),
-                        excluded_batches
-                            .iter()
-                            .cloned()
-                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
-                            .collect(),
-                    );
-                }
-                let inline_txns = inline_block
-                    .iter()
-                    .map(|(_, txns)| txns.len())
-                    .sum::<usize>();
-                counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
-                counters::NUM_INLINE_TXNS.observe(inline_txns as f64);
-
-                let res = GetPayloadResponse::GetPayloadResponse(
-                    if proof_block.is_empty() && inline_block.is_empty() {
-                        Payload::empty(true, self.allow_batches_without_pos_in_proposal)
-                    } else if inline_block.is_empty() {
-                        trace!(
-                            "QS: GetBlockRequest excluded len {}, block len {}",
-                            excluded_batches.len(),
-                            proof_block.len()
-                        );
-                        Payload::InQuorumStore(ProofWithData::new(proof_block))
-                    } else {
-                        trace!(
-                            "QS: GetBlockRequest excluded len {}, block len {}, inline len {}",
-                            excluded_batches.len(),
-                            proof_block.len(),
-                            inline_block.len()
-                        );
-                        Payload::QuorumStoreInlineHybrid(
-                            inline_block,
-                            ProofWithData::new(proof_block),
-                            None,
-                        )
-                    },
-                );
-                match callback.send(Ok(res)) {
-                    Ok(_) => (),
-                    Err(err) => debug!("BlockResponse receiver not available! error {:?}", err),
+                            let res = GetPayloadResponse::GetPayloadResponse(
+                                if proof_block.is_empty() && inline_block.is_empty() {
+                                    Payload::empty(true, self.allow_batches_without_pos_in_proposal)
+                                } else if inline_block.is_empty() {
+                                    trace!(
+                                        "QS: GetBlockRequest excluded len {}, block len {}",
+                                        excluded_batches.len(),
+                                        proof_block.len()
+                                    );
+                                    Payload::InQuorumStore(ProofWithData::new(proof_block))
+                                } else {
+                                    trace!(
+                                        "QS: GetBlockRequest excluded len {}, block len {}, inline len {}",
+                                        excluded_batches.len(),
+                                        proof_block.len(),
+                                        inline_block.len()
+                                    );
+                                    Payload::QuorumStoreInlineHybrid(
+                                        inline_block,
+                                        ProofWithData::new(proof_block),
+                                        None,
+                                    )
+                                },
+                            );
+                            match callback.send(Ok(res)) {
+                                Ok(_) => (),
+                                Err(err) => {
+                                    debug!("BlockResponse receiver not available! error {:?}", err)
+                                },
+                            }
+                        },
+                        Err(e) => {
+                            warn!("Failed to get response from ProofQueue after sending PullProofs command. {:?}", e);
+                        },
+                    }
+                } else {
+                    warn!("Failed to get remaining total num from proof queue");
                 }
             },
         }
@@ -297,7 +352,7 @@ impl ProofManager {
 
             tokio::select! {
                     Some(msg) = proposal_rx.next() => monitor!("proof_manager_handle_proposal", {
-                        self.handle_proposal_request(msg);
+                        self.handle_proposal_request(msg).await;
 
                         let updated_back_pressure = self.qs_back_pressure();
                         if updated_back_pressure != back_pressure {
@@ -317,7 +372,7 @@ impl ProofManager {
                                 break;
                             },
                             ProofManagerCommand::ReceiveProofs(proofs) => {
-                                self.receive_proofs(proofs.take());
+                                self.receive_proofs(proofs.take()).await;
                             },
                             ProofManagerCommand::ReceiveBatches(batches) => {
                                 self.receive_batches(batches);
@@ -326,7 +381,7 @@ impl ProofManager {
                                 self.handle_commit_notification(
                                     block_timestamp,
                                     batches,
-                                );
+                                ).await;
                             },
                         }
                         let updated_back_pressure = self.qs_back_pressure();
