@@ -35,7 +35,11 @@ pub enum TransactionTypeArg {
     ModifyGlobalResourceAggV2,
     ModifyGlobalFlagAggV2,
     ModifyGlobalBoundedAggV2,
-    ModifyGlobalMilestoneAggV2,
+    ModifyGlobalMilestone10AggV2,
+    ModifyGlobalMilestone100AggV2,
+    ModifyGlobalMilestone1000AggV2,
+    ModifyGlobalMilestone10000AggV2,
+    ModifyGlobalMilestone100000000AggV2,
     // Complex EntryPoints
     CreateObjects10,
     CreateObjects10WithPayload10k,
@@ -157,9 +161,37 @@ impl TransactionTypeArg {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
-            TransactionTypeArg::ModifyGlobalMilestoneAggV2 => TransactionType::CallCustomModules {
+            TransactionTypeArg::ModifyGlobalMilestone10AggV2 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::IncGlobalMilestoneAggV2 {
+                    milestone_every: 10,
+                },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ModifyGlobalMilestone100AggV2 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::IncGlobalMilestoneAggV2 {
+                    milestone_every: 100,
+                },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ModifyGlobalMilestone1000AggV2 => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::IncGlobalMilestoneAggV2 {
                     milestone_every: 1000,
+                },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ModifyGlobalMilestone10000AggV2 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::IncGlobalMilestoneAggV2 {
+                    milestone_every: 10000,
+                },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ModifyGlobalMilestone100000000AggV2 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::IncGlobalMilestoneAggV2 {
+                    milestone_every: 100000000,
                 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
