@@ -1,5 +1,17 @@
 #!/bin/bash
 
+# Usage:
+# coverage.sh gen <fuzz_target>
+# coverage.sh clean <fuzz_target>
+# coverage.sh clean all
+#
+# This script runs `cargo cov -- show` to generate the coverage report from a
+# fuzzing session in HTML format.
+# The script should only be run after the fuzzing session has been completed,
+# since it uses `fuzz/corpus/<fuzz_target>` to generate the coverage report.
+# The coverage report is generated under the `coverage` directory.
+# The script can also be used to cleanup the generated coverage files.
+
 function usage() {
     case "$1" in
         "gen")
