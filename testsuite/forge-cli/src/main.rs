@@ -1033,11 +1033,18 @@ fn realistic_env_sweep_wrap(
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
         }))
-        .add_network_test(wrap_with_realistic_env(test))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad { mempool_backlog: 20000 }))
+        // .add_network_test(PFNPerformance::new(
+        //     7,
+        //     add_cpu_chaos,
+        //     add_network_emulation,
+        //     None,
+        // ))
+        // .add_network_test(wrap_with_realistic_env(test))
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
-        .with_emit_job(
-            EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
-        )
+        // .with_emit_job(
+        //     EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
+        // )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
@@ -1054,7 +1061,7 @@ fn realistic_env_sweep_wrap(
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(100, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(100, 2, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
         // workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7500, 10000, 12500]),
