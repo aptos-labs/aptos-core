@@ -2459,7 +2459,7 @@ fn pfn_const_tps(
     const USE_CRAZY_MACHINES: bool = true;
 
     let mut forge_config = ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_initial_fullnode_count(7)
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
@@ -2483,7 +2483,7 @@ fn pfn_const_tps(
                 config.execution.concurrency_level = 58;
             }
         }))
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad { mempool_backlog: 30000 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 10000 }))
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
