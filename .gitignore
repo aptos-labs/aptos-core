@@ -104,7 +104,6 @@ docker/compose/indexer-grpc/data-service-grpc-server.key
 # Typescript
 *.env
 node_modules
-!keyless/circuit-data/**/node_modules
 
 # local /data dir sometimes used for testing
 /data
