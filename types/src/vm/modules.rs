@@ -66,8 +66,6 @@ impl ModuleWriteOp {
             },
         };
 
-        // FIXME(George): This function should also take a deserializer config, which the caller
-        //   must cache and pass here.
         let module = Arc::new(CompiledModule::deserialize_with_config(
             &serialized_module,
             deserializer_config,

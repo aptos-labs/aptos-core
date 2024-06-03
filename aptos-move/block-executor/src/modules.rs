@@ -7,15 +7,11 @@ use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::TStateView,
     transaction::BlockExecutableTransaction as Transaction,
-    vm::{deserialization::Deserializer, modules::OnChainUnverifiedModule},
+    vm::{deserialization::WithDeserializerConfig, modules::OnChainUnverifiedModule},
 };
-use move_binary_format::{
-    deserializer::DeserializerConfig,
-    errors::PartialVMResult,
-    file_format_common::{LEGACY_IDENTIFIER_SIZE_MAX, VERSION_MAX},
-};
+use move_binary_format::errors::PartialVMResult;
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
     LatestView<'a, T, S, X, E>
 {
     pub(crate) fn get_onchain_module_impl(
@@ -82,14 +78,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserial
     ) -> PartialVMResult<Option<OnChainUnverifiedModule>> {
         Ok(match self.get_raw_base_value(key)? {
             Some(state_value) => {
-                // FIXME(George): This function should also take deserializer config.
-                //  Use default for now.
-                let dummy_deserializer_config =
-                    DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX);
-
+                let deserializer_config = self.env.deserializer_config();
                 Some(OnChainUnverifiedModule::from_state_value(
                     state_value,
-                    &dummy_deserializer_config,
+                    deserializer_config,
                 )?)
             },
             None => None,

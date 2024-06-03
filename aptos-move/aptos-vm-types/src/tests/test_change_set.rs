@@ -392,10 +392,15 @@ fn test_roundtrip_to_storage_change_set() {
     let test_module_id = ModuleId::new(AccountAddress::ONE, ident_str!("bar").into());
 
     let resource_key = StateKey::resource(&AccountAddress::ONE, &test_struct_tag).unwrap();
-    let _module_key = StateKey::module_id(&test_module_id);
+    let module_key = StateKey::module_id(&test_module_id);
+
+    let mut module_bytes = vec![];
+    basic_test_module().serialize(&mut module_bytes).unwrap();
+    let write_op = WriteOp::legacy_creation(module_bytes.into());
+
     let write_set = WriteSetMut::new(vec![
         (resource_key, WriteOp::legacy_deletion()),
-        // FIXME(George): add a test for modules which also fails on deletion!
+        (module_key, write_op),
     ])
     .freeze()
     .unwrap();
@@ -410,6 +415,24 @@ fn test_roundtrip_to_storage_change_set() {
     );
     let storage_change_set_after = assert_ok!(change_set.try_into_storage_change_set());
     assert_eq!(storage_change_set_before, storage_change_set_after)
+}
+
+#[test]
+fn test_no_module_deletion_in_storage_change_set() {
+    let test_module_id = ModuleId::new(AccountAddress::ONE, ident_str!("bar").into());
+    let write_ops = vec![(
+        StateKey::module_id(&test_module_id),
+        WriteOp::legacy_deletion(),
+    )];
+    let write_set = WriteSetMut::new(write_ops).freeze().unwrap();
+    let change_set = StorageChangeSet::new(write_set, vec![]);
+    assert_err!(
+        VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
+            &aptos_prod_deserializer_config(&Features::default()),
+            change_set,
+            &MockChangeSetChecker,
+        )
+    );
 }
 
 #[test]

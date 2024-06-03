@@ -953,8 +953,7 @@ pub(crate) struct LatestView<
     E: WithDeserializerConfig,
 > {
     base_view: &'a S,
-    #[allow(dead_code)]
-    env: E,
+    pub(crate) env: E,
     pub(crate) latest_view: ViewState<'a, T, X>,
     pub(crate) txn_idx: TxnIndex,
 }
