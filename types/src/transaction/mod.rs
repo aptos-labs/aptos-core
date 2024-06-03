@@ -922,6 +922,17 @@ impl ExecutionStatus {
         matches!(self, ExecutionStatus::Success)
     }
 
+    // Used by simulation API for showing detail error message. Should not be used by production code.
+    pub fn convert_vm_status_for_simulation(vm_status: VMStatus) -> Self {
+        let mut show_error_flags = Features::default();
+        show_error_flags.disable(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH);
+        let (txn_status, _aux_data) =
+            TransactionStatus::from_vm_status(vm_status, true, &show_error_flags);
+        txn_status.status().unwrap_or_else(|discarded_code| {
+            ExecutionStatus::MiscellaneousError(Some(discarded_code))
+        })
+    }
+
     pub fn remove_error_detail(self) -> Self {
         match self {
             ExecutionStatus::MoveAbort {
