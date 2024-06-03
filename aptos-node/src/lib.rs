@@ -200,6 +200,7 @@ pub struct AptosHandle {
     _admin_service: AdminService,
     _api_runtime: Option<Runtime>,
     _backup_runtime: Option<Runtime>,
+    _consensus_observer_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
     _dkg_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
@@ -637,6 +638,7 @@ pub fn setup_environment_and_start_node(
     let (
         mut event_subscription_service,
         mempool_reconfig_subscription,
+        consensus_observer_reconfig_subscription,
         consensus_reconfig_subscription,
         dkg_subscriptions,
         jwk_consensus_subscriptions,
@@ -652,7 +654,7 @@ pub fn setup_environment_and_start_node(
         mempool_network_interfaces,
         peer_monitoring_service_network_interfaces,
         storage_service_network_interfaces,
-        maybe_observer_network_interfaces,
+        consensus_observer_network_interfaces,
     ) = network::setup_networks_and_get_interfaces(
         &node_config,
         chain_id,
@@ -782,45 +784,54 @@ pub fn setup_environment_and_start_node(
     state_sync_runtimes.block_until_initialized();
     debug!("State sync initialization complete.");
 
-    // Create the consensus runtime (this blocks on state sync first)
-    let consensus_runtime = match consensus_network_interfaces {
-        // validator consensus
+    // Create the consensus and consensus observer runtimes
+    let (consensus_runtime, consensus_observer_runtime) = match consensus_network_interfaces {
         Some(consensus_network_interfaces) => {
-            // Initialize and start consensus
-            let (runtime, consensus_db, quorum_store_db) = services::start_consensus_runtime(
-                &node_config,
-                db_rw,
-                consensus_reconfig_subscription,
-                consensus_network_interfaces,
-                consensus_notifier,
-                consensus_to_mempool_sender,
-                vtxn_pool,
-                maybe_observer_network_interfaces.map(|network| network.network_client),
-            );
+            // Consensus is enabled, start the consensus runtime
+            let consensus_observer_network_client =
+                consensus_observer_network_interfaces.map(|network| network.network_client.clone());
+            let (consensus_runtime, consensus_db, quorum_store_db) =
+                services::start_consensus_runtime(
+                    &node_config,
+                    db_rw,
+                    consensus_reconfig_subscription,
+                    consensus_network_interfaces,
+                    consensus_notifier,
+                    consensus_to_mempool_sender,
+                    vtxn_pool,
+                    consensus_observer_network_client,
+                );
             admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
-            Some(runtime)
+
+            (Some(consensus_runtime), None)
         },
-        // consensus observer
-        None if node_config.consensus_observer.observer_enabled => {
-            let observer_network_interfaces = maybe_observer_network_interfaces.unwrap();
-            let runtime = start_consensus_observer(
-                &node_config,
-                observer_network_interfaces.network_client,
-                observer_network_interfaces.network_service_events,
-                Arc::new(consensus_notifier),
-                consensus_to_mempool_sender,
-                db_rw,
-                consensus_reconfig_subscription.unwrap(),
-            );
-            Some(runtime)
+        None => {
+            if node_config.consensus_observer.observer_enabled {
+                // Consensus observer is enabled, start the consensus observer runtime
+                let consensus_observer_network_interfaces = consensus_observer_network_interfaces
+                    .expect("Consensus observer is enabled, but network interfaces are missing!");
+                let consensus_observer_runtime = start_consensus_observer(
+                    &node_config,
+                    consensus_observer_network_interfaces.network_client,
+                    consensus_observer_network_interfaces.network_service_events,
+                    Arc::new(consensus_notifier),
+                    consensus_to_mempool_sender,
+                    db_rw,
+                    consensus_observer_reconfig_subscription,
+                );
+
+                (None, Some(consensus_observer_runtime))
+            } else {
+                (None, None)
+            }
         },
-        _ => None,
     };
 
     Ok(AptosHandle {
         _admin_service: admin_service,
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
+        _consensus_observer_runtime: consensus_observer_runtime,
         _consensus_runtime: consensus_runtime,
         _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
