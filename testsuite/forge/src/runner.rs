@@ -596,6 +596,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     self.tests.success_criteria.clone(),
                 );
                 let handle = network_ctx.runtime.handle().clone();
+                let _handle_context = handle.enter();
                 let network_ctx = NetworkContextSynchronizer::new(network_ctx, handle);
                 let result = run_test(|| test.run(network_ctx.clone()));
                 // explicitly keep network context in scope so that its created tokio Runtime drops after all the stuff has run.

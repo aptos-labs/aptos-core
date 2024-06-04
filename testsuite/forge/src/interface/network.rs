@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::future::Future;
 use std::sync::Arc;
 use super::Test;
 use crate::{
@@ -11,7 +12,7 @@ use crate::{
 };
 use aptos_transaction_emitter_lib::{EmitJobRequest, TxnStats};
 use std::time::Duration;
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 
 /// The testing interface which defines a test written with full control over an existing network.
 /// Tests written against this interface will have access to both the Root account as well as the
@@ -39,6 +40,18 @@ impl<'t> NetworkContextSynchronizer<'t> {
     pub async fn report_text(&self, text: String) {
         let mut locker = self.ctx.lock().await;
         locker.report.report_text(text);
+    }
+
+    pub fn flex_block_on<F: Future>(&self, future: F) -> F::Output {
+        match Handle::try_current() {
+            Ok(handle) => {
+                // we are in an async context, we don't need block_on
+                handle.block_on(future)
+            }
+            Err(_) => {
+                self.handle.block_on(future)
+            }
+        }
     }
 }
 
@@ -103,5 +116,29 @@ impl<'t> NetworkContext<'t> {
                 start_version,
                 end_version,
             ))
+    }
+
+    pub fn handle(&self) -> Handle {
+        match Handle::try_current() {
+            Ok(handle) => {
+                // we are in an async context, we don't need block_on
+                handle
+            }
+            Err(_) => {
+                self.runtime.handle().clone()
+            }
+        }
+    }
+
+    pub fn flex_block_on<F: Future>(&self, future: F) -> F::Output {
+        match Handle::try_current() {
+            Ok(handle) => {
+                // we are in an async context, we don't need block_on
+                handle.block_on(future)
+            }
+            Err(_) => {
+                self.runtime.block_on(future)
+            }
+        }
     }
 }
