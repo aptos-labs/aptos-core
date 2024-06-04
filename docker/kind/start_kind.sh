@@ -12,8 +12,8 @@ else
   exit
 fi
 
-if uname -a | grep -q Darwin; then
-  echo "MacOS detected, building kind node image for arm64..."
+if [[ $(uname -s) == "Darwin" ]] && [[ $(uname -m) == "arm64" ]]; then
+  echo "Apple Silicon MacOS detected, building kind node image for arm64..."
   docker build -t tempkind $SCRIPT_DIR
   kind create cluster --image tempkind
 else
