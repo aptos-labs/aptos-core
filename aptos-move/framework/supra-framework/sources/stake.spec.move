@@ -371,6 +371,15 @@ spec supra_framework::stake {
         ensures validator_info.consensus_pubkey == new_consensus_pubkey;
     }
 
+    spec rotate_consensus_key_internal(
+        operator: &signer,
+        pool_address: address,
+        new_consensus_pubkey: vector<u8>,
+        genesis: bool,
+    ) {
+        modifies global<ValidatorConfig>(pool_address);
+    }
+
     spec set_delegated_voter_with_cap(owner_cap: &OwnerCapability, new_voter: address) {
         let pool_address = owner_cap.pool_address;
         let post post_stake_pool = global<StakePool>(pool_address);
