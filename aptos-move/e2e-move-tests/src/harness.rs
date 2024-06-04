@@ -620,6 +620,19 @@ impl MoveHarness {
         self.run(txn)
     }
 
+    pub fn transfer_code_object(
+        &mut self,
+        account: &Account,
+        code_object: AccountAddress,
+        new_owner: AccountAddress,
+    ) -> TransactionStatus {
+        let txn = self.create_transaction_payload(
+            account,
+            aptos_stdlib::object_transfer_call(code_object, new_owner),
+        );
+        self.run(txn)
+    }
+
     pub fn evaluate_publish_gas(&mut self, account: &Account, path: &Path) -> u64 {
         let txn = self.create_publish_package(account, path, None, |_| {});
         let output = self.run_raw(txn);

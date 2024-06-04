@@ -5,7 +5,7 @@ use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveH
 use aptos_framework::{
     natives::{
         code::{PackageRegistry, UpgradePolicy},
-        object_code_deployment::ManagingRefs,
+        object_code_deployment::{ManagingRefs, ObjectCore},
     },
     BuildOptions,
 };
@@ -39,6 +39,7 @@ enum ObjectCodeAction {
     Deploy,
     Upgrade,
     Freeze,
+    Transfer,
 }
 
 impl TestContext {
@@ -68,6 +69,7 @@ impl TestContext {
         account: &Account,
         path: &str,
         action: ObjectCodeAction,
+        to: Option<AccountAddress>,
     ) -> TransactionStatus {
         // Replace the module's address with the object address, this is needed to prevent module address mismatch errors.
         let mut options = BuildOptions::default();
@@ -90,6 +92,10 @@ impl TestContext {
             ObjectCodeAction::Freeze => self
                 .harness
                 .object_code_freeze_code_object(account, self.object_address),
+            ObjectCodeAction::Transfer => {
+                self.harness
+                    .transfer_code_object(account, self.object_address, to.unwrap())
+            },
         }
     }
 
@@ -121,6 +127,7 @@ const MODULE_ADDRESS_NAME: &str = "object";
 const PACKAGE_REGISTRY_ACCESS_PATH: &str = "0x1::code::PackageRegistry";
 const EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED: &str = "EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED";
 const ENOT_CODE_OBJECT_OWNER: &str = "ENOT_CODE_OBJECT_OWNER";
+const ENOT_OBJECT_OWNER: &str = "ENOT_OBJECT_OWNER";
 const ENOT_PACKAGE_OWNER: &str = "ENOT_PACKAGE_OWNER";
 
 /// Tests the `publish` object code deployment function with feature flags enabled/disabled.
@@ -137,6 +144,7 @@ fn object_code_deployment_publish_package(enabled: Vec<FeatureFlag>, disabled: V
         &acc,
         "object_code_deployment.data/pack_initial",
         ObjectCodeAction::Deploy,
+        None,
     );
 
     if enabled.contains(&FeatureFlag::OBJECT_CODE_DEPLOYMENT) {
@@ -192,6 +200,7 @@ fn object_code_deployment_upgrade_success_compat() {
         &acc,
         "object_code_deployment.data/pack_initial",
         ObjectCodeAction::Deploy,
+        None,
     ));
 
     // We should be able to upgrade it with the compatible version
@@ -199,6 +208,7 @@ fn object_code_deployment_upgrade_success_compat() {
         &acc,
         "object_code_deployment.data/pack_upgrade_compat",
         ObjectCodeAction::Upgrade,
+        None,
     ));
 
     let module_address = context.object_address.to_string();
@@ -225,6 +235,7 @@ fn object_code_deployment_upgrade_fail_when_not_owner() {
         &acc,
         "object_code_deployment.data/pack_initial",
         ObjectCodeAction::Deploy,
+        None,
     ));
 
     // We should not be able to upgrade with a different account.
@@ -235,6 +246,7 @@ fn object_code_deployment_upgrade_fail_when_not_owner() {
         &different_account,
         "object_code_deployment.data/pack_upgrade_compat",
         ObjectCodeAction::Upgrade,
+        None,
     );
     context.assert_feature_flag_error(status, ENOT_CODE_OBJECT_OWNER);
 }
@@ -250,6 +262,7 @@ fn object_code_deployment_upgrade_fail_when_publisher_ref_does_not_exist() {
         &acc,
         "object_code_deployment.data/pack_initial",
         ObjectCodeAction::Upgrade,
+        None,
     );
     assert_abort!(status, _);
 }
@@ -264,6 +277,7 @@ fn object_code_deployment_upgrade_fail_compat() {
         &acc,
         "object_code_deployment.data/pack_initial",
         ObjectCodeAction::Deploy,
+        None,
     ));
 
     // We should not be able to upgrade it with the incompatible version
@@ -271,6 +285,7 @@ fn object_code_deployment_upgrade_fail_compat() {
         &acc,
         "object_code_deployment.data/pack_upgrade_incompat",
         ObjectCodeAction::Upgrade,
+        None,
     );
     assert_vm_status!(status, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
 }
@@ -285,6 +300,7 @@ fn object_code_deployment_upgrade_fail_immutable() {
         &acc,
         "object_code_deployment.data/pack_initial_immutable",
         ObjectCodeAction::Deploy,
+        None,
     ));
 
     // We should not be able to upgrade it with the incompatible version
@@ -292,6 +308,7 @@ fn object_code_deployment_upgrade_fail_immutable() {
         &acc,
         "object_code_deployment.data/pack_upgrade_compat",
         ObjectCodeAction::Upgrade,
+        None,
     );
     assert_abort!(status, _);
 }
@@ -306,6 +323,7 @@ fn object_code_deployment_upgrade_fail_overlapping_module() {
         &acc,
         "object_code_deployment.data/pack_initial",
         ObjectCodeAction::Deploy,
+        None,
     ));
 
     // Install a different package with the same module.
@@ -313,6 +331,7 @@ fn object_code_deployment_upgrade_fail_overlapping_module() {
         &acc,
         "object_code_deployment.data/pack_other_name",
         ObjectCodeAction::Upgrade,
+        None,
     );
     assert_abort!(status, _);
 }
@@ -328,10 +347,11 @@ fn object_code_deployment_freeze_code_object() {
         &acc,
         "object_code_deployment.data/pack_initial",
         ObjectCodeAction::Deploy,
+        None,
     ));
 
     // Mark packages immutable.
-    assert_success!(context.execute_object_code_action(&acc, "", ObjectCodeAction::Freeze));
+    assert_success!(context.execute_object_code_action(&acc, "", ObjectCodeAction::Freeze, None));
 
     let registry = context
         .read_resource::<PackageRegistry>(&context.object_address, PACKAGE_REGISTRY_ACCESS_PATH)
@@ -351,13 +371,14 @@ fn freeze_code_object_fail_when_not_owner() {
         &acc,
         "object_code_deployment.data/pack_initial",
         ObjectCodeAction::Deploy,
+        None,
     ));
 
     let different_account = context
         .harness
         .new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
     let status =
-        context.execute_object_code_action(&different_account, "", ObjectCodeAction::Freeze);
+        context.execute_object_code_action(&different_account, "", ObjectCodeAction::Freeze, None);
 
     context.assert_feature_flag_error(status, ENOT_PACKAGE_OWNER);
 }
@@ -369,6 +390,61 @@ fn freeze_code_object_fail_when_package_registry_does_not_exist() {
 
     // We should not be able to `freeze_code_object` as `PackageRegistry` does not exist.
     // `PackageRegistry` is only created when calling `publish` first, i.e. deploying a package.
-    let status = context.execute_object_code_action(&acc, "", ObjectCodeAction::Freeze);
+    let status = context.execute_object_code_action(&acc, "", ObjectCodeAction::Freeze, None);
     assert_abort!(status, _);
+}
+
+#[test]
+fn transfer_code_object() {
+    let mut context = TestContext::new(None, None);
+    let acc = context.account.clone();
+
+    assert_success!(context.execute_object_code_action(
+        &acc,
+        "object_code_deployment.data/pack_initial",
+        ObjectCodeAction::Deploy,
+        None,
+    ));
+
+    let new_owner = context.harness.new_account_at(AccountAddress::ONE);
+    assert_success!(context.execute_object_code_action(
+        &acc,
+        "",
+        ObjectCodeAction::Transfer,
+        Some(*new_owner.address())
+    ));
+
+    let code_object: ObjectCore = context
+        .harness
+        .read_resource_from_resource_group(
+            &context.object_address,
+            parse_struct_tag("0x1::object::ObjectGroup").unwrap(),
+            parse_struct_tag("0x1::object::ObjectCore").unwrap(),
+        )
+        .unwrap();
+
+    assert_eq!(code_object.owner, new_owner.address().clone());
+}
+
+#[test]
+fn transfer_code_object_fails_when_not_owner() {
+    let mut context = TestContext::new(None, None);
+    let acc = context.account.clone();
+
+    assert_success!(context.execute_object_code_action(
+        &acc,
+        "object_code_deployment.data/pack_initial",
+        ObjectCodeAction::Deploy,
+        None,
+    ));
+
+    let different_account = context.harness.new_account_at(AccountAddress::ONE);
+    let status = context.execute_object_code_action(
+        &different_account,
+        "",
+        ObjectCodeAction::Transfer,
+        Some(*different_account.address()),
+    );
+
+    context.assert_feature_flag_error(status, ENOT_OBJECT_OWNER);
 }
