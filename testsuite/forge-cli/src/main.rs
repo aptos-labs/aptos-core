@@ -2689,7 +2689,6 @@ impl Test for EmitTransaction {
 impl NetworkTest for EmitTransaction {
     fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
         let handle = ctx.handle.clone();
-        let traffic_handle = ctx.handle.clone();
         handle.block_on(async {
             let mut ctx_locker = ctx.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();
@@ -2699,7 +2698,7 @@ impl NetworkTest for EmitTransaction {
                 .validators()
                 .map(|v| v.peer_id())
                 .collect::<Vec<_>>();
-            let stats = generate_traffic(ctx, &all_validators, duration, Some(traffic_handle)).unwrap();
+            let stats = generate_traffic(ctx, &all_validators, duration).await.unwrap();
             ctx.report.report_txn_stats(self.name().to_string(), &stats);
         });
         Ok(())

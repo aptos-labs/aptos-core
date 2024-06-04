@@ -37,7 +37,7 @@ impl PartialNodesDown {
         thread::sleep(Duration::from_secs(5));
 
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &up_nodes, duration, Some(runtime.handle().clone()))?;
+        let txn_stat = generate_traffic(ctx, &up_nodes, duration).await?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat);
         for n in &down_nodes {

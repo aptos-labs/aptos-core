@@ -72,7 +72,7 @@ impl ForgeSetupTest {
         }
 
         let duration = Duration::from_secs(10 * num_pfns);
-        let txn_stat = generate_traffic(ctx, &pfns, duration, Some(ctx.runtime.handle().clone()))?;
+        let txn_stat = generate_traffic(ctx, &pfns, duration).await?;
 
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat);
