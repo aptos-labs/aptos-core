@@ -1262,14 +1262,6 @@ impl TypeBuilder {
     }
 
     #[cfg(test)]
-    pub fn new_for_test() -> Self {
-        Self::New {
-            max_ty_size: 11,
-            max_ty_depth: 5,
-        }
-    }
-
-    #[cfg(test)]
     fn num_nodes_in_subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<usize> {
         let mut count = 0;
 
@@ -1307,7 +1299,8 @@ pub fn legacy_count_type_nodes(ty: &Type) -> u64 {
 #[cfg(test)]
 mod unit_tests {
     use super::*;
-    use claims::{assert_err, assert_ok};
+    use claims::{assert_err, assert_matches, assert_ok};
+    use move_binary_format::file_format::StructHandleIndex;
 
     fn struct_instantiation_ty_for_test(ty_args: Vec<Type>) -> Type {
         Type::StructInstantiation {
@@ -1324,16 +1317,19 @@ mod unit_tests {
         }
     }
 
-    fn vec_ty_for_test(mut depth: usize) -> Type {
-        use Type::*;
+    fn nested_vec_for_test(ty_depth: u64) -> (SignatureToken, Type) {
+        use SignatureToken::*;
 
-        let mut ty = Address;
-        depth -= 1;
-        while depth > 0 {
-            ty = Vector(TriompheArc::new(ty.clone()));
-            depth -= 1;
+        let mut ty = Type::U8;
+        let mut tok = U8;
+
+        let mut depth = 1;
+        while depth < ty_depth {
+            ty = Type::Vector(TriompheArc::new(ty.clone()));
+            tok = Vector(Box::new(tok.clone()));
+            depth += 1;
         }
-        ty
+        (tok, ty)
     }
 
     #[test]
@@ -1367,7 +1363,7 @@ mod unit_tests {
     fn test_num_nodes_in_subst() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::new_for_test();
+        let ty_builder = TypeBuilder::new(11, 5);
         let cases: Vec<(Type, Vec<Type>, usize)> = vec![
             (TyParam(0), vec![Bool], 1),
             (TyParam(0), vec![Vector(TriompheArc::new(Bool))], 2),
@@ -1398,7 +1394,7 @@ mod unit_tests {
     fn test_substitution_large_depth() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::new_for_test();
+        let ty_builder = TypeBuilder::new(11, 5);
 
         let ty = Vector(TriompheArc::new(Vector(TriompheArc::new(TyParam(0)))));
         let ty_arg = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
@@ -1413,7 +1409,7 @@ mod unit_tests {
     fn test_substitution_large_count() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::new_for_test();
+        let ty_builder = TypeBuilder::new(11, 5);
 
         let ty_params: Vec<Type> = (0..5).map(TyParam).collect();
         let ty = struct_instantiation_ty_for_test(ty_params);
@@ -1438,28 +1434,333 @@ mod unit_tests {
     }
 
     #[test]
-    fn test_create_nested_tys() {
-        let ty_builder = TypeBuilder::new_for_test();
-        let ty = vec_ty_for_test(10);
+    fn test_create_primitive_tys() {
+        // Limits are irrelevant here.
+        let ty_builder = TypeBuilder::new(1, 1);
+        let legacy_ty_builder = TypeBuilder::legacy();
 
-        // These types have the maximum possible depth!
-        let vec_ty = assert_ok!(ty_builder.create_vec_ty(&ty));
-        let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
-        let mut_ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
+        assert_matches!(ty_builder.create_u8_ty(), Type::U8);
+        assert_matches!(legacy_ty_builder.create_u8_ty(), Type::U8);
 
-        let err = assert_err!(ty_builder.create_vec_ty(&vec_ty));
+        assert_matches!(ty_builder.create_u16_ty(), Type::U16);
+        assert_matches!(legacy_ty_builder.create_u16_ty(), Type::U16);
+
+        assert_matches!(ty_builder.create_u32_ty(), Type::U32);
+        assert_matches!(legacy_ty_builder.create_u32_ty(), Type::U32);
+
+        assert_matches!(ty_builder.create_u64_ty(), Type::U64);
+        assert_matches!(legacy_ty_builder.create_u64_ty(), Type::U64);
+
+        assert_matches!(ty_builder.create_u128_ty(), Type::U128);
+        assert_matches!(legacy_ty_builder.create_u128_ty(), Type::U128);
+
+        assert_matches!(ty_builder.create_u256_ty(), Type::U256);
+        assert_matches!(legacy_ty_builder.create_u256_ty(), Type::U256);
+
+        assert_matches!(ty_builder.create_bool_ty(), Type::Bool);
+        assert_matches!(legacy_ty_builder.create_bool_ty(), Type::Bool);
+    }
+
+    #[test]
+    fn test_create_struct_ty() {
+        // Limits are not relevant here.
+        let ty_builder = TypeBuilder::new(1, 1);
+        let legacy_ty_builder = TypeBuilder::legacy();
+
+        let idx = StructNameIndex(0);
+        let ability_info = AbilityInfo::struct_(AbilitySet::EMPTY);
+        let struct_ty = ty_builder.create_struct_ty(idx, ability_info.clone());
+        let legacy_struct_ty = legacy_ty_builder.create_struct_ty(idx, ability_info);
+
+        assert_eq!(&struct_ty, &legacy_struct_ty);
+        assert_matches!(struct_ty, Type::Struct { .. });
+    }
+
+    #[test]
+    fn test_create_struct_instantiation_ty() {
+        todo!()
+    }
+
+    #[test]
+    fn test_create_vec_ty() {
+        let max_ty_depth = 5;
+        let ty_builder = TypeBuilder::new(100, max_ty_depth);
+        let legacy_ty_builder = TypeBuilder::legacy();
+
+        let mut depth = 1;
+        let mut ty = Type::Bool;
+        while depth < max_ty_depth {
+            ty = assert_ok!(ty_builder.create_vec_ty(&ty));
+            let legacy_ty = assert_ok!(legacy_ty_builder.create_vec_ty(&ty));
+            assert_eq!(&ty, &legacy_ty);
+            assert_matches!(ty, Type::Vector(_));
+            depth += 1;
+        }
+        assert_eq!(depth, max_ty_depth);
+
+        // New type builder fails on exceeding the depth, but not the legacy one.
+        let err = assert_err!(ty_builder.create_vec_ty(&ty));
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+        let ty = assert_ok!(legacy_ty_builder.create_vec_ty(&ty));
+        assert_matches!(ty, Type::Vector(_));
+    }
 
-        let err = assert_err!(ty_builder.create_ref_ty(&vec_ty, false));
-        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+    #[test]
+    fn test_create_ref_ty() {
+        let max_ty_depth = 5;
+        let ty_builder = TypeBuilder::new(100, max_ty_depth);
+        let legacy_ty_builder = TypeBuilder::legacy();
 
-        let err = assert_err!(ty_builder.create_ref_ty(&vec_ty, true));
-        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+        let mut depth = 1;
+        let mut ty = Type::Bool;
+        while depth < max_ty_depth {
+            ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
+            let legacy_ty = assert_ok!(legacy_ty_builder.create_ref_ty(&ty, true));
+            assert_eq!(&ty, &legacy_ty);
+            assert_matches!(ty, Type::Reference(_));
 
-        let err = assert_err!(ty_builder.create_vec_ty(&ref_ty));
-        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+            depth += 1;
+        }
+        assert_eq!(depth, max_ty_depth);
 
-        let err = assert_err!(ty_builder.create_vec_ty(&mut_ref_ty));
+        let err = assert_err!(ty_builder.create_ref_ty(&ty, false));
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+        let ty = assert_ok!(legacy_ty_builder.create_ref_ty(&ty, false));
+        assert_matches!(ty, Type::Reference(_));
+    }
+
+    #[test]
+    fn test_create_mut_ref_ty() {
+        let max_ty_depth = 5;
+        let ty_builder = TypeBuilder::new(100, max_ty_depth);
+        let legacy_ty_builder = TypeBuilder::legacy();
+
+        let mut depth = 1;
+        let mut ty = Type::Bool;
+        while depth < max_ty_depth {
+            ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
+            let legacy_ty = assert_ok!(legacy_ty_builder.create_ref_ty(&ty, true));
+            assert_eq!(&ty, &legacy_ty);
+            assert_matches!(ty, Type::MutableReference(_));
+
+            depth += 1;
+        }
+        assert_eq!(depth, max_ty_depth);
+
+        let err = assert_err!(ty_builder.create_ref_ty(&ty, true));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+        let ty = assert_ok!(legacy_ty_builder.create_ref_ty(&ty, true));
+        assert_matches!(ty, Type::MutableReference(_));
+    }
+
+    #[test]
+    fn test_create_constant_ty() {
+        use SignatureToken as S;
+
+        let max_ty_depth = 5;
+        // Maximum type size is irrelevant for constant construction.
+        let ty_builder = TypeBuilder::new(100, max_ty_depth);
+        let legacy_ty_builder = TypeBuilder::legacy();
+
+        assert_matches!(assert_ok!(ty_builder.create_constant_ty(&S::U8)), Type::U8);
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U8)),
+            Type::U8
+        );
+
+        assert_matches!(
+            assert_ok!(ty_builder.create_constant_ty(&S::U16)),
+            Type::U16
+        );
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U16)),
+            Type::U16
+        );
+
+        assert_matches!(
+            assert_ok!(ty_builder.create_constant_ty(&S::U32)),
+            Type::U32
+        );
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U32)),
+            Type::U32
+        );
+
+        assert_matches!(
+            assert_ok!(ty_builder.create_constant_ty(&S::U64)),
+            Type::U64
+        );
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U64)),
+            Type::U64
+        );
+
+        assert_matches!(
+            assert_ok!(ty_builder.create_constant_ty(&S::U128)),
+            Type::U128
+        );
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U128)),
+            Type::U128
+        );
+
+        assert_matches!(
+            assert_ok!(ty_builder.create_constant_ty(&S::U256)),
+            Type::U256
+        );
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U256)),
+            Type::U256
+        );
+
+        assert_matches!(
+            assert_ok!(ty_builder.create_constant_ty(&S::Bool)),
+            Type::Bool
+        );
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::Bool)),
+            Type::Bool
+        );
+
+        assert_matches!(
+            assert_ok!(ty_builder.create_constant_ty(&S::Address)),
+            Type::Address
+        );
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::Address)),
+            Type::Address
+        );
+
+        // Vectors are special, because we limit their depth (= size).
+        // Here, we test the boundary cases.
+
+        for depth in [max_ty_depth - 1, max_ty_depth] {
+            let (vec_tok, expected_ty) = nested_vec_for_test(depth);
+            let ty = assert_ok!(ty_builder.create_constant_ty(&vec_tok));
+            let legacy_ty = assert_ok!(legacy_ty_builder.create_constant_ty(&vec_tok));
+            assert_eq!(&ty, &legacy_ty);
+            assert_eq!(&ty, &expected_ty);
+        }
+
+        let (vec_tok, expected_legacy_ty) = nested_vec_for_test(max_ty_depth + 1);
+        assert_err!(ty_builder.create_constant_ty(&vec_tok));
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&vec_tok)),
+            expected_legacy_ty
+        );
+
+        // The following tokens cannot be constants:
+
+        let struct_tok = S::Struct(StructHandleIndex::new(0));
+        assert_err!(ty_builder.create_constant_ty(&struct_tok));
+        assert_err!(legacy_ty_builder.create_constant_ty(&struct_tok));
+
+        let struct_instantiation_tok = S::StructInstantiation(StructHandleIndex::new(0), vec![]);
+        assert_err!(ty_builder.create_constant_ty(&struct_instantiation_tok));
+        assert_err!(legacy_ty_builder.create_constant_ty(&struct_instantiation_tok));
+
+        assert_err!(ty_builder.create_constant_ty(&S::Signer));
+        assert_err!(legacy_ty_builder.create_constant_ty(&S::Signer));
+
+        let ref_tok = S::Reference(Box::new(S::U8));
+        assert_err!(ty_builder.create_constant_ty(&ref_tok));
+        assert_err!(legacy_ty_builder.create_constant_ty(&ref_tok));
+
+        let mut_ref_tok = S::Reference(Box::new(S::U8));
+        assert_err!(ty_builder.create_constant_ty(&mut_ref_tok));
+        assert_err!(legacy_ty_builder.create_constant_ty(&mut_ref_tok));
+
+        let ty_param_tok = S::TypeParameter(0);
+        assert_err!(ty_builder.create_constant_ty(&ty_param_tok));
+        assert_err!(legacy_ty_builder.create_constant_ty(&ty_param_tok));
+    }
+
+    #[test]
+    fn test_create_ty() {
+        use TypeTag as T;
+
+        let max_ty_size = 11;
+        let max_ty_depth = 5;
+        let ty_builder = TypeBuilder::new(max_ty_size, max_ty_depth);
+        let legacy_ty_builder = TypeBuilder::legacy();
+
+        let no_op = |_: &StructTag| unreachable!("Should not be called");
+
+        // Primitive types.
+
+        assert_matches!(assert_ok!(ty_builder.create_ty(&T::U8, no_op)), Type::U8);
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::U8, no_op)),
+            Type::U8
+        );
+
+        assert_matches!(assert_ok!(ty_builder.create_ty(&T::U16, no_op)), Type::U16);
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::U16, no_op)),
+            Type::U16
+        );
+
+        assert_matches!(assert_ok!(ty_builder.create_ty(&T::U32, no_op)), Type::U32);
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::U32, no_op)),
+            Type::U32
+        );
+
+        assert_matches!(assert_ok!(ty_builder.create_ty(&T::U64, no_op)), Type::U64);
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::U64, no_op)),
+            Type::U64
+        );
+
+        assert_matches!(
+            assert_ok!(ty_builder.create_ty(&T::U128, no_op)),
+            Type::U128
+        );
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::U128, no_op)),
+            Type::U128
+        );
+
+        assert_matches!(
+            assert_ok!(ty_builder.create_ty(&T::U256, no_op)),
+            Type::U256
+        );
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::U256, no_op)),
+            Type::U256
+        );
+
+        assert_matches!(
+            assert_ok!(ty_builder.create_ty(&T::Bool, no_op)),
+            Type::Bool
+        );
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::Bool, no_op)),
+            Type::Bool
+        );
+
+        assert_matches!(
+            assert_ok!(ty_builder.create_ty(&T::Address, no_op)),
+            Type::Address
+        );
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::Address, no_op)),
+            Type::Address
+        );
+
+        assert_matches!(
+            assert_ok!(ty_builder.create_ty(&T::Signer, no_op)),
+            Type::Signer
+        );
+        assert_matches!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::Signer, no_op)),
+            Type::Signer
+        );
+
+        // Vectors.
+
+        todo!()
+
+        // Structs.
     }
 }

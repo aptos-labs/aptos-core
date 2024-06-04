@@ -150,8 +150,10 @@ fn legacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
     let r = locals.borrow_loc(1)?;
     assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
 
+    // Actual limits for type builder are irrelevant for the test.
+    let u8_ty = TypeBuilder::new(10, 10).create_u8_ty();
+
     let r: VectorRef = r.value_as()?;
-    let u8_ty = TypeBuilder::new_for_test().create_u8_ty();
     let r = r.borrow_elem(0, &u8_ty)?;
     assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
 

@@ -116,7 +116,9 @@ fn address_specifier_strategy() -> impl Strategy<Value = AddressSpecifier> {
 }
 
 fn type_args_strategy() -> impl Strategy<Value = Vec<Type>> {
-    let ty_builder = TypeBuilder::new_for_test();
+    // Actual type builder limits do not matter because creating primitive
+    // integer types is always possible.
+    let ty_builder = TypeBuilder::new(10, 10);
     prop_oneof![
         Just(vec![]),
         Just(vec![ty_builder.create_u8_ty()]),
