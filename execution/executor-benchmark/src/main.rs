@@ -373,7 +373,10 @@ enum Command {
     },
 }
 
-fn get_init_features(enable_feature: Vec<FeatureFlag>, disable_feature: Vec<FeatureFlag>) -> Features {
+fn get_init_features(
+    enable_feature: Vec<FeatureFlag>,
+    disable_feature: Vec<FeatureFlag>,
+) -> Features {
     // this check is O(|enable_feature| * |disable_feature|)
     assert!(
         enable_feature.iter().all(|f| !disable_feature.contains(f)),

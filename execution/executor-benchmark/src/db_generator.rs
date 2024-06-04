@@ -16,9 +16,9 @@ use aptos_executor::{
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
 };
 use aptos_storage_interface::DbReaderWriter;
+use aptos_types::on_chain_config::Features;
 use aptos_vm::AptosVM;
 use std::{fs, path::Path};
-use aptos_types::on_chain_config::Features;
 
 pub fn create_db_with_accounts<V>(
     num_accounts: usize,
@@ -62,8 +62,13 @@ pub fn create_db_with_accounts<V>(
     );
 }
 
-fn bootstrap_with_genesis(db_dir: impl AsRef<Path>, enable_storage_sharding: bool, init_features: Features) {
-    let (config, _genesis_key) = aptos_genesis::test_utils::test_config_with_custom_features(init_features);
+fn bootstrap_with_genesis(
+    db_dir: impl AsRef<Path>,
+    enable_storage_sharding: bool,
+    init_features: Features,
+) {
+    let (config, _genesis_key) =
+        aptos_genesis::test_utils::test_config_with_custom_features(init_features);
 
     let mut rocksdb_configs = RocksdbConfigs::default();
     rocksdb_configs.state_merkle_db_config.max_open_files = -1;

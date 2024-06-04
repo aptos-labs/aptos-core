@@ -42,6 +42,7 @@ use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
     TransactionType::{self, NonConflictingCoinTransfer},
 };
+use aptos_types::on_chain_config::Features;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use pipeline::PipelineConfig;
 use std::{
@@ -52,7 +53,6 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
-use aptos_types::on_chain_config::Features;
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
@@ -118,7 +118,8 @@ pub fn run_benchmark<V>(
         checkpoint_dir.as_ref(),
         enable_storage_sharding,
     );
-    let (mut config, genesis_key) = aptos_genesis::test_utils::test_config_with_custom_features(init_features);
+    let (mut config, genesis_key) =
+        aptos_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
@@ -339,7 +340,8 @@ fn add_accounts_impl<V>(
 ) where
     V: TransactionBlockExecutor + 'static,
 {
-    let (mut config, genesis_key) = aptos_genesis::test_utils::test_config_with_custom_features(init_features);
+    let (mut config, genesis_key) =
+        aptos_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = output_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
