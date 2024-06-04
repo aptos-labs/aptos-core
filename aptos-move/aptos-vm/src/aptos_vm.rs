@@ -1636,12 +1636,14 @@ impl AptosVM {
                 return Err(invalid_signature!("Groth16 VK has not been set on-chain"));
             }
 
-            keyless_validation::validate_authenticators(
-                self.pvk.as_ref().unwrap(),
-                &keyless_authenticators,
-                self.features(),
-                resolver,
-            )?;
+            if !self.is_simulation {
+                keyless_validation::validate_authenticators(
+                    self.pvk.as_ref().unwrap(),
+                    &keyless_authenticators,
+                    self.features(),
+                    resolver,
+                )?;
+            }
         }
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
