@@ -179,9 +179,9 @@ impl CliCommand<String> for DeleteProfile {
                 )));
             };
         } else {
-            return Err(CliError::CommandArgumentError(format!(
-                "Config has no profiles",
-            )));
+            return Err(CliError::CommandArgumentError(
+                "Config has no profiles".to_string(),
+            ));
         };
 
         config.save()?;
@@ -226,9 +226,9 @@ impl CliCommand<String> for RenameProfile {
                 )));
             };
         } else {
-            return Err(CliError::CommandArgumentError(format!(
-                "Config has no profiles",
-            )));
+            return Err(CliError::CommandArgumentError(
+                "Config has no profiles".to_string(),
+            ));
         };
 
         config.save()?;
