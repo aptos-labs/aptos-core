@@ -127,11 +127,11 @@ impl BufferedState {
                     .take()
                     .map(Arc::from)
                     .expect("Must exist");
-                info!(
-                    base_version = to_commit.base_version,
-                    version = to_commit.current_version,
-                    "Sent StateDelta to async commit thread."
-                );
+                // info!(
+                //     base_version = to_commit.base_version,
+                //     version = to_commit.current_version,
+                //     "Sent StateDelta to async commit thread."
+                // );
                 self.state_commit_sender
                     .send(CommitMessage::Data(to_commit))
                     .unwrap();

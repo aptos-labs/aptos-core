@@ -228,7 +228,7 @@ impl StateMerkleDb {
             &DbMetadataValue::Version(version),
         )?;
 
-        info!(version = version, "Committing StateMerkleDb.");
+        // info!(version = version, "Committing StateMerkleDb.");
         self.state_merkle_metadata_db.write_schemas(batch)
     }
 
@@ -587,10 +587,10 @@ impl StateMerkleDb {
             readonly,
         )?);
 
-        info!(
-            state_merkle_metadata_db_path = state_merkle_metadata_db_path,
-            "Opened state merkle metadata db!"
-        );
+        // info!(
+        //     state_merkle_metadata_db_path = state_merkle_metadata_db_path,
+        //     "Opened state merkle metadata db!"
+        // );
 
         let mut shard_id: usize = 0;
         let state_merkle_db_shards = arr![{

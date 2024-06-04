@@ -48,11 +48,11 @@ impl BlockPreparationStage {
 
     pub fn process(&mut self, txns: Vec<Transaction>) -> ExecuteBlockMessage {
         let current_block_start_time = Instant::now();
-        info!(
-            "In iteration {}, received {:?} transactions.",
-            self.num_blocks_processed,
-            txns.len()
-        );
+        // info!(
+        //     "In iteration {}, received {:?} transactions.",
+        //     self.num_blocks_processed,
+        //     txns.len()
+        // );
         let block_id = HashValue::random();
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
             let num_txns = txns.len();

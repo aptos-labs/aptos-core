@@ -899,7 +899,7 @@ impl StateStore {
             if !skip_usage || should_write_index_for_version {
                 let version = first_version + i as u64;
                 if should_write_index_for_version {
-                    info!("Write usage at version {version}, {usage:?}, skip_usage: {skip_usage}.");
+                    // info!("Write usage at version {version}, {usage:?}, skip_usage: {skip_usage}.");
                 }
                 batch
                     .put::<VersionDataSchema>(&version, &usage.into())

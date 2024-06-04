@@ -79,12 +79,12 @@ impl StateMerkleBatchCommitter {
                                 cache.maybe_evict_version(self.state_db.state_merkle_db.lru_cache())
                             });
                     }
-                    info!(
-                        version = current_version,
-                        base_version = state_delta.base_version,
-                        root_hash = root_hash,
-                        "State snapshot committed."
-                    );
+                    // info!(
+                    //     version = current_version,
+                    //     base_version = state_delta.base_version,
+                    //     root_hash = root_hash,
+                    //     "State snapshot committed."
+                    // );
                     LATEST_SNAPSHOT_VERSION.set(current_version as i64);
                     self.state_db
                         .state_merkle_pruner

@@ -244,12 +244,12 @@ impl BlockTree {
 
         let root = if ledger_info.ends_epoch() {
             let epoch_genesis_id = epoch_genesis_block_id(ledger_info);
-            info!(
-                LogSchema::new(LogEntry::SpeculationCache)
-                    .root_block_id(epoch_genesis_id)
-                    .original_reconfiguration_block_id(committed_block_id),
-                "Updated with a new root block as a virtual block of reconfiguration block"
-            );
+            // info!(
+            //     LogSchema::new(LogEntry::SpeculationCache)
+            //         .root_block_id(epoch_genesis_id)
+            //         .original_reconfiguration_block_id(committed_block_id),
+            //     "Updated with a new root block as a virtual block of reconfiguration block"
+            // );
             let output = ExecutionOutput::new_with_ledger_update(
                 last_committed_block.output.state().clone(),
                 None,
@@ -264,10 +264,10 @@ impl BlockTree {
             self.block_lookup
                 .fetch_or_add_block(epoch_genesis_id, output, None)?
         } else {
-            info!(
-                LogSchema::new(LogEntry::SpeculationCache).root_block_id(committed_block_id),
-                "Updated with a new root block",
-            );
+            // info!(
+            //     LogSchema::new(LogEntry::SpeculationCache).root_block_id(committed_block_id),
+            //     "Updated with a new root block",
+            // );
             last_committed_block
         };
         root.output
