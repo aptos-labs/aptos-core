@@ -81,6 +81,7 @@ strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
+tokio-stream = { workspace = true }
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }
