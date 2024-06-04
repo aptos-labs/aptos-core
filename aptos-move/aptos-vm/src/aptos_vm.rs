@@ -2595,11 +2595,11 @@ impl VMExecutor for AptosVM {
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
-        info!(
-            log_context,
-            "Executing block, transaction count: {}",
-            transactions.num_txns()
-        );
+        // info!(
+        //     log_context,
+        //     "Executing block, transaction count: {}",
+        //     transactions.num_txns()
+        // );
 
         let count = transactions.num_txns();
         let _timer = TIMER
