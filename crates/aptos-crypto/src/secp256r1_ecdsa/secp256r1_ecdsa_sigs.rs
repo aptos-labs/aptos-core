@@ -71,7 +71,7 @@ impl Signature {
         Ok(())
     }
 
-    /// Check if S < ORDER_HALF to capture invalid signatures.
+    /// Check if S <= ORDER_HALF to capture invalid signatures.
     fn check_s_lt_order_half(s: &[u8]) -> bool {
         for i in 0..32 {
             match s[i].cmp(&ORDER_HALF[i]) {
@@ -80,8 +80,8 @@ impl Signature {
                 _ => {},
             }
         }
-        // At this stage S == ORDER_HALF which implies a non canonical S.
-        false
+        // At this stage S == ORDER_HALF , it is still considered a canonical value.
+        true
     }
 
     /// If the signature {R,S} does not have S < n/2 where n is the Ristretto255 order, return
