@@ -5,12 +5,14 @@ use arbitrary::Unstructured;
 use move_smith::{ast::*, codegen::*, move_smith::*, names::Identifier, types::*, utils::*};
 use num_bigint::BigUint;
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::cell::RefCell;
 
 fn simple_module() -> Module {
     Module {
         name: Identifier(String::from("SimpleModule")),
-        functions: vec![Function {
+        functions: vec![RefCell::new(Function {
             signature: FunctionSignature {
+                name: Identifier(String::from("fun1")),
                 parameters: vec![
                     (Identifier(String::from("param1")), Type::U64),
                     (Identifier(String::from("param2")), Type::U8),
@@ -18,7 +20,6 @@ fn simple_module() -> Module {
                 return_type: Some(Type::U32),
             },
             visibility: Visibility { public: true },
-            name: Identifier(String::from("fun1")),
             body: Some(FunctionBody {
                 stmts: vec![Statement::Expr(Expression::NumberLiteral(NumberLiteral {
                     value: BigUint::from(42u32),
@@ -29,7 +30,7 @@ fn simple_module() -> Module {
                 value: BigUint::from(111u32),
                 typ: Type::U32,
             })),
-        }],
+        })],
         structs: Vec::new(),
     }
 }

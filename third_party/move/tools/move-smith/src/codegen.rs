@@ -55,12 +55,12 @@ impl CodeGenerator for Script {
         let mut code = vec!["//# run".to_string(), "script {".to_string()];
         let main = Function {
             signature: FunctionSignature {
+                name: Identifier("main".to_string()),
                 parameters: Vec::new(),
                 return_type: None,
             },
             visibility: Visibility { public: false },
             // Hardcode one function to simplify the output
-            name: Identifier("main".to_string()),
             body: Some(FunctionBody {
                 stmts: self
                     .main
@@ -88,11 +88,19 @@ impl CodeGenerator for Module {
         ];
 
         for s in &self.structs {
-            append_code_lines_with_indentation(&mut code, s.emit_code_lines(), INDENTATION_SIZE)
+            append_code_lines_with_indentation(
+                &mut code,
+                s.borrow().emit_code_lines(),
+                INDENTATION_SIZE,
+            )
         }
 
         for f in &self.functions {
-            append_code_lines_with_indentation(&mut code, f.emit_code_lines(), INDENTATION_SIZE)
+            append_code_lines_with_indentation(
+                &mut code,
+                f.borrow().emit_code_lines(),
+                INDENTATION_SIZE,
+            )
         }
 
         code.push("}\n".to_string());
@@ -171,7 +179,7 @@ impl CodeGenerator for Function {
         let mut code = vec![format!(
             "{}fun {}({}){} {{",
             visibility,
-            self.name.emit_code(),
+            self.signature.name.emit_code(),
             parameters,
             return_type
         )];

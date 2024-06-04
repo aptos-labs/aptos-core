@@ -9,6 +9,7 @@
 use crate::{names::Identifier, types::Type};
 use arbitrary::Arbitrary;
 use num_bigint::BigUint;
+use std::cell::RefCell;
 
 /// The collection of modules and scripts that make up a Move program.
 /// This is the final output of the MoveSmith fuzzer.
@@ -26,8 +27,8 @@ pub struct Module {
     // pub address: Option<LeadingNameAccess>,
     pub name: Identifier,
     // pub is_spec_module: bool,
-    pub functions: Vec<Function>,
-    pub structs: Vec<StructDefinition>,
+    pub functions: Vec<RefCell<Function>>,
+    pub structs: Vec<RefCell<StructDefinition>>,
     // pub uses: Vec<UseDecl>,
     // pub friends: Vec<FriendDecl>,
     // pub constants: Vec<Constant>,
@@ -54,7 +55,6 @@ pub struct Function {
     /// `None` indicates no specifiers given, `Some([])` indicates the `pure` keyword has been
     /// used.
     // pub access_specifiers: Option<Vec<AccessSpecifier>>,
-    pub name: Identifier,
     // pub inline: bool,
     pub body: Option<FunctionBody>,
 
@@ -72,6 +72,7 @@ pub struct Visibility {
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
     // pub type_parameters: Vec<(Name, Vec<Ability>)>,
+    pub name: Identifier,
     pub parameters: Vec<(Identifier, Type)>,
     pub return_type: Option<Type>,
 }

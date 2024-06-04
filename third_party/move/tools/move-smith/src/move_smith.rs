@@ -25,18 +25,22 @@ use crate::{
 };
 use arbitrary::{Arbitrary, Result, Unstructured};
 use num_bigint::BigUint;
+use std::cell::RefCell;
 
 /// Keeps track of the generation state.
 pub struct MoveSmith {
     pub config: Config,
 
     // The output code
-    pub modules: Vec<Module>,
+    pub modules: Vec<RefCell<Module>>,
     pub script: Option<Script>,
 
+    // Skeleton Information
+    function_signatures: Vec<FunctionSignature>,
+
     // Bookkeeping
-    pub id_pool: IdentifierPool,
-    pub type_pool: TypePool,
+    pub id_pool: RefCell<IdentifierPool>,
+    pub type_pool: RefCell<TypePool>,
 }
 
 impl Default for MoveSmith {
@@ -50,18 +54,24 @@ impl MoveSmith {
     /// Create a new MoveSmith instance with the given configuration.
     pub fn new(config: Config) -> Self {
         Self {
+            config,
             modules: Vec::new(),
             script: None,
-            config,
-            id_pool: IdentifierPool::new(),
-            type_pool: TypePool::new(),
+            function_signatures: Vec::new(),
+            id_pool: RefCell::new(IdentifierPool::new()),
+            type_pool: RefCell::new(TypePool::new()),
         }
     }
 
     /// Get the generated compile unit.
     pub fn get_compile_unit(&self) -> CompileUnit {
+        let modules = self
+            .modules
+            .iter()
+            .map(|m| m.borrow().clone())
+            .collect::<Vec<Module>>();
         CompileUnit {
-            modules: self.modules.clone(),
+            modules,
             scripts: match &self.script {
                 Some(s) => vec![s.clone()],
                 None => Vec::new(),
@@ -76,61 +86,57 @@ impl MoveSmith {
     pub fn generate(&mut self, u: &mut Unstructured) -> Result<()> {
         let num_modules = u.int_in_range(1..=self.config.max_num_modules)?;
 
-        let mut modules = Vec::new();
         for _ in 0..num_modules {
-            modules.push(self.generate_module_skeleton(u)?);
+            self.modules
+                .push(RefCell::new(self.generate_module_skeleton(u)?));
         }
-        self.modules = modules;
 
-        let filled_modules = self
-            .modules
-            .clone()
-            .into_iter()
-            .map(|m| self.fill_module(u, m))
-            .collect::<Result<Vec<Module>>>()?;
-        self.modules = filled_modules;
+        for m in self.modules.iter() {
+            self.fill_module(u, m)?;
+        }
 
-        self.generate_script(u)?;
+        self.script = Some(self.generate_script(u)?);
+
         Ok(())
     }
 
     /// Generate a script that calls functions from the generated modules.
-    fn generate_script(&mut self, u: &mut Unstructured) -> Result<()> {
+    fn generate_script(&self, u: &mut Unstructured) -> Result<Script> {
         let mut script = Script { main: Vec::new() };
 
-        let all_funcs = self
-            .modules
-            .iter()
-            .flat_map(|m| m.functions.iter().cloned())
-            .collect::<Vec<Function>>();
+        let mut all_funcs: Vec<RefCell<Function>> = Vec::new();
+        for m in self.modules.iter() {
+            for f in m.borrow().functions.iter() {
+                all_funcs.push(f.clone());
+            }
+        }
 
         for _ in 0..u.int_in_range(1..=self.config.max_num_calls_in_script)? {
             let func = u.choose(&all_funcs)?;
-            let mut call = self.generate_call_to_function(u, &ROOT_SCOPE, func, false)?;
-            call.name = self.id_pool.flatten_access(&call.name).unwrap();
+            let mut call =
+                self.generate_call_to_function(u, &ROOT_SCOPE, &func.borrow().signature, false)?;
+            call.name = self.id_pool.borrow().flatten_access(&call.name).unwrap();
             script.main.push(call);
         }
 
-        self.script = Some(script);
-        Ok(())
+        Ok(script)
     }
 
     /// Generate a module skeleton with only struct and function skeletions.
-    fn generate_module_skeleton(&mut self, u: &mut Unstructured) -> Result<Module> {
-        let (name, scope) = self
-            .id_pool
-            .next_identifier(IdentifierType::Module, &Scope(Some("0xCAFE".to_string())));
+    fn generate_module_skeleton(&self, u: &mut Unstructured) -> Result<Module> {
+        let hardcoded_address = Scope(Some("0xCAFE".to_string()));
+        let (name, scope) = self.get_next_identifier(IdentifierType::Module, &hardcoded_address);
 
         // Struct names
         let mut structs = Vec::new();
         for _ in 0..u.int_in_range(1..=self.config.max_num_structs_in_module)? {
-            structs.push(self.generate_struct_skeleton(u, &scope)?);
+            structs.push(RefCell::new(self.generate_struct_skeleton(u, &scope)?));
         }
 
         // Function signatures
         let mut functions = Vec::new();
         for _ in 0..u.int_in_range(1..=self.config.max_num_functions_in_module)? {
-            functions.push(self.generate_function_skeleton(u, &scope)?);
+            functions.push(RefCell::new(self.generate_function_skeleton(u, &scope)?));
         }
 
         Ok(Module {
@@ -141,30 +147,31 @@ impl MoveSmith {
     }
 
     /// Fill in the skeletons
-    fn fill_module(&mut self, u: &mut Unstructured, mut module: Module) -> Result<Module> {
-        let scope = self.id_pool.get_scope_for_children(&module.name);
+    fn fill_module(&self, u: &mut Unstructured, module: &RefCell<Module>) -> Result<()> {
+        let scope = self
+            .id_pool
+            .borrow()
+            .get_scope_for_children(&module.borrow().name);
         // Struct fields
-        for s in module.structs.iter_mut() {
+        for s in module.borrow().structs.iter() {
             self.fill_struct(u, s, &scope)?;
         }
 
         // Function bodies
-        for f in module.functions.iter_mut() {
+        for f in module.borrow().functions.iter() {
             self.fill_function(u, f)?;
         }
 
-        Ok(module)
+        Ok(())
     }
 
     // Generate a struct skeleton with name and random abilities.
     fn generate_struct_skeleton(
-        &mut self,
+        &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<StructDefinition> {
-        let (name, _) = self
-            .id_pool
-            .next_identifier(IdentifierType::Struct, parent_scope);
+        let (name, _) = self.get_next_identifier(IdentifierType::Struct, parent_scope);
 
         let mut ability_choices = vec![Ability::Copy, Ability::Drop, Ability::Store, Ability::Key];
         let mut abilities = Vec::new();
@@ -173,7 +180,9 @@ impl MoveSmith {
             abilities.push(ability_choices.remove(idx));
         }
 
-        self.type_pool.register_type(Type::Struct(name.clone()));
+        self.type_pool
+            .borrow_mut()
+            .register_type(Type::Struct(name.clone()));
         Ok(StructDefinition {
             name,
             abilities,
@@ -183,25 +192,24 @@ impl MoveSmith {
 
     /// Fill in the struct fields with random types.
     fn fill_struct(
-        &mut self,
+        &self,
         u: &mut Unstructured,
-        st: &mut StructDefinition,
+        st: &RefCell<StructDefinition>,
         parent_scope: &Scope,
     ) -> Result<()> {
+        let struct_scope = st.borrow().name.to_scope();
         for _ in 0..u.int_in_range(0..=self.config.max_num_fields_in_struct)? {
-            let (name, _) = self
-                .id_pool
-                .next_identifier(IdentifierType::Var, &st.name.to_scope());
+            let (name, _) = self.get_next_identifier(IdentifierType::Var, &struct_scope);
 
             let typ = loop {
                 match u.int_in_range(0..=2)? {
                     // More chance to use basic types than struct types
-                    0 | 1 => break self.type_pool.random_basic_type(u)?,
+                    0 | 1 => break self.generate_basic_type(u)?,
                     2 => {
                         let candidates = self.get_usable_struct_type(
-                            st.abilities.clone(),
+                            st.borrow().abilities.clone(),
                             parent_scope,
-                            &st.name,
+                            &st.borrow().name,
                         );
                         if !candidates.is_empty() {
                             break Type::Struct(u.choose(&candidates)?.name.clone());
@@ -211,8 +219,8 @@ impl MoveSmith {
                 }
             };
             // Keeps track of the type of the field
-            self.type_pool.insert_mapping(&name, &typ);
-            st.fields.push((name, typ));
+            self.type_pool.borrow_mut().insert_mapping(&name, &typ);
+            st.borrow_mut().fields.push((name, typ));
         }
         Ok(())
     }
@@ -271,63 +279,70 @@ impl MoveSmith {
 
     /// Get the struct definition with the given identifier.
     fn get_struct_definition_with_identifier(&self, id: &Identifier) -> Option<StructDefinition> {
-        self.modules
-            .iter()
-            .find_map(|m| m.structs.iter().find(|s| &s.name == id).cloned())
+        for m in self.modules.iter() {
+            for s in m.borrow().structs.iter() {
+                if &s.borrow().name == id {
+                    return Some(s.borrow().clone());
+                }
+            }
+        }
+        None
     }
 
     /// Generate a function skeleton with name and signature.
     fn generate_function_skeleton(
-        &mut self,
+        &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Function> {
-        let (name, scope) = self
-            .id_pool
-            .next_identifier(IdentifierType::Function, parent_scope);
-        let signature = self.generate_function_signature(u, &scope)?;
+        let (name, scope) = self.get_next_identifier(IdentifierType::Function, parent_scope);
+        let signature = self.generate_function_signature(u, &scope, name)?;
 
         Ok(Function {
             signature,
             visibility: Visibility { public: true },
-            name,
             body: None,
             return_stmt: None,
         })
     }
 
     /// Fill in the function body and return statement.
-    fn fill_function(&mut self, u: &mut Unstructured, function: &mut Function) -> Result<()> {
-        let scope = self.id_pool.get_scope_for_children(&function.name);
-        function.body = Some(self.generate_function_body(u, &scope)?);
-        function.return_stmt = self.generate_return_stmt(u, &scope, &function.signature)?;
+    fn fill_function(&self, u: &mut Unstructured, function: &RefCell<Function>) -> Result<()> {
+        let scope = self
+            .id_pool
+            .borrow()
+            .get_scope_for_children(&function.borrow().signature.name);
+        let signature = function.borrow().signature.clone();
+        let mut mut_func = function.borrow_mut();
+        mut_func.body = Some(self.generate_function_body(u, &scope)?);
+        mut_func.return_stmt = self.generate_return_stmt(u, &scope, &signature)?;
         Ok(())
     }
 
     /// Generate a function signature with random number of parameters and return type.
     fn generate_function_signature(
-        &mut self,
+        &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
+        name: Identifier,
     ) -> Result<FunctionSignature> {
         let num_params = u.int_in_range(0..=self.config.max_num_params_in_func)?;
         let mut parameters = Vec::new();
         for _ in 0..num_params {
-            let (name, _) = self
-                .id_pool
-                .next_identifier(IdentifierType::Var, parent_scope);
+            let (name, _) = self.get_next_identifier(IdentifierType::Var, parent_scope);
 
-            let typ = self.type_pool.random_basic_type(u)?;
-            self.type_pool.insert_mapping(&name, &typ);
+            let typ = self.generate_basic_type(u)?;
+            self.type_pool.borrow_mut().insert_mapping(&name, &typ);
             parameters.push((name, typ));
         }
 
         let return_type = match bool::arbitrary(u)? {
-            true => Some(self.type_pool.random_basic_type(u)?),
+            true => Some(self.generate_basic_type(u)?),
             false => None,
         };
 
         Ok(FunctionSignature {
+            name,
             parameters,
             return_type,
         })
@@ -335,7 +350,7 @@ impl MoveSmith {
 
     /// Generate a return statement with a random expression.
     fn generate_return_stmt(
-        &mut self,
+        &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
         signature: &FunctionSignature,
@@ -365,7 +380,7 @@ impl MoveSmith {
 
     /// Generate a function body with random number of statements.
     fn generate_function_body(
-        &mut self,
+        &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<FunctionBody> {
@@ -380,11 +395,7 @@ impl MoveSmith {
     }
 
     /// Generate a random statement.
-    fn generate_statement(
-        &mut self,
-        u: &mut Unstructured,
-        parent_scope: &Scope,
-    ) -> Result<Statement> {
+    fn generate_statement(&self, u: &mut Unstructured, parent_scope: &Scope) -> Result<Statement> {
         match u.int_in_range(0..=1)? {
             0 => Ok(Statement::Decl(self.generate_declaration(u, parent_scope)?)),
             1 => Ok(Statement::Expr(self.generate_expression(u, parent_scope)?)),
@@ -394,15 +405,13 @@ impl MoveSmith {
 
     /// Generate a random declaration.
     fn generate_declaration(
-        &mut self,
+        &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Declaration> {
-        let (name, _) = self
-            .id_pool
-            .next_identifier(IdentifierType::Var, parent_scope);
+        let (name, _) = self.get_next_identifier(IdentifierType::Var, parent_scope);
 
-        let typ = self.type_pool.random_basic_type(u)?;
+        let typ = self.generate_basic_type(u)?;
         // let value = match bool::arbitrary(u)? {
         //     true => Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?),
         //     false => None,
@@ -410,13 +419,13 @@ impl MoveSmith {
         // TODO: disabled declaration without value for now, need to keep track of initialization
         let value = Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?);
         // Keeps track of the type of the newly created variable
-        self.type_pool.insert_mapping(&name, &typ);
+        self.type_pool.borrow_mut().insert_mapping(&name, &typ);
         Ok(Declaration { typ, name, value })
     }
 
     /// Generate a random expression.
     fn generate_expression(
-        &mut self,
+        &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Expression> {
@@ -464,7 +473,7 @@ impl MoveSmith {
     /// `allow_var`: allow using variable access, this is disabled for script
     /// `allow_call`: allow using function calls
     fn generate_expression_of_type(
-        &mut self,
+        &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
         typ: &Type,
@@ -502,10 +511,10 @@ impl MoveSmith {
 
         // Call functions with the given return type
         if allow_call {
-            let callables: Vec<Function> = self
+            let callables: Vec<FunctionSignature> = self
                 .get_callable_functions(parent_scope)
                 .into_iter()
-                .filter(|f| f.signature.return_type == Some(typ.clone()))
+                .filter(|f| f.return_type == Some(typ.clone()))
                 .collect();
             // Currently, we generate calls to all candidate functions
             // This could consume a lot raw bytes and may interfere with mutation
@@ -523,7 +532,7 @@ impl MoveSmith {
     /// Generate a struct initialization expression.
     /// This is `pack` in the parser AST.
     fn generate_struct_initialization(
-        &mut self,
+        &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
         struct_name: &Identifier,
@@ -545,7 +554,7 @@ impl MoveSmith {
 
     /// Generate a random function call.
     fn generate_function_call(
-        &mut self,
+        &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Option<FunctionCall>> {
@@ -565,15 +574,15 @@ impl MoveSmith {
 
     /// Generate a call to the given function.
     fn generate_call_to_function(
-        &mut self,
+        &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
-        func: &Function,
+        func: &FunctionSignature,
         allow_var: bool,
     ) -> Result<FunctionCall> {
         let mut args = Vec::new();
 
-        for (_, typ) in func.signature.parameters.iter() {
+        for (_, typ) in func.parameters.iter() {
             let expr = self.generate_expression_of_type(u, parent_scope, typ, allow_var, false)?;
             args.push(expr);
         }
@@ -587,7 +596,7 @@ impl MoveSmith {
     /// If the `typ` is `None`, a random type will be chosen.
     /// If the `typ` is `Some(Type::{U8, ..., U256})`, a literal of the given type will be used.
     fn generate_number_literal(
-        &mut self,
+        &self,
         u: &mut Unstructured,
         _parent_scope: &Scope,
         typ: Option<&Type>,
@@ -634,19 +643,33 @@ impl MoveSmith {
         })
     }
 
+    /// Returns one of the basic types that does not require a type argument.
+    pub fn generate_basic_type(&self, u: &mut Unstructured) -> Result<Type> {
+        Ok(match u.int_in_range(0..=6)? {
+            0 => Type::U8,
+            1 => Type::U16,
+            2 => Type::U32,
+            3 => Type::U64,
+            4 => Type::U128,
+            5 => Type::U256,
+            6 => Type::Bool,
+            // x => Type::Address, // Leave these two until the end
+            // x => Type::Signer,
+            _ => panic!("Unsupported basic type"),
+        })
+    }
+
     /// Get all callable functions in the given scope.
     // TODO: Handle visibility check
-    fn get_callable_functions(&self, scope: &Scope) -> Vec<Function> {
-        let mut funcs = Vec::new();
-        for m in self.modules.iter() {
-            for f in m.functions.iter() {
-                let parent_scope = self.id_pool.get_parent_scope_of(&f.name).unwrap();
-                if is_in_scope(scope, &parent_scope) {
-                    funcs.push(f.clone());
-                }
+    fn get_callable_functions(&self, scope: &Scope) -> Vec<FunctionSignature> {
+        let mut callable = Vec::new();
+        for f in self.function_signatures.iter() {
+            let parent_scope = self.id_pool.borrow().get_parent_scope_of(&f.name).unwrap();
+            if is_in_scope(scope, &parent_scope) {
+                callable.push(f.clone());
             }
         }
-        funcs
+        callable
     }
 
     /// Filter identifiers based on the given type, identifier type, and scope.
@@ -658,13 +681,16 @@ impl MoveSmith {
     ) -> Vec<Identifier> {
         // Filter based on the IdentifierType
         let all_ident = match ident_type {
-            Some(t) => self.id_pool.get_identifiers_of_ident_type(t),
-            None => self.id_pool.get_all_identifiers(),
+            Some(t) => self.id_pool.borrow().get_identifiers_of_ident_type(t),
+            None => self.id_pool.borrow().get_all_identifiers(),
         };
 
         // Filter based on Scope
         let ident_in_scope = match scope {
-            Some(s) => self.id_pool.filter_identifier_in_scope(&all_ident, s),
+            Some(s) => self
+                .id_pool
+                .borrow()
+                .filter_identifier_in_scope(&all_ident, s),
             None => all_ident,
         };
 
@@ -672,8 +698,20 @@ impl MoveSmith {
         match typ {
             Some(t) => self
                 .type_pool
+                .borrow()
                 .filter_identifier_with_type(t, ident_in_scope),
             None => ident_in_scope,
         }
+    }
+
+    /// Helper to get the next identifier.
+    fn get_next_identifier(
+        &self,
+        ident_type: IdentifierType,
+        parent_scope: &Scope,
+    ) -> (Identifier, Scope) {
+        self.id_pool
+            .borrow_mut()
+            .next_identifier(ident_type, parent_scope)
     }
 }
