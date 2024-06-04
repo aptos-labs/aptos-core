@@ -145,6 +145,18 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
         },
+        TestConfig {
+            name: "unused-assignment",
+            runner: |p| run_test(p, get_config_by_name("unused-assignment") ),
+            include: vec!["/unused-assignment/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone().set_experiment(Experiment::UNUSED_ASSIGNMENT_CHECK, true),
+            stop_after: StopAfter::BytecodePipeline(Some("UnusedAssignmentChecker")),
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: None,
+        },
         // Tests for lambda lifting
         TestConfig {
             name: "lambda-lifting",

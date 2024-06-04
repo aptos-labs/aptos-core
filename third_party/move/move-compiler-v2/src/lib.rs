@@ -34,6 +34,7 @@ use crate::{
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
         unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
+        unused_assignment_checker::UnusedAssignmentChecker,
     },
 };
 use anyhow::bail;
@@ -389,6 +390,11 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     if options.experiment_on(Experiment::UNINITIALIZED_CHECK) {
         let keep_annotations = options.experiment_on(Experiment::KEEP_UNINIT_ANNOTATIONS);
         pipeline.add_processor(Box::new(UninitializedUseChecker { keep_annotations }));
+    }
+
+    if options.experiment_on(Experiment::UNUSED_ASSIGNMENT_CHECK) {
+        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+        pipeline.add_processor(Box::new(UnusedAssignmentChecker {}));
     }
 
     // Reference check is always run, but the processor decides internally
