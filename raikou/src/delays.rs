@@ -1,4 +1,4 @@
-use crate::{framework::NodeId, multichain};
+use crate::framework::NodeId;
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use rand_distr::Distribution;
 use std::{
@@ -8,24 +8,21 @@ use std::{
     sync::Arc,
 };
 
-pub trait DelayFunction<M>: Fn(NodeId, NodeId, &M) -> f64 + Clone + Send + Sync + 'static {}
+pub trait DelayFunction: Fn(NodeId, NodeId) -> f64 + Clone + Send + Sync + 'static {}
 
-impl<M, F> DelayFunction<M> for F where
-    F: Fn(NodeId, NodeId, &M) -> f64 + Clone + Send + Sync + 'static
-{
-}
+impl<F> DelayFunction for F where F: Fn(NodeId, NodeId) -> f64 + Clone + Send + Sync + 'static {}
 
-pub fn uniformly_random_delay<M>(
+pub fn uniformly_random_delay(
     distr: impl Distribution<f64> + Send + Sync + Copy + 'static,
-) -> impl DelayFunction<M> {
-    move |_from, _to, _msg| thread_rng().sample(distr)
+) -> impl DelayFunction {
+    move |_from, _to| thread_rng().sample(distr)
 }
 
-pub fn spacial_delay_2d<M>(
+pub fn spacial_delay_2d(
     max_distr: impl Distribution<f64> + Send + Sync + Copy + 'static,
-) -> impl DelayFunction<M> {
+) -> impl DelayFunction {
     let sqrt2 = f64::sqrt(2.);
-    move |from: NodeId, to, _msg| {
+    move |from: NodeId, to| {
         let from_coordinate = coordinate_2d_from_hash(from);
         let to_coordinate = coordinate_2d_from_hash(to);
         distance_2d(from_coordinate, to_coordinate) / sqrt2 * thread_rng().sample(max_distr)
@@ -35,12 +32,12 @@ pub fn spacial_delay_2d<M>(
 /// `base_distr` is sampled once per pair of nodes.
 /// `mul_noise_distr` and `add_noise_distr` are sampled for each message.
 /// The delay is computed as `base * mul_noise + add_noise`.
-pub fn heterogeneous_symmetric_delay<M>(
+pub fn heterogeneous_symmetric_delay(
     link_base_distr: impl Distribution<f64> + Send + Sync + Copy + 'static,
     mul_noise_distr: impl Distribution<f64> + Send + Sync + Copy + 'static,
     add_noise_distr: impl Distribution<f64> + Send + Sync + Copy + 'static,
-) -> impl DelayFunction<M> {
-    move |from: NodeId, to: NodeId, _msg| {
+) -> impl DelayFunction {
+    move |from: NodeId, to: NodeId| {
         let mut base_seed = [0; 16];
         base_seed[..8].copy_from_slice(&hash((min(from, to), max(from, to))).to_le_bytes());
         let mut base_rng = SmallRng::from_seed(base_seed);
@@ -52,11 +49,11 @@ pub fn heterogeneous_symmetric_delay<M>(
     }
 }
 
-pub fn clustered_delay<M>(
+pub fn clustered_delay(
     within_cluster_distr: impl Distribution<f64> + Send + Sync + Copy + 'static,
     between_cluster_distr: impl Distribution<f64> + Send + Sync + Copy + 'static,
     clusters: Vec<Vec<NodeId>>,
-) -> impl DelayFunction<M> {
+) -> impl DelayFunction {
     // Perform a sanity check that no node is missing or present in multiple clusters.
     let max_id = clusters.iter().flatten().max().unwrap();
     let n_nodes = clusters.iter().map(|cluster| cluster.len()).sum::<usize>();
@@ -72,7 +69,7 @@ pub fn clustered_delay<M>(
             .collect(),
     );
 
-    move |from: NodeId, to: NodeId, _msg| {
+    move |from: NodeId, to: NodeId| {
         let from_cluster = clusters.get(&from).unwrap();
         let to_cluster = clusters.get(&to).unwrap();
         if from_cluster == to_cluster {

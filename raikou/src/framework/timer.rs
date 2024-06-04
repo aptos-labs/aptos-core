@@ -44,6 +44,7 @@ impl<E: Send + Sync> TimerService for LocalTimerService<E> {
     }
 }
 
+#[derive(Clone)]
 pub struct InjectedTimerService<U, I> {
     underlying: U,
     injection: I,
@@ -52,6 +53,15 @@ pub struct InjectedTimerService<U, I> {
 pub trait TimerInjection<E>: Fn(Duration, E) -> (Duration, E) + Send + Sync + 'static {}
 
 impl<I, E> TimerInjection<E> for I where I: Fn(Duration, E) -> (Duration, E) + Send + Sync + 'static {}
+
+pub fn clock_skew_injection<E>(clock_speed: f64) -> impl TimerInjection<E> {
+    move |duration, event| {
+        (
+            Duration::from_secs_f64(duration.as_secs_f64() / clock_speed),
+            event,
+        )
+    }
+}
 
 impl<U, I> InjectedTimerService<U, I>
 where

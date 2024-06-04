@@ -1,12 +1,13 @@
 use crate::{
-    delays::{heterogeneous_symmetric_delay, spacial_delay_2d, DelayFunction},
+    delays::{heterogeneous_symmetric_delay, DelayFunction},
     framework::{
         network::{InjectedLocalNetwork, Network, NetworkInjection},
-        timer::InjectedTimerService,
+        timer::{clock_skew_injection, InjectedTimerService},
         NodeId, Protocol,
     },
     leader_schedule::round_robin,
     multichain::{Config, MultiChainBft},
+    raikou::{dissemination, dissemination::fake::FakeDisseminationLayer},
 };
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use std::{collections::BTreeMap, iter, sync::Arc, time::Duration};
@@ -29,7 +30,7 @@ const JOLTEON_TIMEOUT: u32 = 3; // in Deltas
 
 // TODO: generalize this to any protocol
 fn multichain_network_injection(
-    delay_function: impl DelayFunction<multichain::Message>,
+    delay_function: impl DelayFunction,
     crashes: Vec<(NodeId, Slot)>,
 ) -> impl NetworkInjection<multichain::Message> {
     let crashes = Arc::new(BTreeMap::from_iter(crashes));
@@ -52,21 +53,21 @@ fn multichain_network_injection(
                 }
             }
 
-            let delay = f64::max(delay_function(from, to, &message), 0.);
+            let delay = f64::max(delay_function(from, to), 0.);
             tokio::time::sleep(Duration::from_secs_f64(delay)).await;
             Some(message)
         }
     }
 }
 fn network_injection<M: Send>(
-    delay_function: impl DelayFunction<M>,
+    delay_function: impl DelayFunction,
     // crashes: Vec<(NodeId, Instant)>,
 ) -> impl NetworkInjection<M> {
     move |from, to, message| {
         let delay_function = delay_function.clone();
 
         async move {
-            let delay = f64::max(delay_function(from, to, &message), 0.);
+            let delay = f64::max(delay_function(from, to), 0.);
             tokio::time::sleep(Duration::from_secs_f64(delay)).await;
             Some(message)
         }
@@ -74,7 +75,7 @@ fn network_injection<M: Send>(
 }
 
 async fn test_multichain(
-    delay_function: impl DelayFunction<multichain::Message>,
+    delay_function: impl DelayFunction,
     n_nodes: usize,
     slots_per_delta: Slot,
     delta: f64,
@@ -158,7 +159,7 @@ async fn test_multichain(
             // network_service.clear_inbox().await;
 
             // println!("Spawning node {node_id}");
-            let node = tokio::sync::Mutex::new(MultiChainBft::new_node(
+            let node = Arc::new(tokio::sync::Mutex::new(MultiChainBft::new_node(
                 node_id,
                 config,
                 start_time,
@@ -169,10 +170,10 @@ async fn test_multichain(
                     batch_commit_time: batch_commit_time_sender,
                     indirectly_committed_slots: indirectly_committed_slots_sender,
                 },
-            ));
+            )));
 
             semaphore.add_permits(1);
-            Protocol::run(&node, node_id, network_service, timer).await
+            Protocol::run(node, node_id, network_service, timer).await
         }));
     }
 
@@ -235,7 +236,7 @@ async fn test_multichain(
 }
 
 async fn test_multichain_with_random_crashes(
-    delay_function: impl DelayFunction<multichain::Message>,
+    delay_function: impl DelayFunction,
     n_nodes: usize,
     slots_per_delta: Slot,
     delta: f64,
@@ -268,7 +269,7 @@ async fn test_multichain_with_random_crashes(
 }
 
 async fn test_multichain_with_consecutive_faulty_leaders_in_a_chain(
-    delay_function: impl DelayFunction<multichain::Message>,
+    delay_function: impl DelayFunction,
     n_nodes: usize,
     slots_per_delta: Slot,
     delta: f64,
@@ -298,7 +299,7 @@ async fn test_multichain_with_consecutive_faulty_leaders_in_a_chain(
 }
 
 async fn test_jolteon(
-    delay_function: impl DelayFunction<jolteon::Message<()>>,
+    delay_function: impl DelayFunction,
     n_nodes: usize,
     delta: f64,
     warmup_duration_in_delta: u32,
@@ -377,16 +378,16 @@ async fn test_jolteon(
             let (_, txns_receiver) = mpsc::channel::<()>(100);
 
             // println!("Spawning node {node_id}");
-            let node = tokio::sync::Mutex::new(jolteon::JolteonNode::new(
+            let node = Arc::new(tokio::sync::Mutex::new(jolteon::JolteonNode::new(
                 node_id,
                 config,
                 txns_receiver,
                 start_time,
                 node_id == monitored_node,
-            ));
+            )));
 
             semaphore.add_permits(1);
-            Protocol::run(&node, node_id, network_service, timer).await
+            Protocol::run(node, node_id, network_service, timer).await
         }));
     }
 
@@ -449,7 +450,7 @@ async fn test_jolteon(
 }
 
 async fn test_jolteon_with_fast_qs(
-    delay_function: impl DelayFunction<jolteon_fast_qs::Message<()>>,
+    delay_function: impl DelayFunction,
     n_nodes: usize,
     delta: f64,
     warmup_duration_in_delta: u32,
@@ -532,7 +533,7 @@ async fn test_jolteon_with_fast_qs(
             let next_txn = || ();
 
             // println!("Spawning node {node_id}");
-            let node = tokio::sync::Mutex::new(jolteon_fast_qs::JolteonNode::new(
+            let node = Arc::new(tokio::sync::Mutex::new(jolteon_fast_qs::JolteonNode::new(
                 node_id,
                 config,
                 next_txn,
@@ -544,10 +545,10 @@ async fn test_jolteon_with_fast_qs(
                     batch_commit_time: batch_commit_time_sender,
                     // indirectly_committed_slots: indirectly_committed_slots_sender,
                 },
-            ));
+            )));
 
             semaphore.add_permits(1);
-            Protocol::run(&node, node_id, network_service, timer).await
+            Protocol::run(node, node_id, network_service, timer).await
         }));
     }
 
@@ -612,7 +613,7 @@ async fn test_jolteon_with_fast_qs(
 }
 
 async fn test_raikou(
-    delay_function: impl DelayFunction<raikou::Message>,
+    delay_function: impl DelayFunction + Clone,
     n_nodes: usize,
     delta: f64,
     spawn_period_in_delta: u32,
@@ -631,6 +632,8 @@ async fn test_raikou(
         rand_distr::Uniform::new(1. * delta, spawn_period_in_delta as f64 * delta);
     let clock_speed_distr = rand_distr::Normal::new(1., 0.01).unwrap();
 
+    let mut diss_network =
+        InjectedLocalNetwork::new(n_nodes, network_injection(delay_function.clone()));
     let mut network = InjectedLocalNetwork::new(n_nodes, network_injection(delay_function));
 
     let f = (n_nodes - 1) / 3;
@@ -663,15 +666,14 @@ async fn test_raikou(
     let start_time = Instant::now();
     for node_id in 0..n_nodes {
         let config = config.clone();
+        let diss_network_service = diss_network.service(node_id);
         let network_service = network.service(node_id);
 
         let clock_speed = { thread_rng().sample(clock_speed_distr) };
-        let timer = InjectedTimerService::local(move |duration, event| {
-            (
-                Duration::from_secs_f64(duration.as_secs_f64() / clock_speed),
-                event,
-            )
-        });
+
+        // introduce artificial clock skew.
+        let diss_timer = InjectedTimerService::local(clock_skew_injection(clock_speed));
+        let timer = InjectedTimerService::local(clock_skew_injection(clock_speed));
 
         // let propose_time_sender = Some(propose_time.new_sender());
         // let enter_time_sender = if node_id == monitored_node {
@@ -698,10 +700,23 @@ async fn test_raikou(
             // // Before starting the node, "drop" all messages sent to it during the spawn delay.
             // network_service.clear_inbox().await;
 
+            let txns_iter = iter::repeat_with(|| vec![]);
+
+            let dissemination = FakeDisseminationLayer::new(
+                node_id,
+                dissemination::fake::Config {
+                    n_nodes,
+                    ac_quorum: 2 * f + 1,
+                    batch_interval: Duration::from_secs_f64(delta * 0.1),
+                },
+                txns_iter,
+            );
+
             // println!("Spawning node {node_id}");
-            let node = tokio::sync::Mutex::new(raikou::RaikouNode::new(
+            let node = Arc::new(tokio::sync::Mutex::new(raikou::RaikouNode::new(
                 node_id,
                 config,
+                dissemination.clone(),
                 start_time,
                 node_id == monitored_node,
                 raikou::Metrics {
@@ -710,10 +725,17 @@ async fn test_raikou(
                     batch_commit_time: batch_commit_time_sender,
                     // indirectly_committed_slots: indirectly_committed_slots_sender,
                 },
+            )));
+
+            spawn(Protocol::run(
+                dissemination.protocol(),
+                node_id,
+                diss_network_service,
+                diss_timer,
             ));
+            spawn(Protocol::run(node, node_id, network_service, timer));
 
             semaphore.add_permits(1);
-            Protocol::run(&node, node_id, network_service, timer).await
         }));
     }
 

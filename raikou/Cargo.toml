@@ -12,6 +12,9 @@ rust-version.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+aptos-consensus = { workspace = true }
+aptos-consensus-types = { workspace = true }
+aptos-crypto = { workspace = true }
 bitvec = { workspace = true }
 defaultmap = "0.5.0"  # Since version 0.6.0, the maps are !Send and !Sync
 env_logger = { workspace = true }

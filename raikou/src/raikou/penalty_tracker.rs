@@ -1,8 +1,8 @@
 use crate::{
     framework::NodeId,
     raikou::{
-        types::{BatchSN, Round},
-        Batch, BatchRef, Block, Config,
+        types::{BatchSN, Round, *},
+        Block, Config,
     },
 };
 use bitvec::prelude::BitVec;
@@ -39,11 +39,11 @@ type NodeIdMap<T> = Vec<T>;
 pub struct PenaltyTracker<S> {
     config: Config<S>,
 
-    batch_receive_time: BTreeMap<BatchRef, Instant>,
+    batch_receive_time: BTreeMap<BatchInfo, Instant>,
 
     // The variables below are relative to the last round this node was leader.
     last_round_this_node_was_leader: Round,
-    proposed_batches: Vec<BatchRef>,
+    proposed_batches: Vec<BatchInfo>,
     block_issue_time: Instant,
     received_reports: BTreeSet<NodeId>,
     // The following
@@ -71,7 +71,7 @@ impl<S> PenaltyTracker<S> {
 
     pub fn prepare_reports(
         &self,
-        batches: &Vec<BatchRef>,
+        batches: &Vec<BatchInfo>,
         block_receive_time: Instant,
     ) -> Vec<PenaltyTrackerReportEntry> {
         assert!(self.config.enable_penalty_system);
@@ -123,7 +123,7 @@ impl<S> PenaltyTracker<S> {
                         self.advantage_votes[node_id].push(advantage);
                     },
                     PenaltyTrackerReportEntry::Missing(sn) => {
-                        let batch_ref = BatchRef { node: node_id, sn };
+                        let batch_ref = BatchInfo { node: node_id, sn };
                         if !self.batch_receive_time.contains_key(&batch_ref) {
                             warn!(
                                 "Received a report about an unknown missing batch {:?} \
@@ -145,7 +145,7 @@ impl<S> PenaltyTracker<S> {
         }
     }
 
-    fn batch_propose_delay(&self, batch_ref: BatchRef) -> Duration {
+    fn batch_propose_delay(&self, batch_ref: BatchInfo) -> Duration {
         self.block_issue_time - self.batch_receive_time[&batch_ref]
     }
 
@@ -203,7 +203,7 @@ impl<S> PenaltyTracker<S> {
         updated_penalties
     }
 
-    pub fn on_new_batch(&mut self, batch_ref: BatchRef) {
+    pub fn on_new_batch(&mut self, batch_ref: BatchInfo) {
         // This should be executed even when the penalty system is turned off.
         self.batch_receive_time.insert(batch_ref, Instant::now());
     }
@@ -211,8 +211,8 @@ impl<S> PenaltyTracker<S> {
     pub fn prepare_new_block(
         &mut self,
         round: Round,
-        batches: &BTreeSet<BatchRef>,
-    ) -> Vec<BatchRef> {
+        batches: &BTreeSet<BatchInfo>,
+    ) -> Vec<BatchInfo> {
         if !self.config.enable_penalty_system {
             return batches
                 .iter()
@@ -226,7 +226,7 @@ impl<S> PenaltyTracker<S> {
 
         let now = Instant::now();
 
-        let batches_to_propose: Vec<BatchRef> = batches
+        let batches_to_propose: Vec<BatchInfo> = batches
             .into_iter()
             .copied()
             .map(|batch_ref| {

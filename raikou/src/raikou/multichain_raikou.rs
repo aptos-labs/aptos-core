@@ -1,15 +1,17 @@
+use std::{cmp::max, sync::Arc, time::Duration};
+
+use defaultmap::DefaultBTreeMap;
+use tokio::time::Instant;
+
 use crate::{
     framework::{context::WrappedContext, ContextFor, NodeId, Protocol},
     leader_schedule::LeaderSchedule,
     metrics,
     metrics::Sender,
     protocol, raikou,
-    raikou::{types::Txn, RaikouNode},
+    raikou::{RaikouNode, types::Txn},
     Slot,
 };
-use defaultmap::DefaultBTreeMap;
-use std::{cmp::max, sync::Arc, time::Duration};
-use tokio::time::Instant;
 
 type ChainId = usize;
 

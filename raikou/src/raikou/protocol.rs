@@ -5,6 +5,7 @@ use crate::{
     metrics::Sender,
     protocol,
     raikou::{
+        dissemination::DisseminationLayer,
         penalty_tracker::{PenaltyTracker, PenaltyTrackerReportEntry},
         types::*,
     },
@@ -15,52 +16,23 @@ use defaultmap::DefaultBTreeMap;
 use itertools::Itertools;
 use std::{
     cmp::{max, max_by, max_by_key, min, Ordering},
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     fmt::{Debug, Formatter},
     sync::Arc,
     time::Duration,
 };
 use tokio::time::Instant;
 
-#[derive(Clone)]
-pub struct Batch {
-    node: NodeId,
-    sn: BatchSN,
-}
-
-impl Batch {
-    pub fn get_ref(&self) -> BatchRef {
-        BatchRef {
-            node: self.node,
-            sn: self.sn,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
-pub struct BatchRef {
-    pub node: NodeId,
-    pub sn: BatchSN,
-}
-
-impl Debug for BatchRef {
+impl Debug for BatchInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{{ node: {}, sn: {} }}", self.node, self.sn)
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct AC {
-    // In practice, this would be a hash pointer.
-    batch: BatchRef,
-    signers: BitVec,
-}
-
 #[derive(Clone)]
 pub struct Block {
     pub round: Round,
-    pub acs: Vec<AC>,
-    pub batches: Vec<BatchRef>,
+    pub payload: Payload,
     pub parent_qc: Option<QC>, // `None` only for the genesis block.
     pub reason: RoundEnterReason,
 }
@@ -69,11 +41,26 @@ impl Block {
     pub fn genesis() -> Self {
         Block {
             round: 0,
-            acs: vec![],
-            batches: vec![],
+            payload: Payload::empty(),
             parent_qc: None,
             reason: RoundEnterReason::Genesis,
         }
+    }
+
+    pub fn n_batches(&self) -> usize {
+        self.payload.batches().len()
+    }
+
+    pub fn batch(&self, index: usize) -> BatchInfo {
+        self.payload.batches()[index]
+    }
+
+    pub fn acs(&self) -> &Vec<AC> {
+        self.payload.acs()
+    }
+
+    pub fn batches(&self) -> &Vec<BatchInfo> {
+        self.payload.batches()
     }
 
     pub fn is_genesis(&self) -> bool {
@@ -84,7 +71,7 @@ impl Block {
     /// 1. It contains a valid multi-signature (omitted in the prototype);
     /// 2. It contains a valid parent QC;
     /// 3. At least one of the three conditions hold:
-    ///    - `parent_qc.round == round - 1` and `parent_qc.prefix == parent_qc.n_opt_batches`;
+    ///    - `parent_qc.round == round - 1` and `parent_qc.prefix == parent_qc.n_batches`;
     ///    - `cc` is not None, `cc.round == round - 1`, and `parent_qc.id() >= cc.highest_qc_id()`.
     ///    - `tc` is not None, `cc.round == round - 1`, and `parent_qc.id() >= tc.highest_qc_id()`.
     pub fn is_valid(&self) -> bool {
@@ -99,7 +86,7 @@ impl Block {
         match &self.reason {
             RoundEnterReason::Genesis => false, // Should not be used in a non-genesis block.
             RoundEnterReason::FullPrefixQC => {
-                parent_qc.round == self.round - 1 && parent_qc.prefix == parent_qc.n_opt_batches
+                parent_qc.round == self.round - 1 && parent_qc.prefix == parent_qc.n_batches
             },
             RoundEnterReason::CC(cc) => {
                 cc.round == self.round - 1 && parent_qc.sub_block_id() >= cc.highest_qc_id()
@@ -115,7 +102,7 @@ impl Block {
 pub struct QC {
     round: Round,
     prefix: Prefix,
-    n_opt_batches: Prefix,
+    n_batches: Prefix,
 
     // In practice, this would be a hash pointer.
     block: Arc<Block>,
@@ -149,7 +136,7 @@ impl QC {
         QC {
             round: 0,
             prefix: 0,
-            n_opt_batches: 0,
+            n_batches: 0,
             block: Arc::new(Block::genesis()),
         }
     }
@@ -273,12 +260,6 @@ impl Debug for RoundEnterReason {
 
 #[derive(Clone)]
 pub enum Message {
-    // Dissemination layer
-    Fetch(BatchRef),
-    Batch(Batch),
-    BatchStored(BatchSN),
-    AvailabilityCert(AC),
-
     // Consensus
     Block(Block),
     QcVote(Round, Prefix),
@@ -292,9 +273,6 @@ pub enum Message {
 
 #[derive(Clone)]
 pub enum TimerEvent {
-    // Dissemination layer
-    NewBatch(BatchSN),
-
     // Consensus
     QcVote(Round),
     Timeout(Round),
@@ -347,31 +325,15 @@ pub struct Metrics {
     pub batch_commit_time: Option<metrics::UnorderedSender<(Instant, f64)>>,
 }
 
-pub struct RaikouNode<S> {
+pub struct RaikouNode<S, DL> {
     node_id: NodeId,
     config: Config<S>,
+    dissemination: DL,
 
     // Logging and metrics
     start_time: Instant,
     detailed_logging: bool,
-    batch_created_time: DefaultBTreeMap<BatchSN, Instant>,
     metrics: Metrics,
-
-    // Dissemination layer
-
-    // Storage for all received batches and the time when they were.
-    batches: BTreeMap<BatchRef, Batch>,
-    // Storage of all received ACs.
-    acs: BTreeMap<BatchRef, AC>,
-    // Set of committed batches.
-    committed_batches: BTreeSet<BatchRef>,
-    // Set of known ACs that are not yet committed.
-    new_acs: BTreeSet<BatchRef>,
-    // Set of known uncertified batches that are not yet committed.
-    new_batches: BTreeSet<BatchRef>,
-
-    // The set of nodes that have stored this node's batch with the given sequence number.
-    batch_stored_votes: DefaultBTreeMap<BatchSN, BitVec>,
 
     // Protocol state for the pseudocode
     r_ready: Round,                 // The highest round the node is ready to enter.
@@ -391,7 +353,7 @@ pub struct RaikouNode<S> {
 
     // Additional variables necessary for an efficient implementation
     blocks: BTreeMap<Round, Block>,
-    stored_prefix: Prefix,
+    stored_prefix_cache: (Round, Prefix),
     // In practice, all votes should also include a signature.
     // In this prototype, signatures are omitted.
     qc_votes: DefaultBTreeMap<Round, BTreeMap<NodeId, Prefix>>,
@@ -400,33 +362,27 @@ pub struct RaikouNode<S> {
     tc_votes: DefaultBTreeMap<Round, BTreeMap<NodeId, SubBlockId>>,
 }
 
-impl<S: LeaderSchedule> RaikouNode<S> {
+impl<S: LeaderSchedule, DL: DisseminationLayer> RaikouNode<S, DL> {
     pub fn new(
         id: NodeId,
         config: Config<S>,
+        dissemination: DL,
         start_time: Instant,
         detailed_logging: bool,
         metrics: Metrics,
     ) -> Self {
-        let n_nodes = config.n_nodes;
         let quorum = config.quorum();
 
         RaikouNode {
             node_id: id,
             config: config.clone(),
+            dissemination,
             start_time,
             detailed_logging,
-            batch_created_time: DefaultBTreeMap::new(Instant::now()),
             metrics,
-            batches: Default::default(),
-            committed_batches: Default::default(),
-            new_batches: Default::default(),
-            batch_stored_votes: DefaultBTreeMap::new(BitVec::repeat(false, n_nodes)),
             r_ready: 0,
             r_allowed: 0,
             enter_reason: RoundEnterReason::Genesis,
-            acs: Default::default(),
-            new_acs: Default::default(),
             r_cur: 0,
             last_qc_vote: (0, 0).into(),
             last_commit_vote: (0, 0).into(),
@@ -437,7 +393,7 @@ impl<S: LeaderSchedule> RaikouNode<S> {
             committed_qc: QC::genesis(),
             penalty_tracker: PenaltyTracker::new(config),
             blocks: Default::default(),
-            stored_prefix: 0,
+            stored_prefix_cache: (0, 0),
             qc_votes: Default::default(),
             received_cc_vote: Default::default(),
             cc_votes: DefaultBTreeMap::new(KthMaxSet::new(quorum)),
@@ -472,7 +428,7 @@ impl<S: LeaderSchedule> RaikouNode<S> {
             }
         }
 
-        if new_qc.prefix == new_qc.n_opt_batches {
+        if new_qc.prefix == new_qc.n_batches {
             // If form or receive a qc for the largest possible prefix of a round,
             // advance to the next round after that.
             self.advance_r_ready(new_qc.round + 1, RoundEnterReason::FullPrefixQC, ctx)
@@ -501,42 +457,49 @@ impl<S: LeaderSchedule> RaikouNode<S> {
         }
     }
 
-    /// Utility function to update `self.stored_prefix`.
-    /// Executed after receiving a block or a new batch.
-    fn update_stored_prefix(&mut self) {
-        if let Some(block) = self.blocks.get(&self.r_cur) {
-            let n_opt_batches = block.batches.len();
+    async fn stored_prefix(&mut self) -> Prefix {
+        debug_assert!(self.blocks.contains_key(&self.r_cur));
+        let block = &self.blocks[&self.r_cur];
 
-            while self.stored_prefix < n_opt_batches
-                && self
-                    .batches
-                    .contains_key(&block.batches[self.stored_prefix])
-            {
-                self.stored_prefix += 1;
-            }
+        if self.stored_prefix_cache.0 != self.r_cur {
+            self.stored_prefix_cache = (self.r_cur, 0);
         }
+
+        while self.stored_prefix_cache.1 < block.n_batches()
+            && self
+                .dissemination
+                .check_stored(&block.batch(self.stored_prefix_cache.1))
+                .await
+        {
+            self.stored_prefix_cache.1 += 1;
+        }
+
+        self.stored_prefix_cache.1
     }
 
     /// Returns the number of full-prefix votes in `round` if received the block for `round`
     /// and `0` otherwise.
     fn n_full_prefix_votes(&self, round: Round) -> usize {
         if let Some(block) = self.blocks.get(&round) {
-            let n_opt_batches = block.batches.len();
-
-            // This can be optimized in a practical implementation by tracking the number
-            // of full-prefix votes as they arrive.
+            // TODO: This can be optimized by tracking the number
+            //       of full-prefix votes as they arrive.
             self.qc_votes[round]
                 .values()
-                .filter(|&&vote| vote == n_opt_batches)
+                .filter(|&&vote| vote == block.n_batches())
                 .count()
         } else {
             0
         }
     }
 
-    fn commit_qc(&mut self, qc: &QC, commit_reason: CommitReason) {
+    async fn commit_qc(&mut self, qc: &QC, commit_reason: CommitReason) {
+        let committed = self.commit_qc_impl(qc, commit_reason);
+        self.dissemination.notify_commit(committed).await;
+    }
+
+    fn commit_qc_impl(&mut self, qc: &QC, commit_reason: CommitReason) -> Vec<Payload> {
         if *qc <= self.committed_qc {
-            return;
+            return vec![];
         }
 
         let parent = qc.block.parent_qc.as_ref().unwrap();
@@ -550,38 +513,43 @@ impl<S: LeaderSchedule> RaikouNode<S> {
         }
 
         // First commit the parent block.
-        self.commit_qc(qc.block.parent_qc.as_ref().unwrap(), CommitReason::Indirect);
+        let mut res =
+            self.commit_qc_impl(qc.block.parent_qc.as_ref().unwrap(), CommitReason::Indirect);
 
         // Then, commit the transactions of this block.
 
         if qc.round == self.committed_qc.round {
             assert!(qc.prefix > self.committed_qc.prefix);
             self.log_detail(format!(
-                "Extending the prefix of committed block {}: {} -> {} / {} ({:?})",
+                "Extending the prefix of committed block {}: {} -> {} / {}{} ({:?})",
                 qc.round,
                 self.committed_qc.prefix,
                 qc.prefix,
-                qc.block.batches.len(),
+                qc.block.n_batches(),
+                if qc.prefix == qc.block.n_batches() {
+                    " (full)"
+                } else {
+                    ""
+                },
                 commit_reason,
             ));
-            for batch_ref in qc
+            let new_batches: Vec<BatchInfo> = qc
                 .block
-                .batches
+                .batches()
                 .iter()
                 .take(qc.prefix)
                 .skip(self.committed_qc.prefix)
-                .copied()
-            {
-                self.commit_batch(batch_ref);
-            }
+                .cloned()
+                .collect();
+            res.push(Payload::new(vec![], new_batches));
         } else {
             self.log_detail(format!(
                 "Committing block {} proposed by node {} with prefix {}/{}{} ({:?})",
                 qc.round,
                 self.config.leader(qc.round),
                 qc.prefix,
-                qc.block.batches.len(),
-                if qc.prefix == qc.block.batches.len() {
+                qc.block.n_batches(),
+                if qc.prefix == qc.block.n_batches() {
                     " (full)"
                 } else {
                     ""
@@ -589,39 +557,12 @@ impl<S: LeaderSchedule> RaikouNode<S> {
                 commit_reason,
             ));
 
-            // First, the ACs.
-            for ac in &qc.block.acs {
-                // self.log_detail(format!("Committing batch {:?} through AC", ac.batch));
-                self.commit_batch(ac.batch);
-            }
-
-            // And then the optimistically proposed batches.
-            for batch_ref in qc.block.batches.iter().take(qc.prefix).copied() {
-                // self.log_detail(format!("Committing batch {:?} optimistically", batch_ref));
-                self.commit_batch(batch_ref);
-            }
+            res.push(qc.block.payload.clone());
         }
 
         // Finally, update the committed QC variable.
         self.committed_qc = qc.clone();
-    }
-
-    fn commit_batch(&mut self, batch_ref: BatchRef) {
-        // NB: in this version, for simplicity, we do not deduplicate batches before proposing.
-        if self.committed_batches.insert(batch_ref) {
-            self.new_acs.remove(&batch_ref);
-            self.new_batches.remove(&batch_ref);
-
-            if batch_ref.node == self.node_id {
-                let commit_time = self.batch_created_time[batch_ref.sn]
-                    .elapsed()
-                    .as_secs_f64()
-                    / self.config.delta.as_secs_f64();
-                self.metrics
-                    .batch_commit_time
-                    .push((self.batch_created_time[batch_ref.sn], commit_time));
-            }
-        }
+        res
     }
 
     fn quorum(&self) -> usize {
@@ -648,87 +589,17 @@ impl<S: LeaderSchedule> RaikouNode<S> {
     }
 }
 
-impl<S: LeaderSchedule> Protocol for RaikouNode<S> {
+impl<S, DL> Protocol for RaikouNode<S, DL>
+where
+    S: LeaderSchedule,
+    DL: DisseminationLayer,
+{
     type Message = Message;
     type TimerEvent = TimerEvent;
 
     protocol! {
         self: self;
         ctx: ctx;
-
-        // Dissemination layer
-        // In this implementation, batches are simply sent periodically, by a timer.
-
-        upon start {
-            // The first batch is sent immediately.
-            ctx.set_timer(Duration::ZERO, TimerEvent::NewBatch(1));
-        };
-
-        upon timer [TimerEvent::NewBatch(sn)] {
-            // Multicast a new batch
-            ctx.multicast(Message::Batch(Batch {
-                node: self.node_id,
-                sn,
-            })).await;
-
-            self.batch_created_time[sn] = Instant::now();
-
-            // Reset the timer.
-            ctx.set_timer(self.config.batch_interval, TimerEvent::NewBatch(sn + 1));
-        };
-
-        // Upon receiving a batch, store it, reply with a BatchStored message,
-        // and execute try_vote.
-        upon receive [Message::Batch(batch)] from node [p] {
-            let batch_ref = batch.get_ref();
-            if !self.batches.contains_key(&batch_ref) {
-                self.batches.insert(batch_ref, batch);
-                self.penalty_tracker.on_new_batch(batch_ref);
-                ctx.unicast(Message::BatchStored(batch_ref.sn), p).await;
-
-                // Track the list of known uncommitted uncertified batches.
-                if !self.acs.contains_key(&batch_ref) && !self.committed_batches.contains(&batch_ref) {
-                    self.new_batches.insert(batch_ref);
-                }
-
-                self.update_stored_prefix();
-            }
-        };
-
-        // Upon receiving a quorum of BatchStored messages for a batch,
-        // form an AC and broadcast it.
-        upon receive [Message::BatchStored(sn)] from node [p] {
-            self.batch_stored_votes[sn].set(p, true);
-
-            if self.batch_stored_votes[sn].count_ones() == self.quorum() {
-                ctx.multicast(Message::AvailabilityCert(AC {
-                    batch: BatchRef { node: self.node_id, sn },
-                    signers: self.batch_stored_votes[sn].clone(),
-                })).await;
-            }
-        };
-
-        upon receive [Message::AvailabilityCert(ac)] from [_any_node] {
-            self.acs.insert(ac.batch, ac.clone());
-
-            // Track the list of known uncommitted ACs
-            // and the list of known uncommitted uncertified batches.
-            if !self.committed_batches.contains(&ac.batch) {
-                self.new_acs.insert(ac.batch);
-                self.new_batches.remove(&ac.batch);
-            }
-        };
-
-        upon receive [Message::Fetch(batch_ref)] from node [p] {
-            // FIXME: fetching is not actually being used yet.
-            //        `Message::Fetch` is never sent.
-            // If receive a Fetch message, reply with the batch if it is known.
-            if let Some(batch) = self.batches.get(&batch_ref) {
-                ctx.unicast(Message::Batch(batch.clone()), p).await;
-            }
-        };
-
-        // Steady state protocol
 
         // Nodes start the protocol by entering round 1.
         upon start {
@@ -742,7 +613,6 @@ impl<S: LeaderSchedule> Protocol for RaikouNode<S> {
             let round = self.r_ready;
 
             self.r_cur = round;
-            self.stored_prefix = 0;
 
             self.log_detail(format!("Entering round {} by {:?}", round, self.enter_reason));
 
@@ -754,12 +624,8 @@ impl<S: LeaderSchedule> Protocol for RaikouNode<S> {
 
                 let block = Block {
                     round,
-                    acs: self
-                        .new_acs
-                        .iter()
-                        .map(|&batch_ref| self.acs[&batch_ref].clone())
-                        .collect(),
-                    batches: self.penalty_tracker.prepare_new_block(round, &self.new_batches),
+                    // TODO: implement deduplication.
+                    payload: self.dissemination.pull_payload(HashSet::new()).await,
                     parent_qc: Some(self.qc_high.clone()),
                     reason: self.enter_reason.clone(),
                 };
@@ -787,30 +653,26 @@ impl<S: LeaderSchedule> Protocol for RaikouNode<S> {
             {
                 self.blocks.insert(block.round, block.clone());
 
-                let Block { round, acs, batches, parent_qc, reason, .. } = block;
+                let Block { round, payload, parent_qc, reason, .. } = block;
                 // a valid non-genesis block, by definition, always has a parent QC.
                 let parent_qc = parent_qc.unwrap();
 
                 self.on_new_qc(&parent_qc, ctx).await;
                 self.advance_r_ready(round, reason, ctx).await;
 
-                // update `self.stored_prefix`
-                self.update_stored_prefix();
                 ctx.set_timer(self.config.extra_wait_before_qc_vote, TimerEvent::QcVote(round));
-
-                // store the ACs
-                for ac in acs {
-                    self.acs.insert(ac.batch, ac);
-                }
 
                 // send the penalty tracker reports
                 if self.config.enable_penalty_system {
                     let reports = self.penalty_tracker.prepare_reports(
-                        &batches,
+                        payload.batches(),
                         Instant::now(),
                     );
                     ctx.unicast(Message::PenaltyTrackerReport(round, reports), leader).await;
                 }
+
+                // store the ACs
+                self.dissemination.prefetch_payload_data(payload).await;
             }
         };
 
@@ -830,19 +692,25 @@ impl<S: LeaderSchedule> Protocol for RaikouNode<S> {
 
         upon timer [TimerEvent::QcVote(round)] {
             if round == self.r_cur && self.last_qc_vote.round < round && round > self.r_timeout {
-                self.last_qc_vote = (self.r_cur, self.stored_prefix).into();
-                ctx.multicast(Message::QcVote(self.r_cur, self.stored_prefix)).await;
+                let stored_prefix = self.stored_prefix().await;
+                self.last_qc_vote = (self.r_cur, stored_prefix).into();
+                ctx.multicast(Message::QcVote(self.r_cur, stored_prefix)).await;
             }
         };
 
         upon [
             self.r_cur > self.r_timeout
             && self.blocks.contains_key(&self.r_cur)
-            && self.stored_prefix == self.blocks[&self.r_cur].batches.len()
-            && self.last_qc_vote < (self.r_cur, self.stored_prefix).into()
+            && {
+                let stored_prefix = self.stored_prefix().await;
+
+                stored_prefix == self.blocks[&self.r_cur].n_batches()
+                && self.last_qc_vote < (self.r_cur, stored_prefix).into()
+            }
         ] {
-            self.last_qc_vote = (self.r_cur, self.stored_prefix).into();
-            ctx.multicast(Message::QcVote(self.r_cur, self.stored_prefix)).await;
+            let stored_prefix = self.stored_prefix().await;
+            self.last_qc_vote = (self.r_cur, stored_prefix).into();
+            ctx.multicast(Message::QcVote(self.r_cur, stored_prefix)).await;
         };
 
         // Upon receiving the block for round r_cur and a quorum of qc-votes for this block,
@@ -861,7 +729,7 @@ impl<S: LeaderSchedule> Protocol for RaikouNode<S> {
                 self.qc_high.round < self.r_cur
                 || (
                     self.blocks.contains_key(&self.r_cur)
-                    && self.qc_high.sub_block_id() < (self.r_cur, self.blocks[&self.r_cur].batches.len()).into()
+                    && self.qc_high.sub_block_id() < (self.r_cur, self.blocks[&self.r_cur].n_batches()).into()
                     && self.n_full_prefix_votes(self.r_cur) >= self.config.storage_requirement
                 )
             )
@@ -875,7 +743,7 @@ impl<S: LeaderSchedule> Protocol for RaikouNode<S> {
             let qc = QC {
                 round: block.round,
                 prefix: certified_prefix,
-                n_opt_batches: block.batches.len(),
+                n_batches: block.n_batches(),
                 block: Arc::new(block.clone()),
             };
 
@@ -898,7 +766,7 @@ impl<S: LeaderSchedule> Protocol for RaikouNode<S> {
                     // times for the same round.
                     if *committed_qc > self.committed_qc {
                         let committed_qc = committed_qc.clone();
-                        self.commit_qc(&committed_qc, CommitReason::CC);
+                        self.commit_qc(&committed_qc, CommitReason::CC).await;
                         let cc = CC::new(qc.round, &self.cc_votes[qc.round].k_max_set());
                         assert_eq!(cc.lowest_qc_id(), self.committed_qc.sub_block_id());
                         self.advance_r_ready(qc.round + 1, RoundEnterReason::CC(cc), ctx).await;

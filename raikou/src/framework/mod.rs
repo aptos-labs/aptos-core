@@ -21,7 +21,7 @@ where
 }
 
 pub trait Protocol: Send + Sync {
-    type Message: Send + Sync;
+    type Message: Clone + Send + Sync;
     type TimerEvent: Send + Sync;
 
     fn start_handler<Ctx>(&mut self, ctx: &mut Ctx) -> impl Future<Output = ()> + Send
@@ -50,7 +50,7 @@ pub trait Protocol: Send + Sync {
         Ctx: ContextFor<Self>;
 
     fn run_ctx<Ctx>(
-        protocol: &tokio::sync::Mutex<Self>,
+        protocol: Arc<tokio::sync::Mutex<Self>>,
         ctx: &mut Ctx,
     ) -> impl Future<Output = ()> + Send
     where
@@ -81,7 +81,7 @@ pub trait Protocol: Send + Sync {
     }
 
     fn run<NS, TS>(
-        protocol: &tokio::sync::Mutex<Self>,
+        protocol: Arc<tokio::sync::Mutex<Self>>,
         node_id: NodeId,
         network_service: NS,
         timer: TS,
