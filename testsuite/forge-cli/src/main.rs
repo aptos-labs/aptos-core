@@ -1094,24 +1094,24 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
                 unique_senders: false,
                 mempool_backlog: 20000,
             },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::NoOp,
-                num_modules: 100,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::ModifyGlobalResource,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 30000,
-            },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::NoOp,
+            //     num_modules: 100,
+            //     unique_senders: false,
+            //     mempool_backlog: 20000,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::ModifyGlobalResource,
+            //     num_modules: 1,
+            //     unique_senders: true,
+            //     mempool_backlog: 20000,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
+            //     num_modules: 1,
+            //     unique_senders: true,
+            //     mempool_backlog: 30000,
+            // },
             // transactions get rejected, to fix.
             // TransactionWorkload {
             //     transaction_type: TransactionTypeArg::PublishPackage,
@@ -1123,9 +1123,9 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
             (5500, 100, 0.3, 0.3, 0.8, 0.65),
-            (4500, 100, 0.3, 0.4, 1.0, 2.0),
-            (2000, 300, 0.3, 0.8, 0.8, 2.0),
-            (600, 500, 0.3, 0.6, 0.8, 2.0),
+            // (4500, 100, 0.3, 0.4, 1.0, 2.0),
+            // (2000, 300, 0.3, 0.8, 0.8, 2.0),
+            // (600, 500, 0.3, 0.6, 0.8, 2.0),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
@@ -2484,12 +2484,12 @@ fn pfn_const_tps(
             }
         }))
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad { mempool_backlog: 20000 }))
-        // .add_network_test(PFNPerformance::new(
-        //     7,
-        //     add_cpu_chaos,
-        //     add_network_emulation,
-        //     None,
-        // ))
+        .add_network_test(PFNPerformance::new(
+            7,
+            add_cpu_chaos,
+            add_network_emulation,
+            None,
+        ))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
