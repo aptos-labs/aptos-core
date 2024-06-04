@@ -101,7 +101,7 @@ impl VMExecutor for FakeVM {
 pub struct FakeDb;
 
 impl DbReader for FakeDb {
-    fn get_latest_version(&self) -> aptos_storage_interface::Result<Version> {
+    fn get_latest_ledger_info_version(&self) -> aptos_storage_interface::Result<Version> {
         Ok(self.get_latest_ledger_info()?.ledger_info().version())
     }
 

@@ -37,23 +37,31 @@ use crate::{
     },
 };
 use anyhow::bail;
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{ColorChoice, StandardStream, WriteColor},
+};
 pub use experiments::Experiment;
 use log::{debug, info, log_enabled, Level};
-use move_binary_format::binary_views::BinaryIndexedView;
+use move_binary_format::{binary_views::BinaryIndexedView, errors::VMError};
+use move_bytecode_source_map::source_map::SourceMap;
 use move_command_line_common::files::FileHash;
 use move_compiler::{
+    command_line,
     compiled_unit::{
-        verify_units, AnnotatedCompiledModule, AnnotatedCompiledScript, AnnotatedCompiledUnit,
-        CompiledUnit, FunctionInfo,
+        AnnotatedCompiledModule, AnnotatedCompiledScript, AnnotatedCompiledUnit, CompiledUnit,
+        FunctionInfo, NamedCompiledModule, NamedCompiledScript,
     },
     diagnostics::FilesSourceText,
     shared::{known_attributes::KnownAttribute, unique_map::UniqueMap},
 };
+use move_core_types::vm_status::{StatusCode, StatusType};
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location;
 use move_model::{
-    add_move_lang_diagnostics, metadata::LanguageVersion, model::GlobalEnv, PackageInfo,
+    metadata::LanguageVersion,
+    model::{GlobalEnv, Loc, MoveIrLoc},
+    PackageInfo,
 };
 use move_stackless_bytecode::function_target_pipeline::{
     FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
@@ -221,7 +229,10 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
         if module.is_target() {
             for fun in module.get_functions() {
                 let id = fun.get_qualified_id();
-                todo.insert(id);
+                // Skip inline functions because invoke and lambda are not supported in the current code generator
+                if !fun.is_inline() {
+                    todo.insert(id);
+                }
             }
         }
     }
@@ -446,13 +457,109 @@ pub fn disassemble_compiled_units(units: &[CompiledUnit]) -> anyhow::Result<Stri
 
 /// Run the bytecode verifier on the given compiled units and add any diagnostics to the global env.
 pub fn run_bytecode_verifier(units: &[AnnotatedCompiledUnit], env: &mut GlobalEnv) -> bool {
-    let diags = verify_units(units);
-    if !diags.is_empty() {
-        add_move_lang_diagnostics(env, diags);
-        false
-    } else {
-        true
+    let mut errors = false;
+    for unit in units {
+        match unit {
+            AnnotatedCompiledUnit::Module(AnnotatedCompiledModule {
+                loc,
+                named_module:
+                    NamedCompiledModule {
+                        module, source_map, ..
+                    },
+                ..
+            }) => {
+                if let Err(e) = move_bytecode_verifier::verify_module(module) {
+                    report_bytecode_verification_error(env, loc, source_map, &e);
+                    errors = true
+                }
+            },
+            AnnotatedCompiledUnit::Script(AnnotatedCompiledScript {
+                loc,
+                named_script:
+                    NamedCompiledScript {
+                        script, source_map, ..
+                    },
+                ..
+            }) => {
+                if let Err(e) = move_bytecode_verifier::verify_script(script) {
+                    report_bytecode_verification_error(env, loc, source_map, &e);
+                    errors = true
+                }
+            },
+        }
     }
+    !errors
+}
+
+fn report_bytecode_verification_error(
+    env: &GlobalEnv,
+    module_ir_loc: &MoveIrLoc,
+    source_map: &SourceMap,
+    e: &VMError,
+) {
+    let mut precise_loc = true;
+    let loc = &get_vm_error_loc(env, source_map, e).unwrap_or_else(|| {
+        precise_loc = false;
+        env.to_loc(module_ir_loc)
+    });
+    if e.status_type() != StatusType::Verification {
+        env.diag(
+            Severity::Bug,
+            loc,
+            &format!(
+                "unexpected error returned from bytecode verification. This is a compiler bug, consider reporting it.\n{:#?}",
+                e
+            ),
+        )
+    } else {
+        let debug_info = if command_line::get_move_compiler_backtrace_from_env() {
+            format!("\n{:#?}", e)
+        } else {
+            "".to_string()
+        };
+        use StatusCode::*;
+        match e.major_status() {
+            // Only treat verification errors known to be an issue here
+            BORROWFIELD_EXISTS_MUTABLE_BORROW_ERROR
+            | MOVELOC_EXISTS_BORROW_ERROR
+            | BORROWLOC_EXISTS_BORROW_ERROR
+            | READREF_EXISTS_MUTABLE_BORROW_ERROR
+                if precise_loc =>
+            {
+                env.diag(
+                    Severity::Error,
+                    loc,
+                    &format!(
+                        "reference safety check failed on bytecode level. \
+                This is a known issue, to be fixed later, resulting from differences between \
+                safety rules of the v1 and v2 compiler. Try to rewrite your code \
+                 to workaround this problem.{}",
+                        debug_info
+                    ),
+                )
+            },
+            _ => env.diag(
+                Severity::Bug,
+                loc,
+                &format!(
+                    "bytecode verification failed with \
+                unexpected status code `{:?}`. This is a compiler bug, consider reporting it.{}",
+                    e.major_status(),
+                    debug_info
+                ),
+            ),
+        }
+    }
+}
+
+/// Gets the location associated with the VM error, if available.
+fn get_vm_error_loc(env: &GlobalEnv, source_map: &SourceMap, e: &VMError) -> Option<Loc> {
+    e.offsets().first().and_then(|(fdef_idx, offset)| {
+        source_map
+            .get_code_location(*fdef_idx, *offset)
+            .ok()
+            .map(|l| env.to_loc(&l))
+    })
 }
 
 /// Report any diags in the env to the writer and fail if there are errors.

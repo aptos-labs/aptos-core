@@ -165,7 +165,7 @@ fun m::test_for_each_mut() {
      #
   2: $t3 := borrow_local($t0)
      # live vars: $t0, $t1, $t3
-     # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
+     # graph: {@200=local($t0)[borrow_imm -> @201],@201=derived[]}
      # locals: {$t0=@200,$t3=@201}
      # globals: {}
      #
@@ -177,75 +177,75 @@ fun m::test_for_each_mut() {
      #
   4: $t4 := borrow_local($t0)
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
   5: label L0
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
   6: $t5 := <($t1, $t2)
      # live vars: $t0, $t1, $t2, $t4, $t5
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
   7: if ($t5) goto 8 else goto 16
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
   8: label L2
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
   9: $t6 := vector::borrow_mut<u64>($t4, $t1)
      # live vars: $t0, $t1, $t2, $t4, $t6
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[call(true, 9) -> @900],@900=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[call_mut@9 -> @900],@900=derived[]}
      # locals: {$t0=@200,$t4=@401,$t6=@900}
      # globals: {}
      # derived-from: @900=$t4
      #
  10: $t7 := 2
      # live vars: $t0, $t1, $t2, $t4, $t6, $t7
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[call(true, 9) -> @900],@900=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[call_mut@9 -> @900],@900=derived[]}
      # locals: {$t0=@200,$t4=@401,$t6=@900}
      # globals: {}
      # derived-from: @900=$t4
      #
  11: write_ref($t6, $t7)
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
  12: $t9 := 1
      # live vars: $t0, $t1, $t2, $t4, $t9
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
  13: $t8 := +($t1, $t9)
      # live vars: $t0, $t2, $t4, $t8
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
  14: $t1 := infer($t8)
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
  15: goto 18
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
@@ -257,13 +257,13 @@ fun m::test_for_each_mut() {
      #
  17: goto 20
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
  18: label L4
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
@@ -376,7 +376,7 @@ fun m::test_for_each_mut() {
   2: $t3 := borrow_local($t0)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t3
-     # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
+     # graph: {@200=local($t0)[borrow_imm -> @201],@201=derived[]}
      # locals: {$t0=@200,$t3=@201}
      # globals: {}
      #
@@ -390,42 +390,42 @@ fun m::test_for_each_mut() {
   4: $t4 := borrow_local($t0)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
   5: label L0
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
   6: $t5 := <($t1, $t2)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4, $t5
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
   7: if ($t5) goto 8 else goto 16
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
   8: label L2
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
   9: $t6 := vector::borrow_mut<u64>($t4, $t1)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4, $t6
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[call(true, 9) -> @900],@900=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[call_mut@9 -> @900],@900=derived[]}
      # locals: {$t0=@200,$t4=@401,$t6=@900}
      # globals: {}
      # derived-from: @900=$t4
@@ -433,7 +433,7 @@ fun m::test_for_each_mut() {
  10: $t7 := 2
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4, $t6, $t7
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[call(true, 9) -> @900],@900=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[call_mut@9 -> @900],@900=derived[]}
      # locals: {$t0=@200,$t4=@401,$t6=@900}
      # globals: {}
      # derived-from: @900=$t4
@@ -441,35 +441,35 @@ fun m::test_for_each_mut() {
  11: write_ref($t6, $t7)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
  12: $t9 := 1
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4, $t9
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
  13: $t8 := +($t1, $t9)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t4, $t8
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
  14: $t1 := infer($t8)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
  15: goto 18
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
@@ -483,14 +483,14 @@ fun m::test_for_each_mut() {
  17: goto 20
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #
  18: label L4
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t4
-     # graph: {@200=local($t0)[borrow(true) -> @401],@401=derived[]}
+     # graph: {@200=local($t0)[borrow_mut -> @401],@401=derived[]}
      # locals: {$t0=@200,$t4=@401}
      # globals: {}
      #

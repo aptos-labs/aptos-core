@@ -1612,7 +1612,7 @@ fn create_bootstrapper(
         .expect_get_latest_ledger_info()
         .returning(|| Ok(create_epoch_ending_ledger_info()));
     mock_database_reader
-        .expect_get_latest_version()
+        .expect_get_synced_version()
         .returning(|| Ok(0));
 
     // Create the output fallback handler
@@ -1669,7 +1669,7 @@ fn create_bootstrapper_with_storage(
         .expect_get_latest_ledger_info()
         .returning(move || Ok(epoch_ending_ledger_info.clone()));
     mock_database_reader
-        .expect_get_latest_version()
+        .expect_get_synced_version()
         .returning(move || Ok(latest_synced_version));
 
     // Create the output fallback handler

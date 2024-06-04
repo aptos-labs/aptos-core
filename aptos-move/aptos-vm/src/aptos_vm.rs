@@ -10,7 +10,6 @@ use crate::{
     gas::{check_gas, get_gas_parameters, make_prod_gas_meter, ProdGasMeter},
     keyless_validation,
     move_vm_ext::{
-        get_max_binary_format_version, get_max_identifier_size,
         session::user_transaction_sessions::{
             abort_hook::AbortHookSession, epilogue::EpilogueSession, prologue::PrologueSession,
             user::UserSession,
@@ -20,8 +19,8 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation,
-    verifier::{self, randomness::has_randomness_attribute},
+    transaction_validation, verifier,
+    verifier::randomness::get_randomness_annotation,
     VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
@@ -51,9 +50,9 @@ use aptos_types::{
     invalid_signature,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        new_epoch_event_key, randomness_api_v0_config::RequiredGasDeposit, ApprovedExecutionHashes,
-        ConfigStorage, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
-        TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
+        new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, ConfigurationResource,
+        FeatureFlag, Features, OnChainConfig, TimedFeatureOverride, TimedFeatures,
+        TimedFeaturesBuilder,
     },
     randomness::Randomness,
     state_store::{StateView, TStateView},
@@ -64,6 +63,7 @@ use aptos_types::{
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
+    vm::configs::{aptos_prod_deserializer_config, RandomnessConfig},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::{aptos_try, return_on_failure};
@@ -82,7 +82,6 @@ use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
-    deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
     CompiledModule,
 };
@@ -225,7 +224,7 @@ pub struct AptosVM {
     timed_features: TimedFeatures,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
-    randomness_api_v0_required_deposit: RequiredGasDeposit,
+    randomness_config: RandomnessConfig,
 }
 
 impl AptosVM {
@@ -234,9 +233,8 @@ impl AptosVM {
         override_is_delayed_field_optimization_capable: Option<bool>,
     ) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
-        let randomness_api_v0_required_deposit = RequiredGasDeposit::fetch_config(resolver)
-            .unwrap_or_else(RequiredGasDeposit::default_if_missing);
         let features = Features::fetch_config(resolver).unwrap_or_default();
+        let randomness_config = RandomnessConfig::fetch(resolver);
         let (
             gas_params,
             storage_gas_params,
@@ -295,7 +293,7 @@ impl AptosVM {
             storage_gas_params,
             timed_features,
             pvk,
-            randomness_api_v0_required_deposit,
+            randomness_config,
         }
     }
 
@@ -766,7 +764,7 @@ impl AptosVM {
             )?;
         }
 
-        let loaded_func = session.load_script(script.code(), script.ty_args().to_vec())?;
+        let func = session.load_script(script.code(), script.ty_args())?;
 
         // TODO(Gerardo): consolidate the extended validation to verifier.
         verifier::event_validation::verify_no_event_emission_in_script(
@@ -778,7 +776,7 @@ impl AptosVM {
             session,
             senders,
             convert_txn_args(script.args()),
-            &loaded_func,
+            &func,
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
 
@@ -815,14 +813,13 @@ impl AptosVM {
             )])?;
         }
 
-        let (function, is_friend_or_private) = session.load_function_and_is_friend_or_private_def(
-            entry_fn.module(),
-            entry_fn.function(),
-            entry_fn.ty_args(),
-        )?;
+        let function =
+            session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
 
         // The `has_randomness_attribute()` should have been feature-gated in 1.11...
-        if is_friend_or_private && has_randomness_attribute(resolver, session, entry_fn)? {
+        if function.is_friend_or_private()
+            && get_randomness_annotation(resolver, session, entry_fn)?.is_some()
+        {
             let txn_context = session
                 .get_native_extensions()
                 .get_mut::<RandomnessContext>();
@@ -838,14 +835,7 @@ impl AptosVM {
             &function,
             struct_constructors_enabled,
         )?;
-        session.execute_entry_function(
-            entry_fn.module(),
-            entry_fn.function(),
-            entry_fn.ty_args().to_vec(),
-            args,
-            gas_meter,
-            traversal_context,
-        )?;
+        session.execute_entry_function(function, args, gas_meter, traversal_context)?;
         Ok(())
     }
 
@@ -1387,12 +1377,12 @@ impl AptosVM {
 
     /// Deserialize a module bundle.
     fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
-        let max_version = get_max_binary_format_version(self.features(), None);
-        let max_identifier_size = get_max_identifier_size(self.features());
-        let config = DeserializerConfig::new(max_version, max_identifier_size);
+        let deserializer_config = aptos_prod_deserializer_config(self.features());
+
         let mut result = vec![];
         for module_blob in modules.iter() {
-            match CompiledModule::deserialize_with_config(module_blob.code(), &config) {
+            match CompiledModule::deserialize_with_config(module_blob.code(), &deserializer_config)
+            {
                 Ok(module) => {
                     result.push(module);
                 },
@@ -1635,12 +1625,14 @@ impl AptosVM {
                 return Err(invalid_signature!("Groth16 VK has not been set on-chain"));
             }
 
-            keyless_validation::validate_authenticators(
-                self.pvk.as_ref().unwrap(),
-                &keyless_authenticators,
-                self.features(),
-                resolver,
-            )?;
+            if !self.is_simulation {
+                keyless_validation::validate_authenticators(
+                    self.pvk.as_ref().unwrap(),
+                    &keyless_authenticators,
+                    self.features(),
+                    resolver,
+                )?;
+            }
         }
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
@@ -2259,13 +2251,13 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         gas_meter: &mut impl AptosGasMeter,
     ) -> anyhow::Result<Vec<Vec<u8>>> {
-        let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
+        let func = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.extract_module_metadata(&module_id);
         let arguments = verifier::view_function::validate_view_function(
             session,
             arguments,
             func_name.as_ident_str(),
-            &func_inst,
+            &func,
             metadata.as_ref().map(Arc::as_ref),
             vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
@@ -2495,9 +2487,20 @@ impl AptosVM {
     ) -> Result<Option<u64>, VMStatus> {
         match payload {
             TransactionPayload::EntryFunction(entry_func) => {
-                if let Some(gas_amount) = self.randomness_api_v0_required_deposit.gas_amount {
-                    if has_randomness_attribute(resolver, session, entry_func).unwrap_or(false) {
-                        if gas_amount != u64::from(txn_metadata.max_gas_amount) {
+                if let Some(annotation) =
+                    get_randomness_annotation(resolver, session, entry_func).unwrap_or(None)
+                {
+                    if let Some(default_gas_amount) =
+                        self.randomness_config.randomness_api_v0_required_deposit
+                    {
+                        let required_gas_amount =
+                            if self.randomness_config.allow_rand_contract_custom_max_gas {
+                                annotation.max_gas.unwrap_or(default_gas_amount)
+                            } else {
+                                default_gas_amount
+                            };
+                        let txn_max_gas = u64::from(txn_metadata.max_gas_amount);
+                        if required_gas_amount != txn_max_gas {
                             return Err(VMStatus::error(
                                 StatusCode::REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS,
                                 None,

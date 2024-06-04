@@ -3196,6 +3196,16 @@ This function is private so no other code can call this beside the VM itself as 
     <b>let</b> (num_approvals, _) = <a href="multisig_account.md#0x1_multisig_account_remove_executed_transaction">remove_executed_transaction</a>(multisig_account_resource);
 
     <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>() && implicit_approval) {
+        <b>if</b> (std::features::module_event_migration_enabled()) {
+            emit(
+                <a href="multisig_account.md#0x1_multisig_account_Vote">Vote</a> {
+                    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>,
+                    owner: executor,
+                    sequence_number,
+                    approved: <b>true</b>,
+                }
+            );
+        };
         num_approvals = num_approvals + 1;
         emit_event(
             &<b>mut</b> multisig_account_resource.vote_events,

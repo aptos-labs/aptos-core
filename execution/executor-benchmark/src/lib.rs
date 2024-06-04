@@ -164,7 +164,7 @@ pub fn run_benchmark<V>(
         ((0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>(), phase)
     });
 
-    let version = db.reader.get_latest_version().unwrap();
+    let version = db.reader.get_synced_version().unwrap();
 
     let (pipeline, block_sender) =
         Pipeline::new(executor, version, &pipeline_config, Some(num_blocks));
@@ -232,7 +232,7 @@ pub fn run_benchmark<V>(
         }
     );
 
-    let num_txns = db.reader.get_latest_version().unwrap() - version - num_blocks_created as u64;
+    let num_txns = db.reader.get_synced_version().unwrap() - version - num_blocks_created as u64;
     overall_measuring.print_end("Overall", num_txns);
 
     if verify_sequence_numbers {
@@ -256,7 +256,7 @@ fn init_workload<V>(
 where
     V: TransactionBlockExecutor + 'static,
 {
-    let version = db.reader.get_latest_version().unwrap();
+    let version = db.reader.get_synced_version().unwrap();
     let (pipeline, block_sender) = Pipeline::<V>::new(
         BlockExecutor::new(db.clone()),
         version,
@@ -343,7 +343,7 @@ fn add_accounts_impl<V>(
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
     let (db, executor) = init_db_and_executor::<V>(&config);
 
-    let start_version = db.reader.get_latest_version().unwrap();
+    let start_version = db.reader.get_latest_ledger_info_version().unwrap();
 
     let (pipeline, block_sender) = Pipeline::new(
         executor,
@@ -374,7 +374,7 @@ fn add_accounts_impl<V>(
     pipeline.join();
 
     let elapsed = start_time.elapsed().as_secs_f32();
-    let now_version = db.reader.get_latest_version().unwrap();
+    let now_version = db.reader.get_latest_ledger_info_version().unwrap();
     let delta_v = now_version - start_version;
     info!(
         "Overall TPS: create_db: account creation: {} txn/s",

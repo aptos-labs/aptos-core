@@ -12,9 +12,7 @@ pub struct RequiredGasDeposit {
 
 impl RequiredGasDeposit {
     pub fn default_for_genesis() -> Self {
-        Self {
-            gas_amount: Some(10_000),
-        }
+        Self { gas_amount: None }
     }
 
     pub fn default_if_missing() -> Self {
@@ -30,5 +28,31 @@ impl OnChainConfig for RequiredGasDeposit {
 impl AsMoveValue for RequiredGasDeposit {
     fn as_move_value(&self) -> MoveValue {
         MoveValue::Struct(MoveStruct::Runtime(vec![self.gas_amount.as_move_value()]))
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct AllowCustomMaxGasFlag {
+    pub value: bool,
+}
+
+impl AllowCustomMaxGasFlag {
+    pub fn default_for_genesis() -> Self {
+        Self { value: false }
+    }
+
+    pub fn default_if_missing() -> Self {
+        Self { value: false }
+    }
+}
+
+impl OnChainConfig for AllowCustomMaxGasFlag {
+    const MODULE_IDENTIFIER: &'static str = "randomness_api_v0_config";
+    const TYPE_IDENTIFIER: &'static str = "AllowCustomMaxGasFlag";
+}
+
+impl AsMoveValue for AllowCustomMaxGasFlag {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::Struct(MoveStruct::Runtime(vec![self.value.as_move_value()]))
     }
 }

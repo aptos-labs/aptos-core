@@ -1180,6 +1180,16 @@ module aptos_framework::multisig_account {
         let (num_approvals, _) = remove_executed_transaction(multisig_account_resource);
 
         if(features::multisig_v2_enhancement_feature_enabled() && implicit_approval) {
+            if (std::features::module_event_migration_enabled()) {
+                emit(
+                    Vote {
+                        multisig_account,
+                        owner: executor,
+                        sequence_number,
+                        approved: true,
+                    }
+                );
+            };
             num_approvals = num_approvals + 1;
             emit_event(
                 &mut multisig_account_resource.vote_events,
