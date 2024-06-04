@@ -3,8 +3,8 @@
 
 use crate::{
     consensus_observer::{
-        network::{ConsensusObserverMessage, OrderedBlock},
-        publisher::Publisher,
+        network_message::{ConsensusObserverDirectSend, ConsensusObserverMessage, OrderedBlock},
+        publisher::ConsensusPublisher,
     },
     dag::DagCommitSigner,
     network::{IncomingCommitRequest, IncomingRandGenRequest},
@@ -18,7 +18,7 @@ use aptos_consensus_types::pipeline::commit_decision::CommitDecision;
 use aptos_crypto::{bls12381, Genesis, HashValue};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
-use aptos_logger::{debug, error, info};
+use aptos_logger::{error, info};
 use aptos_network::protocols::{network::Event, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
@@ -67,8 +67,8 @@ pub struct Observer {
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     // Maps between block id and its payload, the same as payload manager returns.
     payload_store: Arc<Mutex<HashMap<HashValue, ObserverDataStatus>>>,
-    // Publisher to forward payload message.
-    publisher: Option<Publisher>,
+    // Consensus publisher to forward payload message
+    consensus_publisher: Option<ConsensusPublisher>,
 }
 
 impl Observer {
@@ -77,7 +77,7 @@ impl Observer {
         execution_client: Arc<dyn TExecutionClient>,
         sync_notifier: tokio::sync::mpsc::UnboundedSender<(u64, Round)>,
         reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
-        publisher: Option<Publisher>,
+        consensus_publisher: Option<ConsensusPublisher>,
     ) -> Self {
         Self {
             epoch: root.commit_info().epoch(),
@@ -88,7 +88,7 @@ impl Observer {
             sync_notifier,
             reconfig_events,
             payload_store: Arc::new(Mutex::new(HashMap::new())),
-            publisher,
+            consensus_publisher,
         }
     }
 
@@ -305,7 +305,10 @@ impl Observer {
         let (_, rand_msg_rx) =
             aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(QueueStyle::FIFO, 1, None);
         let payload_manager = if consensus_config.quorum_store_enabled() {
-            PayloadManager::Observer(self.payload_store.clone(), self.publisher.clone())
+            PayloadManager::ConsensusObserver(
+                self.payload_store.clone(),
+                self.consensus_publisher.clone(),
+            )
         } else {
             PayloadManager::DirectMempool
         };
@@ -325,6 +328,7 @@ impl Observer {
             .await;
     }
 
+    /// Starts the consensus observer process
     pub async fn start(
         mut self,
         mut network_events: Box<dyn Stream<Item = Event<ConsensusObserverMessage>> + Send + Unpin>,
@@ -335,43 +339,48 @@ impl Observer {
         loop {
             tokio::select! {
                 Some(event) = network_events.next() => {
-                    if let Event::Message(peer, msg) = event {
+                    if let Event::Message(peer, message) = event {
                          // todo: verify messages
-                        match msg {
-                            ConsensusObserverMessage::OrderedBlock(ordered_block) => {
-                                 info!(
-                                     "[Observer] received ordered block {} from {}.",
-                                     ordered_block.ordered_proof.commit_info(),
-                                     peer,
-                                 );
-                                 self.process_ordered_block(ordered_block).await;
-                            }
-                            ConsensusObserverMessage::CommitDecision(msg) => {
-                                 info!(
+                        match message {
+                            ConsensusObserverMessage::DirectSend(ConsensusObserverDirectSend::OrderedBlock(ordered_block)) => {
+                                info!(
+                                    "[Observer] received ordered block {} from {}.",
+                                    ordered_block.ordered_proof.commit_info(),
+                                    peer,
+                                );
+                                self.process_ordered_block(ordered_block).await;
+                            },
+                            ConsensusObserverMessage::DirectSend(ConsensusObserverDirectSend::CommitDecision(commit_decision)) => {
+                                info!(
                                      "[Observer] received commit decision {} from {}.",
-                                     msg.ledger_info().commit_info(),
+                                     commit_decision.ledger_info().commit_info(),
                                      peer,
                                  );
-                                 self.process_commit_decision(msg);
-                            }
-                             ConsensusObserverMessage::Payload((block, payload)) => {
-                                 info!("[Observer] received payload {} from {}", block, peer);
+                                 self.process_commit_decision(commit_decision);
+                            },
+                            ConsensusObserverMessage::DirectSend(ConsensusObserverDirectSend::BlockPayload(block_payload)) => {
+                                let block = block_payload.block;
+                                let transactions = block_payload.transactions;
+                                let limit = block_payload.limit;
+
+                                info!("[Observer] received payload {} from {}", block, peer);
                                  match self.payload_store.lock().entry(block.id()) {
                                      Entry::Occupied(mut entry) => {
-                                         let mut status = ObserverDataStatus::Available(payload.clone());
+                                         let mut status = ObserverDataStatus::Available((transactions.clone(), limit));
                                          mem::swap(entry.get_mut(), &mut status);
                                          if let ObserverDataStatus::Requested(tx) = status {
-                                             tx.send(payload).unwrap();
+                                             tx.send((transactions, limit)).unwrap();
                                          }
                                      }
                                      Entry::Vacant(entry) => {
-                                         entry.insert(ObserverDataStatus::Available(payload));
+                                         entry.insert(ObserverDataStatus::Available((transactions, limit)));
                                      }
                                  }
                             }
+                            _ => {
+                                error!("[Observer] received unexpected message from peer: {}", peer);
+                            }
                         }
-                    } else {
-                        debug!("[Observer] Received untracked event: {:?}", event);
                     }
                 },
                 Some((epoch, round)) = notifier_rx.recv() => {

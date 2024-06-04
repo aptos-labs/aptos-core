@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensus_observer::{network::ConsensusObserverMessage, observer::Observer, publisher::Publisher},
+    consensus_observer::{
+        network_client::ConsensusObserverClient, network_message::ConsensusObserverMessage,
+        observer::Observer, publisher::ConsensusPublisher,
+    },
     counters,
     epoch_manager::EpochManager,
     network::NetworkTask,
@@ -45,7 +48,9 @@ pub fn start_consensus(
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     vtxn_pool: VTxnPoolState,
-    observer_network: Option<NetworkClient<ConsensusObserverMessage>>,
+    consensus_observer_client: Option<
+        ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
+    >,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
@@ -82,7 +87,7 @@ pub fn start_consensus(
         consensus_network_client.clone(),
         bounded_executor.clone(),
         rand_storage.clone(),
-        observer_network.clone(),
+        consensus_observer_client.clone(),
     ));
 
     let epoch_mgr = EpochManager::new(
@@ -100,7 +105,7 @@ pub fn start_consensus(
         aptos_time_service::TimeService::real(),
         vtxn_pool,
         rand_storage,
-        observer_network,
+        consensus_observer_client,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);
@@ -112,6 +117,7 @@ pub fn start_consensus(
     (runtime, storage, quorum_store_db)
 }
 
+/// A helper function to start the consensus observer
 pub fn start_consensus_observer(
     node_config: &NodeConfig,
     observer_network_client: NetworkClient<ConsensusObserverMessage>,
@@ -149,6 +155,7 @@ pub fn start_consensus_observer(
     let bounded_executor = BoundedExecutor::new(32, runtime.handle().clone());
     let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
 
+    let consensus_observer_client = ConsensusObserverClient::new(observer_network_client);
     let execution_client = Arc::new(ExecutionProxyClient::new(
         node_config.consensus.clone(),
         Arc::new(execution_proxy),
@@ -158,7 +165,7 @@ pub fn start_consensus_observer(
         bounded_executor.clone(),
         rand_storage.clone(),
         if publisher_enabled {
-            Some(observer_network_client.clone())
+            Some(consensus_observer_client.clone())
         } else {
             None
         },
@@ -180,7 +187,7 @@ pub fn start_consensus_observer(
         tx,
         reconfig_events,
         if publisher_enabled {
-            Some(Publisher::new(observer_network_client))
+            Some(ConsensusPublisher::new(consensus_observer_client))
         } else {
             None
         },

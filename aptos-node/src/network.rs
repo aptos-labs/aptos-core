@@ -8,7 +8,7 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_consensus::{
-    consensus_observer, consensus_observer::network::ConsensusObserverMessage,
+    consensus_observer, consensus_observer::network_message::ConsensusObserverMessage,
     network_interface::ConsensusMsg,
 };
 use aptos_dkg_runtime::DKGMessage;
