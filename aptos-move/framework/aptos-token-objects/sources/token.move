@@ -115,8 +115,8 @@ module aptos_token_objects::token {
     }
 
     inline fun create_common(
+        creator: &signer,
         constructor_ref: &ConstructorRef,
-        creator_address: address,
         collection_name: String,
         description: String,
         name_prefix: String,
@@ -126,10 +126,12 @@ module aptos_token_objects::token {
         royalty: Option<Royalty>,
         uri: String,
     ) {
+        let creator_address = signer::address_of(creator);
         let collection_addr = collection::create_collection_address(&creator_address, &collection_name);
         let collection = object::address_to_object<Collection>(collection_addr);
 
         create_common_with_collection(
+            creator,
             constructor_ref,
             collection,
             description,
@@ -141,6 +143,7 @@ module aptos_token_objects::token {
     }
 
     inline fun create_common_with_collection(
+        creator: &signer,
         constructor_ref: &ConstructorRef,
         collection: Object<Collection>,
         description: String,
@@ -151,6 +154,8 @@ module aptos_token_objects::token {
         royalty: Option<Royalty>,
         uri: String,
     ) {
+        assert!(collection::creator(collection) == signer::address_of(creator), error::unauthenticated(ENOT_CREATOR));
+
         if (option::is_some(&name_with_index_suffix)) {
             // Be conservative, as we don't know what length the index will be, and assume worst case (20 chars in MAX_U64)
             assert!(
@@ -218,6 +223,7 @@ module aptos_token_objects::token {
         let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object(creator_address);
         create_common_with_collection(
+            creator,
             &constructor_ref,
             collection,
             description,
@@ -242,8 +248,8 @@ module aptos_token_objects::token {
         let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object(creator_address);
         create_common(
+            creator,
             &constructor_ref,
-            creator_address,
             collection_name,
             description,
             name,
@@ -274,6 +280,7 @@ module aptos_token_objects::token {
         let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object(creator_address);
         create_common_with_collection(
+            creator,
             &constructor_ref,
             collection,
             description,
@@ -302,8 +309,8 @@ module aptos_token_objects::token {
         let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object(creator_address);
         create_common(
+            creator,
             &constructor_ref,
-            creator_address,
             collection_name,
             description,
             name_with_index_prefix,
@@ -328,6 +335,7 @@ module aptos_token_objects::token {
         let seed = create_token_seed(&collection::name(collection), &name);
         let constructor_ref = object::create_named_object(creator, seed);
         create_common_with_collection(
+            creator,
             &constructor_ref,
             collection,
             description,
@@ -349,13 +357,12 @@ module aptos_token_objects::token {
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
-        let creator_address = signer::address_of(creator);
         let seed = create_token_seed(&collection_name, &name);
 
         let constructor_ref = object::create_named_object(creator, seed);
         create_common(
+            creator,
             &constructor_ref,
-            creator_address,
             collection_name,
             description,
             name,
@@ -380,7 +387,7 @@ module aptos_token_objects::token {
     ): ConstructorRef {
         let seed = create_token_name_with_seed(&collection::name(collection), &name, &seed);
         let constructor_ref = object::create_named_object(creator, seed);
-        create_common_with_collection(&constructor_ref, collection, description, name, option::none(), royalty, uri);
+        create_common_with_collection(creator, &constructor_ref, collection, description, name, option::none(), royalty, uri);
         constructor_ref
     }
 
@@ -397,11 +404,10 @@ module aptos_token_objects::token {
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
-        let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object_from_account(creator);
         create_common(
+            creator,
             &constructor_ref,
-            creator_address,
             collection_name,
             description,
             name,
@@ -713,6 +719,47 @@ module aptos_token_objects::token {
 
         let expected_royalty = royalty::create(25, 10000, creator_address);
         assert!(option::some(expected_royalty) == royalty(token), 2);
+    }
+
+    #[test(creator = @0x123, trader = @0x456)]
+    #[expected_failure(abort_code = 0x40002, location = aptos_token_objects::token)]
+    fun test_create_token_non_creator(creator: &signer, trader: &signer) {
+        let constructor_ref = &create_fixed_collection(creator, string::utf8(b"collection name"), 5);
+        let collection = get_collection_from_ref(&object::generate_extend_ref(constructor_ref));
+        create_token(
+            trader, collection, string::utf8(b"token description"), string::utf8(b"token name"),
+            option::some(royalty::create(25, 10000, signer::address_of(creator))), string::utf8(b"uri"),
+        );
+    }
+
+    #[test(creator = @0x123, trader = @0x456)]
+    #[expected_failure(abort_code = 0x40002, location = aptos_token_objects::token)]
+    fun test_create_named_token_non_creator(creator: &signer, trader: &signer) {
+        let constructor_ref = &create_fixed_collection(creator, string::utf8(b"collection name"), 5);
+        let collection = get_collection_from_ref(&object::generate_extend_ref(constructor_ref));
+        create_token_with_collection_helper(trader, collection, string::utf8(b"token name"));
+    }
+
+    #[test(creator = @0x123, trader = @0x456)]
+    #[expected_failure(abort_code = 0x40002, location = aptos_token_objects::token)]
+    fun test_create_named_token_object_non_creator(creator: &signer, trader: &signer) {
+        let constructor_ref = &create_fixed_collection(creator, string::utf8(b"collection name"), 5);
+        let collection = get_collection_from_ref(&object::generate_extend_ref(constructor_ref));
+        create_named_token_object(
+            trader, collection, string::utf8(b"token description"), string::utf8(b"token name"),
+            option::some(royalty::create(25, 10000, signer::address_of(creator))), string::utf8(b"uri"),
+        );
+    }
+
+    #[test(creator = @0x123, trader = @0x456)]
+    #[expected_failure(abort_code = 0x40002, location = aptos_token_objects::token)]
+    fun test_create_named_token_from_seed_non_creator(creator: &signer, trader: &signer) {
+        let constructor_ref = &create_fixed_collection(creator, string::utf8(b"collection name"), 5);
+        let collection = get_collection_from_ref(&object::generate_extend_ref(constructor_ref));
+        create_named_token_object(
+            trader, collection, string::utf8(b"token description"), string::utf8(b"token name"),
+            option::some(royalty::create(25, 10000, signer::address_of(creator))), string::utf8(b"uri"),
+        );
     }
 
     #[test(creator = @0x123, trader = @0x456)]
