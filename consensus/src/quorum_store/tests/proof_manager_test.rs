@@ -16,11 +16,11 @@ use futures::channel::oneshot;
 use std::{collections::HashSet, sync::Arc};
 
 async fn create_proof_manager() -> ProofManager {
-    let (proof_cmd_tx, proof_cmd_rx) = tokio::sync::mpsc::channel(100);
+    let (proof_queue_tx, proof_queue_rx) = tokio::sync::mpsc::channel(100);
     let proof_queue = ProofQueue::new(PeerId::random());
-    tokio::spawn(proof_queue.start(proof_cmd_rx));
+    tokio::spawn(proof_queue.start(proof_queue_rx));
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(10, 10, batch_store, true, Arc::new(proof_cmd_tx))
+    ProofManager::new(10, 10, batch_store, true, Arc::new(proof_queue_tx))
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {
