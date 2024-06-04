@@ -1,18 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{
-    types::{
-        account_address_from_auth_key, account_address_from_public_key,
-        AuthenticationKeyInputOptions, CliCommand, CliConfig, CliError, CliTypedResult,
-        ConfigSearchMode, EncodingOptions, ExtractPublicKey, HardwareWalletOptions,
-        ParsePrivateKey, ProfileConfig, ProfileOptions, PublicKeyInputOptions, RestOptions,
-        TransactionOptions, TransactionSummary,
-    },
-    utils::{prompt_yes, prompt_yes_with_override, read_line},
+use crate::common::types::{
+    account_address_from_auth_key, account_address_from_public_key, AuthenticationKeyInputOptions,
+    CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, EncodingOptions,
+    ExtractPublicKey, HardwareWalletOptions, ParsePrivateKey, ProfileConfig, ProfileOptions,
+    PublicKeyInputOptions, RestOptions, TransactionOptions, TransactionSummary,
 };
 use aptos_cached_packages::aptos_stdlib;
-use aptos_config::config;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     encoding_type::EncodingType,
@@ -30,7 +25,7 @@ use aptos_types::{
     transaction::authenticator::AuthenticationKey,
 };
 use async_trait::async_trait;
-use clap::Parser;
+use clap::{Args, Parser};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -50,51 +45,38 @@ pub struct RotateKey {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 
+    #[clap(flatten)]
+    pub(crate) new_auth_key_options: NewAuthKeyOptions,
+
+    #[clap(flatten)]
+    pub(crate) new_profile_options: NewProfileOptions,
+}
+
+#[derive(Args, Debug)]
+#[group(required = true, multiple = false)]
+pub(crate) struct NewAuthKeyOptions {
     /// File name that contains the new private key encoded in the type from `--encoding`
-    #[clap(
-        conflicts_with_all = &[
-            "derivation_index",
-            "derivation_path",
-            "new_private_key"
-        ],
-        long,
-        value_parser
-    )]
+    #[clap(long, value_parser)]
     pub(crate) new_private_key_file: Option<PathBuf>,
 
     /// New private key encoded in the type from `--encoding`
-    #[clap(
-        conflicts_with_all = &[
-            "derivation_index",
-            "derivation_path",
-            "new_private_key_file"
-        ],
-        long
-    )]
+    #[clap(long)]
     pub(crate) new_private_key: Option<String>,
 
     #[clap(flatten)]
     pub(crate) new_hardware_wallet_options: HardwareWalletOptions,
+}
 
-    /// Skip saving profile(s)
+#[derive(Args, Debug)]
+#[group(required = true, multiple = false)]
+pub(crate) struct NewProfileOptions {
+    /// Only specify if you do not want to save a new profile
+    #[clap(action, long)]
+    pub(crate) skip_saving_profile: bool,
+
+    /// Name of new the profile to save for the new authentication key
     #[clap(long)]
-    pub(crate) skip_saving_profiles: bool,
-
-    /// Name of the profile to save for the new authentication key
-    #[clap(conflicts_with = "skip_saving_profiles", long)]
     pub(crate) save_to_profile: Option<String>,
-
-    /// New name for the profile that has just been rendered stale by the rotation operation, when
-    /// rotation was from an account with a profile
-    #[clap(
-        conflicts_with_all = &[
-            "new_private_key",
-            "new_private_key_file",
-            "skip_saving_profiles",
-        ],
-        long,
-    )]
-    pub(crate) rename_stale_profile_to: Option<String>,
 }
 
 impl ParsePrivateKey for RotateKey {}
@@ -107,8 +89,8 @@ impl RotateKey {
     ) -> CliTypedResult<Option<Ed25519PrivateKey>> {
         self.parse_private_key(
             encoding,
-            self.new_private_key_file.clone(),
-            self.new_private_key.clone(),
+            self.new_auth_key_options.new_private_key_file.clone(),
+            self.new_auth_key_options.new_private_key.clone(),
         )
     }
 }
@@ -126,62 +108,27 @@ impl CliCommand<RotateSummary> for RotateKey {
     }
 
     async fn execute(self) -> CliTypedResult<RotateSummary> {
-        // Verify profile names before executing rotation operation, to avoid erroring out in a
+        // Verify profile name before executing rotation operation, to avoid erroring out in a
         // manner that results in corrupted config state.
-        if self.save_to_profile.is_some() || self.rename_stale_profile_to.is_some() {
-            // Verify no conflict between new and stale profile names, and that neither are empty.
-            if let Some(stale_name) = self.rename_stale_profile_to {
-                if self.save_to_profile == self.rename_stale_profile_to {
-                    return Err(CliError::CommandArgumentError(
-                        "New stale profile name and new profile name may not be the same"
-                            .to_string(),
-                    ));
-                };
-                if stale_name.is_empty() {
-                    return Err(CliError::CommandArgumentError(
-                        "New stale profile name may not be empty".to_string(),
-                    ));
-                }
-            };
-            if let Some(new_name) = self.save_to_profile {
-                if new_name.is_empty() {
-                    return Err(CliError::CommandArgumentError(
-                        "New profile name may not be empty".to_string(),
-                    ));
-                }
+        if let Some(ref new_profile_name) = self.new_profile_options.save_to_profile {
+            if new_profile_name.is_empty() {
+                return Err(CliError::CommandArgumentError(
+                    "New profile name may not be empty".to_string(),
+                ));
             };
 
-            // Verify that config exists.
-            let mut config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
+            // Verify that config exists by attempting to load it.
+            let config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
 
-            // Verify that the new stale profile name does not already exist in the config, and that
-            // the new profile name does not already exist in the config (unless it is the same as
-            // the name of a stale profile that will be renamed).
+            // Verify that the new profile name does not already exist in the config.
             if let Some(profiles) = config.profiles {
-                if let Some(stale_name) = self.rename_stale_profile_to {
-                    if profiles.contains_key(&stale_name) {
-                        return Err(CliError::CommandArgumentError(format!(
-                            "Profile {} already exists",
-                            stale_name
-                        )));
-                    };
+                if profiles.contains_key(new_profile_name) {
+                    return Err(CliError::CommandArgumentError(format!(
+                        "Profile {} already exists",
+                        new_profile_name
+                    )));
                 };
-                if let Some(new_name) = self.save_to_profile {
-                    if profiles.contains_key(&new_name) {
-                        if self.rename_stale_profile_to.is_some()
-                            && self.save_to_profile == self.txn_options.profile_options.profile
-                        {
-                            // Do nothing, since new profile is taking the name of a stale profile
-                            // that will be renamed.
-                        } else {
-                            return Err(CliError::CommandArgumentError(format!(
-                                "Profile {} already exists",
-                                new_name
-                            )));
-                        }
-                    };
-                };
-            };
+            }
         };
 
         // Get current signer options.
@@ -208,7 +155,10 @@ impl CliCommand<RotateSummary> for RotateKey {
         };
 
         // Get new signer options.
-        let new_derivation_path = self.new_hardware_wallet_options.extract_derivation_path()?;
+        let new_derivation_path = self
+            .new_auth_key_options
+            .new_hardware_wallet_options
+            .extract_derivation_path()?;
         let (new_private_key, new_public_key) = if new_derivation_path.is_some() {
             (
                 None,
@@ -248,6 +198,7 @@ impl CliCommand<RotateSummary> for RotateKey {
 
         // Sign the struct using both the current private key and the new private key.
         let rotation_proof_signed_by_current_private_key = if current_derivation_path.is_some() {
+            eprintln!("Approve rotation proof challenge signature on your Ledger device");
             aptos_ledger::sign_message(
                 current_derivation_path.clone().unwrap().as_str(),
                 &rotation_msg.clone(),
@@ -258,6 +209,7 @@ impl CliCommand<RotateSummary> for RotateKey {
                 .sign_arbitrary_message(&rotation_msg.clone())
         };
         let rotation_proof_signed_by_new_private_key = if new_derivation_path.is_some() {
+            eprintln!("Approve rotation proof challenge signature on your Ledger device");
             aptos_ledger::sign_message(
                 new_derivation_path.clone().unwrap().as_str(),
                 &rotation_msg.clone(),
@@ -270,6 +222,9 @@ impl CliCommand<RotateSummary> for RotateKey {
         };
 
         // Submit transaction.
+        if new_derivation_path.is_some() {
+            eprintln!("Approve transaction on your Ledger device");
+        };
         let txn_summary = self
             .txn_options
             .submit_transaction(aptos_stdlib::account_rotate_authentication_key(
@@ -302,14 +257,17 @@ impl CliCommand<RotateSummary> for RotateKey {
             ));
         }
 
-        let mut profile_name: String;
-
-        if self.skip_saving_profiles {
+        if self.new_profile_options.skip_saving_profile {
             return Ok(RotateSummary {
                 transaction: txn_summary,
                 message: None,
             });
         }
+
+        // Can safe unwrap here since NewProfileOptions arg group requires either that
+        // skip_saving_profile is set, or that a new profile name is specified. If a new profile is
+        // specified, then it will have already been error checked above.
+        let new_profile_name = self.new_profile_options.save_to_profile.unwrap();
 
         // If no config exists, then the error should've been caught earlier during the profile
         // name verification step.
@@ -338,15 +296,9 @@ impl CliCommand<RotateSummary> for RotateKey {
             .insert(new_profile_name.clone(), new_profile_config);
         config.save()?;
 
-        eprintln!("Profile {} is saved.", new_profile_name);
-
-        // Update this
         Ok(RotateSummary {
             transaction: txn_summary,
-            message: Some(format!(
-                "New profile {} is saved, stale profile {} renamed to {}.",
-                new_profile_name
-            )),
+            message: Some(format!("New profile {} is saved.", new_profile_name)),
         })
     }
 }
