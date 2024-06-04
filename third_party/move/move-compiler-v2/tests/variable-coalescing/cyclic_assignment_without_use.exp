@@ -12,6 +12,14 @@ public fun m::test($t0: u64) {
   4: return ()
 }
 
+
+Diagnostics:
+warning: Unused assignment to a. Consider removing or prefixing with an underscore: `_a`
+  ┌─ tests/variable-coalescing/cyclic_assignment_without_use.move:6:9
+  │
+6 │         a = c;
+  │         ^^^^^
+
 ============ after DeadStoreElimination: ================
 
 [variant baseline]

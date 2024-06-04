@@ -18,6 +18,14 @@ fun m::test($t0: u64): bool {
   7: return $t1
 }
 
+
+Diagnostics:
+warning: Unused assignment to a. Consider removing or prefixing with an underscore: `_a`
+  ┌─ tests/copy-propagation/seq_kills_2.move:7:9
+  │
+7 │         a = p + 1; // kill b := a
+  │         ^^^^^^^^^
+
 ============ after DeadStoreElimination: ================
 
 [variant baseline]

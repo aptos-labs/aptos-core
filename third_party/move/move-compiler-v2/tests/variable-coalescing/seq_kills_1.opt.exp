@@ -18,6 +18,14 @@ fun m::test($t0: u64): bool {
   7: return $t1
 }
 
+
+Diagnostics:
+warning: Unused assignment to b. Consider removing or prefixing with an underscore: `_b`
+  ┌─ tests/variable-coalescing/seq_kills_1.move:7:9
+  │
+7 │         b = p + 1; // kill b := a, which removes the whole copy chain
+  │         ^^^^^^^^^
+
 ============ after DeadStoreElimination: ================
 
 [variant baseline]

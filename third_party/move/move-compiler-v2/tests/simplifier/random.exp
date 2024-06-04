@@ -145,6 +145,14 @@ module 0x8675::M {
 
 
 Diagnostics:
+warning: Unused assignment to q. Consider removing or prefixing with an underscore: `_q`
+   ┌─ tests/simplifier/random.move:48:17
+   │
+48 │         let q = v;
+   │                 ^
+
+
+Diagnostics:
 error: cannot mutably borrow since immutable references exist
    ┌─ tests/simplifier/random.move:56:17
    │

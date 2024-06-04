@@ -20,6 +20,14 @@ public fun m::test($t0: bool): u32 {
  12: return $t1
 }
 
+
+Diagnostics:
+warning: Unused assignment to y. Consider removing or prefixing with an underscore: `_y`
+   ┌─ tests/variable-coalescing/dead_assignment_3.move:10:13
+   │
+10 │             y = y;
+   │             ^^^^^
+
 ============ after DeadStoreElimination: ================
 
 [variant baseline]

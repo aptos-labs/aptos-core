@@ -43,6 +43,14 @@ public fun m::test(): u8 {
 
 
 Diagnostics:
+warning: Unused assignment to q. Consider removing or prefixing with an underscore: `_q`
+  ┌─ tests/bytecode-generator/wildcard7.move:6:13
+  │
+6 │         let (_, q) = (x, z);
+  │             ^^^^^^
+
+
+Diagnostics:
 error: cannot move local `x` since it is still in use
   ┌─ tests/bytecode-generator/wildcard7.move:5:17
   │

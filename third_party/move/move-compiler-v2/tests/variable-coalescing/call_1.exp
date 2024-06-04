@@ -33,6 +33,14 @@ fun m::test($t0: u64): u64 {
   6: return $t1
 }
 
+
+Diagnostics:
+warning: Unused assignment to a. Consider removing or prefixing with an underscore: `_a`
+  ┌─ tests/variable-coalescing/call_1.move:7:17
+  │
+7 │         let a = p;
+  │                 ^
+
 ============ after DeadStoreElimination: ================
 
 [variant baseline]
