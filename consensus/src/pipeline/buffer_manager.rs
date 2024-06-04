@@ -5,8 +5,7 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     consensus_observer::{
-        network::{ConsensusObserverMessage, OrderedBlock as ObserverBlock},
-        publisher::Publisher,
+        network_message::ConsensusObserverMessage, publisher::ConsensusPublisher,
     },
     counters, monitor,
     network::{IncomingCommitRequest, NetworkSender},
@@ -135,8 +134,8 @@ pub struct BufferManager {
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
     order_vote_enabled: bool,
-    // Publisher for downstream observers.
-    publisher: Option<Publisher>,
+    // Consensus publisher for downstream observers.
+    consensus_publisher: Option<ConsensusPublisher>,
 }
 
 impl BufferManager {
@@ -162,7 +161,7 @@ impl BufferManager {
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
         order_vote_enabled: bool,
-        publisher: Option<Publisher>,
+        consensus_publisher: Option<ConsensusPublisher>,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -209,7 +208,7 @@ impl BufferManager {
             reset_flag,
             bounded_executor: executor,
             order_vote_enabled,
-            publisher,
+            consensus_publisher,
         }
     }
 
@@ -265,11 +264,12 @@ impl BufferManager {
             ordered_blocks: ordered_blocks.clone(),
             lifetime_guard: self.create_new_request(()),
         });
-        if let Some(publisher) = &self.publisher {
-            publisher.publish(ConsensusObserverMessage::OrderedBlock(ObserverBlock {
-                blocks: ordered_blocks.clone().into_iter().map(Arc::new).collect(),
-                ordered_proof: ordered_proof.clone(),
-            }));
+        if let Some(consensus_publisher) = &self.consensus_publisher {
+            let message = ConsensusObserverMessage::new_ordered_block_message(
+                ordered_blocks.clone().into_iter().map(Arc::new).collect(),
+                ordered_proof.clone(),
+            );
+            consensus_publisher.publish_message(message);
         }
         self.execution_schedule_phase_tx
             .send(request)
@@ -381,10 +381,11 @@ impl BufferManager {
                     // this persisting request will result in BlockNotFound
                     self.reset().await;
                 }
-                if let Some(publisher) = &self.publisher {
-                    publisher.publish(ConsensusObserverMessage::CommitDecision(CommitDecision::new(
-                        commit_proof.clone(),
-                    )));
+                if let Some(consensus_publisher) = &self.consensus_publisher {
+                    let message = ConsensusObserverMessage::new_commit_decision_message(
+                        CommitDecision::new(commit_proof.clone()),
+                    );
+                    consensus_publisher.publish_message(message);
                 }
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {

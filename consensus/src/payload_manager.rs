@@ -3,7 +3,8 @@
 
 use crate::{
     consensus_observer::{
-        network::ConsensusObserverMessage, observer::ObserverDataStatus, publisher::Publisher,
+        network_message::ConsensusObserverMessage, observer::ObserverDataStatus,
+        publisher::ConsensusPublisher,
     },
     counters,
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
@@ -38,11 +39,11 @@ pub enum PayloadManager {
     InQuorumStore(
         Arc<dyn BatchReader>,
         Sender<CoordinatorCommand>,
-        Option<Publisher>,
+        Option<ConsensusPublisher>,
     ),
-    Observer(
+    ConsensusObserver(
         Arc<Mutex<HashMap<HashValue, ObserverDataStatus>>>,
-        Option<Publisher>,
+        Option<ConsensusPublisher>,
     ),
 }
 
@@ -81,7 +82,7 @@ impl PayloadManager {
     ///Pass commit information to BatchReader and QuorumStore wrapper for their internal cleanups.
     pub fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
         match self {
-            PayloadManager::DirectMempool | PayloadManager::Observer(_, _) => {},
+            PayloadManager::DirectMempool | PayloadManager::ConsensusObserver(_, _) => {},
             PayloadManager::InQuorumStore(batch_reader, coordinator_tx, _) => {
                 batch_reader.update_certified_timestamp(block_timestamp);
 
@@ -148,7 +149,7 @@ impl PayloadManager {
             };
 
         match self {
-            PayloadManager::DirectMempool | PayloadManager::Observer(_, _) => {},
+            PayloadManager::DirectMempool | PayloadManager::ConsensusObserver(_, _) => {},
             PayloadManager::InQuorumStore(batch_reader, _, _) => match payload {
                 Payload::InQuorumStore(proof_with_status) => {
                     request_txns_and_update_status(proof_with_status, batch_reader.clone());
@@ -180,7 +181,7 @@ impl PayloadManager {
             None => return Ok((Vec::new(), None)),
         };
 
-        if let PayloadManager::Observer(txns_pool, maybe_publisher) = self {
+        if let PayloadManager::ConsensusObserver(txns_pool, consensus_publisher) = self {
             // If the data is already available, return it, otherwise put the tx in the pool and wait for it.
             // It's important to make sure this doesn't race with the payload insertion part.
             let result = match txns_pool.lock().entry(block.id()) {
@@ -205,11 +206,13 @@ impl PayloadManager {
                     .map_err(|_| ExecutorError::CouldNotGetData)?
                     .map_err(|_| ExecutorError::CouldNotGetData)?,
             };
-            if let Some(publisher) = maybe_publisher {
-                publisher.publish(ConsensusObserverMessage::Payload((
+            if let Some(consensus_publisher) = consensus_publisher {
+                let message = ConsensusObserverMessage::new_block_payload_message(
                     block.gen_block_info(HashValue::zero(), 0, None),
-                    data.clone(),
-                )));
+                    data.0.clone(),
+                    data.1,
+                );
+                consensus_publisher.publish_message(message);
             }
             return Ok(data);
         }
@@ -339,11 +342,13 @@ impl PayloadManager {
                 block.id()
             ),
         };
-        if let PayloadManager::InQuorumStore(_, _, Some(publisher)) = self {
-            publisher.publish(ConsensusObserverMessage::Payload((
+        if let PayloadManager::InQuorumStore(_, _, Some(consensus_publisher)) = self {
+            let message = ConsensusObserverMessage::new_block_payload_message(
                 block.gen_block_info(HashValue::zero(), 0, None),
-                result.clone(),
-            )));
+                result.0.clone(),
+                result.1,
+            );
+            consensus_publisher.publish_message(message);
         }
         Ok(result)
     }

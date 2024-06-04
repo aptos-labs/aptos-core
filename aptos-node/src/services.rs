@@ -6,8 +6,12 @@ use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::{
-    consensus_observer::network::ConsensusObserverMessage, network_interface::ConsensusMsg,
-    persistent_liveness_storage::StorageWriteProxy, quorum_store::quorum_store_db::QuorumStoreDB,
+    consensus_observer::{
+        network_client::ConsensusObserverClient, network_message::ConsensusObserverMessage,
+    },
+    network_interface::ConsensusMsg,
+    persistent_liveness_storage::StorageWriteProxy,
+    quorum_store::quorum_store_db::QuorumStoreDB,
 };
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
@@ -124,6 +128,7 @@ pub fn start_consensus_runtime(
 
     let reconfig_subscription = consensus_reconfig_subscription
         .expect("Consensus requires a reconfiguration subscription!");
+    let consensus_observer_client = observer_network_client.map(ConsensusObserverClient::new);
 
     let consensus = aptos_consensus::consensus_provider::start_consensus(
         node_config,
@@ -134,7 +139,7 @@ pub fn start_consensus_runtime(
         db_rw,
         reconfig_subscription,
         vtxn_pool,
-        observer_network_client,
+        consensus_observer_client,
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
 

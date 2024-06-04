@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensus_observer::publisher::Publisher,
+    consensus_observer::publisher::ConsensusPublisher,
     network::{IncomingCommitRequest, NetworkSender},
     pipeline::{
         buffer_manager::{create_channel, BufferManager, OrderedBlocks, ResetRequest},
@@ -38,7 +38,7 @@ pub fn prepare_phases_and_buffer_manager(
     epoch_state: Arc<EpochState>,
     bounded_executor: BoundedExecutor,
     order_vote_enabled: bool,
-    publisher: Option<Publisher>,
+    publisher: Option<ConsensusPublisher>,
 ) -> (
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,

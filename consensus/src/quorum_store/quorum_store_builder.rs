@@ -3,7 +3,7 @@
 
 use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
-    consensus_observer::publisher::Publisher,
+    consensus_observer::publisher::ConsensusPublisher,
     error::error_kind,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
@@ -49,7 +49,7 @@ pub enum QuorumStoreBuilder {
 impl QuorumStoreBuilder {
     pub fn init_payload_manager(
         &mut self,
-        publisher: Option<Publisher>,
+        publisher: Option<ConsensusPublisher>,
     ) -> (
         Arc<PayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
@@ -428,7 +428,7 @@ impl InnerBuilder {
 
     fn init_payload_manager(
         &mut self,
-        publisher: Option<Publisher>,
+        publisher: Option<ConsensusPublisher>,
     ) -> (
         Arc<PayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
