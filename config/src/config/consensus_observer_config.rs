@@ -43,8 +43,8 @@ impl ConfigOptimizer for ConsensusObserverConfig {
         _node_type: NodeType,
         _chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
-        // TODO: use me to enable consensus observer for validators and VFNs
-        // in controlled environments, e.g., devnet.
+        // TODO: use me to enable consensus observer for
+        // validators and VFNs in controlled environments.
         Ok(false)
     }
 }
