@@ -62,11 +62,11 @@ One style could encompass sublinear functions to reward early adopters more heav
 ## Related files
 ### `bonding_curve_launchpad.move`
 * Contains public methods (both entry and normal), for the end user.
-* Creates and holds references (transfer, burn, mint) to the launched Fungible Asset, through a `SmartTable`.
+* Creates and holds references (transfer) to the launched Fungible Asset through the FA's respective Object.
 * Dispatches to `liquidity_pairs` to create a new pair between the launched FA and APT.
 * Facilitates swaps between any enabled FA and APT.
 ### `liquidity_pairs.move`
-* Creates and holds references to each liquidity pair, through a `SmartTable`.
+* Creates and holds references to each liquidity pair, through a named objects.
 * Contains business logic for performing swaps on each pair.
 * Performs graduation ceremony to disable liquidity pair, and move all reserves to an external, third party DEX.
 ### `test_bonding_curve_launchpad.move`
@@ -78,9 +78,9 @@ One style could encompass sublinear functions to reward early adopters more heav
 ### Lifecycle of launched FA
 #### Launching the FA and liquidity pair
 1. User initiates FA creation on the `bonding_curve_launchpad` through `create_fa_pair(...)`.
-   1. `bonding_curve_launchpad` creates a new dispatchable FA and assigns the `"FA Generator" Object` as the creator, by retrieving it's `signer` using a stored `extend_ref`. Importantly, the user initiating the FA does not have any permissions (mint, transfer, burn), preventing their ability to pre-mint. FA capabilities (`transfer_ref`) are stored within `SmartTable`, using the given name and symbol as a unique key, for future transfers.
+   1. `bonding_curve_launchpad` creates a new dispatchable FA and assigns the `"FA Generator" Object` as the creator, by retrieving it's `signer` using a stored `extend_ref`. Importantly, the user initiating the FA does not have any permissions (mint, transfer, burn), preventing their ability to pre-mint. FA capabilities (`transfer_ref`) are stored within the FA's respective Object, for future transfers.
    2. The dispatchable `withdraw` function is defined to disallow all transfers between FA owners, until **graduation** is met. It does this through a state value associated with the FA's soon-to-be generated liquidity pair, called `is_frozen`, which is initially set to `true`. This prevents the FA from being traded on external DEXs or through external means. Transfers are only available through the limited `transfer_ref` stored on `bonding_curve_launchpad`, and restricted to swaps on the `liquidity_pairs`'s liquidity pair. 
-   3. A pre-defined number of the FA is minted, and kept on `bonding_curve_launchpad`.
+   3. A pre-defined number of the FA is minted, and kept temporarily on `bonding_curve_launchpad`.
 2. `bonding_curve_launchpad` creates a liquidity pair on the `liquidity_pairs` module, which follows the constant product formula.
    1. Liquidity pair is represented and stored as an Object. This allows for the reserves to be held directly on the object, rather than the `bonding_curve_launchpad` account.
    2. The entirety of minted FA + a pre-defined number of **virtual liquidity** for APT is deposited into the liquidity pair object. 
@@ -88,7 +88,7 @@ One style could encompass sublinear functions to reward early adopters more heav
 3. Optionally, the creator can immediately initiate a swap from APT to the FA.
 #### Trading against the FA's associated liquidity pair
 1. External users can swap APT to FA, or vice versa, through `public entry` methods available on `bonding_curve_launchpad`. 
-   1. Although the normal `transfer` functionality of the FA is disabled by the custom dispatchable `withdraw` function, `bonding_curve_launchpad` can assist with swaps using it's stored `transfer_ref` from the FA `SmartTable`. `transfer_ref` is not impeded by the custom dispatchable function.
+   1. Although the normal `transfer` functionality of the FA is disabled by the custom dispatchable `withdraw` function, `bonding_curve_launchpad` can assist with swaps using it's stored `transfer_ref` from the FA's Object. `transfer_ref` is not impeded by the custom dispatchable function.
    2. The logic for calculating the `amountOut` of a swap is based on the constant product formula for reader familiarity. In a production scenario, a sub-linear trading function can assist in incentivizing general early adoption.
 #### Graduating from `liquidity_pairs` to a public FA DEX
 1. After each swap from APT to FA, when the APT reserves are increasing, a threshold is checked for whether the liquidity pair can **graduate** or not. The threshold is a pre-defined minimum amount of APT that must exist in the reserves. Once this threshold is met during a swap, **graduation** begins.
