@@ -201,10 +201,10 @@ impl DB {
 
     fn log_construct(name: &str, inner: rocksdb::DB) -> DB {
         // info!(rocksdb_name = name, "Opened RocksDB.");
-        // DB {
-        //     name: name.to_string(),
-        //     inner,
-        // }
+        DB {
+            name: name.to_string(),
+            inner,
+        }
     }
 
     /// Reads single record by key.
