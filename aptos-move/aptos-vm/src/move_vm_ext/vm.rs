@@ -24,6 +24,7 @@ use aptos_types::{
 };
 use move_binary_format::errors::VMResult;
 use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
+use move_vm_types::loaded_data::runtime_types::TypeBuilder;
 use std::ops::Deref;
 
 pub struct MoveVmExt {
@@ -43,6 +44,7 @@ impl MoveVmExt {
         gas_hook: Option<F>,
         resolver: &impl AptosMoveResolver,
         aggregator_v2_type_tagging: bool,
+        ty_builder: TypeBuilder,
     ) -> VMResult<Self>
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
@@ -67,7 +69,7 @@ impl MoveVmExt {
         );
 
         Ok(Self {
-            inner: WarmVmCache::get_warm_vm(builder, vm_config, resolver)?,
+            inner: WarmVmCache::get_warm_vm(builder, vm_config, ty_builder, resolver)?,
             chain_id,
             features,
         })
@@ -82,6 +84,7 @@ impl MoveVmExt {
         timed_features: TimedFeatures,
         resolver: &impl AptosMoveResolver,
         aggregator_v2_type_tagging: bool,
+        ty_builder: TypeBuilder,
     ) -> VMResult<Self> {
         Self::new_impl::<fn(DynamicExpression)>(
             native_gas_params,
@@ -93,6 +96,7 @@ impl MoveVmExt {
             None,
             resolver,
             aggregator_v2_type_tagging,
+            ty_builder,
         )
     }
 
@@ -106,6 +110,7 @@ impl MoveVmExt {
         gas_hook: Option<F>,
         resolver: &impl AptosMoveResolver,
         aggregator_v2_type_tagging: bool,
+        ty_builder: TypeBuilder,
     ) -> VMResult<Self>
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
@@ -120,6 +125,7 @@ impl MoveVmExt {
             gas_hook,
             resolver,
             aggregator_v2_type_tagging,
+            ty_builder,
         )
     }
 

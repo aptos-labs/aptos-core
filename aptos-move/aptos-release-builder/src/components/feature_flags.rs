@@ -119,6 +119,7 @@ pub enum FeatureFlag {
     AggregatorV2IsAtLeastApi,
     ConcurrentFungibleBalance,
     DefaultToConcurrentFungibleBalance,
+    LimitVMTypeSize,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -310,6 +311,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::DefaultToConcurrentFungibleBalance => {
                 AptosFeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE
             },
+            FeatureFlag::LimitVMTypeSize => AptosFeatureFlag::LIMIT_VM_TYPE_SIZE,
         }
     }
 }
@@ -430,6 +432,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE => {
                 FeatureFlag::DefaultToConcurrentFungibleBalance
             },
+            AptosFeatureFlag::LIMIT_VM_TYPE_SIZE => FeatureFlag::LimitVMTypeSize,
         }
     }
 }

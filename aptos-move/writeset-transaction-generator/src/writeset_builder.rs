@@ -13,6 +13,7 @@ use aptos_types::{
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
+    aptos_vm::aptos_default_ty_builder,
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
@@ -110,15 +111,20 @@ where
     F: FnOnce(&mut GenesisSession),
 {
     let resolver = state_view.as_move_resolver();
+
+    let features = Features::default();
+    let ty_builder = aptos_default_ty_builder(&features);
+
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         chain_id,
-        Features::default(),
+        features,
         TimedFeaturesBuilder::enable_all().build(),
         &resolver,
         false,
+        ty_builder,
     )
     .unwrap();
     let change_set = {

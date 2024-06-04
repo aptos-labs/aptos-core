@@ -38,15 +38,17 @@ impl WarmVmCache {
     pub(crate) fn get_warm_vm(
         native_builder: SafeNativeBuilder,
         vm_config: VMConfig,
+        ty_builder: TypeBuilder,
         resolver: &impl AptosMoveResolver,
     ) -> VMResult<MoveVM> {
-        WARM_VM_CACHE.get(native_builder, vm_config, resolver)
+        WARM_VM_CACHE.get(native_builder, vm_config, ty_builder, resolver)
     }
 
     fn get(
         &self,
         mut native_builder: SafeNativeBuilder,
         vm_config: VMConfig,
+        ty_builder: TypeBuilder,
         resolver: &impl AptosMoveResolver,
     ) -> VMResult<MoveVM> {
         let _timer = TIMER.timer_with(&["warm_vm_get"]);
@@ -71,9 +73,7 @@ impl WarmVmCache {
             let vm = MoveVM::new_with_ty_builder(
                 aptos_natives_with_builder(&mut native_builder),
                 vm_config,
-                // FIXME: How do we extract gas params here if we need to initialize type builder when creating the VM....
-                //   It is a result, use features?
-                TypeBuilder::Legacy,
+                ty_builder,
             )?;
             Self::warm_vm_up(&vm, resolver);
 

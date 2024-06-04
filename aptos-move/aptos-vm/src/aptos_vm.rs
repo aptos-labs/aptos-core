@@ -99,7 +99,10 @@ use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
 };
-use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
+use move_vm_types::{
+    gas::{GasMeter, UnmeteredGasMeter},
+    loaded_data::runtime_types::TypeBuilder,
+};
 use num_cpus;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
@@ -215,6 +218,34 @@ fn is_approved_gov_script(
     }
 }
 
+// TODO(George): move to config file when it is moved from types crate.
+pub fn aptos_prod_ty_builder(
+    features: &Features,
+    gas_params: &Result<AptosGasParameters, String>,
+) -> TypeBuilder {
+    if !features.is_limit_type_size_enabled() {
+        return TypeBuilder::Legacy;
+    };
+
+    gas_params
+        .as_ref()
+        .map(|gas_params| {
+            let max_ty_size = gas_params.vm.txn.max_ty_size;
+            let max_ty_depth = gas_params.vm.txn.max_ty_depth;
+            TypeBuilder::new(max_ty_size.into(), max_ty_depth.into())
+        })
+        .unwrap_or(aptos_default_ty_builder(features))
+}
+
+pub fn aptos_default_ty_builder(features: &Features) -> TypeBuilder {
+    if features.is_limit_type_size_enabled() {
+        // Some default values in case there is no access to gas schedule.
+        TypeBuilder::new(256, 128)
+    } else {
+        TypeBuilder::Legacy
+    }
+}
+
 pub struct AptosVM {
     is_simulation: bool,
     move_vm: MoveVmExt,
@@ -264,6 +295,7 @@ impl AptosVM {
         let aggregator_v2_type_tagging = override_is_delayed_field_optimization_capable
             && features.is_aggregator_v2_delayed_fields_enabled();
 
+        let ty_builder = aptos_prod_ty_builder(&features, &gas_params);
         let move_vm = MoveVmExt::new(
             native_gas_params,
             misc_gas_params,
@@ -273,6 +305,7 @@ impl AptosVM {
             timed_features.clone(),
             resolver,
             aggregator_v2_type_tagging,
+            ty_builder,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 

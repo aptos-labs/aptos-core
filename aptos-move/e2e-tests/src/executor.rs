@@ -54,6 +54,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
+    aptos_vm::{aptos_default_ty_builder, aptos_prod_ty_builder},
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
     gas::{get_gas_parameters, make_prod_gas_meter},
@@ -890,6 +891,7 @@ impl FakeExecutor {
             ),
         };
 
+        let ty_builder = aptos_prod_ty_builder(&self.features, &Ok(gas_params.clone()));
         let vm = MoveVmExt::new(
             gas_params.natives.clone(),
             gas_params.vm.misc.clone(),
@@ -899,6 +901,7 @@ impl FakeExecutor {
             timed_features,
             &resolver,
             false,
+            ty_builder,
         )
         .unwrap();
 
@@ -1005,6 +1008,7 @@ impl FakeExecutor {
                 .build();
 
             let resolver = self.data_store.as_move_resolver();
+            let ty_builder = aptos_default_ty_builder(&self.features);
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new_with_gas_hook(
@@ -1019,6 +1023,7 @@ impl FakeExecutor {
                 }),
                 &resolver,
                 /*aggregator_v2_type_tagging=*/ false,
+                ty_builder,
             )
             .unwrap();
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
@@ -1085,6 +1090,7 @@ impl FakeExecutor {
                 .build();
 
             let resolver = self.data_store.as_move_resolver();
+            let ty_builder = aptos_default_ty_builder(&self.features);
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
@@ -1096,6 +1102,7 @@ impl FakeExecutor {
                 timed_features,
                 &resolver,
                 false,
+                ty_builder,
             )
             .unwrap();
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
@@ -1155,6 +1162,7 @@ impl FakeExecutor {
             misc_gas_params,
             gas_feature_version,
         ) = get_gas_parameters(&features, state_view);
+        let ty_builder = aptos_prod_ty_builder(&features, &gas_params_res);
 
         let gas_params = gas_params_res.unwrap();
         let mut gas_meter = make_prod_gas_meter(
@@ -1178,6 +1186,7 @@ impl FakeExecutor {
             timed_features,
             state_view,
             false,
+            ty_builder,
         )
         .unwrap();
 
@@ -1223,6 +1232,7 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let resolver = self.data_store.as_move_resolver();
+        let ty_builder = aptos_default_ty_builder(&self.features);
 
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
@@ -1235,6 +1245,7 @@ impl FakeExecutor {
             TimedFeaturesBuilder::enable_all().build(),
             &resolver,
             false,
+            ty_builder,
         )
         .unwrap();
         let mut session = vm.new_session(&resolver, SessionId::void(), None);

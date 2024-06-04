@@ -40,6 +40,7 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm::{
+    aptos_vm::aptos_default_ty_builder,
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
@@ -129,15 +130,20 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         state_view.add_module(&module.self_id(), module_bytes);
     }
     let data_cache = state_view.as_move_resolver();
+
+    let features = Features::default();
+    let ty_builder = aptos_default_ty_builder(&features);
+
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
-        Features::default(),
+        features,
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
         false,
+        ty_builder,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -247,15 +253,20 @@ pub fn encode_genesis_change_set(
         state_view.add_module(&module.self_id(), module_bytes);
     }
     let data_cache = state_view.as_move_resolver();
+
+    let features = Features::default();
+    let ty_builder = aptos_default_ty_builder(&features);
+
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
-        Features::default(),
+        features,
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
         false,
+        ty_builder,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -1085,15 +1096,19 @@ pub fn test_genesis_module_publishing() {
     }
     let data_cache = state_view.as_move_resolver();
 
+    let features = Features::default();
+    let ty_builder = aptos_default_ty_builder(&features);
+
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
-        Features::default(),
+        features,
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
         false,
+        ty_builder,
     )
     .unwrap();
     let id1 = HashValue::zero();

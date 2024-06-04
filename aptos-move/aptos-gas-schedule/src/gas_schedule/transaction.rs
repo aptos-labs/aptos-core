@@ -259,20 +259,22 @@ crate::gas_schedule::macros::define_gas_parameters!(
             { RELEASE_V1_12.. => "keyless.base" },
             138_000_000,
         ],
+
+        // Type limits are always enabled because they are protected by feature flag. When
+        // these values change, versioning can be added.
         [
             max_ty_size: NumTypeNodes,
-            { RELEASE_V1_15.. => "max_ty_size" },
+            "max_ty_size",
             256,
         ],
         [
             max_ty_depth: NumTypeNodes,
-            { RELEASE_V1_15.. => "max_ty_depth" },
+            "max_ty_depth",
             128
         ]
     ]
 );
 
-use crate::gas_feature_versions::RELEASE_V1_15;
 use gas_params::*;
 
 impl TransactionGasParameters {
