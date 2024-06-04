@@ -47,7 +47,6 @@ use aptos_types::{
     block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
     chain_id::ChainId,
     fee_statement::FeeStatement,
-    invalid_signature,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features,
@@ -1582,23 +1581,13 @@ impl AptosVM {
             .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, None))?;
 
         // If there are keyless TXN authenticators, validate them all.
-        if !keyless_authenticators.is_empty() {
-            // This should only happen if we incorrectly enable the feature without setting the VK.
-            // Or, if we spawn a network without initializing the VK in genesis. Either way, it must
-            // be handled here.
-            if self.pvk.is_none() {
-                // println!("[aptos-vm][groth16] PVK has not been set on-chain");
-                return Err(invalid_signature!("Groth16 VK has not been set on-chain"));
-            }
-
-            if !self.is_simulation {
-                keyless_validation::validate_authenticators(
-                    self.pvk.as_ref().unwrap(),
-                    &keyless_authenticators,
-                    self.features(),
-                    resolver,
-                )?;
-            }
+        if !keyless_authenticators.is_empty() && !self.is_simulation {
+            keyless_validation::validate_authenticators(
+                &self.pvk,
+                &keyless_authenticators,
+                self.features(),
+                resolver,
+            )?;
         }
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
