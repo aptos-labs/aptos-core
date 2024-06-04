@@ -60,9 +60,12 @@ macro_rules! log {
             concat!(file!(), ':', line!()),
         );
 
-        if METADATA.level() == $crate::Level::Error {
-            $crate::ERROR_LOG_COUNT.inc();
-        }
+        match METADATA.level() {
+            $crate::Level::Error => { $crate::ERROR_LOG_COUNT.inc() },
+            $crate::Level::Warn => { $crate::WARN_LOG_COUNT.inc() },
+            $crate::Level::Info => { $crate::INFO_LOG_COUNT.inc() },
+            _ => {},
+        };
 
         if METADATA.enabled() {
             $crate::Event::dispatch(
