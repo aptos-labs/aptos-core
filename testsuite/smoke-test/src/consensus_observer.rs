@@ -4,7 +4,7 @@
 use crate::{
     smoke_test_environment::SwarmBuilder,
     state_sync_utils,
-    test_utils::{create_test_accounts, execute_transactions, wait_for_all_nodes},
+    utils::{create_test_accounts, execute_transactions, wait_for_all_nodes},
 };
 use aptos_config::config::NodeConfig;
 use aptos_forge::NodeExt;
