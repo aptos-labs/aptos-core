@@ -5,7 +5,9 @@ use crate::{
     account::{
         create::{CreateAccount, DEFAULT_FUNDED_COINS},
         fund::FundWithFaucet,
-        key_rotation::{LookupAddress, RotateKey, RotateSummary},
+        key_rotation::{
+            LookupAddress, NewAuthKeyOptions, NewProfileOptions, RotateKey, RotateSummary,
+        },
         list::{ListAccount, ListQuery},
         transfer::{TransferCoins, TransferSummary},
     },
@@ -14,10 +16,11 @@ use crate::{
         types::{
             account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
             AuthenticationKeyInputOptions, CliError, CliTypedResult, EncodingOptions,
-            EntryFunctionArguments, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-            MovePackageDir, OptionalPoolAddressArgs, OverrideSizeCheckOption, PoolAddressArgs,
-            PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs,
-            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary, TypeArgVec,
+            EntryFunctionArguments, FaucetOptions, GasOptions, HardwareWalletOptions, KeyType,
+            MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs,
+            OverrideSizeCheckOption, PoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
+            PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, ScriptFunctionArguments,
+            TransactionOptions, TransactionSummary, TypeArgVec,
         },
         utils::write_to_file,
     },
@@ -264,10 +267,18 @@ impl CliTestFramework {
                 prompt_options: PromptOptions::yes(),
                 ..Default::default()
             },
-            new_private_key: Some(new_private_key),
-            save_to_profile: None,
-            new_private_key_file: None,
-            skip_saving_profile: true,
+            new_auth_key_options: NewAuthKeyOptions {
+                new_private_key: Some(new_private_key),
+                new_private_key_file: None,
+                new_hardware_wallet_options: HardwareWalletOptions {
+                    derivation_path: None,
+                    derivation_index: None,
+                },
+            },
+            new_profile_options: NewProfileOptions {
+                skip_saving_profile: true,
+                save_to_profile: None,
+            },
         }
         .execute()
         .await?;
