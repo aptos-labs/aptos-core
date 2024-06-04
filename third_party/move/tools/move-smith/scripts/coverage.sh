@@ -41,6 +41,7 @@ function gen() {
     mkdir -p $target_dir
 
     if [ ! -d "fuzz/coverage/$fuzz_target" ]; then
+        export RUSTFLAGS="$RUSTFLAGS -Zcoverage-options=branch"
         cargo fuzz coverage $fuzz_target
     fi
 
@@ -53,6 +54,7 @@ function gen() {
         --show-directory-coverage \
         --output-dir=$target_dir \
         -Xdemangler=rustfilt \
+        --show-branches=count \
         --ignore-filename-regex='rustc/.*/library|\.cargo'
 }
 
