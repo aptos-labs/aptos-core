@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
 use crate::AptosPublicInfo;
 use anyhow::Result;
 use aptos_rest_client::Client as RestClient;
@@ -11,6 +10,7 @@ use aptos_sdk::{
     types::{chain_id::ChainId, LocalAccount},
 };
 use reqwest::Url;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct ChainInfo {
@@ -40,13 +40,8 @@ impl ChainInfo {
     }
 
     pub async fn resync_root_account_seq_num(&mut self, client: &RestClient) -> Result<()> {
-        let root_address = {
-            self.root_account.address()
-        };
-        let account = client
-            .get_account(root_address)
-            .await?
-            .into_inner();
+        let root_address = { self.root_account.address() };
+        let account = client.get_account(root_address).await?.into_inner();
         self.root_account
             .set_sequence_number(account.sequence_number);
         Ok(())

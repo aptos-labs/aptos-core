@@ -17,8 +17,7 @@ use aptos_sdk::{
 };
 use async_trait::async_trait;
 use rand::rngs::StdRng;
-use std::borrow::Borrow;
-use std::sync::Arc;
+use std::{borrow::Borrow, sync::Arc};
 
 pub struct EntryPointTransactionGenerator {
     pub entry_point: EntryPoints,

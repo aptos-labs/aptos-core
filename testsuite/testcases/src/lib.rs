@@ -27,7 +27,11 @@ pub mod validator_join_leave_test;
 pub mod validator_reboot_stress_test;
 
 use anyhow::Context;
-use aptos_forge::{prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown}, EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version, NetworkContextSynchronizer};
+use aptos_forge::{
+    prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown},
+    EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt, Result,
+    Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
+};
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
@@ -35,9 +39,9 @@ use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     fmt::Write,
+    ops::DerefMut,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-use std::ops::DerefMut;
 use tokio::runtime::Runtime;
 
 const WARMUP_DURATION_FRACTION: f32 = 0.07;
@@ -75,10 +79,22 @@ async fn batch_update_gradually(
 ) -> Result<()> {
     // let mut swarm = ctx.swarm();
     for validator in validators_to_update {
-        ctxa.ctx.lock().await.swarm().upgrade_validator(*validator, version).await?;
+        ctxa.ctx
+            .lock()
+            .await
+            .swarm()
+            .upgrade_validator(*validator, version)
+            .await?;
         if wait_until_healthy {
             let deadline = Instant::now() + max_wait;
-            ctxa.ctx.lock().await.swarm().validator_mut(*validator).unwrap().wait_until_healthy(deadline).await?;
+            ctxa.ctx
+                .lock()
+                .await
+                .swarm()
+                .validator_mut(*validator)
+                .unwrap()
+                .wait_until_healthy(deadline)
+                .await?;
         }
         if !delay.is_zero() {
             tokio::time::sleep(delay).await;
@@ -123,11 +139,13 @@ pub async fn generate_traffic(
     let (emitter, emit_job_request) =
         create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng)?;
 
-    let stats = emitter.emit_txn_for(
-        ctx.swarm().chain_info().root_account,
-        emit_job_request,
-        duration,
-    ).await?;
+    let stats = emitter
+        .emit_txn_for(
+            ctx.swarm().chain_info().root_account,
+            emit_job_request,
+            duration,
+        )
+        .await?;
 
     Ok(stats)
 }
@@ -153,11 +171,7 @@ pub fn spawn_generate_traffic(
     duration: Duration,
     handle: Handle,
 ) -> JoinHandle<Result<TxnStats>> {
-    handle.spawn(emitter.emit_txn_for(
-        root_account,
-        emit_job_request,
-        duration,
-    ))
+    handle.spawn(emitter.emit_txn_for(root_account, emit_job_request, duration))
 }
 
 pub enum LoadDestination {
@@ -213,7 +227,10 @@ pub trait NetworkLoadTest: Test {
     }
 }
 
-async fn async_run_network_load_test(nlt: &dyn NetworkLoadTest, ctx: NetworkContextSynchronizer<'_>) -> Result<()> {
+async fn async_run_network_load_test(
+    nlt: &dyn NetworkLoadTest,
+    ctx: NetworkContextSynchronizer<'_>,
+) -> Result<()> {
     let mut ctx_locker = ctx.ctx.lock().await;
     let ctx = ctx_locker.deref_mut();
     let runtime = Runtime::new().unwrap();
@@ -285,14 +302,17 @@ async fn async_run_network_load_test(nlt: &dyn NetworkLoadTest, ctx: NetworkCont
             start_version,
             end_version,
         )
-            .context("check for success")?;
+        .context("check for success")?;
     }
 
-    Ok(())}
+    Ok(())
+}
 
 impl NetworkTest for dyn NetworkLoadTest {
     fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        ctx.handle.clone().block_on(async_run_network_load_test(self, ctx))
+        ctx.handle
+            .clone()
+            .block_on(async_run_network_load_test(self, ctx))
     }
 }
 

@@ -201,7 +201,10 @@ impl SubmissionWorker {
             }
         }
 
-        self.accounts.into_iter().map(|account_arc_mutex| Arc::into_inner(account_arc_mutex).unwrap()).collect()
+        self.accounts
+            .into_iter()
+            .map(|account_arc_mutex| Arc::into_inner(account_arc_mutex).unwrap())
+            .collect()
     }
 
     // returns true if it returned early
@@ -253,10 +256,8 @@ impl SubmissionWorker {
                 &latest_fetched_counts,
             );
         }
-        let (num_committed, num_expired) = count_committed_expired_stats(
-            account_to_start_and_end_seq_num,
-            latest_fetched_counts,
-        );
+        let (num_committed, num_expired) =
+            count_committed_expired_stats(account_to_start_and_end_seq_num, latest_fetched_counts);
         // let (num_committed, num_expired) = update_seq_num_and_get_num_expired(
         //     self.accounts.clone(),
         //     account_to_start_and_end_seq_num,
@@ -344,21 +345,21 @@ fn update_account_seq_num(
             if *count != account.sequence_number() {
                 assert!(account.sequence_number() > *count);
                 debug!(
-                        "Stale sequence_number for {}, expected {}, setting to {}",
-                        account.address(),
-                        account.sequence_number(),
-                        count
-                    );
+                    "Stale sequence_number for {}, expected {}, setting to {}",
+                    account.address(),
+                    account.sequence_number(),
+                    count
+                );
                 account.set_sequence_number(*count);
             }
         },
         None => {
             debug!(
-                    "Couldn't fetch sequence_number for {}, expected {}, setting to {}",
-                    account.address(),
-                    account.sequence_number(),
-                    start_seq_num
-                );
+                "Couldn't fetch sequence_number for {}, expected {}, setting to {}",
+                account.address(),
+                account.sequence_number(),
+                start_seq_num
+            );
             account.set_sequence_number(*start_seq_num);
         },
     }

@@ -2,8 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::future::Future;
-use std::sync::Arc;
 use super::Test;
 use crate::{
     prometheus_metrics::LatencyBreakdown,
@@ -11,7 +9,7 @@ use crate::{
     CoreContext, Result, Swarm, TestReport,
 };
 use aptos_transaction_emitter_lib::{EmitJobRequest, TxnStats};
-use std::time::Duration;
+use std::{future::Future, sync::Arc, time::Duration};
 use tokio::runtime::{Handle, Runtime};
 
 /// The testing interface which defines a test written with full control over an existing network.
@@ -31,7 +29,7 @@ pub struct NetworkContextSynchronizer<'t> {
 // TODO: some useful things that don't need to hold the lock or make a copy
 impl<'t> NetworkContextSynchronizer<'t> {
     pub fn new(ctx: NetworkContext<'t>, handle: tokio::runtime::Handle) -> Self {
-        Self{
+        Self {
             ctx: Arc::new(tokio::sync::Mutex::new(ctx)),
             handle,
         }
@@ -47,10 +45,8 @@ impl<'t> NetworkContextSynchronizer<'t> {
             Ok(handle) => {
                 // we are in an async context, we don't need block_on
                 handle.block_on(future)
-            }
-            Err(_) => {
-                self.handle.block_on(future)
-            }
+            },
+            Err(_) => self.handle.block_on(future),
         }
     }
 }
@@ -123,10 +119,8 @@ impl<'t> NetworkContext<'t> {
             Ok(handle) => {
                 // we are in an async context, we don't need block_on
                 handle
-            }
-            Err(_) => {
-                self.runtime.handle().clone()
-            }
+            },
+            Err(_) => self.runtime.handle().clone(),
         }
     }
 
@@ -135,10 +129,8 @@ impl<'t> NetworkContext<'t> {
             Ok(handle) => {
                 // we are in an async context, we don't need block_on
                 handle.block_on(future)
-            }
-            Err(_) => {
-                self.runtime.block_on(future)
-            }
+            },
+            Err(_) => self.runtime.block_on(future),
         }
     }
 }

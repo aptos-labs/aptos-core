@@ -1,15 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ops::DerefMut;
 use crate::{batch_update, generate_traffic};
 use anyhow::bail;
-use aptos_forge::{NetworkTest, Result, SwarmExt, Test, DEFAULT_ROOT_PRIV_KEY, FORGE_KEY_SEED, NetworkContextSynchronizer};
+use aptos_forge::{
+    NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test, DEFAULT_ROOT_PRIV_KEY,
+    FORGE_KEY_SEED,
+};
 use aptos_keygen::KeyGen;
 use aptos_logger::info;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_temppath::TempPath;
 use aptos_types::transaction::authenticator::AuthenticationKey;
+use std::ops::DerefMut;
 use tokio::{runtime::Runtime, time::Duration};
 
 pub struct FrameworkUpgrade;

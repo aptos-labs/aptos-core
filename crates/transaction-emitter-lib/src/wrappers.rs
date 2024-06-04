@@ -17,8 +17,10 @@ use aptos_logger::{error, info};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::time::{Duration, Instant};
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 pub async fn emit_transactions(
     cluster_args: &ClusterArgs,

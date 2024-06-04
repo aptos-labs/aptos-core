@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{GroupNetworkBandwidth, NetworkContext, NetworkContextSynchronizer, NetworkTest, SwarmChaos, SwarmNetworkBandwidth, Test};
+use aptos_forge::{
+    GroupNetworkBandwidth, NetworkContext, NetworkContextSynchronizer, NetworkTest, SwarmChaos,
+    SwarmNetworkBandwidth, Test,
+};
 
 /// This is deprecated. Use [crate::multi_region_network_test::MultiRegionNetworkEmulationTest] instead
 pub struct NetworkBandwidthTest;

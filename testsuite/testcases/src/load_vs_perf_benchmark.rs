@@ -3,11 +3,16 @@
 
 use crate::{create_emitter_and_request, LoadDestination, NetworkLoadTest};
 use anyhow::Context;
-use aptos_forge::{args::TransactionTypeArg, prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice}, success_criteria::{SuccessCriteria, SuccessCriteriaChecker}, EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Test, TxnStats, WorkflowProgress, NetworkContextSynchronizer};
+use aptos_forge::{
+    args::TransactionTypeArg,
+    prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice},
+    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
+    EmitJobMode, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, Result,
+    Test, TxnStats, WorkflowProgress,
+};
 use aptos_logger::info;
 use rand::SeedableRng;
-use std::{fmt::Debug, time::Duration};
-use std::ops::DerefMut;
+use std::{fmt::Debug, ops::DerefMut, time::Duration};
 use tokio::runtime::Runtime;
 
 // add larger warmup, as when we are exceeding the max load,
@@ -230,7 +235,7 @@ impl LoadVsPerfBenchmark {
                 &nodes_to_send_load_to,
                 rng,
             )
-                .context("create emitter")?;
+            .context("create emitter")?;
 
             let job = rt
                 .block_on(emitter.start_job(

@@ -49,7 +49,10 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
         // Wrap LocalAccount in Arc+Mutex
         // let account_arcs : Vec<Arc<LocalAccount>> = accounts_to_use.into_iter().map(Arc::new).collect();
         // get txns
-        let txns = accounts_to_use.iter().flat_map(|account| self.generator.generate_transactions(account, 1)).collect();
+        let txns = accounts_to_use
+            .iter()
+            .flat_map(|account| self.generator.generate_transactions(account, 1))
+            .collect();
         // let txns = accounts_to_use
         //     .iter_mut()
         //     .flat_map(|account| {

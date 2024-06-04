@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{GroupNetEm, NetworkContext, NetworkContextSynchronizer, NetworkTest, Swarm, SwarmChaos, SwarmNetEm, Test};
+use aptos_forge::{
+    GroupNetEm, NetworkContext, NetworkContextSynchronizer, NetworkTest, Swarm, SwarmChaos,
+    SwarmNetEm, Test,
+};
 use aptos_logger::info;
 use aptos_types::PeerId;
 use itertools::{self, EitherOrBoth, Itertools};

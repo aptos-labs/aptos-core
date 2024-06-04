@@ -2,10 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ops::DerefMut;
 use crate::generate_traffic;
 use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, Test};
-use std::thread;
+use std::{ops::DerefMut, thread};
 use tokio::{runtime::Runtime, time::Duration};
 
 pub struct PartialNodesDown;

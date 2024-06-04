@@ -11,8 +11,7 @@ use rand::{
     seq::IteratorRandom,
     Rng, SeedableRng,
 };
-use std::{thread, time::Duration};
-use std::ops::DerefMut;
+use std::{ops::DerefMut, thread, time::Duration};
 use tokio::runtime::Runtime;
 
 const STATE_SYNC_VERSION_COUNTER_NAME: &str = "aptos_state_sync_version";

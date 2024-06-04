@@ -990,8 +990,8 @@ fn update_seq_num_and_get_num_expired(
     latest_fetched_counts: HashMap<AccountAddress, u64>,
 ) -> (usize, usize) {
     accounts.iter_mut().for_each(|account| {
-    // let mut account_lock = account.lock().unwrap();
-    // let account = account_lock.deref_mut();
+        // let mut account_lock = account.lock().unwrap();
+        // let account = account_lock.deref_mut();
         let (start_seq_num, end_seq_num) =
             if let Some(pair) = account_to_start_and_end_seq_num.get(&account.address()) {
                 pair

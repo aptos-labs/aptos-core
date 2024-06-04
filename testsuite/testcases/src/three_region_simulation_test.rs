@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{GroupNetworkBandwidth, GroupNetworkDelay, NetworkContext, NetworkContextSynchronizer, NetworkTest, Swarm, SwarmChaos, SwarmNetworkBandwidth, SwarmNetworkDelay, Test};
+use aptos_forge::{
+    GroupNetworkBandwidth, GroupNetworkDelay, NetworkContext, NetworkContextSynchronizer,
+    NetworkTest, Swarm, SwarmChaos, SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
+};
 use aptos_logger::info;
 
 /// Represents a test that simulates a network with 3 regions, all in the same cloud.

@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ops::DerefMut;
 use crate::NetworkLoadTest;
 use anyhow::Context;
 use aptos_forge::{NetworkContextSynchronizer, NetworkTest, NodeExt, Test};
 use aptos_sdk::move_types::account_address::AccountAddress;
-use std::time::{Duration, Instant};
+use std::{
+    ops::DerefMut,
+    time::{Duration, Instant},
+};
 use tokio::runtime::Runtime;
 
 pub struct TwinValidatorTest;

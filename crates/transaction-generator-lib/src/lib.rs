@@ -216,7 +216,7 @@ pub trait RootAccountHandle: Send + Sync {
     fn get_root_account(&self) -> Arc<LocalAccount>;
 }
 
-pub struct AlwaysApproveRootAccountHandle{
+pub struct AlwaysApproveRootAccountHandle {
     pub root_account: Arc<LocalAccount>,
 }
 

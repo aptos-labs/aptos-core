@@ -2,13 +2,15 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ops::DerefMut;
 use crate::generate_traffic;
 use anyhow::bail;
-use aptos_forge::{get_highest_synced_epoch, get_highest_synced_version, NetworkContext, NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test};
+use aptos_forge::{
+    get_highest_synced_epoch, get_highest_synced_version, NetworkContext,
+    NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test,
+};
 use aptos_logger::info;
 use aptos_sdk::move_types::account_address::AccountAddress;
-use std::time::Instant;
+use std::{ops::DerefMut, time::Instant};
 use tokio::{runtime::Runtime, time::Duration};
 
 const MAX_EPOCH_CHANGE_SECS: u64 = 300; // Max amount of time (in seconds) to wait for an epoch change
@@ -234,7 +236,11 @@ fn emit_traffic_and_ensure_bounded_sync(
         emit_txn_duration.as_secs()
     );
     let handle = ctx.runtime.handle().clone();
-    let _txn_stat = handle.block_on(generate_traffic(ctx, nodes_to_send_traffic, emit_txn_duration))?;
+    let _txn_stat = handle.block_on(generate_traffic(
+        ctx,
+        nodes_to_send_traffic,
+        emit_txn_duration,
+    ))?;
 
     // Wait for all nodes to synchronize. We time bound this to ensure
     // nodes don't fall too far behind.

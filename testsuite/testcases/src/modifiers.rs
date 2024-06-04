@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{multi_region_network_test::chunk_peers, LoadDestination, NetworkLoadTest};
-use aptos_forge::{GroupCpuStress, NetworkContext, NetworkContextSynchronizer, NetworkTest, Swarm, SwarmChaos, SwarmCpuStress, SwarmExt, Test};
+use aptos_forge::{
+    GroupCpuStress, NetworkContext, NetworkContextSynchronizer, NetworkTest, Swarm, SwarmChaos,
+    SwarmCpuStress, SwarmExt, Test,
+};
 use aptos_logger::info;
 use aptos_types::PeerId;
 use rand::Rng;

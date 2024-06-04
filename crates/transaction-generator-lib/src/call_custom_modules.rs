@@ -13,8 +13,7 @@ use aptos_sdk::{
 };
 use async_trait::async_trait;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
-use std::borrow::Borrow;
-use std::sync::Arc;
+use std::{borrow::Borrow, sync::Arc};
 
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously
 // if you need any coordination, use Arc<RwLock<X>> fields

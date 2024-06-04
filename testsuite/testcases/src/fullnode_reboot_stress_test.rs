@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{NetworkContext, NetworkContextSynchronizer, NetworkTest, Result, Swarm, Test, TestReport};
+use aptos_forge::{
+    NetworkContext, NetworkContextSynchronizer, NetworkTest, Result, Swarm, Test, TestReport,
+};
 use rand::{seq::SliceRandom, thread_rng};
 use std::time::Duration;
 use tokio::{runtime::Runtime, time::Instant};

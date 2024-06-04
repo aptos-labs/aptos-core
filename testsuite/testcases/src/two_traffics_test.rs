@@ -4,7 +4,10 @@
 use crate::{
     create_emitter_and_request, traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
 };
-use aptos_forge::{success_criteria::{SuccessCriteria, SuccessCriteriaChecker}, EmitJobRequest, NetworkTest, Result, Swarm, Test, TestReport, NetworkContextSynchronizer};
+use aptos_forge::{
+    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
+    EmitJobRequest, NetworkContextSynchronizer, NetworkTest, Result, Swarm, Test, TestReport,
+};
 use aptos_logger::info;
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::time::{Duration, Instant};

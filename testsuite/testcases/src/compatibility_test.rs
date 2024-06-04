@@ -2,17 +2,24 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ops::DerefMut;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use crate::{batch_update_gradually, create_emitter_and_request, generate_traffic};
 use anyhow::bail;
-use rand::SeedableRng;
-use aptos_forge::{EmitJobRequest, NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test, TxnEmitter, TxnStats, Version};
+use aptos_forge::{
+    EmitJobRequest, NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test, TxnEmitter,
+    TxnStats, Version,
+};
 use aptos_logger::info;
-use tokio::time::Duration;
 // use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_sdk::types::{LocalAccount, PeerId};
+use rand::SeedableRng;
+use std::{
+    ops::DerefMut,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
+use tokio::time::Duration;
 
 pub struct SimpleValidatorUpgrade;
 
@@ -37,7 +44,15 @@ async fn upgrade_task(
     max_wait: Duration,
     done: Arc<AtomicBool>,
 ) -> Result<()> {
-    let result = batch_update_gradually(ctxa, validators_to_update, version, wait_until_healthy, delay, max_wait).await;
+    let result = batch_update_gradually(
+        ctxa,
+        validators_to_update,
+        version,
+        wait_until_healthy,
+        delay,
+        max_wait,
+    )
+    .await;
     done.store(true, Ordering::Relaxed);
     result
 }
@@ -47,17 +62,20 @@ async fn stat_gather_task(
     source_account: Arc<LocalAccount>,
     upgrade_traffic_chunk_duration: Duration,
     done: Arc<AtomicBool>,
-) -> Result<Option<TxnStats>>{
+) -> Result<Option<TxnStats>> {
     let mut upgrade_stats = vec![];
     while !done.load(Ordering::Relaxed) {
-        let upgrading_stats = emitter.clone().emit_txn_for(
-            source_account.clone(),
-            emit_job_request.clone(),
-            upgrade_traffic_chunk_duration,
-        ).await?;
+        let upgrading_stats = emitter
+            .clone()
+            .emit_txn_for(
+                source_account.clone(),
+                emit_job_request.clone(),
+                upgrade_traffic_chunk_duration,
+            )
+            .await?;
         upgrade_stats.push(upgrading_stats);
     }
-    let statsum = upgrade_stats.into_iter().reduce(|a,b| &a + &b);
+    let statsum = upgrade_stats.into_iter().reduce(|a, b| &a + &b);
     Ok(statsum)
 }
 
@@ -85,13 +103,13 @@ fn traffic_task(
         let source_account = chain_info.root_account.clone();
         (emitter, emit_job_request, source_account)
     };
-        // match create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng) {
-        //     Ok(parts) => parts,
-        //     Err(err) => {
-        //         stats_result = Err(err);
-        //         return;
-        //     }
-        // };
+    // match create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng) {
+    //     Ok(parts) => parts,
+    //     Err(err) => {
+    //         stats_result = Err(err);
+    //         return;
+    //     }
+    // };
     // let source_account = ctx.swarm().chain_info().root_account;
     let traffic_runtime = traffic_emitter_runtime()?;
     // let upgrade_joiner = handle.spawn(upgrade_task(ctx, validators_to_update, version, wait_until_healthy, delay, max_wait, upgrade_done.clone()));
@@ -104,7 +122,6 @@ fn traffic_task(
         upgrade_done.clone(),
     ))
 }
-
 
 fn upgrade_and_gather_stats(
     ctxa: NetworkContextSynchronizer,
@@ -119,8 +136,8 @@ fn upgrade_and_gather_stats(
 ) -> Result<Option<TxnStats>> {
     let upgrade_done = Arc::new(AtomicBool::new(false));
     let emitter_ctx = ctxa.clone();
-    let mut stats_result : Result<Option<TxnStats>> = Ok(None);
-    let mut upgrade_result : Result<()> = Ok(());
+    let mut stats_result: Result<Option<TxnStats>> = Ok(None);
+    let mut upgrade_result: Result<()> = Ok(());
     // std::thread::scope(|scopev| {
     tokio_scoped::scope(|scopev| {
         // emit trafic and gather stats
@@ -135,7 +152,7 @@ fn upgrade_and_gather_stats(
                     Err(err) => {
                         stats_result = Err(err);
                         return;
-                    }
+                    },
                 };
             let source_account = ctx.swarm().chain_info().root_account;
             // let traffic_runtime = match traffic_emitter_runtime() {
@@ -152,13 +169,22 @@ fn upgrade_and_gather_stats(
                 source_account,
                 upgrade_traffic_chunk_duration,
                 upgrade_done.clone(),
-            ).await;
+            )
+            .await;
         });
         // do upgrade
         scopev.spawn(async {
             // let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
             // upgrade_result = runtime.block_on(batch_update_gradually(ctxa, validators_to_update, version, wait_until_healthy, delay, max_wait));
-            upgrade_result = batch_update_gradually(ctxa, validators_to_update, version, wait_until_healthy, delay, max_wait).await;
+            upgrade_result = batch_update_gradually(
+                ctxa,
+                validators_to_update,
+                version,
+                wait_until_healthy,
+                delay,
+                max_wait,
+            )
+            .await;
             upgrade_done.store(true, Ordering::Relaxed);
         });
     });
@@ -206,7 +232,10 @@ impl SimpleValidatorUpgrade {
         if ctxa.ctx.lock().await.swarm().validators().count() < 4 {
             bail!("compat test requires >= 4 validators");
         }
-        let all_validators = ctxa.ctx.lock().await
+        let all_validators = ctxa
+            .ctx
+            .lock()
+            .await
             .swarm()
             .validators()
             .map(|v| v.peer_id())
@@ -251,7 +280,7 @@ impl SimpleValidatorUpgrade {
             upgrade_max_wait,
             &[first_node],
         )?;
-        let upgrade_stats_sum = upgrade_stats.into_iter().reduce(|a,b| &a + &b);
+        let upgrade_stats_sum = upgrade_stats.into_iter().reduce(|a, b| &a + &b);
         if let Some(upgrade_stats_sum) = upgrade_stats_sum {
             ctxa.ctx.lock().await.report.report_txn_stats(
                 format!("{}::single-validator-upgrading", self.name()),
@@ -288,7 +317,7 @@ impl SimpleValidatorUpgrade {
             upgrade_max_wait,
             &first_batch,
         )?;
-        let upgrade2_stats_sum = upgrade2_stats.into_iter().reduce(|a,b| &a + &b);
+        let upgrade2_stats_sum = upgrade2_stats.into_iter().reduce(|a, b| &a + &b);
         if let Some(upgrade2_stats_sum) = upgrade2_stats_sum {
             ctxa.ctx.lock().await.report.report_txn_stats(
                 format!("{}::half-validator-upgrading", self.name()),
@@ -323,7 +352,7 @@ impl SimpleValidatorUpgrade {
             upgrade_max_wait,
             &second_batch,
         )?;
-        let upgrade3_stats_sum = upgrade3_stats.into_iter().reduce(|a,b| &a + &b);
+        let upgrade3_stats_sum = upgrade3_stats.into_iter().reduce(|a, b| &a + &b);
         if let Some(upgrade3_stats_sum) = upgrade3_stats_sum {
             ctxa.ctx.lock().await.report.report_txn_stats(
                 format!("{}::rest-validator-upgrading", self.name()),

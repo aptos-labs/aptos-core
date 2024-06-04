@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{NetworkContext, NetworkContextSynchronizer, NetworkTest, SwarmChaos, SwarmNetworkPartition, Test};
+use aptos_forge::{
+    NetworkContext, NetworkContextSynchronizer, NetworkTest, SwarmChaos, SwarmNetworkPartition,
+    Test,
+};
 
 /// This is deprecated. Use [crate::multi_region_network_test::MultiRegionNetworkEmulationTest] instead
 pub struct NetworkPartitionTest;

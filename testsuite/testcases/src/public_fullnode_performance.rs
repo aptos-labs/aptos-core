@@ -8,7 +8,10 @@ use crate::{
 };
 use anyhow::Error;
 use aptos_config::config::{NodeConfig, OverrideNodeConfig};
-use aptos_forge::{NetworkContext, NetworkContextSynchronizer, NetworkTest, OverrideNodeConfigFn, Result, Swarm, SwarmChaos, SwarmCpuStress, SwarmNetEm, Test};
+use aptos_forge::{
+    NetworkContext, NetworkContextSynchronizer, NetworkTest, OverrideNodeConfigFn, Result, Swarm,
+    SwarmChaos, SwarmCpuStress, SwarmNetEm, Test,
+};
 use aptos_logger::info;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_types::PeerId;

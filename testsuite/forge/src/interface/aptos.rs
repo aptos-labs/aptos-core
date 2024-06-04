@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
 use anyhow::anyhow;
@@ -26,6 +25,7 @@ use aptos_sdk::{
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[async_trait::async_trait]
 pub trait AptosTest: Test {

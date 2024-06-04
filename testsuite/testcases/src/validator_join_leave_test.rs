@@ -4,7 +4,10 @@
 // use std::ops::DerefMut;
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
-use aptos_forge::{reconfig, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test, TestReport, FORGE_KEY_SEED, NetworkContextSynchronizer};
+use aptos_forge::{
+    reconfig, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt, Result, Swarm,
+    SwarmExt, Test, TestReport, FORGE_KEY_SEED,
+};
 use aptos_keygen::KeyGen;
 use aptos_logger::info;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
@@ -130,22 +133,12 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
                     .unwrap();
 
                 let root_account = swarm.chain_info().root_account();
-                reconfig(
-                    &rest_client,
-                    &transaction_factory,
-                    root_account,
-                )
-                .await;
+                reconfig(&rest_client, &transaction_factory, root_account).await;
             }
 
             {
                 let root_account = swarm.chain_info().root_account();
-                reconfig(
-                    &rest_client,
-                    &transaction_factory,
-                    root_account,
-                )
-                    .await;
+                reconfig(&rest_client, &transaction_factory, root_account).await;
             }
         });
 
@@ -159,22 +152,12 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
                 cli.join_validator_set(*operator_index, None).await.unwrap();
 
                 let root_account = swarm.chain_info().root_account();
-                reconfig(
-                    &rest_client,
-                    &transaction_factory,
-                    root_account,
-                )
-                .await;
+                reconfig(&rest_client, &transaction_factory, root_account).await;
             }
 
             {
                 let root_account = swarm.chain_info().root_account();
-                reconfig(
-                    &rest_client,
-                    &transaction_factory,
-                    root_account,
-                )
-                    .await;
+                reconfig(&rest_client, &transaction_factory, root_account).await;
             }
         });
 

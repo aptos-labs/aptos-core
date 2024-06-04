@@ -67,6 +67,7 @@ use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
     num::NonZeroUsize,
+    ops::DerefMut,
     path::{Path, PathBuf},
     process,
     sync::{
@@ -76,7 +77,6 @@ use std::{
     thread,
     time::Duration,
 };
-use std::ops::DerefMut;
 use suites::dag::get_dag_test;
 use tokio::{runtime::Runtime, select};
 use url::Url;
@@ -2696,7 +2696,9 @@ impl NetworkTest for EmitTransaction {
                 .validators()
                 .map(|v| v.peer_id())
                 .collect::<Vec<_>>();
-            let stats = generate_traffic(ctx, &all_validators, duration).await.unwrap();
+            let stats = generate_traffic(ctx, &all_validators, duration)
+                .await
+                .unwrap();
             ctx.report.report_txn_stats(self.name().to_string(), &stats);
         });
         Ok(())

@@ -600,7 +600,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 let network_ctx = NetworkContextSynchronizer::new(network_ctx, handle);
                 let result = run_test(|| test.run(network_ctx.clone()));
                 // explicitly keep network context in scope so that its created tokio Runtime drops after all the stuff has run.
-                let NetworkContextSynchronizer{ctx, handle} = network_ctx;
+                let NetworkContextSynchronizer { ctx, handle } = network_ctx;
                 drop(handle);
                 let ctx = Arc::into_inner(ctx).unwrap().into_inner();
                 drop(ctx);

@@ -18,6 +18,7 @@ use aptos_sdk::{
 use aptos_transaction_generator_lib::{
     CounterState, ReliableTransactionSubmitter, RootAccountHandle, SEND_AMOUNT,
 };
+use aptos_types::account_address::AccountAddress;
 use core::{
     cmp::min,
     result::Result::{Err, Ok},
@@ -29,7 +30,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use aptos_types::account_address::AccountAddress;
 
 pub struct SourceAccountManager<'t> {
     pub source_account: Arc<LocalAccount>,
@@ -413,12 +413,8 @@ impl<'t> AccountMinter<'t> {
         let mut i = 0;
         let mut seed_accounts = vec![];
         let source_account = match new_source_account {
-            None => {
-                self.source_account.get_root_account().clone()
-            },
-            Some(param_account) => {
-                Arc::new(param_account)
-            },
+            None => self.source_account.get_root_account().clone(),
+            Some(param_account) => Arc::new(param_account),
         };
         while i < seed_account_num {
             let batch_size = min(max_submit_batch_size, seed_account_num - i);
@@ -431,11 +427,11 @@ impl<'t> AccountMinter<'t> {
                 .iter()
                 .map(|account| {
                     create_and_fund_account_request(
-                            source_account.clone(),
-                            coins_per_seed_account,
-                            account.public_key(),
-                            txn_factory,
-                        )
+                        source_account.clone(),
+                        coins_per_seed_account,
+                        account.public_key(),
+                        txn_factory,
+                    )
                 })
                 .collect();
             txn_executor
@@ -483,9 +479,7 @@ impl<'t> AccountMinter<'t> {
         let root_address = root_account.address();
         for i in 0..NUM_TRIES {
             {
-                let new_sequence_number = txn_executor
-                    .query_sequence_number(root_address)
-                    .await?;
+                let new_sequence_number = txn_executor.query_sequence_number(root_address).await?;
                 root_account.set_sequence_number(new_sequence_number);
             }
 
