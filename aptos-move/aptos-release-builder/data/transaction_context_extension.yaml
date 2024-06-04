@@ -4,7 +4,7 @@ name: "v1.12"
 proposals:
   - name: enable_transaction_context_extension
     metadata:
-      title: "AIP-82: Allowlisting for delegation pools"
+      title: "AIP-82: Transaction context extension"
       description: "AIP-82: This AIP proposes an extension to the transaction context module within the Aptos Framework."
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/420"
     execution_mode: MultiStep
