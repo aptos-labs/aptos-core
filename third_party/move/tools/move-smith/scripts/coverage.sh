@@ -12,6 +12,8 @@
 # The coverage report is generated under the `coverage` directory.
 # The script can also be used to cleanup the generated coverage files.
 
+MOVE_SMITH_DIR=$(realpath $(dirname $0)/..)
+
 function usage() {
     case "$1" in
         "gen")
@@ -42,13 +44,15 @@ function gen() {
         cargo fuzz coverage $fuzz_target
     fi
 
+    fuzz_target_bin=$(find target/*/coverage -name $fuzz_target -type f)
+    echo "Found fuzz target binary: $fuzz_target_bin"
     # Generate the coverage report
-    # TODO: Do not hardcode the target triple
-    cargo cov -- show target/aarch64-apple-darwin/coverage/aarch64-apple-darwin/release/$fuzz_target \
+    cargo cov -- show $fuzz_target_bin \
         --format=html \
         --instr-profile=fuzz/coverage/$fuzz_target/coverage.profdata \
         --show-directory-coverage \
         --output-dir=$target_dir \
+        -Xdemangler=rustfilt \
         --ignore-filename-regex='rustc/.*/library|\.cargo'
 }
 
@@ -66,6 +70,12 @@ function clean() {
         rm -rf $target_dir
     fi
 }
+
+curr=$(pwd)
+if [ $curr != $MOVE_SMITH_DIR ]; then
+    echo "Please run the script from the move-smith directory"
+    exit 1
+fi
 
 case "$1" in
   "gen")
