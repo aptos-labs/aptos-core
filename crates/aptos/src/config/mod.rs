@@ -25,7 +25,9 @@ use std::{collections::BTreeMap, fmt::Formatter, path::PathBuf, str::FromStr};
 /// default configuration, and user specific settings.
 #[derive(Parser)]
 pub enum ConfigTool {
+    DeleteProfile(DeleteProfile),
     GenerateShellCompletions(GenerateShellCompletions),
+    RenameProfile(RenameProfile),
     SetGlobalConfig(SetGlobalConfig),
     ShowGlobalConfig(ShowGlobalConfig),
     ShowProfiles(ShowProfiles),
@@ -34,7 +36,9 @@ pub enum ConfigTool {
 impl ConfigTool {
     pub async fn execute(self) -> CliResult {
         match self {
+            ConfigTool::DeleteProfile(tool) => tool.execute_serialized().await,
             ConfigTool::GenerateShellCompletions(tool) => tool.execute_serialized_success().await,
+            ConfigTool::RenameProfile(tool) => tool.execute_serialized().await,
             ConfigTool::SetGlobalConfig(tool) => tool.execute_serialized().await,
             ConfigTool::ShowGlobalConfig(tool) => tool.execute_serialized().await,
             ConfigTool::ShowProfiles(tool) => tool.execute_serialized().await,
@@ -147,6 +151,91 @@ impl CliCommand<BTreeMap<String, ProfileSummary>> for ShowProfiles {
             })
             .map(|(key, profile)| (key, ProfileSummary::from(&profile)))
             .collect())
+    }
+}
+
+/// Delete the specified profile.
+#[derive(Parser, Debug)]
+pub struct DeleteProfile {
+    /// Which profile to delete
+    #[clap(long)]
+    profile: String,
+}
+
+#[async_trait]
+impl CliCommand<String> for DeleteProfile {
+    fn command_name(&self) -> &'static str {
+        "DeleteProfile"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        let mut config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
+
+        if let Some(profiles) = &mut config.profiles {
+            if profiles.remove(&self.profile).is_none() {
+                return Err(CliError::CommandArgumentError(format!(
+                    "Profile {} does not exist",
+                    self.profile
+                )));
+            };
+        } else {
+            return Err(CliError::CommandArgumentError(format!(
+                "Config has no profiles",
+            )));
+        };
+
+        config.save()?;
+        Ok(format!("Deleted profile {}", self.profile))
+    }
+}
+
+/// Rename the specified profile.
+#[derive(Parser, Debug)]
+pub struct RenameProfile {
+    /// Which profile to rename
+    #[clap(long)]
+    profile: String,
+
+    /// New profile name
+    #[clap(long)]
+    new_profile_name: String,
+}
+
+#[async_trait]
+impl CliCommand<String> for RenameProfile {
+    fn command_name(&self) -> &'static str {
+        "RenameProfile"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        let mut config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
+
+        if let Some(profiles) = &mut config.profiles {
+            if profiles.contains_key(&self.new_profile_name.clone()) {
+                return Err(CliError::CommandArgumentError(format!(
+                    "Profile {} already exists",
+                    self.new_profile_name
+                )));
+            };
+            if let Some(profile_config) = profiles.remove(&self.profile) {
+                profiles.insert(self.new_profile_name.clone(), profile_config);
+            } else {
+                return Err(CliError::CommandArgumentError(format!(
+                    "Profile {} does not exist",
+                    self.profile
+                )));
+            };
+        } else {
+            return Err(CliError::CommandArgumentError(format!(
+                "Config has no profiles",
+            )));
+        };
+
+        config.save()?;
+        Ok(format!(
+            "Renamed profile {} to {}",
+            self.profile, self.new_profile_name
+        ))
     }
 }
 
