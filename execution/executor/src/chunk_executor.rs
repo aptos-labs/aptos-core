@@ -302,12 +302,12 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                 txn_infos_with_proof,
             })?;
 
-        info!(
-            LogSchema::new(LogEntry::ChunkExecutor)
-                .first_version_in_request(Some(first_version_in_request))
-                .num_txns_in_request(num_txns),
-            "Executed transaction chunk!",
-        );
+        // info!(
+        //     LogSchema::new(LogEntry::ChunkExecutor)
+        //         .first_version_in_request(Some(first_version_in_request))
+        //         .num_txns_in_request(num_txns),
+        //     "Executed transaction chunk!",
+        // );
 
         Ok(())
     }
@@ -390,12 +390,12 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                 txn_infos_with_proof,
             })?;
 
-        info!(
-            LogSchema::new(LogEntry::ChunkExecutor)
-                .first_version_in_request(Some(first_version_in_request))
-                .num_txns_in_request(num_txns),
-            "Applied transaction output chunk!",
-        );
+        // info!(
+        //     LogSchema::new(LogEntry::ChunkExecutor)
+        //         .first_version_in_request(Some(first_version_in_request))
+        //         .num_txns_in_request(num_txns),
+        //     "Applied transaction output chunk!",
+        // );
 
         Ok(())
     }
@@ -458,12 +458,12 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         self.commit_queue
             .lock()
             .save_ledger_update_output(executed_chunk)?;
-        info!(
-            LogSchema::new(LogEntry::ChunkExecutor)
-                .first_version_in_request(Some(first_version))
-                .num_txns_in_request(num_txns),
-            "Calculated ledger update!",
-        );
+        // info!(
+        //     LogSchema::new(LogEntry::ChunkExecutor)
+        //         .first_version_in_request(Some(first_version))
+        //         .num_txns_in_request(num_txns),
+        //     "Calculated ledger update!",
+        // );
         Ok(())
     }
 
@@ -624,10 +624,10 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                     batch_begin,
                     batch_begin + 1,
                 )?;
-                info!(
-                    version_skipped = batch_begin,
-                    "Skipped known broken transaction, applied transaction output directly."
-                );
+                // info!(
+                //     version_skipped = batch_begin,
+                //     "Skipped known broken transaction, applied transaction output directly."
+                // );
                 batch_begin += 1;
                 batch_end = *batch_ends.next().unwrap();
                 continue;

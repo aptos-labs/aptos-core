@@ -71,7 +71,7 @@ where
 
     pub fn run(&mut self) {
         let start_version = self.version;
-        info!("Start with version: {}", start_version);
+        // info!("Start with version: {}", start_version);
 
         while let Ok(msg) = self.block_receiver.recv() {
             let CommitBlockMessage {
@@ -119,36 +119,36 @@ fn report_block(
     block_size: usize,
 ) {
     let total_versions = (version - start_version) as f64;
-    info!(
-        "Version: {}. latency: {} ms, partition time: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0} (partition: {:.0}, execution: {:.0}, commit: {:.0}). Accumulative TPS: {:.0}",
-        version,
-        Instant::now().duration_since(current_block_start_time).as_millis(),
-        partition_time.as_millis(),
-        execution_time.as_millis(),
-        commit_time.as_millis(),
-        block_size as f64 / (std::cmp::max(std::cmp::max(partition_time, execution_time), commit_time)).as_secs_f64(),
-        block_size as f64 / partition_time.as_secs_f64(),
-        block_size as f64 / execution_time.as_secs_f64(),
-        block_size as f64 / commit_time.as_secs_f64(),
-        total_versions / first_block_start_time.elapsed().as_secs_f64(),
-    );
-    info!(
-            "Accumulative total: VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
-            APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum(),
-            APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum(),
-            APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum(),
-            API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum(),
-        );
+    // info!(
+    //     "Version: {}. latency: {} ms, partition time: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0} (partition: {:.0}, execution: {:.0}, commit: {:.0}). Accumulative TPS: {:.0}",
+    //     version,
+    //     Instant::now().duration_since(current_block_start_time).as_millis(),
+    //     partition_time.as_millis(),
+    //     execution_time.as_millis(),
+    //     commit_time.as_millis(),
+    //     block_size as f64 / (std::cmp::max(std::cmp::max(partition_time, execution_time), commit_time)).as_secs_f64(),
+    //     block_size as f64 / partition_time.as_secs_f64(),
+    //     block_size as f64 / execution_time.as_secs_f64(),
+    //     block_size as f64 / commit_time.as_secs_f64(),
+    //     total_versions / first_block_start_time.elapsed().as_secs_f64(),
+    // );
+    // info!(
+    //         "Accumulative total: VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
+    //         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum(),
+    //         APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum(),
+    //         APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum(),
+    //         API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum(),
+    //     );
     const NANOS_PER_SEC: f64 = 1_000_000_000.0;
-    info!(
-            "Accumulative per transaction: VM time: {:.0} ns, executor time: {:.0} ns, commit time: {:.0} ns, DB commit time: {:.0} ns",
-            APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() * NANOS_PER_SEC
-                / total_versions,
-            (APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum()) * NANOS_PER_SEC
-                / total_versions,
-            APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum() * NANOS_PER_SEC
-                / total_versions,
-            API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum() * NANOS_PER_SEC
-                / total_versions,
-        );
+//     info!(
+//             "Accumulative per transaction: VM time: {:.0} ns, executor time: {:.0} ns, commit time: {:.0} ns, DB commit time: {:.0} ns",
+//             APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() * NANOS_PER_SEC
+//                 / total_versions,
+//             (APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum()) * NANOS_PER_SEC
+//                 / total_versions,
+//             APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum() * NANOS_PER_SEC
+//                 / total_versions,
+//             API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum() * NANOS_PER_SEC
+//                 / total_versions,
+//         );
 }

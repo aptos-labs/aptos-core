@@ -31,7 +31,7 @@ pub fn create_db_with_accounts<V>(
 ) where
     V: TransactionBlockExecutor + 'static,
 {
-    println!("Initializing...");
+    // println!("Initializing...");
 
     if db_dir.as_ref().exists() {
         panic!("data-dir exists already.");
@@ -41,10 +41,10 @@ pub fn create_db_with_accounts<V>(
 
     bootstrap_with_genesis(&db_dir, enable_storage_sharding);
 
-    println!(
-        "Finished empty DB creation, DB dir: {}. Creating accounts now...",
-        db_dir.as_ref().display()
-    );
+    // println!(
+    //     "Finished empty DB creation, DB dir: {}. Creating accounts now...",
+    //     db_dir.as_ref().display()
+    // );
 
     add_accounts_impl::<V>(
         num_accounts,

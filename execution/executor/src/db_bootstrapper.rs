@@ -50,7 +50,7 @@ pub fn maybe_bootstrap<V: VMExecutor>(
     // if the waypoint is not targeted with the genesis txn, it may be either already bootstrapped, or
     // aiming for state sync to catch up.
     if executed_trees.version().map_or(0, |v| v + 1) != waypoint.version() {
-        info!(waypoint = %waypoint, "Skip genesis txn.");
+        // info!(waypoint = %waypoint, "Skip genesis txn.");
         return Ok(None);
     }
 
@@ -116,7 +116,7 @@ impl GenesisCommitter {
                 .clone(),
             Some(&self.output.ledger_update_output.sharded_state_cache),
         )?;
-        info!("Genesis commited.");
+        // info!("Genesis commited.");
         // DB bootstrapped, avoid anything that could fail after this.
 
         Ok(())
@@ -203,10 +203,10 @@ pub fn calculate_genesis<V: VMExecutor>(
         output,
         executed_trees.state().base_version,
     )?;
-    info!(
-        "Genesis calculated: ledger_info_with_sigs {:?}, waypoint {:?}",
-        &committer.output.ledger_info, committer.waypoint,
-    );
+    // info!(
+    //     "Genesis calculated: ledger_info_with_sigs {:?}, waypoint {:?}",
+    //     &committer.output.ledger_info, committer.waypoint,
+    // );
     Ok(committer)
 }
 

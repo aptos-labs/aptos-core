@@ -357,12 +357,12 @@ impl TransactionGenerator {
         let num_seed_accounts = (num_new_accounts / 1000).clamp(1, 100000);
         let seed_accounts_cache = Self::gen_seed_account_cache(reader, num_seed_accounts);
 
-        println!(
-            "[{}] Generating {} seed account creation txns, with {} coins.",
-            now_fmt!(),
-            num_seed_accounts,
-            seed_account_balance,
-        );
+        // println!(
+        //     "[{}] Generating {} seed account creation txns, with {} coins.",
+        //     now_fmt!(),
+        //     num_seed_accounts,
+        //     seed_account_balance,
+        // );
         let bar = get_progress_bar(num_seed_accounts);
 
         for chunk in seed_accounts_cache
@@ -390,7 +390,7 @@ impl TransactionGenerator {
             }
         }
         bar.finish();
-        println!("[{}] done.", now_fmt!());
+        // println!("[{}] done.", now_fmt!());
         self.seed_accounts_cache = Some(seed_accounts_cache);
     }
 
@@ -402,13 +402,13 @@ impl TransactionGenerator {
         init_account_balance: u64,
         block_size: usize,
     ) {
-        println!(
-            "[{}] Generating {} account creation txns.",
-            now_fmt!(),
-            num_new_accounts
-        );
+        // println!(
+        //     "[{}] Generating {} account creation txns.",
+        //     now_fmt!(),
+        //     num_new_accounts
+        // );
         let mut generator = AccountGenerator::new_for_user_accounts(num_existing_accounts as u64);
-        println!("Skipped first {} existing accounts.", num_existing_accounts);
+        // println!("Skipped first {} existing accounts.", num_existing_accounts);
 
         let bar = get_progress_bar(num_new_accounts);
 
@@ -445,7 +445,7 @@ impl TransactionGenerator {
             bar.inc(block_size as u64);
         }
         bar.finish();
-        println!("[{}] done.", now_fmt!());
+        // println!("[{}] done.", now_fmt!());
     }
 
     /// Generates transactions for random pairs of accounts.
@@ -693,24 +693,24 @@ impl TransactionGenerator {
             let val = phase.fetch_add(1, Ordering::Relaxed);
             let last_generated_at = last_non_empty_phase.load(Ordering::Relaxed);
             if val > last_generated_at + 2 {
-                info!(
-                    "Block generation: no transactions generated in phase {}, and since {}, ending execution",
-                    val, last_generated_at
-                );
+                // info!(
+                //     "Block generation: no transactions generated in phase {}, and since {}, ending execution",
+                //     val, last_generated_at
+                // );
                 return true;
             }
-            info!(
-                "Block generation: no transactions generated in phase {}, moving to next phase",
-                val
-            );
+            // info!(
+            //     "Block generation: no transactions generated in phase {}, moving to next phase",
+            //     val
+            // );
         } else {
             let val = phase.load(Ordering::Relaxed);
             last_non_empty_phase.fetch_max(val, Ordering::Relaxed);
-            info!(
-                "Block generation: {} transactions generated in phase {}",
-                transactions.len(),
-                val
-            );
+            // info!(
+            //     "Block generation: {} transactions generated in phase {}",
+            //     transactions.len(),
+            //     val
+            // );
         }
 
         NUM_TXNS
@@ -732,13 +732,13 @@ impl TransactionGenerator {
         shuffle_connected_txns: bool,
         hotspot_probability: Option<f32>,
     ) {
-        info!("Starting block generation.");
-        info!("block_size={block_size}");
-        info!("num_blocks={num_blocks}");
+        // info!("Starting block generation.");
+        // info!("block_size={block_size}");
+        // info!("num_blocks={num_blocks}");
         if connected_tx_grps > 0 {
-            info!("block_generation_mode=connected_tx_grps");
-            info!("connected_tx_grps={connected_tx_grps}");
-            info!("shuffle_connected_txns={shuffle_connected_txns}");
+            // info!("block_generation_mode=connected_tx_grps");
+            // info!("connected_tx_grps={connected_tx_grps}");
+            // info!("shuffle_connected_txns={shuffle_connected_txns}");
             self.gen_connected_grps_transfer_transactions(
                 block_size,
                 num_blocks,
@@ -746,16 +746,16 @@ impl TransactionGenerator {
                 shuffle_connected_txns,
             );
         } else if hotspot_probability.is_some() {
-            info!("block_generation_mode=sample_from_pool_with_hotspot");
-            info!("hotspot_ratio={hotspot_probability:?}");
+            // info!("block_generation_mode=sample_from_pool_with_hotspot");
+            // info!("hotspot_ratio={hotspot_probability:?}");
             self.gen_random_transfers_with_hotspot(
                 block_size,
                 num_blocks,
                 hotspot_probability.unwrap(),
             );
         } else {
-            info!("block_generation_mode=default_sample");
-            info!("transactions_per_sender={transactions_per_sender}");
+            // info!("block_generation_mode=default_sample");
+            // info!("transactions_per_sender={transactions_per_sender}");
             self.gen_random_transfer_transactions(block_size, num_blocks, transactions_per_sender);
         }
     }
@@ -768,11 +768,11 @@ impl TransactionGenerator {
         }
 
         let num_accounts_in_cache = self.main_signer_accounts.as_ref().unwrap().len();
-        println!(
-            "[{}] verify {} account sequence numbers.",
-            now_fmt!(),
-            num_accounts_in_cache,
-        );
+        // println!(
+        //     "[{}] verify {} account sequence numbers.",
+        //     now_fmt!(),
+        //     num_accounts_in_cache,
+        // );
         let bar = get_progress_bar(num_accounts_in_cache);
         self.main_signer_accounts
             .as_ref()
@@ -792,7 +792,7 @@ impl TransactionGenerator {
                 bar.inc(1);
             });
         bar.finish();
-        println!("[{}] done.", now_fmt!());
+        // println!("[{}] done.", now_fmt!());
     }
 
     /// Drops the sender to notify the receiving end of the channel.

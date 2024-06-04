@@ -64,10 +64,10 @@ where
             self.maybe_first_block_start_time = Some(current_block_start_time);
         }
         let block_id = executable_block.block_id;
-        info!(
-            "In iteration {}, received block {}.",
-            self.num_blocks_processed, block_id
-        );
+        // info!(
+        //     "In iteration {}, received block {}.",
+        //     self.num_blocks_processed, block_id
+        // );
         let num_txns = executable_block.transactions.num_transactions();
         let output = self
             .executor

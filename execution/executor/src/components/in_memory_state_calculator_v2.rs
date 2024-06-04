@@ -248,13 +248,13 @@ impl InMemoryStateCalculatorV2 {
             updates_since_latest_checkpoint
         };
 
-        info!(
-            "last_checkpoint_index {last_checkpoint_index:?}, result_state: {latest_checkpoint_version:?} {:?} {:?} {current_version} {:?} {:?}",
-            latest_checkpoint.root_hash(),
-            latest_checkpoint.usage(),
-            current_tree.root_hash(),
-            current_tree.usage(),
-        );
+        // info!(
+        //     "last_checkpoint_index {last_checkpoint_index:?}, result_state: {latest_checkpoint_version:?} {:?} {:?} {current_version} {:?} {:?}",
+        //     latest_checkpoint.root_hash(),
+        //     latest_checkpoint.usage(),
+        //     current_tree.root_hash(),
+        //     current_tree.usage(),
+        // );
 
         let result_state = StateDelta::new(
             latest_checkpoint.smt,

@@ -161,21 +161,21 @@ where
                     NUM_TXNS
                         .with_label_values(&["execution"])
                         .inc_by(block_size);
-                    info!("Received block of size {:?} to execute", block_size);
+                    // info!("Received block of size {:?} to execute", block_size);
                     executed += block_size;
                     stage_executed += block_size;
                     exe.execute_block(current_block_start_time, partition_time, block);
-                    info!("Finished executing block");
+                    // info!("Finished executing block");
 
                     // Empty blocks indicate the end of a stage.
                     // Print the accumulated stage stats at that point.
                     if block_size == 0 {
                         if stage_executed > 0 {
-                            info!("Execution finished stage {}", stage_index);
-                            stage_overall_measuring.print_end(
-                                &format!("Staged execution: stage {}:", stage_index),
-                                stage_executed,
-                            );
+                            // info!("Execution finished stage {}", stage_index);
+                            // stage_overall_measuring.print_end(
+                            //     &format!("Staged execution: stage {}:", stage_index),
+                            //     stage_executed,
+                            // );
                         }
                         stage_index += 1;
                         stage_overall_measuring = OverallMeasuring::start();
@@ -184,14 +184,14 @@ where
                 }
 
                 if stage_index > 0 && stage_executed > 0 {
-                    info!("Execution finished stage {}", stage_index);
-                    stage_overall_measuring.print_end(
-                        &format!("Staged execution: stage {}:", stage_index),
-                        stage_executed,
-                    );
+                    // info!("Execution finished stage {}", stage_index);
+                    // stage_overall_measuring.print_end(
+                    //     &format!("Staged execution: stage {}:", stage_index),
+                    //     stage_executed,
+                    // );
                 }
 
-                overall_measuring.print_end("Overall execution", executed);
+                // overall_measuring.print_end("Overall execution", executed);
                 start_commit_tx.map(|tx| tx.send(()));
             })
             .expect("Failed to spawn transaction executor thread.");

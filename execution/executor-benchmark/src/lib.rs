@@ -385,12 +385,12 @@ fn add_accounts_impl<V>(
         generator.verify_sequence_numbers(db.reader.clone());
     }
 
-    println!(
-        "Created {} new accounts. Now at version {}, total # of accounts {}.",
-        num_new_accounts,
-        now_version,
-        generator.num_existing_accounts() + num_new_accounts,
-    );
+    // println!(
+    //     "Created {} new accounts. Now at version {}, total # of accounts {}.",
+    //     num_new_accounts,
+    //     now_version,
+    //     generator.num_existing_accounts() + num_new_accounts,
+    // );
 
     // Assert there were no error log lines in the run.
     assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());

@@ -206,17 +206,17 @@ where
             .expect("Must exist.")
             .ok_or(ExecutorError::BlockNotFound(parent_block_id))?;
         let parent_output = &parent_block.output;
-        info!(
-            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-            "execute_block"
-        );
+        // info!(
+        //     LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+        //     "execute_block"
+        // );
         let committed_block_id = self.committed_block_id();
         let (state, epoch_state, state_checkpoint_output) =
             if parent_block_id != committed_block_id && parent_output.has_reconfiguration() {
-                info!(
-                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-                    "reconfig_descendant_block_received"
-                );
+                // info!(
+                //     LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                //     "reconfig_descendant_block_received"
+                // );
                 (
                     parent_output.state().clone(),
                     parent_output.epoch_state().clone(),
@@ -227,7 +227,7 @@ where
                     let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                         .with_label_values(&["verified_state_view"])
                         .start_timer();
-                    info!("next_version: {}", parent_output.next_version());
+                    // info!("next_version: {}", parent_output.next_version());
                     CachedStateView::new(
                         StateViewId::BlockExecution { block_id },
                         Arc::clone(&self.db.reader),
@@ -271,10 +271,10 @@ where
         state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult> {
         let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.start_timer();
-        info!(
-            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-            "ledger_update"
-        );
+        // info!(
+        //     LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+        //     "ledger_update"
+        // );
         let committed_block_id = self.committed_block_id();
         let mut block_vec = self
             .block_tree
@@ -302,10 +302,10 @@ where
 
         let output =
             if parent_block_id != committed_block_id && parent_block.output.has_reconfiguration() {
-                info!(
-                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-                    "reconfig_descendant_block_received"
-                );
+                // info!(
+                //     LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                //     "reconfig_descendant_block_received"
+                // );
                 parent_output.reconfig_suffix()
             } else {
                 let (output, _, _) = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
@@ -352,10 +352,10 @@ where
 
         // Ensure the last block id matches the ledger info block id to commit
         let block_id_to_commit = ledger_info_with_sigs.ledger_info().consensus_block_id();
-        info!(
-            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id_to_commit),
-            "commit_block"
-        );
+        // info!(
+        //     LogSchema::new(LogEntry::BlockExecutor).block_id(block_id_to_commit),
+        //     "commit_block"
+        // );
         let last_block_id = *block_ids.last().unwrap();
         if last_block_id != block_id_to_commit {
             // This should not happen. If it does, we need to panic!
