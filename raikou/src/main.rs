@@ -649,7 +649,6 @@ async fn test_raikou(
         end_of_run: Instant::now() + Duration::from_secs_f64(delta) * total_duration_in_delta,
         enable_optimistic_dissemination,
         extra_wait_before_qc_vote: Duration::from_secs_f64(delta * 0.1),
-        enable_penalty_system: true,
         enable_round_entry_permission: false,
         enable_commit_votes: true,
     };

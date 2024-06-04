@@ -1,7 +1,7 @@
 use crate::{
     framework::NodeId,
     raikou::{
-        types::{BatchSN, Round, *},
+        types::{BatchId, Round, *},
         Block, Config,
     },
 };
@@ -28,7 +28,7 @@ pub enum PenaltyTrackerReportEntry {
     /// `Missing(sn)` means that the sender of the report was missing the batch with
     /// sequence number `sn` from the node. Of all such batches, the highest-ranked one
     /// (i.e., the first in the block) is reported.
-    Missing(BatchSN),
+    Missing(BatchId),
     /// `None` means that there were no batches from this node proposed.
     None,
 }

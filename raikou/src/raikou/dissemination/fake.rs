@@ -3,7 +3,6 @@ use crate::{
     protocol,
     raikou::{dissemination::DisseminationLayer, types::*},
 };
-use aptos_consensus_types::common::PayloadFilter;
 use bitvec::prelude::BitVec;
 use defaultmap::DefaultBTreeMap;
 use std::{
@@ -16,16 +15,18 @@ use tokio::time::Instant;
 
 #[derive(Clone)]
 pub struct Batch {
-    node: NodeId,
-    sn: BatchSN,
+    author: NodeId,
+    batch_id: BatchId,
+    digest: HashValue,
     txns: Option<Vec<Txn>>,
 }
 
 impl Batch {
-    pub fn get_ref(&self) -> BatchInfo {
+    pub fn get_info(&self) -> BatchInfo {
         BatchInfo {
-            node: self.node,
-            sn: self.sn,
+            author: self.author,
+            batch_id: self.batch_id,
+            digest: self.digest,
         }
     }
 }
@@ -33,14 +34,14 @@ impl Batch {
 #[derive(Clone)]
 pub enum Message {
     Batch(Batch),
-    BatchStored(BatchSN),
+    BatchStored(BatchId),
     AvailabilityCert(AC),
-    Fetch(BatchInfo),
+    // Fetch(BatchHash),
 }
 
 #[derive(Clone)]
 pub enum TimerEvent {
-    NewBatch(BatchSN),
+    NewBatch(BatchId),
 }
 
 pub struct Config {
@@ -77,21 +78,21 @@ impl<TI> DisseminationLayer for FakeDisseminationLayer<TI>
 where
     TI: Iterator<Item = Vec<Txn>> + Send + Sync + 'static,
 {
-    async fn pull_payload(&self, exclude: HashSet<BatchInfo>) -> Payload {
+    async fn prepare_block(&self, exclude: HashSet<BatchHash>) -> Payload {
         let inner = self.inner.lock().await;
 
         let acs = inner
             .new_acs
             .iter()
-            .filter(|&batch_info| !exclude.contains(batch_info))
-            .map(|batch_info| inner.acs[batch_info].clone())
+            .filter(|&batch_hash| !exclude.contains(batch_hash))
+            .map(|batch_hash| inner.acs[batch_hash].clone())  // WARNING: potentially expensive clone
             .collect();
 
         let batches = inner
             .new_batches
             .iter()
-            .filter(|&batch_info| !exclude.contains(batch_info))
-            .cloned()
+            .filter(|&batch_hash| !exclude.contains(batch_hash))
+            .map(|batch_hash| inner.batches[batch_hash].get_info())  // WARNING: potentially expensive clone
             .collect();
 
         Payload::new(acs, batches)
@@ -102,11 +103,11 @@ where
             .acs()
             .into_iter()
             .cloned()
-            .map(|ac| (ac.batch.clone(), ac));
+            .map(|ac| (ac.batch.digest, ac));
         self.inner.lock().await.acs.extend(new_acs);
     }
 
-    async fn check_stored(&self, batch: &BatchInfo) -> bool {
+    async fn check_stored(&self, batch: &BatchHash) -> bool {
         self.inner.lock().await.batches.contains_key(batch)
     }
 
@@ -116,10 +117,10 @@ where
         // TODO: replace if with an assert once deduplication is implemented.
         for payload in payloads {
             for batch in payload.all() {
-                if !inner.committed_batches.contains(batch) {
-                    inner.committed_batches.insert(batch.clone());
-                    inner.new_acs.remove(batch);
-                    inner.new_batches.remove(batch);
+                if !inner.committed_batches.contains(&batch.digest) {
+                    inner.committed_batches.insert(batch.digest);
+                    inner.new_acs.remove(&batch.digest);
+                    inner.new_batches.remove(&batch.digest);
                 }
             }
         }
@@ -143,20 +144,21 @@ pub struct FakeDisseminationLayerInner<TI> {
     node_id: NodeId,
 
     // Storage for all received batches and the time when they were.
-    batches: BTreeMap<BatchInfo, Batch>,
+    batches: BTreeMap<BatchHash, Batch>,
+    my_batches: BTreeMap<BatchId, BatchHash>,
     // Storage of all received ACs.
-    acs: BTreeMap<BatchInfo, AC>,
+    acs: BTreeMap<BatchHash, AC>,
     // Set of committed batches.
-    committed_batches: BTreeSet<BatchInfo>,
+    committed_batches: BTreeSet<BatchHash>,
     // Set of known ACs that are not yet committed.
-    new_acs: BTreeSet<BatchInfo>,
+    new_acs: BTreeSet<BatchHash>,
     // Set of known uncertified batches that are not yet committed.
-    new_batches: BTreeSet<BatchInfo>,
+    new_batches: BTreeSet<BatchHash>,
 
     // The set of nodes that have stored this node's batch with the given sequence number.
-    batch_stored_votes: DefaultBTreeMap<BatchSN, BitVec>,
+    batch_stored_votes: DefaultBTreeMap<BatchId, BitVec>,
 
-    batch_created_time: DefaultBTreeMap<BatchSN, Instant>,
+    batch_created_time: DefaultBTreeMap<BatchId, Instant>,
 }
 
 impl<TI> FakeDisseminationLayerInner<TI>
@@ -171,6 +173,7 @@ where
             config,
             node_id,
             batches: BTreeMap::new(),
+            my_batches: Default::default(),
             acs: BTreeMap::new(),
             committed_batches: BTreeSet::new(),
             new_acs: BTreeSet::new(),
@@ -201,14 +204,19 @@ where
         };
 
         upon timer [TimerEvent::NewBatch(sn)] {
+            let txns = self.txns_iter.next();
+            let digest = hash((self.node_id, sn, &txns));
+
             // Multicast a new batch
             ctx.multicast(Message::Batch(Batch {
-                node: self.node_id,
-                sn,
-                txns: self.txns_iter.next(),
+                author: self.node_id,
+                batch_id: sn,
+                digest,
+                txns,
             })).await;
 
             self.batch_created_time[sn] = Instant::now();
+            self.my_batches.insert(sn, digest);
 
             // Reset the timer.
             ctx.set_timer(self.config.batch_interval, TimerEvent::NewBatch(sn + 1));
@@ -217,53 +225,57 @@ where
         // Upon receiving a batch, store it, reply with a BatchStored message,
         // and execute try_vote.
         upon receive [Message::Batch(batch)] from node [p] {
-            let batch_ref = batch.get_ref();
-            if !self.batches.contains_key(&batch_ref) {
-                self.batches.insert(batch_ref, batch);
+            // TODO: add verification of the digest?
+            let digest = batch.digest;
+            let batch_id = batch.batch_id;
+
+            if !self.batches.contains_key(&digest) {
+                self.batches.insert(digest, batch);
 
                 // TODO
                 // self.penalty_tracker.on_new_batch(batch_ref);
 
-                ctx.unicast(Message::BatchStored(batch_ref.sn), p).await;
+                ctx.unicast(Message::BatchStored(batch_id), p).await;
 
                 // Track the list of known uncommitted uncertified batches.
-                if !self.acs.contains_key(&batch_ref) && !self.committed_batches.contains(&batch_ref) {
-                    self.new_batches.insert(batch_ref);
+                if !self.acs.contains_key(&digest) && !self.committed_batches.contains(&digest) {
+                    self.new_batches.insert(digest);
                 }
             }
         };
 
         // Upon receiving a quorum of BatchStored messages for a batch,
         // form an AC and broadcast it.
-        upon receive [Message::BatchStored(sn)] from node [p] {
-            self.batch_stored_votes[sn].set(p, true);
+        upon receive [Message::BatchStored(batch_id)] from node [p] {
+            self.batch_stored_votes[batch_id].set(p, true);
 
-            if self.batch_stored_votes[sn].count_ones() == self.config.ac_quorum {
+            if self.batch_stored_votes[batch_id].count_ones() == self.config.ac_quorum {
+                let digest = self.my_batches[&batch_id];
                 ctx.multicast(Message::AvailabilityCert(AC {
-                    batch: BatchInfo { node: self.node_id, sn },
-                    signers: self.batch_stored_votes[sn].clone(),
+                    batch: self.batches[&digest].get_info(),
+                    signers: self.batch_stored_votes[batch_id].clone(),
                 })).await;
             }
         };
 
         upon receive [Message::AvailabilityCert(ac)] from [_any_node] {
-            self.acs.insert(ac.batch, ac.clone());
-
             // Track the list of known uncommitted ACs
             // and the list of known uncommitted uncertified batches.
-            if !self.committed_batches.contains(&ac.batch) {
-                self.new_acs.insert(ac.batch);
-                self.new_batches.remove(&ac.batch);
+            if !self.committed_batches.contains(&ac.batch.digest) {
+                self.new_acs.insert(ac.batch.digest);
+                self.new_batches.remove(&ac.batch.digest);
             }
+
+            self.acs.insert(ac.batch.digest, ac.clone());
         };
 
-        upon receive [Message::Fetch(batch_ref)] from node [p] {
-            // FIXME: fetching is not actually being used yet.
-            //        `Message::Fetch` is never sent.
-            // If receive a Fetch message, reply with the batch if it is known.
-            if let Some(batch) = self.batches.get(&batch_ref) {
-                ctx.unicast(Message::Batch(batch.clone()), p).await;
-            }
-        };
+        // upon receive [Message::Fetch(digest)] from node [p] {
+        //     // FIXME: fetching is not actually being used yet.
+        //     //        `Message::Fetch` is never sent.
+        //     // If receive a Fetch message, reply with the batch if it is known.
+        //     if let Some(batch) = self.batches.get(&digest) {
+        //         ctx.unicast(Message::Batch(batch.clone()), p).await;
+        //     }
+        // };
     }
 }

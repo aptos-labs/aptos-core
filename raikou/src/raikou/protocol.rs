@@ -6,7 +6,6 @@ use crate::{
     protocol,
     raikou::{
         dissemination::DisseminationLayer,
-        penalty_tracker::{PenaltyTracker, PenaltyTrackerReportEntry},
         types::*,
     },
     utils::kth_max_set::KthMaxSet,
@@ -22,12 +21,6 @@ use std::{
     time::Duration,
 };
 use tokio::time::Instant;
-
-impl Debug for BatchInfo {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{ node: {}, sn: {} }}", self.node, self.sn)
-    }
-}
 
 #[derive(Clone)]
 pub struct Block {
@@ -51,8 +44,8 @@ impl Block {
         self.payload.batches().len()
     }
 
-    pub fn batch(&self, index: usize) -> BatchInfo {
-        self.payload.batches()[index]
+    pub fn batch(&self, index: usize) -> &BatchInfo {
+        &self.payload.batches()[index]
     }
 
     pub fn acs(&self) -> &Vec<AC> {
@@ -266,9 +259,6 @@ pub enum Message {
     CommitVote(QC),
     Timeout(Round, QC),
     AdvanceRound(Round, QC, RoundEnterReason),
-
-    // Other
-    PenaltyTrackerReport(Round, Vec<PenaltyTrackerReportEntry>),
 }
 
 #[derive(Clone)]
@@ -304,8 +294,7 @@ pub struct Config<S> {
     /// The time validator waits after receiving a block before voting for a QC for it
     /// if it doesn't have all the batches yet.
     pub extra_wait_before_qc_vote: Duration,
-    pub enable_penalty_system: bool,
-
+    
     pub end_of_run: Instant,
 }
 
@@ -347,7 +336,6 @@ pub struct RaikouNode<S, DL> {
     cc_high: CC,
     tc_high: TC,
     committed_qc: QC,
-    penalty_tracker: PenaltyTracker<S>,
 
     // For multichain integration
 
@@ -391,7 +379,6 @@ impl<S: LeaderSchedule, DL: DisseminationLayer> RaikouNode<S, DL> {
             cc_high: CC::genesis(),
             tc_high: TC::genesis(),
             committed_qc: QC::genesis(),
-            penalty_tracker: PenaltyTracker::new(config),
             blocks: Default::default(),
             stored_prefix_cache: (0, 0),
             qc_votes: Default::default(),
@@ -468,7 +455,7 @@ impl<S: LeaderSchedule, DL: DisseminationLayer> RaikouNode<S, DL> {
         while self.stored_prefix_cache.1 < block.n_batches()
             && self
                 .dissemination
-                .check_stored(&block.batch(self.stored_prefix_cache.1))
+                .check_stored(&block.batch(self.stored_prefix_cache.1).digest)
                 .await
         {
             self.stored_prefix_cache.1 += 1;
@@ -625,7 +612,7 @@ where
                 let block = Block {
                     round,
                     // TODO: implement deduplication.
-                    payload: self.dissemination.pull_payload(HashSet::new()).await,
+                    payload: self.dissemination.prepare_block(HashSet::new()).await,
                     parent_qc: Some(self.qc_high.clone()),
                     reason: self.enter_reason.clone(),
                 };
@@ -661,25 +648,9 @@ where
                 self.advance_r_ready(round, reason, ctx).await;
 
                 ctx.set_timer(self.config.extra_wait_before_qc_vote, TimerEvent::QcVote(round));
-
-                // send the penalty tracker reports
-                if self.config.enable_penalty_system {
-                    let reports = self.penalty_tracker.prepare_reports(
-                        payload.batches(),
-                        Instant::now(),
-                    );
-                    ctx.unicast(Message::PenaltyTrackerReport(round, reports), leader).await;
-                }
-
+                
                 // store the ACs
                 self.dissemination.prefetch_payload_data(payload).await;
-            }
-        };
-
-        // The leader uses the missing votes to compute the time penalty for each validator.
-        upon receive [Message::PenaltyTrackerReport(round, reports)] from node [p] {
-            if self.config.enable_penalty_system {
-                self.penalty_tracker.register_reports(round, p, reports);
             }
         };
 

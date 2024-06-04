@@ -1,14 +1,33 @@
-use crate::{framework::NodeId, raikou::types::BatchSN};
+use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
+use crate::framework::NodeId;
 use bitvec::prelude::BitVec;
 use std::sync::Arc;
 
-#[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
+pub type HashValue = u64;
+
+pub type BatchId = i64;
+
+#[derive(Clone)]
 pub struct BatchInfo {
-    pub node: NodeId,
-    pub sn: BatchSN,
+    pub author: NodeId,
+    pub batch_id: BatchId,
+    pub digest: HashValue,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+pub fn hash(x: impl Hash) -> HashValue {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    x.hash(&mut hasher);
+    hasher.finish()
+}
+
+impl Debug for crate::raikou::types::BatchInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{ node: {}, sn: {}, hash: {:#x} }}", self.author, self.batch_id, self.digest)
+    }
+}
+
+#[derive(Clone)]
 pub struct AC {
     // In practice, this would be a hash pointer.
     pub batch: BatchInfo,
@@ -16,7 +35,7 @@ pub struct AC {
 }
 
 #[derive(Clone)]
-pub struct BlockPayload {
+pub struct Payload {
     inner: Arc<BlockPayloadInner>,
 }
 
@@ -25,7 +44,7 @@ struct BlockPayloadInner {
     batches: Vec<BatchInfo>,
 }
 
-impl BlockPayload {
+impl Payload {
     pub fn new(acs: Vec<AC>, batches: Vec<BatchInfo>) -> Self {
         Self {
             inner: Arc::new(BlockPayloadInner { acs, batches }),
