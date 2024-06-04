@@ -334,8 +334,10 @@ impl ProofQueue {
         counters::NUM_TOTAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_proofs as f64);
         counters::NUM_LOCAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_local_txns as f64);
         counters::NUM_LOCAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_local_proofs as f64);
-
-        (self.remaining_txns, self.remaining_proofs)
+        let remaining_txns_without_duplicates = self.remaining_txns();
+        counters::NUM_TOTAL_TXNS_LEFT_ON_UPDATE_WITHOUT_DUPLICATES
+            .observe(remaining_txns_without_duplicates as f64);
+        (remaining_txns_without_duplicates, self.remaining_proofs)
     }
 
     // Mark in the hashmap committed PoS, but keep them until they expire

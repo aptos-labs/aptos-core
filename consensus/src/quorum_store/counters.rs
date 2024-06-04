@@ -312,6 +312,13 @@ pub static NUM_TOTAL_TXNS_LEFT_ON_UPDATE: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
+pub static NUM_TOTAL_TXNS_LEFT_ON_UPDATE_WITHOUT_DUPLICATES: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "quorum_store_num_total_txns_left_on_update_without_duplicates",
+        "Histogram for the number of total txns left after adding or cleaning batches, without duplicates.",
+    )
+});
+
 /// Histogram for the number of total batches/PoS left after adding or cleaning batches.
 pub static NUM_TOTAL_PROOFS_LEFT_ON_UPDATE: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
