@@ -200,11 +200,11 @@ impl DB {
     }
 
     fn log_construct(name: &str, inner: rocksdb::DB) -> DB {
-        info!(rocksdb_name = name, "Opened RocksDB.");
-        DB {
-            name: name.to_string(),
-            inner,
-        }
+        // info!(rocksdb_name = name, "Opened RocksDB.");
+        // DB {
+        //     name: name.to_string(),
+        //     inner,
+        // }
     }
 
     /// Reads single record by key.
@@ -365,7 +365,7 @@ impl DB {
 
 impl Drop for DB {
     fn drop(&mut self) {
-        info!(rocksdb_name = self.name, "Dropped RocksDB.");
+        // info!(rocksdb_name = self.name, "Dropped RocksDB.");
     }
 }
 

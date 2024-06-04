@@ -124,14 +124,14 @@ impl LedgerDb {
             readonly,
         )?);
 
-        info!(
-            ledger_metadata_db_path = ledger_metadata_db_path,
-            sharding = sharding,
-            "Opened ledger metadata db!"
-        );
+        // info!(
+        //     ledger_metadata_db_path = ledger_metadata_db_path,
+        //     sharding = sharding,
+        //     "Opened ledger metadata db!"
+        // );
 
         if !sharding {
-            info!("Individual ledger dbs are not enabled!");
+            // info!("Individual ledger dbs are not enabled!");
             return Ok(Self {
                 ledger_metadata_db: LedgerMetadataDb::new(Arc::clone(&ledger_metadata_db)),
                 event_db: EventDb::new(
@@ -221,10 +221,10 @@ impl LedgerDb {
         let ledger_db = Self::new(db_root_path, rocksdb_configs, /*readonly=*/ false)?;
         let cp_ledger_db_folder = cp_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
 
-        info!(
-            sharding = sharding,
-            "Creating ledger_db checkpoint at: {cp_ledger_db_folder:?}"
-        );
+        // info!(
+        //     sharding = sharding,
+        //     "Creating ledger_db checkpoint at: {cp_ledger_db_folder:?}"
+        // );
 
         std::fs::remove_dir_all(&cp_ledger_db_folder).unwrap_or(());
         if sharding {
@@ -356,7 +356,7 @@ impl LedgerDb {
             )?
         };
 
-        info!("Opened {name} at {path:?}!");
+        // info!("Opened {name} at {path:?}!");
 
         Ok(db)
     }

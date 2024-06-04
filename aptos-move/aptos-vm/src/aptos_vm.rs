@@ -2552,11 +2552,11 @@ impl VMExecutor for AptosVM {
             ))
         });
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
-        info!(
-            log_context,
-            "Executing block, transaction count: {}",
-            transactions.len()
-        );
+        // info!(
+        //     log_context,
+        //     "Executing block, transaction count: {}",
+        //     transactions.len()
+        // );
 
         let count = transactions.len();
         let streamed_transactions_provider = StreamedTransactionsProvider::from_slice(transactions);
