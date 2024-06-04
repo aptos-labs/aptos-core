@@ -2,14 +2,15 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
+use bytes::Bytes;
+use move_binary_format::{errors::PartialVMResult, CompiledModule};
+use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     value::MoveTypeLayout,
 };
-use bytes::Bytes;
-use std::fmt::Debug;
+use std::sync::Arc;
 
 /// Traits for resolving Move modules and resources from persistent storage
 
@@ -23,15 +24,12 @@ use std::fmt::Debug;
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ModuleResolver {
-    type Module;
-    type Error: Debug;
-
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata>;
 
     fn get_module(
         &self,
         module_id: &ModuleId,
-    ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error>;
+    ) -> PartialVMResult<Option<(Arc<CompiledModule>, usize, [u8; 32])>>;
 }
 
 pub fn resource_size(resource: &Option<Bytes>) -> usize {
@@ -48,26 +46,22 @@ pub fn resource_size(resource: &Option<Bytes>) -> usize {
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ResourceResolver {
-    type Error: Debug;
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
         layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error>;
+    ) -> PartialVMResult<(Option<Bytes>, usize)>;
 }
 
 /// A persistent storage implementation that can resolve both resources and modules
-pub trait MoveResolver<M, E: Debug>:
-    ModuleResolver<Module = M, Error = E> + ResourceResolver<Error = E>
-{
+pub trait MoveResolver: ModuleResolver + ResourceResolver {
     fn get_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Bytes>, <Self as ResourceResolver>::Error> {
+    ) -> PartialVMResult<Option<Bytes>> {
         Ok(self
             .get_resource_with_metadata(
                 address,
@@ -82,15 +76,9 @@ pub trait MoveResolver<M, E: Debug>:
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<(Option<Bytes>, usize), <Self as ResourceResolver>::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         self.get_resource_bytes_with_metadata_and_layout(address, struct_tag, metadata, None)
     }
 }
 
-impl<
-        M,
-        E: Debug,
-        T: ModuleResolver<Module = M, Error = E> + ResourceResolver<Error = E> + ?Sized,
-    > MoveResolver<M, E> for T
-{
-}
+impl<T: ModuleResolver + ResourceResolver + ?Sized> MoveResolver for T {}

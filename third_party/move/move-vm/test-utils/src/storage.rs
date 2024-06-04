@@ -14,12 +14,12 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
+use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
 use sha3::{Digest, Sha3_256};
 use std::{
     collections::{btree_map, BTreeMap},
@@ -38,9 +38,6 @@ impl BlankStorage {
 }
 
 impl ModuleResolver for BlankStorage {
-    type Error = PartialVMError;
-    type Module = Arc<CompiledModule>;
-
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
@@ -48,21 +45,19 @@ impl ModuleResolver for BlankStorage {
     fn get_module(
         &self,
         _module_id: &ModuleId,
-    ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error> {
+    ) -> PartialVMResult<Option<(Arc<CompiledModule>, usize, [u8; 32])>> {
         Ok(None)
     }
 }
 
 impl ResourceResolver for BlankStorage {
-    type Error = PartialVMError;
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         Ok((None, 0))
     }
 }
@@ -74,7 +69,7 @@ impl TableResolver for BlankStorage {
         _handle: &TableHandle,
         _key: &[u8],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, PartialVMError> {
+    ) -> PartialVMResult<Option<Bytes>> {
         Ok(None)
     }
 }
@@ -259,9 +254,6 @@ impl InMemoryStorage {
 }
 
 impl ModuleResolver for InMemoryStorage {
-    type Error = PartialVMError;
-    type Module = Arc<CompiledModule>;
-
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
@@ -269,7 +261,7 @@ impl ModuleResolver for InMemoryStorage {
     fn get_module(
         &self,
         module_id: &ModuleId,
-    ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error> {
+    ) -> PartialVMResult<Option<(Arc<CompiledModule>, usize, [u8; 32])>> {
         if let Some(account_storage) = self.accounts.get(module_id.address()) {
             if let Some(bytes) = account_storage.modules.get(module_id.name()) {
                 let module = Arc::new(CompiledModule::deserialize(bytes)?);
@@ -286,15 +278,13 @@ impl ModuleResolver for InMemoryStorage {
 }
 
 impl ResourceResolver for InMemoryStorage {
-    type Error = PartialVMError;
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         if let Some(account_storage) = self.accounts.get(address) {
             let buf = account_storage.resources.get(tag).cloned();
             let buf_size = resource_size(&buf);

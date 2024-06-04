@@ -8,15 +8,10 @@ use aptos_vm_types::resolver::{
     ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
-    CompiledModule,
-};
-use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use move_binary_format::errors::PartialVMResult;
+use move_core_types::language_storage::StructTag;
+use move_vm_types::resolver::MoveResolver;
+use std::collections::{BTreeMap, HashMap};
 
 /// A general resolver used by AptosVM. Allows to implement custom hooks on
 /// top of storage, e.g. get resources from resource groups, etc.
@@ -25,7 +20,7 @@ pub trait AptosMoveResolver:
     AggregatorV1Resolver
     + ConfigStorage
     + DelayedFieldResolver
-    + MoveResolver<Arc<CompiledModule>, PartialVMError>
+    + MoveResolver
     + ResourceGroupResolver
     + StateStorageView
     + TableResolver

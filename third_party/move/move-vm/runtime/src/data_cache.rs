@@ -17,12 +17,12 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
-    resolver::MoveResolver,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    resolver::MoveResolver,
     value_serde::deserialize_and_allow_delayed_values,
     values::{GlobalValue, Value},
 };
@@ -49,7 +49,7 @@ impl AccountDataCache {
 }
 
 fn load_module_impl(
-    remote: &dyn MoveResolver<Arc<CompiledModule>, PartialVMError>,
+    remote: &dyn MoveResolver,
     account_map: &BTreeMap<AccountAddress, AccountDataCache>,
     module_id: &ModuleId,
 ) -> PartialVMResult<(Arc<CompiledModule>, usize, [u8; 32])> {
@@ -85,7 +85,7 @@ fn load_module_impl(
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
 pub(crate) struct TransactionDataCache<'r> {
-    remote: &'r dyn MoveResolver<Arc<CompiledModule>, PartialVMError>,
+    remote: &'r dyn MoveResolver,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
 
     deserializer_config: DeserializerConfig,
@@ -95,7 +95,7 @@ pub(crate) struct TransactionDataCache<'r> {
 impl<'r> TransactionDataCache<'r> {
     pub(crate) fn empty(
         deserializer_config: DeserializerConfig,
-        remote: &'r impl MoveResolver<Arc<CompiledModule>, PartialVMError>,
+        remote: &'r impl MoveResolver,
     ) -> Self {
         TransactionDataCache {
             remote,

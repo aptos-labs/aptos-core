@@ -34,18 +34,17 @@ use aptos_vm_types::{
     resource_group_adapter::ResourceGroupAdapter,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
-    CompiledModule,
-};
+use move_binary_format::{errors::PartialVMResult, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
 };
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use move_vm_types::{
+    delayed_values::delayed_field_id::DelayedFieldID,
+    resolver::{resource_size, ModuleResolver, ResourceResolver},
+};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
@@ -167,23 +166,18 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
 impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {}
 
 impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
-    type Error = PartialVMError;
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         self.get_any_resource_with_layout(address, struct_tag, metadata, maybe_layout)
     }
 }
 
 impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
-    type Error = PartialVMError;
-    type Module = Arc<CompiledModule>;
-
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
         let state_key = StateKey::module_id(module_id);
         match self.executor_view.get_onchain_module(&state_key) {
@@ -195,7 +189,7 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
     fn get_module(
         &self,
         module_id: &ModuleId,
-    ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error> {
+    ) -> PartialVMResult<Option<(Arc<CompiledModule>, usize, [u8; 32])>> {
         let state_key = StateKey::module_id(module_id);
         Ok(self
             .executor_view
@@ -210,7 +204,7 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
         handle: &TableHandle,
         key: &[u8],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, PartialVMError> {
+    ) -> PartialVMResult<Option<Bytes>> {
         let state_key = StateKey::table_item(&(*handle).into(), key);
         self.executor_view
             .get_resource_bytes(&state_key, maybe_layout)
