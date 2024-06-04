@@ -148,7 +148,7 @@ impl ProofQueue {
     }
 
     fn remaining_txns(&self) -> u64 {
-        // All the bath keys for which batch_to_proof is not None
+        // All the bath keys for which batch_to_proof is not None. This is the set of unexpired and uncommitted proofs.
         let batch_keys = self
             .batch_to_proof
             .iter()
@@ -157,9 +157,14 @@ impl ProofQueue {
         let mut remaining_txns = self
             .txn_summary_to_batches
             .iter()
-            .filter(|(_, batches)| batches.iter().any(|batch_key| batch_keys.contains(batch_key)))
+            .filter(|(_, batches)| {
+                batches
+                    .iter()
+                    .any(|batch_key| batch_keys.contains(batch_key))
+            })
             .count() as u64;
-        // If a batch_key is not in batches_with_txn_summary, then add the number of txns in the batch to remaining_txns
+        // If a batch_key is not in batches_with_txn_summary, it means we've received the proof but haven't receive the
+        // transaction summary of the batch from batch coordinator. Add the number of txns in the batch to remaining_txns.
         remaining_txns += self
             .batch_to_proof
             .iter()
@@ -174,16 +179,14 @@ impl ProofQueue {
         remaining_txns
     }
 
-    /// Add the ProofOfStore to proof queue. Return true if the proof is added successfully.
-    fn push(&mut self, proof: ProofOfStore) -> bool {
+    /// Add the ProofOfStore to proof queue.
+    pub(crate) fn push(&mut self, proof: ProofOfStore) {
         if proof.expiration() < self.latest_block_timestamp {
             counters::inc_rejected_pos_count(counters::POS_EXPIRED_LABEL);
-            return false;
         }
         let batch_key = BatchKey::from_info(proof.info());
         if self.batch_to_proof.get(&batch_key).is_some() {
             counters::inc_rejected_pos_count(counters::POS_DUPLICATE_LABEL);
-            return false;
         }
 
         let author = proof.author();
@@ -205,7 +208,6 @@ impl ProofQueue {
         }
 
         self.inc_remaining(&author, num_txns);
-        return true;
     }
 
     // gets excluded and iterates over the vector returning non excluded or expired entries.
@@ -213,7 +215,7 @@ impl ProofQueue {
     // The flag in the second return argument is true iff the entire proof queue is fully utilized
     // when pulling the proofs. If any proof from proof queue cannot be included due to size limits,
     // this flag is set false.
-    fn pull_proofs(
+    pub(crate) fn pull_proofs(
         &mut self,
         excluded_batches: &HashSet<BatchInfo>,
         max_txns: u64,
@@ -310,6 +312,11 @@ impl ProofQueue {
                         num_expired_but_not_committed += 1;
                         counters::GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_COMMIT
                             .observe((block_timestamp - batch.expiration()) as f64);
+                        self.txn_summary_to_batches.retain(|_, batches| {
+                            batches.remove(&key.batch_key);
+                            !batches.is_empty()
+                        });
+                        self.batches_with_txn_summary.remove(&key.batch_key);
                         self.dec_remaining(&batch.author(), batch.num_txns());
                     }
                     claims::assert_some!(self.batch_to_proof.remove(&key.batch_key));
@@ -342,7 +349,12 @@ impl ProofQueue {
                 );
                 self.dec_remaining(&batch.author(), batch.num_txns());
             }
-            self.batch_to_proof.insert(batch_key, None);
+            self.batch_to_proof.insert(batch_key.clone(), None);
+            self.batches_with_txn_summary.remove(&batch_key);
+            self.txn_summary_to_batches.retain(|_, batches| {
+                batches.remove(&batch_key);
+                !batches.is_empty()
+            });
         }
     }
 
@@ -392,6 +404,7 @@ impl ProofQueue {
                                     .or_default()
                                     .insert(batch_key.clone());
                             }
+                            self.batches_with_txn_summary.insert(batch_key);
                         }
                     },
                 }
