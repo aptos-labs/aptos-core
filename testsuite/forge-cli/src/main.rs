@@ -1085,7 +1085,7 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
 }
 
 fn realistic_env_workload_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(100, 2, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
             TransactionWorkload {
