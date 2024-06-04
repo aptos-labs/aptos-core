@@ -72,7 +72,9 @@ impl NetworkSender {
             let self_msg = Event::RpcRequest(receiver, msg.clone(), RPC[0], tx);
             self.self_sender.clone().send(self_msg).await?;
             if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
-                Ok(protocol.from_bytes(&bytes)?)
+                let response_msg =
+                    tokio::task::spawn_blocking(move || protocol.from_bytes(&bytes)).await??;
+                Ok(response_msg)
             } else {
                 bail!("self rpc failed");
             }

@@ -67,10 +67,13 @@ impl RBNetworkSender<JWKConsensusMsg> for NetworkSender {
     ) -> anyhow::Result<JWKConsensusMsg> {
         if receiver == self.author {
             let (tx, rx) = oneshot::channel();
-            let self_msg = Event::RpcRequest(receiver, msg, RPC[0], tx);
+            let protocol = RPC[0];
+            let self_msg = Event::RpcRequest(receiver, msg, protocol, tx);
             self.self_sender.clone().send(self_msg).await?;
             if let Ok(Ok(Ok(bytes))) = timeout(time_limit, rx).await {
-                Ok(RPC[0].from_bytes(&bytes)?)
+                let response_msg =
+                    tokio::task::spawn_blocking(move || protocol.from_bytes(&bytes)).await??;
+                Ok(response_msg)
             } else {
                 bail!("self rpc failed");
             }

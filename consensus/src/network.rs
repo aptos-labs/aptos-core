@@ -283,7 +283,9 @@ impl NetworkSender {
             let self_msg = Event::RpcRequest(receiver, msg.clone(), RPC[0], tx);
             self.self_sender.clone().send(self_msg).await?;
             if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
-                Ok(protocol.from_bytes(&bytes)?)
+                let response_msg =
+                    tokio::task::spawn_blocking(move || protocol.from_bytes(&bytes)).await??;
+                Ok(response_msg)
             } else {
                 bail!("self rpc failed");
             }
@@ -596,10 +598,12 @@ impl<Req: TConsensusMsg + RBMessage + 'static, Res: TConsensusMsg + RBMessage + 
         message: Req,
         timeout: Duration,
     ) -> anyhow::Result<Res> {
-        self.send_rpc(receiver, message.into_network_message(), timeout)
+        let outbound_msg = tokio::task::spawn_blocking(|| message.into_network_message()).await?;
+        let response_msg = self
+            .send_rpc(receiver, outbound_msg, timeout)
             .await
-            .map_err(|e| anyhow!("invalid rpc response: {}", e))
-            .and_then(TConsensusMsg::from_network_message)
+            .map_err(|e| anyhow!("invalid rpc response: {}", e))?;
+        tokio::task::spawn_blocking(|| TConsensusMsg::from_network_message(response_msg)).await?
     }
 }
 
