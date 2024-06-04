@@ -5,7 +5,7 @@
 use crate::{
     smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
     state_sync_utils,
-    test_utils::{
+    utils::{
         create_test_accounts, execute_transactions, execute_transactions_and_wait,
         wait_for_all_nodes, MAX_CATCH_UP_WAIT_SECS,
     },

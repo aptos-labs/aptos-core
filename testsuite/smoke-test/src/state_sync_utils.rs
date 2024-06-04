@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::test_utils::{
+use crate::utils::{
     create_test_accounts, execute_transactions, execute_transactions_and_wait, wait_for_all_nodes,
     MAX_HEALTHY_WAIT_SECS,
 };

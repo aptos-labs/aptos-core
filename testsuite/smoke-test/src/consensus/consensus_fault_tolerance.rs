@@ -3,7 +3,7 @@
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
-    test_utils::{create_and_fund_account, transfer_coins_non_blocking},
+    utils::{create_and_fund_account, transfer_coins_non_blocking},
 };
 use aptos_forge::{
     test_utils::consensus_utils::{
