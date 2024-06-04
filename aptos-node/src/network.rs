@@ -8,7 +8,7 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_consensus::{
-    consensus_observer, consensus_observer::network::ObserverMessage,
+    consensus_observer, consensus_observer::network::ConsensusObserverMessage,
     network_interface::ConsensusMsg,
 };
 use aptos_dkg_runtime::DKGMessage;
@@ -251,7 +251,7 @@ pub fn setup_networks_and_get_interfaces(
 ) -> (
     Vec<Runtime>,
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
-    Option<ApplicationNetworkInterfaces<ObserverMessage>>,
+    Option<ApplicationNetworkInterfaces<ConsensusObserverMessage>>,
     Option<ApplicationNetworkInterfaces<DKGMessage>>,
     Option<ApplicationNetworkInterfaces<JWKConsensusMsg>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,
@@ -265,7 +265,7 @@ pub fn setup_networks_and_get_interfaces(
     let mut network_runtimes = vec![];
     let mut consensus_network_handle = None;
     let mut consensus_observer_network_handles: Option<
-        Vec<ApplicationNetworkHandle<ObserverMessage>>,
+        Vec<ApplicationNetworkHandle<ConsensusObserverMessage>>,
     > = None;
     let mut dkg_network_handle = None;
     let mut jwk_consensus_network_handle = None;
@@ -495,7 +495,9 @@ fn register_client_and_service_with_network<
 fn transform_network_handles_into_interfaces(
     node_config: &NodeConfig,
     consensus_network_handle: Option<ApplicationNetworkHandle<ConsensusMsg>>,
-    consensus_observer_network_handles: Option<Vec<ApplicationNetworkHandle<ObserverMessage>>>,
+    consensus_observer_network_handles: Option<
+        Vec<ApplicationNetworkHandle<ConsensusObserverMessage>>,
+    >,
     dkg_network_handle: Option<ApplicationNetworkHandle<DKGMessage>>,
     jwk_consensus_network_handle: Option<ApplicationNetworkHandle<JWKConsensusMsg>>,
     mempool_network_handles: Vec<ApplicationNetworkHandle<MempoolSyncMsg>>,
@@ -506,7 +508,7 @@ fn transform_network_handles_into_interfaces(
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
-    Option<ApplicationNetworkInterfaces<ObserverMessage>>,
+    Option<ApplicationNetworkInterfaces<ConsensusObserverMessage>>,
     Option<ApplicationNetworkInterfaces<DKGMessage>>,
     Option<ApplicationNetworkInterfaces<JWKConsensusMsg>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,

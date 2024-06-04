@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensus_observer::{network::ObserverMessage, publisher::Publisher},
+    consensus_observer::{network::ConsensusObserverMessage, publisher::Publisher},
     counters,
     error::StateSyncError,
     network::{IncomingCommitRequest, IncomingRandGenRequest, NetworkSender},
@@ -148,7 +148,7 @@ pub struct ExecutionProxyClient {
     // channels to buffer manager
     handle: Arc<RwLock<BufferManagerHandle>>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
-    observer_network: Option<NetworkClient<ObserverMessage>>,
+    observer_network: Option<NetworkClient<ConsensusObserverMessage>>,
 }
 
 impl ExecutionProxyClient {
@@ -160,7 +160,7 @@ impl ExecutionProxyClient {
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         bounded_executor: BoundedExecutor,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
-        observer_network: Option<NetworkClient<ObserverMessage>>,
+        observer_network: Option<NetworkClient<ConsensusObserverMessage>>,
     ) -> Self {
         Self {
             consensus_config,

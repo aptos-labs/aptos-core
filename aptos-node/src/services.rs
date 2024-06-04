@@ -6,7 +6,7 @@ use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::{
-    consensus_observer::network::ObserverMessage, network_interface::ConsensusMsg,
+    consensus_observer::network::ConsensusObserverMessage, network_interface::ConsensusMsg,
     persistent_liveness_storage::StorageWriteProxy, quorum_store::quorum_store_db::QuorumStoreDB,
 };
 use aptos_consensus_notifications::ConsensusNotifier;
@@ -118,7 +118,7 @@ pub fn start_consensus_runtime(
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
     vtxn_pool: VTxnPoolState,
-    observer_network_client: Option<NetworkClient<ObserverMessage>>,
+    observer_network_client: Option<NetworkClient<ConsensusObserverMessage>>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
 

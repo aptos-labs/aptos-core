@@ -5,7 +5,7 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     consensus_observer::{
-        network::{ObserverMessage, OrderedBlock as ObserverBlock},
+        network::{ConsensusObserverMessage, OrderedBlock as ObserverBlock},
         publisher::Publisher,
     },
     counters, monitor,
@@ -266,7 +266,7 @@ impl BufferManager {
             lifetime_guard: self.create_new_request(()),
         });
         if let Some(publisher) = &self.publisher {
-            publisher.publish(ObserverMessage::OrderedBlock(ObserverBlock {
+            publisher.publish(ConsensusObserverMessage::OrderedBlock(ObserverBlock {
                 blocks: ordered_blocks.clone().into_iter().map(Arc::new).collect(),
                 ordered_proof: ordered_proof.clone(),
             }));
@@ -382,7 +382,7 @@ impl BufferManager {
                     self.reset().await;
                 }
                 if let Some(publisher) = &self.publisher {
-                    publisher.publish(ObserverMessage::CommitDecision(CommitDecision::new(
+                    publisher.publish(ConsensusObserverMessage::CommitDecision(CommitDecision::new(
                         commit_proof.clone(),
                     )));
                 }

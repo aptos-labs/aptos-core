@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensus_observer::{network::ObserverMessage, observer::Observer, publisher::Publisher},
+    consensus_observer::{network::ConsensusObserverMessage, observer::Observer, publisher::Publisher},
     counters,
     epoch_manager::EpochManager,
     network::NetworkTask,
@@ -45,7 +45,7 @@ pub fn start_consensus(
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     vtxn_pool: VTxnPoolState,
-    observer_network: Option<NetworkClient<ObserverMessage>>,
+    observer_network: Option<NetworkClient<ConsensusObserverMessage>>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
@@ -114,8 +114,8 @@ pub fn start_consensus(
 
 pub fn start_consensus_observer(
     node_config: &NodeConfig,
-    observer_network_client: NetworkClient<ObserverMessage>,
-    observer_network_service_events: NetworkServiceEvents<ObserverMessage>,
+    observer_network_client: NetworkClient<ConsensusObserverMessage>,
+    observer_network_service_events: NetworkServiceEvents<ConsensusObserverMessage>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
     aptos_db: DbReaderWriter,

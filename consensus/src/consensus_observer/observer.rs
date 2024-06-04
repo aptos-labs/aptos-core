@@ -3,7 +3,7 @@
 
 use crate::{
     consensus_observer::{
-        network::{ObserverMessage, OrderedBlock},
+        network::{ConsensusObserverMessage, OrderedBlock},
         publisher::Publisher,
     },
     dag::DagCommitSigner,
@@ -327,7 +327,7 @@ impl Observer {
 
     pub async fn start(
         mut self,
-        mut network_events: Box<dyn Stream<Item = Event<ObserverMessage>> + Send + Unpin>,
+        mut network_events: Box<dyn Stream<Item = Event<ConsensusObserverMessage>> + Send + Unpin>,
         mut notifier_rx: tokio::sync::mpsc::UnboundedReceiver<(u64, Round)>,
     ) {
         info!("[Observer] starts.");
@@ -338,7 +338,7 @@ impl Observer {
                     if let Event::Message(peer, msg) = event {
                          // todo: verify messages
                         match msg {
-                            ObserverMessage::OrderedBlock(ordered_block) => {
+                            ConsensusObserverMessage::OrderedBlock(ordered_block) => {
                                  info!(
                                      "[Observer] received ordered block {} from {}.",
                                      ordered_block.ordered_proof.commit_info(),
@@ -346,7 +346,7 @@ impl Observer {
                                  );
                                  self.process_ordered_block(ordered_block).await;
                             }
-                            ObserverMessage::CommitDecision(msg) => {
+                            ConsensusObserverMessage::CommitDecision(msg) => {
                                  info!(
                                      "[Observer] received commit decision {} from {}.",
                                      msg.ledger_info().commit_info(),
@@ -354,7 +354,7 @@ impl Observer {
                                  );
                                  self.process_commit_decision(msg);
                             }
-                             ObserverMessage::Payload((block, payload)) => {
+                             ConsensusObserverMessage::Payload((block, payload)) => {
                                  info!("[Observer] received payload {} from {}", block, peer);
                                  match self.payload_store.lock().entry(block.id()) {
                                      Entry::Occupied(mut entry) => {

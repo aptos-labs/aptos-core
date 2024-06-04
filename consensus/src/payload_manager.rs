@@ -3,7 +3,7 @@
 
 use crate::{
     consensus_observer::{
-        network::ObserverMessage, observer::ObserverDataStatus, publisher::Publisher,
+        network::ConsensusObserverMessage, observer::ObserverDataStatus, publisher::Publisher,
     },
     counters,
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
@@ -206,7 +206,7 @@ impl PayloadManager {
                     .map_err(|_| ExecutorError::CouldNotGetData)?,
             };
             if let Some(publisher) = maybe_publisher {
-                publisher.publish(ObserverMessage::Payload((
+                publisher.publish(ConsensusObserverMessage::Payload((
                     block.gen_block_info(HashValue::zero(), 0, None),
                     data.clone(),
                 )));
@@ -340,7 +340,7 @@ impl PayloadManager {
             ),
         };
         if let PayloadManager::InQuorumStore(_, _, Some(publisher)) = self {
-            publisher.publish(ObserverMessage::Payload((
+            publisher.publish(ConsensusObserverMessage::Payload((
                 block.gen_block_info(HashValue::zero(), 0, None),
                 result.clone(),
             )));
