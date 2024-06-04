@@ -1,6 +1,11 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Configuration for the MoveSmith fuzzer.
+
+/// The configuration for the MoveSmith fuzzer.
+/// MoveSmith will randomly pick within [0..max_num_XXX] during generation.
+#[derive(Debug)]
 pub struct Config {
     pub max_num_modules: usize,
     pub max_num_functions_in_module: usize,

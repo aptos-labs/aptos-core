@@ -1,6 +1,22 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! This is the core generation logic for MoveSmith.
+//! Each MoveSmith instance can generates a single Move program consisting of
+//! multiple modules and a script.
+//! Each generated unit should be runnable as a transactional test.
+//! The generation is deterministic. Using the same input Unstructured byte
+//! sequence would lead to the same output.
+//!
+//! The generation for modules is divided into two phases:
+//! 1. Generate the skeleton of several elements so that they can be referenced later.
+//!     - Generate module names
+//!     - Generate struct names and abilities
+//!     - Generate function names and signatures
+//! 2. Fill in the details of the generated elements.
+//!     - Fill in struct fields
+//!     - Fill in function bodies
+
 use crate::{
     ast::*,
     config::Config,
@@ -10,6 +26,7 @@ use crate::{
 use arbitrary::{Arbitrary, Result, Unstructured};
 use num_bigint::BigUint;
 
+/// Keeps track of the generation state.
 pub struct MoveSmith {
     pub config: Config,
 
@@ -23,12 +40,14 @@ pub struct MoveSmith {
 }
 
 impl Default for MoveSmith {
+    /// Create a new MoveSmith instance with default configuration.
     fn default() -> Self {
         Self::new(Config::default())
     }
 }
 
 impl MoveSmith {
+    /// Create a new MoveSmith instance with the given configuration.
     pub fn new(config: Config) -> Self {
         Self {
             modules: Vec::new(),
@@ -39,6 +58,7 @@ impl MoveSmith {
         }
     }
 
+    /// Get the generated compile unit.
     pub fn get_compile_unit(&self) -> CompileUnit {
         CompileUnit {
             modules: self.modules.clone(),
@@ -49,6 +69,10 @@ impl MoveSmith {
         }
     }
 
+    /// Generate a Move program consisting of multiple modules and a script.
+    /// Consumes the given Unstructured instance to guide the generation.
+    ///
+    /// Script is generated after all modules are generated so that the script can call functions.
     pub fn generate(&mut self, u: &mut Unstructured) -> Result<()> {
         let num_modules = u.int_in_range(1..=self.config.max_num_modules)?;
 
@@ -70,7 +94,8 @@ impl MoveSmith {
         Ok(())
     }
 
-    pub fn generate_script(&mut self, u: &mut Unstructured) -> Result<()> {
+    /// Generate a script that calls functions from the generated modules.
+    fn generate_script(&mut self, u: &mut Unstructured) -> Result<()> {
         let mut script = Script { main: Vec::new() };
 
         let all_funcs = self
@@ -90,7 +115,8 @@ impl MoveSmith {
         Ok(())
     }
 
-    pub fn generate_module_skeleton(&mut self, u: &mut Unstructured) -> Result<Module> {
+    /// Generate a module skeleton with only struct and function skeletions.
+    fn generate_module_skeleton(&mut self, u: &mut Unstructured) -> Result<Module> {
         let (name, scope) = self
             .id_pool
             .next_identifier(IdentifierType::Module, &Scope(Some("0xCAFE".to_string())));
@@ -114,7 +140,8 @@ impl MoveSmith {
         })
     }
 
-    pub fn fill_module(&mut self, u: &mut Unstructured, mut module: Module) -> Result<Module> {
+    /// Fill in the skeletons
+    fn fill_module(&mut self, u: &mut Unstructured, mut module: Module) -> Result<Module> {
         let scope = self.id_pool.get_scope_for_children(&module.name);
         // Struct fields
         for s in module.structs.iter_mut() {
@@ -129,6 +156,7 @@ impl MoveSmith {
         Ok(module)
     }
 
+    // Generate a struct skeleton with name and random abilities.
     fn generate_struct_skeleton(
         &mut self,
         u: &mut Unstructured,
@@ -153,6 +181,7 @@ impl MoveSmith {
         })
     }
 
+    /// Fill in the struct fields with random types.
     fn fill_struct(
         &mut self,
         u: &mut Unstructured,
@@ -166,6 +195,7 @@ impl MoveSmith {
 
             let typ = loop {
                 match u.int_in_range(0..=2)? {
+                    // More chance to use basic types than struct types
                     0 | 1 => break self.type_pool.random_basic_type(u)?,
                     2 => {
                         let candidates = self.get_usable_struct_type(
@@ -180,6 +210,7 @@ impl MoveSmith {
                     _ => panic!("Invalid type"),
                 }
             };
+            // Keeps track of the type of the field
             self.type_pool.insert_mapping(&name, &typ);
             st.fields.push((name, typ));
         }
@@ -190,7 +221,7 @@ impl MoveSmith {
     /// * with in the same module (TODO: allow cross module reference)
     /// * have the desired abilities
     /// * if key is in desired abilities, the struct must have store ability
-    /// * does not create loop in the struct hierarchy
+    /// * does not create loop in the struct hierarchy (TODO: fix the check)
     fn get_usable_struct_type(
         &self,
         desired: Vec<Ability>,
@@ -217,6 +248,7 @@ impl MoveSmith {
             .collect()
     }
 
+    /// Check if the struct is reachable from another struct.
     fn check_struct_reachable(&self, source: &Identifier, sink: &Identifier) -> bool {
         if source == sink {
             return true;
@@ -237,12 +269,14 @@ impl MoveSmith {
         false
     }
 
+    /// Get the struct definition with the given identifier.
     fn get_struct_definition_with_identifier(&self, id: &Identifier) -> Option<StructDefinition> {
         self.modules
             .iter()
             .find_map(|m| m.structs.iter().find(|s| &s.name == id).cloned())
     }
 
+    /// Generate a function skeleton with name and signature.
     fn generate_function_skeleton(
         &mut self,
         u: &mut Unstructured,
@@ -262,6 +296,7 @@ impl MoveSmith {
         })
     }
 
+    /// Fill in the function body and return statement.
     fn fill_function(&mut self, u: &mut Unstructured, function: &mut Function) -> Result<()> {
         let scope = self.id_pool.get_scope_for_children(&function.name);
         function.body = Some(self.generate_function_body(u, &scope)?);
@@ -269,6 +304,7 @@ impl MoveSmith {
         Ok(())
     }
 
+    /// Generate a function signature with random number of parameters and return type.
     fn generate_function_signature(
         &mut self,
         u: &mut Unstructured,
@@ -297,6 +333,7 @@ impl MoveSmith {
         })
     }
 
+    /// Generate a return statement with a random expression.
     fn generate_return_stmt(
         &mut self,
         u: &mut Unstructured,
@@ -326,6 +363,7 @@ impl MoveSmith {
         }
     }
 
+    /// Generate a function body with random number of statements.
     fn generate_function_body(
         &mut self,
         u: &mut Unstructured,
@@ -341,6 +379,7 @@ impl MoveSmith {
         Ok(FunctionBody { stmts })
     }
 
+    /// Generate a random statement.
     fn generate_statement(
         &mut self,
         u: &mut Unstructured,
@@ -353,6 +392,7 @@ impl MoveSmith {
         }
     }
 
+    /// Generate a random declaration.
     fn generate_decalration(
         &mut self,
         u: &mut Unstructured,
@@ -369,19 +409,24 @@ impl MoveSmith {
         // };
         // TODO: disabled declaration without value for now, need to keep track of initialization
         let value = Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?);
+        // Keeps track of the type of the newly created variable
         self.type_pool.insert_mapping(&name, &typ);
         Ok(Declaration { typ, name, value })
     }
 
+    /// Generate a random expression.
     fn generate_expression(
         &mut self,
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Expression> {
+        // If no function is callable, then skip generating function calls.
         let callable = self.get_callable_functions(parent_scope);
         let max = if callable.is_empty() { 1 } else { 2 };
+
         let expr = loop {
             match u.int_in_range(0..=max)? {
+                // Generate a number literal
                 0 => {
                     break Expression::NumberLiteral(self.generate_number_literal(
                         u,
@@ -389,6 +434,7 @@ impl MoveSmith {
                         None,
                     )?)
                 },
+                // Generate a variable access
                 1 => {
                     let idents = self.get_filtered_identifiers(
                         None,
@@ -400,6 +446,7 @@ impl MoveSmith {
                         break Expression::Variable(ident);
                     }
                 },
+                // Generate a function call
                 2 => {
                     let call = self.generate_function_call(u, parent_scope)?;
                     match call {
@@ -413,6 +460,9 @@ impl MoveSmith {
         Ok(expr)
     }
 
+    /// Generate an expression of the given type.
+    /// `allow_var`: allow using variable access, this is disabled for script
+    /// `allow_call`: allow using function calls
     fn generate_expression_of_type(
         &mut self,
         u: &mut Unstructured,
@@ -450,13 +500,16 @@ impl MoveSmith {
             }
         }
 
-        // TODO: call functions with the given type
+        // Call functions with the given return type
         if allow_call {
             let callables: Vec<Function> = self
                 .get_callable_functions(parent_scope)
                 .into_iter()
                 .filter(|f| f.signature.return_type == Some(typ.clone()))
                 .collect();
+            // Currently, we generate calls to all candidate functions
+            // This could consume a lot raw bytes and may interfere with mutation
+            // TODO: consider just select a subset of functions to call
             if !callables.is_empty() {
                 let func = u.choose(&callables)?;
                 let call = self.generate_call_to_function(u, parent_scope, func, true)?;
@@ -467,6 +520,8 @@ impl MoveSmith {
         Ok(u.choose(&choices)?.clone())
     }
 
+    /// Generate a struct initialization expression.
+    /// This is `pack` in the parser AST.
     fn generate_struct_initialization(
         &mut self,
         u: &mut Unstructured,
@@ -488,6 +543,7 @@ impl MoveSmith {
         }))
     }
 
+    /// Generate a random function call.
     fn generate_function_call(
         &mut self,
         u: &mut Unstructured,
@@ -507,6 +563,7 @@ impl MoveSmith {
         )?))
     }
 
+    /// Generate a call to the given function.
     fn generate_call_to_function(
         &mut self,
         u: &mut Unstructured,
@@ -577,6 +634,7 @@ impl MoveSmith {
         })
     }
 
+    /// Get all callable functions in the given scope.
     // TODO: Handle visibility check
     fn get_callable_functions(&self, scope: &Scope) -> Vec<Function> {
         let mut funcs = Vec::new();
@@ -591,6 +649,7 @@ impl MoveSmith {
         funcs
     }
 
+    /// Filter identifiers based on the given type, identifier type, and scope.
     fn get_filtered_identifiers(
         &self,
         typ: Option<&Type>,

@@ -1,8 +1,11 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Simple CLI tool that statically generates Move source files or packages
+//! with random content controlled by a seed.
+
 use clap::Parser;
-use move_smith::{utils::raw_to_module, CodeGenerator};
+use move_smith::{utils::raw_to_compile_unit, CodeGenerator};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{fs, path::PathBuf};
 
@@ -42,7 +45,7 @@ fn main() {
     for i in 0..args.num_files {
         let mut buffer = vec![0u8; BUFFER_SIZE_PER_FILE];
         rng.fill(&mut buffer[..]);
-        let module = match raw_to_module(&buffer) {
+        let module = match raw_to_compile_unit(&buffer) {
             Ok(module) => module,
             Err(_) => panic!("Failed to parse raw bytes"),
         };

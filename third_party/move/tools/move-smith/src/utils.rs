@@ -1,6 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Utility functions for MoveSmith.
+// TODO: consider move compiler/vm glue code to a separate file
+
 use crate::{ast::CompileUnit, move_smith::MoveSmith};
 use arbitrary::{Result, Unstructured};
 use move_compiler::{
@@ -13,14 +16,18 @@ use move_transactional_test_runner::{vm_test_harness, vm_test_harness::TestRunCo
 use std::{error::Error, fs::File, io::Write, path::PathBuf};
 use tempfile::{tempdir, TempDir};
 
-pub fn raw_to_module(data: &[u8]) -> Result<CompileUnit> {
+/// Turn raw bytes into a Move module.
+/// This is useful to check the libfuzzer's corpus.
+pub fn raw_to_compile_unit(data: &[u8]) -> Result<CompileUnit> {
     let mut u = Unstructured::new(data);
     let mut smith = MoveSmith::default();
     smith.generate(&mut u)?;
     Ok(smith.get_compile_unit())
 }
 
-pub fn create_tmp_move_file(code: String, name_hint: Option<&str>) -> (PathBuf, TempDir) {
+/// Create a temporary Move file with the given code.
+// TODO: if on Linux, we can create in-memory file to reduce I/O
+fn create_tmp_move_file(code: String, name_hint: Option<&str>) -> (PathBuf, TempDir) {
     let dir = tempdir().unwrap();
     let name = name_hint.unwrap_or("temp.move");
     let file_path = dir.path().join(name);
@@ -46,6 +53,7 @@ pub fn compile_modules(code: String) {
     dir.close().unwrap();
 }
 
+/// Runs the given Move code as a transactional test.
 pub fn run_transactional_test(code: String) -> Result<(), Box<dyn Error>> {
     let (file_path, dir) = create_tmp_move_file(code, None);
     let vm_test_config = TestRunConfig::ComparisonV1V2 {
@@ -69,7 +77,9 @@ pub fn run_transactional_test(code: String) -> Result<(), Box<dyn Error>> {
     }
 }
 
-pub fn process_transactional_test_err(err: Box<dyn Error>) -> Result<(), Box<dyn Error>> {
+/// Filtering the error messages from the transactional test.
+/// Currently only treat `error[Exxxx]` as a real error to ignore warnings.
+fn process_transactional_test_err(err: Box<dyn Error>) -> Result<(), Box<dyn Error>> {
     let msg = format!("{:}", err);
     if msg.contains("error[E") {
         Err(err)

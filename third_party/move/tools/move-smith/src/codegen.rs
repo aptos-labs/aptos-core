@@ -4,6 +4,8 @@
 use crate::{ast::*, names::Identifier, types::Type};
 use std::vec;
 
+/// Generates Move source code from an AST.
+/// `emit_code_lines` should be implemented for each AST node.
 pub trait CodeGenerator {
     fn emit_code(&self) -> String {
         self.emit_code_lines().join("\n")
@@ -11,8 +13,10 @@ pub trait CodeGenerator {
     fn emit_code_lines(&self) -> Vec<String>;
 }
 
+/// The number of spaces to use for indentation.
 const INDENTATION_SIZE: usize = 4;
 
+/// Helper function add indentation to each line of code.
 fn append_code_lines_with_indentation(
     program: &mut Vec<String>,
     lines: Vec<String>,
@@ -29,6 +33,7 @@ impl CodeGenerator for Identifier {
     }
 }
 
+/// To follow the transactional test format, we output module code first, then script code.
 impl CodeGenerator for CompileUnit {
     fn emit_code_lines(&self) -> Vec<String> {
         let mut code = Vec::new();
@@ -46,6 +51,7 @@ impl CodeGenerator for CompileUnit {
 
 impl CodeGenerator for Script {
     fn emit_code_lines(&self) -> Vec<String> {
+        // The `//# run` is for the transactional test
         let mut code = vec!["//# run".to_string(), "script {".to_string()];
         let main = Function {
             signature: FunctionSignature {
@@ -53,6 +59,7 @@ impl CodeGenerator for Script {
                 return_type: None,
             },
             visibility: Visibility { public: false },
+            // Hardcode one function to simplify the output
             name: Identifier("main".to_string()),
             body: Some(FunctionBody {
                 stmts: self
@@ -70,8 +77,11 @@ impl CodeGenerator for Script {
     }
 }
 
+/// Output struct definitions and then function definitions in a module.
 impl CodeGenerator for Module {
     fn emit_code_lines(&self) -> Vec<String> {
+        // The `//# publish` is for the transactional test
+        // TODO: remove the hardcoded address
         let mut code = vec![
             "//# publish".to_string(),
             format!("module 0xCAFE::{} {{", self.name.emit_code()),
