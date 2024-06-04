@@ -764,7 +764,7 @@ impl AptosVM {
             )?;
         }
 
-        let loaded_func = session.load_script(script.code(), script.ty_args().to_vec())?;
+        let func = session.load_script(script.code(), script.ty_args())?;
 
         // TODO(Gerardo): consolidate the extended validation to verifier.
         verifier::event_validation::verify_no_event_emission_in_script(
@@ -776,7 +776,7 @@ impl AptosVM {
             session,
             senders,
             convert_txn_args(script.args()),
-            &loaded_func,
+            &func,
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
 
@@ -813,14 +813,12 @@ impl AptosVM {
             )])?;
         }
 
-        let (function, is_friend_or_private) = session.load_function_and_is_friend_or_private_def(
-            entry_fn.module(),
-            entry_fn.function(),
-            entry_fn.ty_args(),
-        )?;
+        let function =
+            session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
 
         // The `has_randomness_attribute()` should have been feature-gated in 1.11...
-        if is_friend_or_private && get_randomness_annotation(resolver, session, entry_fn)?.is_some()
+        if function.is_friend_or_private()
+            && get_randomness_annotation(resolver, session, entry_fn)?.is_some()
         {
             let txn_context = session
                 .get_native_extensions()
@@ -837,14 +835,7 @@ impl AptosVM {
             &function,
             struct_constructors_enabled,
         )?;
-        session.execute_entry_function(
-            entry_fn.module(),
-            entry_fn.function(),
-            entry_fn.ty_args().to_vec(),
-            args,
-            gas_meter,
-            traversal_context,
-        )?;
+        session.execute_entry_function(function, args, gas_meter, traversal_context)?;
         Ok(())
     }
 
@@ -1634,12 +1625,14 @@ impl AptosVM {
                 return Err(invalid_signature!("Groth16 VK has not been set on-chain"));
             }
 
-            keyless_validation::validate_authenticators(
-                self.pvk.as_ref().unwrap(),
-                &keyless_authenticators,
-                self.features(),
-                resolver,
-            )?;
+            if !self.is_simulation {
+                keyless_validation::validate_authenticators(
+                    self.pvk.as_ref().unwrap(),
+                    &keyless_authenticators,
+                    self.features(),
+                    resolver,
+                )?;
+            }
         }
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
@@ -2258,13 +2251,13 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         gas_meter: &mut impl AptosGasMeter,
     ) -> anyhow::Result<Vec<Vec<u8>>> {
-        let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
+        let func = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.extract_module_metadata(&module_id);
         let arguments = verifier::view_function::validate_view_function(
             session,
             arguments,
             func_name.as_ident_str(),
-            &func_inst,
+            &func,
             metadata.as_ref().map(Arc::as_ref),
             vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;

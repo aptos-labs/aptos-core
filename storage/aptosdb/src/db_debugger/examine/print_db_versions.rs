@@ -49,7 +49,7 @@ impl Cmd {
 
         println!(
             "Overall Progress: {:?}",
-            ledger_db.metadata_db().get_latest_version()?
+            ledger_db.metadata_db().get_synced_version()?
         );
 
         println!(

@@ -195,7 +195,6 @@ module aptos_framework::keyless_account {
     /// WARNING: If a malicious key is set, this would lead to stolen funds.
     public fun set_groth16_verification_key_for_next_epoch(fx: &signer, vk: Groth16VerificationKey) {
         system_addresses::assert_aptos_framework(fx);
-        validate_groth16_vk(&vk);
         config_buffer::upsert<Groth16VerificationKey>(vk);
     }
 
