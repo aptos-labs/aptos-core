@@ -711,6 +711,7 @@ mod tests {
     use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
     use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
+    use aptos_types::on_chain_config::Features;
     use aptos_vm::AptosVM;
 
     fn test_generic_benchmark<E>(
@@ -736,6 +737,7 @@ mod tests {
             verify_sequence_numbers,
             false,
             PipelineConfig::default(),
+            Features::default(),
         );
 
         println!("run_benchmark");
@@ -757,6 +759,7 @@ mod tests {
             NO_OP_STORAGE_PRUNER_CONFIG,
             false,
             PipelineConfig::default(),
+            Features::default(),
         );
     }
 
