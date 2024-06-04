@@ -1,15 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::utils::{mock_tag_0, VMChangeSetBuilder};
 use crate::{
     abstract_write_op::{AbstractResourceWriteOp, GroupWrite},
     change_set::VMChangeSet,
     resolver::ResourceGroupSize,
     tests::utils::{
         as_bytes, as_state_key, mock_add, mock_create, mock_create_with_layout, mock_delete,
-        mock_delete_with_layout, mock_modify, mock_modify_with_layout, mock_tag_1, raw_metadata,
-        ExpandedVMChangeSetBuilder, MockChangeSetChecker,
+        mock_delete_with_layout, mock_modify, mock_modify_with_layout, mock_module_create,
+        mock_module_modify, mock_tag_0, mock_tag_1, raw_metadata, ExpandedVMChangeSetBuilder,
+        MockChangeSetChecker, VMChangeSetBuilder,
     },
 };
 use aptos_aggregator::{
@@ -19,13 +19,18 @@ use aptos_aggregator::{
 };
 use aptos_types::{
     delayed_fields::{PanicError, SnapshotToStringFormula},
+    on_chain_config::Features,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::ChangeSet as StorageChangeSet,
+    vm::configs::aptos_prod_deserializer_config,
     write_set::{WriteOp, WriteSetMut},
 };
 use bytes::Bytes;
 use claims::{assert_err, assert_matches, assert_ok, assert_some_eq};
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::{
+    errors::PartialVMResult,
+    file_format::{basic_test_module, empty_module},
+};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -89,14 +94,10 @@ macro_rules! resource_write_set_1 {
 macro_rules! module_write_set_1 {
     ($d:ident) => {
         vec![
-            mock_create(format!("0{}", $d), 0),
-            mock_modify(format!("1{}", $d), 1),
-            mock_delete(format!("2{}", $d)),
-            mock_create(format!("7{}", $d), 7),
-            mock_create(format!("8{}", $d), 8),
-            mock_modify(format!("10{}", $d), 10),
-            mock_modify(format!("11{}", $d), 11),
-            mock_delete(format!("12{}", $d)),
+            mock_module_create(format!("0{}", $d), basic_test_module()),
+            mock_module_modify(format!("1{}", $d), basic_test_module()),
+            mock_module_create(format!("7{}", $d), empty_module()),
+            mock_module_modify(format!("10{}", $d), empty_module()),
         ]
     };
 }
@@ -119,17 +120,14 @@ macro_rules! resource_write_set_2 {
 macro_rules! module_write_set_2 {
     ($d:ident) => {
         vec![
-            mock_create(format!("3{}", $d), 103),
-            mock_modify(format!("4{}", $d), 104),
-            mock_delete(format!("5{}", $d)),
-            mock_modify(format!("7{}", $d), 107),
-            mock_delete(format!("8{}", $d)),
-            mock_modify(format!("10{}", $d), 110),
-            mock_delete(format!("11{}", $d)),
-            mock_create(format!("12{}", $d), 112),
+            mock_module_create(format!("3{}", $d), basic_test_module()),
+            mock_module_modify(format!("4{}", $d), basic_test_module()),
+            mock_module_modify(format!("7{}", $d), basic_test_module()),
+            mock_module_modify(format!("10{}", $d), basic_test_module()),
         ]
     };
 }
+
 macro_rules! expected_resource_write_set {
     ($d:ident) => {
         BTreeMap::from([
@@ -150,16 +148,12 @@ macro_rules! expected_resource_write_set {
 macro_rules! expected_module_write_set {
     ($d:ident) => {
         BTreeMap::from([
-            mock_create(format!("0{}", $d), 0),
-            mock_modify(format!("1{}", $d), 1),
-            mock_delete(format!("2{}", $d)),
-            mock_create(format!("3{}", $d), 103),
-            mock_modify(format!("4{}", $d), 104),
-            mock_delete(format!("5{}", $d)),
-            mock_create(format!("7{}", $d), 107),
-            mock_modify(format!("10{}", $d), 110),
-            mock_delete(format!("11{}", $d)),
-            mock_modify(format!("12{}", $d), 112),
+            mock_module_create(format!("0{}", $d), basic_test_module()),
+            mock_module_modify(format!("1{}", $d), basic_test_module()),
+            mock_module_create(format!("3{}", $d), basic_test_module()),
+            mock_module_modify(format!("4{}", $d), basic_test_module()),
+            mock_module_create(format!("7{}", $d), basic_test_module()),
+            mock_module_modify(format!("10{}", $d), basic_test_module()),
         ])
     };
 }
@@ -267,14 +261,6 @@ macro_rules! assert_invariant_violation {
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
         let mut cs1 = VMChangeSetBuilder::new()
-            .with_module_write_set($w3.clone())
-            .build();
-        let cs2 = VMChangeSetBuilder::new()
-            .with_module_write_set($w4.clone())
-            .build();
-        let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
-        check(res);
-        let mut cs1 = VMChangeSetBuilder::new()
             .with_aggregator_v1_write_set($w3.clone())
             .build();
         let cs2 = VMChangeSetBuilder::new()
@@ -293,6 +279,21 @@ fn test_unsuccessful_squash_create_create() {
     let write_set_3 = vec![mock_create("6", 6)];
     let write_set_4 = vec![mock_create("6", 106)];
     assert_invariant_violation!(write_set_1, write_set_2, write_set_3, write_set_4);
+
+    // Test modules squashing: create + create.
+    let write_set_5 = vec![mock_module_create("6", empty_module())];
+    let write_set_6 = vec![mock_module_create("6", basic_test_module())];
+    let mut cs1 = VMChangeSetBuilder::new()
+        .with_module_write_set(write_set_5)
+        .build();
+    let cs2 = VMChangeSetBuilder::new()
+        .with_module_write_set(write_set_6)
+        .build();
+    let err = assert_err!(cs1.squash_additional_change_set(cs2, &MockChangeSetChecker));
+    assert_eq!(
+        err.major_status(),
+        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+    );
 }
 
 #[test]
@@ -303,6 +304,21 @@ fn test_unsuccessful_squash_modify_create() {
     let write_set_3 = vec![mock_modify("9", 9)];
     let write_set_4 = vec![mock_create("9", 109)];
     assert_invariant_violation!(write_set_1, write_set_2, write_set_3, write_set_4);
+
+    // Test modules squashing: modify + create.
+    let write_set_5 = vec![mock_module_modify("6", empty_module())];
+    let write_set_6 = vec![mock_module_create("6", basic_test_module())];
+    let mut cs1 = VMChangeSetBuilder::new()
+        .with_module_write_set(write_set_5)
+        .build();
+    let cs2 = VMChangeSetBuilder::new()
+        .with_module_write_set(write_set_6)
+        .build();
+    let err = assert_err!(cs1.squash_additional_change_set(cs2, &MockChangeSetChecker));
+    assert_eq!(
+        err.major_status(),
+        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+    );
 }
 
 #[test]
@@ -377,9 +393,14 @@ fn test_roundtrip_to_storage_change_set() {
 
     let resource_key = StateKey::resource(&AccountAddress::ONE, &test_struct_tag).unwrap();
     let module_key = StateKey::module_id(&test_module_id);
+
+    let mut module_bytes = vec![];
+    basic_test_module().serialize(&mut module_bytes).unwrap();
+    let write_op = WriteOp::legacy_creation(module_bytes.into());
+
     let write_set = WriteSetMut::new(vec![
         (resource_key, WriteOp::legacy_deletion()),
-        (module_key, WriteOp::legacy_deletion()),
+        (module_key, write_op),
     ])
     .freeze()
     .unwrap();
@@ -387,12 +408,31 @@ fn test_roundtrip_to_storage_change_set() {
     let storage_change_set_before = StorageChangeSet::new(write_set, vec![]);
     let change_set = assert_ok!(
         VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
+            &aptos_prod_deserializer_config(&Features::default()),
             storage_change_set_before.clone(),
             &MockChangeSetChecker,
         )
     );
     let storage_change_set_after = assert_ok!(change_set.try_into_storage_change_set());
     assert_eq!(storage_change_set_before, storage_change_set_after)
+}
+
+#[test]
+fn test_no_module_deletion_in_storage_change_set() {
+    let test_module_id = ModuleId::new(AccountAddress::ONE, ident_str!("bar").into());
+    let write_ops = vec![(
+        StateKey::module_id(&test_module_id),
+        WriteOp::legacy_deletion(),
+    )];
+    let write_set = WriteSetMut::new(write_ops).freeze().unwrap();
+    let change_set = StorageChangeSet::new(write_set, vec![]);
+    assert_err!(
+        VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
+            &aptos_prod_deserializer_config(&Features::default()),
+            change_set,
+            &MockChangeSetChecker,
+        )
+    );
 }
 
 #[test]

@@ -4,9 +4,7 @@
 
 use bytes::Bytes;
 use move_binary_format::{
-    deserializer::DeserializerConfig,
     errors::{PartialVMError, PartialVMResult},
-    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
     CompiledModule,
 };
 use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
@@ -16,15 +14,17 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{resource_size, ModuleResolver, MoveResolver, ResourceResolver},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
+use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
+use sha3::{Digest, Sha3_256};
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
+    sync::Arc,
 };
 
 /// A dummy storage containing no modules or resources.
@@ -38,27 +38,26 @@ impl BlankStorage {
 }
 
 impl ModuleResolver for BlankStorage {
-    type Error = PartialVMError;
-
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(
+        &self,
+        _module_id: &ModuleId,
+    ) -> PartialVMResult<Option<(Arc<CompiledModule>, usize, [u8; 32])>> {
         Ok(None)
     }
 }
 
 impl ResourceResolver for BlankStorage {
-    type Error = PartialVMError;
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         Ok((None, 0))
     }
 }
@@ -70,79 +69,8 @@ impl TableResolver for BlankStorage {
         _handle: &TableHandle,
         _key: &[u8],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, PartialVMError> {
+    ) -> PartialVMResult<Option<Bytes>> {
         Ok(None)
-    }
-}
-
-/// A storage adapter created by stacking a change set on top of an existing storage backend.
-/// This can be used for additional computations without modifying the base.
-#[derive(Debug, Clone)]
-pub struct DeltaStorage<'a, 'b, S> {
-    base: &'a S,
-    change_set: &'b ChangeSet,
-}
-
-impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
-    type Error = S::Error;
-
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
-    }
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
-        if let Some(account_storage) = self.change_set.accounts().get(module_id.address()) {
-            if let Some(blob_opt) = account_storage.modules().get(module_id.name()) {
-                return Ok(blob_opt.clone().ok());
-            }
-        }
-
-        self.base.get_module(module_id)
-    }
-}
-
-impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
-    type Error = S::Error;
-
-    fn get_resource_bytes_with_metadata_and_layout(
-        &self,
-        address: &AccountAddress,
-        tag: &StructTag,
-        metadata: &[Metadata],
-        layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
-        if let Some(account_storage) = self.change_set.accounts().get(address) {
-            if let Some(blob_opt) = account_storage.resources().get(tag) {
-                let buf = blob_opt.clone().ok();
-                let buf_size = resource_size(&buf);
-                return Ok((buf, buf_size));
-            }
-        }
-        self.base
-            .get_resource_bytes_with_metadata_and_layout(address, tag, metadata, layout)
-    }
-}
-
-#[cfg(feature = "table-extension")]
-impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
-    fn resolve_table_entry_bytes_with_layout(
-        &self,
-        handle: &TableHandle,
-        key: &[u8],
-        maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, PartialVMError> {
-        // TODO: In addition to `change_set`, cache table outputs.
-        self.base
-            .resolve_table_entry_bytes_with_layout(handle, key, maybe_layout)
-    }
-}
-
-impl<'a, 'b, S: MoveResolver<PartialVMError>> DeltaStorage<'a, 'b, S> {
-    pub fn new(base: &'a S, delta: &'b ChangeSet) -> Self {
-        Self {
-            base,
-            change_set: delta,
-        }
     }
 }
 
@@ -162,16 +90,10 @@ pub struct InMemoryStorage {
 }
 
 impl CompiledModuleView for InMemoryStorage {
-    type Item = CompiledModule;
+    type Item = Arc<CompiledModule>;
 
     fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
-        Ok(match self.get_module(id)? {
-            Some(bytes) => {
-                let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
-                Some(CompiledModule::deserialize_with_config(&bytes, &config)?)
-            },
-            None => None,
-        })
+        Ok(self.get_module(id)?.map(|(m, _, _)| m))
     }
 }
 
@@ -231,8 +153,8 @@ where
 }
 
 impl InMemoryAccountStorage {
-    fn apply(&mut self, account_changeset: AccountChangeSet) -> PartialVMResult<()> {
-        let (modules, resources) = account_changeset.into_inner();
+    fn apply(&mut self, account_change_set: AccountChangeSet<Bytes, Bytes>) -> PartialVMResult<()> {
+        let (modules, resources) = account_change_set.into_inner();
         apply_changes(&mut self.modules, modules)?;
         apply_changes(&mut self.resources, resources)?;
         Ok(())
@@ -249,17 +171,19 @@ impl InMemoryAccountStorage {
 impl InMemoryStorage {
     pub fn apply_extended(
         &mut self,
-        changeset: ChangeSet,
+        change_set: ChangeSet<Bytes, Bytes>,
         #[cfg(feature = "table-extension")] table_changes: TableChangeSet,
     ) -> PartialVMResult<()> {
-        for (addr, account_changeset) in changeset.into_inner() {
+        for (addr, account_change_set) in change_set.into_inner() {
+            use btree_map::Entry::*;
+
             match self.accounts.entry(addr) {
-                btree_map::Entry::Occupied(entry) => {
-                    entry.into_mut().apply(account_changeset)?;
+                Occupied(entry) => {
+                    entry.into_mut().apply(account_change_set)?;
                 },
-                btree_map::Entry::Vacant(entry) => {
+                Vacant(entry) => {
                     let mut account_storage = InMemoryAccountStorage::new();
-                    account_storage.apply(account_changeset)?;
+                    account_storage.apply(account_change_set)?;
                     entry.insert(account_storage);
                 },
             }
@@ -271,9 +195,9 @@ impl InMemoryStorage {
         Ok(())
     }
 
-    pub fn apply(&mut self, changeset: ChangeSet) -> PartialVMResult<()> {
+    pub fn apply(&mut self, change_set: ChangeSet<Bytes, Bytes>) -> PartialVMResult<()> {
         self.apply_extended(
-            changeset,
+            change_set,
             #[cfg(feature = "table-extension")]
             TableChangeSet::default(),
         )
@@ -312,6 +236,7 @@ impl InMemoryStorage {
         let account = get_or_insert(&mut self.accounts, *module_id.address(), || {
             InMemoryAccountStorage::new()
         });
+
         account
             .modules
             .insert(module_id.name().to_owned(), blob.into());
@@ -329,30 +254,37 @@ impl InMemoryStorage {
 }
 
 impl ModuleResolver for InMemoryStorage {
-    type Error = PartialVMError;
-
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(
+        &self,
+        module_id: &ModuleId,
+    ) -> PartialVMResult<Option<(Arc<CompiledModule>, usize, [u8; 32])>> {
         if let Some(account_storage) = self.accounts.get(module_id.address()) {
-            return Ok(account_storage.modules.get(module_id.name()).cloned());
+            if let Some(bytes) = account_storage.modules.get(module_id.name()) {
+                let module = Arc::new(CompiledModule::deserialize(bytes)?);
+
+                let mut sha3_256 = Sha3_256::new();
+                sha3_256.update(bytes);
+                let hash: [u8; 32] = sha3_256.finalize().into();
+
+                return Ok(Some((module, bytes.len(), hash)));
+            }
         }
         Ok(None)
     }
 }
 
 impl ResourceResolver for InMemoryStorage {
-    type Error = PartialVMError;
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         if let Some(account_storage) = self.accounts.get(address) {
             let buf = account_storage.resources.get(tag).cloned();
             let buf_size = resource_size(&buf);

@@ -9,7 +9,6 @@ use aptos_aggregator::{
 use aptos_mvhashmap::{types::TxnIndex, versioned_delayed_fields::TVersionedDelayedFieldView};
 use aptos_types::{
     delayed_fields::PanicError,
-    executable::Executable,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     vm::deserialization::WithDeserializerConfig,
@@ -30,20 +29,19 @@ pub(crate) struct TemporaryValueToIdentifierMapping<
     'a,
     T: Transaction,
     S: TStateView<Key = T::Key>,
-    X: Executable,
     E: WithDeserializerConfig,
 > {
-    latest_view: &'a LatestView<'a, T, S, X, E>,
+    latest_view: &'a LatestView<'a, T, S, E>,
     txn_idx: TxnIndex,
     // These are the delayed field keys that were touched when utilizing this mapping
     // to replace ids with values or values with ids
     delayed_field_ids: RefCell<HashSet<T::Identifier>>,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
-    TemporaryValueToIdentifierMapping<'a, T, S, X, E>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, E: WithDeserializerConfig>
+    TemporaryValueToIdentifierMapping<'a, T, S, E>
 {
-    pub fn new(latest_view: &'a LatestView<'a, T, S, X, E>, txn_idx: TxnIndex) -> Self {
+    pub fn new(latest_view: &'a LatestView<'a, T, S, E>, txn_idx: TxnIndex) -> Self {
         Self {
             latest_view,
             txn_idx,
@@ -63,8 +61,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDese
 // For aggregators V2, values are replaced with identifiers at deserialization time,
 // and are replaced back when the value is serialized. The "lifted" values are cached
 // by the `LatestView` in the aggregators multi-version data structure.
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
-    ValueToIdentifierMapping for TemporaryValueToIdentifierMapping<'a, T, S, X, E>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, E: WithDeserializerConfig>
+    ValueToIdentifierMapping for TemporaryValueToIdentifierMapping<'a, T, S, E>
 {
     type Identifier = T::Identifier;
 

@@ -10,7 +10,7 @@ use move_async_vm::{
     async_vm::{AsyncResult, AsyncSession, AsyncVM, Message},
     natives::GasParameters as ActorGasParameters,
 };
-use move_binary_format::{access::ModuleAccess, errors::PartialVMError};
+use move_binary_format::{access::ModuleAccess, errors::PartialVMResult, CompiledModule};
 use move_command_line_common::testing::get_compiler_exp_extension;
 use move_compiler::{
     attr_derivation, compiled_unit::CompiledUnit, diagnostics::report_diagnostics_to_buffer,
@@ -23,16 +23,18 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_vm_test_utils::gas_schedule::GasStatus;
+use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
+use sha3::{Digest, Sha3_256};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
     path::{Path, PathBuf},
     str::FromStr,
+    sync::Arc,
 };
 
 const TEST_ADDR: &str = "0x3";
@@ -178,15 +180,15 @@ impl Harness {
                     ))
                 }
                 mailbox.extend(success.messages);
-                self.commit_changeset(success.change_set)
+                self.commit_change_set(success.change_set)
             },
             Err(error) => self.log(format!("  FAIL  {:}", error)),
         }
     }
 
-    fn commit_changeset(&self, changeset: ChangeSet) {
-        for (addr, change) in changeset.into_inner() {
-            for (struct_tag, op) in change.into_inner().1 {
+    fn commit_change_set(&self, change_set: ChangeSet<Bytes, Bytes>) {
+        for (addr, account_change_set) in change_set.into_inner() {
+            for (struct_tag, op) in account_change_set.into_resources() {
                 self.log(format!(
                     "  commit 0x{}::{}::{}[0x{}] := {:?}",
                     struct_tag.address.short_str_lossless(),
@@ -382,31 +384,40 @@ struct HarnessProxy<'a> {
 }
 
 impl<'a> ModuleResolver for HarnessProxy<'a> {
-    type Error = PartialVMError;
-
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
-        Ok(self
-            .harness
-            .module_cache
-            .get(id.name())
-            .map(|c| c.serialize(None).into()))
+    fn get_module(
+        &self,
+        module_id: &ModuleId,
+    ) -> PartialVMResult<Option<(Arc<CompiledModule>, usize, [u8; 32])>> {
+        match self.harness.module_cache.get(module_id.name()) {
+            Some(cu) => {
+                let bytes = cu.serialize(None);
+                let module = Arc::new(CompiledModule::deserialize(&bytes)?);
+
+                let num_bytes = bytes.len();
+
+                let mut hash = Sha3_256::new();
+                hash.update(bytes);
+                let hash: [u8; 32] = hash.finalize().into();
+
+                Ok(Some((module, num_bytes, hash)))
+            },
+            None => Ok(None),
+        }
     }
 }
 
 impl<'a> ResourceResolver for HarnessProxy<'a> {
-    type Error = PartialVMError;
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         let res = self
             .harness
             .resource_store

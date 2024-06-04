@@ -3,6 +3,7 @@
 
 use aptos_aggregator::resolver::{TAggregatorV1View, TDelayedFieldView};
 use aptos_types::{
+    on_chain_config::{Features, OnChainConfig},
     serde_helper::bcs_utils::size_u32_as_uleb128,
     state_store::{
         errors::StateviewError,
@@ -11,6 +12,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
+    vm::{configs::aptos_prod_deserializer_config, modules::OnChainUnverifiedModule},
     write_set::WriteOp,
 };
 use bytes::Bytes;
@@ -148,29 +150,22 @@ pub trait TModuleView {
     ///   -  Ok(None)         if the module is not in storage,
     ///   -  Ok(Some(...))    if the module exists in storage,
     ///   -  Err(...)         otherwise (e.g. storage error).
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>>;
-
-    fn get_module_bytes(&self, state_key: &Self::Key) -> PartialVMResult<Option<Bytes>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
-    }
+    fn get_onchain_module(
+        &self,
+        state_key: &Self::Key,
+    ) -> PartialVMResult<Option<OnChainUnverifiedModule>>;
 
     fn get_module_state_value_metadata(
         &self,
         state_key: &Self::Key,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(StateValue::into_metadata))
+        let module = self.get_onchain_module(state_key)?;
+        Ok(module.map(|m| m.state_value_metadata))
     }
 
-    fn get_module_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(|state_value| state_value.size() as u64))
-    }
-
-    fn module_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
-        self.get_module_state_value(state_key)
-            .map(|maybe_state_value| maybe_state_value.is_some())
+    fn get_module_size_in_bytes(&self, state_key: &Self::Key) -> PartialVMResult<Option<usize>> {
+        let module = self.get_onchain_module(state_key)?;
+        Ok(module.map(|m| m.num_bytes))
     }
 }
 
@@ -264,12 +259,26 @@ where
 {
     type Key = StateKey;
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        self.get_state_value(state_key).map_err(|e| {
+    fn get_onchain_module(
+        &self,
+        state_key: &Self::Key,
+    ) -> PartialVMResult<Option<OnChainUnverifiedModule>> {
+        let maybe_state_value = self.get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
                 "Unexpected storage error for module at {:?}: {:?}",
                 state_key, e
             ))
+        })?;
+
+        let features = Features::fetch_config(self).unwrap_or_default();
+        let deserializer_config = aptos_prod_deserializer_config(&features);
+
+        Ok(match maybe_state_value {
+            Some(state_value) => Some(OnChainUnverifiedModule::from_state_value(
+                state_value,
+                &deserializer_config,
+            )?),
+            None => None,
         })
     }
 }

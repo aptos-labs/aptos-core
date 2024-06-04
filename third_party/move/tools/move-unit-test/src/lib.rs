@@ -8,6 +8,7 @@ pub mod test_reporter;
 pub mod test_runner;
 
 use crate::test_runner::TestRunner;
+use bytes::Bytes;
 use clap::*;
 use move_command_line_common::files::verify_and_create_named_address_mapping;
 use move_compiler::{
@@ -215,7 +216,7 @@ impl UnitTestingConfig {
         &self,
         test_plan: TestPlan,
         native_function_table: Option<NativeFunctionTable>,
-        genesis_state: Option<ChangeSet>,
+        genesis_state: Option<ChangeSet<Bytes, Bytes>>,
         cost_table: Option<CostTable>,
         writer: W,
     ) -> Result<(W, bool)> {

@@ -191,7 +191,7 @@ impl WriteOp {
         Ok(true)
     }
 
-    fn ensure_metadata_compatible(
+    pub(crate) fn ensure_metadata_compatible(
         old: &StateValueMetadata,
         new: &StateValueMetadata,
     ) -> Result<()> {

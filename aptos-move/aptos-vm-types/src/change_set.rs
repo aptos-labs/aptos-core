@@ -18,14 +18,16 @@ use aptos_aggregator::{
 use aptos_types::{
     contract_event::ContractEvent,
     delayed_fields::PanicError,
-    state_store::{
-        state_key::{inner::StateKeyInner, StateKey},
-        state_value::StateValueMetadata,
-    },
+    executable::ModulePath,
+    state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::ChangeSet as StorageChangeSet,
+    vm::modules::ModuleWriteOp,
     write_set::{TransactionWrite, WriteOp, WriteOpSize, WriteSetMut},
 };
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -80,7 +82,7 @@ pub fn randomly_check_layout_matches(
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMChangeSet {
     resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
-    module_write_set: BTreeMap<StateKey, WriteOp>,
+    module_write_set: BTreeMap<StateKey, ModuleWriteOp>,
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 
     // Changes separated out from the writes, for better concurrency,
@@ -120,7 +122,7 @@ impl VMChangeSet {
 
     pub fn new(
         resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
-        module_write_set: BTreeMap<StateKey, WriteOp>,
+        module_write_set: BTreeMap<StateKey, ModuleWriteOp>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
@@ -145,7 +147,7 @@ impl VMChangeSet {
     pub fn new_expanded(
         resource_write_set: BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
         resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
-        module_write_set: BTreeMap<StateKey, WriteOp>,
+        module_write_set: BTreeMap<StateKey, ModuleWriteOp>,
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
@@ -238,9 +240,10 @@ impl VMChangeSet {
     ///
     /// Note: does not separate out individual resource group updates.
     pub fn try_from_storage_change_set_with_delayed_field_optimization_disabled(
+        deserializer_config: &DeserializerConfig,
         change_set: StorageChangeSet,
         checker: &dyn CheckChangeSet,
-    ) -> VMResult<Self> {
+    ) -> PartialVMResult<Self> {
         let (write_set, events) = change_set.into_inner();
 
         // There should be no aggregator writes if we have a change set from
@@ -249,7 +252,8 @@ impl VMChangeSet {
         let mut module_write_set = BTreeMap::new();
 
         for (state_key, write_op) in write_set {
-            if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
+            if state_key.is_module_path() {
+                let write_op = ModuleWriteOp::from_write_op(write_op, deserializer_config)?;
                 module_write_set.insert(state_key, write_op);
             } else {
                 // TODO[agg_v1](fix) While everything else must be a resource, first
@@ -271,9 +275,7 @@ impl VMChangeSet {
             aggregator_v1_delta_set: BTreeMap::new(),
             events,
         };
-        checker
-            .check_change_set(&change_set)
-            .map_err(|e| e.finish(Location::Undefined))?;
+        checker.check_change_set(&change_set)?;
         Ok(change_set)
     }
 
@@ -324,7 +326,11 @@ impl VMChangeSet {
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         );
-        write_set_mut.extend(module_write_set);
+        write_set_mut.extend(
+            module_write_set
+                .into_iter()
+                .map(|(k, m)| (k, m.into_write_op())),
+        );
         write_set_mut.extend(aggregator_v1_write_set);
 
         let events = events.into_iter().map(|(e, _)| e).collect();
@@ -334,16 +340,30 @@ impl VMChangeSet {
         Ok(StorageChangeSet::new(write_set, events))
     }
 
-    pub fn concrete_write_set_iter(&self) -> impl Iterator<Item = (&StateKey, Option<&WriteOp>)> {
+    /// Returns storage writes, and panics if abstract writes cannot be
+    /// converted into storage representation. Use with caution.
+    pub fn concrete_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
         self.resource_write_set()
             .iter()
-            .map(|(k, v)| (k, v.try_as_concrete_write()))
+            .map(|(k, w)| {
+                (
+                    k.clone(),
+                    w.clone()
+                        .try_into_concrete_write()
+                        .expect("expect only concrete write ops"),
+                )
+            })
             .chain(
                 self.module_write_set()
                     .iter()
-                    .chain(self.aggregator_v1_write_set().iter())
-                    .map(|(k, v)| (k, Some(v))),
+                    .map(|(k, w)| (k.clone(), w.clone().into_write_op()))
+                    .chain(
+                        self.aggregator_v1_write_set()
+                            .iter()
+                            .map(|(k, w)| (k.clone(), w.clone())),
+                    ),
             )
+            .collect()
     }
 
     pub fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
@@ -353,8 +373,12 @@ impl VMChangeSet {
             .chain(
                 self.module_write_set()
                     .iter()
-                    .chain(self.aggregator_v1_write_set().iter())
-                    .map(|(k, v)| (k, v.write_op_size())),
+                    .map(|(k, w)| (k, w.write_op_size()))
+                    .chain(
+                        self.aggregator_v1_write_set()
+                            .iter()
+                            .map(|(k, v)| (k, v.write_op_size())),
+                    ),
             )
     }
 
@@ -382,7 +406,7 @@ impl VMChangeSet {
             Ok(WriteOpInfo {
                 key,
                 op_size: op.write_op_size(),
-                prev_size: executor_view.get_module_state_value_size(key)?.unwrap_or(0),
+                prev_size: executor_view.get_module_size_in_bytes(key)?.unwrap_or(0) as u64,
                 metadata_mut: op.get_metadata_mut(),
             })
         });
@@ -404,7 +428,7 @@ impl VMChangeSet {
         &self.resource_write_set
     }
 
-    pub fn module_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+    pub fn module_write_set(&self) -> &BTreeMap<StateKey, ModuleWriteOp> {
         &self.module_write_set
     }
 
@@ -645,13 +669,16 @@ impl VMChangeSet {
     }
 
     fn squash_additional_module_writes(
-        write_set: &mut BTreeMap<StateKey, WriteOp>,
-        additional_write_set: BTreeMap<StateKey, WriteOp>,
+        write_set: &mut BTreeMap<StateKey, ModuleWriteOp>,
+        additional_write_set: BTreeMap<StateKey, ModuleWriteOp>,
     ) -> PartialVMResult<()> {
         for (key, additional_write_op) in additional_write_set.into_iter() {
             match write_set.entry(key) {
                 Occupied(mut entry) => {
-                    squash_writes_pair!(entry, additional_write_op);
+                    ModuleWriteOp::squash(entry.get_mut(), additional_write_op).map_err(|e| {
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message(format!("Error while squashing two write ops: {}.", e))
+                    })?;
                 },
                 Vacant(entry) => {
                     entry.insert(additional_write_op);

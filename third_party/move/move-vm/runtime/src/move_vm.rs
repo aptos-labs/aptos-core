@@ -11,16 +11,13 @@ use crate::{
     runtime::VMRuntime,
     session::Session,
 };
-use move_binary_format::{
-    deserializer::DeserializerConfig,
-    errors::{PartialVMError, VMResult},
-    CompiledModule,
-};
+use move_binary_format::{deserializer::DeserializerConfig, errors::VMResult, CompiledModule};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-    metadata::Metadata, resolver::MoveResolver,
+    metadata::Metadata,
 };
+use move_vm_types::resolver::MoveResolver;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -69,22 +66,19 @@ impl MoveVM {
     ///     cases where this may not be necessary, with the most notable one being the common module
     ///     publishing flow: you can keep using the same Move VM if you publish some modules in a Session
     ///     and apply the effects to the storage when the Session ends.
-    pub fn new_session<'r>(
-        &self,
-        remote: &'r impl MoveResolver<PartialVMError>,
-    ) -> Session<'r, '_> {
+    pub fn new_session<'r>(&self, remote: &'r impl MoveResolver) -> Session<'r, '_> {
         self.new_session_with_extensions(remote, NativeContextExtensions::default())
     }
 
     /// Create a new session, as in `new_session`, but provide native context extensions.
     pub fn new_session_with_extensions<'r>(
         &self,
-        remote: &'r impl MoveResolver<PartialVMError>,
+        remote: &'r impl MoveResolver,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,
-            data_cache: TransactionDataCache::new(
+            data_cache: TransactionDataCache::empty(
                 self.runtime.loader().deserializer_config.clone(),
                 remote,
             ),
@@ -93,16 +87,16 @@ impl MoveVM {
         }
     }
 
-    /// Create a new session, as in `new_session`, but provide native context extensions and custome storage for resolved modules.
+    /// Create a new session, as in `new_session`, but provide native context extensions and custom storage for resolved modules.
     pub fn new_session_with_extensions_and_modules<'r>(
         &self,
-        remote: &'r impl MoveResolver<PartialVMError>,
+        remote: &'r impl MoveResolver,
         module_storage: Arc<dyn ModuleStorage>,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,
-            data_cache: TransactionDataCache::new(
+            data_cache: TransactionDataCache::empty(
                 self.runtime.loader().deserializer_config.clone(),
                 remote,
             ),
@@ -115,13 +109,13 @@ impl MoveVM {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        remote: &impl MoveResolver<PartialVMError>,
+        remote: &impl MoveResolver,
     ) -> VMResult<Arc<CompiledModule>> {
         self.runtime
             .loader()
             .load_module(
                 module_id,
-                &mut TransactionDataCache::new(
+                &mut TransactionDataCache::empty(
                     self.runtime.loader().deserializer_config.clone(),
                     remote,
                 ),

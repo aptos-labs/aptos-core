@@ -4,3 +4,4 @@
 pub mod configs;
 pub mod deserialization;
 pub mod environment;
+pub mod modules;

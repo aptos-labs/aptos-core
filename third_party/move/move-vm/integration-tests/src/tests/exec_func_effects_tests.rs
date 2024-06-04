@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::compiler::{as_module, compile_units};
+use bytes::Bytes;
 use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
@@ -89,7 +90,7 @@ fn run(
     module: &ModuleCode,
     fun_name: &str,
     arg_val0: MoveValue,
-) -> VMResult<(ChangeSet, SerializedReturnValues)> {
+) -> VMResult<(ChangeSet<Bytes, Bytes>, SerializedReturnValues)> {
     let module_id = &module.0;
     let modules = vec![module.clone()];
     let (vm, storage) = setup_vm(&modules);
@@ -108,7 +109,7 @@ fn run(
             &mut TraversalContext::new(&traversal_storage),
         )
         .and_then(|ret_values| {
-            let change_set = session.finish()?;
+            let change_set = session.finish()?.map_modules(|entry| entry.1);
             Ok((change_set, ret_values))
         })
 }

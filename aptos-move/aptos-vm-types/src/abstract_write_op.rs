@@ -223,9 +223,9 @@ impl GroupWrite {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
 /// Note that write_op can be a Deletion, as long as the Move type layout contains
 /// a delayed field. This simplifies squashing session outputs, in particular.
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct WriteWithDelayedFieldsOp {
     pub write_op: WriteOp,
     pub layout: Arc<MoveTypeLayout>,

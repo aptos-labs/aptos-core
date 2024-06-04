@@ -1,64 +1,39 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{Flag, MVModulesError, MVModulesOutput, TxnIndex};
-use aptos_crypto::hash::{DefaultHasher, HashValue};
-use aptos_types::{
-    executable::{Executable, ExecutableDescriptor},
-    write_set::TransactionWrite,
-};
+use crate::types::{Flag, MVModulesError, MVModulesOutput, ShiftedTxnIndex, TxnIndex};
+use aptos_types::vm::modules::OnChainUnverifiedModule;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
-use std::{
-    collections::{btree_map::BTreeMap, HashMap},
-    hash::Hash,
-    sync::Arc,
-};
+use std::{collections::btree_map::BTreeMap, hash::Hash};
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
-struct Entry<V: TransactionWrite> {
+struct Entry {
     /// Used to mark the entry as a "write estimate".
     flag: Flag,
 
-    /// The contents of the module as produced by the VM (can be WriteOp based on a
-    /// blob or CompiledModule, but must satisfy TransactionWrite to be able to
-    /// generate the hash below.
-    module: Arc<V>,
-    /// The hash of the blob, used instead of incarnation for validation purposes,
-    /// and also for uniquely identifying associated executables.
-    hash: HashValue,
+    /// The contents of the module as produced by the VM.
+    // TODO: Use a generic here when we have a more stable representation.
+    module: OnChainUnverifiedModule,
 }
 
 /// A VersionedValue internally contains a BTreeMap from indices of transactions
 /// that update the given access path alongside the corresponding entries.
-struct VersionedValue<V: TransactionWrite, X: Executable> {
-    versioned_map: BTreeMap<TxnIndex, CachePadded<Entry<V>>>,
-
-    /// Executables corresponding to published versions of the module, based on hash.
-    executables: HashMap<HashValue, Arc<X>>,
+struct VersionedValue {
+    versioned_map: BTreeMap<ShiftedTxnIndex, CachePadded<Entry>>,
 }
 
 /// Maps each key (access path) to an internal VersionedValue.
-pub struct VersionedModules<K, V: TransactionWrite, X: Executable> {
-    values: DashMap<K, VersionedValue<V, X>>,
+pub struct VersionedModules<K> {
+    values: DashMap<K, VersionedValue>,
 }
 
-impl<V: TransactionWrite> Entry<V> {
-    pub fn new_write_from(module: V) -> Entry<V> {
-        let hash = module
-            .extract_raw_bytes()
-            .map(|bytes| {
-                let mut hasher = DefaultHasher::new(b"Module");
-                hasher.update(&bytes);
-                hasher.finish()
-            })
-            .expect("Module can't be deleted");
-
+impl Entry {
+    pub fn new_write_from(module: OnChainUnverifiedModule) -> Entry {
         Entry {
             flag: Flag::Done,
-            module: Arc::new(module),
-            hash,
+            module,
         }
     }
 
@@ -71,36 +46,41 @@ impl<V: TransactionWrite> Entry<V> {
     }
 }
 
-impl<V: TransactionWrite, X: Executable> VersionedValue<V, X> {
+impl VersionedValue {
     pub fn new() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
-            executables: HashMap::new(),
         }
     }
 
-    fn read(&self, txn_idx: TxnIndex) -> anyhow::Result<(Arc<V>, HashValue), MVModulesError> {
-        match self.versioned_map.range(0..txn_idx).next_back() {
+    fn read(&self, txn_idx: TxnIndex) -> Result<OnChainUnverifiedModule, MVModulesError> {
+        match self
+            .versioned_map
+            .range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
+            .next_back()
+        {
             Some((idx, entry)) => {
                 if entry.flag() == Flag::Estimate {
                     // Found a dependency.
-                    return Err(MVModulesError::Dependency(*idx));
+                    return Err(MVModulesError::Dependency(
+                        idx.idx().expect("May not depend on storage version"),
+                    ));
                 }
 
-                Ok((entry.module.clone(), entry.hash))
+                Ok(entry.module.clone())
             },
             None => Err(MVModulesError::NotFound),
         }
     }
 }
 
-impl<V: TransactionWrite, X: Executable> Default for VersionedValue<V, X> {
+impl Default for VersionedValue {
     fn default() -> Self {
         VersionedValue::new()
     }
 }
 
-impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<K, V, X> {
+impl<K: Hash + Clone + Eq> VersionedModules<K> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
@@ -116,26 +96,26 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
     pub fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
         let mut v = self.values.get_mut(key).expect("Path must exist");
         v.versioned_map
-            .get_mut(&txn_idx)
+            .get_mut(&ShiftedTxnIndex::new(txn_idx))
             .expect("Entry by the txn must exist to mark estimate")
             .mark_estimate();
     }
 
     /// Versioned write of module at a given key (and version).
-    pub fn write(&self, key: K, txn_idx: TxnIndex, data: V) {
+    pub fn write(&self, key: K, txn_idx: TxnIndex, data: OnChainUnverifiedModule) {
         let mut v = self.values.entry(key).or_default();
-        v.versioned_map
-            .insert(txn_idx, CachePadded::new(Entry::new_write_from(data)));
+        v.versioned_map.insert(
+            ShiftedTxnIndex::new(txn_idx),
+            CachePadded::new(Entry::new_write_from(data)),
+        );
     }
 
-    /// Adds a new executable to the multi-version data-structure. The executable is either
-    /// storage-version (and fixed) or uniquely identified by the (cryptographic) hash of the
-    /// module published during the block.
-    pub fn store_executable(&self, key: &K, descriptor_hash: HashValue, executable: X) {
-        let mut v = self.values.get_mut(key).expect("Path must exist");
-        v.executables
-            .entry(descriptor_hash)
-            .or_insert_with(|| Arc::new(executable));
+    pub fn set_base(&self, key: K, data: OnChainUnverifiedModule) {
+        let mut v = self.values.entry(key).or_default();
+        v.versioned_map.insert(
+            ShiftedTxnIndex::zero_idx(),
+            CachePadded::new(Entry::new_write_from(data)),
+        );
     }
 
     /// Fetches the latest module stored at the given key, either as in an executable form,
@@ -145,17 +125,12 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
         &self,
         key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVModulesOutput<V, X>, MVModulesError> {
+    ) -> Result<MVModulesOutput, MVModulesError> {
         use MVModulesError::*;
         use MVModulesOutput::*;
 
         match self.values.get(key) {
-            Some(v) => v
-                .read(txn_idx)
-                .map(|(module, hash)| match v.executables.get(&hash) {
-                    Some(x) => Executable((x.clone(), ExecutableDescriptor::Published(hash))),
-                    None => Module((module, hash)),
-                }),
+            Some(v) => v.read(txn_idx).map(Module),
             None => Err(NotFound),
         }
     }
@@ -166,7 +141,9 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
         // TODO: investigate logical deletion.
         let mut v = self.values.get_mut(key).expect("Path must exist");
         assert!(
-            v.versioned_map.remove(&txn_idx).is_some(),
+            v.versioned_map
+                .remove(&ShiftedTxnIndex::new(txn_idx))
+                .is_some(),
             "Entry must exist to be deleted"
         );
     }

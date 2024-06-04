@@ -18,6 +18,7 @@ pub const DEFAULT_STORAGE_DIR: &str = "storage";
 pub const DEFAULT_BUILD_DIR: &str = ".";
 
 use anyhow::Result;
+use bytes::Bytes;
 use clap::Parser;
 use move_core_types::{
     account_address::AccountAddress, effects::ChangeSet, identifier::Identifier,
@@ -68,9 +69,9 @@ pub enum Command {
     Test(Test),
 }
 
-pub fn run_cli(
+fn run_cli(
     natives: Vec<NativeFunctionRecord>,
-    genesis: ChangeSet,
+    genesis: ChangeSet<Bytes, Bytes>,
     cost_table: &CostTable,
     move_args: Move,
     cmd: Command,
@@ -98,7 +99,7 @@ pub fn run_cli(
 
 pub fn move_cli(
     natives: Vec<NativeFunctionRecord>,
-    genesis: ChangeSet,
+    genesis: ChangeSet<Bytes, Bytes>,
     cost_table: &CostTable,
 ) -> Result<()> {
     let args = MoveCLI::parse();

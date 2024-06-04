@@ -28,7 +28,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         },
         UnitTestingConfig::default_with_bound(Some(100_000)),
         natives,
-        ChangeSet::new(),
+        ChangeSet::empty(),
         None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),

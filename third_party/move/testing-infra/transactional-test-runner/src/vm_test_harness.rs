@@ -30,7 +30,6 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
     value::MoveValue,
 };
 use move_model::metadata::LanguageVersion;
@@ -46,6 +45,7 @@ use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
     InMemoryStorage,
 };
+use move_vm_types::resolver::MoveResolver;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -383,12 +383,9 @@ impl<'a> SimpleVMTestAdapter<'a> {
             (session, gas_status)
         };
 
-        // perform op
         let res = f(&mut session, &mut gas_status)?;
-
-        // save changeset
-        let changeset = session.finish()?;
-        self.storage.apply(changeset).unwrap();
+        let change_set = session.finish()?.map_modules(|entry| entry.1);
+        self.storage.apply(change_set).unwrap();
         Ok(res)
     }
 }

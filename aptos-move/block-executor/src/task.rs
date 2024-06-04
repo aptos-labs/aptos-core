@@ -12,7 +12,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
-    vm::deserialization::WithDeserializerConfig,
+    vm::{deserialization::WithDeserializerConfig, modules::OnChainUnverifiedModule},
     write_set::WriteOp,
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
@@ -108,7 +108,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn module_write_set(
         &self,
-    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> BTreeMap<<Self::Txn as Transaction>::Key, OnChainUnverifiedModule>;
 
     fn aggregator_v1_write_set(
         &self,

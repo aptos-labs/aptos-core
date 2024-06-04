@@ -145,8 +145,6 @@ pub fn verify_script(script: &CompiledScript) -> VMResult<()> {
 }
 
 pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScript) -> VMResult<()> {
-    fail::fail_point!("verifier-failpoint-3", |_| { Ok(()) });
-
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
         BoundsChecker::verify_script(script).map_err(|e| e.finish(Location::Script))?;

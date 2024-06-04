@@ -13,8 +13,6 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    access_path::AccessPath,
-    account_address::AccountAddress,
     contract_event::TransactionEvent,
     delayed_fields::PanicError,
     executable::ModulePath,
@@ -27,6 +25,7 @@ use aptos_types::{
         StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
+    vm::modules::OnChainUnverifiedModule,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
@@ -39,7 +38,6 @@ use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, samp
 use proptest_derive::Arbitrary;
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap, BTreeSet, HashMap, HashSet},
-    convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},
     marker::PhantomData,
@@ -154,21 +152,8 @@ pub(crate) struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
 );
 
 impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> {
-    fn module_path(&self) -> Option<AccessPath> {
-        // Since K is generic, use its hash to assign addresses.
-        let mut hasher = DefaultHasher::new();
-        self.0.hash(&mut hasher);
-        let mut hashed_address = vec![1u8; AccountAddress::LENGTH - 8];
-        hashed_address.extend_from_slice(&hasher.finish().to_ne_bytes());
-
-        if self.1 {
-            Some(AccessPath {
-                address: AccountAddress::new(hashed_address.try_into().unwrap()),
-                path: b"/foo/b".to_vec(),
-            })
-        } else {
-            None
-        }
+    fn is_module_path(&self) -> bool {
+        self.1
     }
 }
 
@@ -857,15 +842,13 @@ where
                 for k in behavior.reads.iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     // TODO: test aggregator reads.
-                    match k.module_path() {
-                        Some(_) => match view.get_module_bytes(k) {
+                    if k.is_module_path() {
+                        // TODO: Add module tests
+                    } else {
+                        match view.get_resource_bytes(k, None) {
                             Ok(v) => read_results.push(v.map(Into::into)),
                             Err(_) => read_results.push(None),
-                        },
-                        None => match view.get_resource_bytes(k, None) {
-                            Ok(v) => read_results.push(v.map(Into::into)),
-                            Err(_) => read_results.push(None),
-                        },
+                        }
                     }
                 }
                 // Read from groups.
@@ -1007,18 +990,15 @@ where
     fn resource_write_set(&self) -> Vec<(K, Arc<ValueType>, Option<Arc<MoveTypeLayout>>)> {
         self.writes
             .iter()
-            .filter(|(k, _)| k.module_path().is_none())
+            .filter(|(k, _)| !k.is_module_path())
             .cloned()
             .map(|(k, v)| (k, Arc::new(v), None))
             .collect()
     }
 
-    fn module_write_set(&self) -> BTreeMap<K, ValueType> {
-        self.writes
-            .iter()
-            .filter(|(k, _)| k.module_path().is_some())
-            .cloned()
-            .collect()
+    fn module_write_set(&self) -> BTreeMap<K, OnChainUnverifiedModule> {
+        // TODO: Support module writes
+        BTreeMap::new()
     }
 
     // Aggregator v1 writes are included in resource_write_set for tests (writes are produced

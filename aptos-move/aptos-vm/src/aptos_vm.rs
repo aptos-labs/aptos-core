@@ -237,7 +237,6 @@ impl AptosVM {
     //       configs to the environment.
     pub(crate) fn new_with_environment(env: Arc<Environment>, state_view: &impl StateView) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
-
         let (
             gas_params,
             storage_gas_params,
@@ -1525,13 +1524,8 @@ impl AptosVM {
             modules,
             self.features()
                 .is_enabled(FeatureFlag::SAFER_RESOURCE_GROUPS),
-            self.deserializer_config(),
         )?;
-        verifier::event_validation::validate_module_events(
-            session,
-            modules,
-            self.deserializer_config(),
-        )?;
+        verifier::event_validation::validate_module_events(session, modules)?;
 
         if !expected_modules.is_empty() {
             return Err(Self::metadata_validation_error(
@@ -1890,10 +1884,11 @@ impl AptosVM {
                 // it requires restarting execution afterwards,
                 // which allows it to be used as last transaction in delayed_field_enabled context.
                 let change = VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
+                    self.deserializer_config(),
                     change_set.clone(),
                     &change_set_configs,
                 )
-                .map_err(|e| e.into_vm_status())?;
+                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
 
                 // validate_waypoint_change_set checks that this is true, so we only log here.
                 if !Self::should_restart_execution(&change) {
@@ -1944,7 +1939,7 @@ impl AptosVM {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
         for state_key in change_set.module_write_set().keys() {
-            executor_view.get_module_state_value(state_key)?;
+            executor_view.get_onchain_module(state_key)?;
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {
             executor_view.get_resource_state_value(state_key, None)?;

@@ -12,6 +12,7 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 better_any = { workspace = true }
+bytes = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 colored = { workspace = true }

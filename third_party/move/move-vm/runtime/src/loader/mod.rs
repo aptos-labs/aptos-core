@@ -841,7 +841,7 @@ impl Loader {
                 Some(module) => (module.module.clone(), module.size),
                 None => {
                     let (module, size, _) = data_store.load_compiled_module_to_cache(
-                        ModuleId::new(*addr, name.to_owned()),
+                        &ModuleId::new(*addr, name.to_owned()),
                         allow_loading_failure,
                     )?;
                     (module, size)
@@ -901,7 +901,7 @@ impl Loader {
             let size = match module_store.module_at_by_ref(addr, name) {
                 Some(module) => module.size,
                 None => match data_store
-                    .load_compiled_module_to_cache(ModuleId::new(*addr, name.to_owned()), true)
+                    .load_compiled_module_to_cache(&ModuleId::new(*addr, name.to_owned()), true)
                 {
                     Ok((_module, size, _hash)) => size,
                     Err(err) if err.major_status() == StatusCode::LINKER_ERROR => continue,
@@ -957,20 +957,20 @@ impl Loader {
     // Load, deserialize, and check the module with the bytecode verifier, without linking
     fn load_and_verify_module(
         &self,
-        id: &ModuleId,
+        module_id: &ModuleId,
         data_store: &mut TransactionDataCache,
         allow_loading_failure: bool,
     ) -> VMResult<(Arc<CompiledModule>, usize)> {
         let (module, size, hash_value) =
-            data_store.load_compiled_module_to_cache(id.clone(), allow_loading_failure)?;
+            data_store.load_compiled_module_to_cache(module_id, allow_loading_failure)?;
 
         fail::fail_point!("verifier-failpoint-2", |_| { Ok((module.clone(), size)) });
 
-        if self.vm_config.paranoid_type_checks && &module.self_id() != id {
+        if self.vm_config.paranoid_type_checks && &module.self_id() != module_id {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("Module self id mismatch with storage".to_string())
-                    .finish(Location::Module(id.clone())),
+                    .finish(Location::Module(module_id.clone())),
             );
         }
 

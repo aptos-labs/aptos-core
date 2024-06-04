@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
+use bytes::Bytes;
 use move_binary_format::{
     file_format_common,
     file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
@@ -306,16 +307,16 @@ impl Features {
     }
 }
 
-pub fn aptos_test_feature_flags_genesis() -> ChangeSet {
-    let features_value = bcs::to_bytes(&Features::default()).unwrap();
+pub fn aptos_test_feature_flags_genesis() -> ChangeSet<Bytes, Bytes> {
+    let features_bytes = bcs::to_bytes(&Features::default()).unwrap();
 
-    let mut change_set = ChangeSet::new();
-    // we need to initialize features to their defaults.
+    // We need to initialize features to their defaults.
+    let mut change_set = ChangeSet::empty();
     change_set
         .add_resource_op(
             CORE_CODE_ADDRESS,
             Features::struct_tag(),
-            Op::New(features_value.into()),
+            Op::New(features_bytes.into()),
         )
         .expect("adding genesis Feature resource must succeed");
 

@@ -8,13 +8,13 @@ use crate::{
     natives,
     natives::{AsyncExtension, GasParameters as ActorGasParameters},
 };
+use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
@@ -25,7 +25,10 @@ use move_vm_runtime::{
     session::{SerializedReturnValues, Session},
 };
 use move_vm_test_utils::gas_schedule::{Gas, GasStatus};
-use move_vm_types::values::{Reference, Value};
+use move_vm_types::{
+    resolver::MoveResolver,
+    values::{Reference, Value},
+};
 use std::{
     collections::HashMap,
     error::Error,
@@ -82,7 +85,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut impl MoveResolver<PartialVMError>,
+        move_resolver: &'r mut impl MoveResolver,
     ) -> AsyncSession<'r, 'l> {
         self.new_session_with_extensions(
             for_actor,
@@ -97,7 +100,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut impl MoveResolver<PartialVMError>,
+        move_resolver: &'r mut impl MoveResolver,
         ext: NativeContextExtensions<'r>,
     ) -> AsyncSession<'r, 'l> {
         let extensions = make_extensions(ext, for_actor, virtual_time, true);
@@ -141,7 +144,7 @@ pub type Message = (AccountAddress, u64, Vec<Vec<u8>>);
 
 /// A structure to represent success for the execution of an async session operation.
 pub struct AsyncSuccess<'r> {
-    pub change_set: ChangeSet,
+    pub change_set: ChangeSet<Bytes, Bytes>,
     pub messages: Vec<Message>,
     pub gas_used: Gas,
     pub ext: NativeContextExtensions<'r>,
@@ -214,15 +217,16 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
 
         // Process the result, moving the return value of the initializer function into the
-        // changeset.
+        // change set.
         match result {
             Ok((
                 SerializedReturnValues {
                     mutable_reference_outputs: _,
                     mut return_values,
                 },
-                (mut change_set, mut native_extensions),
+                (change_set, mut native_extensions),
             )) => {
+                let mut change_set = change_set.map_modules(|entry| entry.1);
                 if return_values.len() != 1 {
                     Err(async_extension_error(format!(
                         "inconsistent initializer `{}`",
@@ -320,8 +324,9 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                     mut mutable_reference_outputs,
                     return_values: _,
                 },
-                (mut change_set, mut native_extensions),
+                (change_set, mut native_extensions),
             )) => {
+                let mut change_set = change_set.map_modules(|entry| entry.1);
                 if mutable_reference_outputs.len() > 1 {
                     Err(async_extension_error(format!(
                         "inconsistent handler `{}`",
@@ -379,7 +384,7 @@ fn make_extensions(
 }
 
 fn publish_actor_state(
-    change_set: &mut ChangeSet,
+    change_set: &mut ChangeSet<Bytes, Bytes>,
     actor_addr: AccountAddress,
     state_tag: StructTag,
     state: Vec<u8>,

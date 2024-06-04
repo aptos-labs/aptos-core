@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::format_module_id;
+use bytes::Bytes;
 use codespan_reporting::files::{Files, SimpleFiles};
 use colored::{control, Colorize};
 use move_binary_format::{
@@ -26,7 +27,7 @@ use std::{
     time::Duration,
 };
 
-#[derive(Debug, Clone, Ord, PartialOrd, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FailureReason {
     // Expected to error, but it didn't
     NoError(String),
@@ -41,9 +42,9 @@ pub enum FailureReason {
     // The execution results of the Move VM and stackless VM does not match
     Mismatch {
         move_vm_return_values: Box<VMResult<Vec<Vec<u8>>>>,
-        move_vm_change_set: Box<VMResult<ChangeSet>>,
+        move_vm_change_set: Box<VMResult<ChangeSet<Bytes, Bytes>>>,
         stackless_vm_return_values: Box<VMResult<Vec<Vec<u8>>>>,
-        stackless_vm_change_set: Box<VMResult<ChangeSet>>,
+        stackless_vm_change_set: Box<VMResult<ChangeSet<Bytes, Bytes>>>,
     },
     // Property checking failed
     Property(String),
@@ -53,7 +54,7 @@ pub enum FailureReason {
     MoveToEVMError(String),
 }
 
-#[derive(Debug, Clone, Ord, PartialOrd, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestFailure {
     pub test_run_info: TestRunInfo,
     pub vm_error: Option<VMError>,
@@ -71,7 +72,7 @@ pub struct TestRunInfo {
 #[derive(Debug, Clone)]
 pub struct TestStatistics {
     passed: BTreeMap<ModuleId, BTreeSet<TestRunInfo>>,
-    failed: BTreeMap<ModuleId, BTreeSet<TestFailure>>,
+    failed: BTreeMap<ModuleId, Vec<TestFailure>>,
     output: BTreeMap<ModuleId, BTreeMap<TestName, String>>,
 }
 
@@ -122,9 +123,9 @@ impl FailureReason {
 
     pub fn mismatch(
         move_vm_return_values: VMResult<Vec<Vec<u8>>>,
-        move_vm_change_set: VMResult<ChangeSet>,
+        move_vm_change_set: VMResult<ChangeSet<Bytes, Bytes>>,
         stackless_vm_return_values: VMResult<Vec<Vec<u8>>>,
-        stackless_vm_change_set: VMResult<ChangeSet>,
+        stackless_vm_change_set: VMResult<ChangeSet<Bytes, Bytes>>,
     ) -> Self {
         FailureReason::Mismatch {
             move_vm_return_values: Box::new(move_vm_return_values),
@@ -410,7 +411,7 @@ impl TestStatistics {
         self.failed
             .entry(test_plan.module_id.clone())
             .or_default()
-            .insert(test_failure);
+            .push(test_failure);
     }
 
     pub fn test_success(&mut self, test_info: TestRunInfo, test_plan: &ModuleTestPlan) {

@@ -14,9 +14,12 @@ use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{contract_event::ContractEvent, state_store::state_key::StateKey};
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use bytes::Bytes;
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
+use move_binary_format::{
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
-    effects::{AccountChanges, Changes, Op as MoveStorageOp},
+    effects::{AccountChangeSet, ChangeSet, Op as MoveStorageOp},
     language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::StatusCode,
@@ -40,8 +43,6 @@ pub(crate) enum ResourceGroupChangeSet {
     // Granular ops to individual resources within a group.
     V1(BTreeMap<StateKey, BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>>),
 }
-type AccountChangeSet = AccountChanges<Bytes, BytesWithResourceLayout>;
-type ChangeSet = Changes<Bytes, BytesWithResourceLayout>;
 pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
 pub struct SessionExt<'r, 'l> {
@@ -207,15 +208,18 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     fn split_and_merge_resource_groups(
         runtime: &MoveVM,
         remote: &dyn AptosMoveResolver,
-        change_set: ChangeSet,
-    ) -> PartialVMResult<(ChangeSet, ResourceGroupChangeSet)> {
+        change_set: ChangeSet<(Arc<CompiledModule>, Bytes), BytesWithResourceLayout>,
+    ) -> PartialVMResult<(
+        ChangeSet<(Arc<CompiledModule>, Bytes), BytesWithResourceLayout>,
+        ResourceGroupChangeSet,
+    )> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = || {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("split_and_merge_resource_groups error".to_string())
         };
-        let mut change_set_filtered = ChangeSet::new();
+        let mut change_set_filtered = ChangeSet::empty();
 
         let mut maybe_resource_group_cache = remote.release_resource_group_cache().map(|v| {
             v.into_iter()
@@ -256,10 +260,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
 
             change_set_filtered
-                .add_account_changeset(
-                    addr,
-                    AccountChangeSet::from_modules_resources(modules, resources_filtered),
-                )
+                .add_account_change_set(addr, AccountChangeSet::new(modules, resources_filtered))
                 .map_err(|_| common_error())?;
 
             for (resource_group_tag, resources) in resource_groups {
@@ -300,7 +301,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
     pub(crate) fn convert_change_set(
         woc: &WriteOpConverter,
-        change_set: ChangeSet,
+        change_set: ChangeSet<(Arc<CompiledModule>, Bytes), BytesWithResourceLayout>,
         resource_group_change_set: ResourceGroupChangeSet,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         table_change_set: TableChangeSet,
@@ -326,9 +327,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 resource_write_set.insert(state_key, op);
             }
 
-            for (name, blob_op) in modules {
+            for (name, op) in modules {
                 let state_key = StateKey::module(&addr, &name);
-                let op = woc.convert_module(&state_key, blob_op, false)?;
+                let op = woc.convert_module(&state_key, op, false)?;
                 module_write_set.insert(state_key, op);
             }
         }
