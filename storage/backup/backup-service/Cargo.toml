@@ -22,10 +22,12 @@ aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
+futures = { workspace = true }
 hyper = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
+tokio-stream = { workspace = true }
 warp = { workspace = true }
 
 [dev-dependencies]
