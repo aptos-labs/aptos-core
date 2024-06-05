@@ -1979,19 +1979,13 @@ fn realistic_env_max_load_test(
     }
 
     // Create the test
-    let memory_backlog = if ha_proxy {
-        30000
-    } else {
-        40000
-    };
+    let mempool_backlog = if ha_proxy { 30000 } else { 40000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: memory_backlog,
-                })
+                .mode(EmitJobMode::MaxLoad { mempool_backlog })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
