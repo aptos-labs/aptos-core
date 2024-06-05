@@ -212,10 +212,6 @@ impl AptosDebugger {
         Ok(ret)
     }
 
-    pub async fn get_latest_version(&self) -> Result<Version> {
-        self.debugger.get_latest_version().await
-    }
-
     pub async fn get_version_by_account_sequence(
         &self,
         account: AccountAddress,

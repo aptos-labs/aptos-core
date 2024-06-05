@@ -922,6 +922,17 @@ impl ExecutionStatus {
         matches!(self, ExecutionStatus::Success)
     }
 
+    // Used by simulation API for showing detail error message. Should not be used by production code.
+    pub fn convert_vm_status_for_simulation(vm_status: VMStatus) -> Self {
+        let mut show_error_flags = Features::default();
+        show_error_flags.disable(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH);
+        let (txn_status, _aux_data) =
+            TransactionStatus::from_vm_status(vm_status, true, &show_error_flags);
+        txn_status.status().unwrap_or_else(|discarded_code| {
+            ExecutionStatus::MiscellaneousError(Some(discarded_code))
+        })
+    }
+
     pub fn remove_error_detail(self) -> Self {
         match self {
             ExecutionStatus::MoveAbort {
@@ -1382,14 +1393,6 @@ impl TransactionInfo {
         ))
     }
 
-    pub fn inject_auxiliary_error_data(&mut self, auxiliary_data: TransactionAuxiliaryData) {
-        match self {
-            Self::V0(ref mut info) => {
-                info.inject_auxiliary_error_data(auxiliary_data);
-            },
-        }
-    }
-
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_placeholder(
         gas_used: u64,
@@ -1476,14 +1479,6 @@ impl TransactionInfoV0 {
             state_change_hash,
             state_checkpoint_hash,
             state_cemetery_hash: None,
-        }
-    }
-
-    pub fn inject_auxiliary_error_data(&mut self, auxiliary_data: TransactionAuxiliaryData) {
-        if let Some(detail) = auxiliary_data.get_detail_error_message() {
-            if let ExecutionStatus::MiscellaneousError(None) = &mut self.status {
-                self.status = ExecutionStatus::MiscellaneousError(Some(detail.status_code()))
-            }
         }
     }
 
