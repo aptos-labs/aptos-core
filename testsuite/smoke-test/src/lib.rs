@@ -13,6 +13,8 @@ mod client;
 #[cfg(test)]
 mod consensus;
 #[cfg(test)]
+mod consensus_observer;
+#[cfg(test)]
 mod execution;
 #[cfg(test)]
 mod full_nodes;
@@ -38,6 +40,8 @@ mod rest_api;
 mod rosetta;
 #[cfg(test)]
 mod state_sync;
+#[cfg(test)]
+mod state_sync_utils;
 #[cfg(test)]
 mod storage;
 #[cfg(test)]
