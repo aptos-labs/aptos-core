@@ -1989,6 +1989,14 @@ fn realistic_env_max_load_test(
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             config.consensus_observer.observer_enabled = true
         }))
+        .with_validator_resource_override(NodeResourceOverride {
+            cpu_cores: Some(58),
+            memory_gib: Some(200),
+        })
+        .with_fullnode_resource_override(NodeResourceOverride {
+            cpu_cores: Some(58),
+            memory_gib: Some(200),
+        })
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
