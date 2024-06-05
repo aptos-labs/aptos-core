@@ -163,6 +163,24 @@ impl ProofQueue {
                     .any(|batch_key| batch_keys.contains(batch_key))
             })
             .count() as u64;
+
+        // count the number of batches with proofs but without txn summaries
+        counters::PROOFS_WITHOUT_BATCH_DATA.set(self.batch_to_proof.iter().map(|(batch_key, proof)| {
+            if proof.is_some() && !self.batches_with_txn_summary.contains(batch_key) {
+                1
+            } else {
+                0
+            }
+        }).sum() as i64);
+
+        counters::PROOFS_IN_PROOF_QUEUE.set(self.batch_to_proof.iter().map(|(batch_key, proof)| {
+            if proof.is_some() {
+                1
+            } else {
+                0
+            }
+        }).sum::<i64>());
+
         // If a batch_key is not in batches_with_txn_summary, it means we've received the proof but haven't receive the
         // transaction summary of the batch from batch coordinator. Add the number of txns in the batch to remaining_txns.
         remaining_txns += self
@@ -176,6 +194,14 @@ impl ProofQueue {
                 }
             })
             .sum::<u64>();
+
+        //count the number of transactions with more than one batches
+        counters::TXNS_WITH_DUPLICATE_BATCHES.set(self.txn_summary_to_batches.iter().filter(|(_, batches)| {
+            batches.len() > 1
+        }).count() as i64);
+
+        counters::TXNS_IN_PROOF_QUEUE.set(self.txn_summary_to_batches.len() as i64);
+
         remaining_txns
     }
 
