@@ -5,6 +5,7 @@
 //! This module provides mock dbreader for tests.
 
 use crate::{errors::AptosDbError, DbReader, DbWriter, Result};
+use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
@@ -65,6 +66,30 @@ impl DbReader for MockDbReaderWriter {
         Ok(self
             .get_state_value_by_version(state_key, version)?
             .map(|value| (version, value)))
+    }
+
+    fn get_block_info_by_height(
+        &self,
+        height: u64,
+    ) -> Result<(Version, Version, aptos_types::account_config::NewBlockEvent)> {
+        Ok((
+            0,
+            1,
+            aptos_types::account_config::NewBlockEvent::new(
+                AccountAddress::random(),
+                0,
+                0,
+                height,
+                vec![],
+                AccountAddress::random(),
+                vec![],
+                0,
+            ),
+        ))
+    }
+
+    fn get_accumulator_root_hash(&self, version: Version) -> Result<HashValue> {
+        Ok(HashValue::zero())
     }
 }
 
