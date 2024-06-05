@@ -1979,10 +1979,16 @@ fn realistic_env_max_load_test(
     }
 
     // Create the test
-    let mempool_backlog = if ha_proxy { 30000 } else { 40000 };
+    let mempool_backlog = 20000;
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.publisher_enabled = true
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.observer_enabled = true
+        }))
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
