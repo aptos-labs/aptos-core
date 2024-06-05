@@ -1713,11 +1713,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .specialize(&self.env().get_node_type(rhs.node_id()));
                 let rhs = rhs.into_exp();
                 // Insert freeze for rhs of the assignment
-                let rhs = if lhs_ty.is_tuple()
+                if lhs_ty.is_tuple()
                     && rhs_ty.is_tuple()
                     && matches!(rhs.as_ref(), ExpData::Call(_, Operation::Tuple, _))
                 {
-                    if let (Pattern::Tuple(_, lhs_pats), Type::Tuple(rhs_tys)) = (&lhs, &rhs_ty) {
+                    let rhs = if let (Pattern::Tuple(_, lhs_pats), Type::Tuple(rhs_tys)) =
+                        (&lhs, &rhs_ty)
+                    {
                         let lhs_tys = lhs_pats
                             .iter()
                             .map(|pat| self.get_node_type(pat.node_id()))
@@ -1725,11 +1727,84 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         self.freeze_tuple_exp(&lhs_tys, rhs_tys, rhs, &loc)
                     } else {
                         self.try_freeze(&lhs_ty, &rhs_ty, rhs)
-                    }
+                    };
+                    ExpData::Assign(id, lhs, rhs)
+                }
+                // If operation is a function call that returns a tuple and
+                // lhs is a tuple contains immutable reference types
+                // e.g. f(...): (&mut u64, &mut u64); let (x, y): (&u64, &u64) = f(...);
+                // generate an intermediate binding: let ($x, $y): (&mut u64, &mut u64) = f(...);
+                // and then assignments: x = freeze($x); y = freeze($y);
+                else if lhs_ty.is_tuple_containing_imm_ref()
+                    && rhs_ty.is_tuple()
+                    && matches!(
+                        rhs.as_ref(),
+                        ExpData::Call(_, Operation::MoveFunction(..), _)
+                    )
+                {
+                    if let (Pattern::Tuple(_, lhs_pats), Type::Tuple(rhs_tys)) = (&lhs, &rhs_ty) {
+                        let mut var_patterns = vec![];
+                        let mut vars = vec![];
+                        // Generate intermediate variables $x... and bindings
+                        for (i, lhs_pat) in lhs_pats.iter().enumerate() {
+                            if let Pattern::Var(_, symbol) = lhs_pat {
+                                let rh_ty = rhs_tys.get(i).unwrap();
+                                // starts with $ for internal generated vars
+                                let var_name = self
+                                    .symbol_pool()
+                                    .make(&format!("${}", symbol.display(self.symbol_pool())));
+                                let local_var = ExpData::LocalVar(
+                                    self.new_node_id_with_type_loc(rh_ty, &loc),
+                                    var_name,
+                                );
+                                vars.push(local_var);
+                                var_patterns.push(Pattern::Var(
+                                    self.new_node_id_with_type_loc(rh_ty, &loc),
+                                    var_name,
+                                ));
+                            }
+                        }
+                        let binding_pattern = Pattern::Tuple(
+                            self.new_node_id_with_type_loc(&rhs_ty, &loc),
+                            var_patterns.clone(),
+                        );
+                        let lhs_tys = lhs_pats
+                            .iter()
+                            .map(|pat| self.get_node_type(pat.node_id()))
+                            .collect_vec();
+                        let mut exp_lst = vec![];
+                        // Generate assignments, insert freeze if necessary, e.g. x = freeze($x);
+                        for (i, p) in vars.iter().enumerate() {
+                            let ty = lhs_tys.get(i).unwrap();
+                            let rhs =
+                                self.try_freeze(ty, rhs_tys.get(i).unwrap(), p.clone().into_exp());
+                            exp_lst.push(
+                                ExpData::Assign(
+                                    self.new_node_id_with_type_loc(ty, &loc),
+                                    lhs_pats.get(i).unwrap().clone(),
+                                    rhs,
+                                )
+                                .into_exp(),
+                            );
+                        }
+                        let seq = ExpData::Sequence(
+                            self.new_node_id_with_type_loc(&Type::unit(), &loc),
+                            exp_lst,
+                        );
+                        return ExpData::Block(
+                            id,
+                            binding_pattern,
+                            Some(self.freeze_tuple_exp(&lhs_tys, rhs_tys, rhs, &loc)),
+                            seq.into_exp(),
+                        );
+                    } else {
+                        let rhs = self.try_freeze(&lhs_ty, &rhs_ty, rhs);
+                        return ExpData::Assign(id, lhs, rhs);
+                    };
                 } else {
-                    self.try_freeze(&lhs_ty, &rhs_ty, rhs)
-                };
-                ExpData::Assign(id, lhs, rhs)
+                    let rhs = self.try_freeze(&lhs_ty, &rhs_ty, rhs);
+                    return ExpData::Assign(id, lhs, rhs);
+                }
             },
             EA::Exp_::Mutate(lhs, rhs) => {
                 let (rhs_ty, rhs) = self.translate_exp_free(rhs);

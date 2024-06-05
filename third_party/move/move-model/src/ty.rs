@@ -1335,6 +1335,15 @@ impl Type {
     pub fn is_tuple(&self) -> bool {
         matches!(self, Type::Tuple(_))
     }
+
+    /// If this is a tuple that contains any immutable reference type, return true
+    pub fn is_tuple_containing_imm_ref(&self) -> bool {
+        if let Type::Tuple(tys) = self {
+            tys.iter().any(|ty| ty.is_immutable_reference())
+        } else {
+            false
+        }
+    }
 }
 
 /// A parameter for type unification that specifies the type compatibility rules to follow.
