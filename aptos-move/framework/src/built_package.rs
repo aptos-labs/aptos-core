@@ -26,7 +26,7 @@ use move_model::{
 };
 use move_package::{
     compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
-    source_package::manifest_parser::{parse_move_manifest_string, parse_source_manifest},
+    source_package::{manifest_parser::{parse_move_manifest_string, parse_source_manifest}, std_lib::StdVersion},
     BuildConfig, CompilerConfig, ModelConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -75,7 +75,7 @@ pub struct BuildOptions {
     pub named_addresses: BTreeMap<String, AccountAddress>,
     /// Whether to override the standard library with the given version.
     #[clap(long, value_parser)]
-    pub override_std: Option<String>,
+    pub override_std: Option<StdVersion>,
     #[clap(skip)]
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]

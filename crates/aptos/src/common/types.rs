@@ -53,6 +53,7 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_package::source_package::std_lib::StdVersion;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -1048,9 +1049,9 @@ pub struct MovePackageDir {
     #[clap(long, value_parser = crate::common::utils::parse_map::<String, AccountAddressWrapper>, default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
 
-    /// Override the standard library version by mainnet/testnet/dev
+    /// Override the standard library version by mainnet/testnet/devnet
     #[clap(long, value_parser)]
-    pub override_std: Option<String>,
+    pub override_std: Option<StdVersion>,
 
     /// Skip pulling the latest git dependencies
     ///

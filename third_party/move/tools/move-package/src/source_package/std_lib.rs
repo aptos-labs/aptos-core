@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::source_package::parsed_manifest::{Dependency, GitInfo};
-use move_command_line_common::env::MOVE_HOME;
+use clap::ValueEnum;
 use move_symbol_pool::symbol::Symbol;
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
+use serde::{Deserialize, Serialize};
+
+use crate::manifest_parser::git_repo_cache_path;
 
 /// Represents a standard library.
 pub enum StdLib {
@@ -19,8 +22,7 @@ impl StdLib {
 
     /// Returns the dependency for the standard library with the given version.
     pub fn dependency(&self, version: &StdVersion) -> Dependency {
-        let local =
-            PathBuf::from(MOVE_HOME.clone()).join(format!("{}_{}", self.as_str(), version.rev()));
+        let local = git_repo_cache_path(Self::STD_GIT_URL, version.rev());
         Dependency {
             local: local.join(self.sub_dir()),
             subst: None,
@@ -66,6 +68,8 @@ impl StdLib {
 }
 
 /// Represents a standard library version.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, ValueEnum)]
+#[clap(rename_all = "lower")]
 pub enum StdVersion {
     Mainnet,
     Testnet,
@@ -94,5 +98,11 @@ impl StdVersion {
             StdVersion::DEVNET => Some(Self::Devnet),
             _ => None,
         }
+    }
+}
+
+impl Display for StdVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.rev())
     }
 }

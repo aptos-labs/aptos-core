@@ -114,18 +114,7 @@ impl ResolvingGraph {
             package_table: BTreeMap::new(),
         };
 
-        let override_std = if let Some(version_str) = &build_options.override_std {
-            if let Some(version) = StdVersion::from_rev(version_str) {
-                Some(version)
-            } else {
-                bail!(
-                    "Invalid verion for standard libraries to override: {}",
-                    version_str
-                )
-            }
-        } else {
-            None
-        };
+        let override_std = &build_options.override_std;
 
         resolution_graph
             .build_resolution_graph(
