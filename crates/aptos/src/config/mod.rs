@@ -30,6 +30,7 @@ pub enum ConfigTool {
     RenameProfile(RenameProfile),
     SetGlobalConfig(SetGlobalConfig),
     ShowGlobalConfig(ShowGlobalConfig),
+    ShowPrivateKey(ShowPrivateKey),
     ShowProfiles(ShowProfiles),
 }
 
@@ -41,6 +42,7 @@ impl ConfigTool {
             ConfigTool::RenameProfile(tool) => tool.execute_serialized().await,
             ConfigTool::SetGlobalConfig(tool) => tool.execute_serialized().await,
             ConfigTool::ShowGlobalConfig(tool) => tool.execute_serialized().await,
+            ConfigTool::ShowPrivateKey(tool) => tool.execute_serialized().await,
             ConfigTool::ShowProfiles(tool) => tool.execute_serialized().await,
         }
     }
@@ -116,10 +118,47 @@ impl CliCommand<GlobalConfig> for SetGlobalConfig {
     }
 }
 
-/// Shows the current profiles available
-///
-/// This will only show public information and will not show
-/// private information
+/// Show the private key for the given profile
+#[derive(Parser, Debug)]
+pub struct ShowPrivateKey {
+    /// Which profile's private key to show
+    #[clap(long)]
+    profile: String,
+}
+
+#[async_trait]
+impl CliCommand<String> for ShowPrivateKey {
+    fn command_name(&self) -> &'static str {
+        "ShowPrivateKey"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        let config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
+
+        if let Some(profiles) = &config.profiles {
+            if let Some(profile) = profiles.get(&self.profile.clone()) {
+                if let Some(private_key) = &profile.private_key {
+                    return Ok(format!("0x{}", hex::encode(private_key.to_bytes())));
+                } else {
+                    return Err(CliError::CommandArgumentError(format!(
+                        "Profile {} does not have a private key",
+                        self.profile
+                    )));
+                }
+            } else {
+                return Err(CliError::CommandArgumentError(format!(
+                    "Profile {} does not exist",
+                    self.profile
+                )));
+            };
+        } else {
+            return Err(CliError::CommandArgumentError(
+                "Config has no profiles".to_string(),
+            ));
+        };
+    }
+}
+
 #[derive(Parser, Debug)]
 pub struct ShowProfiles {
     /// Which profile to show
