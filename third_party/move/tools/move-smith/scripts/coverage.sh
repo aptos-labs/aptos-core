@@ -1,9 +1,8 @@
 #!/bin/bash
 
-# Usage:
-# coverage.sh gen <fuzz_target>
-# coverage.sh clean <fuzz_target>
-# coverage.sh clean all
+# Usage: ./scripts/coverage.sh <fuzz_target> [base_dir]
+#
+# `base_dir` should be a directory containing the `corpus/fuzz_target` directory.
 #
 # This script runs `cargo cov -- show` to generate the coverage report from a
 # fuzzing session in HTML format.
@@ -14,36 +13,22 @@
 
 MOVE_SMITH_DIR=$(realpath $(dirname $0)/..)
 
-function usage() {
-    case "$1" in
-        "gen")
-            echo "Usage: $0 gen <fuzz_target>"
-            ;;
-        "clean")
-            echo "Usage: $0 clean <fuzz_target|all>"
-            ;;
-        *)
-            echo "Usage: $0 <gen|clean>"
-            echo "    gen               generate the HTML coverage report"
-            echo "    clean             cleanup generated coverage files"
-            ;;
-    esac
-    exit 1
-}
+function generate_coverage() {
+    local fuzz_target=$1
+    local base_dir=${2:-$MOVE_SMITH_DIR}
 
-function gen() {
-    if [ "$#" -ne 1 ]; then
-        usage gen
-    fi
+    local corpus_dir="$base_dir/fuzz/corpus/$fuzz_target"
+    local target_dir="$base_dir/coverage"
 
-    local fuzz_target="$1"
-    local target_dir="coverage/$fuzz_target"
     mkdir -p $target_dir
+    target_dir=$(realpath $target_dir)
 
-    if [ ! -d "fuzz/coverage/$fuzz_target" ]; then
-        export RUSTFLAGS="$RUSTFLAGS -Zcoverage-options=branch"
-        cargo fuzz coverage $fuzz_target
-    fi
+    echo "Generating coverage report for $corpus_dir"
+    echo "Output directory: $target_dir"
+
+    echo "Collecting coverage data for $fuzz_target"
+    export RUSTFLAGS="$RUSTFLAGS -Zcoverage-options=branch"
+    cargo fuzz coverage $fuzz_target $corpus_dir
 
     fuzz_target_bin=$(find target/*/coverage -name $fuzz_target -type f)
     echo "Found fuzz target binary: $fuzz_target_bin"
@@ -56,21 +41,7 @@ function gen() {
         -Xdemangler=rustfilt \
         --show-branches=count \
         --ignore-filename-regex='rustc/.*/library|\.cargo'
-}
-
-function clean() {
-    if [ "$#" -ne 1 ]; then
-        usage clean
-    fi
-
-    local fuzz_target="$1"
-    local target_dir="coverage/$fuzz_target"
-
-    if [ "$fuzz_target" == "all" ]; then
-        rm -rf coverage
-    else
-        rm -rf $target_dir
-    fi
+    echo "Generated coverage report in $target_dir/index.html"
 }
 
 curr=$(pwd)
@@ -79,16 +50,4 @@ if [ $curr != $MOVE_SMITH_DIR ]; then
     exit 1
 fi
 
-case "$1" in
-  "gen")
-    shift
-    gen "$@"
-    ;;
-  "clean")
-    shift
-    clean "$@"
-    ;;
-  *)
-    usage general
-    ;;
-esac
+generate_coverage $@

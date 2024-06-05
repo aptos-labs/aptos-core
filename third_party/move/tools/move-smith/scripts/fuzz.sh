@@ -45,7 +45,8 @@ function run_fuzz() {
 
     # Create an initial corpus with 8KB inputs
     # This makes libfuzzer to "guess" the max_len should be 8KB
-    create_initial_corpus $fuzz_target 8
+    local input_len=8
+    create_initial_corpus $fuzz_target $input_len
 
     echo "Current date time: $(date)" | tee -a $log_file
     echo "Created initial corpus for $fuzz_target, size: $input_len KB" | tee -a $log_file
@@ -57,6 +58,7 @@ function run_fuzz() {
     if [[ "$OSTYPE" == "linux-gnu" ]]; then
         asan_flag="-s=none"
     fi
+    echo "ASAN flag: $asan_flag" | tee -a $log_file
 
     cargo fuzz run $asan_flag $fuzz_target -- \
         -max_total_time=$total_seconds \
