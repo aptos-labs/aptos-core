@@ -30,10 +30,12 @@ impl<Db: DbReader> FinalityView<Db> {
     /// Updates the information on the latest finalized block's ledger.
     pub fn set_finalized_ledger_info(&self, height: u64) -> Result<()> {
         let (_start_ver, end_ver, block_event) = self.reader.get_block_info_by_height(height)?;
+        let block_hash = block_event.hash()?;
+        dbg!(block_hash);
         let block_info = BlockInfo::new(
             block_event.epoch(),
             block_event.round(),
-            block_event.hash()?,
+            block_hash,
             self.reader.get_accumulator_root_hash(end_ver)?,
             end_ver,
             block_event.proposed_time(),
@@ -99,6 +101,9 @@ mod tests {
 
     #[test]
     fn test_get_latest_ledger_info() {
+        // If the mock is changed to be stateful, this should be ref-counted
+        // and shared with the view.
+        let mock = MockDbReaderWriter;
         let view = FinalityView::new(MockDbReaderWriter);
 
         let ledger_info = view.get_latest_ledger_info_option().unwrap();
@@ -110,7 +115,7 @@ mod tests {
 
         // Capture the block event once
         let (_start_ver, end_ver, block_event) =
-            view.get_block_info_by_height(blockheight).unwrap();
+            mock.get_block_info_by_height(blockheight).unwrap();
         let block_hash = block_event.hash().unwrap(); // Used to verify hash is generated
 
         let block_info = BlockInfo::new(
@@ -129,46 +134,7 @@ mod tests {
         // Get the latest ledger info after setting it
         let ledger_info = view.get_latest_ledger_info_option().unwrap().unwrap();
 
-        // We assert every field except the hash because there is no way
-        // to predict an expected hash value
-        assert_eq!(
-            ledger_info.ledger_info().commit_info().epoch(),
-            expected_ledger_info.ledger_info().commit_info().epoch()
-        );
-        assert_eq!(
-            ledger_info.ledger_info().commit_info().round(),
-            expected_ledger_info.ledger_info().commit_info().round()
-        );
-        assert_eq!(
-            ledger_info.ledger_info().commit_info().version(),
-            expected_ledger_info.ledger_info().commit_info().version()
-        );
-        assert_eq!(
-            ledger_info.ledger_info().commit_info().timestamp_usecs(),
-            expected_ledger_info
-                .ledger_info()
-                .commit_info()
-                .timestamp_usecs()
-        );
-        assert_eq!(
-            ledger_info.ledger_info().commit_info().executed_state_id(),
-            expected_ledger_info
-                .ledger_info()
-                .commit_info()
-                .executed_state_id()
-        );
-        assert_eq!(
-            ledger_info.ledger_info().commit_info().next_epoch_state(),
-            expected_ledger_info
-                .ledger_info()
-                .commit_info()
-                .next_epoch_state()
-        );
-        assert_eq!(
-            ledger_info.ledger_info().consensus_data_hash(),
-            expected_ledger_info.ledger_info().consensus_data_hash()
-        );
-        assert_eq!(ledger_info.signatures(), expected_ledger_info.signatures());
+        assert_eq!(ledger_info, expected_ledger_info);
     }
 
     #[test]
@@ -187,9 +153,6 @@ mod tests {
         let view = FinalityView::new(MockDbReaderWriter);
         let version = view.get_latest_state_checkpoint_version().unwrap();
         assert_eq!(version, None);
-        let fin_ledger_info =
-            LedgerInfoWithSignatures::new(LedgerInfo::dummy(), AggregateSignature::empty());
-        let blockheight = 1;
         view.set_finalized_ledger_info(1).unwrap();
         let version = view.get_latest_state_checkpoint_version().unwrap();
         assert_eq!(version, Some(1));

@@ -76,19 +76,19 @@ impl DbReader for MockDbReaderWriter {
             0,
             1,
             aptos_types::account_config::NewBlockEvent::new(
-                AccountAddress::random(),
+                AccountAddress::ONE,
                 0,
                 0,
                 height,
                 vec![],
-                AccountAddress::random(),
+                AccountAddress::TWO,
                 vec![],
                 0,
             ),
         ))
     }
 
-    fn get_accumulator_root_hash(&self, version: Version) -> Result<HashValue> {
+    fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue> {
         Ok(HashValue::zero())
     }
 }
