@@ -257,7 +257,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             keyless_base_cost: InternalGas,
             { RELEASE_V1_12.. => "keyless.base" },
-            138_000_000,
+            32_000_000,
         ]
     ]
 );
