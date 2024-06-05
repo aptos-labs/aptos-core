@@ -6,3 +6,4 @@
 *.svg
 coverage/
 output/
+*logs/

@@ -77,10 +77,18 @@ pub fn run_transactional_test(code: String) -> Result<(), Box<dyn Error>> {
     }
 }
 
+// TODO: Find a better place for this: config or in fuzz target
+const IGNORE_ERRORS: [&str; 1] = ["cyclic data"];
+
 /// Filtering the error messages from the transactional test.
 /// Currently only treat `error[Exxxx]` as a real error to ignore warnings.
 fn process_transactional_test_err(err: Box<dyn Error>) -> Result<(), Box<dyn Error>> {
     let msg = format!("{:}", err);
+    for ignore in IGNORE_ERRORS.iter() {
+        if msg.contains(ignore) {
+            return Ok(());
+        }
+    }
     if msg.contains("error[E") {
         Err(err)
     } else {
