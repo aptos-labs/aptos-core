@@ -58,7 +58,6 @@ impl DirectMempoolQuorumStore {
             max_items,
             max_bytes,
             return_non_full,
-            false,
             exclude_txns,
             callback,
         );
@@ -141,6 +140,8 @@ impl DirectMempoolQuorumStore {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
                 max_bytes,
+                _max_inline_txns,
+                _max_inline_bytes,
                 return_non_full,
                 payload_filter,
                 callback,

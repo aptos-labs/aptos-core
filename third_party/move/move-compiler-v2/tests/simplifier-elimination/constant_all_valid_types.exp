@@ -1,0 +1,76 @@
+
+Diagnostics:
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/constant_all_valid_types.move:31:10
+   │
+31 │         (C1: u8);
+   │          ^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/constant_all_valid_types.move:32:10
+   │
+32 │         (C2: u64);
+   │          ^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/constant_all_valid_types.move:33:10
+   │
+33 │         (C3: u128);
+   │          ^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/constant_all_valid_types.move:34:10
+   │
+34 │         (C4: bool);
+   │          ^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/constant_all_valid_types.move:35:10
+   │
+35 │         (C5: address);
+   │          ^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/constant_all_valid_types.move:36:10
+   │
+36 │         (C6: vector<u8>);
+   │          ^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/constant_all_valid_types.move:37:10
+   │
+37 │         (C7: vector<u8>);
+   │          ^^
+
+// -- Model dump before bytecode pipeline
+module 0x42::M {
+    private fun t1(): u8 {
+        0
+    }
+    private fun t2(): u64 {
+        0
+    }
+    private fun t3(): u128 {
+        0
+    }
+    private fun t4(): bool {
+        false
+    }
+    private fun t5(): address {
+        0x0
+    }
+    private fun t6(): vector<u8> {
+        [1, 35]
+    }
+    private fun t7(): vector<u8> {
+        [97, 98, 99, 100]
+    }
+} // end 0x42::M
+module <SELF>_0 {
+    private fun t() {
+        Tuple()
+    }
+} // end <SELF>_0
+
+
+============ bytecode verification succeeded ========

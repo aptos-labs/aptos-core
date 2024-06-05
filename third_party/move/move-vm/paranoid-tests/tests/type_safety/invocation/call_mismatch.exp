@@ -9,6 +9,15 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
+task 2 'run'. lines 30-39:
+Error: Script execution failed with VMError: {
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+
 task 3 'run'. lines 41-50:
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -20,8 +29,8 @@ Error: Script execution failed with VMError: {
 
 task 4 'run'. lines 52-61:
 Error: Script execution failed with VMError: {
-    major_status: INTERNAL_TYPE_ERROR,
-    sub_status: None,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
     location: undefined,
     indices: [],
     offsets: [],

@@ -441,6 +441,13 @@ pub enum Visibility {
 
 impl Visibility {
     pub const DEPRECATED_SCRIPT: u8 = 0x2;
+
+    pub fn is_public(&self) -> bool {
+        match self {
+            Self::Public => true,
+            Self::Private | Self::Friend => false,
+        }
+    }
 }
 
 impl std::convert::TryFrom<u8> for Visibility {
@@ -625,7 +632,7 @@ impl Ability {
         }
     }
 
-    /// Returns an interator that iterates over all abilities.
+    /// Returns an iterator that iterates over all abilities.
     pub fn all() -> impl ExactSizeIterator<Item = Ability> {
         use Ability::*;
 
@@ -660,6 +667,8 @@ impl AbilitySet {
     );
     /// The empty ability set
     pub const EMPTY: Self = Self(0);
+    /// Abilities for `Functions`
+    pub const FUNCTIONS: AbilitySet = Self(Ability::Drop as u8);
     /// Abilities for `Bool`, `U8`, `U64`, `U128`, and `Address`
     pub const PRIMITIVES: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
@@ -673,6 +682,14 @@ impl AbilitySet {
 
     pub fn singleton(ability: Ability) -> Self {
         Self(ability as u8)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = Ability> + '_ {
+        Ability::all().filter(|a| self.has_ability(*a))
     }
 
     pub fn has_ability(self, ability: Ability) -> bool {
@@ -805,15 +822,11 @@ impl AbilitySet {
 
 impl fmt::Display for AbilitySet {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let v = Ability::all().filter_map(|a| {
-            if self.has_ability(a) {
-                Some(a.to_string())
-            } else {
-                None
-            }
-        });
         f.write_str(
-            &v.reduce(|l, r| format!("{} & {}", l, r))
+            &self
+                .iter()
+                .map(|a| a.to_string())
+                .reduce(|l, r| format!("{} + {}", l, r))
                 .unwrap_or_default(),
         )
     }
@@ -1404,7 +1417,7 @@ pub enum Bytecode {
     /// ```..., integer_value -> ..., u128_value```
     CastU128,
     /// Push a `Constant` onto the stack. The value is loaded and deserialized (according to its
-    /// type) from the the `ConstantPool` via `ConstantPoolIndex`
+    /// type) from the `ConstantPool` via `ConstantPoolIndex`
     ///
     /// Stack transition:
     ///
@@ -2228,6 +2241,14 @@ impl CompiledModule {
     /// Returns the code key of `self`
     pub fn self_id(&self) -> ModuleId {
         self.module_id_for_handle(self.self_handle())
+    }
+
+    pub fn self_addr(&self) -> &AccountAddress {
+        self.address_identifier_at(self.self_handle().address)
+    }
+
+    pub fn self_name(&self) -> &IdentStr {
+        self.identifier_at(self.self_handle().name)
     }
 }
 

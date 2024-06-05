@@ -77,13 +77,45 @@ spec:
         {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
         app.kubernetes.io/name: validator
         app.kubernetes.io/instance: validator-{{$i}}
+        {{- if $.Values.chain.name }}
+        chain_name: {{ $.Values.chain.name }}
+        {{- end}}
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: runtime/default
         checksum/validator.yaml: {{ tpl ($.Files.Get "files/configs/validator.yaml") $ | sha256sum }}
         prometheus.io/scrape: "true"
         prometheus.io/port: "9101"
+        {{- if $.Values.metrics.destination }}
+        aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
+        {{- end}}
     spec:
       terminationGracePeriodSeconds: 0
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: run-script
+          image: curlimages/curl:latest
+          command:
+            - sh
+            - -c
+            - |
+              set -x
+              cp /opt/aptos/genesis_readonly/* /opt/aptos/genesis
+              if [ ! -f /opt/aptos/genesis/genesis.blob ]; then
+                genesis_blob_upload_url="{{ $.Values.genesis_blob_upload_url }}"
+                genesis_blob_upload_url="$genesis_blob_upload_url&namespace={{ $.Release.Namespace }}&method=GET"
+                echo "genesis.blob not found locally, downloading..."
+                signed_url=$(curl -s -X GET "$genesis_blob_upload_url")
+                curl -o /opt/aptos/genesis/genesis.blob "$signed_url"
+              else
+                echo "genesis.blob found locally"
+              fi
+              ls -l /opt/aptos/genesis
+          volumeMounts:
+            - name: genesis-config
+              mountPath: /opt/aptos/genesis_readonly
+            - name: writable-genesis
+              mountPath: /opt/aptos/genesis
       containers:
       - name: validator
         {{- if and $validator_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
@@ -124,7 +156,7 @@ spec:
         volumeMounts:
         - name: aptos-config
           mountPath: /opt/aptos/etc
-        - name: genesis-config
+        - name: writable-genesis
           mountPath: /opt/aptos/genesis
         - name: aptos-data
           mountPath: /opt/aptos/data
@@ -173,6 +205,8 @@ spec:
         runAsGroup: 6180
         fsGroup: 6180
         {{- end }}
+        seccompProfile:
+          type: RuntimeDefault
       {{- end }}
       volumes:
       - name: aptos-config
@@ -186,6 +220,8 @@ spec:
       - name: aptos-data
         persistentVolumeClaim:
           claimName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator-e{{ $.Values.chain.era }}
+      - name: writable-genesis
+        emptyDir: {}
       serviceAccountName: {{ include "aptos-validator.fullname" $ }}-validator
       {{- if $.Values.imagePullSecret }}
       imagePullSecrets:

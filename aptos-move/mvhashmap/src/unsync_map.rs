@@ -4,6 +4,7 @@
 use crate::{
     types::{GroupReadResult, MVModulesOutput, UnsyncGroupError, ValueWithLayout},
     utils::module_hash,
+    BlockStateStats,
 };
 use aptos_aggregator::types::{code_invariant_error, DelayedFieldValue};
 use aptos_crypto::hash::HashValue;
@@ -16,7 +17,16 @@ use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::MoveTypeLayout;
 use serde::Serialize;
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fmt::Debug,
+    hash::Hash,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+};
 
 /// UnsyncMap is designed to mimic the functionality of MVHashMap for sequential execution.
 /// In this case only the latest recorded version is relevant, simplifying the implementation.
@@ -38,6 +48,9 @@ pub struct UnsyncMap<
     executable_cache: RefCell<HashMap<HashValue, Arc<X>>>,
     executable_bytes: RefCell<usize>,
     delayed_field_map: RefCell<HashMap<I, DelayedFieldValue>>,
+
+    total_base_resource_size: AtomicU64,
+    total_base_delayed_field_size: AtomicU64,
 }
 
 impl<
@@ -56,6 +69,8 @@ impl<
             executable_cache: RefCell::new(HashMap::new()),
             executable_bytes: RefCell::new(0),
             delayed_field_map: RefCell::new(HashMap::new()),
+            total_base_resource_size: AtomicU64::new(0),
+            total_base_delayed_field_size: AtomicU64::new(0),
         }
     }
 }
@@ -70,6 +85,17 @@ impl<
 {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn stats(&self) -> BlockStateStats {
+        BlockStateStats {
+            num_resources: self.resource_map.borrow().len(),
+            num_resource_groups: self.group_cache.borrow().len(),
+            num_delayed_fields: self.delayed_field_map.borrow().len(),
+            num_modules: self.module_map.borrow().len(),
+            base_resources_size: self.total_base_resource_size.load(Ordering::Relaxed),
+            base_delayed_fields_size: self.total_base_delayed_field_size.load(Ordering::Relaxed),
+        }
     }
 
     pub fn set_group_base_values(
@@ -245,7 +271,13 @@ impl<
     }
 
     pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
-        self.resource_map.borrow_mut().insert(key, value);
+        let cur_size = value.bytes_len();
+        if self.resource_map.borrow_mut().insert(key, value).is_none() {
+            if let Some(cur_size) = cur_size {
+                self.total_base_resource_size
+                    .fetch_add(cur_size as u64, Ordering::Relaxed);
+            }
+        }
     }
 
     /// We return false if the executable was already stored, as this isn't supposed to happen
@@ -272,6 +304,14 @@ impl<
     }
 
     pub fn write_delayed_field(&self, id: I, value: DelayedFieldValue) {
+        self.delayed_field_map.borrow_mut().insert(id, value);
+    }
+
+    pub fn set_base_delayed_field(&self, id: I, value: DelayedFieldValue) {
+        self.total_base_delayed_field_size.fetch_add(
+            value.get_approximate_memory_size() as u64,
+            Ordering::Relaxed,
+        );
         self.delayed_field_map.borrow_mut().insert(id, value);
     }
 }

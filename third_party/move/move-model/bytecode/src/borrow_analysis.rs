@@ -571,13 +571,14 @@ impl<'a> BorrowAnalysis<'a> {
         let state_map = self.analyze_function(state, instrs, &cfg);
 
         // Summarize the result
-        let code_map = self.state_per_instruction(state_map, instrs, &cfg, |before, after| {
-            let mut before = before.clone();
-            let mut after = after.clone();
-            before.consolidate();
-            after.consolidate();
-            BorrowInfoAtCodeOffset { before, after }
-        });
+        let code_map =
+            self.state_per_instruction_with_default(state_map, instrs, &cfg, |before, after| {
+                let mut before = before.clone();
+                let mut after = after.clone();
+                before.consolidate();
+                after.consolidate();
+                BorrowInfoAtCodeOffset { before, after }
+            });
         let mut summary = BorrowInfo::default();
         for (offs, code) in instrs.iter().enumerate() {
             if let Bytecode::Ret(_, temps) = code {
@@ -620,15 +621,17 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                 let src_node = self.borrow_node(*src);
                 match kind {
                     AssignKind::Move | AssignKind::Inferred => {
-                        assert!(!self.func_target.get_local_type(*src).is_reference());
-                        assert!(!self.func_target.get_local_type(*dest).is_reference());
-                        state.del_node(&src_node);
+                        if self.func_target.get_local_type(*src).is_mutable_reference() {
+                            assert!(self
+                                .func_target
+                                .get_local_type(*dest)
+                                .is_mutable_reference());
+                            state.add_edge(src_node, dest_node, BorrowEdge::Direct);
+                        } else {
+                            state.del_node(&src_node)
+                        }
                     },
-                    AssignKind::Copy => {
-                        assert!(!self.func_target.get_local_type(*src).is_reference());
-                        assert!(!self.func_target.get_local_type(*dest).is_reference());
-                    },
-                    AssignKind::Store => {
+                    AssignKind::Copy | AssignKind::Store => {
                         if self.func_target.get_local_type(*src).is_mutable_reference() {
                             assert!(self
                                 .func_target

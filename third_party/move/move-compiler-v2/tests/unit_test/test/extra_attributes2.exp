@@ -1,0 +1,28 @@
+
+Diagnostics:
+error: invalid attribute
+  ┌─ tests/unit_test/test/extra_attributes2.move:9:38
+  │
+9 │     #[expected_failure(abort_code=3, test, location=Self)]
+  │                                      ^^^^ Attribute 'test' is not expected in a nested attribute position
+
+error: invalid attribute
+   ┌─ tests/unit_test/test/extra_attributes2.move:13:38
+   │
+13 │     #[expected_failure(vector_error, test_only, location=Self)]
+   │                                      ^^^^^^^^^ Attribute 'test_only' is not expected in a nested attribute position
+
+error: invalid attribute
+   ┌─ tests/unit_test/test/extra_attributes2.move:17:24
+   │
+17 │     #[expected_failure(bytecode_instruction, location=Self)]
+   │                        ^^^^^^^^^^^^^^^^^^^^ Attribute 'bytecode_instruction' is not expected in a nested attribute position
+
+error: invalid attribute
+   ┌─ tests/unit_test/test/extra_attributes2.move:21:24
+   │
+21 │     #[expected_failure(verify_only)]
+   │                        ^^^^^^^^^^^ Attribute 'verify_only' is not expected in a nested attribute position
+
+
+============ bytecode verification succeeded ========

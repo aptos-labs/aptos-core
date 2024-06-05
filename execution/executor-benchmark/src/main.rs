@@ -22,7 +22,7 @@ use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadMa
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
-use aptos_transaction_generator_lib::args::TransactionTypeArg;
+use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
 use aptos_vm::AptosVM;
 use clap::{ArgGroup, Parser, Subcommand};
 use once_cell::sync::Lazy;
@@ -259,6 +259,9 @@ struct Opt {
 
     #[clap(flatten)]
     profiler_opt: ProfilerOpt,
+
+    #[clap(long)]
+    skip_paranoid_checks: bool,
 }
 
 impl Opt {
@@ -378,6 +381,7 @@ where
                     &[],
                     module_working_set_size,
                     use_sender_account_pool,
+                    WorkflowProgress::MoveByPhases,
                 );
                 assert!(mix_per_phase.len() == 1);
                 Some(mix_per_phase[0].clone())
@@ -486,6 +490,9 @@ fn main() {
         execution_threads_per_shard = execution_threads;
     }
 
+    if opt.skip_paranoid_checks {
+        AptosVM::set_paranoid_type_checks(false);
+    }
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);
     NativeExecutor::set_concurrency_level_once(execution_threads_per_shard);

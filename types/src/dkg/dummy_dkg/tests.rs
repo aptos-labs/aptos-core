@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     dkg::{
         dummy_dkg::{DummyDKG, DummyDKGTranscript, DummySecret},
         DKGSessionMetadata, DKGTrait,
     },
+    on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };
 use aptos_crypto::{bls12381, Uniform};
@@ -95,6 +97,7 @@ fn test_dummy_dkg_correctness() {
     // Now imagine DKG starts.
     let dkg_session_metadata = DKGSessionMetadata {
         dealer_epoch: 999,
+        randomness_config: OnChainRandomnessConfig::default_enabled().into(),
         dealer_validator_set: dealer_infos.clone(),
         target_validator_set: new_validator_infos.clone(),
     };

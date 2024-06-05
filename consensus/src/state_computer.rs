@@ -217,22 +217,43 @@ impl StateComputer for ExecutionProxy {
             .await;
 
         Box::pin(async move {
+            let pipeline_execution_result = fut.await?;
             debug!(
                 block_id = block_id,
                 "Got state compute result, post processing."
             );
-            let pipeline_execution_result = fut.await?;
-            let input_txns = pipeline_execution_result.input_txns.clone();
+            let user_txns = &pipeline_execution_result.input_txns;
             let result = &pipeline_execution_result.result;
 
             observe_block(timestamp, BlockStage::EXECUTED);
 
-            // notify mempool about failed transaction
-            if let Err(e) = txn_notifier.notify_failed_txn(input_txns, result).await {
-                error!(
-                    error = ?e, "Failed to notify mempool of rejected txns",
-                );
+            let compute_status = result.compute_status_for_input_txns();
+            // the length of compute_status is user_txns.len() + num_vtxns + 1 due to having blockmetadata
+            if user_txns.len() >= compute_status.len() {
+                // reconfiguration suffix blocks don't have any transactions
+                // otherwise, this is an error
+                if !compute_status.is_empty() {
+                    error!(
+                        "Expected compute_status length and actual compute_status length mismatch! user_txns len: {}, compute_status len: {}, has_reconfiguration: {}",
+                        user_txns.len(),
+                        compute_status.len(),
+                        result.has_reconfiguration(),
+                    );
+                }
+            } else {
+                let user_txn_status = &compute_status[compute_status.len() - user_txns.len()..];
+
+                // notify mempool about failed transaction
+                if let Err(e) = txn_notifier
+                    .notify_failed_txn(user_txns, user_txn_status)
+                    .await
+                {
+                    error!(
+                        error = ?e, "Failed to notify mempool of rejected txns",
+                    );
+                }
             }
+
             Ok(pipeline_execution_result)
         })
     }
@@ -404,7 +425,7 @@ async fn test_commit_sync_race() {
         block_info::BlockInfo,
         ledger_info::LedgerInfo,
         on_chain_config::{TransactionDeduperType, TransactionShufflerType},
-        transaction::SignedTransaction,
+        transaction::{SignedTransaction, TransactionStatus},
     };
 
     struct RecordedCommit {
@@ -467,8 +488,8 @@ async fn test_commit_sync_race() {
     impl TxnNotifier for RecordedCommit {
         async fn notify_failed_txn(
             &self,
-            _txns: Vec<SignedTransaction>,
-            _compute_results: &StateComputeResult,
+            _txns: &[SignedTransaction],
+            _compute_results: &[TransactionStatus],
         ) -> Result<(), MempoolError> {
             Ok(())
         }

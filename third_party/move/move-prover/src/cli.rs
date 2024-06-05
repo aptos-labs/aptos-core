@@ -11,11 +11,16 @@ use clap::{builder::PossibleValuesParser, Arg, ArgAction, ArgAction::SetTrue, Co
 use codespan_reporting::diagnostic::Severity;
 use log::LevelFilter;
 use move_abigen::AbigenOptions;
+use move_command_line_common::env::{bool_to_str, get_move_compiler_v2_from_env};
 use move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddress};
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
-use move_model::{model::VerificationScope, options::ModelBuilderOptions};
-use move_prover_boogie_backend::options::{BoogieOptions, VectorTheory};
+use move_model::{
+    metadata::{CompilerVersion, LanguageVersion},
+    model::VerificationScope,
+    options::ModelBuilderOptions,
+};
+use move_prover_boogie_backend::options::{BoogieOptions, CustomNativeOptions, VectorTheory};
 use move_prover_bytecode_pipeline::options::{AutoTraceLevel, ProverOptions};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -55,9 +60,16 @@ pub struct Options {
     /// Whether to run the read write set analysis instead of the prover
     pub run_read_write_set: bool,
     /// The paths to the Move sources.
+    /// Each source path should refer to either (1) a Move file or (2) a directory containing Move
+    /// files, all to be compiled (e.g., not the root directory of a package---which contains
+    /// Move.toml---but a specific subdirectorysuch as `sources`, `scripts`, and/or `tests`,
+    /// depending on compilation mode).
     pub move_sources: Vec<String>,
     /// The paths to any dependencies for the Move sources. Those will not be verified but
     /// can be used by `move_sources`.
+    /// Each move_dep path should refer to either (1) a Move file or (2) a directory containing
+    /// Move files, all to be compiled (e.g., not the root directory of a package---which contains
+    /// Move.toml---but a specific subdirectorysuch as `sources`).
     pub move_deps: Vec<String>,
     /// The values assigned to named addresses in the Move code being verified.
     pub move_named_address_values: Vec<String>,
@@ -65,7 +77,10 @@ pub struct Options {
     pub experimental_pipeline: bool,
     /// Whether to skip checking for unknown attributes
     pub skip_attribute_checks: bool,
-
+    /// Whether to use compiler v2 to compile Move code
+    pub compiler_v2: bool,
+    /// The language version to use
+    pub language_version: Option<LanguageVersion>,
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
     /// Options for the model builder.
     pub model_builder: ModelBuilderOptions,
@@ -103,6 +118,11 @@ impl Default for Options {
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
             skip_attribute_checks: false,
+            compiler_v2: match CompilerVersion::default() {
+                CompilerVersion::V1 => false,
+                CompilerVersion::V2_0 => true,
+            },
+            language_version: None,
         }
     }
 }
@@ -156,6 +176,25 @@ impl Options {
                     .long("print-config")
                     .action(SetTrue)
                     .help("prints the effective toml configuration, then exits")
+            )
+            .arg(
+                Arg::new("aptos")
+                    .long("aptos")
+                    .action(SetTrue)
+                    .help("configures the prover to use Aptos natives")
+            )
+            .arg(
+                Arg::new("compiler-v2")
+                    .long("compiler-v2")
+                    .default_value(bool_to_str(get_move_compiler_v2_from_env()))
+                    .action(SetTrue)
+                    .help("whether to use Move compiler v2 to compile to bytecode")
+            )
+            .arg(
+                Arg::new("language-version")
+                    .long("language-version")
+                    .value_parser(clap::value_parser!(LanguageVersion))
+                    .help("the language version to use")
             )
             .arg(
                 Arg::new("output")
@@ -763,6 +802,31 @@ impl Options {
             options.prover.ban_int_2_bv = true;
         }
 
+        if matches.get_flag("aptos") {
+            options.backend.custom_natives = Some(CustomNativeOptions {
+                template_bytes: include_bytes!(
+                    "../../../../aptos-move/framework/src/aptos-natives.bpl"
+                )
+                .to_vec(),
+                module_instance_names: vec![(
+                    "0x1::object".to_string(),
+                    "object_instances".to_string(),
+                    true,
+                )],
+            });
+            options
+                .move_named_address_values
+                .push("Extensions=0x1".to_string())
+        }
+        if matches.get_flag("compiler-v2") {
+            options.compiler_v2 = true;
+        }
+        if matches.contains_id("language-version") {
+            options.language_version = matches
+                .get_one::<LanguageVersion>("language-version")
+                .cloned();
+        }
+
         options.backend.derive_options();
 
         if matches.get_flag("print-config") {
@@ -786,7 +850,8 @@ impl Options {
             .set_time_level(LevelFilter::Debug)
             .set_level_padding(LevelPadding::Off)
             .build();
-        let logger = if atty::is(atty::Stream::Stderr) && atty::is(atty::Stream::Stdout) {
+        // Ignore error if logger is already setup
+        let _logger = if atty::is(atty::Stream::Stderr) && atty::is(atty::Stream::Stdout) {
             CombinedLogger::init(vec![TermLogger::new(
                 self.verbosity_level,
                 config,
@@ -795,7 +860,6 @@ impl Options {
         } else {
             CombinedLogger::init(vec![SimpleLogger::new(self.verbosity_level, config)])
         };
-        logger.expect("Unexpected CombinedLogger init failure");
     }
 
     pub fn setup_logging_for_test(&self) {
@@ -806,8 +870,8 @@ impl Options {
             return;
         }
         TEST_MODE.store(true, Ordering::Relaxed);
-        SimpleLogger::init(self.verbosity_level, Config::default())
-            .expect("UnexpectedSimpleLogger failure");
+        // Ignore error if logger is already setup
+        let _ = SimpleLogger::init(self.verbosity_level, Config::default());
     }
 
     /// Convenience function to enable debugging (like high verbosity) on this instance.

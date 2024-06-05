@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::m {
     use std::vector;
     struct E {
@@ -8,10 +8,7 @@ module 0x42::m {
         data: vector<m::E>,
     }
     public fun foo(v: &m::S): u8 {
-        select m::E.k(vector::borrow<m::E>(Borrow(Immutable)(select m::S.data(v)), 0))
-    }
-    spec fun $foo(v: m::S): u8 {
-        select m::E.k(vector::$borrow<m::E>(select m::S.data(v), 0))
+        select m::E.k<&m::E>(vector::borrow<m::E>(Borrow(Immutable)(select m::S.data<&m::S>(v)), 0))
     }
 } // end 0x42::m
 
@@ -31,3 +28,6 @@ public fun m::foo($t0: &m::S): u8 {
   4: $t1 := read_ref($t5)
   5: return $t1
 }
+
+
+============ bytecode verification succeeded ========

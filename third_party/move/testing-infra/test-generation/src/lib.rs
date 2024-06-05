@@ -39,7 +39,7 @@ use move_core_types::{
     value::MoveValue,
     vm_status::{StatusCode, VMStatus},
 };
-use move_vm_runtime::move_vm::MoveVM;
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
@@ -156,6 +156,7 @@ fn execute_function_in_module(
             .unwrap();
         let delta_storage = DeltaStorage::new(storage, &changeset);
         let mut sess = vm.new_session(&delta_storage);
+        let traversal_storage = TraversalStorage::new();
 
         sess.execute_function_bypass_visibility(
             &module_id,
@@ -163,6 +164,7 @@ fn execute_function_in_module(
             ty_args,
             args,
             &mut UnmeteredGasMeter,
+            &mut TraversalContext::new(&traversal_storage),
         )?;
 
         Ok(())

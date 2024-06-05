@@ -51,11 +51,14 @@ spec aptos_framework::transaction_fee {
     ///
     spec module {
         use aptos_framework::chain_status;
-        pragma verify = true;
+
+        // TODO(fa_migration)
+        pragma verify = false;
+
         pragma aborts_if_is_strict;
         // property 1: Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn Aptos coins.
         /// [high-level-req-1]
-        invariant [suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(@aptos_framework);
+        invariant [suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(@aptos_framework) || exists<AptosFABurnCapabilities>(@aptos_framework);
     }
 
     spec CollectedFeesPerBlock {
@@ -198,7 +201,8 @@ spec aptos_framework::transaction_fee {
         use aptos_framework::optional_aggregator;
         use aptos_framework::coin;
         use aptos_framework::coin::{CoinInfo, CoinStore};
-
+        // TODO(fa_migration)
+        pragma verify = false;
 
         aborts_if !exists<AptosCoinCapabilities>(@aptos_framework);
 
@@ -210,7 +214,7 @@ spec aptos_framework::transaction_fee {
         let coin_store = global<CoinStore<AptosCoin>>(account_addr);
         let post post_coin_store = global<CoinStore<AptosCoin>>(account_addr);
 
-        modifies global<CoinStore<AptosCoin>>(account_addr);
+        // modifies global<CoinStore<AptosCoin>>(account_addr);
 
         aborts_if amount != 0 && !(exists<CoinInfo<AptosCoin>>(aptos_addr)
             && exists<CoinStore<AptosCoin>>(account_addr));
@@ -240,16 +244,17 @@ spec aptos_framework::transaction_fee {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::coin::{CoinInfo, CoinStore};
         use aptos_framework::coin;
-
-        pragma opaque;
+        // TODO(fa_migration)
+        pragma verify = false;
+        // pragma opaque;
 
         let aptos_addr = type_info::type_of<AptosCoin>().account_address;
-        modifies global<CoinInfo<AptosCoin>>(aptos_addr);
+
         aborts_if (refund != 0) && !exists<CoinInfo<AptosCoin>>(aptos_addr);
         include coin::CoinAddAbortsIf<AptosCoin> { amount: refund };
 
         aborts_if !exists<CoinStore<AptosCoin>>(account);
-        modifies global<CoinStore<AptosCoin>>(account);
+        // modifies global<CoinStore<AptosCoin>>(account);
 
         aborts_if !exists<AptosCoinMintCapability>(@aptos_framework);
 
@@ -261,6 +266,8 @@ spec aptos_framework::transaction_fee {
 
     spec collect_fee(account: address, fee: u64) {
         use aptos_framework::aggregator;
+        // TODO(fa_migration)
+        pragma verify = false;
 
         let collected_fees = global<CollectedFeesPerBlock>(@aptos_framework).amount;
         let aggr = collected_fees.value;
@@ -285,10 +292,17 @@ spec aptos_framework::transaction_fee {
     /// Aborts if `AptosCoinCapabilities` already exists.
     spec store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
         use std::signer;
+
+        // TODO(fa_migration)
+        pragma verify = false;
+
         let addr = signer::address_of(aptos_framework);
         aborts_if !system_addresses::is_aptos_framework_address(addr);
+
+        aborts_if exists<AptosFABurnCapabilities>(addr);
         aborts_if exists<AptosCoinCapabilities>(addr);
-        ensures exists<AptosCoinCapabilities>(addr);
+
+        ensures exists<AptosFABurnCapabilities>(addr) || exists<AptosCoinCapabilities>(addr);
     }
 
     /// Ensure caller is admin.

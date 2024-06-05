@@ -304,9 +304,8 @@ fn verify_simple_payment() {
 
     // Test for a max_gas_amount that is insufficient to pay the minimum fee.
     // Find the minimum transaction gas units and subtract 1.
-    let mut gas_limit: Gas = txn_gas_params
-        .min_transaction_gas_units
-        .to_unit_round_up_with_params(&txn_gas_params);
+    let mut gas_limit: Gas =
+        (txn_gas_params.min_transaction_gas_units).to_unit_round_up_with_params(&txn_gas_params);
 
     if gas_limit > 0.into() {
         gas_limit = gas_limit.checked_sub(1.into()).unwrap();
@@ -657,7 +656,7 @@ fn test_type_tag_dependency_fails_verification() {
                 address: account_config::CORE_CODE_ADDRESS,
                 module: Identifier::new("Test").unwrap(),
                 name: Identifier::new("S1").unwrap(),
-                type_params: vec![],
+                type_args: vec![],
             }))],
             vec![],
         ))
@@ -765,7 +764,7 @@ fn test_type_tag_transitive_dependency_fails_verification() {
                 address: account_config::CORE_CODE_ADDRESS,
                 module: Identifier::new("Test2").unwrap(),
                 name: Identifier::new("S").unwrap(),
-                type_params: vec![],
+                type_args: vec![],
             }))],
             vec![],
         ))

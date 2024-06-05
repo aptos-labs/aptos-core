@@ -14,10 +14,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
-use aptos_storage_interface::{
-    block_info::{BlockInfo, BlockInfoV0},
-    db_ensure as ensure, AptosDbError, Result,
-};
+use aptos_storage_interface::{block_info::BlockInfo, db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     account_config::NewBlockEvent, block_info::BlockHeight, contract_event::ContractEvent,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
@@ -76,7 +73,7 @@ impl LedgerMetadataDb {
         self.db.write_schemas(batch)
     }
 
-    pub(crate) fn get_latest_version(&self) -> Result<Version> {
+    pub(crate) fn get_synced_version(&self) -> Result<Version> {
         get_progress(&self.db, &DbMetadataKey::OverallCommitProgress)?.ok_or(
             AptosDbError::NotFound("No OverallCommitProgress in db.".to_string()),
         )
@@ -310,19 +307,7 @@ impl LedgerMetadataDb {
     ) -> Result<()> {
         let new_block_event = NewBlockEvent::try_from_bytes(event.event_data())?;
         let block_height = new_block_event.height();
-        let id = new_block_event.hash()?;
-        let epoch = new_block_event.epoch();
-        let round = new_block_event.round();
-        let proposer = new_block_event.proposer();
-        let block_timestamp_usecs = new_block_event.proposed_time();
-        let block_info = BlockInfo::V0(BlockInfoV0::new(
-            id,
-            epoch,
-            round,
-            proposer,
-            block_timestamp_usecs,
-            version,
-        ));
+        let block_info = BlockInfo::from_new_block_event(version, &new_block_event);
         batch.put::<BlockInfoSchema>(&block_height, &block_info)?;
         batch.put::<BlockByVersionSchema>(&version, &block_height)?;
 

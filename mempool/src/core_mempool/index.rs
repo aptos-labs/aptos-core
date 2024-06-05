@@ -10,6 +10,7 @@ use crate::{
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_consensus_types::common::TransactionSummary;
+use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::account_address::AccountAddress;
 use rand::seq::SliceRandom;
@@ -18,7 +19,7 @@ use std::{
     collections::{btree_set::Iter, BTreeMap, BTreeSet, HashMap},
     iter::Rev,
     ops::Bound,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 pub type AccountTransactions = BTreeMap<u64, MempoolTransaction>;
@@ -60,6 +61,7 @@ impl PriorityIndex {
             expiration_time: txn.expiration_time,
             address: txn.get_sender(),
             sequence_number: txn.sequence_info,
+            hash: txn.get_committed_hash(),
         }
     }
 
@@ -78,6 +80,7 @@ pub struct OrderedQueueKey {
     pub expiration_time: Duration,
     pub address: AccountAddress,
     pub sequence_number: SequenceInfo,
+    pub hash: HashValue,
 }
 
 impl PartialOrd for OrderedQueueKey {
@@ -100,10 +103,16 @@ impl Ord for OrderedQueueKey {
             Ordering::Equal => {},
             ordering => return ordering,
         }
-        self.sequence_number
+        match self
+            .sequence_number
             .transaction_sequence_number
             .cmp(&other.sequence_number.transaction_sequence_number)
             .reverse()
+        {
+            Ordering::Equal => {},
+            ordering => return ordering,
+        }
+        self.hash.cmp(&other.hash)
     }
 }
 
@@ -391,7 +400,7 @@ pub struct ParkingLotIndex {
     // DS invariants:
     // 1. for each entry (account, txns) in `data`, `txns` is never empty
     // 2. for all accounts, data.get(account_indices.get(`account`)) == (account, sequence numbers of account's txns)
-    data: Vec<(AccountAddress, BTreeSet<u64>)>,
+    data: Vec<(AccountAddress, BTreeSet<(u64, HashValue)>)>,
     account_indices: HashMap<AccountAddress, usize>,
     size: usize,
 }
@@ -405,13 +414,19 @@ impl ParkingLotIndex {
         }
     }
 
-    pub(crate) fn insert(&mut self, txn: &MempoolTransaction) {
+    pub(crate) fn insert(&mut self, txn: &mut MempoolTransaction) {
+        if txn.insertion_info.park_time.is_none() {
+            txn.insertion_info.park_time = Some(SystemTime::now());
+        }
+        txn.was_parked = true;
+
         let sender = &txn.txn.sender();
         let sequence_number = txn.txn.sequence_number();
+        let hash = txn.get_committed_hash();
         let is_new_entry = match self.account_indices.get(sender) {
             Some(index) => {
                 if let Some((_account, seq_nums)) = self.data.get_mut(*index) {
-                    seq_nums.insert(sequence_number)
+                    seq_nums.insert((sequence_number, hash))
                 } else {
                     counters::CORE_MEMPOOL_INVARIANT_VIOLATION_COUNT.inc();
                     error!(
@@ -423,8 +438,11 @@ impl ParkingLotIndex {
                 }
             },
             None => {
-                let seq_nums = [sequence_number].iter().cloned().collect::<BTreeSet<_>>();
-                self.data.push((*sender, seq_nums));
+                let entry = [(sequence_number, hash)]
+                    .iter()
+                    .cloned()
+                    .collect::<BTreeSet<_>>();
+                self.data.push((*sender, entry));
                 self.account_indices.insert(*sender, self.data.len() - 1);
                 true
             },
@@ -438,7 +456,7 @@ impl ParkingLotIndex {
         let sender = &txn.txn.sender();
         if let Some(index) = self.account_indices.get(sender).cloned() {
             if let Some((_account, txns)) = self.data.get_mut(index) {
-                if txns.remove(&txn.txn.sequence_number()) {
+                if txns.remove(&(txn.txn.sequence_number(), txn.get_committed_hash())) {
                     self.size -= 1;
                 }
 
@@ -457,20 +475,21 @@ impl ParkingLotIndex {
         }
     }
 
-    pub(crate) fn contains(&self, account: &AccountAddress, seq_num: &u64) -> bool {
+    pub(crate) fn contains(&self, account: &AccountAddress, seq_num: u64, hash: HashValue) -> bool {
         self.account_indices
             .get(account)
             .and_then(|idx| self.data.get(*idx))
-            .map_or(false, |(_account, txns)| txns.contains(seq_num))
+            .map_or(false, |(_account, txns)| txns.contains(&(seq_num, hash)))
     }
 
     /// Returns a random "non-ready" transaction (with highest sequence number for that account).
     pub(crate) fn get_poppable(&self) -> Option<TxnPointer> {
         let mut rng = rand::thread_rng();
         self.data.choose(&mut rng).and_then(|(sender, txns)| {
-            txns.iter().next_back().map(|seq_num| TxnPointer {
+            txns.iter().next_back().map(|(seq_num, hash)| TxnPointer {
                 sender: *sender,
                 sequence_number: *seq_num,
+                hash: *hash,
             })
         })
     }
@@ -489,6 +508,7 @@ impl From<&MempoolTransaction> for TxnPointer {
         Self {
             sender: txn.get_sender(),
             sequence_number: txn.sequence_info.transaction_sequence_number,
+            hash: txn.get_committed_hash(),
         }
     }
 }
@@ -498,6 +518,7 @@ impl From<&OrderedQueueKey> for TxnPointer {
         Self {
             sender: key.address,
             sequence_number: key.sequence_number.transaction_sequence_number,
+            hash: key.hash,
         }
     }
 }

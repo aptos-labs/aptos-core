@@ -244,6 +244,17 @@ impl DelayedFieldValue {
             },
         })
     }
+
+    /// Approximate memory consumption of current DelayedFieldValue
+    pub fn get_approximate_memory_size(&self) -> usize {
+        // 32 + len
+        std::mem::size_of::<DelayedFieldValue>()
+            + match &self {
+                DelayedFieldValue::Aggregator(_) | DelayedFieldValue::Snapshot(_) => 0,
+                // additional allocated memory for the data:
+                DelayedFieldValue::Derived(v) => v.len(),
+            }
+    }
 }
 
 impl TryFromMoveValue for DelayedFieldValue {

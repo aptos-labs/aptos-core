@@ -7,8 +7,12 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockReader, BlockRetriever, BlockStore,
     },
-    counters,
-    counters::{PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
+    counters::{
+        self, ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE, ORDER_VOTE_ADDED,
+        ORDER_VOTE_BROADCASTED, ORDER_VOTE_OTHER_ERRORS, ORDER_VOTE_VERY_OLD, PROPOSAL_VOTE_ADDED,
+        PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT,
+        QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT,
+    },
     error::{error_kind, VerifyError},
     liveness::{
         proposal_generator::ProposalGenerator,
@@ -21,9 +25,11 @@ use crate::{
     monitor,
     network::NetworkSender,
     network_interface::ConsensusMsg,
+    pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
+    rand::rand_gen::types::{FastShare, RandConfig, Share, TShare},
     util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure, Context};
@@ -34,28 +40,38 @@ use aptos_consensus_types::{
     block_data::BlockType,
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
-    proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
+    order_vote_msg::OrderVoteMsg,
+    proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
     vote::Vote,
+    vote_data::VoteData,
     vote_msg::VoteMsg,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
+use aptos_crypto::HashValue;
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
 use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
+    block_info::BlockInfo,
     epoch_state::EpochState,
-    on_chain_config::{Features, OnChainConsensusConfig, ValidatorTxnConfig},
+    on_chain_config::{
+        OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+        ValidatorTxnConfig,
+    },
+    randomness::RandMetadata,
     validator_verifier::ValidatorVerifier,
     PeerId,
 };
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
 use futures_channel::mpsc::UnboundedReceiver;
+use lru::LruCache;
 use serde::Serialize;
 use std::{mem::Discriminant, sync::Arc, time::Duration};
 use tokio::{
@@ -67,6 +83,7 @@ use tokio::{
 pub enum UnverifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VoteMsg(Box<VoteMsg>),
+    OrderVoteMsg(Box<OrderVoteMsg>),
     SyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
@@ -80,6 +97,7 @@ impl UnverifiedEvent {
         self,
         peer_id: PeerId,
         validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
         quorum_store_enabled: bool,
         self_message: bool,
         max_num_batches: usize,
@@ -90,7 +108,7 @@ impl UnverifiedEvent {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
                 if !self_message {
-                    p.verify(validator, quorum_store_enabled)?;
+                    p.verify(validator, proof_cache, quorum_store_enabled)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proposal"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -105,6 +123,15 @@ impl UnverifiedEvent {
                         .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::VoteMsg(v)
+            },
+            UnverifiedEvent::OrderVoteMsg(v) => {
+                if !self_message {
+                    v.verify(validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["order_vote"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedEvent::OrderVoteMsg(v)
             },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
@@ -133,7 +160,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
                 if !self_message {
-                    p.verify(max_num_batches, validator)?;
+                    p.verify(max_num_batches, validator, proof_cache)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proof_of_store"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -147,6 +174,7 @@ impl UnverifiedEvent {
         match self {
             UnverifiedEvent::ProposalMsg(p) => Ok(p.epoch()),
             UnverifiedEvent::VoteMsg(v) => Ok(v.epoch()),
+            UnverifiedEvent::OrderVoteMsg(v) => Ok(v.epoch()),
             UnverifiedEvent::SyncInfo(s) => Ok(s.epoch()),
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
@@ -160,6 +188,7 @@ impl From<ConsensusMsg> for UnverifiedEvent {
         match value {
             ConsensusMsg::ProposalMsg(m) => UnverifiedEvent::ProposalMsg(m),
             ConsensusMsg::VoteMsg(m) => UnverifiedEvent::VoteMsg(m),
+            ConsensusMsg::OrderVoteMsg(m) => UnverifiedEvent::OrderVoteMsg(m),
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
@@ -175,6 +204,7 @@ pub enum VerifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
+    OrderVoteMsg(Box<OrderVoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
@@ -211,11 +241,19 @@ pub struct RoundManager {
     vtxn_config: ValidatorTxnConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
-    features: Features,
-    broadcast_vote: bool,
+    randomness_config: OnChainRandomnessConfig,
+    jwk_consensus_config: OnChainJWKConsensusConfig,
+    fast_rand_config: Option<RandConfig>,
+    // Stores the order votes from all the rounds above highest_ordered_round
+    pending_order_votes: PendingOrderVotes,
+    // Round manager broadcasts fast shares when forming a QC or when receiving a proposal.
+    // To avoid duplicate broadcasts for the same block, we keep track of blocks for
+    // which we recently broadcasted fast shares.
+    blocks_with_broadcasted_fast_shares: LruCache<HashValue, ()>,
 }
 
 impl RoundManager {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         epoch_state: Arc<EpochState>,
         block_store: Arc<BlockStore>,
@@ -228,8 +266,9 @@ impl RoundManager {
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
-        features: Features,
-        broadcast_vote: bool,
+        randomness_config: OnChainRandomnessConfig,
+        jwk_consensus_config: OnChainJWKConsensusConfig,
+        fast_rand_config: Option<RandConfig>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -254,8 +293,11 @@ impl RoundManager {
             vtxn_config,
             buffered_proposal_tx,
             local_config,
-            features,
-            broadcast_vote,
+            randomness_config,
+            jwk_consensus_config,
+            fast_rand_config,
+            pending_order_votes: PendingOrderVotes::new(),
+            blocks_with_broadcasted_fast_shares: LruCache::new(5),
         }
     }
 
@@ -270,6 +312,7 @@ impl RoundManager {
                 .collect(),
             self.local_config
                 .max_blocks_per_sending_request(self.onchain_config.quorum_store_enabled()),
+            self.block_store.pending_blocks(),
         )
     }
 
@@ -303,6 +346,8 @@ impl RoundManager {
             self.new_log(LogEvent::NewRound),
             reason = new_round_event.reason
         );
+        self.pending_order_votes
+            .garbage_collect(self.block_store.sync_info().highest_ordered_round());
 
         if self
             .proposer_election
@@ -498,7 +543,7 @@ impl RoundManager {
             info!(
                 self.new_log(LogEvent::ReceiveNewCertificate)
                     .remote_peer(author),
-                "Local state {}, remote state {}", local_sync_info, sync_info
+                "Local state {},\n remote state {}", local_sync_info, sync_info
             );
             // Some information in SyncInfo is ahead of what we have locally.
             // First verify the SyncInfo (didn't verify it in the yet).
@@ -513,6 +558,7 @@ impl RoundManager {
                     );
                     VerifyError::from(e)
                 })?;
+            SYNC_INFO_RECEIVED_WITH_NEWER_CERT.inc();
             let result = self
                 .block_store
                 .add_certs(sync_info, self.create_block_retriever(author))
@@ -543,9 +589,11 @@ impl RoundManager {
         self.sync_up(sync_info, author).await?;
         ensure!(
             message_round == self.round_state.current_round(),
-            "After sync, round {} doesn't match local {}",
+            "After sync, round {} doesn't match local {}. Local Sync Info: {}. Remote Sync Info: {}",
             message_round,
-            self.round_state.current_round()
+            self.round_state.current_round(),
+            self.block_store.sync_info(),
+            sync_info,
         );
         Ok(true)
     }
@@ -571,6 +619,9 @@ impl RoundManager {
 
     fn sync_only(&self) -> bool {
         let sync_or_not = self.local_config.sync_only || self.block_store.vote_back_pressure();
+        if self.block_store.vote_back_pressure() {
+            warn!("Vote back pressure is set");
+        }
         counters::OP_COUNTERS
             .gauge("sync_only")
             .set(sync_or_not as i64);
@@ -676,7 +727,7 @@ impl RoundManager {
         if let Some(vtxns) = proposal.validator_txns() {
             for vtxn in vtxns {
                 ensure!(
-                    is_vtxn_expected(&self.features, vtxn),
+                    is_vtxn_expected(&self.randomness_config, &self.jwk_consensus_config, vtxn),
                     "unexpected validator txn: {:?}",
                     vtxn.topic()
                 );
@@ -784,7 +835,7 @@ impl RoundManager {
             // tries to add the same block again, which is okay as `execute_and_insert_block` call
             // is idempotent.
             self.block_store
-                .insert_ordered_block(proposal.clone())
+                .insert_block(proposal.clone())
                 .await
                 .context("[RoundManager] Failed to execute_and_insert the block")?;
             self.resend_verified_proposal_to_self(
@@ -825,6 +876,30 @@ impl RoundManager {
         });
     }
 
+    async fn broadcast_fast_shares(&mut self, block_info: &BlockInfo) {
+        // generate and multicast randomness share for the fast path
+        if let Some(fast_config) = &self.fast_rand_config {
+            if !block_info.is_empty()
+                && !self
+                    .blocks_with_broadcasted_fast_shares
+                    .contains(&block_info.id())
+            {
+                let metadata = RandMetadata {
+                    epoch: block_info.epoch(),
+                    round: block_info.round(),
+                };
+                let self_share = Share::generate(fast_config, metadata);
+                let fast_share = FastShare::new(self_share);
+                info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
+                    .epoch(fast_share.epoch())
+                    .round(fast_share.round()));
+                self.network.broadcast_fast_share(fast_share).await;
+                self.blocks_with_broadcasted_fast_shares
+                    .put(block_info.id(), ());
+            }
+        }
+    }
+
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
         let vote = self
@@ -834,8 +909,12 @@ impl RoundManager {
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
 
-        if self.broadcast_vote {
+        self.broadcast_fast_shares(vote.ledger_info().commit_info())
+            .await;
+
+        if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
+            PROPOSAL_VOTE_BROADCASTED.inc();
             self.network.broadcast_vote(vote_msg).await;
         } else {
             let recipient = self
@@ -858,7 +937,7 @@ impl RoundManager {
     async fn execute_and_vote(&mut self, proposed_block: Block) -> anyhow::Result<Vote> {
         let executed_block = self
             .block_store
-            .insert_ordered_block(proposed_block)
+            .insert_block(proposed_block)
             .await
             .context("[RoundManager] Failed to execute_and_insert the block")?;
 
@@ -892,6 +971,76 @@ impl RoundManager {
             .context("[RoundManager] Fail to persist last vote")?;
 
         Ok(vote)
+    }
+
+    async fn process_order_vote_msg(&mut self, order_vote_msg: OrderVoteMsg) -> anyhow::Result<()> {
+        if self.onchain_config.order_vote_enabled() {
+            fail_point!("consensus::process_order_vote_msg", |_| {
+                Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
+            });
+            info!(
+                self.new_log(LogEvent::ReceiveOrderVote),
+                "{}", order_vote_msg
+            );
+
+            if self
+                .pending_order_votes
+                .has_enough_order_votes(order_vote_msg.order_vote().ledger_info())
+            {
+                return Ok(());
+            }
+
+            if order_vote_msg.order_vote().ledger_info().round()
+                > self.block_store.sync_info().highest_ordered_round()
+            {
+                let vote_reception_result = self
+                    .pending_order_votes
+                    .insert_order_vote(order_vote_msg.order_vote(), &self.epoch_state.verifier);
+                self.process_order_vote_reception_result(&order_vote_msg, vote_reception_result)
+                    .await?;
+            } else {
+                ORDER_VOTE_VERY_OLD.inc();
+                info!(
+                    "Received old order vote. Order vote round: {:?}, Highest ordered round: {:?}",
+                    order_vote_msg.order_vote().ledger_info().round(),
+                    self.block_store.sync_info().highest_ordered_round()
+                );
+            }
+        }
+        Ok(())
+    }
+
+    async fn broadcast_order_vote(
+        &mut self,
+        vote: &Vote,
+        qc: Arc<QuorumCert>,
+    ) -> anyhow::Result<()> {
+        if let Some(proposed_block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
+            // Generate an order vote with ledger_info = proposed_block
+            let order_vote_proposal = proposed_block.order_vote_proposal(qc.clone());
+            let order_vote_result = self
+                .safety_rules
+                .lock()
+                .construct_and_sign_order_vote(&order_vote_proposal);
+            let order_vote = order_vote_result.context(format!(
+                "[RoundManager] SafetyRules Rejected {} for order vote",
+                proposed_block.block()
+            ))?;
+            if !proposed_block.block().is_nil_block() {
+                observe_block(
+                    proposed_block.block().timestamp_usecs(),
+                    BlockStage::ORDER_VOTED,
+                );
+            }
+            let order_vote_msg = OrderVoteMsg::new(order_vote.clone(), qc.as_ref().clone());
+            info!(
+                self.new_log(LogEvent::BroadcastOrderVote),
+                "{}", order_vote_msg
+            );
+            self.network.broadcast_order_vote(order_vote_msg).await;
+            ORDER_VOTE_BROADCASTED.inc();
+        }
+        Ok(())
     }
 
     /// Upon new vote:
@@ -939,7 +1088,7 @@ impl RoundManager {
             is_timeout = vote.is_timeout(),
         );
 
-        if !self.broadcast_vote && !vote.is_timeout() {
+        if !self.local_config.broadcast_vote && !vote.is_timeout() {
             // Unlike timeout votes regular votes are sent to the leaders of the next round only.
             let next_round = round + 1;
             ensure!(
@@ -981,7 +1130,26 @@ impl RoundManager {
                         BlockStage::QC_AGGREGATED,
                     );
                 }
-                self.new_qc_aggregated(qc, vote.author()).await
+                QC_AGGREGATED_FROM_VOTES.inc();
+                self.new_qc_aggregated(qc.clone(), vote.author())
+                    .await
+                    .context(format!(
+                        "[RoundManager] Unable to process the created QC {:?}",
+                        qc
+                    ))?;
+                if self.onchain_config.order_vote_enabled() {
+                    // Broadcast order vote if the QC is successfully aggregated
+                    // Even if broadcast order vote fails, the function will return Ok
+                    if let Err(e) = self.broadcast_order_vote(vote, qc.clone()).await {
+                        warn!(
+                            "Failed to broadcast order vote for QC {:?}. Error: {:?}",
+                            qc, e
+                        );
+                    } else {
+                        self.broadcast_fast_shares(qc.certified_block()).await;
+                    }
+                }
+                Ok(())
             },
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 self.new_2chain_tc_aggregated(tc).await
@@ -989,11 +1157,39 @@ impl RoundManager {
             VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_vote_timeout() => {
                 self.process_local_timeout(round).await
             },
-            VoteReceptionResult::VoteAdded(_)
-            | VoteReceptionResult::VoteAddedQCDelayed(_)
+            VoteReceptionResult::VoteAdded(_) => {
+                PROPOSAL_VOTE_ADDED.inc();
+                Ok(())
+            },
+            VoteReceptionResult::VoteAddedQCDelayed(_)
             | VoteReceptionResult::EchoTimeout(_)
             | VoteReceptionResult::DuplicateVote => Ok(()),
             e => Err(anyhow::anyhow!("{:?}", e)),
+        }
+    }
+
+    async fn process_order_vote_reception_result(
+        &mut self,
+        order_vote_msg: &OrderVoteMsg,
+        result: OrderVoteReceptionResult,
+    ) -> anyhow::Result<()> {
+        match result {
+            OrderVoteReceptionResult::NewLedgerInfoWithSignatures(ledger_info_with_signatures) => {
+                self.new_ordered_cert(
+                    WrappedLedgerInfo::new(VoteData::dummy(), ledger_info_with_signatures),
+                    order_vote_msg.quorum_cert(),
+                    order_vote_msg.order_vote().author(),
+                )
+                .await
+            },
+            OrderVoteReceptionResult::VoteAdded(_) => {
+                ORDER_VOTE_ADDED.inc();
+                Ok(())
+            },
+            e => {
+                ORDER_VOTE_OTHER_ERRORS.inc();
+                Err(anyhow::anyhow!("{:?}", e))
+            },
         }
     }
 
@@ -1009,6 +1205,37 @@ impl RoundManager {
             .context("[RoundManager] Failed to process a newly aggregated QC");
         self.process_certificates().await?;
         result
+    }
+
+    // Insert ordered certificate formed by aggregating order votes
+    async fn new_ordered_cert(
+        &mut self,
+        ordered_cert: WrappedLedgerInfo,
+        quorum_cert: &QuorumCert,
+        preferred_peer: Author,
+    ) -> anyhow::Result<()> {
+        ensure!(
+            ordered_cert.commit_info().id() == quorum_cert.certified_block().id(),
+            "QuorumCert attached to order votes doesn't match"
+        );
+        if self
+            .block_store
+            .get_block(ordered_cert.commit_info().id())
+            .is_none()
+        {
+            ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE.inc();
+        }
+        self.block_store
+            .insert_quorum_cert(
+                quorum_cert,
+                &mut self.create_block_retriever(preferred_peer),
+            )
+            .await
+            .context("RoundManager] Failed to process QC in order Cert")?;
+        self.block_store
+            .insert_ordered_cert(&ordered_cert)
+            .await
+            .context("[RoundManager] Failed to process a new OrderCert formed by order votes")
     }
 
     async fn new_2chain_tc_aggregated(
@@ -1110,6 +1337,11 @@ impl RoundManager {
                         }
                     };
                     proposals.sort_by_key(get_round);
+                    // If the first proposal is not for the next round, we only process the last proposal.
+                    // to avoid going through block retrieval of many garbage collected rounds.
+                    if self.round_state.current_round() + 1 < get_round(&proposals[0]) {
+                        proposals = vec![proposals.pop().unwrap()];
+                    }
                     for proposal in proposals {
                         let result = match proposal {
                             VerifiedEvent::ProposalMsg(proposal_msg) => {
@@ -1140,6 +1372,9 @@ impl RoundManager {
                     let result = match event {
                         VerifiedEvent::VoteMsg(vote_msg) => {
                             monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
+                        }
+                        VerifiedEvent::OrderVoteMsg(order_vote_msg) => {
+                            monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg).await)
                         }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(

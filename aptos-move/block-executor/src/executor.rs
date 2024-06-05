@@ -370,7 +370,7 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         scheduler: &Scheduler,
-    ) -> SchedulerTask {
+    ) -> Result<SchedulerTask, PanicError> {
         let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
 
         if aborted {
@@ -383,7 +383,7 @@ where
                 scheduler.queueing_commits_arm();
             }
 
-            SchedulerTask::NoTask
+            Ok(SchedulerTask::Retry)
         }
     }
 
@@ -468,7 +468,7 @@ where
                     ),
                 )?;
 
-                scheduler.finish_execution_during_commit(txn_idx);
+                scheduler.finish_execution_during_commit(txn_idx)?;
 
                 let validation_result =
                     Self::validate(txn_idx, last_input_output, versioned_cache)?;
@@ -482,10 +482,6 @@ where
                     ))
                     .into());
                 }
-            }
-
-            defer! {
-                scheduler.add_to_commit_queue(txn_idx);
             }
 
             last_input_output
@@ -549,6 +545,9 @@ where
                 .collect::<Result<Vec<_>, _>>()?;
 
             last_input_output.record_finalized_group(txn_idx, finalized_groups);
+            defer! {
+                scheduler.add_to_commit_queue(txn_idx);
+            }
 
             // While the above propagate errors and lead to eventually halting parallel execution,
             // below we may halt the execution without an error in cases when:
@@ -740,7 +739,7 @@ where
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
-        let mut scheduler_task = SchedulerTask::NoTask;
+        let mut scheduler_task = SchedulerTask::Retry;
 
         let drain_commit_queue = || -> Result<(), PanicError> {
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
@@ -759,7 +758,6 @@ where
         };
 
         loop {
-            // Prioritize committing validated transactions
             while scheduler.should_coordinate_commits() {
                 self.prepare_and_queue_commit_ready_txns(
                     &self.config.onchain.block_gas_limit_type,
@@ -790,7 +788,7 @@ where
                         last_input_output,
                         versioned_cache,
                         scheduler,
-                    )
+                    )?
                 },
                 SchedulerTask::ExecutionTask(
                     txn_idx,
@@ -812,19 +810,22 @@ where
                             shared_counter,
                         ),
                     )?;
-                    scheduler.finish_execution(txn_idx, incarnation, updates_outside)
+                    scheduler.finish_execution(txn_idx, incarnation, updates_outside)?
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
-                    let (lock, cvar) = &*condvar;
-                    // Mark dependency resolved.
-                    let mut lock = lock.lock();
-                    *lock = DependencyStatus::Resolved;
-                    // Wake up the process waiting for dependency.
-                    cvar.notify_one();
+                    {
+                        let (lock, cvar) = &*condvar;
+
+                        // Mark dependency resolved.
+                        let mut lock = lock.lock();
+                        *lock = DependencyStatus::Resolved;
+                        // Wake up the process waiting for dependency.
+                        cvar.notify_one();
+                    }
 
                     scheduler.next_task()
                 },
-                SchedulerTask::NoTask => scheduler.next_task(),
+                SchedulerTask::Retry => scheduler.next_task(),
                 SchedulerTask::Done => {
                     drain_commit_queue()?;
                     break Ok(());
@@ -909,6 +910,9 @@ where
             }
         });
         drop(timer);
+
+        counters::update_state_counters(versioned_cache.stats(), true);
+
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
@@ -1270,6 +1274,8 @@ where
             .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
 
         ret.resize_with(num_txns, E::Output::skip_output);
+
+        counters::update_state_counters(unsync_map.stats(), false);
 
         // TODO add block end info to output.
         // block_limit_processor.is_block_limit_reached();

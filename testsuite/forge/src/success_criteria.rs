@@ -3,7 +3,8 @@
 
 use crate::{
     prometheus_metrics::{
-        fetch_system_metrics, LatencyBreakdown, LatencyBreakdownSlice, SystemMetrics,
+        fetch_error_metrics, fetch_system_metrics, LatencyBreakdown, LatencyBreakdownSlice,
+        SystemMetrics,
     },
     Swarm, SwarmExt, TestReport,
 };
@@ -143,6 +144,7 @@ pub struct SuccessCriteria {
     latency_thresholds: Vec<(Duration, LatencyType)>,
     latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
     check_no_restarts: bool,
+    check_no_errors: bool,
     max_expired_tps: Option<usize>,
     max_failed_submission_tps: Option<usize>,
     wait_for_all_nodes_to_catchup: Option<Duration>,
@@ -158,12 +160,18 @@ impl SuccessCriteria {
             latency_thresholds: Vec::new(),
             latency_breakdown_thresholds: None,
             check_no_restarts: false,
+            check_no_errors: true,
             max_expired_tps: None,
             max_failed_submission_tps: None,
             wait_for_all_nodes_to_catchup: None,
             system_metrics_threshold: None,
             chain_progress_check: None,
         }
+    }
+
+    pub fn allow_errors(mut self) -> Self {
+        self.check_no_errors = false;
+        self
     }
 
     pub fn add_no_restarts(mut self) -> Self {
@@ -297,6 +305,10 @@ impl SuccessCriteriaChecker {
                 .context("Failed ensuring no fullnode restarted")?;
         }
 
+        if success_criteria.check_no_errors {
+            Self::check_no_errors(swarm).await?;
+        }
+
         if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
             Self::check_system_metrics(swarm, start_time, end_time, system_metrics_threshold)
                 .await?;
@@ -420,7 +432,7 @@ impl SuccessCriteriaChecker {
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
         let avg_tps = stats_rate.committed;
-        if avg_tps < min_avg_tps as u64 {
+        if avg_tps < min_avg_tps as f64 {
             bail!(
                 "TPS requirement{} failed. Average TPS {}, minimum TPS requirement {}. Full stats: {}",
                 traffic_name_addition,
@@ -440,12 +452,12 @@ impl SuccessCriteriaChecker {
     fn check_max_value(
         max_config: Option<usize>,
         stats_rate: &TxnStatsRate,
-        value: u64,
+        value: f64,
         value_desc: &str,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
         if let Some(max) = max_config {
-            if value > max as u64 {
+            if value > max as f64 {
                 bail!(
                     "{} requirement{} failed. {} TPS: average {}, maximum requirement {}. Full stats: {}",
                     value_desc,
@@ -500,7 +512,7 @@ impl SuccessCriteriaChecker {
         let mut failures = Vec::new();
         for (latency_threshold, latency_type) in latency_thresholds {
             let latency = Duration::from_millis(match latency_type {
-                LatencyType::Average => stats_rate.latency,
+                LatencyType::Average => stats_rate.latency as u64,
                 LatencyType::P50 => stats_rate.p50_latency,
                 LatencyType::P90 => stats_rate.p90_latency,
                 LatencyType::P99 => stats_rate.p99_latency,
@@ -530,6 +542,19 @@ impl SuccessCriteriaChecker {
         if !failures.is_empty() {
             bail!("Failed latency check, for {:?}", failures);
         } else {
+            Ok(())
+        }
+    }
+
+    async fn check_no_errors(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+        let error_count = fetch_error_metrics(swarm).await?;
+        if error_count > 0 {
+            bail!(
+                "error!() count in validator logs was {}, and must be 0",
+                error_count
+            );
+        } else {
+            println!("No error!() found in validator logs");
             Ok(())
         }
     }

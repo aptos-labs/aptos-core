@@ -18,7 +18,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-/// ThreadClient is the actual owner of the thread but in the context of Consenus and SafetyRules
+/// ThreadClient is the actual owner of the thread but in the context of Consensus and SafetyRules
 /// is on the client side of the operations as it makes queries / requests to SafetyRules.
 pub struct ThreadService {
     _child: JoinHandle<()>,

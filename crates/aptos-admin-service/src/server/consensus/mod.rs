@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::server::utils::{reply_with, reply_with_status, spawn_blocking};
 use anyhow::{bail, Error};
 use aptos_consensus::{
     persistent_liveness_storage::PersistentLivenessStorage,
@@ -9,6 +8,7 @@ use aptos_consensus::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::info;
+use aptos_system_utils::utils::{reply_with, reply_with_status, spawn_blocking};
 use aptos_types::transaction::Transaction;
 use http::header::{HeaderValue, CONTENT_LENGTH};
 use hyper::{Body, Request, Response, StatusCode};
@@ -152,7 +152,6 @@ fn dump_consensus_db(consensus_db: &dyn PersistentLivenessStorage) -> anyhow::Re
     for qc in consensus_qcs {
         body.push_str(&format!("{qc:?}\n\n"));
     }
-
     Ok(body)
 }
 

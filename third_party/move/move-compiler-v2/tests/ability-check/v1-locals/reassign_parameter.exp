@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: local `r` of type `M::R` does not have the `drop` ability
+  ┌─ tests/ability-check/v1-locals/reassign_parameter.move:7:9
+  │
+7 │ ╭         if  (true) {
+8 │ │             let R { } = r;
+9 │ │         }
+  │ ╰─────────^ implicitly dropped here since it is no longer used

@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {
         f: u64,
@@ -10,25 +10,18 @@ module 0x8675309::M {
         Abort(0)
     }
     private fun t0(cond: bool,_s: M::S) {
-        select M::S.f(M::foo());
-        select M::S.f(M::bar());
-        select M::S.f(if cond {
+        select M::S.f<&M::S>(M::foo());
+        select M::S.f<M::S>(M::bar());
+        select M::S.f<&M::S>(if cond {
           M::foo()
         } else {
           Borrow(Immutable)(M::bar())
         });
-        select M::S.f(if cond {
+        select M::S.f<M::S>(if cond {
           Deref(M::foo())
         } else {
           M::bar()
         });
         Tuple()
     }
-    spec fun $bar(): M::S {
-        pack M::S(0)
-    }
-    spec fun $foo(): M::S {
-        Abort(0)
-    }
-    spec fun $t0(cond: bool,_s: M::S);
 } // end 0x8675309::M

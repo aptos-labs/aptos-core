@@ -10,10 +10,11 @@ publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.52"
-codespan-reporting = { version = "0.11.1", features = ["serde", "serialization"] }
+anyhow = { workspace = true }
+codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
 move-command-line-common = { path = "../../move-command-line-common" }
 move-compiler = { path = "../../move-compiler" }
+move-compiler-v2 = { path = "../../move-compiler-v2" }
 move-model = { path = ".." }
 move-prover-test-utils = { path = "../../move-prover/test-utils" }
 move-stackless-bytecode = { path = "../bytecode" }

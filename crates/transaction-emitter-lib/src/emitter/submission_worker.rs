@@ -268,14 +268,14 @@ impl SubmissionWorker {
         }
 
         if num_committed > 0 {
-            let sum_latency = sum_of_completion_timestamps_millis
-                - (avg_txn_offset_time as u128 * num_committed as u128);
-            let avg_latency = (sum_latency / num_committed as u128) as u64;
             loop_stats
                 .committed
                 .fetch_add(num_committed as u64, Ordering::Relaxed);
 
             if !skip_latency_stats {
+                let sum_latency = sum_of_completion_timestamps_millis
+                    - (avg_txn_offset_time as u128 * num_committed as u128);
+                let avg_latency = (sum_latency / num_committed as u128) as u64;
                 loop_stats
                     .latency
                     .fetch_add(sum_latency as u64, Ordering::Relaxed);

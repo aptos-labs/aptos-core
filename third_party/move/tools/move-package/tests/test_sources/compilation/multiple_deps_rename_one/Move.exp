@@ -35,7 +35,10 @@ CompiledPackageInfo {
                 "verify_only",
             },
             skip_attribute_checks: false,
-            compiler_version: None,
+            compiler_version: Some(
+                V1,
+            ),
+            language_version: None,
         },
     },
 }

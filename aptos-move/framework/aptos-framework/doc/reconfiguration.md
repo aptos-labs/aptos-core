@@ -8,6 +8,7 @@ to synchronize configuration changes for the validators.
 
 
 -  [Struct `NewEpochEvent`](#0x1_reconfiguration_NewEpochEvent)
+-  [Struct `NewEpoch`](#0x1_reconfiguration_NewEpoch)
 -  [Resource `Configuration`](#0x1_reconfiguration_Configuration)
 -  [Resource `DisableReconfiguration`](#0x1_reconfiguration_DisableReconfiguration)
 -  [Constants](#@Constants_0)
@@ -57,7 +58,39 @@ with new configuration information. This is also called a
 "reconfiguration event"
 
 
-<pre><code><b>struct</b> <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> <b>has</b> drop, store
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>epoch: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_reconfiguration_NewEpoch"></a>
+
+## Struct `NewEpoch`
+
+Event that signals consensus to start a new epoch,
+with new configuration information. This is also called a
+"reconfiguration event"
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="reconfiguration.md#0x1_reconfiguration_NewEpoch">NewEpoch</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -388,6 +421,13 @@ Signal validators to start using new configuration. Must be called from friend c
     };
     config_ref.epoch = config_ref.epoch + 1;
 
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="reconfiguration.md#0x1_reconfiguration_NewEpoch">NewEpoch</a> {
+                epoch: config_ref.epoch,
+            },
+        );
+    };
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
         &<b>mut</b> config_ref.events,
         <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
@@ -473,6 +513,13 @@ reconfiguration event.
     <b>assert</b>!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_ECONFIGURATION">ECONFIGURATION</a>));
     config_ref.epoch = 1;
 
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="reconfiguration.md#0x1_reconfiguration_NewEpoch">NewEpoch</a> {
+                epoch: config_ref.epoch,
+            },
+        );
+    };
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
         &<b>mut</b> config_ref.events,
         <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {

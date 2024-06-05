@@ -81,13 +81,13 @@ jobs:
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 720 }}
     runs-on: ${{ inputs.RUNS_ON }}
     strategy:
-        fail-fast: false
-        matrix:
-          number: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] # runner number
+      fail-fast: false
+      matrix:
+        number: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] # runner number
     steps:
       - name: Echo Runner Number
         run: echo "Runner is ${{ matrix.number }}"
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.GIT_SHA }}
 
@@ -96,7 +96,7 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Install GCloud SDK
-        uses: "google-github-actions/setup-gcloud@62d4898025f6041e16b1068643bfc5a696863587" # pin@v1
+        uses: "google-github-actions/setup-gcloud@v2"
         with:
           version: ">= 418.0.0"
           install_components: "kubectl,gke-gcloud-auth-plugin"
@@ -107,7 +107,7 @@ jobs:
 
       - name: Run replay-verify in parallel
         shell: bash
-        run: testsuite/replay_verify.py ${{ matrix.number }} 17 # first argument is the runner number, second argument is the total number of runners
+        run: testsuite/replay_verify.py ${{ matrix.number }} 19 # first argument is the runner number, second argument is the total number of runners
         env:
           BUCKET: ${{ inputs.BUCKET }}
           SUB_DIR: ${{ inputs.SUB_DIR }}

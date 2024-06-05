@@ -33,6 +33,10 @@ spec std::features {
     spec change_feature_flags_for_next_epoch(framework: &signer, enable: vector<u64>, disable: vector<u64>) {
         aborts_if signer::address_of(framework) != @std;
         // TODO(tengzhang): add functional spec
+        // TODO(#12526): undo declaring opaque once fixed
+        pragma opaque;
+        modifies global<Features>(@std);
+        modifies global<PendingFeatures>(@std);
     }
 
     spec fun spec_contains(features: vector<u8>, feature: u64): bool {
@@ -40,7 +44,7 @@ spec std::features {
             && (feature / 8) < len(features)
     }
 
-    spec change_feature_flags(framework: &signer, enable: vector<u64>, disable: vector<u64>) {
+    spec change_feature_flags_internal(framework: &signer, enable: vector<u64>, disable: vector<u64>) {
         pragma opaque;
         modifies global<Features>(@std);
         aborts_if signer::address_of(framework) != @std;
@@ -92,12 +96,11 @@ spec std::features {
         ensures [abstract] result == spec_module_event_enabled();
     }
 
-    spec on_new_epoch(vm_or_framework: &signer) {
-        let addr = signer::address_of(vm_or_framework);
-        aborts_if addr != @std && addr != @vm;
-        aborts_if exists<PendingFeatures>(@std) && !exists<Features>(@std);
+    spec on_new_epoch(framework: &signer) {
+        requires @std == signer::address_of(framework);
         let features_pending = global<PendingFeatures>(@std).features;
         let post features_std = global<Features>(@std).features;
         ensures exists<PendingFeatures>(@std) ==> features_std == features_pending;
+        aborts_if false;
     }
 }

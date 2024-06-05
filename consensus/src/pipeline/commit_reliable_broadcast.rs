@@ -105,6 +105,9 @@ impl RBNetworkSender<CommitMessage> for NetworkSender {
         let msg = ConsensusMsg::CommitMessage(Box::new(message));
         let response = match self.send_rpc(receiver, msg, timeout_duration).await? {
             ConsensusMsg::CommitMessage(resp) if matches!(*resp, CommitMessage::Ack(_)) => *resp,
+            ConsensusMsg::CommitMessage(resp) if matches!(*resp, CommitMessage::Nack) => {
+                bail!("Received nack, will retry")
+            },
             _ => bail!("Invalid response to request"),
         };
 

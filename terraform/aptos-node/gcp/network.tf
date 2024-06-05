@@ -26,9 +26,13 @@ resource "google_compute_address" "nat" {
 }
 
 resource "google_compute_router_nat" "nat" {
-  name                               = "aptos-${local.workspace_name}-nat"
-  router                             = google_compute_router.nat.name
-  nat_ip_allocate_option             = "MANUAL_ONLY"
-  nat_ips                            = [google_compute_address.nat.self_link]
-  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_PRIMARY_IP_RANGES"
+  name                                = "aptos-${local.workspace_name}-nat"
+  router                              = google_compute_router.nat.name
+  nat_ip_allocate_option              = var.router_nat_ip_allocate_option
+  nat_ips                             = var.router_nat_ip_allocate_option == "MANUAL_ONLY" ? [google_compute_address.nat.self_link] : null
+  source_subnetwork_ip_ranges_to_nat  = "ALL_SUBNETWORKS_ALL_PRIMARY_IP_RANGES"
+  min_ports_per_vm                    = var.router_nat_ip_allocate_option == "MANUAL_ONLY" ? null : 32
+  enable_endpoint_independent_mapping = var.enable_endpoint_independent_mapping
+  # EndpointIndependentMapping and DynamicPortAllocation are mutually exclusive.
+  enable_dynamic_port_allocation = !var.enable_endpoint_independent_mapping
 }

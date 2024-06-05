@@ -641,7 +641,7 @@ mod tests {
         let previous_qc = certificate_for_genesis();
         let proposal = ProposalMsg::new(
             Block::new_proposal(
-                Payload::empty(false),
+                Payload::empty(false, true),
                 1,
                 1,
                 previous_qc.clone(),
@@ -649,7 +649,11 @@ mod tests {
                 Vec::new(),
             )
             .unwrap(),
-            SyncInfo::new(previous_qc.clone(), previous_qc, None),
+            SyncInfo::new(
+                previous_qc.clone(),
+                previous_qc.into_wrapped_ledger_info(),
+                None,
+            ),
         );
         timed_block_on(&runtime, async {
             nodes[0]

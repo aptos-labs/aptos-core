@@ -699,6 +699,10 @@ impl<'env> SpecTranslator<'env> {
                 emit!(self.writer, ")");
             },
             ExpData::Invalid(_) => panic!("unexpected error expression"),
+            ExpData::Sequence(_, exp_vec) if exp_vec.len() == 1 => {
+                // Single-element sequence is just a wrapped value.
+                self.translate_exp(exp_vec.first().expect("list has an element"));
+            },
             ExpData::Return(..)
             | ExpData::Sequence(..)
             | ExpData::Loop(..)
@@ -740,6 +744,10 @@ impl<'env> SpecTranslator<'env> {
             Value::Vector(val) => {
                 emit!(self.writer, &boogie_value_blob(self.env, self.options, val))
             },
+            Value::Tuple(val) => {
+                let loc = self.env.get_node_loc(node_id);
+                self.error(&loc, &format!("tuple value not yet supported: {:#?}", val))
+            },
         }
     }
 
@@ -760,23 +768,39 @@ impl<'env> SpecTranslator<'env> {
     }
 
     fn translate_block(&self, pat: &Pattern, binding: &Option<Exp>, scope: &Exp) {
-        match (pat, binding) {
-            (Pattern::Var(_, name), Some(exp)) => {
-                let name_str = self.env.symbol_pool().string(*name);
-                emit!(self.writer, "(var {} := ", name_str);
-                self.translate_exp(exp);
-                emit!(self.writer, "; ");
-                self.translate_exp(scope);
-                emit!(self.writer, ")");
-            },
-            (_, Some(_)) => {
+        let binding = binding.as_ref().expect("valid specification binding");
+        let pats = pat.clone().flatten();
+        let bindings = if let ExpData::Call(_, Operation::Tuple, args) = binding.as_ref() {
+            args.clone()
+        } else {
+            vec![binding.clone()]
+        };
+        assert_eq!(pats.len(), bindings.len(), "valid specification binding");
+        let mut vars = vec![];
+        for pat in pats {
+            if let Pattern::Var(_, sym) = pat {
+                vars.push(sym.display(self.env.symbol_pool()).to_string())
+            } else {
                 self.error(
                     &self.env.get_node_loc(pat.node_id()),
                     "patterns not supported in specification language",
                 );
-            },
-            _ => panic!("unexpected missing binding in specification block"),
+                return;
+            }
         }
+        emit!(self.writer, "(var {} := ", vars.into_iter().join(","));
+        let mut first = true;
+        for binding in bindings {
+            if first {
+                first = false
+            } else {
+                emit!(self.writer, ", ")
+            }
+            self.translate_exp(&binding);
+        }
+        emit!(self.writer, "; ");
+        self.translate_exp(scope);
+        emit!(self.writer, ")");
     }
 
     fn translate_call(&self, node_id: NodeId, oper: &Operation, args: &[Exp]) {
@@ -786,6 +810,7 @@ impl<'env> SpecTranslator<'env> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         match oper {
+            Operation::Closure(..) => unimplemented!("closures in specs"),
             // Operators we introduced in the top level public entry `SpecTranslator::translate`,
             // mapping between Boogies single value domain and our typed world.
             Operation::BoxValue | Operation::UnboxValue => panic!("unexpected box/unbox"),
@@ -801,6 +826,7 @@ impl<'env> SpecTranslator<'env> {
                 self.translate_spec_fun_call(node_id, *module_id, *fun_id, args, memory_labels)
             },
             Operation::Pack(mid, sid) => self.translate_pack(node_id, *mid, *sid, args),
+            Operation::Tuple if args.len() == 1 => self.translate_exp(&args[0]),
             Operation::Tuple => self.error(&loc, "Tuple not yet supported"),
             Operation::Select(module_id, struct_id, field_id) => {
                 self.translate_select(node_id, *module_id, *struct_id, *field_id, args)
@@ -913,7 +939,7 @@ impl<'env> SpecTranslator<'env> {
                     "currently `TRACE(..)` cannot be used in spec functions or in lets",
                 )
             },
-            Operation::Freeze => {
+            Operation::Freeze(_) => {
                 // Skip freeze operation
                 self.translate_exp(&args[0])
             },
@@ -926,7 +952,7 @@ impl<'env> SpecTranslator<'env> {
             | Operation::Abort
             | Operation::Vector
             | Operation::Old => {
-                panic!("operation unexpected: {:?}", oper)
+                panic!("operation unexpected: {}", oper.display(self.env, node_id))
             },
         }
     }
@@ -1509,7 +1535,7 @@ impl<'env> SpecTranslator<'env> {
             .map(|(s, ty)| (s, self.inst(ty.skip_reference())))
             .collect_vec();
         let used_temps = range_and_body
-            .used_temporaries(self.env)
+            .used_temporaries_with_types(self.env)
             .into_iter()
             .collect_vec();
         let used_memory = range_and_body

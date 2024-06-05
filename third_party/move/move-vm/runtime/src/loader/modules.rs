@@ -22,6 +22,7 @@ use move_binary_format::{
     },
 };
 use move_core_types::{
+    account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
     vm_status::StatusCode,
@@ -39,11 +40,12 @@ use std::{
 /// This trait provides an additional api for the Session to decide where the resolved modules should be stored.
 ///
 /// The default api will store the modules inside MoveVM structure but the caller can also choose to store it
-/// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the the caller, i.e: the
+/// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the caller, i.e: the
 /// adapter layer, to freely decide when to drop or persist the cache as well as determining its own eviction policy.
 pub trait ModuleStorage {
     fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module>;
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>>;
+    fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>>;
 }
 
 pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, Module>>);
@@ -72,6 +74,10 @@ impl ModuleStorage for ModuleCache {
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>> {
         self.0.read().get(module_id).map(Arc::clone)
     }
+
+    fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>> {
+        self.0.read().get(&(addr, name)).map(Arc::clone)
+    }
 }
 
 pub(crate) struct ModuleStorageAdapter {
@@ -89,18 +95,27 @@ impl ModuleStorageAdapter {
         self.modules.fetch_module(id)
     }
 
+    pub(crate) fn module_at_by_ref(
+        &self,
+        addr: &AccountAddress,
+        name: &IdentStr,
+    ) -> Option<Arc<Module>> {
+        self.modules.fetch_module_by_ref(addr, name)
+    }
+
     pub(crate) fn insert(
         &self,
         natives: &NativeFunctions,
         id: ModuleId,
-        module: CompiledModule,
+        module_size: usize,
+        module: Arc<CompiledModule>,
         name_cache: &StructNameCache,
     ) -> VMResult<Arc<Module>> {
         if let Some(cached) = self.module_at(&id) {
             return Ok(cached);
         }
 
-        match Module::new(natives, module, self, name_cache) {
+        match Module::new(natives, module_size, module, self, name_cache) {
             Ok(module) => Ok(self.modules.store_module(&id, module)),
             Err((err, _)) => Err(err.finish(Location::Undefined)),
         }
@@ -180,6 +195,10 @@ impl ModuleStorageAdapter {
 pub struct Module {
     #[allow(dead_code)]
     id: ModuleId,
+
+    // size in bytes
+    pub(crate) size: usize,
+
     // primitive pools
     pub(crate) module: Arc<CompiledModule>,
 
@@ -252,10 +271,11 @@ pub(crate) struct FieldInstantiation {
 impl Module {
     pub(crate) fn new(
         natives: &NativeFunctions,
-        module: CompiledModule,
+        size: usize,
+        module: Arc<CompiledModule>,
         cache: &ModuleStorageAdapter,
         name_cache: &StructNameCache,
-    ) -> Result<Self, (PartialVMError, CompiledModule)> {
+    ) -> Result<Self, (PartialVMError, Arc<CompiledModule>)> {
         let id = module.self_id();
 
         let mut structs = vec![];
@@ -309,7 +329,7 @@ impl Module {
                 let definition_struct_type =
                     Arc::new(Self::make_struct_type(&module, struct_def, &struct_idxs)?);
                 structs.push(StructDef {
-                    field_count: definition_struct_type.fields.len() as u16,
+                    field_count: definition_struct_type.field_tys.len() as u16,
                     definition_struct_type,
                 });
                 let name =
@@ -440,7 +460,8 @@ impl Module {
         match create() {
             Ok(_) => Ok(Self {
                 id,
-                module: Arc::new(module),
+                size,
+                module,
                 structs,
                 struct_instantiations,
                 function_refs,
@@ -471,7 +492,7 @@ impl Module {
         };
         let abilities = struct_handle.abilities;
         let name = module.identifier_at(struct_handle.name).to_owned();
-        let type_parameters = struct_handle.type_parameters.clone();
+        let ty_params = struct_handle.type_parameters.clone();
         let fields = match &struct_def.field_information {
             StructFieldInformation::Native => unreachable!("native structs have been removed"),
             StructFieldInformation::Declared(fields) => fields,
@@ -489,15 +510,15 @@ impl Module {
         }
 
         Ok(StructType {
-            fields: field_tys,
-            phantom_ty_args_mask: struct_handle
+            field_tys,
+            phantom_ty_params_mask: struct_handle
                 .type_parameters
                 .iter()
                 .map(|ty| ty.is_phantom)
                 .collect(),
             field_names,
             abilities,
-            type_parameters,
+            ty_params,
             idx: struct_name_table[struct_def.struct_handle.0 as usize],
             module: module.self_id(),
             name,

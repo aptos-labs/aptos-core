@@ -10,6 +10,10 @@ use tokio::{runtime::Runtime, time::Duration};
 
 pub struct SimpleValidatorUpgrade;
 
+impl SimpleValidatorUpgrade {
+    pub const EPOCH_DURATION_SECS: u64 = 30;
+}
+
 impl Test for SimpleValidatorUpgrade {
     fn name(&self) -> &'static str {
         "compatibility::simple-validator-upgrade"
@@ -19,6 +23,8 @@ impl Test for SimpleValidatorUpgrade {
 impl NetworkTest for SimpleValidatorUpgrade {
     fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let runtime = Runtime::new()?;
+
+        let epoch_duration = Duration::from_secs(Self::EPOCH_DURATION_SECS);
 
         // Get the different versions we're testing with
         let (old_version, new_version) = {
@@ -96,7 +102,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
             &txn_stat,
         );
 
-        ctx.swarm().fork_check()?;
+        ctx.swarm().fork_check(epoch_duration)?;
 
         // Update the second batch
         let msg = format!("4. upgrading second batch to new version: {}", new_version);
@@ -114,7 +120,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         let msg = "5. check swarm health".to_string();
         info!("{}", msg);
         ctx.report.report_text(msg);
-        ctx.swarm().fork_check()?;
+        ctx.swarm().fork_check(epoch_duration)?;
         ctx.report.report_text(format!(
             "Compatibility test for {} ==> {} passed",
             old_version, new_version

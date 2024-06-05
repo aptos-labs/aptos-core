@@ -29,3 +29,6 @@ fun m::test() {
   0: $t0 := 0
   1: abort($t0)
 }
+
+
+============ bytecode verification succeeded ========

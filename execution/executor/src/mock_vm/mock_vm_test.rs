@@ -58,11 +58,11 @@ fn test_mock_vm_different_senders() {
                 .collect::<BTreeMap<_, _>>(),
             [
                 (
-                    StateKey::access_path(balance_ap(sender)),
+                    StateKey::raw(&balance_ap(sender)),
                     WriteOp::legacy_modification(amount.le_bytes()),
                 ),
                 (
-                    StateKey::access_path(seqnum_ap(sender)),
+                    StateKey::raw(&seqnum_ap(sender)),
                     WriteOp::legacy_modification(1u64.le_bytes()),
                 ),
             ]
@@ -94,11 +94,11 @@ fn test_mock_vm_same_sender() {
                 .collect::<BTreeMap<_, _>>(),
             [
                 (
-                    StateKey::access_path(balance_ap(sender)),
+                    StateKey::raw(&balance_ap(sender)),
                     WriteOp::legacy_modification((amount * (i as u64 + 1)).le_bytes()),
                 ),
                 (
-                    StateKey::access_path(seqnum_ap(sender)),
+                    StateKey::raw(&seqnum_ap(sender)),
                     WriteOp::legacy_modification((i as u64 + 1).le_bytes()),
                 ),
             ]
@@ -133,15 +133,15 @@ fn test_mock_vm_payment() {
             .collect::<BTreeMap<_, _>>(),
         [
             (
-                StateKey::access_path(balance_ap(gen_address(0))),
+                StateKey::raw(&balance_ap(gen_address(0))),
                 WriteOp::legacy_modification(50u64.le_bytes())
             ),
             (
-                StateKey::access_path(seqnum_ap(gen_address(0))),
+                StateKey::raw(&seqnum_ap(gen_address(0))),
                 WriteOp::legacy_modification(2u64.le_bytes())
             ),
             (
-                StateKey::access_path(balance_ap(gen_address(1))),
+                StateKey::raw(&balance_ap(gen_address(1))),
                 WriteOp::legacy_modification(150u64.le_bytes())
             ),
         ]

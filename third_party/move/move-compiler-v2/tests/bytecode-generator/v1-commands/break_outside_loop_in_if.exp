@@ -1,13 +1,6 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module <SELF>_0 {
     private fun main() {
-        if true {
-          break
-        } else {
-          Tuple()
-        }
-    }
-    spec fun $main() {
         if true {
           break
         } else {

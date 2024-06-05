@@ -20,7 +20,6 @@ aptos-build-info = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db-indexer = { workspace = true }
-aptos-framework =  { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-logger = { workspace = true }
@@ -29,7 +28,6 @@ aptos-metrics-core = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
-aptos-utils = { workspace = true }
 aptos-vm = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
@@ -51,7 +49,6 @@ regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-url = { workspace = true }
 
 [dev-dependencies]
 aptos-api-test-context = { workspace = true }
@@ -59,6 +56,7 @@ aptos-cached-packages = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-meter = { workspace = true }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
+aptos-move-stdlib = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-sdk = { workspace = true }
 move-package = { workspace = true }
@@ -72,3 +70,6 @@ warp = { workspace = true }
 
 [features]
 failpoints = ["fail/failpoints"]
+
+[package.metadata.cargo-machete]
+ignored = ["mime"]

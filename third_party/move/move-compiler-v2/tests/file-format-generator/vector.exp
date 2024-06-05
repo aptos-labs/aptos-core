@@ -8,10 +8,12 @@ use 0000000000000000000000000000000000000000000000000000000000000001::vector as 
 
 
 public remove<Ty0>(Arg0: &mut vector<Ty0>, Arg1: u64): Ty0 /* def_idx: 0 */ {
-L0:	loc2: &mut vector<Ty0>
-L1:	loc3: u64
-L2:	loc4: u64
-L3:	loc5: u64
+L2:	loc0: u64
+L3:	loc1: u64
+L4:	loc2: &mut vector<Ty0>
+L5:	loc3: u64
+L6:	loc4: u64
+L7:	loc5: u64
 B0:
 	0: CopyLoc[0](Arg0: &mut vector<Ty0>)
 	1: FreezeRef
@@ -69,72 +71,60 @@ B8:
 }
 create(): vector<u64> /* def_idx: 1 */ {
 B0:
-	0: LdU64(1)
-	1: LdU64(2)
-	2: LdU64(3)
-	3: VecPack(5, 3)
-	4: Ret
+	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
+	1: Ret
 }
 test_fold() /* def_idx: 2 */ {
 L0:	loc0: vector<u64>
-L1:	loc1: vector<u64>
+L1:	loc1: u64
 L2:	loc2: u64
 L3:	loc3: u64
-L4:	loc4: vector<u64>
+L4:	loc4: u64
 L5:	loc5: u64
 L6:	loc6: u64
-L7:	loc7: u64
-L8:	loc8: u64
-L9:	loc9: u64
 B0:
-	0: LdU64(1)
-	1: VecPack(5, 1)
+	0: LdU64(0)
+	1: LdConst[1](Vector(U64): [1, 1, 0, 0, 0, 0, 0, 0, 0])
 	2: StLoc[0](loc0: vector<u64>)
-	3: MoveLoc[0](loc0: vector<u64>)
-	4: StLoc[1](loc1: vector<u64>)
-	5: LdU64(0)
-	6: StLoc[2](loc2: u64)
-	7: MoveLoc[2](loc2: u64)
-	8: StLoc[3](loc3: u64)
-	9: MoveLoc[1](loc1: vector<u64>)
-	10: StLoc[4](loc4: vector<u64>)
-	11: MutBorrowLoc[4](loc4: vector<u64>)
-	12: Call 1vector::reverse<u64>(&mut vector<u64>)
+	3: MutBorrowLoc[0](loc0: vector<u64>)
+	4: Call 1vector::reverse<u64>(&mut vector<u64>)
+	5: StLoc[1](loc1: u64)
 B1:
-	13: ImmBorrowLoc[4](loc4: vector<u64>)
-	14: Call 1vector::is_empty<u64>(&vector<u64>): bool
-	15: Not
-	16: BrFalse(25)
+	6: ImmBorrowLoc[0](loc0: vector<u64>)
+	7: Call 1vector::is_empty<u64>(&vector<u64>): bool
+	8: Not
+	9: BrFalse(20)
 B2:
-	17: MutBorrowLoc[4](loc4: vector<u64>)
-	18: VecPopBack(5)
-	19: StLoc[5](loc5: u64)
-	20: MoveLoc[5](loc5: u64)
-	21: StLoc[6](loc6: u64)
-	22: LdU64(0)
-	23: StLoc[3](loc3: u64)
-	24: Branch(26)
+	10: MutBorrowLoc[0](loc0: vector<u64>)
+	11: VecPopBack(5)
+	12: StLoc[2](loc2: u64)
+	13: MoveLoc[1](loc1: u64)
+	14: StLoc[3](loc3: u64)
+	15: MoveLoc[2](loc2: u64)
+	16: StLoc[4](loc4: u64)
+	17: LdU64(0)
+	18: StLoc[1](loc1: u64)
+	19: Branch(21)
 B3:
-	25: Branch(27)
+	20: Branch(22)
 B4:
-	26: Branch(13)
+	21: Branch(6)
 B5:
-	27: MoveLoc[3](loc3: u64)
-	28: StLoc[7](loc7: u64)
-	29: MoveLoc[7](loc7: u64)
-	30: StLoc[8](loc8: u64)
-	31: LdU64(0)
-	32: StLoc[9](loc9: u64)
-	33: MoveLoc[8](loc8: u64)
-	34: MoveLoc[9](loc9: u64)
-	35: Eq
-	36: BrFalse(38)
+	22: MoveLoc[1](loc1: u64)
+	23: StLoc[5](loc5: u64)
+	24: LdU64(0)
+	25: StLoc[6](loc6: u64)
+	26: MoveLoc[5](loc5: u64)
+	27: MoveLoc[6](loc6: u64)
+	28: Eq
+	29: BrFalse(31)
 B6:
-	37: Branch(40)
+	30: Branch(33)
 B7:
-	38: LdU64(0)
-	39: Abort
+	31: LdU64(0)
+	32: Abort
 B8:
-	40: Ret
+	33: Ret
 }
 }
+============ bytecode verification succeeded ========
