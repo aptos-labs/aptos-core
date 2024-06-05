@@ -1,13 +1,14 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::source_package::parsed_manifest::{Dependency, GitInfo};
+use crate::{
+    manifest_parser::git_repo_cache_path,
+    source_package::parsed_manifest::{Dependency, GitInfo},
+};
 use clap::ValueEnum;
 use move_symbol_pool::symbol::Symbol;
-use std::{fmt::Display, path::PathBuf};
 use serde::{Deserialize, Serialize};
-
-use crate::manifest_parser::git_repo_cache_path;
+use std::{fmt::Display, path::PathBuf};
 
 /// Represents a standard library.
 pub enum StdLib {

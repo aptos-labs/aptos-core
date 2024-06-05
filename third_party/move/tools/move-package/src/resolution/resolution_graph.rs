@@ -121,7 +121,7 @@ impl ResolvingGraph {
                 root_package.clone(),
                 root_package_path,
                 true,
-                &override_std,
+                override_std,
                 writer,
             )
             .with_context(|| {

@@ -26,7 +26,10 @@ use move_model::{
 };
 use move_package::{
     compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
-    source_package::{manifest_parser::{parse_move_manifest_string, parse_source_manifest}, std_lib::StdVersion},
+    source_package::{
+        manifest_parser::{parse_move_manifest_string, parse_source_manifest},
+        std_lib::StdVersion,
+    },
     BuildConfig, CompilerConfig, ModelConfig,
 };
 use serde::{Deserialize, Serialize};

@@ -10,12 +10,12 @@ use move_compiler::shared::known_attributes::KnownAttribute;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{
     compilation::{build_plan::BuildPlan, model_builder::ModelBuilder},
-    package_hooks,
-    package_hooks::PackageHooks,
+    package_hooks::{self, PackageHooks},
     resolution::resolution_graph as RG,
     source_package::{
         manifest_parser as MP,
         parsed_manifest::{CustomDepInfo, PackageDigest},
+        std_lib::StdVersion,
     },
     BuildConfig, CompilerConfig, ModelConfig,
 };
@@ -42,7 +42,10 @@ fn run_test_impl(
     compiler_config.compiler_version = Some(compiler_version);
     let override_path = path.with_extension(OVERRIDE_EXT);
     let override_std = if override_path.is_file() {
-        Some(fs::read_to_string(override_path)?)
+        Some(
+            StdVersion::from_rev(&fs::read_to_string(override_path)?)
+                .expect("one of mainnet/testnet/devnet"),
+        )
     } else {
         None
     };
