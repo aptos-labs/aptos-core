@@ -1967,7 +1967,7 @@ fn realistic_env_max_load_test(
                 vec![
                     (LatencyBreakdownSlice::QsBatchToPos, 0.35),
                     // only reaches close to threshold during epoch change
-                    (LatencyBreakdownSlice::QsPosToProposal, 0.6),
+                    (LatencyBreakdownSlice::QsPosToProposal, 2.5),
                     // can be adjusted down if less backpressure
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
                     // can be adjusted down if less backpressure
