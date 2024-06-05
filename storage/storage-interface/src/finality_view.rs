@@ -27,8 +27,8 @@ impl<Db> FinalityView<Db> {
 }
 
 impl<Db: DbReader> FinalityView<Db> {
-    /// Updates the information on the latest finalized block's ledger.
-    pub fn set_finalized_ledger_info(&self, height: u64) -> Result<()> {
+    /// Updates the information on the latest finalized block at the specified height.
+    pub fn set_finalized_block_height(&self, height: u64) -> Result<()> {
         let (_start_ver, end_ver, block_event) = self.reader.get_block_info_by_height(height)?;
         let block_hash = block_event.hash()?;
         dbg!(block_hash);
@@ -111,7 +111,7 @@ mod tests {
         let blockheight = 1;
 
         // Set the finalized ledger info
-        view.set_finalized_ledger_info(blockheight).unwrap();
+        view.set_finalized_block_height(blockheight).unwrap();
 
         // Capture the block event once
         let (_start_ver, end_ver, block_event) =
@@ -143,7 +143,7 @@ mod tests {
         let res = view.get_latest_version();
         assert!(res.is_err());
         let blockheight = 1;
-        view.set_finalized_ledger_info(blockheight).unwrap();
+        view.set_finalized_block_height(blockheight).unwrap();
         let version = view.get_latest_version().unwrap();
         assert_eq!(version, 1);
     }
@@ -153,7 +153,7 @@ mod tests {
         let view = FinalityView::new(MockDbReaderWriter);
         let version = view.get_latest_state_checkpoint_version().unwrap();
         assert_eq!(version, None);
-        view.set_finalized_ledger_info(1).unwrap();
+        view.set_finalized_block_height(1).unwrap();
         let version = view.get_latest_state_checkpoint_version().unwrap();
         assert_eq!(version, Some(1));
     }
