@@ -1,4 +1,4 @@
-error: field `xx` not declared in struct `S`
+error: field `xx` not declared in `S`
    ┌─ tests/sources/structs_err.move:26:7
    │
 26 │       s.xx

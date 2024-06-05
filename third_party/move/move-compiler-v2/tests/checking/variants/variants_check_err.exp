@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: undeclared struct `m::RGB`
+   ┌─ tests/checking/variants/variants_check_err.move:17:13
+   │
+17 │             RGB{red, green, blue} => false,
+   │             ^^^
+
+error: variant `Rgb` not declared in `m::Color`
+   ┌─ tests/checking/variants/variants_check_err.move:25:13
+   │
+25 │             Color::Rgb{red, green, blue} => false,
+   │             ^^^^^^^^^^
+
+error: variants not allowed in this context
+   ┌─ tests/checking/variants/variants_check_err.move:31:41
+   │
+31 │     fun missplaced_variant(self: Color::Red): bool {
+   │                                         ^^^
+
+error: variants not allowed in this context
+   ┌─ tests/checking/variants/variants_check_err.move:32:39
+   │
+32 │         0x815::m::missplaced_variant::Red();
+   │                                       ^^^
+
+error: variants not allowed in this context
+   ┌─ tests/checking/variants/variants_check_err.move:36:36
+   │
+36 │     fun missing_field(self: Color::Red): bool {
+   │                                    ^^^
+
+error: missing field `blue`
+   ┌─ tests/checking/variants/variants_check_err.move:38:13
+   │
+38 │             Color::RGB{red, green} => false,
+   │             ^^^^^^^^^^^^^^^^^^^^^^
+
+error: field `black` not declared in `m::Color`
+   ┌─ tests/checking/variants/variants_check_err.move:44:42
+   │
+44 │             Color::RGB{red, green, blue, black} => false,
+   │                                          ^^^^^
+
+error: field `red` not declared in `Color`
+   ┌─ tests/checking/variants/variants_check_err.move:49:9
+   │
+49 │         self.red
+   │         ^^^^

@@ -135,6 +135,10 @@ pub fn shortest_cycle<'a, T: Ord + Hash>(
 // Compilation Env
 //**************************************************************************************************
 
+/// Flavor to activate features of Move 2. This currently effects only the parser
+/// and expansion phases which are shared between v1 and v2.
+pub const MOVE_2_FLAVOR: &str = "Move 2";
+
 pub type NamedAddressMap = BTreeMap<Symbol, NumericalAddress>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -279,6 +283,11 @@ impl CompilationEnv {
 
     pub fn get_known_attributes(&self) -> &BTreeSet<String> {
         &self.known_attributes
+    }
+
+    // Return true if Move 2 is parsed
+    pub fn is_move_2(&self) -> bool {
+        self.flags.has_flavor(MOVE_2_FLAVOR)
     }
 }
 

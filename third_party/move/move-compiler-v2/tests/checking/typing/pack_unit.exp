@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: tuple type `()` is not allowed as a type argument (type was inferred)
+error: tuple type `()` is not allowed as a type instantiation (type was inferred)
   ┌─ tests/checking/typing/pack_unit.move:5:9
   │
 2 │     struct Box<T> has drop { f: T }
