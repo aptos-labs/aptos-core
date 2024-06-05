@@ -1,0 +1,16 @@
+---
+remote_endpoint: ~
+name: coin_to_fa_migration
+proposals:
+  - name: enable_coin_to_fa_migration
+    metadata:
+      title: "Enable the mapping from coin to fungible asset including APT"
+      description: "Enables the changes in AIP-63 https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-63.md"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/326"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - concurrent_fungible_assets
+            - coin_to_fungible_asset_migration
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/create_apt_mapping.move
