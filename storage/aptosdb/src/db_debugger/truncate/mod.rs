@@ -231,7 +231,9 @@ mod test {
             epoch_by_version::EpochByVersionSchema, ledger_info::LedgerInfoSchema,
             stale_node_index::StaleNodeIndexSchema,
             stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
-            stale_state_value_index::StaleStateValueIndexSchema, state_value::StateValueSchema,
+            stale_state_value_index::StaleStateValueIndexSchema,
+            stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
+            state_value::StateValueSchema, state_value_by_key_hash::StateValueByKeyHashSchema,
             transaction::TransactionSchema, transaction_accumulator::TransactionAccumulatorSchema,
             transaction_info::TransactionInfoSchema, version_data::VersionDataSchema,
             write_set::WriteSetSchema,
@@ -353,20 +355,40 @@ mod test {
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, epoch);
 
+            if sharding_config.enable_storage_sharding {
+                let mut iter = state_kv_db.metadata_db().iter::<StateValueByKeyHashSchema>().unwrap();
+                iter.seek_to_first();
+                for item in iter {
+                    let ((_, version), _) = item.unwrap();
+                    prop_assert!(version <= target_version);
+                }
 
-            let mut iter = state_kv_db.metadata_db().iter::<StateValueSchema>().unwrap();
-            iter.seek_to_first();
-            for item in iter {
-                let ((_, version), _) = item.unwrap();
-                prop_assert!(version <= target_version);
-            }
+                let mut iter = state_kv_db.metadata_db().iter::<StaleStateValueIndexByKeyHashSchema>().unwrap();
+                iter.seek_to_first();
+                for item in iter {
+                    let version = item.unwrap().0.stale_since_version;
+                    prop_assert!(version <= target_version);
+                }
 
-            let mut iter = state_kv_db.metadata_db().iter::<StaleStateValueIndexSchema>().unwrap();
+            } else {
+                let mut iter = state_kv_db.metadata_db().iter::<StateValueSchema>().unwrap();
+                iter.seek_to_first();
+                for item in iter {
+                    let ((_, version), _) = item.unwrap();
+                    prop_assert!(version <= target_version);
+                }
+
+                let mut iter = state_kv_db.metadata_db().iter::<StaleStateValueIndexSchema>().unwrap();
             iter.seek_to_first();
             for item in iter {
                 let version = item.unwrap().0.stale_since_version;
                 prop_assert!(version <= target_version);
             }
+            }
+
+
+
+
 
             let mut iter = state_merkle_db.metadata_db().iter::<StaleNodeIndexSchema>().unwrap();
             iter.seek_to_first();
@@ -392,14 +414,14 @@ mod test {
             if sharding_config.enable_storage_sharding {
                 let state_merkle_db = Arc::new(state_merkle_db);
                 for i in 0..NUM_STATE_SHARDS as u8 {
-                    let mut kv_shard_iter = state_kv_db.db_shard(i).iter::<StateValueSchema>().unwrap();
+                    let mut kv_shard_iter = state_kv_db.db_shard(i).iter::<StateValueByKeyHashSchema>().unwrap();
                     kv_shard_iter.seek_to_first();
                     for item in kv_shard_iter {
                         let ((_, version), _) = item.unwrap();
                         prop_assert!(version <= target_version);
                     }
 
-                    let value_index_shard_iter = state_kv_db.db_shard(i).iter::<StaleStateValueIndexSchema>().unwrap();
+                    let value_index_shard_iter = state_kv_db.db_shard(i).iter::<StaleStateValueIndexByKeyHashSchema>().unwrap();
                     for item in value_index_shard_iter {
                         let version = item.unwrap().0.stale_since_version;
                         prop_assert!(version <= target_version);

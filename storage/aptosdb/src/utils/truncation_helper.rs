@@ -13,7 +13,9 @@ use crate::{
         stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
         stale_state_value_index::StaleStateValueIndexSchema,
+        stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
         state_value::StateValueSchema,
+        state_value_by_key_hash::StateValueByKeyHashSchema,
         transaction::TransactionSchema,
         transaction_accumulator::TransactionAccumulatorSchema,
         transaction_info::TransactionInfoSchema,
@@ -123,7 +125,12 @@ pub(crate) fn truncate_state_kv_db_single_shard(
     target_version: Version,
 ) -> Result<()> {
     let batch = SchemaBatch::new();
-    delete_state_value_and_index(state_kv_db.db_shard(shard_id), target_version + 1, &batch)?;
+    delete_state_value_and_index(
+        state_kv_db.db_shard(shard_id),
+        target_version + 1,
+        &batch,
+        state_kv_db.enabled_sharding(),
+    )?;
     state_kv_db.commit_single_shard(target_version, shard_id, batch)
 }
 
@@ -413,14 +420,29 @@ fn delete_state_value_and_index(
     state_kv_db_shard: &DB,
     start_version: Version,
     batch: &SchemaBatch,
+    enable_sharding: bool,
 ) -> Result<()> {
-    let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>()?;
-    iter.seek(&start_version)?;
+    if enable_sharding {
+        let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexByKeyHashSchema>()?;
+        iter.seek(&start_version)?;
 
-    for item in iter {
-        let (index, _) = item?;
-        batch.delete::<StaleStateValueIndexSchema>(&index)?;
-        batch.delete::<StateValueSchema>(&(index.state_key, index.stale_since_version))?;
+        for item in iter {
+            let (index, _) = item?;
+            batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
+            batch.delete::<StateValueByKeyHashSchema>(&(
+                index.state_key_hash,
+                index.stale_since_version,
+            ))?;
+        }
+    } else {
+        let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>()?;
+        iter.seek(&start_version)?;
+
+        for item in iter {
+            let (index, _) = item?;
+            batch.delete::<StaleStateValueIndexSchema>(&index)?;
+            batch.delete::<StateValueSchema>(&(index.state_key, index.stale_since_version))?;
+        }
     }
 
     Ok(())
