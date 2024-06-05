@@ -23,14 +23,14 @@ pub const POS_DUPLICATE_LABEL: &str = "duplicate";
 
 static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
-        /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 25,
+        /*start=*/ 1.5, /*factor=*/ 1.3, /*count=*/ 40,
     )
     .unwrap()
 });
 
 static BYTE_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
-        /*start=*/ 500.0, /*factor=*/ 1.5, /*count=*/ 25,
+        /*start=*/ 500.0, /*factor=*/ 1.3, /*count=*/ 45,
     )
     .unwrap()
 });
@@ -125,6 +125,15 @@ pub fn num_txn_per_batch(bucket_start: &str, num: usize) {
         .with_label_values(&[bucket_start])
         .observe(num as f64)
 }
+
+pub static BATCH_SIZE_IN_BYTES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_batch_size_in_bytes",
+        "Histogram for the size of batches in bytes.",
+        BYTE_BUCKETS.clone(),
+    )
+    .unwrap()
+});
 
 /// Histogram for the number of transactions per block when pulled for consensus.
 pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
@@ -229,6 +238,14 @@ pub static BATCH_IN_PROGRESS_TIMEOUT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_batch_in_progress_timeout",
         "Number of batches that are removed from in progress by a proof collection timeout."
+    )
+    .unwrap()
+});
+
+pub static SCHEDULED_BATCH_PULLS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_scheduled_batch_pulls",
+        "Number of times a batch pull is scheduled."
     )
     .unwrap()
 });
@@ -385,6 +402,19 @@ pub static CREATED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_created_batch_count",
         "Count of the created batches since last restart."
+    )
+    .unwrap()
+});
+
+pub static CREATED_NUM_BATCHES_PER_PULL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_created_num_batches_per_pull",
+        "Number of batches created per pull",
+        ([
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
+            17.0, 18.0, 19.0, 20.0
+        ])
+        .to_vec()
     )
     .unwrap()
 });
@@ -627,6 +657,24 @@ pub static QS_BACKPRESSURE_DYNAMIC_MAX: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
+pub static QS_DYNAMIC_MAX_PULL_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_dynamic_max_pull_txns",
+        "What the dynamic max pull txns is set to",
+        TRANSACTION_COUNT_BUCKETS.clone()
+    )
+    .unwrap()
+});
+
+pub static QS_MAX_PULL_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_max_pull_txns",
+        "What the max pull txns is set to",
+        TRANSACTION_COUNT_BUCKETS.clone()
+    )
+    .unwrap()
+});
+
 /// Latencies
 
 /// Histogram of the time durations for batch creation.
@@ -639,6 +687,15 @@ pub static BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
         )
         .unwrap(),
     )
+});
+
+pub static QS_SINCE_LAST_NON_EMPTY_PULL_TIME: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_since_last_non_empty_pull_ms",
+        "Histogram of the time since last non-empty pull time",
+        QUORUM_STORE_LATENCY_BUCKETS.to_vec()
+    )
+    .unwrap()
 });
 
 /// Histogram of the time durations for empty batch creation.

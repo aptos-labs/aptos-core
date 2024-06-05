@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use super::index::TxnPointer;
 use crate::{
     core_mempool::{
         index::{
@@ -17,6 +18,7 @@ use crate::{
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::MempoolConfig;
+use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Level};
 use aptos_types::{
@@ -26,7 +28,7 @@ use aptos_types::{
 };
 use std::{
     cmp::max,
-    collections::HashMap,
+    collections::{BTreeMap, HashMap, HashSet},
     mem::size_of,
     ops::Bound,
     time::{Duration, SystemTime},
@@ -181,6 +183,31 @@ impl TransactionStore {
 
     pub(crate) fn get_sequence_number(&self, address: &AccountAddress) -> Option<&u64> {
         self.sequence_numbers.get(address)
+    }
+
+    pub(crate) fn total_num_transactions(&self) -> u64 {
+        self.transactions
+            .values()
+            .map(|txns| txns.len() as u64)
+            .sum()
+    }
+
+    pub(crate) fn total_num_transactions_excluding(
+        &self,
+        excluded_transactions: &BTreeMap<TransactionSummary, TransactionInProgress>,
+    ) -> u64 {
+        let excluded_transactions = excluded_transactions
+            .iter()
+            .map(|(txn_summary, _)| txn_summary)
+            .collect::<HashSet<_>>();
+        self.transactions
+            .values()
+            .map(|txns| {
+                txns.iter()
+                    .filter(|(_, txn)| !excluded_transactions.contains(&TxnPointer::from(*txn)))
+                    .count() as u64
+            })
+            .sum()
     }
 
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.

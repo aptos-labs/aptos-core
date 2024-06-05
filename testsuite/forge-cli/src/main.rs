@@ -669,7 +669,7 @@ fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
             pfn_performance(duration, false, true, false, 7, 1, false)
         },
         "pfn_performance_with_realistic_env" => {
-            pfn_performance(duration, true, true, false, 7, 1, false)
+            pfn_performance(duration, true, true, false, 100, 7, false)
         },
         "pfn_spam_duplicates" => pfn_performance(duration, true, true, true, 7, 7, true),
         _ => return None, // The test name does not match a PFN test
@@ -1025,6 +1025,12 @@ fn realistic_env_sweep_wrap(
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.publisher_enabled = true
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.observer_enabled = true
+        }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
         }))
         .add_network_test(wrap_with_realistic_env(test))
@@ -1048,15 +1054,19 @@ fn realistic_env_sweep_wrap(
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(100, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
+        // workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7500, 10000, 12500]),
         criteria: [
             (9, 1.5, 3., 4., 0),
             (95, 1.5, 3., 4., 0),
             (950, 2., 3., 4., 0),
             (2750, 2.5, 3.5, 4.5, 0),
             (4600, 3., 4., 6., 10), // Allow some expired transactions (high-load)
+                                    // (7000, 4.5, 6., 8., 20), // Allow some expired transactions (high-load)
+                                    // (9500, 6., 9., 12., 30), // Allow some expired transactions (high-load)
+                                    // (12000, 8., 12., 16., 40), // Allow some expired transactions (high-load)
         ]
         .into_iter()
         .map(
@@ -1983,6 +1993,12 @@ fn realistic_env_max_load_test(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.publisher_enabled = true
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.observer_enabled = true
+        }))
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
@@ -2438,10 +2454,35 @@ fn pfn_const_tps(
         60 * 60 * 2 // 2 hours; avoid epoch changes which can introduce noise
     };
 
-    ForgeConfig::default()
+    // Increase the concurrency level
+    const USE_CRAZY_MACHINES: bool = true;
+
+    let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
+            optimize_state_sync_for_throughput(config);
+
+            config.consensus_observer.publisher_enabled = true;
+
+            // Increase the concurrency level
+            if USE_CRAZY_MACHINES {
+                config.execution.concurrency_level = 58;
+            }
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
+            optimize_state_sync_for_throughput(config);
+
+            config.consensus_observer.observer_enabled = true;
+
+            // Increase the concurrency level
+            if USE_CRAZY_MACHINES {
+                config.execution.concurrency_level = 58;
+            }
+        }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad { mempool_backlog: 30000 }))
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
@@ -2452,14 +2493,14 @@ fn pfn_const_tps(
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(95)
+            SuccessCriteria::new(12000)
                 .add_no_restarts()
                 .add_max_expired_tps(0)
                 .add_max_failed_submission_tps(0)
                 // Percentile thresholds are set to +1 second of non-PFN tests. Should be revisited.
-                .add_latency_threshold(2.5, LatencyType::P50)
-                .add_latency_threshold(4., LatencyType::P90)
-                .add_latency_threshold(5., LatencyType::P99)
+                .add_latency_threshold(5., LatencyType::P50)
+                .add_latency_threshold(6., LatencyType::P90)
+                .add_latency_threshold(7., LatencyType::P99)
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup and at most 10% of the run
                     (duration.as_secs() / 10).max(60),
@@ -2468,7 +2509,21 @@ fn pfn_const_tps(
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
                 }),
-        )
+        );
+
+    if USE_CRAZY_MACHINES {
+        forge_config = forge_config
+            .with_validator_resource_override(NodeResourceOverride {
+                cpu_cores: Some(58),
+                memory_gib: Some(200),
+            })
+            .with_fullnode_resource_override(NodeResourceOverride {
+                cpu_cores: Some(58),
+                memory_gib: Some(200),
+            })
+    }
+
+    forge_config
 }
 
 /// This test runs a performance benchmark where the network includes
@@ -2510,6 +2565,13 @@ fn pfn_performance(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_validators)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.publisher_enabled = true
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.observer_enabled = true
+        }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
         .add_network_test(PFNPerformance::new(
             num_pfns as u64,
             add_cpu_chaos,
