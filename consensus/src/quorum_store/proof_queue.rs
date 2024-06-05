@@ -183,12 +183,13 @@ impl ProofQueue {
     pub(crate) fn push(&mut self, proof: ProofOfStore) {
         if proof.expiration() < self.latest_block_timestamp {
             counters::inc_rejected_pos_count(counters::POS_EXPIRED_LABEL);
+            return;
         }
         let batch_key = BatchKey::from_info(proof.info());
         if self.batch_to_proof.get(&batch_key).is_some() {
             counters::inc_rejected_pos_count(counters::POS_DUPLICATE_LABEL);
+            return;
         }
-
         let author = proof.author();
         let bucket = proof.gas_bucket_start();
         let num_txns = proof.num_txns();
@@ -206,7 +207,6 @@ impl ProofQueue {
         } else {
             counters::inc_remote_pos_count(bucket);
         }
-
         self.inc_remaining(&author, num_txns);
     }
 
@@ -342,8 +342,8 @@ impl ProofQueue {
 
     // Mark in the hashmap committed PoS, but keep them until they expire
     fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
-        for batch in batches {
-            let batch_key = BatchKey::from_info(&batch);
+        for batch in &batches {
+            let batch_key = BatchKey::from_info(batch);
             if let Some(Some((proof, insertion_time))) = self.batch_to_proof.get(&batch_key) {
                 counters::pos_to_commit(
                     proof.gas_bucket_start(),
