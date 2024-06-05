@@ -6,11 +6,14 @@ upgrade_policy = "compatible"
 
 [addresses]
 bonding_curve_launchpad = "_"
-deployer = "0xcafe"
-swap = "0xcafe"
+deployer = "_"
+swap = "_"
 
 [dev-addresses]
 bonding_curve_launchpad = "0x650"
+deployer = "0xaaa"
+swap = "0xcafe"
+
 
 [dependencies.AptosFramework]
 git = "https://github.com/aptos-labs/aptos-core.git"

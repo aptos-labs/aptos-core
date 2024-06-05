@@ -11,9 +11,6 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
     use aptos_std::math128;
     use bonding_curve_launchpad::liquidity_pairs;
 
-    const INITIAL_NEW_FA_RESERVE_u64: u64 = 8_003_000_000_000;
-    const INITIAL_NEW_FA_RESERVE: u128 = 8_003_000_000_000;
-
     /// FA's name and symbol already exist on the launchpad.
     const EFA_EXISTS_ALREADY: u64 = 10;
     /// Unknown FA. Not recognized on platform.
@@ -222,7 +219,7 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         );
         let mint_ref = fungible_asset::generate_mint_ref(fa_obj_constructor_ref);
         let transfer_ref = fungible_asset::generate_transfer_ref(fa_obj_constructor_ref);
-        let fa_minted = fungible_asset::mint(&mint_ref, INITIAL_NEW_FA_RESERVE_u64);
+        let fa_minted = fungible_asset::mint(&mint_ref, (max_supply as u64));
         // Define the dispatchable FA's withdraw as a conditionally global freezing effect.
         dispatchable_fungible_asset::register_dispatch_functions(
             fa_obj_constructor_ref,
@@ -241,7 +238,7 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
             FungibleAssetCreated {
                 name,
                 symbol,
-                max_supply: INITIAL_NEW_FA_RESERVE,
+                max_supply,
                 decimals,
                 icon_uri,
                 project_uri
