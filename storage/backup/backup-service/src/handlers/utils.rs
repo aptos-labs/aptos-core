@@ -53,11 +53,11 @@ pub(super) struct BytesSender {
 
 impl BytesSender {
     fn new(endpoint: &'static str, mut inner: hyper::body::Sender) -> Self {
-        let (batch_tx, mut batch_rx) = tokio::sync::mpsc::channel::<Bytes>(2);
+        let (batch_tx, mut batch_rx) = tokio::sync::mpsc::channel::<Bytes>(100);
 
         let sender_task = tokio::spawn(async move {
             let res = async {
-                while let Some(batch) = batch_rx.recv().await {
+                while let Some(batch) = Self::recv_some(&mut batch_rx).await {
                     let n_bytes = batch.len();
 
                     inner.send_data(batch).await.into_db_res()?;
@@ -75,6 +75,20 @@ impl BytesSender {
             buffer: BytesMut::new(),
             batch_tx: Some(batch_tx),
             sender_task: Some(sender_task),
+        }
+    }
+
+    async fn recv_some(rx: &mut tokio::sync::mpsc::Receiver<Bytes>) -> Option<Bytes> {
+        let mut buf = BytesMut::new();
+
+        while let Ok(bytes) = rx.try_recv() {
+            buf.put(bytes);
+        }
+
+        if buf.is_empty() {
+            rx.recv().await
+        } else {
+            Some(buf.freeze())
         }
     }
 
@@ -98,7 +112,7 @@ impl BytesSender {
 
         self.buffer.put_slice(bytes);
 
-        const TARGET_BATCH_SIZE: usize = if cfg!(test) { 10 } else { 1024 * 1024 * 10 };
+        const TARGET_BATCH_SIZE: usize = if cfg!(test) { 10 } else { 1024 * 1024 };
         if self.buffer.len() >= TARGET_BATCH_SIZE {
             self.flush_buffer().await?
         }
