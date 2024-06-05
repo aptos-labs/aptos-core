@@ -45,7 +45,11 @@ const RELEVANT_PACKAGES_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 2] =
     ["aptos-framework", "aptos-release-builder"];
 
 // The targeted unit test packages to ignore (these will be run separately, by other jobs)
-const TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE: [&str; 2] = ["aptos-testcases", "smoke-test"];
+const TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE: [&str; 3] = [
+    "aptos-testcases",
+    "smoke-test",
+    "aptos-keyless-circuit-tests",
+];
 
 #[derive(Args, Clone, Debug)]
 #[command(disable_help_flag = true)]

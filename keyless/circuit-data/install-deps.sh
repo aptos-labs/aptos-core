@@ -2,7 +2,7 @@
 
 set -e
 install_node() {
-    echo -n "nodejs installation started."
+    echo "nodejs installation started."
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
@@ -10,11 +10,11 @@ install_node() {
     nvm install --lts
     node -v
     npm -v
-    echo -n "nodejs installation finished."
+    echo "nodejs installation finished."
 }
 
 install_git_lfs() {
-    echo -n "git lfs installation started."
+    echo "git lfs installation started."
     if which brew > /dev/null; then
         brew install git-lfs
     elif which apt-get > /dev/null; then
@@ -23,11 +23,11 @@ install_git_lfs() {
         echo "Can't figure out what platform you are on. Currently this script only supports MacOS and Debian."
     fi
     git lfs install
-    echo -n "git lfs installation finished."
+    echo "git lfs installation finished."
 }
 
 install_circom() {
-    echo -n "circom installation started."
+    echo "circom installation started."
     original_dir=$(pwd)
     cd `mktemp -d`
     git clone https://github.com/iden3/circom
@@ -36,25 +36,25 @@ install_circom() {
     cargo build --release
     cargo install --path circom
     cd "$original_dir"
-    echo -n "circom installation finished."
+    echo "circom installation finished."
 }
 
 install_pip3_deps() {
-    echo -n "pip3 deps installation started."
+    echo "pip3 deps installation started."
     pip3 install virtualenv pyjwt cryptography pycryptodome
-    echo -n "pip3 deps installation finished."
+    echo "pip3 deps installation finished."
 }
   
 install_npm_deps() {
-    echo -n "snarkjs installation started."
+    echo "snarkjs installation started."
     npm install -g snarkjs
-    echo -n "snarkjs installation finished."
+    echo "snarkjs installation finished."
 }
 
 install_circomlib() {
-    echo -n "circomlib@2.0.5 installation started."
+    echo "circomlib@2.0.5 installation started."
     npm install -g circomlib@2.0.5
-    echo -n "circomlib@2.0.5 installation finished."
+    echo "circomlib@2.0.5 installation finished."
 }
 
 install_node
