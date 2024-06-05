@@ -241,9 +241,7 @@ impl LargePackageTestContext {
                     taken_size = 0;
                 }
 
-                if !code_indices.contains(&(idx as u16)) {
-                    code_indices.push(idx as u16);
-                }
+                code_indices.push(idx as u16);
                 taken_size += chunk.len();
                 code_chunks.push(chunk);
             }
