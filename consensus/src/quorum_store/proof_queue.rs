@@ -171,9 +171,9 @@ impl ProofQueue {
             } else {
                 0
             }
-        }).sum() as i64);
+        }).sum::<i64>());
 
-        counters::PROOFS_IN_PROOF_QUEUE.set(self.batch_to_proof.iter().map(|(batch_key, proof)| {
+        counters::PROOFS_IN_PROOF_QUEUE.set(self.batch_to_proof.iter().map(|(_, proof)| {
             if proof.is_some() {
                 1
             } else {
