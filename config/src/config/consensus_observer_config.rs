@@ -22,8 +22,8 @@ pub struct ConsensusObserverConfig {
 impl Default for ConsensusObserverConfig {
     fn default() -> Self {
         Self {
-            observer_enabled: false,
-            publisher_enabled: false,
+            observer_enabled: true, // TODO: rollback before landing!
+            publisher_enabled: true, // TODO: rollback before landing!
             max_network_channel_size: 1000,
         }
     }
