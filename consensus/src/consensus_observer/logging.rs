@@ -12,6 +12,7 @@ pub struct LogSchema<'a> {
     #[schema(debug)]
     error: Option<&'a Error>,
     event: Option<LogEvent>,
+    log: Option<&'a str>,
     message_content: Option<&'a str>,
     message_type: Option<&'a str>,
     #[schema(display)]
@@ -26,6 +27,7 @@ impl<'a> LogSchema<'a> {
             name,
             error: None,
             event: None,
+            log: None,
             message_content: None,
             message_type: None,
             peer: None,
@@ -38,6 +40,7 @@ impl<'a> LogSchema<'a> {
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LogEntry {
+    ConsensusObserver,
     GetDownstreamPeers,
     SendDirectSendMessage,
     SendRpcRequest,

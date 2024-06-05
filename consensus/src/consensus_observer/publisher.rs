@@ -48,11 +48,9 @@ impl ConsensusPublisher {
                 .collect(),
             Err(error) => {
                 // Log the error and return an empty set of peers
-                error!(
-                    (LogSchema::new(LogEntry::GetDownstreamPeers)
-                        .event(LogEvent::UnexpectedError)
-                        .error(&error.into()))
-                );
+                error!(LogSchema::new(LogEntry::GetDownstreamPeers)
+                    .event(LogEvent::UnexpectedError)
+                    .error(&error.into()));
                 vec![]
             },
         }

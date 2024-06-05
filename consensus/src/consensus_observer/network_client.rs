@@ -49,13 +49,11 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
         );
 
         // Log the message being sent
-        debug!(
-            (LogSchema::new(LogEntry::SendDirectSendMessage)
-                .event(LogEvent::SendDirectSendMessage)
-                .message_content(&message.get_content())
-                .message_type(message.get_label())
-                .peer(peer_network_id))
-        );
+        debug!(LogSchema::new(LogEntry::SendDirectSendMessage)
+            .event(LogEvent::SendDirectSendMessage)
+            .message_content(&message.get_content())
+            .message_type(message.get_label())
+            .peer(peer_network_id));
 
         // Send the message
         let result = self
@@ -68,13 +66,11 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
 
         // Process any error results
         if let Err(error) = result {
-            warn!(
-                (LogSchema::new(LogEntry::SendDirectSendMessage)
-                    .event(LogEvent::NetworkError)
-                    .message_type(message_label)
-                    .peer(peer_network_id)
-                    .error(&error))
-            );
+            warn!(LogSchema::new(LogEntry::SendDirectSendMessage)
+                .event(LogEvent::NetworkError)
+                .message_type(message_label)
+                .peer(peer_network_id)
+                .error(&error));
             metrics::increment_request_counter(
                 &metrics::DIRECT_SEND_ERRORS,
                 error.get_label(),
@@ -119,13 +115,11 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
         );
 
         // Log the request being sent
-        debug!(
-            (LogSchema::new(LogEntry::SendRpcRequest)
-                .event(LogEvent::SendRpcRequest)
-                .request_type(request.get_label())
-                .request_id(request_id)
-                .peer(peer_network_id))
-        );
+        debug!(LogSchema::new(LogEntry::SendRpcRequest)
+            .event(LogEvent::SendRpcRequest)
+            .request_type(request.get_label())
+            .request_id(request_id)
+            .peer(peer_network_id));
 
         // Send the request and process the result
         let result = consensus_observer_client
@@ -145,14 +139,12 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
                 Ok(response)
             },
             Err(error) => {
-                warn!(
-                    (LogSchema::new(LogEntry::SendRpcRequest)
-                        .event(LogEvent::InvalidRpcResponse)
-                        .request_type(request.get_label())
-                        .request_id(request_id)
-                        .peer(peer_network_id)
-                        .error(&error))
-                );
+                warn!(LogSchema::new(LogEntry::SendRpcRequest)
+                    .event(LogEvent::InvalidRpcResponse)
+                    .request_type(request.get_label())
+                    .request_id(request_id)
+                    .peer(peer_network_id)
+                    .error(&error));
                 metrics::increment_request_counter(
                     &metrics::DIRECT_SEND_ERRORS,
                     error.get_label(),

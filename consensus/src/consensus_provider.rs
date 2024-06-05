@@ -5,7 +5,7 @@
 use crate::{
     consensus_observer::{
         network_client::ConsensusObserverClient, network_message::ConsensusObserverMessage,
-        observer::Observer, publisher::ConsensusPublisher,
+        observer::ConsensusObserver, publisher::ConsensusPublisher,
     },
     counters,
     epoch_manager::EpochManager,
@@ -127,71 +127,77 @@ pub fn start_consensus_observer(
     aptos_db: DbReaderWriter,
     reconfig_events: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
 ) -> Runtime {
-    let publisher_enabled = node_config.consensus_observer.publisher_enabled;
+    // Create a consensus observer runtime
     let runtime = aptos_runtimes::spawn_named_runtime("observer".into(), None);
-    let root = aptos_db.reader.get_latest_ledger_info().unwrap();
 
+    // Create the consensus observer client and publisher (if enabled)
+    let (consensus_observer_client, consensus_publisher) =
+        if node_config.consensus_observer.publisher_enabled {
+            let consensus_observer_client =
+                ConsensusObserverClient::new(observer_network_client.clone());
+            let consensus_publisher = ConsensusPublisher::new(consensus_observer_client.clone());
+            (Some(consensus_observer_client), Some(consensus_publisher))
+        } else {
+            (None, None)
+        };
+
+    // Create the execution proxy
     let txn_notifier = Arc::new(MempoolNotifier::new(
         consensus_to_mempool_sender.clone(),
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
-
     let execution_proxy = ExecutionProxy::new(
-        Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),
+        Arc::new(BlockExecutor::<AptosVM>::new(aptos_db.clone())),
         txn_notifier,
         state_sync_notifier,
         runtime.handle(),
         TransactionFilter::new(node_config.execution.transaction_filter.clone()),
     );
 
+    // Create the (dummy) consensus network client
     let (self_sender, _self_receiver) =
         aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
-    let dummy_client = ConsensusNetworkClient::new(NetworkClient::new(
+    let consensus_network_client = ConsensusNetworkClient::new(NetworkClient::new(
         vec![],
         vec![],
         HashMap::new(),
         observer_network_client.get_peers_and_metadata(),
     ));
+
+    // Create the execution proxy client
     let bounded_executor = BoundedExecutor::new(32, runtime.handle().clone());
     let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
-
-    let consensus_observer_client = ConsensusObserverClient::new(observer_network_client);
     let execution_client = Arc::new(ExecutionProxyClient::new(
         node_config.consensus.clone(),
         Arc::new(execution_proxy),
         AccountAddress::ONE,
         self_sender.clone(),
-        dummy_client,
-        bounded_executor.clone(),
+        consensus_network_client,
+        bounded_executor,
         rand_storage.clone(),
-        if publisher_enabled {
-            Some(consensus_observer_client.clone())
-        } else {
-            None
-        },
+        consensus_observer_client.clone(),
     ));
 
-    let events: Vec<_> = observer_network_service_events
+    // Collect the observer network events
+    let network_events: Vec<_> = observer_network_service_events
         .into_network_and_events()
         .into_values()
         .collect();
-    let network_events = Box::new(select_all(events));
+    let observer_network_events = Box::new(select_all(network_events));
 
-    let reconfig_events =
-        reconfig_events.expect("Reconfig events are required for the consensus observer!");
-
+    // Create the consensus observer
+    let root = aptos_db.reader.get_latest_ledger_info().unwrap();
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-    let observer = Observer::new(
+    let consensus_observer = ConsensusObserver::new(
         root,
         execution_client,
         tx,
-        reconfig_events,
-        if publisher_enabled {
-            Some(ConsensusPublisher::new(consensus_observer_client))
-        } else {
-            None
-        },
+        reconfig_events.expect("Reconfig events are required for the consensus observer!"),
+        consensus_publisher,
     );
-    runtime.spawn(observer.start(network_events, rx));
+
+    // Start the consensus observer
+    runtime.spawn(consensus_observer.start(observer_network_events, rx));
+
     runtime
 }

@@ -199,7 +199,7 @@ impl PayloadManager {
                     Either::Right(rx)
                 },
             };
-            let data = match result {
+            let block_transaction_payload = match result {
                 Either::Left(data) => data,
                 Either::Right(rx) => timeout(Duration::from_millis(300), rx)
                     .await
@@ -209,12 +209,15 @@ impl PayloadManager {
             if let Some(consensus_publisher) = consensus_publisher {
                 let message = ConsensusObserverMessage::new_block_payload_message(
                     block.gen_block_info(HashValue::zero(), 0, None),
-                    data.0.clone(),
-                    data.1,
+                    block_transaction_payload.transactions.clone(),
+                    block_transaction_payload.limit,
                 );
                 consensus_publisher.publish_message(message);
             }
-            return Ok(data);
+            return Ok((
+                block_transaction_payload.transactions,
+                block_transaction_payload.limit,
+            ));
         }
 
         async fn process_payload(

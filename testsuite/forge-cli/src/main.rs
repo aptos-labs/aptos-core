@@ -2000,6 +2000,15 @@ fn realistic_env_max_load_test(
                 },
             ),
         }))
+        // TODO: revert me before landing!
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // Enable consensus publisher
+            config.consensus_observer.publisher_enabled = true;
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            // Enable consensus observer
+            config.consensus_observer.observer_enabled = true;
+        }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
