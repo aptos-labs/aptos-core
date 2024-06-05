@@ -114,25 +114,20 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_TOKEN_V2,
             FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
             FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
-            FeatureFlag::BN254_STRUCTURES,
             FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
             FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
             FeatureFlag::WEBAUTHN_SIGNATURE,
             // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
-            FeatureFlag::KEYLESS_ACCOUNTS,
-            FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::JWK_CONSENSUS,
             FeatureFlag::REFUNDABLE_BYTES,
             FeatureFlag::OBJECT_CODE_DEPLOYMENT,
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
-            FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
             FeatureFlag::MODULE_EVENT_MIGRATION,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE,
             FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
-            FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
         ]
     }
 }

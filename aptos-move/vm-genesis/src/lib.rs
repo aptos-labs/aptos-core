@@ -303,7 +303,6 @@ pub fn encode_genesis_change_set(
         .unwrap_or_else(OnChainJWKConsensusConfig::default_for_genesis);
     initialize_jwk_consensus_config(&mut session, &jwk_consensus_config);
     initialize_jwks_resources(&mut session);
-    initialize_keyless_accounts(&mut session, chain_id);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.

@@ -46,6 +46,7 @@ use std::{
     thread,
 };
 use tokio::runtime::Runtime;
+use aptos_crypto::ed25519::Ed25519PublicKey;
 
 const EPOCH_LENGTH_SECS: u64 = 60;
 
@@ -574,6 +575,11 @@ where
         })))
         .with_randomize_first_validator_ports(random_ports);
     let (root_key, _genesis, genesis_waypoint, mut validators) = builder.build(rng)?;
+    let pk = Ed25519PublicKey::from(&root_key);
+    let sk_bytes = root_key.to_bytes().to_vec();
+    let pk_bytes = pk.to_bytes().to_vec();
+    println!("sk_hex={}", hex::encode(sk_bytes));
+    println!("pk_hex={}", hex::encode(pk_bytes));
 
     // Write the mint key to disk
     let serialized_keys = bcs::to_bytes(&root_key)?;
