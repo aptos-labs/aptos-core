@@ -484,9 +484,9 @@ pub trait DbReader: Send + Sync {
     }
 }
 
-impl<T: ?Sized + DbReader> DbReader for Arc<T> {
+impl DbReader for Arc<dyn DbReader> {
     fn get_read_delegatee(&self) -> &dyn DbReader {
-        self
+        &**self
     }
 }
 
