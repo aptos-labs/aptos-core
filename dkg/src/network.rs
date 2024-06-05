@@ -117,6 +117,10 @@ impl RBNetworkSender<DKGMessage> for NetworkSender {
     ) -> anyhow::Result<HashMap<AccountAddress, Bytes>> {
         self.dkg_network_client.to_bytes_by_protocol(peers, message)
     }
+
+    fn sort_peers_by_latency(&self, peers: &mut [AccountAddress]) {
+        self.dkg_network_client.sort_peers_by_latency(peers)
+    }
 }
 
 pub struct NetworkReceivers {

@@ -136,6 +136,8 @@ where
             .map(|peer| (peer, raw_message.clone()))
             .collect())
     }
+
+    fn sort_peers_by_latency(&self, _: &mut [Author]) {}
 }
 
 #[tokio::test]

@@ -80,4 +80,9 @@ impl<NetworkClient: NetworkClientInterface<DKGMessage>> DKGNetworkClient<Network
     fn get_peer_network_id_for_peer(&self, peer: PeerId) -> PeerNetworkId {
         PeerNetworkId::new(NetworkId::Validator, peer)
     }
+
+    pub fn sort_peers_by_latency(&self, peers: &mut [PeerId]) {
+        self.network_client
+            .sort_peers_by_latency(NetworkId::Validator, peers)
+    }
 }

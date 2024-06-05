@@ -151,12 +151,9 @@ impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient
     }
 
     /// Send a single message to the destination peers
-    pub fn send_to_many(
-        &self,
-        peers: impl Iterator<Item = PeerId>,
-        message: ConsensusMsg,
-    ) -> Result<(), Error> {
+    pub fn send_to_many(&self, peers: Vec<PeerId>, message: ConsensusMsg) -> Result<(), Error> {
         let peer_network_ids: Vec<PeerNetworkId> = peers
+            .into_iter()
             .map(|peer| self.get_peer_network_id_for_peer(peer))
             .collect();
         self.network_client.send_to_peers(message, peer_network_ids)
@@ -208,5 +205,10 @@ impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient
     // peer and network ids.
     fn get_peer_network_id_for_peer(&self, peer: PeerId) -> PeerNetworkId {
         PeerNetworkId::new(NetworkId::Validator, peer)
+    }
+
+    pub fn sort_peers_by_latency(&self, peers: &mut [PeerId]) {
+        self.network_client
+            .sort_peers_by_latency(NetworkId::Validator, peers);
     }
 }

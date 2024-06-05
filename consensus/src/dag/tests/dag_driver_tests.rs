@@ -74,6 +74,8 @@ impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockNetworkSender {
     ) -> anyhow::Result<HashMap<Author, Bytes>> {
         Ok(peers.into_iter().map(|peer| (peer, Bytes::new())).collect())
     }
+
+    fn sort_peers_by_latency(&self, _: &mut [Author]) {}
 }
 
 #[async_trait]

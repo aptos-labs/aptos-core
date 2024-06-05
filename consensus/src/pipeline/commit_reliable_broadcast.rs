@@ -9,7 +9,7 @@ use aptos_consensus_types::{
 };
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage, RBNetworkSender};
-use aptos_types::validator_verifier::ValidatorVerifier;
+use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
 use async_trait::async_trait;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -148,5 +148,9 @@ impl RBNetworkSender<CommitMessage> for NetworkSender {
         let msg = ConsensusMsg::CommitMessage(Box::new(message));
         self.consensus_network_client
             .to_bytes_by_protocol(peers, msg)
+    }
+
+    fn sort_peers_by_latency(&self, peers: &mut [PeerId]) {
+        self.sort_peers_by_latency(peers);
     }
 }
