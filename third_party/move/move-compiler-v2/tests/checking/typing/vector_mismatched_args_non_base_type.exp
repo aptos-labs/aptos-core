@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: reference type `&mut u64` is not allowed as a type argument
+error: reference type `&mut u64` is not allowed as a type instantiation
   ┌─ tests/checking/typing/vector_mismatched_args_non_base_type.move:7:16
   │
 7 │         vector<&mut u64>[&0];

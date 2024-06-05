@@ -16,7 +16,7 @@ error: reference type `&Bar` is not allowed as a field type
   │
   = required by declaration of field `f`
 
-error: tuple type `(&Baz, &mut Baz)` is not allowed as a type argument
+error: tuple type `(&Baz, &mut Baz)` is not allowed as a type instantiation
   ┌─ tests/checking/typing/recursive_structs_malformed.move:6:21
   │
 6 │     struct Baz { f: vector<(&Baz, &mut Baz)> }

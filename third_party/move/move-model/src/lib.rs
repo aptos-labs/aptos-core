@@ -111,7 +111,14 @@ pub fn run_model_builder_in_compiler_mode(
         },
         Flags::model_compilation()
             .set_skip_attribute_checks(skip_attribute_checks)
-            .set_keep_testing_functions(compile_test_code),
+            .set_keep_testing_functions(compile_test_code)
+            .set_flavor(
+                if language_version != LanguageVersion::V1 {
+                    move_compiler::shared::MOVE_2_FLAVOR
+                } else {
+                    ""
+                },
+            ),
         known_attributes,
     )
 }
@@ -1029,7 +1036,7 @@ fn downgrade_type_inlining_to_expansion(ty: &N::Type) -> E::Type {
                     E::Type_::Apply(sp(ty.loc, access), rewritten_args)
                 },
                 N::TypeName_::ModuleType(module_ident, struct_name) => {
-                    let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0);
+                    let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0, None);
                     E::Type_::Apply(sp(struct_name.loc(), access), rewritten_args)
                 },
                 N::TypeName_::Multiple(size) => {
@@ -1061,7 +1068,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
         UnannotatedExp_::Constant(module_ident_opt, name) => {
             let access = match module_ident_opt {
                 None => E::ModuleAccess_::Name(name.0),
-                Some(module_ident) => E::ModuleAccess_::ModuleAccess(*module_ident, name.0),
+                Some(module_ident) => E::ModuleAccess_::ModuleAccess(*module_ident, name.0, None),
             };
             Exp_::Name(sp(name.loc(), access), None)
         },
@@ -1076,7 +1083,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
                 parameter_types: _,
                 acquires: _,
             } = call.as_ref();
-            let access = E::ModuleAccess_::ModuleAccess(*module, name.0);
+            let access = E::ModuleAccess_::ModuleAccess(*module, name.0, None);
             let rewritten_arguments = match downgrade_exp_inlining_to_expansion(arguments).value {
                 Exp_::Unit { .. } => vec![],
                 Exp_::ExpList(exps) => exps,
@@ -1192,7 +1199,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
         ),
 
         UnannotatedExp_::Pack(module_ident, struct_name, ty_args, fields) => {
-            let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0);
+            let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0, None);
             let rewritten_ty_args = ty_args
                 .iter()
                 .map(downgrade_type_inlining_to_expansion)
@@ -1283,7 +1290,7 @@ fn downgrade_lvalue_inlining_to_expansion(val: &T::LValue) -> E::LValue {
         },
         T::LValue_::Unpack(module_ident, struct_name, ty_args, fields)
         | T::LValue_::BorrowUnpack(_, module_ident, struct_name, ty_args, fields) => {
-            let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0);
+            let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0, None);
             let rewritten_ty_args: Vec<_> = ty_args
                 .iter()
                 .map(downgrade_type_inlining_to_expansion)

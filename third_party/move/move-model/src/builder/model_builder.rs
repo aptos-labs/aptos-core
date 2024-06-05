@@ -12,8 +12,8 @@ use crate::{
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, QualifiedInstId,
-        SpecFunId, SpecVarId, StructId, TypeParameter,
+        FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
+        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
     ty::{Constraint, Type, TypeDisplayContext},
@@ -119,11 +119,26 @@ pub(crate) struct StructEntry {
     pub struct_id: StructId,
     pub type_params: Vec<TypeParameter>,
     pub abilities: AbilitySet,
-    pub fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
+    pub layout: StructLayout,
     pub attributes: Vec<Attribute>,
     /// Maps simple function names to the qualified symbols of receiver functions. The
     /// symbol can be used to index the global function table.
     pub receiver_functions: BTreeMap<Symbol, QualifiedSymbol>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum StructLayout {
+    Singleton(BTreeMap<Symbol, FieldData>),
+    Variants(Vec<StructVariant>),
+    None,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct StructVariant {
+    pub loc: Loc,
+    pub name: Symbol,
+    pub attributes: Vec<Attribute>,
+    pub fields: BTreeMap<Symbol, FieldData>,
 }
 
 /// A declaration of a function.
@@ -335,7 +350,7 @@ impl<'env> ModelBuilder<'env> {
         struct_id: StructId,
         abilities: AbilitySet,
         type_params: Vec<TypeParameter>,
-        fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
+        layout: StructLayout,
     ) {
         let entry = StructEntry {
             loc,
@@ -344,7 +359,7 @@ impl<'env> ModelBuilder<'env> {
             struct_id,
             abilities,
             type_params,
-            fields,
+            layout,
             receiver_functions: BTreeMap::new(),
         };
         self.struct_table.insert(name.clone(), entry);
@@ -483,18 +498,18 @@ impl<'env> ModelBuilder<'env> {
             })
     }
 
-    /// Looks up the fields of a structure, with instantiated field types.
+    /// Looks up the fields of a structure, with instantiated field types. Returns empty
+    /// map if the struct has variants.
     pub fn lookup_struct_fields(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
         let entry = self.lookup_struct_entry(id.to_qualified_id());
-        entry
-            .fields
-            .as_ref()
-            .map(|f| {
-                f.iter()
-                    .map(|(n, (_, _, field_ty))| (*n, field_ty.instantiate(&id.inst)))
-                    .collect::<BTreeMap<_, _>>()
-            })
-            .unwrap_or_default()
+        if let StructLayout::Singleton(fields) = &entry.layout {
+            fields
+                .values()
+                .map(|f| (f.name, f.ty.instantiate(&id.inst)))
+                .collect()
+        } else {
+            BTreeMap::new()
+        }
     }
 
     /// Looks up a receiver function for a given type.

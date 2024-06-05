@@ -12,7 +12,7 @@ error: cannot use `bool` with an operator which expects a value of type `integer
 14 │         0 != false;
    │              ^^^^^
 
-error: reference type `&integer` is not allowed as a type argument (type was inferred)
+error: reference type `&integer` is not allowed as a type instantiation (type was inferred)
    ┌─ tests/checking/typing/neq_invalid.move:15:12
    │
 15 │         &0 != 1;
@@ -32,7 +32,7 @@ error: cannot use `&S` with an operator which expects a value of type `S`
 17 │         s != s_ref;
    │              ^^^^^
 
-error: reference type `&mut S` is not allowed as a type argument (type was inferred)
+error: reference type `&mut S` is not allowed as a type instantiation (type was inferred)
    ┌─ tests/checking/typing/neq_invalid.move:18:15
    │
 18 │         s_mut != s;
@@ -58,7 +58,7 @@ error: unable to infer instantiation of type `G2<_>` (consider providing type ar
 28 │         G2{} != G2{};
    │         ^^^^
 
-error: tuple type `()` is not allowed as a type argument (type was inferred)
+error: tuple type `()` is not allowed as a type instantiation (type was inferred)
    ┌─ tests/checking/typing/neq_invalid.move:32:12
    │
 32 │         () != ();
@@ -66,7 +66,7 @@ error: tuple type `()` is not allowed as a type argument (type was inferred)
    │
    = required by instantiating type parameter `T` of function `!=`
 
-error: tuple type `(integer, integer)` is not allowed as a type argument (type was inferred)
+error: tuple type `(integer, integer)` is not allowed as a type instantiation (type was inferred)
    ┌─ tests/checking/typing/neq_invalid.move:33:16
    │
 33 │         (0, 1) != (0, 1);
@@ -74,7 +74,7 @@ error: tuple type `(integer, integer)` is not allowed as a type argument (type w
    │
    = required by instantiating type parameter `T` of function `!=`
 
-error: tuple type `(integer, integer, integer)` is not allowed as a type argument (type was inferred)
+error: tuple type `(integer, integer, integer)` is not allowed as a type instantiation (type was inferred)
    ┌─ tests/checking/typing/neq_invalid.move:34:19
    │
 34 │         (1, 2, 3) != (0, 1);
@@ -82,7 +82,7 @@ error: tuple type `(integer, integer, integer)` is not allowed as a type argumen
    │
    = required by instantiating type parameter `T` of function `!=`
 
-error: tuple type `(integer, integer)` is not allowed as a type argument (type was inferred)
+error: tuple type `(integer, integer)` is not allowed as a type instantiation (type was inferred)
    ┌─ tests/checking/typing/neq_invalid.move:35:16
    │
 35 │         (0, 1) != (1, 2, 3);

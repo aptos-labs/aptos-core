@@ -1,24 +1,12 @@
-error[E01012]: invalid access specifier
-   ┌─ tests/move_check/expansion/access_specifier_not_supported.move:14:23
-   │
-14 │     fun f4() acquires S(*) {
-   │                       ^^^^ compiler version 1 only supports simple 'acquires <resource_name>' clauses
+error[E01013]: unsupported language construct
+  ┌─ tests/move_check/expansion/access_specifier_not_supported.move:8:14
+  │
+8 │     fun f2() reads S {
+  │              ^^^^^ Move 2 language construct is not enabled: access specifiers
 
-error[E01012]: invalid access specifier
-   ┌─ tests/move_check/expansion/access_specifier_not_supported.move:23:23
+error[E01013]: unsupported language construct
+   ┌─ tests/move_check/expansion/access_specifier_not_supported.move:11:14
    │
-23 │     fun f7() acquires *(*) {
-   │                       ^^^^ compiler version 1 only supports simple 'acquires <resource_name>' clauses
-
-error[E01012]: invalid access specifier
-   ┌─ tests/move_check/expansion/access_specifier_not_supported.move:26:23
-   │
-26 │     fun f8() acquires *(0x42) {
-   │                       ^^^^^^^ compiler version 1 only supports simple 'acquires <resource_name>' clauses
-
-error[E01012]: invalid access specifier
-   ┌─ tests/move_check/expansion/access_specifier_not_supported.move:29:34
-   │
-29 │     fun f9(_a: address) acquires *(_a) {
-   │                                  ^^^^^ compiler version 1 only supports simple 'acquires <resource_name>' clauses
+11 │     fun f3() writes S {
+   │              ^^^^^^ Move 2 language construct is not enabled: access specifiers
 

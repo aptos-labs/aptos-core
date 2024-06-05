@@ -2809,7 +2809,7 @@ impl TypeUnificationError {
                         origin: ConstraintOrigin::TupleElement(_, _),
                         ..
                     }) => "as a tuple element",
-                    _ => "as a type argument",
+                    _ => "as a type instantiation",
                 };
                 let (mut note, mut hints, mut labels) = ctx_opt
                     .as_ref()
@@ -2930,7 +2930,7 @@ impl TypeUnificationError {
                 let fields =
                     Self::print_fields(display_context.env, missing_fields.into_iter().cloned());
                 format!(
-                    "{} not declared in struct `{}`",
+                    "{} not declared in `{}`",
                     fields,
                     ty.display(display_context)
                 )

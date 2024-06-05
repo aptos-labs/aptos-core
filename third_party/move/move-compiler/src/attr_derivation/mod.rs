@@ -10,7 +10,7 @@ use crate::{
     parser::ast::{
         Attribute, AttributeValue, Attribute_, Attributes, CallKind, Definition, Exp, Exp_,
         Function, FunctionBody_, FunctionName, FunctionSignature, LeadingNameAccess_,
-        NameAccessChain, NameAccessChain_, StructDefinition, StructFields, StructName, Type, Type_,
+        NameAccessChain, NameAccessChain_, StructDefinition, StructLayout, StructName, Type, Type_,
         Value_, Var, Visibility,
     },
     shared::{
@@ -163,7 +163,7 @@ pub(crate) fn new_fun(
 }
 
 /// Helper to create a new struct declaration.
-pub(crate) fn new_struct(loc: Loc, name: StructName, fields: StructFields) -> StructDefinition {
+pub(crate) fn new_struct(loc: Loc, name: StructName, fields: StructLayout) -> StructDefinition {
     StructDefinition {
         attributes: vec![sp(
             // #[event]
@@ -174,7 +174,7 @@ pub(crate) fn new_struct(loc: Loc, name: StructName, fields: StructFields) -> St
         abilities: vec![],
         name,
         type_parameters: vec![],
-        fields,
+        layout: fields,
     }
 }
 
