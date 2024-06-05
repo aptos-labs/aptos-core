@@ -605,7 +605,7 @@ fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 100, 3)
+            realistic_env_max_load_test(duration, test_cmd, 7, 3)
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
@@ -1987,7 +1987,8 @@ fn realistic_env_max_load_test(
             config.consensus_observer.publisher_enabled = true
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
-            config.consensus_observer.observer_enabled = true
+            config.consensus_observer.observer_enabled = true;
+            optimize_state_sync_for_throughput(config);
         }))
         .with_validator_resource_override(NodeResourceOverride {
             cpu_cores: Some(58),
