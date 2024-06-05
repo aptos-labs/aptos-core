@@ -33,8 +33,9 @@ use crate::{
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
-        unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
+        unreachable_code_remover::UnreachableCodeRemover,
         unused_assignment_checker::UnusedAssignmentChecker,
+        variable_coalescing::VariableCoalescing,
     },
 };
 use anyhow::bail;
