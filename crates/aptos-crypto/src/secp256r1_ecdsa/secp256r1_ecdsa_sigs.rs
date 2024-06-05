@@ -65,14 +65,14 @@ impl Signature {
         if bytes.len() != SIGNATURE_LENGTH {
             return Err(CryptoMaterialError::WrongLengthError);
         }
-        if !Signature::check_s_lt_order_half(&bytes[32..]) {
+        if !Signature::check_s_le_order_half(&bytes[32..]) {
             return Err(CryptoMaterialError::CanonicalRepresentationError);
         }
         Ok(())
     }
 
     /// Check if S <= ORDER_HALF to capture invalid signatures.
-    fn check_s_lt_order_half(s: &[u8]) -> bool {
+    fn check_s_le_order_half(s: &[u8]) -> bool {
         for i in 0..32 {
             match s[i].cmp(&ORDER_HALF[i]) {
                 Ordering::Less => return true,
