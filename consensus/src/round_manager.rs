@@ -588,7 +588,7 @@ impl RoundManager {
         }
         self.sync_up(sync_info, author).await?;
         ensure!(
-            message_round == self.round_state.current_round(),
+            self.round_state.current_round() >= message_round,
             "After sync, round {} doesn't match local {}. Local Sync Info: {}. Remote Sync Info: {}",
             message_round,
             self.round_state.current_round(),
