@@ -31,7 +31,6 @@ impl<Db: DbReader> FinalityView<Db> {
     pub fn set_finalized_block_height(&self, height: u64) -> Result<()> {
         let (_start_ver, end_ver, block_event) = self.reader.get_block_info_by_height(height)?;
         let block_hash = block_event.hash()?;
-        dbg!(block_hash);
         let block_info = BlockInfo::new(
             block_event.epoch(),
             block_event.round(),
