@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::compiler::{as_module, as_script, compile_units};
-use move_binary_format::deserializer::DeserializerConfig;
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::{config::VMConfig, module_traversal::*, move_vm::MoveVM};
@@ -38,22 +37,19 @@ fn test_publish_module_with_nested_loops() {
 
     // Should succeed with max_loop_depth = 2
     {
-        let deserializer_config = DeserializerConfig::default();
-        let verifier_config = VerifierConfig {
-            max_loop_depth: Some(2),
-            ..VerifierConfig::default()
-        };
-        let vm_config = VMConfig::default();
-
         let storage = InMemoryStorage::new();
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
                 move_stdlib::natives::GasParameters::zeros(),
             ),
-            deserializer_config,
-            verifier_config,
-            vm_config,
+            VMConfig {
+                verifier_config: VerifierConfig {
+                    max_loop_depth: Some(2),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
         );
 
         let mut sess = vm.new_session(&storage);
@@ -63,22 +59,19 @@ fn test_publish_module_with_nested_loops() {
 
     // Should fail with max_loop_depth = 1
     {
-        let deserializer_config = DeserializerConfig::default();
-        let verifier_config = VerifierConfig {
-            max_loop_depth: Some(1),
-            ..VerifierConfig::default()
-        };
-        let vm_config = VMConfig::default();
-
         let storage = InMemoryStorage::new();
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
                 move_stdlib::natives::GasParameters::zeros(),
             ),
-            deserializer_config,
-            verifier_config,
-            vm_config,
+            VMConfig {
+                verifier_config: VerifierConfig {
+                    max_loop_depth: Some(1),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
         );
 
         let mut sess = vm.new_session(&storage);
@@ -115,22 +108,19 @@ fn test_run_script_with_nested_loops() {
 
     // Should succeed with max_loop_depth = 2
     {
-        let deserializer_config = DeserializerConfig::default();
-        let verifier_config = VerifierConfig {
-            max_loop_depth: Some(2),
-            ..VerifierConfig::default()
-        };
-        let vm_config = VMConfig::default();
-
         let storage = InMemoryStorage::new();
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
                 move_stdlib::natives::GasParameters::zeros(),
             ),
-            deserializer_config,
-            verifier_config,
-            vm_config,
+            VMConfig {
+                verifier_config: VerifierConfig {
+                    max_loop_depth: Some(2),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
         );
 
         let mut sess = vm.new_session(&storage);
@@ -147,21 +137,19 @@ fn test_run_script_with_nested_loops() {
 
     // Should fail with max_loop_depth = 1
     {
-        let deserializer_config = DeserializerConfig::default();
-        let verifier_config = VerifierConfig {
-            max_loop_depth: Some(1),
-            ..VerifierConfig::default()
-        };
-        let vm_config = VMConfig::default();
         let storage = InMemoryStorage::new();
         let vm = MoveVM::new_with_config(
             move_stdlib::natives::all_natives(
                 AccountAddress::from_hex_literal("0x1").unwrap(),
                 move_stdlib::natives::GasParameters::zeros(),
             ),
-            deserializer_config,
-            verifier_config,
-            vm_config,
+            VMConfig {
+                verifier_config: VerifierConfig {
+                    max_loop_depth: Some(1),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
         );
 
         let mut sess = vm.new_session(&storage);

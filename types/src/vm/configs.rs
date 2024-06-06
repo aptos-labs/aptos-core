@@ -66,6 +66,7 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
 }
 
 pub fn aptos_prod_vm_config(
+    features: &Features,
     timed_features: &TimedFeatures,
     delayed_field_optimization_enabled: bool,
     paranoid_type_checks: bool,
@@ -83,7 +84,12 @@ pub fn aptos_prod_vm_config(
         type_byte_cost = 1;
     }
 
+    let deserializer_config = aptos_prod_deserializer_config(features);
+    let verifier_config = aptos_prod_verifier_config(features);
+
     VMConfig {
+        verifier_config,
+        deserializer_config,
         paranoid_type_checks,
         check_invariant_in_swap_loc,
         type_size_limit: true,

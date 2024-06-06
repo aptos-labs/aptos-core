@@ -12,13 +12,13 @@ pub trait WithDeserializerConfig {
 
 impl WithDeserializerConfig for AptosEnvironment {
     fn deserializer_config(&self) -> &DeserializerConfig {
-        &self.0.deserializer_config
+        todo!()
     }
 }
 
 // Dummy implementation for testing.
 impl WithDeserializerConfig for () {
     fn deserializer_config(&self) -> &DeserializerConfig {
-        unreachable!("Irrelevant for tests")
+        todo!()
     }
 }

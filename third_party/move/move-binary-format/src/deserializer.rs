@@ -89,7 +89,7 @@ impl DeserializerConfig {
 
 impl Default for DeserializerConfig {
     fn default() -> Self {
-        Self::new(VERSION_MAX, IDENTIFIER_SIZE_MAX)
+        Self::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX)
     }
 }
 

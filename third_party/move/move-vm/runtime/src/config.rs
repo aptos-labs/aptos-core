@@ -1,6 +1,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use move_binary_format::deserializer::DeserializerConfig;
+use move_bytecode_verifier::VerifierConfig;
 use serde::Serialize;
 
 pub const DEFAULT_MAX_VALUE_NEST_DEPTH: u64 = 128;
@@ -8,6 +10,8 @@ pub const DEFAULT_MAX_VALUE_NEST_DEPTH: u64 = 128;
 /// Dynamic config options for the Move VM.
 #[derive(Clone, Serialize)]
 pub struct VMConfig {
+    pub verifier_config: VerifierConfig,
+    pub deserializer_config: DeserializerConfig,
     /// When this flag is set to true, MoveVM will perform type checks at every instruction
     /// execution to ensure that type safety cannot be violated at runtime.
     pub paranoid_type_checks: bool,
@@ -24,6 +28,8 @@ pub struct VMConfig {
 impl Default for VMConfig {
     fn default() -> Self {
         Self {
+            verifier_config: VerifierConfig::default(),
+            deserializer_config: DeserializerConfig::default(),
             paranoid_type_checks: false,
             check_invariant_in_swap_loc: true,
             type_size_limit: false,

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::compiler::{as_module, compile_units};
-use move_binary_format::{deserializer::DeserializerConfig, errors::PartialVMResult};
+use move_binary_format::errors::PartialVMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress, gas_algebra::InternalGas, identifier::Identifier,
@@ -56,12 +56,6 @@ fn test_publish_module_with_nested_loops() {
 
     // Should succeed with max_loop_depth = 2
     {
-        let deserializer_config = DeserializerConfig::default();
-        let verifier_config = VerifierConfig {
-            max_loop_depth: Some(2),
-            ..VerifierConfig::default()
-        };
-        let vm_config = VMConfig::default();
         let storage = InMemoryStorage::new();
 
         let natives = vec![(
@@ -70,7 +64,13 @@ fn test_publish_module_with_nested_loops() {
             Identifier::new("bar").unwrap(),
             make_failed_native(),
         )];
-        let vm = MoveVM::new_with_config(natives, deserializer_config, verifier_config, vm_config);
+        let vm = MoveVM::new_with_config(natives, VMConfig {
+            verifier_config: VerifierConfig {
+                max_loop_depth: Some(2),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
 
         let mut sess = vm.new_session(&storage);
         sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)

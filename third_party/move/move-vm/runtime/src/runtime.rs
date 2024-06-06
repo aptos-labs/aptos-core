@@ -15,12 +15,10 @@ use crate::{
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
-    deserializer::DeserializerConfig,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     file_format::LocalIndex,
     normalized, CompiledModule, IndexKind,
 };
-use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::TypeTag,
     value::MoveTypeLayout, vm_status::StatusCode,
@@ -50,16 +48,12 @@ impl Clone for VMRuntime {
 impl VMRuntime {
     pub(crate) fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-        deserializer_config: DeserializerConfig,
-        verifier_config: VerifierConfig,
         vm_config: VMConfig,
     ) -> Self {
         VMRuntime {
             loader: Loader::new(
                 NativeFunctions::new(natives)
                     .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e)),
-                deserializer_config,
-                verifier_config,
                 vm_config,
             ),
             module_cache: Arc::new(ModuleCache::new()),
@@ -80,7 +74,10 @@ impl VMRuntime {
         let compiled_modules = match modules
             .iter()
             .map(|blob| {
-                CompiledModule::deserialize_with_config(blob, &self.loader.deserializer_config)
+                CompiledModule::deserialize_with_config(
+                    blob,
+                    &self.loader.vm_config.deserializer_config,
+                )
             })
             .collect::<PartialVMResult<Vec<_>>>()
         {

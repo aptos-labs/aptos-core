@@ -295,7 +295,7 @@ impl AptosVM {
 
     #[inline(always)]
     fn deserializer_config(&self) -> &DeserializerConfig {
-        &self.move_vm.env.deserializer_config
+        &self.move_vm.env.vm_config.deserializer_config
     }
 
     #[inline(always)]

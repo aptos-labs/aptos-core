@@ -8,13 +8,8 @@ use crate::{
         TimedFeaturesBuilder,
     },
     state_store::StateView,
-    vm::configs::{
-        aptos_prod_deserializer_config, aptos_prod_verifier_config, aptos_prod_vm_config,
-        get_paranoid_type_checks, get_timed_feature_override,
-    },
+    vm::configs::{aptos_prod_vm_config, get_paranoid_type_checks, get_timed_feature_override},
 };
-use move_binary_format::deserializer::DeserializerConfig;
-use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::config::VMConfig;
 use std::sync::Arc;
 
@@ -26,8 +21,6 @@ pub struct Environment {
     pub features: Features,
     pub timed_features: TimedFeatures,
 
-    pub deserializer_config: DeserializerConfig,
-    pub verifier_config: VerifierConfig,
     pub vm_config: VMConfig,
 }
 
@@ -88,14 +81,13 @@ impl Environment {
     }
 
     fn initialize(features: Features, timed_features: TimedFeatures, chain_id: ChainId) -> Self {
-        let deserializer_config = aptos_prod_deserializer_config(&features);
-        let verifier_config = aptos_prod_verifier_config(&features);
-
         // By default, do not use delayed field optimization. Instead, clients should enable it
         // manually where applicable.
         let delayed_field_optimization_enabled = false;
         let paranoid_type_checks = get_paranoid_type_checks();
+
         let vm_config = aptos_prod_vm_config(
+            &features,
             &timed_features,
             delayed_field_optimization_enabled,
             paranoid_type_checks,
@@ -105,8 +97,6 @@ impl Environment {
             chain_id,
             features,
             timed_features,
-            deserializer_config,
-            verifier_config,
             vm_config,
         }
     }
