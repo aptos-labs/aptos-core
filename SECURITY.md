@@ -4,6 +4,10 @@
 
 **DO NOT CREATE AN ISSUE** to report a security problem.
 
+Go to https://hackenproof.com/aptos-labs/aptos-network and open a vulnerability report. The team will triage the issue from there.
+
+
+<!--
 Go to https://github.com/aptos-labs/aptos-core/security/advisories and open a vulnerability report. Send an email to [security@aptosfoundation.org](mailto:security@aptosfoundation.org) and provide your GitHub username. The team will triage the issue from there.
 
 For security reasons, DO NOT include attachments or provide detail sufficient for exploitation regarding the security issue in this email. Instead, wait for the advisory to be created, and **provide any sensitive details in the private GitHub advisory**.
@@ -137,3 +141,4 @@ The following activities are prohibited by this bug bounty program:
 - Any denial of service attacks.
 - Automated testing of services that generates significant amounts of traffic.
 - Public disclosure of an unpatched vulnerability in an embargoed bounty.
+-->
