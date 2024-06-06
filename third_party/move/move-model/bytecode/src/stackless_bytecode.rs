@@ -342,7 +342,7 @@ impl Operation {
             Operation::Drop => false,
             Operation::Release => false,
             Operation::ReadRef => false,
-            Operation::WriteRef => false,
+            Operation::WriteRef => true,
             Operation::FreezeRef(_) => false,
             Operation::Vector => true,
             Operation::Havoc(_) => false,
