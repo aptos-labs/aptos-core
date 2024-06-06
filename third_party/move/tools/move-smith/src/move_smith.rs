@@ -20,7 +20,7 @@
 use crate::{
     ast::*,
     config::Config,
-    names::{is_in_scope, Identifier, IdentifierPool, IdentifierType, Scope, ROOT_SCOPE},
+    names::{is_in_scope, Identifier, IdentifierPool, IdentifierType as IDType, Scope, ROOT_SCOPE},
     types::{Type, TypePool},
 };
 use arbitrary::{Arbitrary, Result, Unstructured};
@@ -125,7 +125,7 @@ impl MoveSmith {
     /// Generate a module skeleton with only struct and function skeletions.
     fn generate_module_skeleton(&self, u: &mut Unstructured) -> Result<Module> {
         let hardcoded_address = Scope(Some("0xCAFE".to_string()));
-        let (name, scope) = self.get_next_identifier(IdentifierType::Module, &hardcoded_address);
+        let (name, scope) = self.get_next_identifier(IDType::Module, &hardcoded_address);
 
         // Struct names
         let mut structs = Vec::new();
@@ -171,7 +171,7 @@ impl MoveSmith {
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<StructDefinition> {
-        let (name, _) = self.get_next_identifier(IdentifierType::Struct, parent_scope);
+        let (name, _) = self.get_next_identifier(IDType::Struct, parent_scope);
 
         let mut ability_choices = vec![Ability::Copy, Ability::Drop, Ability::Store, Ability::Key];
         let mut abilities = Vec::new();
@@ -199,7 +199,7 @@ impl MoveSmith {
     ) -> Result<()> {
         let struct_scope = st.borrow().name.to_scope();
         for _ in 0..u.int_in_range(0..=self.config.max_num_fields_in_struct)? {
-            let (name, _) = self.get_next_identifier(IdentifierType::Var, &struct_scope);
+            let (name, _) = self.get_next_identifier(IDType::Var, &struct_scope);
 
             let typ = loop {
                 match u.int_in_range(0..=2)? {
@@ -236,7 +236,7 @@ impl MoveSmith {
         scope: &Scope,
         parent_struct_id: &Identifier,
     ) -> Vec<StructDefinition> {
-        let ids = self.get_filtered_identifiers(None, Some(IdentifierType::Struct), Some(scope));
+        let ids = self.get_filtered_identifiers(None, Some(IDType::Struct), Some(scope));
         ids.iter()
             .filter_map(|s| {
                 let struct_def = self.get_struct_definition_with_identifier(s).unwrap();
@@ -295,14 +295,13 @@ impl MoveSmith {
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Function> {
-        let (name, scope) = self.get_next_identifier(IdentifierType::Function, parent_scope);
+        let (name, scope) = self.get_next_identifier(IDType::Function, parent_scope);
         let signature = self.generate_function_signature(u, &scope, name)?;
 
         Ok(Function {
             signature,
             visibility: Visibility { public: true },
             body: None,
-            return_stmt: None,
         })
     }
 
@@ -313,9 +312,8 @@ impl MoveSmith {
             .borrow()
             .get_scope_for_children(&function.borrow().signature.name);
         let signature = function.borrow().signature.clone();
-        let mut mut_func = function.borrow_mut();
-        mut_func.body = Some(self.generate_function_body(u, &scope)?);
-        mut_func.return_stmt = self.generate_return_stmt(u, &scope, &signature)?;
+        let body = self.generate_block(u, &scope, None, signature.return_type.clone())?;
+        function.borrow_mut().body = Some(body);
         Ok(())
     }
 
@@ -329,7 +327,7 @@ impl MoveSmith {
         let num_params = u.int_in_range(0..=self.config.max_num_params_in_func)?;
         let mut parameters = Vec::new();
         for _ in 0..num_params {
-            let (name, _) = self.get_next_identifier(IdentifierType::Var, parent_scope);
+            let (name, _) = self.get_next_identifier(IDType::Var, parent_scope);
 
             let typ = self.generate_basic_type(u)?;
             self.type_pool.borrow_mut().insert_mapping(&name, &typ);
@@ -348,50 +346,58 @@ impl MoveSmith {
         })
     }
 
-    /// Generate a return statement with a random expression.
-    fn generate_return_stmt(
+    /// Generate an expression block
+    fn generate_block(
         &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
-        signature: &FunctionSignature,
-    ) -> Result<Option<Expression>> {
-        match signature.return_type {
-            Some(ref typ) => {
-                let ids = self.get_filtered_identifiers(
-                    Some(typ),
-                    Some(IdentifierType::Var),
-                    Some(parent_scope),
-                );
-                match ids.is_empty() {
-                    true => {
-                        let expr =
-                            self.generate_expression_of_type(u, parent_scope, typ, true, true)?;
-                        Ok(Some(expr))
-                    },
-                    false => {
-                        let ident = u.choose(&ids)?.clone();
-                        Ok(Some(Expression::Variable(ident)))
-                    },
-                }
+        num_stmts: Option<usize>,
+        ret_typ: Option<Type>,
+    ) -> Result<Block> {
+        let (_, block_scope) = self.get_next_identifier(IDType::Block, parent_scope);
+        let num_stmts =
+            num_stmts.unwrap_or(u.int_in_range(0..=self.config.max_num_stmts_in_block)?);
+        let stmts = self.generate_statements(u, &block_scope, num_stmts)?;
+        let return_expr = match ret_typ {
+            Some(ref typ) => Some(self.generate_block_return(u, parent_scope, typ)?),
+            None => None,
+        };
+        Ok(Block { stmts, return_expr })
+    }
+
+    /// Generate a return expression
+    /// Prefer to return a variable if possible
+    fn generate_block_return(
+        &self,
+        u: &mut Unstructured,
+        parent_scope: &Scope,
+        typ: &Type,
+    ) -> Result<Expression> {
+        let ids = self.get_filtered_identifiers(Some(typ), Some(IDType::Var), Some(parent_scope));
+        match ids.is_empty() {
+            true => {
+                let expr = self.generate_expression_of_type(u, parent_scope, typ, true, true)?;
+                Ok(expr)
             },
-            None => Ok(None),
+            false => {
+                let ident = u.choose(&ids)?.clone();
+                Ok(Expression::Variable(ident))
+            },
         }
     }
 
-    /// Generate a function body with random number of statements.
-    fn generate_function_body(
+    /// Generate a list of statements.
+    fn generate_statements(
         &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
-    ) -> Result<FunctionBody> {
-        let len = u.int_in_range(0..=self.config.max_num_stmt_in_func)?;
+        num_stmts: usize,
+    ) -> Result<Vec<Statement>> {
         let mut stmts = Vec::new();
-
-        for _ in 0..len {
+        for _ in 0..num_stmts {
             stmts.push(self.generate_statement(u, parent_scope)?);
         }
-
-        Ok(FunctionBody { stmts })
+        Ok(stmts)
     }
 
     /// Generate a random statement.
@@ -409,7 +415,7 @@ impl MoveSmith {
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Declaration> {
-        let (name, _) = self.get_next_identifier(IdentifierType::Var, parent_scope);
+        let (name, _) = self.get_next_identifier(IDType::Var, parent_scope);
 
         let typ = self.generate_basic_type(u)?;
         // let value = match bool::arbitrary(u)? {
@@ -445,11 +451,8 @@ impl MoveSmith {
                 },
                 // Generate a variable access
                 1 => {
-                    let idents = self.get_filtered_identifiers(
-                        None,
-                        Some(IdentifierType::Var),
-                        Some(parent_scope),
-                    );
+                    let idents =
+                        self.get_filtered_identifiers(None, Some(IDType::Var), Some(parent_scope));
                     if !idents.is_empty() {
                         let ident = u.choose(&idents)?.clone();
                         break Expression::Variable(ident);
@@ -676,10 +679,10 @@ impl MoveSmith {
     fn get_filtered_identifiers(
         &self,
         typ: Option<&Type>,
-        ident_type: Option<IdentifierType>,
+        ident_type: Option<IDType>,
         scope: Option<&Scope>,
     ) -> Vec<Identifier> {
-        // Filter based on the IdentifierType
+        // Filter based on the IDType
         let all_ident = match ident_type {
             Some(t) => self.id_pool.borrow().get_identifiers_of_ident_type(t),
             None => self.id_pool.borrow().get_all_identifiers(),
@@ -705,11 +708,7 @@ impl MoveSmith {
     }
 
     /// Helper to get the next identifier.
-    fn get_next_identifier(
-        &self,
-        ident_type: IdentifierType,
-        parent_scope: &Scope,
-    ) -> (Identifier, Scope) {
+    fn get_next_identifier(&self, ident_type: IDType, parent_scope: &Scope) -> (Identifier, Scope) {
         self.id_pool
             .borrow_mut()
             .next_identifier(ident_type, parent_scope)

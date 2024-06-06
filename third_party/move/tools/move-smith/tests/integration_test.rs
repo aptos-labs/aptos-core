@@ -20,16 +20,16 @@ fn simple_module() -> Module {
                 return_type: Some(Type::U32),
             },
             visibility: Visibility { public: true },
-            body: Some(FunctionBody {
+            body: Some(Block {
                 stmts: vec![Statement::Expr(Expression::NumberLiteral(NumberLiteral {
                     value: BigUint::from(42u32),
                     typ: Type::U32,
                 }))],
+                return_expr: Some(Expression::NumberLiteral(NumberLiteral {
+                    value: BigUint::from(111u32),
+                    typ: Type::U32,
+                })),
             }),
-            return_stmt: Some(Expression::NumberLiteral(NumberLiteral {
-                value: BigUint::from(111u32),
-                typ: Type::U32,
-            })),
         })],
         structs: Vec::new(),
     }

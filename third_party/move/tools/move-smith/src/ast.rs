@@ -56,9 +56,7 @@ pub struct Function {
     /// used.
     // pub access_specifiers: Option<Vec<AccessSpecifier>>,
     // pub inline: bool,
-    pub body: Option<FunctionBody>,
-
-    pub return_stmt: Option<Expression>,
+    pub body: Option<Block>,
 }
 
 /// The Visibility
@@ -77,10 +75,11 @@ pub struct FunctionSignature {
     pub return_type: Option<Type>,
 }
 
-/// The body of a function excluding the return statement.
+/// An expression block
 #[derive(Debug, Clone)]
-pub struct FunctionBody {
+pub struct Block {
     pub stmts: Vec<Statement>,
+    pub return_expr: Option<Expression>,
 }
 
 /// The definition of a struct.

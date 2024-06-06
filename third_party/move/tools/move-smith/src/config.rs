@@ -17,8 +17,13 @@ pub struct Config {
 
     pub max_num_fields_in_struct: usize,
 
-    pub max_num_stmt_in_func: usize,
+    pub max_num_stmts_in_func: usize,
     pub max_num_params_in_func: usize,
+
+    // This has lowest priority
+    // i.e. if the block is a function body
+    // max_num_stmts_in_func will override this
+    pub max_num_stmts_in_block: usize,
 
     pub max_num_calls_in_script: usize,
 }
@@ -36,8 +41,10 @@ impl Default for Config {
 
             max_num_fields_in_struct: 5,
 
-            max_num_stmt_in_func: 20,
+            max_num_stmts_in_func: 20,
             max_num_params_in_func: 5,
+
+            max_num_stmts_in_block: 10,
 
             max_num_calls_in_script: 20,
         }

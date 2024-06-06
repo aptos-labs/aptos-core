@@ -61,7 +61,7 @@ pub struct IdentifierPool {
     modules: Vec<Identifier>,
     scripts: Vec<Identifier>,
     constants: Vec<Identifier>,
-
+    blocks: Vec<Identifier>,
     scopes: HashMap<Identifier, Scope>,
 }
 
@@ -74,6 +74,9 @@ pub enum IdentifierType {
     Module,
     Script,
     Constant,
+
+    // Block identifiers are only used to keep track of scope.
+    Block,
 }
 
 impl Default for IdentifierPool {
@@ -92,6 +95,7 @@ impl IdentifierPool {
             modules: Vec::new(),
             scripts: Vec::new(),
             constants: Vec::new(),
+            blocks: Vec::new(),
             scopes: HashMap::new(),
         }
     }
@@ -172,6 +176,7 @@ impl IdentifierPool {
             IdentifierType::Module => &self.modules,
             IdentifierType::Script => &self.scripts,
             IdentifierType::Constant => &self.constants,
+            IdentifierType::Block => &self.blocks,
         }
     }
 
@@ -184,6 +189,7 @@ impl IdentifierPool {
             IdentifierType::Module => self.modules.push(name),
             IdentifierType::Script => self.scripts.push(name),
             IdentifierType::Constant => self.constants.push(name),
+            IdentifierType::Block => self.blocks.push(name),
         }
     }
 
@@ -196,6 +202,7 @@ impl IdentifierPool {
             IdentifierType::Module => self.modules.len(),
             IdentifierType::Script => self.scripts.len(),
             IdentifierType::Constant => self.constants.len(),
+            IdentifierType::Block => self.blocks.len(),
         }
     }
 
@@ -208,6 +215,7 @@ impl IdentifierPool {
             IdentifierType::Module => "Module",
             IdentifierType::Script => "Script",
             IdentifierType::Constant => "CONST",
+            IdentifierType::Block => "_block",
         };
         format!("{}{}", type_prefix, idx)
     }

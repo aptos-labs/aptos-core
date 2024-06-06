@@ -61,14 +61,14 @@ impl CodeGenerator for Script {
             },
             visibility: Visibility { public: false },
             // Hardcode one function to simplify the output
-            body: Some(FunctionBody {
+            body: Some(Block {
                 stmts: self
                     .main
                     .iter()
                     .map(|f| Statement::Expr(Expression::FunctionCall(f.clone())))
                     .collect(),
+                return_expr: None,
             }),
-            return_stmt: None,
         };
         let main_code = main.emit_code_lines();
         append_code_lines_with_indentation(&mut code, main_code, INDENTATION_SIZE);
@@ -188,21 +188,20 @@ impl CodeGenerator for Function {
             None => Vec::new(),
         };
 
-        if let Some(ref expr) = self.return_stmt {
-            body.push(expr.emit_code().to_string());
-        }
-
         append_code_lines_with_indentation(&mut code, body, INDENTATION_SIZE);
         code.push("}".to_string());
         code
     }
 }
 
-impl CodeGenerator for FunctionBody {
+impl CodeGenerator for Block {
     fn emit_code_lines(&self) -> Vec<String> {
         let mut code = Vec::new();
         for stmt in &self.stmts {
             code.extend(stmt.emit_code_lines());
+        }
+        if let Some(ref expr) = self.return_expr {
+            code.push(format!("{}", expr.emit_code()));
         }
         code
     }
