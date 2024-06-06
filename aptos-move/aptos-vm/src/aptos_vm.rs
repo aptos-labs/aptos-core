@@ -62,7 +62,7 @@ use aptos_types::{
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
-    vm::{configs::RandomnessConfig, environment::Environment},
+    vm::configs::RandomnessConfig,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::{aptos_try, return_on_failure};
@@ -70,6 +70,7 @@ use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculat
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp,
     change_set::VMChangeSet,
+    environment::Environment,
     output::VMOutput,
     resolver::{ExecutorView, ResourceGroupView},
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},

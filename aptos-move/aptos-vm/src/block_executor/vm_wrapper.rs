@@ -11,10 +11,12 @@ use aptos_types::{
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
     },
-    vm::environment::Environment,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
+use aptos_vm_types::{
+    environment::Environment,
+    resolver::{ExecutorView, ResourceGroupView},
+};
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 use std::sync::Arc;

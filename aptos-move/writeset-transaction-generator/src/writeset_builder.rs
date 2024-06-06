@@ -10,13 +10,12 @@ use aptos_types::{
     account_config::{self, aptos_test_root_address},
     state_store::StateView,
     transaction::{ChangeSet, Script, Version},
-    vm::environment::Environment,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
+use aptos_vm_types::{environment::Environment, storage::change_set_configs::ChangeSetConfigs};
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},

@@ -37,14 +37,13 @@ use aptos_types::{
         APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
-    vm::environment::Environment,
     write_set::TransactionWrite,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
+use aptos_vm_types::{environment::Environment, storage::change_set_configs::ChangeSetConfigs};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,

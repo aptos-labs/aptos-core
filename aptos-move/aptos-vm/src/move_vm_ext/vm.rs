@@ -18,8 +18,8 @@ use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
 use aptos_types::{
     on_chain_config::FeatureFlag, transaction::user_transaction_context::UserTransactionContext,
-    vm::environment::Environment,
 };
+use aptos_vm_types::environment::Environment;
 use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
 use std::{ops::Deref, sync::Arc};
 

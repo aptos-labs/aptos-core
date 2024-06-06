@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
+use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{
         ConfigurationResource, Features, OnChainConfig, TimedFeatureOverride, TimedFeatures,
@@ -95,5 +95,15 @@ impl Environment {
             timed_features,
             vm_config,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_genesis_environment() {
+        // FIXME
     }
 }
