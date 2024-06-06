@@ -296,23 +296,21 @@ impl<'a> Transformer<'a> {
             },
             Call(id, dests, op, srcs, ai) => {
                 use Operation::*;
-                match &op {
-                    Function(..) => {
-                        let new_srcs = self.copy_args_if_needed(code_offset, id, srcs);
-                        self.check_and_emit_bytecode(code_offset, Call(id, dests, op, new_srcs, ai))
-                    },
-                    _ => {
-                        if op.can_take_non_ref_primitive_as_args() {
-                            let new_srcs = self.copy_args_if_needed(code_offset, id, srcs);
-                            self.check_and_emit_bytecode(
-                                code_offset,
-                                Call(id, dests, op, new_srcs, ai),
-                            )
-                        } else {
-                            self.check_and_emit_bytecode(code_offset, bc.clone())
-                        }
-                    },
-                }
+                let new_bc = if op.can_take_non_ref_primitive_as_args() {
+                    // srcs[0] in WriteRef is the target reference to be written, do not copy it
+                    let new_srcs = if let WriteRef = op {
+                        vec![
+                            srcs[0],
+                            self.copy_args_if_needed(code_offset, id, vec![srcs[1]])[0],
+                        ]
+                    } else {
+                        self.copy_args_if_needed(code_offset, id, srcs)
+                    };
+                    Call(id, dests, op, new_srcs, ai)
+                } else {
+                    bc.clone()
+                };
+                self.check_and_emit_bytecode(code_offset, new_bc)
             },
             _ => self.check_and_emit_bytecode(code_offset, bc.clone()),
         }
