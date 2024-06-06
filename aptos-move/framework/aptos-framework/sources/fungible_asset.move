@@ -112,7 +112,7 @@ module aptos_framework::fungible_asset {
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Metadata of a Fungible asset
-    struct Metadata has key {
+    struct Metadata has key, copy, drop {
         /// Name of the fungible metadata, i.e., "USDT".
         name: String,
         /// Symbol of the fungible metadata, usually a shorter version of the name.
@@ -465,6 +465,12 @@ module aptos_framework::fungible_asset {
     /// Get the project uri from the `metadata` object.
     public fun project_uri<T: key>(metadata: Object<T>): String acquires Metadata {
         borrow_fungible_metadata(&metadata).project_uri
+    }
+
+    #[view]
+    /// Get the metadata struct from the `metadata` object.
+    public fun metadata<T: key>(metadata: Object<T>): Metadata acquires Metadata {
+        *borrow_fungible_metadata(&metadata)
     }
 
     #[view]
@@ -1127,10 +1133,18 @@ module aptos_framework::fungible_asset {
         assert!(icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 6);
         assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 7);
 
+        assert!(metadata(metadata) == Metadata {
+            name: string::utf8(b"TEST"),
+            symbol: string::utf8(b"@@"),
+            decimals: 0,
+            icon_uri: string::utf8(b"http://www.example.com/favicon.ico"),
+            project_uri: string::utf8(b"http://www.example.com"),
+        }, 8);
+
         increase_supply(&metadata, 50);
-        assert!(supply(metadata) == option::some(50), 8);
+        assert!(supply(metadata) == option::some(50), 9);
         decrease_supply(&metadata, 30);
-        assert!(supply(metadata) == option::some(20), 9);
+        assert!(supply(metadata) == option::some(20), 10);
     }
 
     #[test(creator = @0xcafe)]
