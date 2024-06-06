@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
-pub(crate) const MAX_SENDING_BLOCK_TXNS: u64 = 1900;
+const MAX_SENDING_BLOCK_TXNS: u64 = 4000;
+pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
+    Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_TXNS));
 // stop reducing size at this point, so 1MB transactions can still go through
 const MIN_BLOCK_BYTES_OVERRIDE: u64 = 1024 * 1024 + BATCH_PADDING_BYTES as u64;
 
@@ -150,8 +152,8 @@ impl Default for ConsensusConfig {
         ConsensusConfig {
             max_network_channel_size: 1024,
             max_sending_block_txns: MAX_SENDING_BLOCK_TXNS,
-            max_sending_block_bytes: 3 * 1024 * 1024, // 3MB
-            max_receiving_block_txns: 10000.max(2 * MAX_SENDING_BLOCK_TXNS),
+            max_sending_block_bytes: 6 * 1024 * 1024, // 3MB
+            max_receiving_block_txns: *MAX_RECEIVING_BLOCK_TXNS,
             max_sending_inline_txns: 100,
             max_sending_inline_bytes: 200 * 1024,       // 200 KB
             max_receiving_block_bytes: 6 * 1024 * 1024, // 6MB

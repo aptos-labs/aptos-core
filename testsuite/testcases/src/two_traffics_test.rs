@@ -35,7 +35,8 @@ impl NetworkLoadTest for TwoTrafficsTest {
             duration.as_secs_f32()
         );
         let nodes_to_send_load_to =
-            LoadDestination::FullnodesOtherwiseValidators.get_destination_nodes(swarm);
+            LoadDestination::Peers(swarm.validators().take(3).map(|v| v.peer_id()).collect())
+                .get_destination_nodes(swarm);
         let rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
 
         let (emitter, emit_job_request) = create_emitter_and_request(
