@@ -5,12 +5,27 @@ commands:
     FILE_HANDLE="$BACKUP_HANDLE/$FILE_NAME"
     echo "$FILE_HANDLE"
     exec 1>&-  # close stdout
-    gzip -c | gsutil -q cp - "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" > /dev/null
-  open_for_read: 'gsutil -q cp "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" - | gzip -cd'
-  save_metadata_line: | 
+    gzip -c | gcloud storage cp - "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" > /dev/null
+  open_for_read: |
+    TEMP=$(mktemp)
+    trap "rm -f $TEMP" EXIT
+    for try in {0..4}
+    do
+        if [ $try -gt 0 ]; then
+            SLEEP=$((10 * $try))
+            echo "sleeping for $SLEEP seconds before retry #$try" >&2
+          sleep $SLEEP
+        fi
+      gcloud storage cp "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" $TEMP 1>&2 || continue
+      cat $TEMP | gzip -cd
+      exit
+    done
+    echo "Failed after 5 tries" >&2
+    exit 1
+  save_metadata_line: |
     FILE_HANDLE="metadata/$FILE_NAME"
     echo "$FILE_HANDLE"
     exec 1>&-
-    gzip -c | gsutil -q cp - "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" > /dev/null
-  list_metadata_files: '(gsutil -q ls gs://$BUCKET/$SUB_DIR/metadata/ ||:) | sed -ne "s#gs://.*/metadata/#metadata/#p"'
-  backup_metadata_file: 'gsutil mv gs://$BUCKET/$SUB_DIR/metadata/$FILE_NAME gs://$BUCKET/$SUB_DIR/metadata_backup/$FILE_NAME'
+    gzip -c | gcloud storage cp - "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" > /dev/null
+  list_metadata_files: '(gcloud storage ls gs://$BUCKET/$SUB_DIR/metadata/ ||:) | sed -ne "s#gs://.*/metadata/#metadata/#p"'
+  backup_metadata_file: "gcloud storage mv gs://$BUCKET/$SUB_DIR/metadata/$FILE_NAME gs://$BUCKET/$SUB_DIR/metadata_backup/$FILE_NAME"
