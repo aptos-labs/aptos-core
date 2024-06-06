@@ -1,4 +1,3 @@
-WARNING: test `move-compiler-v2/tests/checking/typing/unused_local.move` and `move-compiler-v2/tests/unused-assignment/v1-typing/unused_local.move` share common key `typing/unused_local.move`, discarding former one
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/borrow_global_acquires_1.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_1.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/borrow_global_acquires_2.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_2.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/borrow_global_acquires_3.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_3.exp
@@ -547,7 +546,7 @@ move-compiler/tests/move_check/typing/uninferred_type_unpack_assign.exp   move-c
 move-compiler/tests/move_check/typing/uninferred_type_unpack_bind.exp   move-compiler-v2/tests/checking/typing/uninferred_type_unpack_bind.exp
 move-compiler/tests/move_check/typing/uninferred_type_unpack_decl.exp   move-compiler-v2/tests/checking/typing/uninferred_type_unpack_decl.exp
 move-compiler/tests/move_check/typing/unit.exp   move-compiler-v2/tests/checking/typing/unit.exp
-move-compiler/tests/move_check/typing/unused_local.exp   move-compiler-v2/tests/unused-assignment/v1-typing/unused_local.exp
+move-compiler/tests/move_check/typing/unused_local.exp   move-compiler-v2/tests/checking/typing/unused_local.exp
 move-compiler/tests/move_check/typing/use_local.exp   move-compiler-v2/tests/checking/typing/use_local.exp
 move-compiler/tests/move_check/typing/valid_acquire.exp   move-compiler-v2/tests/acquires-checker/v1-tests/valid_acquire.exp
 move-compiler/tests/move_check/typing/values.exp   move-compiler-v2/tests/checking/typing/values.exp

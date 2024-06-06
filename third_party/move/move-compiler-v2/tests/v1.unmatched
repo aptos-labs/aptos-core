@@ -1,4 +1,3 @@
-WARNING: test `move-compiler-v2/tests/checking/typing/unused_local.move` and `move-compiler-v2/tests/unused-assignment/v1-typing/unused_local.move` share common key `typing/unused_local.move`, discarding former one
 move-compiler/tests/move_check/borrow_tests/{
   borrow_global_acquires_duplicate_annotation.move,
   eq_bad.move,
