@@ -50,8 +50,9 @@ message Transaction {
     TRANSACTION_TYPE_BLOCK_METADATA = 2;
     TRANSACTION_TYPE_STATE_CHECKPOINT = 3;
     TRANSACTION_TYPE_USER = 4;
+    // values 5-19 skipped for no reason
     TRANSACTION_TYPE_VALIDATOR = 20;
-    TRANSACTION_TYPE_BLOCK_EPILOGUE = 23;
+    TRANSACTION_TYPE_BLOCK_EPILOGUE = 21;
   }
 
   TransactionType type = 6;
@@ -61,8 +62,10 @@ message Transaction {
     GenesisTransaction genesis = 8;
     StateCheckpointTransaction state_checkpoint = 9;
     UserTransaction user = 10;
+    // value 11-19 skipped for no reason
     ValidatorTransaction validator = 21;
-    BlockEpilogueTransaction block_epilogue = 24;
+    // value 22 is used up below (all Transaction fields have to have different index), so going to 23
+    BlockEpilogueTransaction block_epilogue = 23;
   }
 
   TransactionSizeInfo size_info = 22;

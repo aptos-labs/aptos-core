@@ -221,8 +221,14 @@ export interface Transaction {
   blockMetadata?: BlockMetadataTransaction | undefined;
   genesis?: GenesisTransaction | undefined;
   stateCheckpoint?: StateCheckpointTransaction | undefined;
-  user?: UserTransaction | undefined;
-  validator?: ValidatorTransaction | undefined;
+  user?:
+    | UserTransaction
+    | undefined;
+  /** value 11-19 skipped for no reason */
+  validator?:
+    | ValidatorTransaction
+    | undefined;
+  /** value 22 is used up below (all Transaction fields have to have different index), so going to 23 */
   blockEpilogue?: BlockEpilogueTransaction | undefined;
   sizeInfo?: TransactionSizeInfo | undefined;
 }
@@ -233,8 +239,9 @@ export enum Transaction_TransactionType {
   TRANSACTION_TYPE_BLOCK_METADATA = 2,
   TRANSACTION_TYPE_STATE_CHECKPOINT = 3,
   TRANSACTION_TYPE_USER = 4,
+  /** TRANSACTION_TYPE_VALIDATOR - values 5-19 skipped for no reason */
   TRANSACTION_TYPE_VALIDATOR = 20,
-  TRANSACTION_TYPE_BLOCK_EPILOGUE = 23,
+  TRANSACTION_TYPE_BLOCK_EPILOGUE = 21,
   UNRECOGNIZED = -1,
 }
 
@@ -258,7 +265,7 @@ export function transaction_TransactionTypeFromJSON(object: any): Transaction_Tr
     case 20:
     case "TRANSACTION_TYPE_VALIDATOR":
       return Transaction_TransactionType.TRANSACTION_TYPE_VALIDATOR;
-    case 23:
+    case 21:
     case "TRANSACTION_TYPE_BLOCK_EPILOGUE":
       return Transaction_TransactionType.TRANSACTION_TYPE_BLOCK_EPILOGUE;
     case -1:
@@ -1327,7 +1334,7 @@ export const Transaction = {
       ValidatorTransaction.encode(message.validator, writer.uint32(170).fork()).ldelim();
     }
     if (message.blockEpilogue !== undefined) {
-      BlockEpilogueTransaction.encode(message.blockEpilogue, writer.uint32(194).fork()).ldelim();
+      BlockEpilogueTransaction.encode(message.blockEpilogue, writer.uint32(186).fork()).ldelim();
     }
     if (message.sizeInfo !== undefined) {
       TransactionSizeInfo.encode(message.sizeInfo, writer.uint32(178).fork()).ldelim();
@@ -1419,8 +1426,8 @@ export const Transaction = {
 
           message.validator = ValidatorTransaction.decode(reader, reader.uint32());
           continue;
-        case 24:
-          if (tag !== 194) {
+        case 23:
+          if (tag !== 186) {
             break;
           }
 
