@@ -60,14 +60,6 @@ fn simple_compile_unit() -> CompileUnit {
     }
 }
 
-fn get_raw_data() -> Vec<u8> {
-    let seed: u64 = 12345;
-    let mut rng = StdRng::seed_from_u64(seed);
-    let mut buffer = vec![0u8; 4096];
-    rng.fill(&mut buffer[..]);
-    buffer
-}
-
 #[test]
 fn test_emit_code() {
     let lines = simple_module().emit_code_lines();
@@ -87,7 +79,7 @@ fn test_emit_code() {
 
 #[test]
 fn test_generation_and_compile() {
-    let raw_data = get_raw_data();
+    let raw_data = get_random_bytes(12345, 4096);
     let mut u = Unstructured::new(&raw_data);
     let mut smith = MoveSmith::default();
     smith.generate(&mut u).unwrap();
