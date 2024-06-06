@@ -17,7 +17,10 @@ use aptos_types::{
 };
 use itertools::Itertools;
 use maplit::btreemap;
-use std::time::{Duration, SystemTime};
+use std::{
+    thread::sleep,
+    time::{Duration, Instant, SystemTime},
+};
 
 #[test]
 fn test_transaction_ordering_only_seqnos() {
@@ -386,6 +389,35 @@ fn test_timeline() {
     assert_eq!(view(timeline), vec![5]);
     // check parking lot is empty
     assert_eq!(0, pool.get_parking_lot_size());
+}
+
+#[test]
+fn test_timeline_before() {
+    let mut pool = setup_mempool().0;
+    add_txns_to_mempool(&mut pool, vec![
+        TestTransaction::new(1, 0, 1),
+        TestTransaction::new(1, 1, 1),
+        TestTransaction::new(1, 3, 1),
+        TestTransaction::new(1, 5, 1),
+    ]);
+    let insertion_done_time = Instant::now();
+
+    let (timeline, _) = pool.read_timeline(
+        &vec![0].into(),
+        10,
+        Some(insertion_done_time - Duration::from_millis(200)),
+    );
+    assert!(timeline.is_empty());
+
+    let (timeline, _) = pool.read_timeline(&vec![0].into(), 10, Some(insertion_done_time));
+    assert_eq!(view(timeline), vec![0, 1]);
+
+    let (timeline, _) = pool.read_timeline(
+        &vec![0].into(),
+        10,
+        Some(insertion_done_time + Duration::from_millis(200)),
+    );
+    assert_eq!(view(timeline), vec![0, 1]);
 }
 
 #[test]
