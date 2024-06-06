@@ -63,15 +63,25 @@ pub(crate) struct NewAuthKeyOptions {
     #[clap(long)]
     pub(crate) new_private_key: Option<String>,
 
-    #[clap(flatten)]
-    pub(crate) new_hardware_wallet_options: HardwareWalletOptions,
+    /// BIP44 derivation path of hardware wallet account, e.g. `m/44'/637'/0'/0'/0'`
+    ///
+    /// Note you may need to escape single quotes in your shell, for example
+    /// `m/44'/637'/0'/0'/0'` would be `m/44\'/637\'/0\'/0\'/0\'`
+    #[clap(long)]
+    pub(crate) new_derivation_path: Option<String>,
+
+    /// BIP44 account index of hardware wallet account, e.g. `0`
+    ///
+    /// Given index `n` maps to BIP44 derivation path `m/44'/637'/n'/0'/0`
+    #[clap(long)]
+    pub(crate) new_derivation_index: Option<String>,
 }
 
 #[derive(Args, Debug)]
 #[group(required = true, multiple = false)]
 pub(crate) struct NewProfileOptions {
     /// Only specify if you do not want to save a new profile
-    #[clap(action, long)]
+    #[clap(long)]
     pub(crate) skip_saving_profile: bool,
 
     /// Name of new the profile to save for the new authentication key
@@ -155,10 +165,11 @@ impl CliCommand<RotateSummary> for RotateKey {
         };
 
         // Get new signer options.
-        let new_derivation_path = self
-            .new_auth_key_options
-            .new_hardware_wallet_options
-            .extract_derivation_path()?;
+        let new_hardware_wallet_options = HardwareWalletOptions {
+            derivation_path: self.new_auth_key_options.new_derivation_path.clone(),
+            derivation_index: self.new_auth_key_options.new_derivation_index.clone(),
+        };
+        let new_derivation_path = new_hardware_wallet_options.extract_derivation_path()?;
         let (new_private_key, new_public_key) = if new_derivation_path.is_some() {
             (
                 None,
