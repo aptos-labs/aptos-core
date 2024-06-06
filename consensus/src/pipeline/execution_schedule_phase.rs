@@ -104,8 +104,9 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                         input_txns,
                         result,
                         execution_time,
+                        commit_rx,
                     } = res?;
-                    Ok(block.set_execution_result(input_txns, result, execution_time))
+                    Ok(block.set_execution_result(input_txns, result, execution_time, commit_rx))
                 })
                 .collect::<ExecutorResult<Vec<_>>>()?;
             drop(lifetime_guard);

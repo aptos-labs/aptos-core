@@ -181,6 +181,10 @@ pub trait BlockExecutorTrait: Send + Sync {
         ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> ExecutorResult<()>;
 
+    fn pre_commit(&self, block_id: HashValue, parent_block_id: HashValue) -> ExecutorResult<()>;
+
+    fn latest_synced_version(&self) -> Version;
+
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
 }

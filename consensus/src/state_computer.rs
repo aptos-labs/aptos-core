@@ -35,15 +35,16 @@ use aptos_types::{
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc, time::Duration};
-use tokio::sync::Mutex as AsyncMutex;
+use tokio::sync::{oneshot, Mutex as AsyncMutex};
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug)]
 pub struct PipelineExecutionResult {
     pub input_txns: Vec<SignedTransaction>,
     pub result: StateComputeResult,
     pub execution_time: Duration,
+    pub commit_rx: oneshot::Receiver<ExecutorResult<()>>,
 }
 
 impl PipelineExecutionResult {
@@ -51,11 +52,13 @@ impl PipelineExecutionResult {
         input_txns: Vec<SignedTransaction>,
         result: StateComputeResult,
         execution_time: Duration,
+        commit_rx: oneshot::Receiver<ExecutorResult<()>>,
     ) -> Self {
         Self {
             input_txns,
             result,
             execution_time,
+            commit_rx,
         }
     }
 }
@@ -296,6 +299,7 @@ impl StateComputer for ExecutionProxy {
             .as_ref()
             .cloned()
             .expect("must be set within an epoch");
+        let mut pre_commit_rxs = Vec::with_capacity(blocks.len());
         for block in blocks {
             block_ids.push(block.id());
 
@@ -305,6 +309,12 @@ impl StateComputer for ExecutionProxy {
 
             txns.extend(self.transactions_to_commit(block, &validators, is_randomness_enabled));
             subscribable_txn_events.extend(block.subscribable_events());
+            pre_commit_rxs.push(block.take_commit_rx());
+        }
+
+        // wait until all blocks are committed
+        for pre_commit_rx in pre_commit_rxs {
+            pre_commit_rx.await??;
         }
 
         let executor = self.executor.clone();
@@ -342,6 +352,17 @@ impl StateComputer for ExecutionProxy {
             LogicalTime::new(target.ledger_info().epoch(), target.ledger_info().round());
         let block_timestamp = target.commit_info().timestamp_usecs();
 
+        if self.executor.committed_block_id() == target.commit_info().id() {
+            return Ok(());
+        }
+        if self.executor.latest_synced_version() == target.commit_info().version() {
+            // write the ledger down directly if it's already pre-commit (for epoch ending)
+            info!("Write the ledger info directly as it's already pre-committed.");
+            self.executor
+                .commit_blocks_ext(vec![target.commit_info().id()], target, false)
+                .unwrap();
+            return Ok(());
+        }
         // Before the state synchronization, we have to call finish() to free the in-memory SMT
         // held by BlockExecutor to prevent memory leak.
         self.executor.finish();
