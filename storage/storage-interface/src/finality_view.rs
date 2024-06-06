@@ -99,23 +99,23 @@ mod tests {
     use crate::mock::MockDbReaderWriter;
 
     #[test]
-    fn test_get_latest_ledger_info() {
+    fn test_get_latest_ledger_info() -> anyhow::Result<()> {
         // If the mock is changed to be stateful, this should be ref-counted
         // and shared with the view.
         let mock = MockDbReaderWriter;
         let view = FinalityView::new(MockDbReaderWriter);
 
-        let ledger_info = view.get_latest_ledger_info_option().unwrap();
+        let ledger_info = view.get_latest_ledger_info_option()?;
         assert_eq!(ledger_info, None);
         let blockheight = 1;
 
         // Set the finalized ledger info
-        view.set_finalized_block_height(blockheight).unwrap();
+        view.set_finalized_block_height(blockheight)?;
 
         // Capture the block event once
         let (_start_ver, end_ver, block_event) =
-            mock.get_block_info_by_height(blockheight).unwrap();
-        let block_hash = block_event.hash().unwrap(); // Used to verify hash is generated
+            mock.get_block_info_by_height(blockheight)?;
+        let block_hash = block_event.hash()?; // Used to verify hash is generated
 
         let block_info = BlockInfo::new(
             block_event.epoch(),
@@ -131,29 +131,33 @@ mod tests {
             LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty());
 
         // Get the latest ledger info after setting it
-        let ledger_info = view.get_latest_ledger_info_option().unwrap().unwrap();
+        let ledger_info = view.get_latest_ledger_info_option()?.unwrap();
 
         assert_eq!(ledger_info, expected_ledger_info);
+
+        Ok(())
     }
 
     #[test]
-    fn test_get_latest_version() {
+    fn test_get_latest_version() -> anyhow::Result<()> {
         let view = FinalityView::new(MockDbReaderWriter);
         let res = view.get_latest_version();
         assert!(res.is_err());
         let blockheight = 1;
-        view.set_finalized_block_height(blockheight).unwrap();
-        let version = view.get_latest_version().unwrap();
+        view.set_finalized_block_height(blockheight)?;
+        let version = view.get_latest_version()?;
         assert_eq!(version, 1);
+        Ok(())
     }
 
     #[test]
-    fn test_get_latest_state_checkpoint_version() {
+    fn test_get_latest_state_checkpoint_version() -> Result<()> {
         let view = FinalityView::new(MockDbReaderWriter);
-        let version = view.get_latest_state_checkpoint_version().unwrap();
+        let version = view.get_latest_state_checkpoint_version()?;
         assert_eq!(version, None);
-        view.set_finalized_block_height(1).unwrap();
-        let version = view.get_latest_state_checkpoint_version().unwrap();
+        view.set_finalized_block_height(1)?;
+        let version = view.get_latest_state_checkpoint_version()?;
         assert_eq!(version, Some(1));
+        Ok(())
     }
 }
