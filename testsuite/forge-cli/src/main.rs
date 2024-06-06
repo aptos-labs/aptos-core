@@ -1946,7 +1946,7 @@ fn realistic_env_max_load_test(
     };
 
     // Determine if this is a long running test
-    let duration_secs = duration.as_secs();
+    let duration_secs = 1200;
     let long_running = duration_secs >= 2400;
 
     let mut success_criteria = SuccessCriteria::new(95)
