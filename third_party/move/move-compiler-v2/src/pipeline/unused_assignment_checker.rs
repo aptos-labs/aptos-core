@@ -24,7 +24,6 @@ impl UnusedAssignmentChecker {
         id: AttrId,
         offset: CodeOffset,
         dst: TempIndex,
-        after: bool,
     ) {
         let data = target.data;
         // only check for user defined variables
@@ -34,15 +33,17 @@ impl UnusedAssignmentChecker {
                 .get::<LiveVarAnnotation>()
                 .expect("live variable annotation")
                 .get_info_at(offset);
-            let live_var_info = if after {
-                &live_var_info.after
-            } else {
-                &live_var_info.before
-            };
+            let live_after = &live_var_info.after;
             let dst_name = dst_name.display(target.func_env.symbol_pool()).to_string();
-            if !dst_name.starts_with('_') && live_var_info.get(&dst).is_none() {
+            if !dst_name.starts_with('_') && live_after.get(&dst).is_none() {
                 let loc = target.get_bytecode_loc(id);
-                target.global_env().diag(Severity::Warning, &loc, &format!("Unused assignment to `{}`. Consider removing or prefixing with an underscore: `_{}`", dst_name, dst_name));
+                target
+					.global_env()
+					.diag(
+						Severity::Warning,
+						&loc,
+						&format!("Unused assignment to `{}`. Consider removing or prefixing with an underscore: `_{}`", dst_name, dst_name)
+					);
             }
         }
     }
@@ -66,13 +67,13 @@ impl FunctionTargetProcessor for UnusedAssignmentChecker {
             match bytecode {
                 Load(id, dst, _) | Assign(id, dst, _, _) => {
                     UnusedAssignmentChecker::check_unused_assignment(
-                        &target, *id, offset, *dst, true,
+                        &target, *id, offset, *dst
                     )
                 },
                 Call(id, dsts, _, _, _) => {
                     for dst in dsts {
                         UnusedAssignmentChecker::check_unused_assignment(
-                            &target, *id, offset, *dst, true,
+                            &target, *id, offset, *dst
                         )
                     }
                 },
