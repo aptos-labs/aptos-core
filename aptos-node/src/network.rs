@@ -171,7 +171,7 @@ pub fn consensus_observer_network_configuration(
     node_config: &NodeConfig,
 ) -> NetworkApplicationConfig {
     let direct_send_protocols = vec![ProtocolId::ConsensusObserver];
-    let rpc_protocols = vec![];
+    let rpc_protocols = vec![ProtocolId::ConsensusObserverRpc];
     let max_network_channel_size = node_config.consensus_observer.max_network_channel_size as usize;
 
     let network_client_config =
@@ -335,7 +335,10 @@ pub fn setup_networks_and_get_interfaces(
         }
 
         // Register consensus observer (both client and server) with the network
-        if node_config.consensus_observer.is_enabled() {
+        if node_config
+            .consensus_observer
+            .is_observer_or_publisher_enabled()
+        {
             // Create the network handle for this network type
             let network_handle = register_client_and_service_with_network(
                 &mut network_builder,

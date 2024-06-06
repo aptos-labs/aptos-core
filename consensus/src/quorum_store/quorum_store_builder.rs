@@ -49,7 +49,7 @@ pub enum QuorumStoreBuilder {
 impl QuorumStoreBuilder {
     pub fn init_payload_manager(
         &mut self,
-        consensus_publisher: Option<ConsensusPublisher>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> (
         Arc<PayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
@@ -430,7 +430,7 @@ impl InnerBuilder {
 
     fn init_payload_manager(
         &mut self,
-        consensus_publisher: Option<ConsensusPublisher>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> (
         Arc<PayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,

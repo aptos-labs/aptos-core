@@ -908,6 +908,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-retry",
+ "tokio-stream",
 ]
 
 [[package]]

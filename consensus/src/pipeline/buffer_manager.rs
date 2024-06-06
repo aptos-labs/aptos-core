@@ -135,7 +135,7 @@ pub struct BufferManager {
     bounded_executor: BoundedExecutor,
     order_vote_enabled: bool,
     // Consensus publisher for downstream observers.
-    consensus_publisher: Option<ConsensusPublisher>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
 }
 
 impl BufferManager {
@@ -161,7 +161,7 @@ impl BufferManager {
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
         order_vote_enabled: bool,
-        consensus_publisher: Option<ConsensusPublisher>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 

@@ -14,6 +14,7 @@ use aptos_config::network_id::PeerNetworkId;
 use aptos_logger::{debug, warn};
 use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
 use aptos_time_service::{TimeService, TimeServiceTrait};
+use rand::Rng;
 use std::{sync::Arc, time::Duration};
 
 /// The interface for sending consensus publisher and observer messages
@@ -82,31 +83,16 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
         }
     }
 
-    /// Sends a direct send message to all peers
-    pub fn send_message_to_peers(
-        &self,
-        peer_network_ids: Vec<PeerNetworkId>,
-        message: ConsensusObserverDirectSend,
-    ) {
-        // TODO: Identify if we need to use broadcast, instead of sending to each peer individually
-
-        // Send the message to each peer (individually). If an error is encountered,
-        // it will be logged, and we will continue sending to the remaining peers.
-        for peer_network_id in peer_network_ids {
-            let _ = self.send_message_to_peer(&peer_network_id, message.clone());
-        }
-    }
-
     /// Sends a RPC request to a specific peer and returns the response
     pub async fn send_rpc_request_to_peer(
-        consensus_observer_client: &ConsensusObserverClient<
-            aptos_network::application::interface::NetworkClient<ConsensusObserverMessage>,
-        >,
+        &self,
         peer_network_id: &PeerNetworkId,
-        request_id: u64,
         request: ConsensusObserverRequest,
         request_timeout_ms: u64,
     ) -> Result<ConsensusObserverResponse, Error> {
+        // Generate a random request ID
+        let request_id = rand::thread_rng().gen();
+
         // Increment the request counter
         metrics::increment_request_counter(
             &metrics::RPC_SENT_REQUESTS,
@@ -121,35 +107,44 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
             .request_id(request_id)
             .peer(peer_network_id));
 
-        // Send the request and process the result
-        let result = consensus_observer_client
+        // Send the request and wait for the response
+        let request_label = request.get_label();
+        let result = self
             .send_rpc_request(
                 *peer_network_id,
-                request.clone(),
+                request,
                 Duration::from_millis(request_timeout_ms),
             )
             .await;
+
+        // Process the response
         match result {
-            Ok(response) => {
+            Ok(consensus_observer_response) => {
+                // Update the RPC success metrics
                 metrics::increment_request_counter(
                     &metrics::RPC_SUCCESS_RESPONSES,
-                    request.clone().get_label(),
+                    request_label,
                     peer_network_id,
                 );
-                Ok(response)
+
+                Ok(consensus_observer_response)
             },
             Err(error) => {
+                // Log the failed RPC request
                 warn!(LogSchema::new(LogEntry::SendRpcRequest)
                     .event(LogEvent::InvalidRpcResponse)
-                    .request_type(request.get_label())
+                    .request_type(request_label)
                     .request_id(request_id)
                     .peer(peer_network_id)
                     .error(&error));
+
+                // Update the RPC error metrics
                 metrics::increment_request_counter(
-                    &metrics::DIRECT_SEND_ERRORS,
+                    &metrics::RPC_ERROR_RESPONSES,
                     error.get_label(),
                     peer_network_id,
                 );
+
                 Err(error)
             },
         }

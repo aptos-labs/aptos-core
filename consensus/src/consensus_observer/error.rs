@@ -12,6 +12,9 @@ pub enum Error {
     #[error("Aptos network rpc error: {0}")]
     RpcError(#[from] RpcError),
 
+    #[error("Subscription timeout: {0}")]
+    SubscriptionTimeout(String),
+
     #[error("Unexpected error encountered: {0}")]
     UnexpectedError(String),
 }
@@ -22,6 +25,7 @@ impl Error {
         match self {
             Self::NetworkError(_) => "network_error",
             Self::RpcError(_) => "rpc_error",
+            Self::SubscriptionTimeout(_) => "subscription_timeout",
             Self::UnexpectedError(_) => "unexpected_error",
         }
     }

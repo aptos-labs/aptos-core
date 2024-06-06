@@ -39,11 +39,11 @@ pub enum PayloadManager {
     InQuorumStore(
         Arc<dyn BatchReader>,
         Sender<CoordinatorCommand>,
-        Option<ConsensusPublisher>,
+        Option<Arc<ConsensusPublisher>>,
     ),
     ConsensusObserver(
         Arc<Mutex<HashMap<HashValue, ObserverDataStatus>>>,
-        Option<ConsensusPublisher>,
+        Option<Arc<ConsensusPublisher>>,
     ),
 }
 

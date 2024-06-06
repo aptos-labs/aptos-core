@@ -38,7 +38,7 @@ pub fn prepare_phases_and_buffer_manager(
     epoch_state: Arc<EpochState>,
     bounded_executor: BoundedExecutor,
     order_vote_enabled: bool,
-    consensus_publisher: Option<ConsensusPublisher>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
 ) -> (
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,

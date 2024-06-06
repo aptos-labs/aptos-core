@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensus_observer::{
-        network_client::ConsensusObserverClient, network_message::ConsensusObserverMessage,
-        publisher::ConsensusPublisher,
-    },
+    consensus_observer::publisher::ConsensusPublisher,
     counters,
     error::StateSyncError,
     network::{IncomingCommitRequest, IncomingRandGenRequest, NetworkSender},
@@ -151,8 +148,7 @@ pub struct ExecutionProxyClient {
     // channels to buffer manager
     handle: Arc<RwLock<BufferManagerHandle>>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
-    consensus_observer_client:
-        Option<ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
 }
 
 impl ExecutionProxyClient {
@@ -164,9 +160,7 @@ impl ExecutionProxyClient {
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         bounded_executor: BoundedExecutor,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
-        consensus_observer_client: Option<
-            ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
-        >,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
         Self {
             consensus_config,
@@ -177,7 +171,7 @@ impl ExecutionProxyClient {
             bounded_executor,
             handle: Arc::new(RwLock::new(BufferManagerHandle::new())),
             rand_storage,
-            consensus_observer_client,
+            consensus_publisher,
         }
     }
 
@@ -190,7 +184,7 @@ impl ExecutionProxyClient {
         onchain_consensus_config: &OnChainConsensusConfig,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_ordered_round: Round,
-        consensus_publisher: Option<ConsensusPublisher>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -309,9 +303,7 @@ impl TExecutionClient for ExecutionProxyClient {
             onchain_consensus_config,
             rand_msg_rx,
             highest_ordered_round,
-            self.consensus_observer_client
-                .clone()
-                .map(ConsensusPublisher::new),
+            self.consensus_publisher.clone(),
         );
 
         let transaction_shuffler =
