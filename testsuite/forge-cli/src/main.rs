@@ -2060,7 +2060,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             config.consensus.quorum_store_pull_timeout_ms = 200;
 
             // Experimental storage optimizations
-            config.storage.rocksdb_configs.enable_storage_sharding = true;
+            config.storage.rocksdb_configs.enable_storage_sharding = false;
 
             // Increase the concurrency level
             if USE_CRAZY_MACHINES {
@@ -2098,7 +2098,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 optimize_state_sync_for_throughput(config);
 
                 // Experimental storage optimizations
-                config.storage.rocksdb_configs.enable_storage_sharding = true;
+                config.storage.rocksdb_configs.enable_storage_sharding = false;
 
                 // Increase the concurrency level
                 if USE_CRAZY_MACHINES {
