@@ -37,6 +37,7 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         fa_generator_extend_ref: ExtendRef
     }
 
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct FAController has key, store {
         transfer_ref: TransferRef
     }
