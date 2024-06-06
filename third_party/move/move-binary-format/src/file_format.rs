@@ -1312,7 +1312,7 @@ impl SignatureToken {
 }
 
 /// A `Constant` is a serialized value along with its type. That type will be deserialized by the
-/// loader/evauluator
+/// loader/evaluator
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Constant {
@@ -1336,6 +1336,18 @@ pub struct CodeUnit {
     pub code: Vec<Bytecode>,
 }
 
+// Note: custom attributes are used to specify the bytecode instructions.
+//
+// Please refer to the `move-bytecode-spec` crate for
+//   1. The list of supported attributes and whether they are always required
+//     a. Currently three attributes are required: `group`, `description`, `semantics`
+//   2. The list of groups allowed
+// In the rare case of needing to add new attributes or groups, you can also add them there.
+//
+// Common notations for the semantics:
+//   - `stack >> a`: pop an item off the stack and store it in variable a
+//   - `stack << a`: push the value stored in variable a onto the stack
+
 /// `Bytecode` is a VM instruction of variable size. The type of the bytecode (opcode) defines
 /// the size of the bytecode.
 ///
@@ -1350,30 +1362,29 @@ pub enum Bytecode {
     #[group = "stack_and_local"]
     #[description = "Pop and discard the value at the top of the stack. The value on the stack must be an copyable type."]
     #[semantics = "stack >> _"]
-    #[paranoid_post = r#"
+    #[runtime_check_epilogue = r#"
         ty_stack >> ty
         assert ty has drop
     "#]
     Pop,
 
-    // TODO: double check semantics
     #[group = "control_flow"]
     #[description = r#"
-        Return from current function call, possibly with values according to the return types in the function signature. 
+        Return from current function call, possibly with values according to the return types in the function signature.
 
         The returned values need to be pushed on the stack prior to the return instruction.
     "#]
     #[semantics = r#"
-        call_stack >> current_frame 
-        // The frame of the function being return from is dropped.
-        
+        call_stack >> current_frame
+        // The frame of the function being returned from is dropped.
+
         current_frame.pc += 1
     "#]
     Ret,
 
     #[group = "control_flow"]
     #[description = r#"
-        Branch to the instruction at position `code_offset` if the value at the top of the stack is true. 
+        Branch to the instruction at position `code_offset` if the value at the top of the stack is true.
         Code offsets are relative to the start of the function body.
     "#]
     #[static_operands = "[code_offset]"]
@@ -1384,12 +1395,12 @@ pub enum Bytecode {
         else
             current_frame.pc += 1
     "#]
-    #[paranoid_pre = "ty_stack >> _"]
+    #[runtime_check_prologue = "ty_stack >> _"]
     BrTrue(CodeOffset),
 
     #[group = "control_flow"]
     #[description = r#"
-        Branch to the instruction at position `code_offset` if the value at the top of the stack is false. 
+        Branch to the instruction at position `code_offset` if the value at the top of the stack is false.
         Code offsets are relative to the start of the function body.
     "#]
     #[static_operands = "[code_offset]"]
@@ -1398,14 +1409,14 @@ pub enum Bytecode {
         if flag is false
             current_frame.pc = code_offset
         else
-            current_frame += 1
+            current_frame.pc += 1
     "#]
-    #[paranoid_pre = "ty_stack >> _"]
+    #[runtime_check_prologue = "ty_stack >> _"]
     BrFalse(CodeOffset),
 
     #[group = "control_flow"]
     #[description = r#"
-        Branch unconditionally to the instruction at position `code_offset`. 
+        Branch unconditionally to the instruction at position `code_offset`.
         Code offsets are relative to the start of a function body.
     "#]
     #[static_operands = "[code_offset]"]
@@ -1416,26 +1427,26 @@ pub enum Bytecode {
     #[description = "Push a u8 constant onto the stack."]
     #[static_operands = "[u8_value]"]
     #[semantics = "stack << u8_value"]
-    #[paranoid_post = "ty_stack << u8"]
+    #[runtime_check_epilogue = "ty_stack << u8"]
     LdU8(u8),
 
     #[group = "stack_and_local"]
     #[description = "Push a u64 constant onto the stack."]
     #[static_operands = "[u64_value]"]
     #[semantics = "stack << u64_value"]
-    #[paranoid_post = "ty_stack << u64"]
+    #[runtime_check_epilogue = "ty_stack << u64"]
     LdU64(u64),
 
     #[group = "stack_and_local"]
     #[description = "Push a u128 constant onto the stack."]
     #[static_operands = "[u128_value]"]
     #[semantics = "stack << u128_value"]
-    #[paranoid_post = "ty_stack << u128"]
+    #[runtime_check_epilogue = "ty_stack << u128"]
     LdU128(u128),
 
     #[group = "casting"]
     #[description = r#"
-        Convert the integer value at the top of the stack into a u8. 
+        Convert the integer value at the top of the stack into a u8.
         An arithmetic error will be raised if the value cannot be represented as a u8.
     "#]
     #[semantics = r#"
@@ -1445,7 +1456,7 @@ pub enum Bytecode {
         else:
             stack << int_val as u8
     "#]
-    #[paranoid_post = r#"
+    #[runtime_check_epilogue = r#"
         ty_stack >> _
         ty_stack << u8
     "#]
@@ -1453,7 +1464,7 @@ pub enum Bytecode {
 
     #[group = "casting"]
     #[description = r#"
-        Convert the integer value at the top of the stack into a u64. 
+        Convert the integer value at the top of the stack into a u64.
         An arithmetic error will be raised if the value cannot be represented as a u64.
     "#]
     #[semantics = r#"
@@ -1463,7 +1474,7 @@ pub enum Bytecode {
         else:
             stack << int_val as u64
     "#]
-    #[paranoid_post = r#"
+    #[runtime_check_epilogue = r#"
         ty_stack >> _
         ty_stack << u64
     "#]
@@ -1471,7 +1482,7 @@ pub enum Bytecode {
 
     #[group = "casting"]
     #[description = r#"
-        Convert the integer value at the top of the stack into a u128. 
+        Convert the integer value at the top of the stack into a u128.
         An arithmetic error will be raised if the value cannot be represented as a u128.
     "#]
     #[semantics = r#"
@@ -1481,7 +1492,7 @@ pub enum Bytecode {
         else:
             stack << int_val as u128
     "#]
-    #[paranoid_post = r#"
+    #[runtime_check_epilogue = r#"
         ty_stack >> _
         ty_stack << u128
     "#]
@@ -1489,25 +1500,25 @@ pub enum Bytecode {
 
     #[group = "stack_and_local"]
     #[description = r#"
-        Push a constant value onto the stack. 
+        Push a constant value onto the stack.
         The value is loaded and deserialized (according to its type) from the the file format.
     "#]
     #[static_operands = "[const_idx]"]
     #[semantics = "stack << constants[const_idx]"]
-    #[paranoid_post = "ty_stack << const_ty"]
+    #[runtime_check_epilogue = "ty_stack << const_ty"]
     #[gas_type_creation_tier_1 = "const_ty"]
     LdConst(ConstantPoolIndex),
 
     #[group = "stack_and_local"]
     #[description = "Push a true value onto the stack."]
     #[semantics = "stack << true"]
-    #[paranoid_post = "ty_stack << bool"]
+    #[runtime_check_epilogue = "ty_stack << bool"]
     LdTrue,
 
     #[group = "stack_and_local"]
     #[description = "Push a false value onto the stack."]
     #[semantics = "stack << false"]
-    #[paranoid_post = "ty_stack << bool"]
+    #[runtime_check_epilogue = "ty_stack << bool"]
     LdFalse,
 
     #[group = "stack_and_local"]
@@ -1518,18 +1529,18 @@ pub enum Bytecode {
     #[semantics = r#"
         stack << locals[local_idx]
     "#]
-    #[paranoid_post = r#"
+    #[runtime_check_epilogue = r#"
         ty = clone local_ty
-        assert ty has copy 
+        assert ty has copy
         ty_stack << ty
     "#]
     CopyLoc(LocalIndex),
 
     #[group = "stack_and_local"]
     #[description = r#"
-        Move the local identified by the local index onto the stack. 
+        Move the local identified by the local index onto the stack.
 
-        Once moved, the local becomes invalid to use, unless a store operation writes 
+        Once moved, the local becomes invalid to use, unless a store operation writes
         to the local before any read to that local.
     "#]
     #[static_operands = "[local_idx]"]
@@ -1537,65 +1548,64 @@ pub enum Bytecode {
         stack << locals[local_idx]
         locals[local_idx] = invalid
     "#]
-    #[paranoid_post = r#"
-        ty = clone local_ty 
+    #[runtime_check_epilogue = r#"
+        ty = clone local_ty
         ty_stack << ty
     "#]
     MoveLoc(LocalIndex),
 
     #[group = "stack_and_local"]
     #[description = r#"
-        Pop value from the top of the stack and store it into the local identified by the local index. 
-        
+        Pop value from the top of the stack and store it into the local identified by the local index.
+
         If the local contains an old value, then that value is dropped.
     "#]
     #[static_operands = "[local_idx]"]
-    #[semantics = r#"
-        stack >> val
-        locals[local_idx] = val
-    "#]
-    #[paranoid_pre = r#"
-        ty << clone local_ty
+    #[semantics = "stack >> locals[local_idx]"]
+    #[runtime_check_prologue = r#"
+        ty = clone local_ty
         ty_stack >> val_ty
         assert ty == val_ty
-        assert ty has drop
+        if locals[local_idx] != invalid
+            assert ty has drop
     "#]
     StLoc(LocalIndex),
 
     #[group = "control_flow"]
     #[static_operands = "[func_handle_idx]"]
     #[description = r#"
-        Call a function. The stack has the arguments pushed first to last. 
-        The arguments are consumed and pushed to the locals of the function. 
+        Call a function. The stack has the arguments pushed first to last.
+        The arguments are consumed and pushed to the locals of the function.
 
-        Return values are pushed on the stack and available to the caller after returning from the callee.    
+        Return values are pushed onto the stack from the first to the last and
+        available to the caller after returning from the callee.
     "#]
     #[semantics = r#"
         func = <func from handle or instantiation>
-        // Here `func` is a prototype containinig information like the
+        // Here `func` is loaded from the file format, containing information like the
         // the function signature, the locals, and the body.
-        
+
         ty_args = if func.is_generic then func.ty_args else []
-        
+
         n = func.num_params
-        stack >> arg_n
+        stack >> arg_n-1
         ..
-        stack >> arg_1
-        
+        stack >> arg_0
+
         if func.is_native()
-            call_native(func.name, ty_args, args = [arg_1, .., arg_n])
+            call_native(func.name, ty_args, args = [arg_0, .., arg_n-1])
             current_frame.pc += 1
         else
             call_stack << current_frame
-        
+
             current_frame = new_frame_from_func(
-                func, 
-                ty_args, 
-                locals = [arg_1, .., arg_n, null, ..]
-                                        // ^ other locals
+                func,
+                ty_args,
+                locals = [arg_0, .., arg_n-1, invalid, ..]
+                                           // ^ other locals
             )
     "#]
-    #[paranoid_post = r#"
+    #[runtime_check_epilogue = r#"
         assert func visibility rules
         for i in 0..#args:
             ty_stack >> ty
@@ -1607,7 +1617,7 @@ pub enum Bytecode {
     #[static_operands = "[func_inst_idx]"]
     #[description = "Generic version of `Call`."]
     #[semantics = "See `Call`."]
-    #[paranoid_post = "See `Call`."]
+    #[runtime_check_epilogue = "See `Call`."]
     #[gas_type_creation_tier_0 = "ty_args"]
     #[gas_type_creation_tier_1 = "local_tys"]
     CallGeneric(FunctionInstantiationIndex),
@@ -1615,20 +1625,20 @@ pub enum Bytecode {
     #[group = "struct"]
     #[static_operands = "[struct_def_idx]"]
     #[description = r#"
-        Create an instance of the struct specified by the struct def index and push it on the stack. 
-        The values of the fields of the struct, in the order they appear in the struct declaration, 
-        must be pushed on the stack. All fields must be provided. 
+        Create an instance of the struct specified by the struct def index and push it on the stack.
+        The values of the fields of the struct, in the order they appear in the struct declaration,
+        must be pushed on the stack. All fields must be provided.
     "#]
     #[semantics = r#"
-        stack >> field_n
+        stack >> field_n-1
         ...
-        stack >> field_1
-        stack << struct { field_1, ..., field_n }    
+        stack >> field_0
+        stack << struct { field_0, ..., field_n-1 }
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> tys 
-        assert tys == field_tys 
-        check field abilities 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> tys
+        assert tys == field_tys
+        check field abilities
         ty_stack << struct_ty
     "#]
     Pack(StructDefinitionIndex),
@@ -1636,7 +1646,7 @@ pub enum Bytecode {
     #[static_operands = "[struct_inst_idx]"]
     #[description = "Generic version of `Pack`."]
     #[semantics = "See `Pack`."]
-    #[paranoid_post = "See `Pack`."]
+    #[runtime_check_epilogue = "See `Pack`."]
     #[gas_type_creation_tier_0 = "struct_ty"]
     #[gas_type_creation_tier_1 = "field_tys"]
     PackGeneric(StructDefInstantiationIndex),
@@ -1645,14 +1655,14 @@ pub enum Bytecode {
     #[static_operands = "[struct_def_idx]"]
     #[description = "Destroy an instance of a struct and push the values bound to each field onto the stack."]
     #[semantics = r#"
-        stack >> struct { field_1, .., field_n }
-        stack << field_1
+        stack >> struct { field_0, .., field_n-1 }
+        stack << field_0
         ...
-        stack << field_n
+        stack << field_n-1
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ty 
-        assert ty == struct_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == struct_ty
         ty_stack << field_tys
     "#]
     Unpack(StructDefinitionIndex),
@@ -1660,7 +1670,7 @@ pub enum Bytecode {
     #[static_operands = "[struct_inst_idx]"]
     #[description = "Generic version of `Unpack`."]
     #[semantics = "See `Unpack`."]
-    #[paranoid_post = "See `Unpack`."]
+    #[runtime_check_epilogue = "See `Unpack`."]
     #[gas_type_creation_tier_0 = "struct_ty"]
     #[gas_type_creation_tier_1 = "field_tys"]
     UnpackGeneric(StructDefInstantiationIndex),
@@ -1676,7 +1686,7 @@ pub enum Bytecode {
         stack >> ref
         stack << copy *ref
     "#]
-    #[paranoid_post = r#"
+    #[runtime_check_epilogue = r#"
         ty_stack >> ref_ty
         assert ty has copy
     "#]
@@ -1693,10 +1703,10 @@ pub enum Bytecode {
         stack >> val
         *ref = val
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ref_ty 
-        ty_stack >> val_ty 
-        assert ref_ty == &val_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ref_ty
+        ty_stack >> val_ty
+        assert ref_ty == &val_ty
         assert val_ty has drop
     "#]
     WriteRef,
@@ -1709,8 +1719,8 @@ pub enum Bytecode {
         stack >> mutable_ref
         stack << mutable_ref.into_immutable()
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> &mut ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> &mut ty
         ty_stack << &ty
     "#]
     FreezeRef,
@@ -1719,8 +1729,8 @@ pub enum Bytecode {
     #[description = "Load a mutable reference to a local identified by the local index."]
     #[static_operands = "[local_idx]"]
     #[semantics = "stack << &mut locals[local_idx]"]
-    #[paranoid_post = r#"
-        ty << clone local_ty 
+    #[runtime_check_epilogue = r#"
+        ty = clone local_ty
         ty_stack << &mut ty
     "#]
     MutBorrowLoc(LocalIndex),
@@ -1729,8 +1739,8 @@ pub enum Bytecode {
     #[description = "Load an immutable reference to a local identified by the local index."]
     #[static_operands = "[local_idx]"]
     #[semantics = "stack << &locals[local_idx]"]
-    #[paranoid_post = r#"
-        ty << clone local_ty 
+    #[runtime_check_epilogue = r#"
+        ty << clone local_ty
         ty_stack << &ty
     "#]
     ImmBorrowLoc(LocalIndex),
@@ -1739,15 +1749,15 @@ pub enum Bytecode {
     #[static_operands = "[field_handle_idx]"]
     #[description = r#"
         Consume the reference to a struct at the top of the stack,
-        and load a mutable reference to the field identifierd by the field handle index.
+        and load a mutable reference to the field identified by the field handle index.
     "#]
     #[semantics = r#"
         stack >> struct_ref
         stack << &mut (*struct_ref).field(field_index)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ty 
-        assert ty == &mut struct_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == &mut struct_ty
         ty_stack << &mut field_ty
     "#]
     MutBorrowField(FieldHandleIndex),
@@ -1756,15 +1766,15 @@ pub enum Bytecode {
     #[static_operands = "[field_inst_idx]"]
     #[description = r#"
         Consume the reference to a generic struct at the top of the stack,
-        and load a mutable reference to the field identifierd by the field handle index.
+        and load a mutable reference to the field identified by the field handle index.
     "#]
     #[semantics = r#"
         stack >> struct_ref
         stack << &mut (*struct_ref).field(field_index)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ty 
-        assert ty == &struct_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == &struct_ty
         ty_stack << &mut field_ty
     "#]
     #[gas_type_creation_tier_0 = "struct_ty"]
@@ -1774,16 +1784,16 @@ pub enum Bytecode {
     #[group = "struct"]
     #[static_operands = "[field_handle_idx]"]
     #[description = r#"
-        Consume the reference to a struct at the top of the stack, 
-        and load an immutable reference to the field identifierd by the field handle index.
+        Consume the reference to a struct at the top of the stack,
+        and load an immutable reference to the field identified by the field handle index.
     "#]
     #[semantics = r#"
         stack >> struct_ref
         stack << &(*struct_ref).field(field_index)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ty 
-        assert ty == &struct_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == &struct_ty
         ty_stack << &field_ty
     "#]
     ImmBorrowField(FieldHandleIndex),
@@ -1792,15 +1802,15 @@ pub enum Bytecode {
     #[static_operands = "[field_inst_idx]"]
     #[description = r#"
         Consume the reference to a generic struct at the top of the stack,
-        and load an immutable reference to the field identifierd by the field handle index.
+        and load an immutable reference to the field identified by the field handle index.
     "#]
     #[semantics = r#"
         stack >> struct_ref
         stack << &(*struct_ref).field(field_index)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ty 
-        assert ty == &struct_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == &struct_ty
         ty_stack << &field_ty
     "#]
     #[gas_type_creation_tier_0 = "struct_ty"]
@@ -1818,29 +1828,29 @@ pub enum Bytecode {
         stack >> addr
 
         if global_state[addr] contains struct_type
-            stack << &global_state[addr][struct_type]
+            stack << &mut global_state[addr][struct_type]
         else
             error
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ty 
-        assert ty == address 
-        assert struct_ty has key 
-        ty_stack << &struct_ty
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == address
+        assert struct_ty has key
+        ty_stack << &mut struct_ty
     "#]
     MutBorrowGlobal(StructDefinitionIndex),
     #[group = "global"]
     #[static_operands = "[struct_inst_idx]"]
     #[description = "Generic version of `mut_borrow_global`."]
     #[semantics = "See `mut_borrow_global`."]
-    #[paranoid_post = "See `mut_borrow_global`."]
+    #[runtime_check_epilogue = "See `mut_borrow_global`."]
     #[gas_type_creation_tier_0 = "resource_ty"]
     MutBorrowGlobalGeneric(StructDefInstantiationIndex),
 
     #[group = "global"]
     #[static_operands = "[struct_def_idx]"]
     #[description = r#"
-        Return am immutable reference to an instance of the specified type under the address passed as argument.
+        Return an immutable reference to an instance of the specified type under the address passed as argument.
 
         Abort execution if such an object does not exist.
     "#]
@@ -1848,29 +1858,29 @@ pub enum Bytecode {
         stack >> addr
 
         if global_state[addr] contains struct_type
-            stack << &mut global_state[addr][struct_type]
+            stack << &global_state[addr][struct_type]
         else
             error
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ty 
-        assert ty == address 
-        assert struct_ty has key 
-        ty_stack << &mut struct_ty
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == address
+        assert struct_ty has key
+        ty_stack << &struct_ty
     "#]
     ImmBorrowGlobal(StructDefinitionIndex),
     #[group = "global"]
     #[static_operands = "[struct_inst_idx]"]
     #[description = "Generic version of `imm_borrow_global`."]
     #[semantics = "See `imm_borrow_global`."]
-    #[paranoid_post = "See `imm_borrow_global`."]
+    #[runtime_check_epilogue = "See `imm_borrow_global`."]
     #[gas_type_creation_tier_0 = "resource_ty"]
     ImmBorrowGlobalGeneric(StructDefInstantiationIndex),
 
     #[group = "arithmetic"]
     #[description = r#"
-        Add the two integer values at the top of the stack and push the result on the stack. 
-        
+        Add the two integer values at the top of the stack and push the result on the stack.
+
         This operation aborts the transaction in case of overflow.
     "#]
     #[semantics = r#"
@@ -1881,17 +1891,17 @@ pub enum Bytecode {
         else
             stack << (lhs + rhs)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
         assert left_ty == right_ty
-        ty_stack << left_ty
+        ty_stack << right_ty
     "#]
     Add,
 
     #[group = "arithmetic"]
     #[description = r#"
-        Subtract the two integer value at the top of the stack and push the result on the stack. 
+        Subtract the two integer values at the top of the stack and push the result on the stack.
 
         This operation aborts the transaction in case of underflow.
     "#]
@@ -1903,17 +1913,17 @@ pub enum Bytecode {
         else
             stack << (lhs - rhs)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
         assert left_ty == right_ty
-        ty_stack << left_ty
+        ty_stack << right_ty
     "#]
     Sub,
 
     #[group = "arithmetic"]
     #[description = r#"
-        Multiply the two integer values at the top of the stack and push the result on the stack. 
+        Multiply the two integer values at the top of the stack and push the result on the stack.
 
         This operation aborts the transaction in case of overflow.
     "#]
@@ -1925,17 +1935,17 @@ pub enum Bytecode {
         else
             stack << (lhs * rhs)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
         assert left_ty == right_ty
-        ty_stack << left_ty
+        ty_stack << right_ty
     "#]
     Mul,
 
     #[group = "arithmetic"]
     #[description = r#"
-        Perform a modulo operation on the two integer values at the top of the stack and push the result on the stack. 
+        Perform a modulo operation on the two integer values at the top of the stack and push the result on the stack.
 
         This operation aborts the transaction in case the right hand side is zero.
     "#]
@@ -1947,17 +1957,17 @@ pub enum Bytecode {
         else
             stack << (lhs % rhs)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
         assert left_ty == right_ty
-        ty_stack << left_ty
+        ty_stack << right_ty
     "#]
     Mod,
 
     #[group = "arithmetic"]
     #[description = r#"
-        Divide the two integer values at the top of the stack and push the result on the stack. 
+        Divide the two integer values at the top of the stack and push the result on the stack.
 
         This operation aborts the transaction in case the right hand side is zero.
     "#]
@@ -1969,51 +1979,51 @@ pub enum Bytecode {
         else
             stack << (lhs / rhs)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
         assert left_ty == right_ty
-        ty_stack << left_ty
+        ty_stack << right_ty
     "#]
     Div,
 
     #[group = "bitwise"]
     #[description = r#"
         Perform a bitwise OR operation on the two integer values at the top of the stack
-        and push the result on the stack. 
+        and push the result on the stack.
 
-        The operands can be of any primitive integer type.
+        The operands can be of any (but the same) primitive integer type.
     "#]
     #[semantics = r#"
         stack >> rhs
         stack >> lhs
         stack << lhs | rhs
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
         assert left_ty == right_ty
-        ty_stack << left_ty
+        ty_stack << right_ty
     "#]
     BitOr,
 
     #[group = "bitwise"]
     #[description = r#"
         Perform a bitwise AND operation on the two integer values at the top of the stack
-        and push the result on the stack. 
+        and push the result on the stack.
 
-        The operands can be of any primitive integer type.
+        The operands can be of any (but the same) primitive integer type.
     "#]
     #[semantics = r#"
         stack >> rhs
         stack >> lhs
         stack << lhs & rhs
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
         assert left_ty == right_ty
-        ty_stack << left_ty
+        ty_stack << right_ty
     "#]
     BitAnd,
 
@@ -2022,70 +2032,70 @@ pub enum Bytecode {
     #[group = "bitwise"]
     #[description = r#"
         Perform a bitwise XOR operation on the two integer values at the top of the stack
-        and push the result on the stack. 
+        and push the result on the stack.
 
-        The operands can be of any primitive integer type.
+        The operands can be of any (but the same) primitive integer type.
     "#]
     #[semantics = r#"
         stack >> rhs
         stack >> lhs
         stack << lhs ^ rhs
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
         assert left_ty == right_ty
-        ty_stack << left_ty
+        ty_stack << right_ty
     "#]
     Xor,
 
     #[group = "boolean"]
     #[description = r#"
-        Perform a boolean OR operation on the two bool values at the top of the stack 
-        and push the result on the stack. 
+        Perform a boolean OR operation on the two bool values at the top of the stack
+        and push the result on the stack.
     "#]
     #[semantics = r#"
         stack >> rhs
         stack >> lhs
         stack << lhs || rhs
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
         assert left_ty == right_ty
-        ty_stack << left_ty
+        ty_stack << right_ty
     "#]
     Or,
 
     #[group = "boolean"]
     #[description = r#"
-        Perform a boolean AND operation on the two bool values at the top of the stack 
-        and push the result on the stack. 
+        Perform a boolean AND operation on the two bool values at the top of the stack
+        and push the result on the stack.
     "#]
     #[semantics = r#"
         stack >> rhs
         stack >> lhs
         stack << lhs && rhs
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
         assert left_ty == right_ty
-        ty_stack << left_ty
+        ty_stack << right_ty
     "#]
     And,
 
     #[group = "boolean"]
     #[description = r#"
-        Invert the bool value at the top of the stack and push the result on the stack. 
+        Invert the bool value at the top of the stack and push the result on the stack.
     "#]
     #[semantics = r#"
         stack >> bool_val
         stack << (not bool_val)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ty 
-        assert ty == bool 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == bool
         ty_stack << bool
     "#]
     Not,
@@ -2106,11 +2116,11 @@ pub enum Bytecode {
             - vector<T> where equality is defined for T
             - &T (or &mut T) where equality is defined for T
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
-        assert left_ty == right_ty 
-        assert left_ty has drop 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
+        assert right_ty == left_ty
+        assert right_ty has drop
         ty_stack << bool
     "#]
     Eq,
@@ -2124,11 +2134,11 @@ pub enum Bytecode {
         stack >> lhs
         stack << (lhs != rhs)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
-        assert left_ty == right_ty 
-        assert left_ty has drop 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
+        assert right_ty == left_ty
+        assert right_ty has drop
         ty_stack << bool
     "#]
     Neq,
@@ -2137,17 +2147,19 @@ pub enum Bytecode {
     #[description = r#"
         Perform a "less than" operation of the two integer values at the top of the stack
         and push the boolean result on the stack.
+
+        The operands can be of any (but the same) primitive integer type.
     "#]
     #[semantics = r#"
         stack >> (rhs: int_ty)
         stack >> (lhs: int_ty)
         stack << (lhs < rhs)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
-        assert left_ty == right_ty 
-        assert left_ty has drop 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
+        assert right_ty == left_ty
+        assert right_ty has drop
         ty_stack << bool
     "#]
     Lt,
@@ -2156,17 +2168,19 @@ pub enum Bytecode {
     #[description = r#"
         Perform a "greater than" operation of the two integer values at the top of the stack
         and push the boolean result on the stack.
+
+        The operands can be of any (but the same) primitive integer type.
     "#]
     #[semantics = r#"
         stack >> (rhs: int_ty)
         stack >> (lhs: int_ty)
         stack << (lhs > rhs)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
-        assert left_ty == right_ty 
-        assert left_ty has drop 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
+        assert right_ty == left_ty
+        assert right_ty has drop
         ty_stack << bool
     "#]
     Gt,
@@ -2175,17 +2189,19 @@ pub enum Bytecode {
     #[description = r#"
         Perform a "less than or equal to" operation of the two integer values at the top of the stack
         and push the boolean result on the stack.
+
+        The operands can be of any (but the same) primitive integer type.
     "#]
     #[semantics = r#"
         stack >> (rhs: int_ty)
         stack >> (lhs: int_ty)
         stack << (lhs <= rhs)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
-        assert left_ty == right_ty 
-        assert left_ty has drop 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
+        assert right_ty == left_ty
+        assert right_ty has drop
         ty_stack << bool
     "#]
     Le,
@@ -2194,17 +2210,19 @@ pub enum Bytecode {
     #[description = r#"
         Perform a "greater than or equal to" operation of the two integer values at the top of the stack
         and push the boolean result on the stack.
+
+        The operands can be of any (but the same) primitive integer type.
     "#]
     #[semantics = r#"
         stack >> (rhs: int_ty)
         stack >> (lhs: int_ty)
         stack << (lhs >= rhs)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
-        ty_stack >> right_ty 
-        assert left_ty == right_ty 
-        assert left_ty has drop 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> right_ty
+        ty_stack >> left_ty
+        assert right_ty == left_ty
+        assert right_ty has drop
         ty_stack << bool
     "#]
     Ge,
@@ -2217,15 +2235,15 @@ pub enum Bytecode {
         stack >> (error_code: u64)
         abort transaction with error_code
     "#]
+    #[runtime_check_prologue = "ty_stack >> _"]
     Abort,
 
     #[group = "control_flow"]
     #[description = r#"
-        A "no operation" -- an instruction that does not perform any meaningful operation. 
+        A "no operation" -- an instruction that does not perform any meaningful operation.
         It can be however, useful as a placeholder in certain cases.
     "#]
     #[semantics = "current_frame.pc += 1"]
-    #[paranoid_pre = "ty_stack >> _"]
     Nop,
 
     #[group = "global"]
@@ -2233,11 +2251,11 @@ pub enum Bytecode {
     #[description = "Check whether or not a given address in the global storage has an object of the specified type already."]
     #[semantics = r#"
         stack >> addr
-        stack << (global_state[addr] contains struct_type)    
+        stack << (global_state[addr] contains struct_type)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ty 
-        assert ty == address 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == address
         ty_stack << bool
     "#]
     Exists(StructDefinitionIndex),
@@ -2245,30 +2263,30 @@ pub enum Bytecode {
     #[static_operands = "[struct_inst_idx]"]
     #[description = "Generic version of `Exists`"]
     #[semantics = "See `Exists`."]
-    #[paranoid_post = "See `Exists`."]
+    #[runtime_check_epilogue = "See `Exists`."]
     #[gas_type_creation_tier_0 = "resource_ty"]
     ExistsGeneric(StructDefInstantiationIndex),
 
     #[group = "global"]
     #[static_operands = "[struct_def_idx]"]
     #[description = r#"
-        Move the value of the specified type under the address in the global storage onto the top of the stack. 
+        Move the value of the specified type under the address in the global storage onto the top of the stack.
 
-        Abort execution if such an value does not exist.    
+        Abort execution if such an value does not exist.
     "#]
     #[semantics = r#"
         stack >> addr
 
         if global_state[addr] contains struct_type
             stack << global_state[addr][struct_type]
-            global_state[addr][struct_type] = null
+            delete global_state[addr][struct_type]
         else
             error
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ty 
-        assert ty == signer 
-        assert struct_ty has key 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == address
+        assert struct_ty has key
         ty_stack << struct_ty
     "#]
     MoveFrom(StructDefinitionIndex),
@@ -2276,7 +2294,7 @@ pub enum Bytecode {
     #[static_operands = "[struct_inst_idx]"]
     #[description = "Generic version of `MoveFrom`"]
     #[semantics = "See `MoveFrom`."]
-    #[paranoid_post = "See `MoveFrom`."]
+    #[runtime_check_epilogue = "See `MoveFrom`."]
     #[gas_type_creation_tier_0 = "resource_ty"]
     MoveFromGeneric(StructDefInstantiationIndex),
 
@@ -2284,24 +2302,24 @@ pub enum Bytecode {
     #[static_operands = "[struct_def_idx]"]
     #[description = r#"
         Move the value at the top of the stack into the global storage,
-        under the address of the `signer` on the stack below it. 
+        under the address of the `signer` on the stack below it.
 
         Abort execution if an object of the same type already exists under that address.
     "#]
     #[semantics = r#"
         stack >> struct_val
         stack >> &signer
-        
+
         if global_state[signer.addr] contains struct_type
             error
         else
             global_state[signer.addr][struct_type] = struct_val
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ty1 
-        assert ty1 == signer 
-        ty_stack >> ty2 
-        assert ty == struct_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty1
+        ty_stack >> ty2
+        assert ty2 == signer
+        assert ty1 == struct_ty
         assert struct_ty has key
     "#]
     MoveTo(StructDefinitionIndex),
@@ -2309,7 +2327,7 @@ pub enum Bytecode {
     #[static_operands = "[struct_inst_idx]"]
     #[description = "Generic version of `MoveTo`"]
     #[semantics = "See `MoveTo`."]
-    #[paranoid_post = "See `MoveTo`."]
+    #[runtime_check_epilogue = "See `MoveTo`."]
     #[gas_type_creation_tier_0 = "resource_ty"]
     MoveToGeneric(StructDefInstantiationIndex),
 
@@ -2317,8 +2335,11 @@ pub enum Bytecode {
     #[description = r#"
         Shift the (second top value) right (top value) bits and pushes the result on the stack.
 
-        The number of bits shifted must be less than the number of bits in the integer value being shifted, 
+        The number of bits shifted must be less than the number of bits in the integer value being shifted,
         or the transaction will be aborted with an arithmetic error.
+
+        The number being shifted can be of any primitive integer type, but the number of bits
+        shifted must be u64.
     "#]
     #[semantics = r#"
         stack >> (rhs: u8)
@@ -2328,9 +2349,9 @@ pub enum Bytecode {
         else
             stack << (lhs __shift_left__ rhs)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
+    #[runtime_check_epilogue = r#"
         ty_stack >> right_ty
+        ty_stack >> left_ty
         ty_stack << left_ty
     "#]
     Shl,
@@ -2339,8 +2360,11 @@ pub enum Bytecode {
     #[description = r#"
         Shift the (second top value) left (top value) bits and pushes the result on the stack.
 
-        The number of bits shifted must be less than the number of bits in the integer value being shifted, 
+        The number of bits shifted must be less than the number of bits in the integer value being shifted,
         or the transaction will be aborted with an arithmetic error.
+
+        The number being shifted can be of any primitive integer type, but the number of bits
+        shifted must be u64.
     "#]
     #[semantics = r#"
         stack >> (rhs: u8)
@@ -2350,32 +2374,32 @@ pub enum Bytecode {
         else
             stack << (lhs __shift_right__ rhs)
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> left_ty 
+    #[runtime_check_epilogue = r#"
         ty_stack >> right_ty
+        ty_stack >> left_ty
         ty_stack << left_ty
     "#]
     Shr,
 
     #[group = "vector"]
     #[description = r#"
-        Create a vector by packing a statically known number of elements from the stack. 
+        Create a vector by packing a statically known number of elements from the stack.
 
-        Abort the execution if there are not enough number of elements on the stack 
+        Abort the execution if there are not enough number of elements on the stack
         to pack from or they do not have the same type identified by the `elem_ty_idx`.
     "#]
-    #[static_operands = "[elem_ty_idx] [n]"]
+    #[static_operands = "[elem_ty_idx] [num_elements]"]
     #[semantics = r#"
-        stack >> elem_n
+        stack >> elem_n-1
         ..
-        stack >> elem_1
-        stack << vector[elem_1, .., elem_n]
+        stack >> elem_0
+        stack << vector[elem_0, .., elem_n-1]
     "#]
-    #[paranoid_post = r#"
-        elem_ty << instantiate elem_ty 
-        for i in 1..=n: 
-            ty_stack >> ty  
-            assert ty == elem_ty 
+    #[runtime_check_epilogue = r#"
+        elem_ty = instantiate elem_ty
+        for i in 1..=n:
+            ty_stack >> ty
+            assert ty == elem_ty
         ty_stack << vector<elem_ty>
     "#]
     #[gas_type_creation_tier_0 = "elem_ty"]
@@ -2388,10 +2412,10 @@ pub enum Bytecode {
         stack >> vec_ref
         stack << (*vec_ref).len
     "#]
-    #[paranoid_post = r#"
-        elem_ty << instantiate elem_ty 
-        ty_stack >> ty 
-        assert ty == &elem_ty 
+    #[runtime_check_epilogue = r#"
+        elem_ty = instantiate elem_ty
+        ty_stack >> ty
+        assert ty == &elem_ty
         ty_stack << u64
     "#]
     #[gas_type_creation_tier_0 = "elem_ty"]
@@ -2399,7 +2423,7 @@ pub enum Bytecode {
 
     #[group = "vector"]
     #[description = r#"
-        Acquire an immutable reference to the element at a given index of the vector. 
+        Acquire an immutable reference to the element at a given index of the vector.
         Abort the execution if the index is out of bounds.
     "#]
     #[static_operands = "[elem_ty_idx]"]
@@ -2408,11 +2432,11 @@ pub enum Bytecode {
         stack >> vec_ref
         stack << &((*vec_ref)[i])
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> idx_ty 
-        assert idx_ty == u64 
-        ty_stack >> ref_ty 
-        assert ref_ty == &vector<elem_ty> 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> idx_ty
+        assert idx_ty == u64
+        ty_stack >> ref_ty
+        assert ref_ty == &vector<elem_ty>
         ty_stack << &elem_ty
     "#]
     #[gas_type_creation_tier_0 = "elem_ty"]
@@ -2420,7 +2444,7 @@ pub enum Bytecode {
 
     #[group = "vector"]
     #[description = r#"
-        Acquire a mutable reference to the element at a given index of the vector. 
+        Acquire a mutable reference to the element at a given index of the vector.
         Abort the execution if the index is out of bounds.
     "#]
     #[static_operands = "[elem_ty_idx]"]
@@ -2429,11 +2453,11 @@ pub enum Bytecode {
         stack >> vec_ref
         stack << &mut ((*vec_ref)[i])
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> idx_ty 
-        assert idx_ty == u64 
-        ty_stack >> ref_ty 
-        assert ref_ty == &vector<elem_ty> 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> idx_ty
+        assert idx_ty == u64
+        ty_stack >> ref_ty
+        assert ref_ty == &mut vector<elem_ty>
         ty_stack << &mut elem_ty
     "#]
     #[gas_type_creation_tier_0 = "elem_ty"]
@@ -2447,17 +2471,17 @@ pub enum Bytecode {
         stack >> vec_ref
         (*vec_ref) << val
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> val_ty 
-        assert val_ty == elem_ty 
-        ty_stack >> ref_ty 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> val_ty
+        assert val_ty == elem_ty
+        ty_stack >> ref_ty
         assert ref_ty == &mut vector<elem_ty>
     "#]
     VecPushBack(SignatureIndex),
 
     #[group = "vector"]
     #[description = r#"
-        Pop an element from the end of vector. 
+        Pop an element from the end of vector.
         Aborts if the vector is empty.
     "#]
     #[static_operands = "[elem_ty_idx]"]
@@ -2466,36 +2490,36 @@ pub enum Bytecode {
         (*vec_ref) >> val
         stack << val
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ref_ty 
-        assert ref_ty == &mut vector<elem_ty> 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ref_ty
+        assert ref_ty == &mut vector<elem_ty>
         ty_stack << val_ty
     "#]
     VecPopBack(SignatureIndex),
 
     #[group = "vector"]
     #[description = r#"
-        Destroy the vector and unpack a statically known number of elements onto the stack. 
+        Destroy the vector and unpack a statically known number of elements onto the stack.
         Abort if the vector does not have a length `n`.
     "#]
-    #[static_operands = "[elem_ty_idx] [n]"]
+    #[static_operands = "[elem_ty_idx] [num_elements]"]
     #[semantics = r#"
-        stack >> vector[elem_1, ..., elem_n]
-        stack << elem_1
+        stack >> vector[elem_0, ..., elem_n-1]
+        stack << elem_0
         ...
         stack << elem_n
     "#]
-    #[paranoid_post = r#"
-        ty_stack >> ty 
-        assert ty == vector<elem_ty> 
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == vector<elem_ty>
         ty_stack << [elem_ty]*n
     "#]
     VecUnpack(SignatureIndex, u64),
 
     #[group = "vector"]
     #[description = r#"
-        Swaps the elements at two indices in the vector. 
-        Abort the execution if any of the indice is out of bounds.
+        Swaps the elements at two indices in the vector.
+        Abort the execution if any of the indices are out of bounds.
     "#]
     #[static_operands = "[elem_ty_idx]"]
     #[semantics = r#"
@@ -2504,7 +2528,7 @@ pub enum Bytecode {
         stack >> vec_ref
         (*vec_ref)[i], (*vec_ref)[j] = (*vec_ref)[j], (*vec_ref)[i]
     "#]
-    #[paranoid_post = r#"
+    #[runtime_check_epilogue = r#"
         ty_stack >> ty1
         ty_stack >> ty2
         ty_stack >> ty3
@@ -2518,26 +2542,26 @@ pub enum Bytecode {
     #[description = "Push a u16 constant onto the stack."]
     #[static_operands = "[u16_value]"]
     #[semantics = "stack << u16_value"]
-    #[paranoid_post = "ty_stack << u16"]
+    #[runtime_check_epilogue = "ty_stack << u16"]
     LdU16(u16),
 
     #[group = "stack_and_local"]
     #[description = "Push a u32 constant onto the stack."]
     #[static_operands = "[u32_value]"]
     #[semantics = "stack << u32_value"]
-    #[paranoid_post = "ty_stack << u32"]
+    #[runtime_check_epilogue = "ty_stack << u32"]
     LdU32(u32),
 
     #[group = "stack_and_local"]
     #[description = "Push a u256 constant onto the stack."]
     #[static_operands = "[u256_value]"]
     #[semantics = "stack << u256_value"]
-    #[paranoid_post = "ty_stack << u256"]
+    #[runtime_check_epilogue = "ty_stack << u256"]
     LdU256(move_core_types::u256::U256),
 
     #[group = "casting"]
     #[description = r#"
-        Convert the integer value at the top of the stack into a u16. 
+        Convert the integer value at the top of the stack into a u16.
         An arithmetic error will be raised if the value cannot be represented as a u16.
     "#]
     #[semantics = r#"
@@ -2547,7 +2571,7 @@ pub enum Bytecode {
         else:
             stack << int_val as u16
     "#]
-    #[paranoid_post = r#"
+    #[runtime_check_epilogue = r#"
         ty_stack >> _
         ty_stack << u16
     "#]
@@ -2555,7 +2579,7 @@ pub enum Bytecode {
 
     #[group = "casting"]
     #[description = r#"
-        Convert the integer value at the top of the stack into a u32. 
+        Convert the integer value at the top of the stack into a u32.
         An arithmetic error will be raised if the value cannot be represented as a u32.
     "#]
     #[semantics = r#"
@@ -2565,7 +2589,7 @@ pub enum Bytecode {
         else:
             stack << int_val as u32
     "#]
-    #[paranoid_post = r#"
+    #[runtime_check_epilogue = r#"
         ty_stack >> _
         ty_stack << u32
     "#]
@@ -2579,16 +2603,11 @@ pub enum Bytecode {
         stack >> int_val
         stack << int_val as u256
     "#]
-    #[paranoid_post = r#"
+    #[runtime_check_epilogue = r#"
         ty_stack >> _
         ty_stack << u256
     "#]
     CastU256,
-}
-
-#[test]
-fn tttt() {
-    println!("{:#?}", Bytecode::spec());
 }
 
 impl ::std::fmt::Debug for Bytecode {

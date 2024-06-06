@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 extern crate proc_macro;
 
 use once_cell::sync::Lazy;
@@ -92,17 +95,46 @@ fn trim_leading_indentation(input: &str) -> String {
     result_lines.join("\n")
 }
 
-static KNOWN_ATTRIBUTES: Lazy<BTreeMap<&str, ()>> = Lazy::new(|| {
+static KNOWN_ATTRIBUTES: Lazy<BTreeMap<&str, bool>> = Lazy::new(|| {
     [
-        "name",
-        "group",
-        "description",
-        "static_operands",
-        "semantics",
-        "paranoid_pre",
-        "paranoid_post",
-        "gas_type_creation_tier_0",
-        "gas_type_creation_tier_1",
+        // The name of the instruction.
+        // Will be automatically derived if not specified.
+        // No need to define it manually unless you want to override it.
+        ("name", false),
+        // The group the instruction belongs to, used to group instructions in rendered docs.
+        ("group", true),
+        // Description of the instruction in human language.
+        ("description", true),
+        // The operands encoded as part of the instruction in the binary format.
+        ("static_operands", false),
+        // The semantics of the instruction, described in pseudocode.
+        ("semantics", true),
+        // Runtime checks performed before the execution of the instruction.
+        ("runtime_check_prologue", false),
+        // Runtime checks performed after the execution of the instruction.
+        ("runtime_check_epilogue", false),
+        // Gas semantics for type creations that are explicitly carried by the instruction.
+        ("gas_type_creation_tier_0", false),
+        // Gas semantics for type creations that are implied by the instruction.
+        ("gas_type_creation_tier_1", false),
+    ]
+    .into_iter()
+    .collect()
+});
+
+static VALID_GROUPS: Lazy<BTreeMap<&str, ()>> = Lazy::new(|| {
+    [
+        "control_flow",
+        "stack_and_local",
+        "reference",
+        "arithmetic",
+        "casting",
+        "bitwise",
+        "comparison",
+        "boolean",
+        "struct",
+        "global",
+        "vector",
     ]
     .into_iter()
     .map(|attr_name| (attr_name, ()))
@@ -121,7 +153,7 @@ pub fn bytecode_spec(_attr: TokenStream, tokens: TokenStream) -> TokenStream {
 
     let mut maps = Vec::new();
     for variant in &mut data.variants {
-        let variant_name = variant.ident.to_string();
+        let instr_name = variant.ident.to_string();
 
         let mut map_entries = BTreeMap::new();
         variant.attrs.retain(|attr| {
@@ -134,7 +166,8 @@ pub fn bytecode_spec(_attr: TokenStream, tokens: TokenStream) -> TokenStream {
                                 match map_entries.entry(attr_name) {
                                     btree_map::Entry::Occupied(entry) => {
                                         panic!(
-                                            "Attribute \"{}\" defined more than once.",
+                                            "Instruction {}: attribute \"{}\" defined more than once.",
+                                            instr_name,
                                             entry.key()
                                         );
                                     },
@@ -144,7 +177,7 @@ pub fn bytecode_spec(_attr: TokenStream, tokens: TokenStream) -> TokenStream {
                                 }
                                 return false;
                             },
-                            _ => panic!("Invalid value. Expected string literal."),
+                            _ => panic!("Instruction {}: Invalid value for attribute {}. Expected string literal.", instr_name, attr_name),
                         }
                     }
                 }
@@ -155,8 +188,21 @@ pub fn bytecode_spec(_attr: TokenStream, tokens: TokenStream) -> TokenStream {
         match map_entries.entry("name".to_string()) {
             btree_map::Entry::Occupied(_entry) => (),
             btree_map::Entry::Vacant(entry) => {
-                entry.insert(upper_camel_to_lower_snake_case(&variant_name));
+                entry.insert(upper_camel_to_lower_snake_case(&instr_name));
             },
+        }
+
+        for (attr, is_required) in &*KNOWN_ATTRIBUTES {
+            if *is_required && !map_entries.contains_key(*attr) {
+                panic!(
+                    "Instruction {}: missing required attribute {}",
+                    instr_name, attr
+                )
+            }
+        }
+        let group = map_entries.get("group").unwrap();
+        if !VALID_GROUPS.contains_key(group.as_str()) {
+            panic!("Instruction {}: invalid group {}", instr_name, group)
         }
 
         let mut code = quote! {};

@@ -2,7 +2,7 @@
 name = "move-bytecode-spec"
 version = "0.1.0"
 authors = ["Aptos Labs"]
-description = "Move compiler based on stackless bytecode"
+description = "Procedural macros to generate Move bytecode specification"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptosfoundation.org/"
 license = "Apache-2.0"
