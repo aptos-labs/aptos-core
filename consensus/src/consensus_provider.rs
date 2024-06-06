@@ -119,7 +119,7 @@ pub fn start_consensus_observer(
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
     aptos_db: DbReaderWriter,
-    reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
+    reconfig_events: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
 ) -> Runtime {
     let publisher_enabled = node_config.consensus_observer.publisher_enabled;
     let runtime = aptos_runtimes::spawn_named_runtime("observer".into(), None);
@@ -169,6 +169,9 @@ pub fn start_consensus_observer(
         .into_values()
         .collect();
     let network_events = Box::new(select_all(events));
+
+    let reconfig_events =
+        reconfig_events.expect("Reconfig events are required for the consensus observer!");
 
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     let observer = Observer::new(

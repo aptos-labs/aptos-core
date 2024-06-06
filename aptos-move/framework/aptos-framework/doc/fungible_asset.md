@@ -41,6 +41,8 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `name`](#0x1_fungible_asset_name)
 -  [Function `symbol`](#0x1_fungible_asset_symbol)
 -  [Function `decimals`](#0x1_fungible_asset_decimals)
+-  [Function `icon_uri`](#0x1_fungible_asset_icon_uri)
+-  [Function `project_uri`](#0x1_fungible_asset_project_uri)
 -  [Function `store_exists`](#0x1_fungible_asset_store_exists)
 -  [Function `store_exists_inline`](#0x1_fungible_asset_store_exists_inline)
 -  [Function `concurrent_fungible_balance_exists_inline`](#0x1_fungible_asset_concurrent_fungible_balance_exists_inline)
@@ -1638,6 +1640,58 @@ Get the decimals from the <code>metadata</code> object.
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_decimals">decimals</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): u8 <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
     <a href="fungible_asset.md#0x1_fungible_asset_borrow_fungible_metadata">borrow_fungible_metadata</a>(&metadata).decimals
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_icon_uri"></a>
+
+## Function `icon_uri`
+
+Get the icon uri from the <code>metadata</code> object.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_icon_uri">icon_uri</a>&lt;T: key&gt;(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_icon_uri">icon_uri</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): String <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
+    <a href="fungible_asset.md#0x1_fungible_asset_borrow_fungible_metadata">borrow_fungible_metadata</a>(&metadata).icon_uri
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_project_uri"></a>
+
+## Function `project_uri`
+
+Get the project uri from the <code>metadata</code> object.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_project_uri">project_uri</a>&lt;T: key&gt;(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_project_uri">project_uri</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): String <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
+    <a href="fungible_asset.md#0x1_fungible_asset_borrow_fungible_metadata">borrow_fungible_metadata</a>(&metadata).project_uri
 }
 </code></pre>
 
