@@ -1,19 +1,45 @@
-module 0x42::test {
-    fun foo(a: u8, _b: u8) {
+module 0x8675309::M {
+    fun t0() {
         let x = 0;
-        x = x + 1;
-        let y = 0;
-        let _z = 42;
-        let w = bar(false);
     }
 
-    fun bar(x: bool): u8 {
-        let y = 0;
-        if (x) {
-            y = y + 1;
-        } else {
-            y = y + 2;
-        };
-        42
+    fun t1() {
+        let x = 0;
+        x = 0;
     }
+
+    fun t2(cond: bool) {
+        if (cond) {
+            let x = 0;
+        }
+    }
+
+    fun t3(cond: bool) {
+        let x = 0;
+        x;
+        if (cond) {
+            x = 0;
+        }
+    }
+
+    fun t4(cond: bool) {
+        let x = 0;
+        if (cond) {
+            x = 1;
+        } else {
+            x = 2;
+        }
+    }
+
+    fun t5(cond: bool) {
+        let x;
+        while (cond) {
+            x = 0;
+            if (cond) {
+                x;
+            };
+            x = 1;
+        }
+    }
+
 }

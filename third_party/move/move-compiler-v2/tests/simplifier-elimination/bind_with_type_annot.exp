@@ -39,19 +39,19 @@ module 0x8675309::M {
 
 
 Diagnostics:
-warning: Unused assignment to f. Consider removing or prefixing with an underscore: `_f`
+warning: Unused assignment to `f`. Consider removing or prefixing with an underscore: `_f`
   ┌─ tests/simplifier-elimination/bind_with_type_annot.move:7:20
   │
 7 │         let (x, b, R{f}): (u64, bool, R) = (0, false, R { f: 0 }); x; b; f;
   │                    ^^^^
 
-warning: Unused assignment to b. Consider removing or prefixing with an underscore: `_b`
+warning: Unused assignment to `b`. Consider removing or prefixing with an underscore: `_b`
   ┌─ tests/simplifier-elimination/bind_with_type_annot.move:7:13
   │
 7 │         let (x, b, R{f}): (u64, bool, R) = (0, false, R { f: 0 }); x; b; f;
   │             ^^^^^^^^^^^^
 
-warning: Unused assignment to x. Consider removing or prefixing with an underscore: `_x`
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
   ┌─ tests/simplifier-elimination/bind_with_type_annot.move:7:13
   │
 7 │         let (x, b, R{f}): (u64, bool, R) = (0, false, R { f: 0 }); x; b; f;

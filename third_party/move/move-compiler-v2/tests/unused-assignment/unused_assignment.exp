@@ -1,152 +1,299 @@
 
 Diagnostics:
-warning: Unused parameter `a`. Consider removing or prefixing with an underscore: `_a`
-  ┌─ tests/unused-assignment/unused_assignment.move:2:13
+warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/unused-assignment/unused_assignment.move:3:13
   │
-2 │     fun foo(a: u8, _b: u8) {
+3 │         let x = 0;
   │             ^
 
-warning: Unused local variable `y`. Consider removing or prefixing with an underscore: `_y`
-  ┌─ tests/unused-assignment/unused_assignment.move:5:13
-  │
-5 │         let y = 0;
-  │             ^
-
-warning: Unused local variable `w`. Consider removing or prefixing with an underscore: `_w`
-  ┌─ tests/unused-assignment/unused_assignment.move:7:13
-  │
-7 │         let w = bar(false);
-  │             ^
+warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/unused-assignment/unused_assignment.move:13:17
+   │
+13 │             let x = 0;
+   │                 ^
 
 ============ initial bytecode ================
 
 [variant baseline]
-fun test::bar($t0: bool): u8 {
-     var $t1: u8
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: u64
-  0: $t2 := 0
-  1: if ($t0) goto 2 else goto 7
-  2: label L0
-  3: $t4 := 1
-  4: $t3 := +($t2, $t4)
-  5: $t2 := infer($t3)
-  6: goto 11
-  7: label L1
-  8: $t6 := 2
-  9: $t5 := +($t2, $t6)
- 10: $t2 := infer($t5)
- 11: label L2
- 12: $t1 := 42
- 13: return $t1
+fun M::t0() {
+  0: return ()
 }
 
 
 [variant baseline]
-fun test::foo($t0: u8, $t1: u8) {
+fun M::t1() {
+     var $t0: u64
+     var $t1: u64
+  0: $t0 := 0
+  1: $t1 := 0
+  2: $t0 := infer($t1)
+  3: return ()
+}
+
+
+[variant baseline]
+fun M::t2($t0: bool) {
+  0: if ($t0) goto 1 else goto 3
+  1: label L0
+  2: goto 4
+  3: label L1
+  4: label L2
+  5: return ()
+}
+
+
+[variant baseline]
+fun M::t3($t0: bool) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := 0
+  1: $t2 := infer($t1)
+  2: if ($t0) goto 3 else goto 7
+  3: label L0
+  4: $t3 := 0
+  5: $t1 := infer($t3)
+  6: goto 8
+  7: label L1
+  8: label L2
+  9: return ()
+}
+
+
+[variant baseline]
+fun M::t4($t0: bool) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := 0
+  1: if ($t0) goto 2 else goto 6
+  2: label L0
+  3: $t2 := 1
+  4: $t1 := infer($t2)
+  5: goto 9
+  6: label L1
+  7: $t3 := 2
+  8: $t1 := infer($t3)
+  9: label L2
+ 10: return ()
+}
+
+
+[variant baseline]
+fun M::t5($t0: bool) {
+     var $t1: u64
      var $t2: u64
      var $t3: u64
      var $t4: u64
-     var $t5: u8
-     var $t6: bool
-  0: $t2 := 0
-  1: $t4 := 1
-  2: $t3 := +($t2, $t4)
-  3: $t2 := infer($t3)
-  4: $t6 := false
-  5: $t5 := test::bar($t6)
-  6: return ()
+  0: label L0
+  1: if ($t0) goto 2 else goto 14
+  2: label L2
+  3: $t2 := 0
+  4: $t1 := infer($t2)
+  5: if ($t0) goto 6 else goto 9
+  6: label L5
+  7: $t3 := infer($t1)
+  8: goto 10
+  9: label L6
+ 10: label L7
+ 11: $t4 := 1
+ 12: $t1 := infer($t4)
+ 13: goto 16
+ 14: label L3
+ 15: goto 18
+ 16: label L4
+ 17: goto 0
+ 18: label L1
+ 19: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
-fun test::bar($t0: bool): u8 {
-     var $t1: u8
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: u64
-     # live vars: $t0
-  0: $t2 := 0
-     # live vars: $t0, $t2
-  1: if ($t0) goto 2 else goto 7
-     # live vars: $t2
-  2: label L0
-     # live vars: $t2
-  3: $t4 := 1
-     # live vars: $t2, $t4
-  4: $t3 := +($t2, $t4)
-     # live vars: $t3
-  5: $t2 := infer($t3)
+fun M::t0() {
      # live vars:
-  6: goto 11
-     # live vars: $t2
-  7: label L1
-     # live vars: $t2
-  8: $t6 := 2
-     # live vars: $t2, $t6
-  9: $t5 := +($t2, $t6)
-     # live vars: $t5
- 10: $t2 := infer($t5)
-     # live vars:
- 11: label L2
-     # live vars:
- 12: $t1 := 42
-     # live vars: $t1
- 13: return $t1
+  0: return ()
 }
 
 
 [variant baseline]
-fun test::foo($t0: u8, $t1: u8) {
+fun M::t1() {
+     var $t0: u64
+     var $t1: u64
+     # live vars:
+  0: $t0 := 0
+     # live vars:
+  1: $t1 := 0
+     # live vars: $t1
+  2: $t0 := infer($t1)
+     # live vars:
+  3: return ()
+}
+
+
+[variant baseline]
+fun M::t2($t0: bool) {
+     # live vars: $t0
+  0: if ($t0) goto 1 else goto 3
+     # live vars:
+  1: label L0
+     # live vars:
+  2: goto 4
+     # live vars:
+  3: label L1
+     # live vars:
+  4: label L2
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun M::t3($t0: bool) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t1 := 0
+     # live vars: $t0, $t1
+  1: $t2 := infer($t1)
+     # live vars: $t0
+  2: if ($t0) goto 3 else goto 7
+     # live vars:
+  3: label L0
+     # live vars:
+  4: $t3 := 0
+     # live vars: $t3
+  5: $t1 := infer($t3)
+     # live vars:
+  6: goto 8
+     # live vars:
+  7: label L1
+     # live vars:
+  8: label L2
+     # live vars:
+  9: return ()
+}
+
+
+[variant baseline]
+fun M::t4($t0: bool) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t1 := 0
+     # live vars: $t0
+  1: if ($t0) goto 2 else goto 6
+     # live vars:
+  2: label L0
+     # live vars:
+  3: $t2 := 1
+     # live vars: $t2
+  4: $t1 := infer($t2)
+     # live vars:
+  5: goto 9
+     # live vars:
+  6: label L1
+     # live vars:
+  7: $t3 := 2
+     # live vars: $t3
+  8: $t1 := infer($t3)
+     # live vars:
+  9: label L2
+     # live vars:
+ 10: return ()
+}
+
+
+[variant baseline]
+fun M::t5($t0: bool) {
+     var $t1: u64
      var $t2: u64
      var $t3: u64
      var $t4: u64
-     var $t5: u8
-     var $t6: bool
+     # live vars: $t0
+  0: label L0
+     # live vars: $t0
+  1: if ($t0) goto 2 else goto 14
+     # live vars: $t0
+  2: label L2
+     # live vars: $t0
+  3: $t2 := 0
+     # live vars: $t0, $t2
+  4: $t1 := infer($t2)
      # live vars: $t0, $t1
-  0: $t2 := 0
-     # live vars: $t2
-  1: $t4 := 1
-     # live vars: $t2, $t4
-  2: $t3 := +($t2, $t4)
-     # live vars: $t3
-  3: $t2 := infer($t3)
+  5: if ($t0) goto 6 else goto 9
+     # live vars: $t0, $t1
+  6: label L5
+     # live vars: $t0, $t1
+  7: $t3 := infer($t1)
+     # live vars: $t0
+  8: goto 10
+     # live vars: $t0, $t1
+  9: label L6
+     # live vars: $t0
+ 10: label L7
+     # live vars: $t0
+ 11: $t4 := 1
+     # live vars: $t0, $t4
+ 12: $t1 := infer($t4)
+     # live vars: $t0
+ 13: goto 16
+     # live vars: $t0
+ 14: label L3
      # live vars:
-  4: $t6 := false
-     # live vars: $t6
-  5: $t5 := test::bar($t6)
+ 15: goto 18
+     # live vars: $t0
+ 16: label L4
+     # live vars: $t0
+ 17: goto 0
      # live vars:
-  6: return ()
+ 18: label L1
+     # live vars:
+ 19: return ()
 }
 
 
 Diagnostics:
 warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
-  ┌─ tests/unused-assignment/unused_assignment.move:4:9
-  │
-4 │         x = x + 1;
-  │         ^^^^^^^^^
-
-warning: Unused assignment to `w`. Consider removing or prefixing with an underscore: `_w`
   ┌─ tests/unused-assignment/unused_assignment.move:7:17
   │
-7 │         let w = bar(false);
-  │                 ^^^^^^^^^^
+7 │         let x = 0;
+  │                 ^
 
-warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
-   ┌─ tests/unused-assignment/unused_assignment.move:13:13
-   │
-13 │             y = y + 1;
-   │             ^^^^^^^^^
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/unused-assignment/unused_assignment.move:8:9
+  │
+8 │         x = 0;
+  │         ^^^^^
 
-warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
-   ┌─ tests/unused-assignment/unused_assignment.move:15:13
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/unused-assignment/unused_assignment.move:21:13
    │
-15 │             y = y + 2;
-   │             ^^^^^^^^^
+21 │             x = 0;
+   │             ^^^^^
+
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/unused-assignment/unused_assignment.move:26:17
+   │
+26 │         let x = 0;
+   │                 ^
+
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/unused-assignment/unused_assignment.move:28:13
+   │
+28 │             x = 1;
+   │             ^^^^^
+
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/unused-assignment/unused_assignment.move:30:13
+   │
+30 │             x = 2;
+   │             ^^^^^
+
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/unused-assignment/unused_assignment.move:41:13
+   │
+41 │             x = 1;
+   │             ^^^^^

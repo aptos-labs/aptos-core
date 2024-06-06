@@ -14,7 +14,7 @@ fun m::test(): u64 {
 
 
 Diagnostics:
-warning: Unused assignment to x. Consider removing or prefixing with an underscore: `_x`
+warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
   ┌─ tests/variable-coalescing/multi_assigns.move:3:17
   │
 3 │         let x = 1;

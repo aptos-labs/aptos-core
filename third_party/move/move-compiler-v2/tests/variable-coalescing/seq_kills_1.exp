@@ -20,7 +20,7 @@ fun m::test($t0: u64): bool {
 
 
 Diagnostics:
-warning: Unused assignment to b. Consider removing or prefixing with an underscore: `_b`
+warning: Unused assignment to `b`. Consider removing or prefixing with an underscore: `_b`
   ┌─ tests/variable-coalescing/seq_kills_1.move:7:9
   │
 7 │         b = p + 1; // kill b := a, which removes the whole copy chain

@@ -43,7 +43,7 @@ public fun m::test(): u8 {
 
 
 Diagnostics:
-warning: Unused assignment to q. Consider removing or prefixing with an underscore: `_q`
+warning: Unused assignment to `q`. Consider removing or prefixing with an underscore: `_q`
   ┌─ tests/bytecode-generator/wildcard7.move:6:13
   │
 6 │         let (_, q) = (x, z);

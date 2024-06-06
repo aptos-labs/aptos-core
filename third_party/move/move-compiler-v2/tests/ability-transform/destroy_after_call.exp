@@ -56,7 +56,7 @@ fun m::g() {
 
 
 Diagnostics:
-warning: Unused assignment to r. Consider removing or prefixing with an underscore: `_r`
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
   ┌─ tests/ability-transform/destroy_after_call.move:8:9
   │
 8 │         r = f(r);
