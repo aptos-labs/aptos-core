@@ -354,6 +354,9 @@ impl AptosDB {
         sharded_state_cache: Option<&ShardedStateCache>,
         skip_index_and_usage: bool,
     ) -> Result<()> {
+        if txns_to_commit.is_empty() {
+            return Ok(());
+        }
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_state_kv_and_ledger_metadata"])
             .start_timer();

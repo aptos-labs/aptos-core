@@ -23,11 +23,14 @@ use aptos_executor_types::{
     BlockExecutorTrait, ExecutorError, ExecutorResult, StateComputeResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_infallible::RwLock;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
+    async_proof_fetcher::AsyncProofFetcher,
+    cached_state_view::{CachedStateView, ShardedStateCache},
+    state_delta::StateDelta,
+    DbReaderWriter,
 };
 use aptos_types::{
     block_executor::{
@@ -35,7 +38,7 @@ use aptos_types::{
         partitioner::{ExecutableBlock, ExecutableTransactions},
     },
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_value::StateValue, StateViewId},
+    state_store::{create_empty_sharded_state_updates, state_value::StateValue, StateViewId},
 };
 use aptos_vm::AptosVM;
 use fail::fail_point;
@@ -62,6 +65,7 @@ impl TransactionBlockExecutor for AptosVM {
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
     inner: RwLock<Option<BlockExecutorInner<V>>>,
+    commit_lock: Mutex<()>,
 }
 
 impl<V> BlockExecutor<V>
@@ -72,6 +76,7 @@ where
         Self {
             db,
             inner: RwLock::new(None),
+            commit_lock: Mutex::new(()),
         }
     }
 
@@ -142,11 +147,30 @@ where
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> ExecutorResult<()> {
+        let _lock = self.commit_lock.lock();
         self.inner
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
             .commit_blocks(block_ids, ledger_info_with_sigs)
+    }
+
+    fn pre_commit(&self, block_id: HashValue, parent_block_id: HashValue) -> ExecutorResult<()> {
+        let _lock = self.commit_lock.lock();
+        self.maybe_initialize()?;
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .pre_commit(block_id, parent_block_id)
+    }
+
+    fn latest_synced_version(&self) -> u64 {
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .latest_synced_version()
     }
 
     fn finish(&self) {
@@ -341,7 +365,7 @@ where
         }
 
         // Check for any potential retries
-        let mut committed_block = self.block_tree.root_block();
+        let committed_block = self.block_tree.root_block();
         if committed_block.num_persisted_transactions()
             == ledger_info_with_sigs.ledger_info().version() + 1
         {
@@ -352,7 +376,7 @@ where
         let block_id_to_commit = ledger_info_with_sigs.ledger_info().consensus_block_id();
         info!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id_to_commit),
-            "commit_block"
+            "commit_ledger"
         );
         let last_block_id = *block_ids.last().unwrap();
         if last_block_id != block_id_to_commit {
@@ -365,7 +389,7 @@ where
 
         let blocks = self.block_tree.get_blocks(&block_ids)?;
 
-        let mut first_version = committed_block
+        let first_version = committed_block
             .output
             .get_ledger_update()
             .txn_accumulator()
@@ -386,40 +410,87 @@ where
         fail_point!("executor::commit_blocks", |_| {
             Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
         });
-
-        for (i, block) in blocks.iter().enumerate() {
-            let txns_to_commit = block.output.get_ledger_update().transactions_to_commit();
-
-            let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
-            APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
-
-            let result_in_memory_state = block.output.state().clone();
+        // only write the last ledger down
+        if self.db.reader.get_synced_version()? == Some(target_version) {
             self.db.writer.save_transactions(
-                txns_to_commit,
-                first_version,
-                committed_block.output.state().base_version,
-                if i == blocks.len() - 1 {
-                    Some(&ledger_info_with_sigs)
-                } else {
-                    None
-                },
-                false, // sync_commit
-                result_in_memory_state,
-                // TODO(grao): Avoid this clone.
-                block
-                    .output
-                    .get_ledger_update()
-                    .state_updates_until_last_checkpoint
-                    .clone(),
-                Some(&block.output.get_ledger_update().sharded_state_cache),
+                &[],
+                target_version + 1,
+                Some(target_version),
+                Some(&ledger_info_with_sigs),
+                false,
+                StateDelta::new_with_version(target_version, target_version),
+                Some(create_empty_sharded_state_updates()),
+                Some(&ShardedStateCache::default()),
             )?;
-            first_version += txns_to_commit.len() as u64;
-            committed_block = block.clone();
         }
+
         self.block_tree
             .prune(ledger_info_with_sigs.ledger_info())
             .expect("Failure pruning block tree.");
 
         Ok(())
+    }
+
+    fn pre_commit(
+        &self,
+        block_id_to_commit: HashValue,
+        parent_block_id: HashValue,
+    ) -> ExecutorResult<()> {
+        let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
+
+        let parent_block = self
+            .block_tree
+            .get_blocks(&[parent_block_id])?
+            .pop()
+            .ok_or(ExecutorError::BlockNotFound(parent_block_id))?;
+        info!(
+            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id_to_commit),
+            "pre_commit_block"
+        );
+
+        let block = self
+            .block_tree
+            .get_blocks(&[block_id_to_commit])?
+            .pop()
+            .ok_or(ExecutorError::BlockNotFound(block_id_to_commit))?;
+
+        let first_version = parent_block
+            .output
+            .get_ledger_update()
+            .txn_accumulator()
+            .num_leaves();
+
+        let to_commit: usize = block.output.get_ledger_update().to_commit.len();
+        fail_point!("executor::commit_blocks", |_| {
+            Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
+        });
+
+        let txns_to_commit = block.output.get_ledger_update().transactions_to_commit();
+
+        let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
+        APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
+
+        let result_in_memory_state = block.output.state().clone();
+        self.db.writer.save_transactions(
+            txns_to_commit,
+            first_version,
+            parent_block.output.state().base_version,
+            None,
+            false,
+            result_in_memory_state,
+            // TODO(grao): Avoid this clone.
+            block
+                .output
+                .get_ledger_update()
+                .state_updates_until_last_checkpoint
+                .clone(),
+            Some(&block.output.get_ledger_update().sharded_state_cache),
+        )?;
+
+        Ok(())
+    }
+
+    fn latest_synced_version(&self) -> u64 {
+        self.db.reader.ensure_synced_version().unwrap()
     }
 }
