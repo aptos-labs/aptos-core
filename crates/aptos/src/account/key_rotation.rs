@@ -256,13 +256,13 @@ impl CliCommand<RotateSummary> for RotateKey {
 
         if let Some(txn_success) = txn_summary.success {
             if !txn_success {
-                eprintln!("{}", string);
+                eprintln!("{}", txn_string);
                 return Err(CliError::ApiError(
                     "Transaction was not executed successfully".to_string(),
                 ));
             }
         } else {
-            eprintln!("{}", string);
+            eprintln!("{}", txn_string);
             return Err(CliError::UnexpectedError(
                 "Malformed transaction response".to_string(),
             ));
