@@ -15,6 +15,7 @@ use aptos_forge::{
 use aptos_logger::info;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_types::PeerId;
+use async_trait::async_trait;
 use itertools::{EitherOrBoth, Itertools};
 use rand::{
     rngs::{OsRng, StdRng},
@@ -124,9 +125,10 @@ impl Test for PFNPerformance {
     }
 }
 
+#[async_trait]
 impl NetworkTest for PFNPerformance {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }
 

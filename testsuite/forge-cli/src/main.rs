@@ -60,6 +60,7 @@ use aptos_testcases::{
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
 };
+use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::Lazy;
@@ -2658,19 +2659,18 @@ impl Test for RestartValidator {
     }
 }
 
+#[async_trait]
 impl NetworkTest for RestartValidator {
-    fn run(&self, ctxa: NetworkContextSynchronizer) -> Result<()> {
-        ctxa.handle.clone().block_on(async {
-            let mut ctx_locker = ctxa.ctx.lock().await;
-            let ctx = ctx_locker.deref_mut();
-            let node = ctx.swarm().validators_mut().next().unwrap();
-            node.health_check().await.expect("node health check failed");
-            node.stop().await.unwrap();
-            println!("Restarting node {}", node.peer_id());
-            node.start().await.unwrap();
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            node.health_check().await.expect("node health check failed");
-        });
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
+        let node = ctx.swarm().validators_mut().next().unwrap();
+        node.health_check().await.expect("node health check failed");
+        node.stop().await.unwrap();
+        println!("Restarting node {}", node.peer_id());
+        node.start().await.unwrap();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        node.health_check().await.expect("node health check failed");
         Ok(())
     }
 }
@@ -2684,23 +2684,21 @@ impl Test for EmitTransaction {
     }
 }
 
+#[async_trait]
 impl NetworkTest for EmitTransaction {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        let handle = ctx.handle.clone();
-        handle.block_on(async {
-            let mut ctx_locker = ctx.ctx.lock().await;
-            let ctx = ctx_locker.deref_mut();
-            let duration = Duration::from_secs(10);
-            let all_validators = ctx
-                .swarm()
-                .validators()
-                .map(|v| v.peer_id())
-                .collect::<Vec<_>>();
-            let stats = generate_traffic(ctx, &all_validators, duration)
-                .await
-                .unwrap();
-            ctx.report.report_txn_stats(self.name().to_string(), &stats);
-        });
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
+        let duration = Duration::from_secs(10);
+        let all_validators = ctx
+            .swarm()
+            .validators()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>();
+        let stats = generate_traffic(ctx, &all_validators, duration)
+            .await
+            .unwrap();
+        ctx.report.report_txn_stats(self.name().to_string(), &stats);
         Ok(())
     }
 }
@@ -2722,10 +2720,11 @@ impl Test for Delay {
     }
 }
 
+#[async_trait]
 impl NetworkTest for Delay {
-    fn run(&self, _ctx: NetworkContextSynchronizer) -> Result<()> {
+    async fn run<'a>(&self, _ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         info!("forge sleep {}", self.seconds);
-        std::thread::sleep(Duration::from_secs(self.seconds));
+        tokio::time::sleep(Duration::from_secs(self.seconds)).await;
         Ok(())
     }
 }
@@ -2739,13 +2738,12 @@ impl Test for GatherMetrics {
     }
 }
 
+#[async_trait]
 impl NetworkTest for GatherMetrics {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        ctx.handle.clone().block_on(async {
-            let mut ctx_locker = ctx.ctx.lock().await;
-            let ctx = ctx_locker.deref_mut();
-            gather_metrics_one(ctx).await;
-        });
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
+        gather_metrics_one(ctx).await;
         Ok(())
     }
 }

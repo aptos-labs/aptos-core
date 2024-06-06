@@ -7,6 +7,7 @@ use aptos_forge::{
     NetworkTest, Swarm, SwarmChaos, SwarmNetworkBandwidth, SwarmNetworkDelay, Test,
 };
 use aptos_logger::info;
+use async_trait::async_trait;
 
 /// Represents a test that simulates a network with 3 regions, all in the same cloud.
 pub struct ThreeRegionSameCloudSimulationTest;
@@ -103,8 +104,9 @@ impl NetworkLoadTest for ThreeRegionSameCloudSimulationTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for ThreeRegionSameCloudSimulationTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

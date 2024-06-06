@@ -10,6 +10,7 @@ use aptos_forge::{
 };
 use aptos_logger::info;
 use aptos_sdk::move_types::account_address::AccountAddress;
+use async_trait::async_trait;
 use std::{ops::DerefMut, time::Instant};
 use tokio::{runtime::Runtime, time::Duration};
 
@@ -21,8 +22,15 @@ const NUM_STATE_VALUE_COUNTER_NAME: &str = "aptos_jellyfish_leaf_count"; // The 
 /// In the test, all fullnodes are wiped, restarted and timed to synchronize.
 pub struct StateSyncFullnodePerformance;
 
-impl StateSyncFullnodePerformance {
-    async fn async_run(&self, ctx: NetworkContextSynchronizer<'_>) -> Result<()> {
+impl Test for StateSyncFullnodePerformance {
+    fn name(&self) -> &'static str {
+        "StateSyncFullnodePerformance"
+    }
+}
+
+#[async_trait]
+impl NetworkTest for StateSyncFullnodePerformance {
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         let mut ctx_locker = ctx.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
         let all_fullnodes = get_fullnodes_and_check_setup(ctx, self.name())?;
@@ -39,24 +47,19 @@ impl StateSyncFullnodePerformance {
     }
 }
 
-impl Test for StateSyncFullnodePerformance {
-    fn name(&self) -> &'static str {
-        "StateSyncFullnodePerformance"
-    }
-}
-
-impl NetworkTest for StateSyncFullnodePerformance {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        ctx.handle.clone().block_on(self.async_run(ctx))
-    }
-}
-
 /// A state sync performance test that measures fast sync performance.
 /// In the test, all fullnodes are wiped, restarted and timed to synchronize.
 pub struct StateSyncFullnodeFastSyncPerformance;
 
-impl StateSyncFullnodeFastSyncPerformance {
-    async fn async_run(&self, ctxa: NetworkContextSynchronizer<'_>) -> Result<()> {
+impl Test for StateSyncFullnodeFastSyncPerformance {
+    fn name(&self) -> &'static str {
+        "StateSyncFullnodeFastSyncPerformance"
+    }
+}
+
+#[async_trait]
+impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
+    async fn run<'a>(&self, ctxa: NetworkContextSynchronizer<'a>) -> Result<()> {
         let mut ctx_locker = ctxa.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
         let all_fullnodes = get_fullnodes_and_check_setup(ctx, self.name())?;
@@ -123,24 +126,19 @@ impl StateSyncFullnodeFastSyncPerformance {
     }
 }
 
-impl Test for StateSyncFullnodeFastSyncPerformance {
-    fn name(&self) -> &'static str {
-        "StateSyncFullnodeFastSyncPerformance"
-    }
-}
-
-impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
-    fn run(&self, ctxa: NetworkContextSynchronizer) -> Result<()> {
-        ctxa.handle.clone().block_on(self.async_run(ctxa))
-    }
-}
-
 /// A state sync performance test that measures validator sync performance.
 /// In the test, 2 validators are wiped, restarted and timed to synchronize.
 pub struct StateSyncValidatorPerformance;
 
-impl StateSyncValidatorPerformance {
-    async fn async_run(&self, ctxa: NetworkContextSynchronizer<'_>) -> Result<()> {
+impl Test for StateSyncValidatorPerformance {
+    fn name(&self) -> &'static str {
+        "StateSyncValidatorPerformance"
+    }
+}
+
+#[async_trait]
+impl NetworkTest for StateSyncValidatorPerformance {
+    async fn run<'a>(&self, ctxa: NetworkContextSynchronizer<'a>) -> Result<()> {
         let mut ctx_locker = ctxa.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
         // Verify we have at least 7 validators (i.e., 3f+1, where f is 2)
@@ -177,18 +175,6 @@ impl StateSyncValidatorPerformance {
         // Wait for all nodes to catch up to the highest synced version
         // then calculate and display the throughput results.
         ensure_state_sync_transaction_throughput(ctx, self.name())
-    }
-}
-
-impl Test for StateSyncValidatorPerformance {
-    fn name(&self) -> &'static str {
-        "StateSyncValidatorPerformance"
-    }
-}
-
-impl NetworkTest for StateSyncValidatorPerformance {
-    fn run(&self, ctxa: NetworkContextSynchronizer) -> Result<()> {
-        ctxa.handle.clone().block_on(self.async_run(ctxa))
     }
 }
 

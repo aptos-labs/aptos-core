@@ -11,6 +11,7 @@ use aptos_forge::{
 use aptos_logger::info;
 // use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_sdk::types::{LocalAccount, PeerId};
+use async_trait::async_trait;
 use rand::SeedableRng;
 use std::{
     ops::DerefMut,
@@ -193,17 +194,9 @@ fn upgrade_and_gather_stats(
     stats_result
 }
 
+#[async_trait]
 impl NetworkTest for SimpleValidatorUpgrade {
-    fn run(&self, ctxa: NetworkContextSynchronizer) -> Result<()> {
-        let handle = ctxa.handle.clone();
-        handle.block_on(self.async_run(ctxa))
-    }
-}
-
-impl SimpleValidatorUpgrade {
-    async fn async_run(&self, ctxa: NetworkContextSynchronizer<'_>) -> Result<()> {
-        // let runtime = Runtime::new()?;
-        // let traffic_runtime = traffic_emitter_runtime()?;
+    async fn run<'a>(&self, ctxa: NetworkContextSynchronizer<'a>) -> Result<()> {
         let upgrade_wait_for_healthy = true;
         let upgrade_node_delay = Duration::from_secs(10);
         let upgrade_max_wait = Duration::from_secs(40);

@@ -12,6 +12,7 @@ use aptos_logger::info;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_temppath::TempPath;
 use aptos_types::transaction::authenticator::AuthenticationKey;
+use async_trait::async_trait;
 use std::ops::DerefMut;
 use tokio::{runtime::Runtime, time::Duration};
 
@@ -19,8 +20,17 @@ pub struct FrameworkUpgrade;
 
 impl FrameworkUpgrade {
     pub const EPOCH_DURATION_SECS: u64 = 10;
+}
 
-    async fn async_run(&self, ctx: NetworkContextSynchronizer<'_>) -> Result<()> {
+impl Test for FrameworkUpgrade {
+    fn name(&self) -> &'static str {
+        "framework_upgrade::framework-upgrade"
+    }
+}
+
+#[async_trait]
+impl NetworkTest for FrameworkUpgrade {
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         let mut ctx_locker = ctx.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
         let runtime = Runtime::new()?;
@@ -164,17 +174,5 @@ impl FrameworkUpgrade {
         ctx.swarm().fork_check(epoch_duration)?;
 
         Ok(())
-    }
-}
-
-impl Test for FrameworkUpgrade {
-    fn name(&self) -> &'static str {
-        "framework_upgrade::framework-upgrade"
-    }
-}
-
-impl NetworkTest for FrameworkUpgrade {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        ctx.handle.clone().block_on(self.async_run(ctx))
     }
 }

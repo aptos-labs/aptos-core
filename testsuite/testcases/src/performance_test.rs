@@ -4,6 +4,7 @@
 
 use crate::NetworkLoadTest;
 use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, Test};
+use async_trait::async_trait;
 
 pub struct PerformanceBenchmark;
 
@@ -15,8 +16,9 @@ impl Test for PerformanceBenchmark {
 
 impl NetworkLoadTest for PerformanceBenchmark {}
 
+#[async_trait]
 impl NetworkTest for PerformanceBenchmark {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

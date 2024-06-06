@@ -12,6 +12,7 @@ use aptos_keygen::KeyGen;
 use aptos_logger::info;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey};
+use async_trait::async_trait;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
@@ -173,9 +174,10 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for ValidatorJoinLeaveTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }
 

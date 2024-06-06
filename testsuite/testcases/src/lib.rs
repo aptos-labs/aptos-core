@@ -35,6 +35,7 @@ use aptos_forge::{
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
+use async_trait::async_trait;
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
@@ -227,92 +228,84 @@ pub trait NetworkLoadTest: Test {
     }
 }
 
-async fn async_run_network_load_test(
-    nlt: &dyn NetworkLoadTest,
-    ctx: NetworkContextSynchronizer<'_>,
-) -> Result<()> {
-    let mut ctx_locker = ctx.ctx.lock().await;
-    let ctx = ctx_locker.deref_mut();
-    let runtime = Runtime::new().unwrap();
-    let start_timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs();
-    let (start_version, _) = runtime
-        .block_on(ctx.swarm().get_client_with_newest_ledger_version())
-        .context("no clients replied for start version")?;
-    let emit_job_request = ctx.emit_job.clone();
-    let rng = SeedableRng::from_rng(ctx.core().rng())?;
-    let duration = ctx.global_duration;
-    let stats_by_phase = nlt.network_load_test(
-        ctx,
-        emit_job_request,
-        duration,
-        WARMUP_DURATION_FRACTION,
-        COOLDOWN_DURATION_FRACTION,
-        rng,
-    )?;
-
-    let phased = stats_by_phase.len() > 1;
-    for (phase, phase_stats) in stats_by_phase.iter().enumerate() {
-        let test_name = if phased {
-            format!("{}_phase_{}", nlt.name(), phase)
-        } else {
-            nlt.name().to_string()
-        };
-        ctx.report
-            .report_txn_stats(test_name, &phase_stats.emitter_stats);
-        ctx.report.report_text(format!(
-            "Latency breakdown for phase {}: {:?}",
-            phase,
-            phase_stats
-                .latency_breakdown
-                .keys()
-                .into_iter()
-                .map(|slice| {
-                    let slice_samples = phase_stats.latency_breakdown.get_samples(&slice);
-                    format!(
-                        "{:?}: max: {:.3}, avg: {:.3}",
-                        slice,
-                        slice_samples.max_sample(),
-                        slice_samples.avg_sample()
-                    )
-                })
-                .collect::<Vec<_>>()
-        ));
-    }
-
-    let end_timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs();
-    let (end_version, _) = runtime
-        .block_on(ctx.swarm().get_client_with_newest_ledger_version())
-        .context("no clients replied for end version")?;
-
-    nlt.finish(ctx).context("finish NetworkLoadTest ")?;
-
-    for phase_stats in stats_by_phase.into_iter() {
-        ctx.check_for_success(
-            &phase_stats.emitter_stats,
-            phase_stats.actual_duration,
-            &phase_stats.latency_breakdown,
-            start_timestamp as i64,
-            end_timestamp as i64,
-            start_version,
-            end_version,
-        )
-        .context("check for success")?;
-    }
-
-    Ok(())
-}
-
+#[async_trait]
 impl NetworkTest for dyn NetworkLoadTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        ctx.handle
-            .clone()
-            .block_on(async_run_network_load_test(self, ctx))
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
+        let runtime = Runtime::new().unwrap();
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        let (start_version, _) = runtime
+            .block_on(ctx.swarm().get_client_with_newest_ledger_version())
+            .context("no clients replied for start version")?;
+        let emit_job_request = ctx.emit_job.clone();
+        let rng = SeedableRng::from_rng(ctx.core().rng())?;
+        let duration = ctx.global_duration;
+        let stats_by_phase = self.network_load_test(
+            ctx,
+            emit_job_request,
+            duration,
+            WARMUP_DURATION_FRACTION,
+            COOLDOWN_DURATION_FRACTION,
+            rng,
+        )?;
+
+        let phased = stats_by_phase.len() > 1;
+        for (phase, phase_stats) in stats_by_phase.iter().enumerate() {
+            let test_name = if phased {
+                format!("{}_phase_{}", self.name(), phase)
+            } else {
+                self.name().to_string()
+            };
+            ctx.report
+                .report_txn_stats(test_name, &phase_stats.emitter_stats);
+            ctx.report.report_text(format!(
+                "Latency breakdown for phase {}: {:?}",
+                phase,
+                phase_stats
+                    .latency_breakdown
+                    .keys()
+                    .into_iter()
+                    .map(|slice| {
+                        let slice_samples = phase_stats.latency_breakdown.get_samples(&slice);
+                        format!(
+                            "{:?}: max: {:.3}, avg: {:.3}",
+                            slice,
+                            slice_samples.max_sample(),
+                            slice_samples.avg_sample()
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            ));
+        }
+
+        let end_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        let (end_version, _) = runtime
+            .block_on(ctx.swarm().get_client_with_newest_ledger_version())
+            .context("no clients replied for end version")?;
+
+        self.finish(ctx).context("finish NetworkLoadTest ")?;
+
+        for phase_stats in stats_by_phase.into_iter() {
+            ctx.check_for_success(
+                &phase_stats.emitter_stats,
+                phase_stats.actual_duration,
+                &phase_stats.latency_breakdown,
+                start_timestamp as i64,
+                end_timestamp as i64,
+                start_version,
+                end_version,
+            )
+            .context("check for success")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -563,8 +556,11 @@ impl CompositeNetworkTest {
             test: Box::new(test),
         }
     }
+}
 
-    async fn async_run(&self, ctxa: NetworkContextSynchronizer<'_>) -> Result<()> {
+#[async_trait]
+impl NetworkTest for CompositeNetworkTest {
+    async fn run<'a>(&self, ctxa: NetworkContextSynchronizer<'a>) -> Result<()> {
         {
             let mut ctx_locker = ctxa.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();
@@ -572,7 +568,7 @@ impl CompositeNetworkTest {
                 wrapper.setup(ctx)?;
             }
         }
-        self.test.run(ctxa.clone())?;
+        self.test.run(ctxa.clone()).await?;
         {
             let mut ctx_locker = ctxa.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();
@@ -581,12 +577,6 @@ impl CompositeNetworkTest {
             }
         }
         Ok(())
-    }
-}
-
-impl NetworkTest for CompositeNetworkTest {
-    fn run(&self, ctxa: NetworkContextSynchronizer) -> Result<()> {
-        ctxa.handle.clone().block_on(self.async_run(ctxa))
     }
 }
 

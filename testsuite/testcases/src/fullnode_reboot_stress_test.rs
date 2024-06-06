@@ -5,6 +5,7 @@ use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{
     NetworkContext, NetworkContextSynchronizer, NetworkTest, Result, Swarm, Test, TestReport,
 };
+use async_trait::async_trait;
 use rand::{seq::SliceRandom, thread_rng};
 use std::time::Duration;
 use tokio::{runtime::Runtime, time::Instant};
@@ -48,8 +49,9 @@ impl NetworkLoadTest for FullNodeRebootStressTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for FullNodeRebootStressTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

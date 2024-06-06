@@ -8,6 +8,7 @@ use aptos_forge::{
 };
 use aptos_logger::info;
 use aptos_types::PeerId;
+use async_trait::async_trait;
 use rand::Rng;
 use tokio::runtime::Runtime;
 
@@ -102,9 +103,10 @@ impl NetworkLoadTest for ExecutionDelayTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for ExecutionDelayTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }
 
@@ -187,9 +189,10 @@ impl NetworkLoadTest for NetworkUnreliabilityTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for NetworkUnreliabilityTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }
 
@@ -302,8 +305,9 @@ impl NetworkLoadTest for CpuChaosTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for CpuChaosTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

@@ -3871,6 +3871,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "assert_approx_eq",
+ "async-trait",
  "bcs 0.1.4",
  "csv",
  "futures",

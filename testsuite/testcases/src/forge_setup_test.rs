@@ -6,6 +6,7 @@ use anyhow::Context;
 use aptos_config::config::OverrideNodeConfig;
 use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, Test};
 use aptos_logger::info;
+use async_trait::async_trait;
 use rand::{
     rngs::{OsRng, StdRng},
     seq::IteratorRandom,
@@ -18,8 +19,15 @@ const STATE_SYNC_VERSION_COUNTER_NAME: &str = "aptos_state_sync_version";
 
 pub struct ForgeSetupTest;
 
-impl ForgeSetupTest {
-    async fn async_run(&self, ctx: NetworkContextSynchronizer<'_>) -> Result<()> {
+impl Test for ForgeSetupTest {
+    fn name(&self) -> &'static str {
+        "verify_forge_setup"
+    }
+}
+
+#[async_trait]
+impl NetworkTest for ForgeSetupTest {
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         let mut rng = StdRng::from_seed(OsRng.gen());
         let runtime = Runtime::new().unwrap();
         let mut ctx_locker = ctx.ctx.lock().await;
@@ -77,17 +85,5 @@ impl ForgeSetupTest {
             .report_txn_stats(self.name().to_string(), &txn_stat);
 
         Ok(())
-    }
-}
-
-impl Test for ForgeSetupTest {
-    fn name(&self) -> &'static str {
-        "verify_forge_setup"
-    }
-}
-
-impl NetworkTest for ForgeSetupTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        ctx.handle.clone().block_on(self.async_run(ctx))
     }
 }

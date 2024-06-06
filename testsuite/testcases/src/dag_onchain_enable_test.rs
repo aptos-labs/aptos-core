@@ -13,6 +13,7 @@ use aptos_types::{
         ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, ValidatorTxnConfig,
     },
 };
+use async_trait::async_trait;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
@@ -209,8 +210,9 @@ impl NetworkLoadTest for DagOnChainEnableTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for DagOnChainEnableTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

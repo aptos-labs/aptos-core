@@ -5,6 +5,7 @@ use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{
     NetworkContext, NetworkContextSynchronizer, NetworkTest, SwarmChaos, SwarmNetworkLoss, Test,
 };
+use async_trait::async_trait;
 
 /// This is deprecated. Use [crate::multi_region_network_test::MultiRegionNetworkEmulationTest] instead
 pub struct NetworkLossTest;
@@ -46,8 +47,9 @@ impl NetworkLoadTest for NetworkLossTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for NetworkLossTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

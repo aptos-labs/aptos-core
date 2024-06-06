@@ -4,6 +4,7 @@
 
 use anyhow::anyhow;
 use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, Test};
+use async_trait::async_trait;
 
 pub struct ReconfigurationTest;
 
@@ -13,8 +14,9 @@ impl Test for ReconfigurationTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for ReconfigurationTest {
-    fn run(&self, _ctx: NetworkContextSynchronizer) -> Result<()> {
+    async fn run<'a>(&self, _ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         Err(anyhow!("Not supported in aptos-framework yet"))
     }
     // TODO(https://github.com/aptos-labs/aptos-core/issues/317): add back after support those transactions in aptos-framework

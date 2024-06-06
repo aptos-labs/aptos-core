@@ -6,6 +6,7 @@ use aptos_forge::{
     GroupNetworkBandwidth, NetworkContext, NetworkContextSynchronizer, NetworkTest, SwarmChaos,
     SwarmNetworkBandwidth, Test,
 };
+use async_trait::async_trait;
 
 /// This is deprecated. Use [crate::multi_region_network_test::MultiRegionNetworkEmulationTest] instead
 pub struct NetworkBandwidthTest;
@@ -66,8 +67,9 @@ impl NetworkLoadTest for NetworkBandwidthTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for NetworkBandwidthTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

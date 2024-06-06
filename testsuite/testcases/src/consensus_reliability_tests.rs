@@ -11,6 +11,7 @@ use aptos_forge::{
     TestReport,
 };
 use aptos_logger::{info, warn};
+use async_trait::async_trait;
 use rand::Rng;
 use std::{collections::HashSet, time::Duration};
 use tokio::runtime::Runtime;
@@ -296,8 +297,9 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for ChangingWorkingQuorumTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

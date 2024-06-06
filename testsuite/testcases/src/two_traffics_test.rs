@@ -9,6 +9,7 @@ use aptos_forge::{
     EmitJobRequest, NetworkContextSynchronizer, NetworkTest, Result, Swarm, Test, TestReport,
 };
 use aptos_logger::info;
+use async_trait::async_trait;
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::time::{Duration, Instant};
 
@@ -77,8 +78,9 @@ impl NetworkLoadTest for TwoTrafficsTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for TwoTrafficsTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

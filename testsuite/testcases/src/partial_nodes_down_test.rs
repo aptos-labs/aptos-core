@@ -4,6 +4,7 @@
 
 use crate::generate_traffic;
 use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, Test};
+use async_trait::async_trait;
 use std::{ops::DerefMut, thread};
 use tokio::{runtime::Runtime, time::Duration};
 
@@ -15,8 +16,9 @@ impl Test for PartialNodesDown {
     }
 }
 
-impl PartialNodesDown {
-    async fn async_run(&self, ctx: NetworkContextSynchronizer<'_>) -> Result<()> {
+#[async_trait]
+impl NetworkTest for PartialNodesDown {
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         let mut ctx_locker = ctx.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
         let runtime = Runtime::new()?;
@@ -46,11 +48,5 @@ impl PartialNodesDown {
         }
 
         Ok(())
-    }
-}
-
-impl NetworkTest for PartialNodesDown {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        ctx.handle.clone().block_on(self.async_run(ctx))
     }
 }

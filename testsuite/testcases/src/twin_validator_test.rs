@@ -5,6 +5,7 @@ use crate::NetworkLoadTest;
 use anyhow::Context;
 use aptos_forge::{NetworkContextSynchronizer, NetworkTest, NodeExt, Test};
 use aptos_sdk::move_types::account_address::AccountAddress;
+use async_trait::async_trait;
 use std::{
     ops::DerefMut,
     time::{Duration, Instant},
@@ -13,8 +14,17 @@ use tokio::runtime::Runtime;
 
 pub struct TwinValidatorTest;
 
-impl TwinValidatorTest {
-    async fn async_run(&self, ctxa: NetworkContextSynchronizer<'_>) -> anyhow::Result<()> {
+impl Test for TwinValidatorTest {
+    fn name(&self) -> &'static str {
+        "twin validator"
+    }
+}
+
+impl NetworkLoadTest for TwinValidatorTest {}
+
+#[async_trait]
+impl NetworkTest for TwinValidatorTest {
+    async fn run<'a>(&self, ctxa: NetworkContextSynchronizer<'a>) -> anyhow::Result<()> {
         {
             let mut ctx_locker = ctxa.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();
@@ -68,20 +78,6 @@ impl TwinValidatorTest {
                 Ok::<(), anyhow::Error>(())
             })?;
         }
-        <dyn NetworkLoadTest>::run(self, ctxa)
-    }
-}
-
-impl Test for TwinValidatorTest {
-    fn name(&self) -> &'static str {
-        "twin validator"
-    }
-}
-
-impl NetworkLoadTest for TwinValidatorTest {}
-
-impl NetworkTest for TwinValidatorTest {
-    fn run(&self, ctxa: NetworkContextSynchronizer) -> anyhow::Result<()> {
-        ctxa.handle.clone().block_on(self.async_run(ctxa))
+        <dyn NetworkLoadTest>::run(self, ctxa).await
     }
 }

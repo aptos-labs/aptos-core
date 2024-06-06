@@ -35,6 +35,7 @@ rand = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
 tokio-scoped = { workspace = true }
+async-trait = { workspace = true }
 
 [dev-dependencies]
 assert_approx_eq = { workspace = true }

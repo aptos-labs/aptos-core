@@ -11,6 +11,7 @@ use aptos_forge::{
     Test, TxnStats, WorkflowProgress,
 };
 use aptos_logger::info;
+use async_trait::async_trait;
 use rand::SeedableRng;
 use std::{fmt::Debug, ops::DerefMut, time::Duration};
 use tokio::runtime::Runtime;
@@ -212,8 +213,11 @@ impl LoadVsPerfBenchmark {
 
         Ok(result)
     }
+}
 
-    async fn async_run(&self, ctx: NetworkContextSynchronizer<'_>) -> Result<()> {
+#[async_trait]
+impl NetworkTest for LoadVsPerfBenchmark {
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         assert!(
             self.criteria.is_empty() || self.criteria.len() == self.workloads.len(),
             "Invalid config, {} criteria and {} workloads given",
@@ -345,12 +349,6 @@ impl LoadVsPerfBenchmark {
         }
 
         Ok(())
-    }
-}
-
-impl NetworkTest for LoadVsPerfBenchmark {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
-        ctx.handle.clone().block_on(self.async_run(ctx))
     }
 }
 

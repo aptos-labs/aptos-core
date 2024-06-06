@@ -9,15 +9,17 @@ use crate::{
     CoreContext, Result, Swarm, TestReport,
 };
 use aptos_transaction_emitter_lib::{EmitJobRequest, TxnStats};
+use async_trait::async_trait;
 use std::{future::Future, sync::Arc, time::Duration};
 use tokio::runtime::{Handle, Runtime};
 
 /// The testing interface which defines a test written with full control over an existing network.
 /// Tests written against this interface will have access to both the Root account as well as the
 /// nodes which comprise the network.
+#[async_trait]
 pub trait NetworkTest: Test {
     /// Executes the test against the given context.
-    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()>;
+    async fn run<'t>(&self, ctx: NetworkContextSynchronizer<'t>) -> Result<()>;
 }
 
 #[derive(Clone)]

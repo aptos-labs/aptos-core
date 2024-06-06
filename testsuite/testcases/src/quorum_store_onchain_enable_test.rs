@@ -11,6 +11,7 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
 };
+use async_trait::async_trait;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
@@ -111,8 +112,9 @@ impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for QuorumStoreOnChainEnableTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }

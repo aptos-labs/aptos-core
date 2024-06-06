@@ -8,6 +8,7 @@ use aptos_forge::{
 };
 use aptos_logger::info;
 use aptos_types::PeerId;
+use async_trait::async_trait;
 use itertools::{self, EitherOrBoth, Itertools};
 use std::collections::BTreeMap;
 
@@ -329,9 +330,10 @@ impl NetworkLoadTest for MultiRegionNetworkEmulationTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for MultiRegionNetworkEmulationTest {
-    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
-        <dyn NetworkLoadTest>::run(self, ctx)
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
     }
 }
 
