@@ -270,10 +270,8 @@ impl CliTestFramework {
             new_auth_key_options: NewAuthKeyOptions {
                 new_private_key: Some(new_private_key),
                 new_private_key_file: None,
-                new_hardware_wallet_options: HardwareWalletOptions {
-                    derivation_path: None,
-                    derivation_index: None,
-                },
+                new_derivation_path: None,
+                new_derivation_index: None,
             },
             new_profile_options: NewProfileOptions {
                 skip_saving_profile: true,

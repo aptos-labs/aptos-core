@@ -251,18 +251,18 @@ impl CliCommand<RotateSummary> for RotateKey {
             .await
             .map(TransactionSummary::from)?;
 
-        let string = serde_json::to_string_pretty(&txn_summary)
+        let txn_string = serde_json::to_string_pretty(&txn_summary)
             .map_err(|err| CliError::UnableToParse("transaction summary", err.to_string()))?;
-
-        eprintln!("{}", string);
 
         if let Some(txn_success) = txn_summary.success {
             if !txn_success {
+                eprintln!("{}", string);
                 return Err(CliError::ApiError(
                     "Transaction was not executed successfully".to_string(),
                 ));
             }
         } else {
+            eprintln!("{}", string);
             return Err(CliError::UnexpectedError(
                 "Malformed transaction response".to_string(),
             ));
@@ -309,7 +309,7 @@ impl CliCommand<RotateSummary> for RotateKey {
 
         Ok(RotateSummary {
             transaction: txn_summary,
-            message: Some(format!("New profile {} is saved.", new_profile_name)),
+            message: Some(format!("Saved new profile {}", new_profile_name)),
         })
     }
 }
