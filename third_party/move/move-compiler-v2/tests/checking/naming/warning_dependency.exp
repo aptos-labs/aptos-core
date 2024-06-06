@@ -1,0 +1,33 @@
+
+Diagnostics:
+warning: unused alias
+  ┌─ tests/checking/naming/warning_dependency.move:3:21
+  │
+3 │     use 0x42::test::S0;
+  │                     ^^ Unused 'use' of alias 'S0'. Consider removing it
+
+// -- Model dump before bytecode pipeline
+module 0x42::dependency {
+    use 0x42::test::{S0};
+} // end 0x42::dependency
+module 0x42::test {
+    struct S0 {
+        dummy_field: bool,
+    }
+    struct S1 {
+        dummy_field: bool,
+    }
+    struct S2 {
+        f: test::S3<#1>,
+    }
+    struct S3 {
+        dummy_field: bool,
+    }
+    struct S4 {
+        f: vector<#0>,
+    }
+    struct S5 {
+        f: vector<#0>,
+        g: vector<#1>,
+    }
+} // end 0x42::test

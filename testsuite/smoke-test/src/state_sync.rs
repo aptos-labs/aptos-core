@@ -4,16 +4,15 @@
 
 use crate::{
     smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
+    state_sync_utils,
     test_utils::{
         create_test_accounts, execute_transactions, execute_transactions_and_wait,
-        wait_for_all_nodes, MAX_CATCH_UP_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
+        wait_for_all_nodes, MAX_CATCH_UP_WAIT_SECS,
     },
 };
-use aptos_config::config::{
-    BootstrappingMode, ContinuousSyncingMode, NodeConfig, OverrideNodeConfig,
-};
+use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
 use aptos_db::AptosDB;
-use aptos_forge::{LocalNode, LocalSwarm, Node, NodeExt, Swarm};
+use aptos_forge::{LocalNode, LocalSwarm, Node, NodeExt};
 use aptos_inspection_service::inspection_client::InspectionClient;
 use aptos_rest_client::Client as RestClient;
 use aptos_storage_interface::DbReader;
@@ -23,12 +22,8 @@ use aptos_types::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
         ProposerElectionType,
     },
-    PeerId,
 };
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, time::Duration};
 
 // TODO: Go through the existing tests, identify any gaps, and clean up the rest.
 
@@ -60,8 +55,8 @@ async fn test_fullnode_output_sync_epoch_changes() {
     vfn_config.state_sync.aptos_data_client.use_compression = true;
 
     // Create the fullnode and test its ability to sync
-    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
-    test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
+    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
+    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
 }
 
 #[tokio::test]
@@ -80,8 +75,8 @@ async fn test_fullnode_output_sync_no_compression() {
     vfn_config.state_sync.aptos_data_client.use_compression = false;
 
     // Create the fullnode and test its ability to sync
-    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
-    test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
+    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
+    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
 }
 
 #[tokio::test]
@@ -100,8 +95,8 @@ async fn test_fullnode_output_sync_exponential_backoff() {
     vfn_config.state_sync.aptos_data_client.response_timeout_ms = 1;
 
     // Create the fullnode and test its ability to sync
-    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
-    test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
+    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
+    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
 }
 
 #[tokio::test]
@@ -130,8 +125,8 @@ async fn test_fullnode_intelligent_sync_epoch_changes() {
     vfn_config.state_sync.aptos_data_client.response_timeout_ms = 1;
 
     // Create the fullnode and test its ability to sync
-    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
-    test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
+    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
+    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
 }
 
 #[tokio::test]
@@ -160,8 +155,8 @@ async fn test_fullnode_fast_and_intelligent_sync_epoch_changes() {
     vfn_config.state_sync.aptos_data_client.response_timeout_ms = 1;
 
     // Create the fullnode and test its ability to sync
-    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
-    test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
+    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
+    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
 }
 
 #[tokio::test]
@@ -180,8 +175,8 @@ async fn test_fullnode_execution_sync_epoch_changes() {
     vfn_config.state_sync.aptos_data_client.use_compression = true;
 
     // Create the fullnode and test its ability to sync
-    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
-    test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
+    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
+    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
 }
 
 #[tokio::test]
@@ -197,8 +192,8 @@ async fn test_fullnode_output_sync_no_epoch_changes() {
         .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
 
     // Create the fullnode and test its ability to sync
-    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
-    test_fullnode_sync(vfn_peer_id, &mut swarm, false, false).await;
+    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
+    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, false, false).await;
 }
 
 #[tokio::test]
@@ -214,8 +209,8 @@ async fn test_fullnode_execution_sync_no_epoch_changes() {
         .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactions;
 
     // Create the fullnode and test its ability to sync
-    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
-    test_fullnode_sync(vfn_peer_id, &mut swarm, false, false).await;
+    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
+    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, false, false).await;
 }
 
 #[tokio::test]
@@ -570,25 +565,6 @@ async fn test_all_validators_fast_and_execution_sync() {
     test_all_validator_failures(swarm).await;
 }
 
-/// Creates a new full node using the given config and swarm
-async fn create_fullnode(full_node_config: NodeConfig, swarm: &mut LocalSwarm) -> PeerId {
-    let validator_peer_id = swarm.validators().next().unwrap().peer_id();
-    let vfn_peer_id = swarm
-        .add_validator_fullnode(
-            &swarm.versions().max().unwrap(),
-            OverrideNodeConfig::new_with_default_base(full_node_config),
-            validator_peer_id,
-        )
-        .unwrap();
-    for fullnode in swarm.full_nodes_mut() {
-        fullnode
-            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
-            .await
-            .unwrap();
-    }
-    vfn_peer_id
-}
-
 /// A test method that verifies that a fullnode can fast sync from
 /// a validator after a data wipe. If `epoch_changes` are enabled
 /// then epoch changes can occur during test execution and fullnode syncing.
@@ -617,8 +593,8 @@ async fn test_fullnode_fast_sync(epoch_changes: bool) {
         BootstrappingMode::DownloadLatestStates;
 
     // Test the ability of a fullnode to sync
-    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
-    test_fullnode_sync(vfn_peer_id, &mut swarm, epoch_changes, true).await;
+    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
+    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, epoch_changes, true).await;
 
     // Verify the oldest ledger info and pruning metrics for the fullnode
     if epoch_changes {
@@ -651,54 +627,6 @@ async fn test_validator_sync_exponential_backoff(epoch_changes: bool) {
 
     // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, epoch_changes).await;
-}
-
-/// A helper method that tests that a full node can sync from a validator after
-/// a failure and continue to stay up-to-date.
-async fn test_fullnode_sync(
-    vfn_peer_id: PeerId,
-    swarm: &mut LocalSwarm,
-    epoch_changes: bool,
-    clear_storage: bool,
-) {
-    // Stop the fullnode and potentially clear storage
-    if clear_storage {
-        stop_fullnode_and_delete_storage(swarm, vfn_peer_id).await;
-    } else {
-        swarm.fullnode_mut(vfn_peer_id).unwrap().stop();
-    }
-
-    // Execute a number of transactions on the validator
-    let validator_peer_id = swarm.validators().next().unwrap().peer_id();
-    let validator_client = swarm.validator(validator_peer_id).unwrap().rest_client();
-    let (mut account_0, mut account_1) = create_test_accounts(swarm).await;
-    execute_transactions(
-        swarm,
-        &validator_client,
-        &mut account_0,
-        &account_1,
-        epoch_changes,
-    )
-    .await;
-
-    // Restart the fullnode and verify it can sync
-    swarm
-        .fullnode_mut(vfn_peer_id)
-        .unwrap()
-        .restart()
-        .await
-        .unwrap();
-    wait_for_all_nodes(swarm).await;
-
-    // Execute more transactions on the validator and verify the fullnode catches up
-    execute_transactions_and_wait(
-        swarm,
-        &validator_client,
-        &mut account_1,
-        &account_0,
-        epoch_changes,
-    )
-    .await;
 }
 
 /// A helper method that tests that a validator can sync after a failure and
@@ -912,14 +840,6 @@ pub async fn test_all_validator_failures(mut swarm: LocalSwarm) {
         true,
     )
     .await;
-}
-
-/// Stops the specified fullnode and deletes storage
-async fn stop_fullnode_and_delete_storage(swarm: &mut LocalSwarm, fullnode: AccountAddress) {
-    let fullnode = swarm.full_node_mut(fullnode).unwrap();
-
-    // The fullnode is stopped during the clear_storage() call
-    fullnode.clear_storage().await.unwrap();
 }
 
 /// Stops the specified validator and deletes storage
