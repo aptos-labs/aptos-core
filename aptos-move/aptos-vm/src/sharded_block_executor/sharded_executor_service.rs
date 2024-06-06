@@ -321,9 +321,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     self.shard_id,
                     num_txns_in_the_block
                 );
-            let exe_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
-                .with_label_values(&[&self.shard_id.to_string(), "execute_block"])
-                .start_timer();
+            // let exe_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
+            //     .with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+            //     .start_timer();
             let ret = self.execute_block(
                 blocking_transactions_provider,
                 state_view.as_ref(),
@@ -339,7 +339,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 stream_results_tx.clone(),
             );
             drop(state_view);
-            drop(exe_timer);
+            // drop(exe_timer);
 
             self.coordinator_client.lock().unwrap().record_execution_complete_time_on_shard();
 
