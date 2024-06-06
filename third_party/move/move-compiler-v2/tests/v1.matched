@@ -1,3 +1,4 @@
+WARNING: test `move-compiler-v2/tests/checking/typing/unused_local.move` and `move-compiler-v2/tests/unused-assignment/v1-typing/unused_local.move` share common key `typing/unused_local.move`, discarding former one
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/borrow_global_acquires_1.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_1.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/borrow_global_acquires_2.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_2.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/borrow_global_acquires_3.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_3.exp
@@ -205,9 +206,13 @@ move-compiler/tests/move_check/translated_ir_tests/move/generics/instantiation_l
 move-compiler/tests/move_check/translated_ir_tests/move/generics/instantiation_loops/two_loops.exp   move-compiler-v2/tests/cyclic-instantiation-checker/v1-tests/two_loops.exp
 move-compiler/tests/move_check/liveness/mut_inline.exp   move-compiler-v2/tests/live-var/mut_inline.exp
 move-compiler/tests/move_check/liveness/mut_ref.exp   move-compiler-v2/tests/live-var/mut_ref.exp
+move-compiler/tests/move_check/liveness/unused_assignment.exp   move-compiler-v2/tests/unused-assignment/v1-liveness/unused_assignment.exp
 move-compiler/tests/move_check/locals/drop_conditional.exp   move-compiler-v2/tests/ability-check/v1-locals/drop_conditional.exp
 move-compiler/tests/move_check/locals/eliminate_temps.exp   move-compiler-v2/tests/reference-safety/v1-locals/eliminate_temps.exp
 move-compiler/tests/move_check/locals/reassign_parameter.exp   move-compiler-v2/tests/ability-check/v1-locals/reassign_parameter.exp
+move-compiler/tests/move_check/locals/unused_copyable.exp   move-compiler-v2/tests/unused-assignment/v1-locals/unused_copyable.exp
+move-compiler/tests/move_check/locals/unused_resource.exp   move-compiler-v2/tests/unused-assignment/v1-locals/unused_resource.exp
+move-compiler/tests/move_check/locals/unused_resource_explicit_return.exp   move-compiler-v2/tests/unused-assignment/v1-locals/unused_resource_explicit_return.exp
 move-compiler/tests/move_check/locals/use_before_assign_if.exp   move-compiler-v2/tests/uninit-use-checker/v1-locals/use_before_assign_if.exp
 move-compiler/tests/move_check/locals/use_before_assign_if_else.exp   move-compiler-v2/tests/uninit-use-checker/v1-locals/use_before_assign_if_else.exp
 move-compiler/tests/move_check/locals/use_before_assign_loop.exp   move-compiler-v2/tests/uninit-use-checker/v1-locals/use_before_assign_loop.exp
@@ -542,7 +547,7 @@ move-compiler/tests/move_check/typing/uninferred_type_unpack_assign.exp   move-c
 move-compiler/tests/move_check/typing/uninferred_type_unpack_bind.exp   move-compiler-v2/tests/checking/typing/uninferred_type_unpack_bind.exp
 move-compiler/tests/move_check/typing/uninferred_type_unpack_decl.exp   move-compiler-v2/tests/checking/typing/uninferred_type_unpack_decl.exp
 move-compiler/tests/move_check/typing/unit.exp   move-compiler-v2/tests/checking/typing/unit.exp
-move-compiler/tests/move_check/typing/unused_local.exp   move-compiler-v2/tests/checking/typing/unused_local.exp
+move-compiler/tests/move_check/typing/unused_local.exp   move-compiler-v2/tests/unused-assignment/v1-typing/unused_local.exp
 move-compiler/tests/move_check/typing/use_local.exp   move-compiler-v2/tests/checking/typing/use_local.exp
 move-compiler/tests/move_check/typing/valid_acquire.exp   move-compiler-v2/tests/acquires-checker/v1-tests/valid_acquire.exp
 move-compiler/tests/move_check/typing/values.exp   move-compiler-v2/tests/checking/typing/values.exp

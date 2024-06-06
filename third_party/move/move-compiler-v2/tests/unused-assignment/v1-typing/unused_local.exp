@@ -1,0 +1,61 @@
+
+Diagnostics:
+warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/unused-assignment/v1-typing/unused_local.move:5:13
+  │
+5 │         let x: u64;
+  │             ^
+
+warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/unused-assignment/v1-typing/unused_local.move:9:14
+  │
+9 │         let (x, y): (u64, u64);
+  │              ^
+
+warning: Unused local variable `y`. Consider removing or prefixing with an underscore: `_y`
+  ┌─ tests/unused-assignment/v1-typing/unused_local.move:9:17
+  │
+9 │         let (x, y): (u64, u64);
+  │                 ^
+
+warning: Unused local variable `f`. Consider removing or prefixing with an underscore: `_f`
+   ┌─ tests/unused-assignment/v1-typing/unused_local.move:13:16
+   │
+13 │         let S{ f, g }: S;
+   │                ^
+
+warning: Unused local variable `g`. Consider removing or prefixing with an underscore: `_g`
+   ┌─ tests/unused-assignment/v1-typing/unused_local.move:13:19
+   │
+13 │         let S{ f, g }: S;
+   │                   ^
+
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/unused-assignment/v1-typing/unused_local.move:25:22
+   │
+25 │     fun unused_param(x: u64) {
+   │                      ^
+
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/unused-assignment/v1-typing/unused_local.move:28:20
+   │
+28 │     fun two_unused(x: u64, y: bool) {
+   │                    ^
+
+warning: Unused parameter `y`. Consider removing or prefixing with an underscore: `_y`
+   ┌─ tests/unused-assignment/v1-typing/unused_local.move:28:28
+   │
+28 │     fun two_unused(x: u64, y: bool) {
+   │                            ^
+
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/unused-assignment/v1-typing/unused_local.move:31:35
+   │
+31 │     fun unused_param1_used_param2(x: u64, y: bool): bool {
+   │                                   ^
+
+warning: Unused parameter `y`. Consider removing or prefixing with an underscore: `_y`
+   ┌─ tests/unused-assignment/v1-typing/unused_local.move:35:43
+   │
+35 │     fun unused_param2_used_param1(x: u64, y: bool): u64 {
+   │                                           ^

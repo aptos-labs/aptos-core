@@ -1,3 +1,4 @@
+WARNING: test `move-compiler-v2/tests/checking/typing/unused_local.move` and `move-compiler-v2/tests/unused-assignment/v1-typing/unused_local.move` share common key `typing/unused_local.move`, discarding former one
 move-compiler/tests/move_check/borrow_tests/{
   borrow_global_acquires_duplicate_annotation.move,
   eq_bad.move,
@@ -66,15 +67,11 @@ move-compiler/tests/move_check/liveness/{
   move_in_infinite_loop_branched.move,
   trailing_semi.move,
   trailing_semi_loops.move,
-  unused_assignment.move,
 }
 move-compiler/tests/move_check/locals/{
   assign_partial_resource.move,
   assign_resource.move,
   struct_use_before_assign.move,
-  unused_copyable.move,
-  unused_resource.move,
-  unused_resource_explicit_return.move,
   use_after_move_if.move,
   use_after_move_if_else.move,
   use_after_move_loop.move,
