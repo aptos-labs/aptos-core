@@ -89,7 +89,9 @@ impl DeserializerConfig {
 
 impl Default for DeserializerConfig {
     fn default() -> Self {
-        Self::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX)
+        // Note that here version max is used as a default version, as this how
+        // it was previously defined in VM config.
+        Self::new(VERSION_MAX, IDENTIFIER_SIZE_MAX)
     }
 }
 
