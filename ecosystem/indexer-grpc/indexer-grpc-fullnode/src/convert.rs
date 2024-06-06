@@ -754,7 +754,7 @@ pub fn convert_transaction(
             transaction::transaction::TransactionType::StateCheckpoint
         },
         Transaction::BlockEpilogueTransaction(_) => {
-            panic!("BlockEpilogueTransaction not supported")
+            transaction::transaction::TransactionType::BlockEpilogue
         },
         Transaction::PendingTransaction(_) => panic!("PendingTransaction is not supported"),
         Transaction::ValidatorTransaction(_) => {
@@ -809,8 +809,21 @@ pub fn convert_transaction(
                 transaction::StateCheckpointTransaction {},
             )
         },
-        Transaction::BlockEpilogueTransaction(_) => {
-            panic!("BlockEpilogueTransaction not supported")
+        Transaction::BlockEpilogueTransaction(block_epilogue) => {
+            transaction::transaction::TxnData::BlockEpilogue(
+                transaction::BlockEpilogueTransaction {
+                    block_end_info: block_epilogue
+                        .block_end_info
+                        .as_ref()
+                        .map(|block_end_info| transaction::BlockEndInfo {
+                            block_gas_limit_reached: block_end_info.block_gas_limit_reached,
+                            block_output_limit_reached: block_end_info.block_output_limit_reached,
+                            block_effective_block_gas_units: block_end_info
+                                .block_effective_block_gas_units,
+                            block_approx_output_size: block_end_info.block_approx_output_size,
+                        }),
+                },
+            )
         },
         Transaction::PendingTransaction(_) => panic!("PendingTransaction not supported"),
         Transaction::ValidatorTransaction(_) => {

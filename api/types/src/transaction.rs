@@ -431,6 +431,14 @@ pub struct StateCheckpointTransaction {
     pub timestamp: U64,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct BlockEndInfo {
+    pub block_gas_limit_reached: bool,
+    pub block_output_limit_reached: bool,
+    pub block_effective_block_gas_units: u64,
+    pub block_approx_output_size: u64,
+}
+
 /// A block epilogue transaction
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct BlockEpilogueTransaction {
@@ -438,6 +446,7 @@ pub struct BlockEpilogueTransaction {
     #[oai(flatten)]
     pub info: TransactionInfo,
     pub timestamp: U64,
+    pub block_end_info: Option<BlockEndInfo>,
 }
 
 /// A request to submit a transaction

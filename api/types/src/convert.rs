@@ -4,9 +4,10 @@
 
 use crate::{
     transaction::{
-        BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem,
-        DeletedTableData, MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
-        UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
+        BlockEndInfo, BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource,
+        DeleteTableItem, DeletedTableData, MultisigPayload, MultisigTransactionPayload,
+        StateCheckpointTransaction, UserTransactionRequestInner, WriteModule, WriteResource,
+        WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
     Address, Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event,
@@ -32,8 +33,8 @@ use aptos_types::{
         StateView,
     },
     transaction::{
-        EntryFunction, ExecutionStatus, Multisig, RawTransaction, Script, SignedTransaction,
-        TransactionAuxiliaryData,
+        BlockEpiloguePayload, EntryFunction, ExecutionStatus, Multisig, RawTransaction, Script,
+        SignedTransaction, TransactionAuxiliaryData,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -206,10 +207,25 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     timestamp: timestamp.into(),
                 })
             },
-            BlockEpilogue(_) => Transaction::BlockEpilogueTransaction(BlockEpilogueTransaction {
-                info,
-                timestamp: timestamp.into(),
-            }),
+            BlockEpilogue(block_epilogue_payload) => {
+                Transaction::BlockEpilogueTransaction(BlockEpilogueTransaction {
+                    info,
+                    timestamp: timestamp.into(),
+                    block_end_info: match block_epilogue_payload {
+                        BlockEpiloguePayload::BlockId(_) => None,
+                        BlockEpiloguePayload::WithBlockEndInfo { block_end_info, .. } => {
+                            Some(BlockEndInfo {
+                                block_gas_limit_reached: block_end_info.block_gas_limit_reached,
+                                block_output_limit_reached: block_end_info
+                                    .block_output_limit_reached,
+                                block_effective_block_gas_units: block_end_info
+                                    .block_effective_block_gas_units,
+                                block_approx_output_size: block_end_info.block_approx_output_size,
+                            })
+                        },
+                    },
+                })
+            },
             ValidatorTransaction(_txn) => (info, events, timestamp).into(),
         })
     }
