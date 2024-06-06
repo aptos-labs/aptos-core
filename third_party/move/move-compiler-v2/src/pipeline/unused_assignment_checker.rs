@@ -66,15 +66,11 @@ impl FunctionTargetProcessor for UnusedAssignmentChecker {
             use Bytecode::*;
             match bytecode {
                 Load(id, dst, _) | Assign(id, dst, _, _) => {
-                    UnusedAssignmentChecker::check_unused_assignment(
-                        &target, *id, offset, *dst
-                    )
+                    UnusedAssignmentChecker::check_unused_assignment(&target, *id, offset, *dst)
                 },
                 Call(id, dsts, _, _, _) => {
                     for dst in dsts {
-                        UnusedAssignmentChecker::check_unused_assignment(
-                            &target, *id, offset, *dst
-                        )
+                        UnusedAssignmentChecker::check_unused_assignment(&target, *id, offset, *dst)
                     }
                 },
                 _ => {},
