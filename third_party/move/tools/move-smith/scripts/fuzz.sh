@@ -2,7 +2,7 @@
 
 # This script runs a fuzz target for a given number of hours.
 #
-# Usage: ./scripts/fuzz.sh [fuzz_target] [total_hour]
+# Usage: ./scripts/fuzz.sh <fuzz_target> <total_hour> <max_input_len>
 #
 # * Keep a log file under move-smith/logs
 # * Creates an initial corpus with 8KB inputs
@@ -29,23 +29,25 @@ function create_initial_corpus() {
     mkdir -p $corpus_dir
 
     for i in {0..9}; do
-        of_name=$corpus_dir/random_input_$i
-        dd if=/dev/urandom of=$of_name ibs=1024 count=$input_len 2>/dev/null
+        large=$corpus_dir/random_input_large_$i
+        mid=$corpus_dir/random_input_mid_$i
+        small=$corpus_dir/random_input_small_$i
+        dd if=/dev/urandom of=$large ibs=1024 count=$input_len 2>/dev/null
+        dd if=/dev/urandom of=$mid ibs=512 count=$input_len 2>/dev/null
+        dd if=/dev/urandom of=$small ibs=256 count=$input_len 2>/dev/null
     done
 }
 
 function run_fuzz() {
-    local fuzz_target=$1
-    local total_hour=$2    # in hours
+    local fuzz_target=${1:-"transactional"}
+    local total_hour=${2:-24}    # Default to 24 hours
+    local input_len=${3:-4}      # Default to 4 KB
 
     # Convert hours to seconds, convert to integer
     local total_seconds=$(echo "$total_hour * 3600" | bc)
     local log_file=$(create_log "$MOVE_SMITH_DIR/logs")
     echo "Writing logs to $log_file"
 
-    # Create an initial corpus with 8KB inputs
-    # This makes libfuzzer to "guess" the max_len should be 8KB
-    local input_len=8
     create_initial_corpus $fuzz_target $input_len
 
     echo "Current date time: $(date)" | tee -a $log_file
@@ -71,11 +73,9 @@ function run_fuzz() {
         -print_final_stats=1 2>&1 | tee -a $log_file
 }
 
-if [ "$#" -ne 2 ]; then
-    echo "Usage: ./scripts/fuzz.sh [fuzz_target] [total_hour]"
+if [ "$#" -ne 3 ]; then
+    echo "Usage: ./scripts/fuzz.sh <fuzz_target> <total_hour> <max_input_len>"
     exit 1
 fi
 
-fuzz_target=${1:-"transactional"}
-total_hour=${2:-24}
-run_fuzz $fuzz_target $total_hour
+run_fuzz $@
