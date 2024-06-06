@@ -4,6 +4,7 @@
 use crate::{
     assert_move_abort, assert_success, assert_vm_status, build_package, tests::common, MoveHarness,
 };
+use aptos::move_tool::chunked_publish::create_chunks;
 use aptos_framework::{
     natives::{
         code::{PackageMetadata, PackageRegistry, UpgradePolicy},
@@ -189,7 +190,7 @@ impl LargePackageTestContext {
 
         // Chunk the metadata
         let mut metadata_chunks =
-            Self::create_chunks(bcs::to_bytes(&metadata).expect("Failed deserializing metadata"));
+            create_chunks(bcs::to_bytes(&metadata).expect("Failed deserializing metadata"));
 
         // Separate last chunk for special handling
         let mut metadata_chunk = metadata_chunks.pop().unwrap_or_default();
@@ -217,7 +218,7 @@ impl LargePackageTestContext {
         let mut code_chunks: Vec<Vec<u8>> = vec![];
 
         for (idx, module_code) in package_code.into_iter().enumerate() {
-            let chunked_module = Self::create_chunks(module_code);
+            let chunked_module = create_chunks(module_code);
             for chunk in chunked_module {
                 if taken_size + chunk.len() > MAX_CHUNK_SIZE_IN_BYTES {
                     // Create a payload and reset accumulators
@@ -272,13 +273,6 @@ impl LargePackageTestContext {
         transactions.push(transaction);
 
         transactions
-    }
-
-    /// Create chunks of data based on the defined maximum chunk size.
-    fn create_chunks(data: Vec<u8>) -> Vec<Vec<u8>> {
-        data.chunks(MAX_CHUNK_SIZE_IN_BYTES)
-            .map(|chunk| chunk.to_vec())
-            .collect()
     }
 
     /// Create a transaction payload for staging or publishing the large package.

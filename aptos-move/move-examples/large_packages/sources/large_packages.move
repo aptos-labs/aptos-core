@@ -1,7 +1,13 @@
 /// This provides a framework for uploading large packages to standard accounts or objects.
 /// In each pass, the caller pushes more code by calling `stage_code_chunk`.
 /// In the final call, the caller can optionally set `publish_to_account`, `publish_to_object`, or `upgrade_object_code`.
-/// If any of these options are set, the package will be published inline, saving an extra transaction and additional storage costs.
+/// If any of these options are set, the package will be published or upgraded inline, saving an extra transaction and additional storage costs.
+///
+/// Note that `code_indices` must be sequential and without gaps. For example, if `code_indices` are provided as [0, 1, 3]
+/// (skipping index 2), the inline function `assemble_module_code` will abort. This is because `StagingArea.last_module_idx`
+/// is set to the maximum value from `code_indices`. When `assemble_module_code` iterates over the range from 0 to
+/// `StagingArea.last_module_idx`, it expects each index to be present in the `StagingArea.code` SmartTable.
+/// Any missing index in this range will cause the function to fail.
 module large_packages::large_packages {
     use std::error;
     use std::option::{Self, Option};
@@ -34,7 +40,7 @@ module large_packages::large_packages {
         publish_to_account: bool,
         publish_to_object: bool,
         upgrade_object_code: bool,
-        code_object: Option<Object<PackageRegistry>>,
+        code_object: Option<Object<PackageRegistry>>, // must be provided for upgrading object code.
     ) acquires StagingArea {
         let publish_param_count = (if (publish_to_account) 1 else 0) + (if (publish_to_object) 1 else 0) + (if (upgrade_object_code) 1 else 0);
         assert!(publish_param_count <= 1, error::invalid_argument(EINVALID_PUBLISHING_FLAGS));
@@ -151,7 +157,7 @@ module large_packages::large_packages {
     }
 
     /// Publishes the code from the staging area to a standard account.
-    public entry fun publish_staged_code(
+    public entry fun publish_staged_code_to_account(
         publisher: &signer,
     ) acquires StagingArea {
         let staging_area = borrow_global_mut<StagingArea>(signer::address_of(publisher));

@@ -306,6 +306,7 @@ dependencies = [
  "chrono",
  "clap 4.4.14",
  "clap_complete",
+ "colored",
  "dashmap",
  "diesel",
  "diesel-async",
@@ -7319,6 +7320,7 @@ name = "e2e-move-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos",
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
