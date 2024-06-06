@@ -90,6 +90,8 @@ impl<R: AsyncRead + Send + Unpin> ChunkerState<R> {
             .expect("get_next_full_chunk after EOF.");
 
         while let Some(record_bytes) = input.read_record_bytes().await? {
+            let _timer = BACKUP_TIMER.timer_with(&["state_snapshot_process_records"]);
+
             // If buf + current_record exceeds max_chunk_size, dump current buf to a new chunk
             let chunk_cut_opt = should_cut_chunk(&self.buf, &record_bytes, self.max_chunk_size)
                 .then(|| {
