@@ -20,6 +20,7 @@ pub struct QuorumStoreBackPressureConfig {
     pub decrease_duration_ms: u64,
     pub increase_duration_ms: u64,
     pub decrease_fraction: f64,
+    pub increase_fraction: f64,
     pub dynamic_min_txn_per_s: u64,
     pub dynamic_max_txn_per_s: u64,
 }
@@ -35,6 +36,7 @@ impl Default for QuorumStoreBackPressureConfig {
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
+            increase_fraction: 1.5,
             dynamic_min_txn_per_s: 160,
             dynamic_max_txn_per_s: 12000,
         }
