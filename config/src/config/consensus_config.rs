@@ -6,6 +6,7 @@ use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
     QuorumStoreConfig, ReliableBroadcastConfig, SafetyRulesConfig, BATCH_PADDING_BYTES,
 };
+use aptos_crypto::_once_cell::sync::Lazy;
 use aptos_types::chain_id::ChainId;
 use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
