@@ -244,7 +244,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
     }
 
     pub(crate) fn get_block_end_info(&self) -> BlockEndInfo {
-        BlockEndInfo {
+        BlockEndInfo::V0 {
             block_gas_limit_reached: self
                 .block_gas_limit_type
                 .block_gas_limit()

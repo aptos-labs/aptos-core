@@ -253,7 +253,7 @@ impl ApplyChunkOutput {
         if let Some(block_id) = state_checkpoint_to_add {
             let state_checkpoint_txn =
                 block_end_info.map_or(Transaction::StateCheckpoint(block_id), |block_end_info| {
-                    Transaction::BlockEpilogue(BlockEpiloguePayload::WithBlockEndInfo {
+                    Transaction::BlockEpilogue(BlockEpiloguePayload::V0 {
                         block_id,
                         block_end_info,
                     })

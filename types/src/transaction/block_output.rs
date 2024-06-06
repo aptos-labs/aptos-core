@@ -18,9 +18,15 @@ impl<Output: Debug> BlockOutput<Output> {
         }
     }
 
+    fn is_block_limit_reached(&self) -> bool {
+        self.block_end_info
+            .as_ref()
+            .map_or(false, BlockEndInfo::limit_reached)
+    }
+
     /// If block limit is not set (i.e. in tests), we can safely unwrap here
     pub fn into_transaction_outputs_forced(self) -> Vec<Output> {
-        assert!(self.block_end_info.is_none());
+        assert!(!self.is_block_limit_reached());
         self.transaction_outputs
     }
 
@@ -29,7 +35,7 @@ impl<Output: Debug> BlockOutput<Output> {
     }
 
     pub fn get_transaction_outputs_forced(&self) -> &[Output] {
-        assert!(self.block_end_info.is_none());
+        assert!(!self.is_block_limit_reached());
         &self.transaction_outputs
     }
 }

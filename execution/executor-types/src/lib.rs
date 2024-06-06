@@ -463,7 +463,7 @@ impl StateComputeResult {
                 (!self.has_reconfiguration()).then_some(self.block_end_info.clone().map_or(
                     Transaction::StateCheckpoint(block_id),
                     |block_end_info| {
-                        Transaction::BlockEpilogue(BlockEpiloguePayload::WithBlockEndInfo {
+                        Transaction::BlockEpilogue(BlockEpiloguePayload::V0 {
                             block_id,
                             block_end_info,
                         })
