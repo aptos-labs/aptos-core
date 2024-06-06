@@ -877,14 +877,27 @@ impl ExecutionStatus {
     }
 
     // Used by simulation API for showing detail error message. Should not be used by production code.
-    pub fn convert_vm_status_for_simulation(vm_status: VMStatus) -> Self {
-        let mut show_error_flags = Features::default();
-        show_error_flags.disable(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH);
-        let (txn_status, _aux_data) =
-            TransactionStatus::from_vm_status(vm_status, true, &show_error_flags);
-        txn_status.status().unwrap_or_else(|discarded_code| {
-            ExecutionStatus::MiscellaneousError(Some(discarded_code))
-        })
+    pub fn conmbine_vm_status_for_simulation(
+        aux_data: &TransactionAuxiliaryData,
+        partial_status: TransactionStatus,
+    ) -> Self {
+        match partial_status {
+            TransactionStatus::Keep(exec_status) => {
+                if let Some(aux_error) = aux_data.get_detail_error_message() {
+                    let status_code = aux_error.status_code;
+                    match exec_status {
+                        ExecutionStatus::MiscellaneousError(_) => {
+                            ExecutionStatus::MiscellaneousError(Some(status_code))
+                        },
+                        _ => exec_status,
+                    }
+                } else {
+                    exec_status
+                }
+            },
+            TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
+            _ => ExecutionStatus::MiscellaneousError(None),
+        }
     }
 
     pub fn remove_error_detail(self) -> Self {

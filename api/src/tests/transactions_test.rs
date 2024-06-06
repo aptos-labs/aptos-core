@@ -1505,6 +1505,42 @@ async fn test_simulation_failure_error_message() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_simulation_failure_with_move_abort_error_rendering() {
+    let mut context = new_test_context(current_function_name!());
+    let account = context.create_account().await;
+    let raw_txn = context
+        .transaction_factory()
+        .entry_function(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::from_hex_literal("0x1").unwrap(),
+                Identifier::new("aptos_account").unwrap(),
+            ),
+            Identifier::new("transfer").unwrap(),
+            vec![],
+            vec![
+                bcs::to_bytes(&AccountAddress::from_hex_literal("0x1").unwrap()).unwrap(),
+                bcs::to_bytes(&999999999999999999u64).unwrap(),
+            ],
+        ))
+        .sender(account.address())
+        .sequence_number(account.sequence_number())
+        .expiration_timestamp_secs(u64::MAX)
+        .build();
+    let invalid_key = AccountKey::generate(&mut context.rng());
+
+    let txn = raw_txn
+        .sign(invalid_key.private_key(), account.public_key().clone())
+        .unwrap()
+        .into_inner();
+    let body = bcs::to_bytes(&txn).unwrap();
+    let resp = context
+        .expect_status_code(200)
+        .post_bcs_txn("/transactions/simulate", body)
+        .await;
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_simulation_failure_with_detail_error() {
     let mut context = new_test_context(current_function_name!());
     let account = context.root_account().await;
@@ -1536,10 +1572,7 @@ async fn test_simulation_failure_with_detail_error() {
         .expect_status_code(200)
         .post_bcs_txn("/transactions/simulate", body)
         .await;
-    assert!(resp.as_array().unwrap()[0]["vm_status"]
-        .as_str()
-        .unwrap()
-        .contains("LINKER_ERROR"));
+    context.check_golden_output(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
