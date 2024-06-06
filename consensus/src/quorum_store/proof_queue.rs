@@ -149,10 +149,11 @@ impl ProofQueue {
 
     fn remaining_txns(&self) -> u64 {
         // All the bath keys for which batch_to_proof is not None. This is the set of unexpired and uncommitted proofs.
-        let batch_keys = self
+        let unexpired_batch_keys = self
             .batch_to_proof
             .iter()
-            .filter_map(|(batch_key, proof)| proof.as_ref().map(|_| batch_key))
+            .filter(|(_, proof)| proof.is_some())
+            .map(|(batch_key, _)| batch_key)
             .collect::<HashSet<_>>();
         let mut remaining_txns = self
             .txn_summary_to_batches
@@ -160,26 +161,9 @@ impl ProofQueue {
             .filter(|(_, batches)| {
                 batches
                     .iter()
-                    .any(|batch_key| batch_keys.contains(batch_key))
+                    .any(|batch_key| unexpired_batch_keys.contains(batch_key))
             })
             .count() as u64;
-
-        // count the number of batches with proofs but without txn summaries
-        counters::PROOFS_WITHOUT_BATCH_DATA.set(self.batch_to_proof.iter().map(|(batch_key, proof)| {
-            if proof.is_some() && !self.batches_with_txn_summary.contains(batch_key) {
-                1
-            } else {
-                0
-            }
-        }).sum::<i64>());
-
-        counters::PROOFS_IN_PROOF_QUEUE.set(self.batch_to_proof.iter().map(|(_, proof)| {
-            if proof.is_some() {
-                1
-            } else {
-                0
-            }
-        }).sum::<i64>());
 
         // If a batch_key is not in batches_with_txn_summary, it means we've received the proof but haven't receive the
         // transaction summary of the batch from batch coordinator. Add the number of txns in the batch to remaining_txns.
@@ -196,11 +180,35 @@ impl ProofQueue {
             .sum::<u64>();
 
         //count the number of transactions with more than one batches
-        counters::TXNS_WITH_DUPLICATE_BATCHES.set(self.txn_summary_to_batches.iter().filter(|(_, batches)| {
-            batches.len() > 1
-        }).count() as i64);
+        counters::TXNS_WITH_DUPLICATE_BATCHES.set(
+            self.txn_summary_to_batches
+                .iter()
+                .filter(|(_, batches)| batches.len() > 1)
+                .count() as i64,
+        );
 
         counters::TXNS_IN_PROOF_QUEUE.set(self.txn_summary_to_batches.len() as i64);
+
+        // count the number of batches with proofs but without txn summaries
+        counters::PROOFS_WITHOUT_BATCH_DATA.set(
+            self.batch_to_proof
+                .iter()
+                .map(|(batch_key, proof)| {
+                    if proof.is_some() && !self.batches_with_txn_summary.contains(batch_key) {
+                        1
+                    } else {
+                        0
+                    }
+                })
+                .sum::<i64>(),
+        );
+
+        counters::PROOFS_IN_PROOF_QUEUE.set(
+            self.batch_to_proof
+                .values()
+                .map(|proof| if proof.is_some() { 1 } else { 0 })
+                .sum::<i64>(),
+        );
 
         remaining_txns
     }

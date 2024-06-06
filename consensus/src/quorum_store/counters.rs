@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge
+    exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_histogram,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -115,15 +117,13 @@ pub static TXNS_IN_PROOF_QUEUE: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static PROOFS_IN_PROOF_QUEUE: Lazy<IntGauge> =  Lazy::new(|| {
+pub static PROOFS_IN_PROOF_QUEUE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "quorum_store_proofs_in_proof_queue",
         "Number of proofs in the proof queue"
     )
     .unwrap()
 });
-
-
 
 //////////////////////
 // NEW QUORUM STORE
