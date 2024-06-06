@@ -59,6 +59,17 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: &["/operator_eval/"],
     },
     TestConfig {
+        name: "no-optimize-only",
+        runner: |p| run(p, get_config_by_name("no-optimize-only")),
+        experiments: &[
+            (Experiment::OPTIMIZE, false),
+            (Experiment::ACQUIRES_CHECK, false),
+        ],
+        language_version: LanguageVersion::V2_0,
+        include: &["/no-optimize-only/"], // all tests except those excluded below
+        exclude: &[],
+    },
+    TestConfig {
         name: "optimize-no-simplify",
         runner: |p| run(p, get_config_by_name("optimize-no-simplify")),
         experiments: &[
