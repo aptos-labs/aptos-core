@@ -11,12 +11,13 @@ use aptos_types::{
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
     },
-    vm::environment::AptosEnvironment,
+    vm::environment::Environment,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
+use std::sync::Arc;
 
 pub(crate) struct AptosExecutorTask {
     vm: AptosVM,
@@ -24,13 +25,13 @@ pub(crate) struct AptosExecutorTask {
 }
 
 impl ExecutorTask for AptosExecutorTask {
-    type Environment = AptosEnvironment;
+    type Environment = Arc<Environment>;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
     fn init(env: Self::Environment, state_view: &impl StateView) -> Self {
-        let vm = AptosVM::new_with_environment(env.0, state_view);
+        let vm = AptosVM::new_with_environment(env, state_view);
         let id = state_view.id();
         Self { vm, id }
     }
