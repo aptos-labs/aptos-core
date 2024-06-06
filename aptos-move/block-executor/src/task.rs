@@ -12,7 +12,6 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
-    vm::deserialization::WithDeserializerConfig,
     write_set::WriteOp,
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
@@ -62,7 +61,7 @@ pub trait ExecutorTask: Sync {
 
     /// Type to initialize the single thread transaction executor. Clone and Sync are required because
     /// we will create an instance of executor on each individual thread.
-    type Environment: Sync + Clone + WithDeserializerConfig;
+    type Environment: Sync + Clone;
 
     /// Create an instance of the transaction executor.
     fn init(

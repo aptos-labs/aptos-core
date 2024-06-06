@@ -8,7 +8,7 @@ use aptos_mvhashmap::types::ValueWithLayout;
 use aptos_types::{
     contract_event::TransactionEvent, delayed_fields::PanicError, executable::Executable,
     state_store::TStateView, transaction::BlockExecutableTransaction as Transaction,
-    vm::deserialization::WithDeserializerConfig, write_set::TransactionWrite,
+    write_set::TransactionWrite,
 };
 use aptos_vm_logging::{alert, prelude::*};
 use bytes::Bytes;
@@ -166,10 +166,9 @@ pub(crate) fn map_id_to_values_in_group_writes<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
-    E: WithDeserializerConfig,
 >(
     finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>,
-    latest_view: &LatestView<T, S, X, E>,
+    latest_view: &LatestView<T, S, X>,
 ) -> Result<Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>, PanicError> {
     let mut patched_finalized_groups = Vec::with_capacity(finalized_groups.len());
     for (group_key, group_metadata_op, resource_vec) in finalized_groups.into_iter() {
@@ -195,10 +194,9 @@ pub(crate) fn map_id_to_values_in_write_set<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
-    E: WithDeserializerConfig,
 >(
     resource_write_set: Vec<(T::Key, Arc<T::Value>, Arc<MoveTypeLayout>)>,
-    latest_view: &LatestView<T, S, X, E>,
+    latest_view: &LatestView<T, S, X>,
 ) -> Result<Vec<(T::Key, T::Value)>, PanicError> {
     resource_write_set
         .into_iter()
@@ -216,10 +214,9 @@ pub(crate) fn map_id_to_values_events<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
-    E: WithDeserializerConfig,
 >(
     events: Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>>,
-    latest_view: &LatestView<T, S, X, E>,
+    latest_view: &LatestView<T, S, X>,
 ) -> Result<Vec<T::Event>, PanicError> {
     events
         .map(|(event, layout)| {
@@ -250,11 +247,10 @@ fn replace_ids_with_values<
     T: Transaction,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
-    E: WithDeserializerConfig,
 >(
     value: &Arc<T::Value>,
     layout: &MoveTypeLayout,
-    latest_view: &LatestView<T, S, X, E>,
+    latest_view: &LatestView<T, S, X>,
 ) -> Result<T::Value, PanicError> {
     let mut value = (**value).clone();
 

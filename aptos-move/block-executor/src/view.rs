@@ -45,7 +45,6 @@ use aptos_types::{
         StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
-    vm::deserialization::WithDeserializerConfig,
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
@@ -961,32 +960,20 @@ impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
-pub(crate) struct LatestView<
-    'a,
-    T: Transaction,
-    S: TStateView<Key = T::Key>,
-    X: Executable,
-    E: WithDeserializerConfig,
-> {
+pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
     base_view: &'a S,
-    #[allow(dead_code)]
-    env: E,
     pub(crate) latest_view: ViewState<'a, T, X>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
-    LatestView<'a, T, S, X, E>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
     pub(crate) fn new(
         base_view: &'a S,
-        env: E,
         latest_view: ViewState<'a, T, X>,
         txn_idx: TxnIndex,
     ) -> Self {
         Self {
             base_view,
-            env,
             latest_view,
             txn_idx,
         }
@@ -1397,8 +1384,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDese
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
-    TResourceView for LatestView<'a, T, S, X, E>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceView
+    for LatestView<'a, T, S, X>
 {
     type Key = T::Key;
     type Layout = MoveTypeLayout;
@@ -1442,8 +1429,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDese
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
-    TResourceGroupView for LatestView<'a, T, S, X, E>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGroupView
+    for LatestView<'a, T, S, X>
 {
     type GroupKey = T::Key;
     type Layout = MoveTypeLayout;
@@ -1535,8 +1522,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDese
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
-    TModuleView for LatestView<'a, T, S, X, E>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
+    for LatestView<'a, T, S, X>
 {
     type Key = T::Key;
 
@@ -1578,8 +1565,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDese
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
-    StateStorageView for LatestView<'a, T, S, X, E>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
+    for LatestView<'a, T, S, X>
 {
     fn id(&self) -> StateViewId {
         self.base_view.id()
@@ -1590,8 +1577,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDese
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
-    TAggregatorV1View for LatestView<'a, T, S, X, E>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorV1View
+    for LatestView<'a, T, S, X>
 {
     type Identifier = T::Key;
 
@@ -1608,8 +1595,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDese
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: WithDeserializerConfig>
-    TDelayedFieldView for LatestView<'a, T, S, X, E>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFieldView
+    for LatestView<'a, T, S, X>
 {
     type Identifier = T::Identifier;
     type ResourceGroupTag = T::Tag;
@@ -2454,9 +2441,8 @@ mod test {
         let counter = RefCell::new(5);
         let base_view = MockStateView::new(HashMap::new());
         let start_counter = 5;
-        let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable, ()>::new(
+        let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
             &base_view,
-            (),
             ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
             1,
         );
@@ -2736,13 +2722,12 @@ mod test {
 
     fn create_sequential_latest_view<'a>(
         h: &'a Holder,
-    ) -> LatestView<'a, TestTransactionType, MockStateView, MockExecutable, ()> {
+    ) -> LatestView<'a, TestTransactionType, MockStateView, MockExecutable> {
         let sequential_state: SequentialState<'a, TestTransactionType, MockExecutable> =
             SequentialState::new(&h.unsync_map, *h.counter.borrow(), &h.counter);
 
-        LatestView::<'a, TestTransactionType, MockStateView, MockExecutable, ()>::new(
+        LatestView::<'a, TestTransactionType, MockStateView, MockExecutable>::new(
             &h.base_view,
-            (),
             ViewState::Unsync(sequential_state),
             1,
         )
@@ -2778,9 +2763,8 @@ mod test {
         fn new_view(&self) -> ViewsComparison<'_> {
             let latest_view_seq = create_sequential_latest_view(&self.holder);
             let latest_view_par =
-                LatestView::<TestTransactionType, MockStateView, MockExecutable, ()>::new(
+                LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
                     &self.base_view,
-                    (),
                     ViewState::Sync(ParallelState::new(
                         &self.versioned_map,
                         &self.scheduler,
@@ -2798,8 +2782,8 @@ mod test {
     }
 
     struct ViewsComparison<'a> {
-        latest_view_seq: LatestView<'a, TestTransactionType, MockStateView, MockExecutable, ()>,
-        latest_view_par: LatestView<'a, TestTransactionType, MockStateView, MockExecutable, ()>,
+        latest_view_seq: LatestView<'a, TestTransactionType, MockStateView, MockExecutable>,
+        latest_view_par: LatestView<'a, TestTransactionType, MockStateView, MockExecutable>,
     }
 
     impl<'a> ViewsComparison<'a> {

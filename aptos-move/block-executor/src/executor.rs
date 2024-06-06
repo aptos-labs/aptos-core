@@ -105,19 +105,13 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         executor: &E,
         base_view: &S,
-        env: E::Environment,
         parallel_state: ParallelState<T, X>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
-        let sync_view = LatestView::new(
-            base_view,
-            env,
-            ViewState::Sync(parallel_state),
-            idx_to_execute,
-        );
+        let sync_view = LatestView::new(base_view, ViewState::Sync(parallel_state), idx_to_execute);
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
         let mut prev_modified_keys = last_input_output
@@ -442,7 +436,6 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         base_view: &S,
-        env: E::Environment,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         executor: &E,
@@ -467,7 +460,6 @@ where
                     versioned_cache,
                     executor,
                     base_view,
-                    env.clone(),
                     ParallelState::new(
                         versioned_cache,
                         scheduler,
@@ -652,7 +644,6 @@ where
         shared_counter: &AtomicU32,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
-        env: E::Environment,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) -> Result<(), PanicError> {
         let parallel_state = ParallelState::<T, X>::new(
@@ -661,7 +652,7 @@ where
             start_shared_counter,
             shared_counter,
         );
-        let latest_view = LatestView::new(base_view, env, ViewState::Sync(parallel_state), txn_idx);
+        let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
         let finalized_groups = last_input_output.take_finalized_group(txn_idx);
         let materialized_finalized_groups =
             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
@@ -744,7 +735,7 @@ where
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(env.clone(), base_view);
+        let executor = E::init(env, base_view);
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
@@ -760,7 +751,6 @@ where
                     shared_counter,
                     last_input_output,
                     base_view,
-                    env.clone(),
                     final_results,
                 )?;
             }
@@ -777,7 +767,6 @@ where
                     last_input_output,
                     shared_commit_state,
                     base_view,
-                    env.clone(),
                     start_shared_counter,
                     shared_counter,
                     &executor,
@@ -814,7 +803,6 @@ where
                         versioned_cache,
                         &executor,
                         base_view,
-                        env.clone(),
                         ParallelState::new(
                             versioned_cache,
                             scheduler,
@@ -1019,7 +1007,7 @@ where
     ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(env.clone(), base_view);
+        let executor = E::init(env, base_view);
         drop(init_timer);
 
         let start_counter = gen_id_start_value(true);
@@ -1035,9 +1023,8 @@ where
             TxnLastInputOutput::new(num_txns as TxnIndex);
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {
-            let latest_view = LatestView::<T, S, X, E::Environment>::new(
+            let latest_view = LatestView::<T, S, X>::new(
                 base_view,
-                env.clone(),
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
