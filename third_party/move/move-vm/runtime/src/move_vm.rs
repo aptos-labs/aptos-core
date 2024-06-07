@@ -40,6 +40,8 @@ impl MoveVM {
         Self::new_with_config(natives, vm_config)
     }
 
+    /// Creates a new VM instance, with provided VM configurations. Panics if there are duplicated
+    /// natives.
     pub fn new_with_config(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,

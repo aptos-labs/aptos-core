@@ -46,6 +46,8 @@ impl Clone for VMRuntime {
 }
 
 impl VMRuntime {
+    /// Creates a new runtime instance with provided native functions and VM
+    /// configurations. If there are duplicated natives, panics.
     pub(crate) fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
