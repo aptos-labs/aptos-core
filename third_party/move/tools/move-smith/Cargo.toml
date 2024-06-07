@@ -29,3 +29,7 @@ path = "src/cli/raw2move.rs"
 [[bin]]
 name = "generator"
 path = "src/cli/generator.rs"
+
+[[bin]]
+name = "check_artifact"
+path = "src/cli/check_artifact.rs"
