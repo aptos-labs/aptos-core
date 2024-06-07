@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Instant;
+
 use crate::{counters, types::ReadWriteSummary};
 use aptos_logger::info;
 use aptos_types::{
@@ -18,6 +20,7 @@ pub struct BlockGasLimitProcessor<T: Transaction> {
     txn_fee_statements: Vec<FeeStatement>,
     txn_read_write_summaries: Vec<ReadWriteSummary<T>>,
     module_rw_conflict: bool,
+    start_time: Instant,
 }
 
 impl<T: Transaction> BlockGasLimitProcessor<T> {
@@ -30,6 +33,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             txn_fee_statements: Vec::with_capacity(init_size),
             txn_read_write_summaries: Vec::with_capacity(init_size),
             module_rw_conflict: false,
+            start_time: Instant::now(),
         }
     }
 
@@ -216,7 +220,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                 .block_gas_limit_type
                 .block_output_limit()
                 .map_or(false, |limit| accumulated_approx_output_size >= limit),
-            "[BlockSTM]: {} execution completed. {} out of {} txns committed",
+            "[BlockSTM]: {} execution completed. {} out of {} txns committed, took {}ms",
             if is_parallel {
                 "Parallel"
             } else {
@@ -224,6 +228,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             },
             num_committed,
             num_total,
+            self.start_time.elapsed().as_millis(),
         );
     }
 
