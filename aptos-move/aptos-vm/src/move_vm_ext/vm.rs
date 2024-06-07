@@ -25,12 +25,12 @@ use std::{ops::Deref, sync::Arc};
 /// and should only be used to run genesis sessions.
 pub struct GenesisMoveVM {
     vm: MoveVM,
+    chain_id: ChainId,
     features: Features,
 }
 
 impl GenesisMoveVM {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub fn new(chain_id: ChainId) -> Self {
         let features = Features::default();
         let timed_features = TimedFeaturesBuilder::enable_all().build();
 
@@ -58,7 +58,11 @@ impl GenesisMoveVM {
             vm_config.clone(),
         );
 
-        Self { vm, features }
+        Self {
+            vm,
+            chain_id,
+            features,
+        }
     }
 
     pub fn genesis_change_set_configs(&self) -> ChangeSetConfigs {
@@ -72,12 +76,11 @@ impl GenesisMoveVM {
         resolver: &'r R,
         genesis_id: HashValue,
     ) -> SessionExt<'r, '_> {
-        let chain_id = ChainId::test();
         let session_id = SessionId::genesis(genesis_id);
         SessionExt::new(
             session_id,
             &self.vm,
-            chain_id,
+            self.chain_id,
             &self.features,
             None,
             resolver,

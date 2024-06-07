@@ -127,7 +127,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         state_view.add_module(&module.self_id(), module_bytes);
     }
 
-    let vm = GenesisMoveVM::new();
+    let vm = GenesisMoveVM::new(chain_id);
     let resolver = state_view.as_move_resolver();
     let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
 
@@ -235,7 +235,7 @@ pub fn encode_genesis_change_set(
     }
 
     let resolver = state_view.as_move_resolver();
-    let vm = GenesisMoveVM::new();
+    let vm = GenesisMoveVM::new(chain_id);
     let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
 
     // On-chain genesis process.
@@ -1057,7 +1057,7 @@ pub fn test_genesis_module_publishing() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
 
-    let vm = GenesisMoveVM::new();
+    let vm = GenesisMoveVM::new(ChainId::test());
     let resolver = state_view.as_move_resolver();
 
     let mut session = vm.new_genesis_session(&resolver, HashValue::zero());

@@ -7,6 +7,7 @@ use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
+    chain_id::ChainId,
     state_store::StateView,
     transaction::{ChangeSet, Script, Version},
 };
@@ -102,15 +103,20 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
     }
 }
 
-pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, id: HashValue) -> ChangeSet
+pub fn build_changeset<S: StateView, F>(
+    state_view: &S,
+    procedure: F,
+    chain_id: ChainId,
+    genesis_id: HashValue,
+) -> ChangeSet
 where
     F: FnOnce(&mut GenesisSession),
 {
-    let vm = GenesisMoveVM::new();
+    let vm = GenesisMoveVM::new(chain_id);
 
     let change_set = {
         let resolver = state_view.as_move_resolver();
-        let mut session = GenesisSession(vm.new_genesis_session(&resolver, id));
+        let mut session = GenesisSession(vm.new_genesis_session(&resolver, genesis_id));
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();
