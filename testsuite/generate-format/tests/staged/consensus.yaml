@@ -175,19 +175,18 @@ BlockData:
     - block_type:
         TYPENAME: BlockType
 BlockEndInfo:
-  STRUCT:
-    - block_gas_limit_reached: BOOL
-    - block_output_limit_reached: BOOL
-    - block_effective_block_gas_units: U64
-    - block_approx_output_size: U64
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - block_gas_limit_reached: BOOL
+          - block_output_limit_reached: BOOL
+          - block_effective_block_gas_units: U64
+          - block_approx_output_size: U64
 BlockEpiloguePayload:
   ENUM:
     0:
-      BlockId:
-        NEWTYPE:
-          TYPENAME: HashValue
-    1:
-      WithBlockEndInfo:
+      V0:
         STRUCT:
           - block_id:
               TYPENAME: HashValue
