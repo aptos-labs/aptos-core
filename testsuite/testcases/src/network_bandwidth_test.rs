@@ -25,20 +25,19 @@ impl Test for NetworkBandwidthTest {
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for NetworkBandwidthTest {
-    fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
-        ctx.runtime
-            .block_on(
-                ctx.swarm
-                    .inject_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
-                        group_network_bandwidths: vec![GroupNetworkBandwidth {
-                            name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
-                            rate: RATE_MBPS,
-                            limit: LIMIT_BYTES,
-                            buffer: BUFFER_BYTES,
-                        }],
-                    })),
-            )?;
+    async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<LoadDestination> {
+        ctx.swarm
+            .inject_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
+                group_network_bandwidths: vec![GroupNetworkBandwidth {
+                    name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
+                    rate: RATE_MBPS,
+                    limit: LIMIT_BYTES,
+                    buffer: BUFFER_BYTES,
+                }],
+            }))
+            .await?;
 
         let msg = format!(
             "Limited bandwidth to {}mbps with limit {} and buffer {} to namespace",
@@ -50,19 +49,17 @@ impl NetworkLoadTest for NetworkBandwidthTest {
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
-    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
-        ctx.runtime
-            .block_on(
-                ctx.swarm
-                    .remove_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
-                        group_network_bandwidths: vec![GroupNetworkBandwidth {
-                            name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
-                            rate: RATE_MBPS,
-                            limit: LIMIT_BYTES,
-                            buffer: BUFFER_BYTES,
-                        }],
-                    })),
-            )?;
+    async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {
+        ctx.swarm
+            .remove_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
+                group_network_bandwidths: vec![GroupNetworkBandwidth {
+                    name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
+                    rate: RATE_MBPS,
+                    limit: LIMIT_BYTES,
+                    buffer: BUFFER_BYTES,
+                }],
+            }))
+            .await?;
         Ok(())
     }
 }

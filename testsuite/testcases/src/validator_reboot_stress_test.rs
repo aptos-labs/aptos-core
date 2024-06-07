@@ -6,7 +6,7 @@ use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, Swarm, Test, 
 use async_trait::async_trait;
 use rand::{seq::SliceRandom, thread_rng};
 use std::time::Duration;
-use tokio::{runtime::Runtime, time::Instant};
+use tokio::time::Instant;
 
 pub struct ValidatorRebootStressTest {
     pub num_simultaneously: usize,
@@ -20,40 +20,41 @@ impl Test for ValidatorRebootStressTest {
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for ValidatorRebootStressTest {
-    fn test(
+    async fn test(
         &self,
         swarm: &mut dyn Swarm,
         _report: &mut TestReport,
         duration: Duration,
     ) -> Result<()> {
         let start = Instant::now();
-        let runtime = Runtime::new().unwrap();
 
         let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
-        let mut rng = thread_rng();
-
         while start.elapsed() < duration {
-            let addresses: Vec<_> = all_validators
-                .choose_multiple(&mut rng, self.num_simultaneously)
-                .cloned()
-                .collect();
+            let addresses: Vec<_> = {
+                let mut rng = thread_rng();
+                all_validators
+                    .choose_multiple(&mut rng, self.num_simultaneously)
+                    .cloned()
+                    .collect()
+            };
             for adr in &addresses {
                 let validator_to_reboot = swarm.validator_mut(*adr).unwrap();
-                runtime.block_on(async { validator_to_reboot.stop().await })?;
+                validator_to_reboot.stop().await?;
             }
             if self.down_time_secs > 0.0 {
-                std::thread::sleep(Duration::from_secs_f32(self.down_time_secs));
+                tokio::time::sleep(Duration::from_secs_f32(self.down_time_secs)).await;
             }
 
             for adr in &addresses {
                 let validator_to_reboot = swarm.validator_mut(*adr).unwrap();
-                runtime.block_on(async { validator_to_reboot.start().await })?;
+                validator_to_reboot.start().await?;
             }
 
             if self.pause_secs > 0.0 {
-                std::thread::sleep(Duration::from_secs_f32(self.pause_secs));
+                tokio::time::sleep(Duration::from_secs_f32(self.pause_secs)).await;
             }
         }
 

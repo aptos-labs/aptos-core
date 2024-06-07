@@ -132,10 +132,11 @@ impl NetworkTest for PFNPerformance {
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for PFNPerformance {
     /// We must override the setup function to: (i) create PFNs in
     /// the swarm; and (ii) use those PFNs as the load destination.
-    fn setup(&self, ctx: &mut NetworkContext) -> Result<LoadDestination> {
+    async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> Result<LoadDestination> {
         // Add the PFNs to the swarm
         let pfn_peer_ids =
             create_and_add_pfns(ctx, self.num_pfns, self.config_override_fn.clone())?;
@@ -143,34 +144,38 @@ impl NetworkLoadTest for PFNPerformance {
         // Add CPU chaos to the swarm
         if self.add_cpu_chaos {
             let cpu_chaos = self.create_cpu_chaos(ctx.swarm);
-            ctx.runtime
-                .block_on(ctx.swarm.inject_chaos(SwarmChaos::CpuStress(cpu_chaos)))?;
+            ctx.swarm
+                .inject_chaos(SwarmChaos::CpuStress(cpu_chaos))
+                .await?;
         }
 
         // Add network emulation to the swarm
         if self.add_network_emulation {
             let network_chaos = self.create_network_emulation_chaos(ctx.swarm);
-            ctx.runtime
-                .block_on(ctx.swarm.inject_chaos(SwarmChaos::NetEm(network_chaos)))?;
+            ctx.swarm
+                .inject_chaos(SwarmChaos::NetEm(network_chaos))
+                .await?;
         }
 
         // Use the PFNs as the load destination
         Ok(LoadDestination::Peers(pfn_peer_ids))
     }
 
-    fn finish(&self, ctx: &mut NetworkContext) -> Result<()> {
+    async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> Result<()> {
         // Remove CPU chaos from the swarm
         if self.add_cpu_chaos {
             let cpu_chaos = self.create_cpu_chaos(ctx.swarm);
-            ctx.runtime
-                .block_on(ctx.swarm.remove_chaos(SwarmChaos::CpuStress(cpu_chaos)))?;
+            ctx.swarm
+                .remove_chaos(SwarmChaos::CpuStress(cpu_chaos))
+                .await?;
         }
 
         // Remove network emulation from the swarm
         if self.add_network_emulation {
             let network_chaos = self.create_network_emulation_chaos(ctx.swarm);
-            ctx.runtime
-                .block_on(ctx.swarm.remove_chaos(SwarmChaos::NetEm(network_chaos)))?;
+            ctx.swarm
+                .remove_chaos(SwarmChaos::NetEm(network_chaos))
+                .await?;
         }
 
         Ok(())

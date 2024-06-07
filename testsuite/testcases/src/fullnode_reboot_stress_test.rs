@@ -8,7 +8,7 @@ use aptos_forge::{
 use async_trait::async_trait;
 use rand::{seq::SliceRandom, thread_rng};
 use std::time::Duration;
-use tokio::{runtime::Runtime, time::Instant};
+use tokio::time::Instant;
 
 pub struct FullNodeRebootStressTest;
 
@@ -18,31 +18,32 @@ impl Test for FullNodeRebootStressTest {
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for FullNodeRebootStressTest {
-    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
+    async fn setup<'a>(&self, _ctx: &mut NetworkContext<'a>) -> Result<LoadDestination> {
         Ok(LoadDestination::AllFullnodes)
     }
 
-    fn test(
+    async fn test(
         &self,
         swarm: &mut dyn Swarm,
         _report: &mut TestReport,
         duration: Duration,
     ) -> Result<()> {
         let start = Instant::now();
-        let runtime = Runtime::new().unwrap();
 
         let all_fullnodes = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
 
-        let mut rng = thread_rng();
-
         while start.elapsed() < duration {
-            let fullnode_to_reboot = swarm
-                .full_node_mut(*all_fullnodes.choose(&mut rng).unwrap())
-                .unwrap();
-            runtime.block_on(async { fullnode_to_reboot.stop().await })?;
-            runtime.block_on(async { fullnode_to_reboot.start().await })?;
-            std::thread::sleep(Duration::from_secs(10));
+            let fullnode_to_reboot = {
+                let mut rng = thread_rng();
+                swarm
+                    .full_node_mut(*all_fullnodes.choose(&mut rng).unwrap())
+                    .unwrap()
+            };
+            fullnode_to_reboot.stop().await?;
+            fullnode_to_reboot.start().await?;
+            tokio::time::sleep(Duration::from_secs(10)).await;
         }
 
         Ok(())

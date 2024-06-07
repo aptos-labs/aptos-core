@@ -92,13 +92,14 @@ pub struct ExecutionDelayTest {
     pub add_execution_delay: ExecutionDelayConfig,
 }
 
+#[async_trait]
 impl NetworkLoadTest for ExecutionDelayTest {
-    fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
+    async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<LoadDestination> {
         add_execution_delay(ctx.swarm(), &self.add_execution_delay)?;
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
-    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
+    async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {
         remove_execution_delay(ctx.swarm())
     }
 }
@@ -125,16 +126,16 @@ pub struct NetworkUnreliabilityTest {
     pub config: NetworkUnreliabilityConfig,
 }
 
+#[async_trait]
 impl NetworkLoadTest for NetworkUnreliabilityTest {
-    fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
+    async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<LoadDestination> {
         let swarm = ctx.swarm();
-        let runtime = Runtime::new().unwrap();
         let validators = swarm.get_validator_clients_with_names();
 
-        runtime.block_on(async {
-            let mut rng = rand::thread_rng();
-            for (name, validator) in validators {
-                let drop_percentage = if rng.gen_bool(self.config.inject_unreliability_fraction) {
+        for (name, validator) in validators {
+            let drop_percentage = {
+                let mut rng = rand::thread_rng();
+                if rng.gen_bool(self.config.inject_unreliability_fraction) {
                     rng.gen_range(
                         1_u32,
                         (self.config.inject_max_unreliability_percentage * 1000.0) as u32,
@@ -142,50 +143,46 @@ impl NetworkLoadTest for NetworkUnreliabilityTest {
                         / 1000.0
                 } else {
                     0.0
-                };
-                info!(
-                    "Validator {} dropping {}% of messages",
-                    name, drop_percentage
-                );
-                validator
-                    .set_failpoint(
-                        "consensus::send::any".to_string(),
-                        format!("{}%return", drop_percentage),
+                }
+            };
+            info!(
+                "Validator {} dropping {}% of messages",
+                name, drop_percentage
+            );
+            validator
+                .set_failpoint(
+                    "consensus::send::any".to_string(),
+                    format!("{}%return", drop_percentage),
+                )
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "set_failpoint to add unreliability on {} failed, {:?}",
+                        name,
+                        e
                     )
-                    .await
-                    .map_err(|e| {
-                        anyhow::anyhow!(
-                            "set_failpoint to add unreliability on {} failed, {:?}",
-                            name,
-                            e
-                        )
-                    })?;
-            }
-            Ok::<(), anyhow::Error>(())
-        })?;
+                })?;
+        }
 
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
-    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
-        let runtime = Runtime::new().unwrap();
+    async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {
         let validators = ctx.swarm().get_validator_clients_with_names();
 
-        runtime.block_on(async {
-            for (name, validator) in validators {
-                validator
-                    .set_failpoint("consensus::send::any".to_string(), "off".to_string())
-                    .await
-                    .map_err(|e| {
-                        anyhow::anyhow!(
-                            "set_failpoint to remove unreliability on {} failed, {:?}",
-                            name,
-                            e
-                        )
-                    })?;
-            }
-            Ok(())
-        })
+        for (name, validator) in validators {
+            validator
+                .set_failpoint("consensus::send::any".to_string(), "off".to_string())
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "set_failpoint to remove unreliability on {} failed, {:?}",
+                        name,
+                        e
+                    )
+                })?;
+        }
+        Ok(())
     }
 }
 
@@ -283,25 +280,24 @@ pub fn create_swarm_cpu_stress(
     SwarmCpuStress { group_cpu_stresses }
 }
 
+#[async_trait]
 impl NetworkLoadTest for CpuChaosTest {
-    fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
+    async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<LoadDestination> {
         let swarm_cpu_stress = self.create_cpu_chaos(ctx.swarm());
 
-        ctx.runtime.block_on(
-            ctx.swarm
-                .inject_chaos(SwarmChaos::CpuStress(swarm_cpu_stress)),
-        )?;
+        ctx.swarm
+            .inject_chaos(SwarmChaos::CpuStress(swarm_cpu_stress))
+            .await?;
 
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
-    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
+    async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {
         let swarm_cpu_stress = self.create_cpu_chaos(ctx.swarm());
 
-        ctx.runtime.block_on(
-            ctx.swarm
-                .remove_chaos(SwarmChaos::CpuStress(swarm_cpu_stress)),
-        )
+        ctx.swarm
+            .remove_chaos(SwarmChaos::CpuStress(swarm_cpu_stress))
+            .await
     }
 }
 

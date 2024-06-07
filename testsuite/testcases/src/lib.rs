@@ -205,25 +205,26 @@ impl LoadDestination {
     }
 }
 
+#[async_trait]
 pub trait NetworkLoadTest: Test {
-    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
+    async fn setup<'a>(&self, _ctx: &mut NetworkContext<'a>) -> Result<LoadDestination> {
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
     // Load is started before this function is called, and stops after this function returns.
     // Expected duration is passed into this function, expecting this function to take that much
     // time to finish. How long this function takes will dictate how long the actual test lasts.
-    fn test(
+    async fn test(
         &self,
         _swarm: &mut dyn Swarm,
         _report: &mut TestReport,
         duration: Duration,
     ) -> Result<()> {
-        std::thread::sleep(duration);
+        tokio::time::sleep(duration).await;
         Ok(())
     }
 
-    fn finish(&self, _ctx: &mut NetworkContext) -> Result<()> {
+    async fn finish<'a>(&self, _ctx: &mut NetworkContext<'a>) -> Result<()> {
         Ok(())
     }
 }
@@ -244,14 +245,16 @@ impl NetworkTest for dyn NetworkLoadTest {
         let emit_job_request = ctx.emit_job.clone();
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let duration = ctx.global_duration;
-        let stats_by_phase = self.network_load_test(
-            ctx,
-            emit_job_request,
-            duration,
-            WARMUP_DURATION_FRACTION,
-            COOLDOWN_DURATION_FRACTION,
-            rng,
-        )?;
+        let stats_by_phase = self
+            .network_load_test(
+                ctx,
+                emit_job_request,
+                duration,
+                WARMUP_DURATION_FRACTION,
+                COOLDOWN_DURATION_FRACTION,
+                rng,
+            )
+            .await?;
 
         let phased = stats_by_phase.len() > 1;
         for (phase, phase_stats) in stats_by_phase.iter().enumerate() {
@@ -290,7 +293,7 @@ impl NetworkTest for dyn NetworkLoadTest {
             .block_on(ctx.swarm().get_client_with_newest_ledger_version())
             .context("no clients replied for end version")?;
 
-        self.finish(ctx).context("finish NetworkLoadTest ")?;
+        self.finish(ctx).await.context("finish NetworkLoadTest ")?;
 
         for phase_stats in stats_by_phase.into_iter() {
             ctx.check_for_success(
@@ -310,16 +313,16 @@ impl NetworkTest for dyn NetworkLoadTest {
 }
 
 impl dyn NetworkLoadTest + '_ {
-    pub fn network_load_test(
+    pub async fn network_load_test<'a>(
         &self,
-        ctx: &mut NetworkContext,
+        ctx: &mut NetworkContext<'a>,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
         rng: StdRng,
     ) -> Result<Vec<LoadTestPhaseStats>> {
-        let destination = self.setup(ctx).context("setup NetworkLoadTest")?;
+        let destination = self.setup(ctx).await.context("setup NetworkLoadTest")?;
         let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm());
 
         // Generate some traffic
@@ -376,6 +379,7 @@ impl dyn NetworkLoadTest + '_ {
 
             let join_stats = rt.spawn(job.periodic_stat_forward(phase_duration, 60));
             self.test(ctx.swarm, ctx.report, phase_duration)
+                .await
                 .context("test NetworkLoadTest")?;
             job = rt.block_on(join_stats).context("join stats")?;
             phase_timing.push(phase_start.elapsed());
@@ -565,7 +569,7 @@ impl NetworkTest for CompositeNetworkTest {
             let mut ctx_locker = ctxa.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();
             for wrapper in &self.wrappers {
-                wrapper.setup(ctx)?;
+                wrapper.setup(ctx).await?;
             }
         }
         self.test.run(ctxa.clone()).await?;
@@ -573,7 +577,7 @@ impl NetworkTest for CompositeNetworkTest {
             let mut ctx_locker = ctxa.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();
             for wrapper in &self.wrappers {
-                wrapper.finish(ctx)?;
+                wrapper.finish(ctx).await?;
             }
         }
         Ok(())

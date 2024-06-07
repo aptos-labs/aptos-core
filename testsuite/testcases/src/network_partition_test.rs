@@ -20,15 +20,14 @@ impl Test for NetworkPartitionTest {
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for NetworkPartitionTest {
-    fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
-        ctx.runtime
-            .block_on(
-                ctx.swarm
-                    .inject_chaos(SwarmChaos::Partition(SwarmNetworkPartition {
-                        partition_percentage: PARTITION_PERCENTAGE,
-                    })),
-            )?;
+    async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<LoadDestination> {
+        ctx.swarm
+            .inject_chaos(SwarmChaos::Partition(SwarmNetworkPartition {
+                partition_percentage: PARTITION_PERCENTAGE,
+            }))
+            .await?;
 
         let msg = format!(
             "Partitioned {}% validators in namespace",
@@ -45,14 +44,12 @@ impl NetworkLoadTest for NetworkPartitionTest {
             .unwrap()]))
     }
 
-    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
-        ctx.runtime
-            .block_on(
-                ctx.swarm
-                    .remove_chaos(SwarmChaos::Partition(SwarmNetworkPartition {
-                        partition_percentage: PARTITION_PERCENTAGE,
-                    })),
-            )?;
+    async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {
+        ctx.swarm
+            .remove_chaos(SwarmChaos::Partition(SwarmNetworkPartition {
+                partition_percentage: PARTITION_PERCENTAGE,
+            }))
+            .await?;
         Ok(())
     }
 }

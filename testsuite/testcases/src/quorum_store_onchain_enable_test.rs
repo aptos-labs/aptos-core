@@ -13,7 +13,6 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use std::time::Duration;
-use tokio::runtime::Runtime;
 
 const MAX_NODE_LAG_SECS: u64 = 360;
 
@@ -25,88 +24,81 @@ impl Test for QuorumStoreOnChainEnableTest {
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
-    fn test(
+    async fn test(
         &self,
         swarm: &mut dyn aptos_forge::Swarm,
         _report: &mut aptos_forge::TestReport,
         duration: std::time::Duration,
     ) -> anyhow::Result<()> {
-        let runtime = Runtime::new().unwrap();
-
         let faucet_endpoint: reqwest::Url = "http://localhost:8081".parse().unwrap();
         let rest_client = swarm.validators().next().unwrap().rest_client();
 
-        let mut cli = runtime.block_on(async {
-            CliTestFramework::new(
-                swarm.validators().next().unwrap().rest_api_endpoint(),
-                faucet_endpoint,
-                /*num_cli_accounts=*/ 0,
+        let rest_api_endpoint = swarm.validators().next().unwrap().rest_api_endpoint();
+        let mut cli = CliTestFramework::new(
+            rest_api_endpoint,
+            faucet_endpoint,
+            /*num_cli_accounts=*/ 0,
+        )
+        .await;
+
+        tokio::time::sleep(duration / 2).await;
+
+        let root_cli_index = {
+            let root_account = swarm.chain_info().root_account();
+            cli.add_account_with_address_to_cli(
+                root_account.private_key().clone(),
+                root_account.address(),
             )
-            .await
-        });
+        };
 
-        std::thread::sleep(duration / 2);
-
-        runtime.block_on(async {
-
-            let root_cli_index = {
-                let root_account = swarm.chain_info().root_account();
-                cli.add_account_with_address_to_cli(
-                    root_account.private_key().clone(),
-                    root_account.address(),
+        let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
+            &rest_client
+                .get_account_resource_bcs::<Vec<u8>>(
+                    CORE_CODE_ADDRESS,
+                    "0x1::consensus_config::ConsensusConfig",
                 )
-            };
-
-            let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
-                &rest_client
-                    .get_account_resource_bcs::<Vec<u8>>(
-                        CORE_CODE_ADDRESS,
-                        "0x1::consensus_config::ConsensusConfig",
-                    )
-                    .await
-                    .unwrap()
-                    .into_inner(),
-            )
-            .unwrap();
-
-            let inner = match current_consensus_config {
-                OnChainConsensusConfig::V1(inner) => inner,
-                OnChainConsensusConfig::V2(_) => panic!("Unexpected V2 config"),
-                _ => unimplemented!()
-            };
-
-            // Change to V2
-            let new_consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV1 { ..inner });
-
-            let update_consensus_config_script = format!(
-                r#"
-        script {{
-            use aptos_framework::aptos_governance;
-            use aptos_framework::consensus_config;
-            fun main(core_resources: &signer) {{
-                let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-                let config_bytes = {};
-                consensus_config::set(&framework_signer, config_bytes);
-            }}
-        }}
-        "#,
-                generate_onchain_config_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
-            );
-
-            cli.run_script_with_default_framework(root_cli_index, &update_consensus_config_script)
                 .await
-        })?;
+                .unwrap()
+                .into_inner(),
+        )
+        .unwrap();
 
-        std::thread::sleep(duration / 2);
+        let inner = match current_consensus_config {
+            OnChainConsensusConfig::V1(inner) => inner,
+            OnChainConsensusConfig::V2(_) => panic!("Unexpected V2 config"),
+            _ => unimplemented!(),
+        };
+
+        // Change to V2
+        let new_consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV1 { ..inner });
+
+        let update_consensus_config_script = format!(
+            r#"
+    script {{
+        use aptos_framework::aptos_governance;
+        use aptos_framework::consensus_config;
+        fun main(core_resources: &signer) {{
+            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let config_bytes = {};
+            consensus_config::set(&framework_signer, config_bytes);
+        }}
+    }}
+    "#,
+            generate_onchain_config_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
+        );
+
+        cli.run_script_with_default_framework(root_cli_index, &update_consensus_config_script)
+            .await?;
+
+        tokio::time::sleep(duration / 2).await;
 
         // Wait for all nodes to synchronize and stabilize.
         info!("Waiting for the validators to be synchronized.");
-        runtime.block_on(async {
-            swarm
-                .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
-                .await
-        })?;
+        swarm
+            .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
+            .await?;
 
         Ok(())
     }

@@ -1,9 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    create_emitter_and_request, traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
-};
+use crate::{create_emitter_and_request, LoadDestination, NetworkLoadTest};
 use aptos_forge::{
     success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
     EmitJobRequest, NetworkContextSynchronizer, NetworkTest, Result, Swarm, Test, TestReport,
@@ -24,8 +22,9 @@ impl Test for TwoTrafficsTest {
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for TwoTrafficsTest {
-    fn test(
+    async fn test(
         &self,
         swarm: &mut dyn Swarm,
         report: &mut TestReport,
@@ -46,15 +45,11 @@ impl NetworkLoadTest for TwoTrafficsTest {
             rng,
         )?;
 
-        let rt = traffic_emitter_runtime()?;
-
         let test_start = Instant::now();
 
-        let stats = rt.block_on(emitter.emit_txn_for(
-            swarm.chain_info().root_account,
-            emit_job_request,
-            duration,
-        ))?;
+        let stats = emitter
+            .emit_txn_for(swarm.chain_info().root_account, emit_job_request, duration)
+            .await?;
 
         let actual_test_duration = test_start.elapsed();
         info!(

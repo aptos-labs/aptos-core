@@ -34,8 +34,9 @@ impl Test for ChangingWorkingQuorumTest {
     }
 }
 
+#[async_trait]
 impl NetworkLoadTest for ChangingWorkingQuorumTest {
-    fn setup(&self, ctx: &mut NetworkContext) -> Result<LoadDestination> {
+    async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> Result<LoadDestination> {
         // because we are doing failure testing, we should be sending
         // traffic to nodes that are alive.
         if ctx.swarm().full_nodes().count() > 0 {
@@ -53,7 +54,7 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
         }
     }
 
-    fn test(
+    async fn test(
         &self,
         swarm: &mut dyn Swarm,
         _report: &mut TestReport,

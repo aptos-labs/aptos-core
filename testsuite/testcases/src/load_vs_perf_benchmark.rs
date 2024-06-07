@@ -182,7 +182,7 @@ impl Test for LoadVsPerfBenchmark {
 }
 
 impl LoadVsPerfBenchmark {
-    fn evaluate_single(
+    async fn evaluate_single(
         &self,
         ctx: &mut NetworkContext<'_>,
         workloads: &Workloads,
@@ -191,14 +191,17 @@ impl LoadVsPerfBenchmark {
     ) -> Result<Vec<SingleRunStats>> {
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let emit_job_request = workloads.configure(index, ctx.emit_job.clone());
-        let stats_by_phase = self.test.network_load_test(
-            ctx,
-            emit_job_request,
-            duration,
-            PER_TEST_WARMUP_DURATION_FRACTION,
-            PER_TEST_COOLDOWN_DURATION_FRACTION,
-            rng,
-        )?;
+        let stats_by_phase = self
+            .test
+            .network_load_test(
+                ctx,
+                emit_job_request,
+                duration,
+                PER_TEST_WARMUP_DURATION_FRACTION,
+                PER_TEST_COOLDOWN_DURATION_FRACTION,
+                rng,
+            )
+            .await?;
 
         let mut result = vec![];
         for (phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
@@ -275,7 +278,8 @@ impl NetworkTest for LoadVsPerfBenchmark {
                     phase_duration
                         .checked_mul(self.workloads.num_phases(index) as u32)
                         .unwrap(),
-                )?,
+                )
+                .await?,
             );
 
             if let Some(job) = continous_job.as_mut() {
