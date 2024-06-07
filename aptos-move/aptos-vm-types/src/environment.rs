@@ -18,6 +18,7 @@ use std::sync::Arc;
 pub struct Environment {
     pub chain_id: ChainId,
 
+    // Note: if features and timed features change, VM config needs re-initialization.
     pub features: Features,
     pub timed_features: TimedFeatures,
 
@@ -47,21 +48,21 @@ impl Environment {
         let chain_id = ChainId::test();
         let features = Features::default();
         let timed_features = TimedFeaturesBuilder::enable_all().build();
-        // Wrap as Arc here to simplify the code in callers.
         Arc::new(Self::initialize(features, timed_features, chain_id))
     }
 
     pub fn testing(chain_id: ChainId) -> Arc<Self> {
         let features = Features::default();
+
+        // FIXME: should probably read the timestamp from storage.
         let timed_features = TimedFeaturesBuilder::enable_all()
             .with_override_profile(TimedFeatureOverride::Testing)
             .build();
-        // Wrap as Arc here to simplify the code in tests.
+
         Arc::new(Self::initialize(features, timed_features, chain_id))
     }
 
     pub fn with_features_for_testing(self, features: Features) -> Arc<Self> {
-        // We need to re-initialize configs because they depend on the feature flags!
         Arc::new(Self::initialize(
             features,
             self.timed_features,
