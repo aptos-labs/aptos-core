@@ -40,21 +40,13 @@ impl<Db: DbReader> FinalityView<Db> {
             block_event.proposed_time(),
             None,
         );
-        // Sanity checks: finalization should not be set on an empty database,
-        // the finality version should not exceed the latest committed.
-        match self.reader.get_latest_state_checkpoint_version()? {
-            None => return Err(AptosDbError::Other("no ledger states to finalize".into())),
-            Some(ver) => {
-                if end_ver > ver {
-                    return Err(AptosDbError::Other(format!(
-                        "finality version {end_ver} exceeds committed version {ver}"
-                    )));
-                }
-            },
-        }
-        let ledger_info = LedgerInfo::new(block_info, HashValue::zero()); // we don't use consensus_data_hash
-        let aggregate_signature = aggregate_signature::AggregateSignature::empty(); // we don't use
-                                                                                    // aggregate_signatures
+        // FinalityView is created for Movement, where we don't use the consensus hash
+        // or the ledger info signatures. So we leave them empty here and can still construct
+        // a valid ledger info for the view.
+        // In a more general implementation, this API could accept LedgerInfoWithSignatures
+        // which is either preserved from an earlier version, or fudged like in our case.
+        let ledger_info = LedgerInfo::new(block_info, HashValue::zero());
+        let aggregate_signature = aggregate_signature::AggregateSignature::empty();
         let ledger_info = LedgerInfoWithSignatures::new(ledger_info, aggregate_signature);
         let mut fin_legder_info = self.finalized_ledger_info.write().unwrap();
         *fin_legder_info = Some(ledger_info);
