@@ -8,15 +8,20 @@ use crate::{errors::AptosDbError, DbReader, DbWriter, Result};
 use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::AccountResource,
+    account_config::{AccountResource, NewBlockEvent},
     account_state::AccountState,
+    aggregate_signature::AggregateSignature,
+    block_info::BlockInfo,
+    epoch_state::EpochState,
     event::EventHandle,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::SparseMerkleProofExt,
     state_store::{
         state_key::{StateKey, StateKeyInner},
         state_value::StateValue,
     },
     transaction::Version,
+    validator_verifier::ValidatorVerifier,
 };
 use move_core_types::move_resource::MoveResource;
 
@@ -68,14 +73,37 @@ impl DbReader for MockDbReaderWriter {
             .map(|value| (version, value)))
     }
 
-    fn get_block_info_by_height(
-        &self,
-        height: u64,
-    ) -> Result<(Version, Version, aptos_types::account_config::NewBlockEvent)> {
+    fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures> {
+        if known_version == 0 {
+            let next_epoch_state = EpochState {
+                epoch: 1,
+                verifier: ValidatorVerifier::new(vec![]),
+            };
+            let block_info = BlockInfo::new(
+                0,
+                0,
+                HashValue::new([1; HashValue::LENGTH]),
+                HashValue::zero(),
+                1,
+                1717757545265,
+                Some(next_epoch_state),
+            );
+            Ok(LedgerInfoWithSignatures::new(
+                LedgerInfo::new(block_info, HashValue::zero()),
+                AggregateSignature::empty(),
+            ))
+        } else {
+            Err(AptosDbError::NotFound(format!(
+                "mock ledger info for version {known_version}"
+            )))
+        }
+    }
+
+    fn get_block_info_by_height(&self, height: u64) -> Result<(Version, Version, NewBlockEvent)> {
         Ok((
             0,
             1,
-            aptos_types::account_config::NewBlockEvent::new(
+            NewBlockEvent::new(
                 AccountAddress::ONE,
                 0,
                 0,
