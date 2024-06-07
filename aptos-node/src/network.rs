@@ -8,7 +8,8 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_consensus::{
-    consensus_observer::network::ObserverMessage, network_interface::ConsensusMsg,
+    consensus_observer, consensus_observer::network::ObserverMessage,
+    network_interface::ConsensusMsg,
 };
 use aptos_dkg_runtime::DKGMessage;
 use aptos_event_notifications::EventSubscriptionService;
@@ -70,6 +71,7 @@ pub fn consensus_network_configuration(node_config: &NodeConfig) -> NetworkAppli
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
 
+/// Returns the network application config for the DKG client and service
 pub fn dkg_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
     let direct_send_protocols: Vec<ProtocolId> =
         aptos_dkg_runtime::network_interface::DIRECT_SEND.into();
@@ -86,6 +88,7 @@ pub fn dkg_network_configuration(node_config: &NodeConfig) -> NetworkApplication
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
 
+/// Returns the network application config for the JWK consensus client and service
 pub fn jwk_consensus_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
     let direct_send_protocols: Vec<ProtocolId> =
         aptos_jwk_consensus::network_interface::DIRECT_SEND.into();
@@ -163,23 +166,27 @@ pub fn storage_service_network_configuration(node_config: &NodeConfig) -> Networ
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
 
-pub fn observer_service_network_configuration(
-    _node_config: &NodeConfig,
+/// Returns the network application config for the consensus observer client and server
+pub fn consensus_observer_network_configuration(
+    node_config: &NodeConfig,
 ) -> NetworkApplicationConfig {
     let direct_send_protocols = vec![ProtocolId::ConsensusObserver];
     let rpc_protocols = vec![];
-    let max_network_channel_size = 100;
+    let max_network_channel_size = node_config.consensus_observer.max_network_channel_size as usize;
 
     let network_client_config =
         NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());
     let network_service_config = NetworkServiceConfig::new(
         direct_send_protocols,
         rpc_protocols,
-        aptos_channel::Config::new(max_network_channel_size).queue_style(QueueStyle::FIFO),
+        aptos_channel::Config::new(max_network_channel_size)
+            .queue_style(QueueStyle::FIFO)
+            .counters(&consensus_observer::metrics::PENDING_CONSENSUS_OBSERVER_NETWORK_EVENTS),
     );
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
 
+/// Returns the network application config for the netbench client and server
 pub fn netbench_network_configuration(
     node_config: &NodeConfig,
 ) -> Option<NetworkApplicationConfig> {
@@ -244,24 +251,24 @@ pub fn setup_networks_and_get_interfaces(
 ) -> (
     Vec<Runtime>,
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
+    Option<ApplicationNetworkInterfaces<ObserverMessage>>,
     Option<ApplicationNetworkInterfaces<DKGMessage>>,
     Option<ApplicationNetworkInterfaces<JWKConsensusMsg>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,
     ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
     ApplicationNetworkInterfaces<StorageServiceMessage>,
-    Option<ApplicationNetworkInterfaces<ObserverMessage>>,
 ) {
     // Gather all network configs
     let network_configs = extract_network_configs(node_config);
-    let observer_enabled = node_config.consensus_observer.publisher_enabled
-        || node_config.consensus_observer.observer_enabled;
 
     // Create each network and register the application handles
     let mut network_runtimes = vec![];
     let mut consensus_network_handle = None;
+    let mut consensus_observer_network_handles: Option<
+        Vec<ApplicationNetworkHandle<ObserverMessage>>,
+    > = None;
     let mut dkg_network_handle = None;
     let mut jwk_consensus_network_handle = None;
-    let mut observer_network_handles = vec![];
     let mut mempool_network_handles = vec![];
     let mut peer_monitoring_service_network_handles = vec![];
     let mut storage_service_network_handles = vec![];
@@ -290,37 +297,61 @@ pub fn setup_networks_and_get_interfaces(
             if consensus_network_handle.is_some() {
                 panic!("There can be at most one validator network!");
             } else {
-                consensus_network_handle = Some(register_client_and_service_with_network(
+                let network_handle = register_client_and_service_with_network(
                     &mut network_builder,
                     network_id,
                     &network_config,
                     consensus_network_configuration(node_config),
                     false,
-                ));
+                );
+                consensus_network_handle = Some(network_handle);
             }
 
             if dkg_network_handle.is_some() {
                 panic!("There can be at most one validator network!");
             } else {
-                dkg_network_handle = Some(register_client_and_service_with_network(
+                let network_handle = register_client_and_service_with_network(
                     &mut network_builder,
                     network_id,
                     &network_config,
                     dkg_network_configuration(node_config),
                     false,
-                ));
+                );
+                dkg_network_handle = Some(network_handle);
             }
 
             if jwk_consensus_network_handle.is_some() {
                 panic!("There can be at most one validator network!");
             } else {
-                jwk_consensus_network_handle = Some(register_client_and_service_with_network(
+                let network_handle = register_client_and_service_with_network(
                     &mut network_builder,
                     network_id,
                     &network_config,
                     jwk_consensus_network_configuration(node_config),
                     false,
-                ));
+                );
+                jwk_consensus_network_handle = Some(network_handle);
+            }
+        }
+
+        // Register consensus observer (both client and server) with the network
+        if node_config.consensus_observer.is_enabled() {
+            // Create the network handle for this network type
+            let network_handle = register_client_and_service_with_network(
+                &mut network_builder,
+                network_id,
+                &network_config,
+                consensus_observer_network_configuration(node_config),
+                true,
+            );
+
+            // Add the network handle to the set of handles
+            if let Some(consensus_observer_network_handles) =
+                &mut consensus_observer_network_handles
+            {
+                consensus_observer_network_handles.push(network_handle);
+            } else {
+                consensus_observer_network_handles = Some(vec![network_handle]);
             }
         }
 
@@ -354,18 +385,7 @@ pub fn setup_networks_and_get_interfaces(
         );
         storage_service_network_handles.push(storage_service_network_handle);
 
-        if observer_enabled {
-            let observer_network_handle = register_client_and_service_with_network(
-                &mut network_builder,
-                network_id,
-                &network_config,
-                observer_service_network_configuration(node_config),
-                true,
-            );
-            observer_network_handles.push(observer_network_handle);
-        }
-
-        // Register benchmark test service
+        // Register the network benchmark test service
         if let Some(app_config) = netbench_network_configuration(node_config) {
             let netbench_handle = register_client_and_service_with_network(
                 &mut network_builder,
@@ -390,21 +410,21 @@ pub fn setup_networks_and_get_interfaces(
     // Transform all network handles into application interfaces
     let (
         consensus_interfaces,
+        consensus_observer_interfaces,
         dkg_interfaces,
         jwk_consensus_interfaces,
         mempool_interfaces,
         peer_monitoring_service_interfaces,
         storage_service_interfaces,
-        observer_interfaces,
     ) = transform_network_handles_into_interfaces(
         node_config,
         consensus_network_handle,
+        consensus_observer_network_handles,
         dkg_network_handle,
         jwk_consensus_network_handle,
         mempool_network_handles,
         peer_monitoring_service_network_handles,
         storage_service_network_handles,
-        observer_network_handles,
         peers_and_metadata.clone(),
     );
 
@@ -421,20 +441,15 @@ pub fn setup_networks_and_get_interfaces(
         network_runtimes.push(netbench_runtime);
     }
 
-    let observer_interfaces = if observer_enabled {
-        Some(observer_interfaces)
-    } else {
-        None
-    };
     (
         network_runtimes,
         consensus_interfaces,
+        consensus_observer_interfaces,
         dkg_interfaces,
         jwk_consensus_interfaces,
         mempool_interfaces,
         peer_monitoring_service_interfaces,
         storage_service_interfaces,
-        observer_interfaces,
     )
 }
 
@@ -480,6 +495,7 @@ fn register_client_and_service_with_network<
 fn transform_network_handles_into_interfaces(
     node_config: &NodeConfig,
     consensus_network_handle: Option<ApplicationNetworkHandle<ConsensusMsg>>,
+    consensus_observer_network_handles: Option<Vec<ApplicationNetworkHandle<ObserverMessage>>>,
     dkg_network_handle: Option<ApplicationNetworkHandle<DKGMessage>>,
     jwk_consensus_network_handle: Option<ApplicationNetworkHandle<JWKConsensusMsg>>,
     mempool_network_handles: Vec<ApplicationNetworkHandle<MempoolSyncMsg>>,
@@ -487,16 +503,15 @@ fn transform_network_handles_into_interfaces(
         ApplicationNetworkHandle<PeerMonitoringServiceMessage>,
     >,
     storage_service_network_handles: Vec<ApplicationNetworkHandle<StorageServiceMessage>>,
-    observer_network_handles: Vec<ApplicationNetworkHandle<ObserverMessage>>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
+    Option<ApplicationNetworkInterfaces<ObserverMessage>>,
     Option<ApplicationNetworkInterfaces<DKGMessage>>,
     Option<ApplicationNetworkInterfaces<JWKConsensusMsg>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,
     ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
     ApplicationNetworkInterfaces<StorageServiceMessage>,
-    ApplicationNetworkInterfaces<ObserverMessage>,
 ) {
     let consensus_interfaces = consensus_network_handle.map(|consensus_network_handle| {
         create_network_interfaces(
@@ -505,6 +520,15 @@ fn transform_network_handles_into_interfaces(
             peers_and_metadata.clone(),
         )
     });
+
+    let consensus_observer_interfaces =
+        consensus_observer_network_handles.map(|consensus_observer_network_handles| {
+            create_network_interfaces(
+                consensus_observer_network_handles,
+                consensus_observer_network_configuration(node_config),
+                peers_and_metadata.clone(),
+            )
+        });
 
     let dkg_interfaces = dkg_network_handle.map(|handle| {
         create_network_interfaces(
@@ -527,30 +551,27 @@ fn transform_network_handles_into_interfaces(
         mempool_network_configuration(node_config),
         peers_and_metadata.clone(),
     );
+
     let peer_monitoring_service_interfaces = create_network_interfaces(
         peer_monitoring_service_network_handles,
         peer_monitoring_network_configuration(node_config),
         peers_and_metadata.clone(),
     );
+
     let storage_service_interfaces = create_network_interfaces(
         storage_service_network_handles,
         storage_service_network_configuration(node_config),
         peers_and_metadata.clone(),
     );
-    let observer_interfaces = create_network_interfaces(
-        observer_network_handles,
-        observer_service_network_configuration(node_config),
-        peers_and_metadata,
-    );
 
     (
         consensus_interfaces,
+        consensus_observer_interfaces,
         dkg_interfaces,
         jwk_consensus_interfaces,
         mempool_interfaces,
         peer_monitoring_service_interfaces,
         storage_service_interfaces,
-        observer_interfaces,
     )
 }
 

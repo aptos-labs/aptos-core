@@ -18,7 +18,7 @@ use aptos_consensus_types::pipeline::commit_decision::CommitDecision;
 use aptos_crypto::{bls12381, Genesis, HashValue};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
-use aptos_logger::{error, info};
+use aptos_logger::{debug, error, info};
 use aptos_network::protocols::{network::Event, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
@@ -226,6 +226,10 @@ impl Observer {
     }
 
     async fn process_sync_notify(&mut self, epoch: u64, round: Round) {
+        info!(
+            "[Observer] Received sync notify to epoch {}, round: {}",
+            epoch, round
+        );
         {
             let lock = self.root.lock();
             let expected = (lock.commit_info().epoch(), lock.commit_info().round());
@@ -366,6 +370,8 @@ impl Observer {
                                  }
                             }
                         }
+                    } else {
+                        debug!("[Observer] Received untracked event: {:?}", event);
                     }
                 },
                 Some((epoch, round)) = notifier_rx.recv() => {
