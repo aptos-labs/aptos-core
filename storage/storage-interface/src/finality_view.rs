@@ -70,6 +70,7 @@ mod tests {
     use std::sync::Arc;
 
     use aptos_crypto::HashValue;
+    use aptos_types::state_store::{state_key::StateKey, TStateView as _};
 
     use super::*;
     use crate::{mock::MockDbReaderWriter, state_view::LatestDbStateCheckpointView as _};
@@ -123,9 +124,12 @@ mod tests {
     fn test_latest_state_checkpoint_view() -> anyhow::Result<()> {
         let view = Arc::new(FinalityView::new(MockDbReaderWriter));
         let reader: Arc<dyn DbReader> = view.clone();
-        view.set_finalized_block_height(0)?;
-        let _latest_state_view = reader.latest_state_checkpoint_view()?;
-        // TODO: get some states available from the mock
+        view.set_finalized_block_height(1)?;
+        let latest_state_view = reader.latest_state_checkpoint_view()?;
+        // TODO: modify mock so we get different states for different versions
+        let key = StateKey::raw(vec![1]);
+        let value = latest_state_view.get_state_value(&key)?.unwrap();
+        assert_eq!(value.bytes(), &vec![1]);
         Ok(())
     }
 }
