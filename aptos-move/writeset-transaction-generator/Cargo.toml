@@ -15,10 +15,8 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-gas-schedule = { workspace = true } 
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-aptos-vm-types = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }

@@ -8,7 +8,7 @@ use aptos_types::{
         TimedFeaturesBuilder,
     },
     state_store::StateView,
-    vm::configs::{aptos_prod_vm_config, get_paranoid_type_checks, get_timed_feature_override},
+    vm::configs::{aptos_prod_vm_config, get_timed_feature_override},
 };
 use move_vm_runtime::config::VMConfig;
 use std::sync::Arc;
@@ -80,13 +80,11 @@ impl Environment {
         // By default, do not use delayed field optimization. Instead, clients should enable it
         // manually where applicable.
         let delayed_field_optimization_enabled = false;
-        let paranoid_type_checks = get_paranoid_type_checks();
 
         let vm_config = aptos_prod_vm_config(
             &features,
             &timed_features,
             delayed_field_optimization_enabled,
-            paranoid_type_checks,
         );
 
         Self {
@@ -95,15 +93,5 @@ impl Environment {
             timed_features,
             vm_config,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_genesis_environment() {
-        // FIXME
     }
 }

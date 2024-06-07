@@ -69,10 +69,10 @@ pub fn aptos_prod_vm_config(
     features: &Features,
     timed_features: &TimedFeatures,
     delayed_field_optimization_enabled: bool,
-    paranoid_type_checks: bool,
 ) -> VMConfig {
     let check_invariant_in_swap_loc =
         !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
+    let paranoid_type_checks = get_paranoid_type_checks();
 
     let mut type_max_cost = 0;
     let mut type_base_cost = 0;

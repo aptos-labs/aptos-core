@@ -4216,7 +4216,6 @@ dependencies = [
  "aptos-proptest-helpers",
  "aptos-types",
  "aptos-vm",
- "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
  "move-core-types",
@@ -4336,7 +4335,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
- "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-types",
