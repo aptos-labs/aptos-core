@@ -5,14 +5,14 @@ use aptos_keyless_pepper_common::BadPepperRequestError;
 use aptos_keyless_pepper_service::{
     about::ABOUT_JSON,
     account_managers::ACCOUNT_MANAGERS,
-    jwk,
+    jwk::{self, parse_jwks, DECODING_KEY_CACHE},
     metrics::start_metric_server,
     process_signature_v0, process_v0,
     vuf_keys::{PEPPER_VUF_VERIFICATION_KEY_JSON, VUF_SK},
-    ProcessingFailure,
-    ProcessingFailure::{BadRequest, InternalError},
+    ProcessingFailure::{self, BadRequest, InternalError},
 };
 use aptos_logger::info;
+use aptos_types::keyless::test_utils::get_sample_iss;
 use hyper::{
     header::{
         ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS,
@@ -78,8 +78,14 @@ async fn main() {
     );
     jwk::start_jwk_refresh_loop(
         "https://appleid.apple.com",
-        "https://appleid.apple.com/.well-known/openid-configuration",
+        "https://appleid.apple.com/auth/keys",
         Duration::from_secs(10),
+    );
+
+    let test_jwk = include_str!("../../../../types/src/jwks/rsa/secure_test_jwk.json");
+    DECODING_KEY_CACHE.insert(
+        get_sample_iss(),
+        parse_jwks(test_jwk).expect("test jwk should parse"),
     );
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 8000));

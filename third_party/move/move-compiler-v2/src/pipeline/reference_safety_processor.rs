@@ -116,10 +116,10 @@ use abstract_domain_derive::AbstractDomain;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use log::{debug, log_enabled, Level};
-use move_binary_format::file_format::CodeOffset;
+use move_binary_format::{file_format, file_format::CodeOffset};
 use move_model::{
     ast::TempIndex,
-    model::{FieldId, FunctionEnv, GlobalEnv, Loc, Parameter, QualifiedInstId, StructId},
+    model::{FieldId, FunId, FunctionEnv, GlobalEnv, Loc, Parameter, QualifiedInstId, StructId},
     ty::Type,
 };
 use move_stackless_bytecode::{
@@ -1603,13 +1603,17 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         }
     }
 
-    /// Process a function call. For now we implement standard Move semantics, where
+    /// Process a function call. For now, we implement standard Move semantics, where
     /// 1) every output immutable reference is a child of all input references;
     /// 2) every output mutable reference is a child of all input mutable references,
     /// because mutable references cannot be derived from immutable references.
     /// Here would be the point where to
     /// evaluate lifetime modifiers in future language versions.
     fn call_operation(&mut self, oper: Operation, dests: &[TempIndex], srcs: &[TempIndex]) {
+        // If this a function call, check acquires conditions for global borrows.
+        if let Operation::Function(mid, fid, inst) = &oper {
+            self.check_global_access(mid.qualified_inst(*fid, inst.clone()))
+        }
         // Check validness of arguments
         for src in srcs {
             self.check_read_local(*src, ReadMode::Argument);
@@ -1666,6 +1670,46 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         self.release_refs_not_alive_after();
         for dest in dests {
             self.check_write_local(*dest)
+        }
+    }
+
+    /// Checks whether a function potentially accesses a global resource which is
+    /// currently borrowed.
+    fn check_global_access(&mut self, fun_id: QualifiedInstId<FunId>) {
+        let fun = self.global_env().get_function(fun_id.to_qualified_id());
+        let specifiers = fun.get_access_specifiers().unwrap_or(&[]);
+
+        for (global, label) in &self.state.global_to_label_map {
+            let is_mut = self.state.children(label).any(|e| e.kind.is_mut());
+            // We are only checking positive specifiers, as negatives say nothing
+            // about what is accessed.
+            for spec in specifiers.iter().filter(|s| !s.negated) {
+                if spec
+                    .resource
+                    .1
+                    .matches(self.global_env(), &fun_id.inst, global)
+                    // For mut global borrows, no access is allowed at all. For
+                    // non-mut, write access is not allowed.
+                    && (is_mut || spec.kind.subsumes(&file_format::AccessKind::Writes))
+                {
+                    self.error_with_hints(
+                        self.cur_loc(),
+                        format!(
+                            "function {} global `{}` which is currently {}borrowed",
+                            spec.kind,
+                            self.global_env().display(global),
+                            if is_mut { "mutably " } else { "" }
+                        ),
+                        "function called here",
+                        self.borrow_info(label, |_| true)
+                            .into_iter()
+                            .chain(iter::once((
+                                spec.loc.clone(),
+                                "access declared here".to_owned(),
+                            ))),
+                    )
+                }
+            }
         }
     }
 

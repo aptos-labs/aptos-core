@@ -6,27 +6,22 @@ use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
-    loader::{Function, LoadedFunction, Loader, ModuleCache, ModuleStorage, ModuleStorageAdapter},
+    loader::{LoadedFunction, Loader, ModuleCache, ModuleStorage, ModuleStorageAdapter},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::{NativeFunction, NativeFunctions},
-    session::{LoadedFunctionInstantiation, SerializedReturnValues},
+    session::SerializedReturnValues,
 };
 use move_binary_format::{
     access::ModuleAccess,
-    binary_views::BinaryIndexedView,
     compatibility::Compatibility,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::{LocalIndex, SignatureIndex},
+    file_format::LocalIndex,
     normalized, CompiledModule, IndexKind,
 };
-use move_bytecode_verifier::script_signature;
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, TypeTag},
-    value::MoveTypeLayout,
-    vm_status::StatusCode,
+    account_address::AccountAddress, identifier::Identifier, language_storage::TypeTag,
+    value::MoveTypeLayout, vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -352,13 +347,9 @@ impl VMRuntime {
             .collect()
     }
 
-    #[allow(clippy::needless_collect)]
     fn execute_function_impl(
         &self,
-        func: Arc<Function>,
-        ty_args: Vec<Type>,
-        param_tys: Vec<Type>,
-        return_tys: Vec<Type>,
+        func: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
@@ -366,8 +357,11 @@ impl VMRuntime {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
-        let param_tys = param_tys
-            .into_iter()
+        let LoadedFunction { ty_args, function } = func;
+
+        let param_tys = function
+            .param_tys()
+            .iter()
             .map(|ty| ty.subst(&ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
@@ -382,14 +376,15 @@ impl VMRuntime {
         let (mut dummy_locals, deserialized_args) = self
             .deserialize_args(module_store, param_tys, serialized_args)
             .map_err(|e| e.finish(Location::Undefined))?;
-        let return_tys = return_tys
-            .into_iter()
+        let return_tys = function
+            .return_tys()
+            .iter()
             .map(|ty| ty.subst(&ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
 
         let return_values = Interpreter::entrypoint(
-            func,
+            function,
             ty_args,
             deserialized_args,
             data_store,
@@ -416,7 +411,7 @@ impl VMRuntime {
             .map_err(|e| e.finish(Location::Undefined))?;
 
         // locals should not be dropped until all return values are serialized
-        std::mem::drop(dummy_locals);
+        drop(dummy_locals);
 
         Ok(SerializedReturnValues {
             mutable_reference_outputs: serialized_mut_ref_outputs,
@@ -424,87 +419,18 @@ impl VMRuntime {
         })
     }
 
-    pub(crate) fn execute_function(
-        &self,
-        module: &ModuleId,
-        function_name: &IdentStr,
-        ty_args: Vec<TypeTag>,
-        serialized_args: Vec<impl Borrow<[u8]>>,
-        data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        extensions: &mut NativeContextExtensions,
-        bypass_declared_entry_check: bool,
-    ) -> VMResult<SerializedReturnValues> {
-        let (module, function, instantiation) =
-            self.loader
-                .load_function(module, function_name, &ty_args, data_store, module_store)?;
-
-        self.execute_function_instantiation(
-            LoadedFunction { module, function },
-            instantiation,
-            serialized_args,
-            data_store,
-            module_store,
-            gas_meter,
-            traversal_context,
-            extensions,
-            bypass_declared_entry_check,
-        )
-    }
-
     pub(crate) fn execute_function_instantiation(
         &self,
         func: LoadedFunction,
-        function_instantiation: LoadedFunctionInstantiation,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        bypass_declared_entry_check: bool,
     ) -> VMResult<SerializedReturnValues> {
-        let LoadedFunctionInstantiation {
-            ty_args,
-            param_tys,
-            return_tys,
-        } = function_instantiation;
-
-        fn check_is_entry(
-            _resolver: &BinaryIndexedView,
-            is_entry: bool,
-            _parameters_idx: SignatureIndex,
-            _return_idx: Option<SignatureIndex>,
-        ) -> PartialVMResult<()> {
-            if is_entry {
-                Ok(())
-            } else {
-                Err(PartialVMError::new(
-                    StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
-                ))
-            }
-        }
-        let additional_signature_checks = if bypass_declared_entry_check {
-            move_bytecode_verifier::no_additional_script_signature_checks
-        } else {
-            check_is_entry
-        };
-
-        let LoadedFunction { module, function } = func;
-
-        script_signature::verify_module_function_signature_by_name(
-            module.module(),
-            IdentStr::new(function.as_ref().name()).unwrap(),
-            additional_signature_checks,
-        )?;
-
         self.execute_function_impl(
-            function,
-            ty_args,
-            param_tys,
-            return_tys,
+            func,
             serialized_args,
             data_store,
             module_store,
@@ -514,7 +440,6 @@ impl VMRuntime {
         )
     }
 
-    // See Session::execute_script for what contracts to follow.
     pub(crate) fn execute_script(
         &self,
         script: impl Borrow<[u8]>,
@@ -526,22 +451,12 @@ impl VMRuntime {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<()> {
-        // load the script, perform verification
-        let (
-            func,
-            LoadedFunctionInstantiation {
-                ty_args,
-                param_tys,
-                return_tys,
-            },
-        ) = self
+        // Load the script first, verify it, and then execute the entry-point main function.
+        let main = self
             .loader
             .load_script(script.borrow(), &ty_args, data_store, module_store)?;
         self.execute_function_impl(
-            func,
-            ty_args,
-            param_tys,
-            return_tys,
+            main,
             serialized_args,
             data_store,
             module_store,

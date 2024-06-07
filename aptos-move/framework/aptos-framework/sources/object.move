@@ -475,8 +475,14 @@ module aptos_framework::object {
     }
 
     /// Transfer to the destination address using a LinearTransferRef.
-    public fun transfer_with_ref(ref: LinearTransferRef, to: address) acquires ObjectCore {
+    public fun transfer_with_ref(ref: LinearTransferRef, to: address) acquires ObjectCore, TombStone {
         assert!(!exists<Untransferable>(ref.self), error::permission_denied(ENOT_MOVABLE));
+
+        // Undo soft burn if present as we don't want the original owner to be able to reclaim by calling unburn later.
+        if (exists<TombStone>(ref.self)) {
+            let TombStone { original_owner: _ } = move_from<TombStone>(ref.self);
+        };
+
         let object = borrow_global_mut<ObjectCore>(ref.self);
         assert!(
             object.owner == ref.owner,
@@ -785,7 +791,7 @@ module aptos_framework::object {
     }
 
     #[test(creator = @0x123)]
-    fun test_linear_transfer(creator: &signer) acquires ObjectCore {
+    fun test_linear_transfer(creator: &signer) acquires ObjectCore, TombStone {
         let (hero_constructor, hero) = create_hero(creator);
         assert!(root_owner(hero) == @0x123, 0);
 
@@ -799,7 +805,7 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x50004, location = Self)]
-    fun test_bad_linear_transfer(creator: &signer) acquires ObjectCore {
+    fun test_bad_linear_transfer(creator: &signer) acquires ObjectCore, TombStone {
         let (hero_constructor, hero) = create_hero(creator);
         let transfer_ref = generate_transfer_ref(&hero_constructor);
         let linear_transfer_ref_good = generate_linear_transfer_ref(&transfer_ref);
@@ -810,12 +816,18 @@ module aptos_framework::object {
         transfer_with_ref(linear_transfer_ref_bad, @0x789);
     }
 
-    #[test(fx = @std)]
-    fun test_correct_auid(fx: signer) {
-        use std::features;
-        let feature = features::get_auids();
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
+    #[test(creator = @0x123)]
+    #[expected_failure(abort_code = 0x10008, location = Self)]
+    fun test_cannot_unburn_after_transfer_with_ref(creator: &signer) acquires ObjectCore, TombStone {
+        let (hero_constructor, hero) = create_hero(creator);
+        burn(creator, hero);
+        let transfer_ref = generate_transfer_ref(&hero_constructor);
+        transfer_with_ref(generate_linear_transfer_ref(&transfer_ref), @0x456);
+        unburn(creator, hero);
+    }
 
+    #[test(fx = @std)]
+    fun test_correct_auid() {
         let auid1 = aptos_framework::transaction_context::generate_auid_address();
         let bytes = aptos_framework::transaction_context::get_transaction_hash();
         std::vector::push_back(&mut bytes, 1);
@@ -1008,7 +1020,7 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 327689, location = Self)]
-    fun test_untransferable_direct_ownership_with_linear_transfer_ref(creator: &signer) acquires ObjectCore {
+    fun test_untransferable_direct_ownership_with_linear_transfer_ref(creator: &signer) acquires ObjectCore, TombStone {
         let (hero_constructor_ref, _) = create_hero(creator);
         let transfer_ref = generate_transfer_ref(&hero_constructor_ref);
         let linear_transfer_ref = generate_linear_transfer_ref(&transfer_ref);
@@ -1049,7 +1061,7 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 327689, location = Self)]
-    fun test_untransferable_indirect_ownership_with_linear_transfer_ref(creator: &signer) acquires ObjectCore {
+    fun test_untransferable_indirect_ownership_with_linear_transfer_ref(creator: &signer) acquires ObjectCore, TombStone {
         let (_, hero) = create_hero(creator);
         let (weapon_constructor_ref, weapon) = create_weapon(creator);
         transfer_to_object(creator, weapon, hero);
