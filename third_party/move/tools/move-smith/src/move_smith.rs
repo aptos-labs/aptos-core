@@ -732,28 +732,33 @@ impl MoveSmith {
         scope: &Scope,
         allow_struct: bool,
     ) -> Result<Type> {
+        // Try to use smaller ints more often to reduce input consumption
         let basics = vec![
-            Type::U8,
-            Type::U16,
-            Type::U32,
-            Type::U64,
-            Type::U128,
-            Type::U256,
-            Type::Bool,
+            (Type::U8, 15),
+            (Type::U16, 15),
+            (Type::U32, 15),
+            (Type::U64, 2),
+            (Type::U128, 2),
+            (Type::U256, 2),
+            (Type::Bool, 10),
         ];
+
         let mut categories = vec![basics];
 
         if allow_struct {
             let struct_ids = self.get_filtered_identifiers(None, Some(IDType::Struct), Some(scope));
             let structs = struct_ids
                 .iter()
-                .map(|id| Type::Struct(id.clone()))
-                .collect::<Vec<Type>>();
+                .map(|id| (Type::Struct(id.clone()), 1))
+                .collect::<Vec<(Type, u32)>>();
             categories.push(structs);
         }
 
         let chosen_cat = u.choose(&categories)?;
-        u.choose(chosen_cat).cloned()
+
+        let weights = chosen_cat.iter().map(|(_, w)| *w).collect::<Vec<u32>>();
+        let choice = choose_idx_weighted(u, &weights)?;
+        Ok(chosen_cat[choice].0.clone())
     }
 
     /// Get all callable functions in the given scope.
