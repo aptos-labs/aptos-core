@@ -1336,13 +1336,19 @@ impl Type {
         matches!(self, Type::Tuple(_))
     }
 
-    /// If this is a tuple that contains any immutable reference type, return true
-    pub fn is_tuple_containing_imm_ref(&self) -> bool {
-        if let Type::Tuple(tys) = self {
-            tys.iter().any(|ty| ty.is_immutable_reference())
-        } else {
-            false
+    /// Return the index position in a tuple type where self is immutable and `other` is mutable reference
+    pub fn immutable_mut_pair_from_tuple(&self, other: &Type) -> Vec<usize> {
+        let mut ret = vec![];
+        if let (Type::Tuple(tys), Type::Tuple(other_tys)) = (self, other) {
+            if tys.len() == other_tys.len() {
+                for (i, (ty, other_ty)) in tys.iter().zip(other_tys).enumerate() {
+                    if ty.is_immutable_reference() && other_ty.is_mutable_reference() {
+                        ret.push(i);
+                    }
+                }
+            }
         }
+        ret
     }
 }
 
