@@ -29,7 +29,7 @@ use std::{
     collections::HashMap,
     mem::size_of,
     ops::Bound,
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
 /// Estimated per-txn overhead of indexes. Needs to be updated if additional indexes are added.
@@ -560,6 +560,7 @@ impl TransactionStore {
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
+        before: Option<Instant>,
     ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
@@ -568,7 +569,7 @@ impl TransactionStore {
         // Add as many transactions to the batch as possible
         for (i, bucket) in self
             .timeline_index
-            .read_timeline(timeline_id, count)
+            .read_timeline(timeline_id, count, before)
             .iter()
             .enumerate()
             .rev()
