@@ -26,6 +26,7 @@
 -  [Function `exists_at`](#0x1_account_exists_at)
 -  [Function `get_guid_next_creation_num`](#0x1_account_get_guid_next_creation_num)
 -  [Function `get_sequence_number`](#0x1_account_get_sequence_number)
+-  [Function `originating_address`](#0x1_account_originating_address)
 -  [Function `increment_sequence_number`](#0x1_account_increment_sequence_number)
 -  [Function `get_authentication_key`](#0x1_account_get_authentication_key)
 -  [Function `rotate_authentication_key_internal`](#0x1_account_rotate_authentication_key_internal)
@@ -33,6 +34,7 @@
 -  [Function `rotate_authentication_key`](#0x1_account_rotate_authentication_key)
 -  [Function `rotate_authentication_key_with_rotation_capability`](#0x1_account_rotate_authentication_key_with_rotation_capability)
 -  [Function `offer_rotation_capability`](#0x1_account_offer_rotation_capability)
+-  [Function `set_originating_address`](#0x1_account_set_originating_address)
 -  [Function `is_rotation_capability_offered`](#0x1_account_is_rotation_capability_offered)
 -  [Function `get_rotation_capability_offer_for`](#0x1_account_get_rotation_capability_offer_for)
 -  [Function `revoke_rotation_capability`](#0x1_account_revoke_rotation_capability)
@@ -422,25 +424,25 @@ context because they include the TXN's unique sequence number.
 <code>sequence_number: u64</code>
 </dt>
 <dd>
-
+ The sequence number of the account whose key is being rotated.
 </dd>
 <dt>
 <code>originator: <b>address</b></code>
 </dt>
 <dd>
-
+ The address of the account whose key is being rotated.
 </dd>
 <dt>
 <code>current_auth_key: <b>address</b></code>
 </dt>
 <dd>
-
+ The current authentication key of the account whose key is being rotated.
 </dd>
 <dt>
 <code>new_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
-
+ The new public key that the account owner wants to rotate to.
 </dd>
 </dl>
 
@@ -682,6 +684,7 @@ Scheme identifier for Ed25519 signatures used to derive authentication keys for 
 
 <a id="0x1_account_EEXCEEDED_MAX_GUID_CREATION_NUM"></a>
 
+This account has exceeded the allocated GUIDs it can create. It should be impossible to reach this number for real applications
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_EEXCEEDED_MAX_GUID_CREATION_NUM">EEXCEEDED_MAX_GUID_CREATION_NUM</a>: u64 = 20;
@@ -739,6 +742,26 @@ The provided authentication key has an invalid length
 
 
 
+<a id="0x1_account_ENEW_AUTH_KEY_ALREADY_MAPPED"></a>
+
+The new authentication key already has an entry in the <code><a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a></code> table
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_ENEW_AUTH_KEY_ALREADY_MAPPED">ENEW_AUTH_KEY_ALREADY_MAPPED</a>: u64 = 21;
+</code></pre>
+
+
+
+<a id="0x1_account_ENEW_AUTH_KEY_SAME_AS_CURRENT"></a>
+
+The current authentication key and the new authentication key are the same
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_ENEW_AUTH_KEY_SAME_AS_CURRENT">ENEW_AUTH_KEY_SAME_AS_CURRENT</a>: u64 = 22;
+</code></pre>
+
+
+
 <a id="0x1_account_ENO_CAPABILITY"></a>
 
 The caller does not have a digital-signature-based capability to call this function
@@ -751,6 +774,7 @@ The caller does not have a digital-signature-based capability to call this funct
 
 <a id="0x1_account_ENO_SIGNER_CAPABILITY_OFFERED"></a>
 
+The signer capability is not offered to any address
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SIGNER_CAPABILITY_OFFERED">ENO_SIGNER_CAPABILITY_OFFERED</a>: u64 = 19;
@@ -1084,6 +1108,36 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
+<a id="0x1_account_originating_address"></a>
+
+## Function `originating_address`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_originating_address">originating_address</a>(auth_key: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_originating_address">originating_address</a>(auth_key: <b>address</b>): Option&lt;<b>address</b>&gt; <b>acquires</b> <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
+    <b>let</b> address_map_ref = &<b>borrow_global</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework).address_map;
+    <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(address_map_ref, auth_key)) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(address_map_ref, auth_key))
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_account_increment_sequence_number"></a>
 
 ## Function `increment_sequence_number`
@@ -1185,6 +1239,9 @@ Note that this does not update the <code><a href="account.md#0x1_account_Origina
 does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
 the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
 the format expected in <code>rotate_authentication_key</code>.
+
+If you'd like to followup with updating the <code><a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a></code> table, you can call
+<code><a href="account.md#0x1_account_set_originating_address">set_originating_address</a>()</code>.
 
 
 <pre><code>entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
@@ -1458,6 +1515,56 @@ offer, calling this function will replace the previous <code>recipient_address</
 
     // <b>update</b> the existing rotation capability offer or put in a new rotation capability offer for the current <a href="account.md#0x1_account">account</a>
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_swap_or_fill">option::swap_or_fill</a>(&<b>mut</b> account_resource.rotation_capability_offer.for, recipient_address);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_set_originating_address"></a>
+
+## Function `set_originating_address`
+
+For the given account, add an entry to <code><a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a></code> table mapping the account's
+authentication key to the account's address.
+
+Can be used as a followup to <code><a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>()</code> to reconcile the
+<code><a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a></code> table, or to establish a mapping for a new account that has not yet had
+its authentication key rotated.
+
+Aborts if there is already an entry in the <code><a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a></code> table for the account's
+authentication key.
+
+Kept as a private entry function to ensure that after an unproven rotation via
+<code><a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>()</code>, the <code><a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a></code> table is only updated under the
+authority of the new authentication key.
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_set_originating_address">set_originating_address</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_set_originating_address">set_originating_address</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a>, <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
+    <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>assert</b>!(<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
+    <b>let</b> auth_key_as_address =
+        <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(<b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr).authentication_key);
+    <b>let</b> address_map_ref_mut =
+        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework).address_map;
+    <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(address_map_ref_mut, auth_key_as_address)) {
+        <b>assert</b>!(
+            *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(address_map_ref_mut, auth_key_as_address) == account_addr,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ENEW_AUTH_KEY_ALREADY_MAPPED">ENEW_AUTH_KEY_ALREADY_MAPPED</a>)
+        );
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(address_map_ref_mut, auth_key_as_address, account_addr);
+    };
 }
 </code></pre>
 
@@ -1859,6 +1966,11 @@ in the event of key recovery.
 ) <b>acquires</b> <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
     <b>let</b> address_map = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework).address_map;
     <b>let</b> curr_auth_key = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(account_resource.authentication_key);
+    <b>let</b> new_auth_key = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(new_auth_key_vector);
+    <b>assert</b>!(
+        new_auth_key != curr_auth_key,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ENEW_AUTH_KEY_SAME_AS_CURRENT">ENEW_AUTH_KEY_SAME_AS_CURRENT</a>)
+    );
 
     // Checks `<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>[curr_auth_key]` is either unmapped, or mapped <b>to</b> `originating_address`.
     // If it's mapped <b>to</b> the originating <b>address</b>, removes that mapping.
@@ -1880,7 +1992,10 @@ in the event of key recovery.
     };
 
     // Set `<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>[new_auth_key] = originating_address`.
-    <b>let</b> new_auth_key = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(new_auth_key_vector);
+    <b>assert</b>!(
+        !<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(address_map, new_auth_key),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ENEW_AUTH_KEY_ALREADY_MAPPED">ENEW_AUTH_KEY_ALREADY_MAPPED</a>)
+    );
     <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(address_map, new_auth_key, originating_addr);
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
