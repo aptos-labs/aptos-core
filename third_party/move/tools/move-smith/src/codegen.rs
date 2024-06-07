@@ -209,6 +209,9 @@ impl CodeGenerator for Function {
 
 impl CodeGenerator for Block {
     fn emit_code_lines(&self) -> Vec<String> {
+        if self.stmts.is_empty() && self.return_expr.is_none() {
+            return vec!["{}".to_string()];
+        }
         let mut code = vec!["{".to_string()];
 
         let mut body = Vec::new();
@@ -253,7 +256,7 @@ impl CodeGenerator for Declaration {
         if let Some(ref expr) = self.value {
             code[0].push_str(" = ");
             let rhs = expr.emit_code_lines();
-            append_block(&mut code, rhs, INDENTATION_SIZE);
+            append_block(&mut code, rhs, 0);
         }
         code.last_mut().unwrap().push(';');
         code
@@ -276,6 +279,10 @@ impl CodeGenerator for Expression {
 impl CodeGenerator for StructInitialization {
     fn emit_code_lines(&self) -> Vec<String> {
         let mut code = vec![format!("{}", self.name.emit_code())];
+        if self.fields.is_empty() {
+            code.last_mut().unwrap().push_str(" {}");
+            return code;
+        }
 
         let mut body = vec!["{".to_string()];
 
@@ -283,11 +290,11 @@ impl CodeGenerator for StructInitialization {
         for (field, expr) in &self.fields {
             let mut curr_field = vec![format!("{}:", field.emit_code())];
             let rhs = expr.emit_code_lines();
-            append_block(&mut curr_field, rhs, INDENTATION_SIZE);
+            append_block(&mut curr_field, rhs, 0);
             field_inside.extend(curr_field);
             field_inside.last_mut().unwrap().push(',');
         }
-        append_code_lines_with_indentation(&mut body, field_inside, INDENTATION_SIZE);
+        append_code_lines_with_indentation(&mut body, field_inside, 0);
         body.push("}".to_string());
 
         append_block(&mut code, body, INDENTATION_SIZE);
