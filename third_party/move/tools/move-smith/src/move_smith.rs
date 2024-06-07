@@ -20,8 +20,9 @@
 use crate::{
     ast::*,
     config::Config,
-    names::{is_in_scope, Identifier, IdentifierPool, IdentifierType as IDType, Scope, ROOT_SCOPE},
+    names::{Identifier, IdentifierPool, IdentifierType as IDType, Scope, ROOT_SCOPE},
     types::{Type, TypePool},
+    utils::choose_idx_weighted,
 };
 use arbitrary::{Arbitrary, Result, Unstructured};
 use num_bigint::BigUint;
@@ -29,18 +30,19 @@ use std::cell::RefCell;
 
 /// Keeps track of the generation state.
 pub struct MoveSmith {
-    pub config: Config,
+    config: Config,
 
     // The output code
-    pub modules: Vec<RefCell<Module>>,
-    pub script: Option<Script>,
+    modules: Vec<RefCell<Module>>,
+    script: Option<Script>,
 
     // Skeleton Information
     function_signatures: Vec<FunctionSignature>,
 
     // Bookkeeping
-    pub id_pool: RefCell<IdentifierPool>,
-    pub type_pool: RefCell<TypePool>,
+    id_pool: RefCell<IdentifierPool>,
+    type_pool: RefCell<TypePool>,
+    expr_depth: RefCell<usize>,
 }
 
 impl Default for MoveSmith {
@@ -60,6 +62,7 @@ impl MoveSmith {
             function_signatures: Vec::new(),
             id_pool: RefCell::new(IdentifierPool::new()),
             type_pool: RefCell::new(TypePool::new()),
+            expr_depth: RefCell::new(0),
         }
     }
 
@@ -115,7 +118,7 @@ impl MoveSmith {
             let func = u.choose(&all_funcs)?;
             let mut call =
                 self.generate_call_to_function(u, &ROOT_SCOPE, &func.borrow().signature, false)?;
-            call.name = self.id_pool.borrow().flatten_access(&call.name).unwrap();
+            call.name = self.id_pool.borrow().flatten_access(&call.name);
             script.main.push(call);
         }
 
@@ -359,14 +362,14 @@ impl MoveSmith {
             num_stmts.unwrap_or(u.int_in_range(0..=self.config.max_num_stmts_in_block)?);
         let stmts = self.generate_statements(u, &block_scope, num_stmts)?;
         let return_expr = match ret_typ {
-            Some(ref typ) => Some(self.generate_block_return(u, parent_scope, typ)?),
+            Some(ref typ) => Some(self.generate_block_return(u, &block_scope, typ)?),
             None => None,
         };
         Ok(Block { stmts, return_expr })
     }
 
     /// Generate a return expression
-    /// Prefer to return a variable if possible
+    /// Prefer to return a variable in scope if possible
     fn generate_block_return(
         &self,
         u: &mut Unstructured,
@@ -430,25 +433,42 @@ impl MoveSmith {
     }
 
     /// Generate a random expression.
+    ///
+    /// To avoid infinite recursion, we limit the depth of the expression tree.
     fn generate_expression(
         &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Expression> {
-        // If no function is callable, then skip generating function calls.
-        let callable = self.get_callable_functions(parent_scope);
-        let max = if callable.is_empty() { 1 } else { 2 };
+        // Increment the expression depth
+        *self.expr_depth.borrow_mut() += 1;
+
+        // Reached the maximum depth, generate a dummy number literal
+        if *self.expr_depth.borrow() >= self.config.max_expr_depth {
+            *self.expr_depth.borrow_mut() -= 1;
+            return Ok(Expression::NumberLiteral(
+                self.generate_number_literal(u, None)?,
+            ));
+        }
+
+        let weights = vec![
+            1, // NumberLiteral
+            1, // Variable
+            // Boolean
+            // StructInitialization
+            1, // Block
+            // FunctionCall
+            // If no function is callable, then skip generating function calls.
+            match self.get_callable_functions(parent_scope).is_empty() {
+                true => 0,
+                false => 1,
+            },
+        ];
 
         let expr = loop {
-            match u.int_in_range(0..=max)? {
+            match choose_idx_weighted(u, &weights)? {
                 // Generate a number literal
-                0 => {
-                    break Expression::NumberLiteral(self.generate_number_literal(
-                        u,
-                        parent_scope,
-                        None,
-                    )?)
-                },
+                0 => break Expression::NumberLiteral(self.generate_number_literal(u, None)?),
                 // Generate a variable access
                 1 => {
                     let idents =
@@ -458,8 +478,17 @@ impl MoveSmith {
                         break Expression::Variable(ident);
                     }
                 },
-                // Generate a function call
+                // Generate a block
                 2 => {
+                    let ret_typ = match bool::arbitrary(u)? {
+                        true => Some(self.generate_basic_type(u)?),
+                        false => None,
+                    };
+                    let block = self.generate_block(u, parent_scope, None, ret_typ)?;
+                    break Expression::Block(Box::new(block));
+                },
+                // Generate a function call
+                3 => {
                     let call = self.generate_function_call(u, parent_scope)?;
                     match call {
                         Some(c) => break Expression::FunctionCall(c),
@@ -469,12 +498,18 @@ impl MoveSmith {
                 _ => panic!("Invalid expression type"),
             }
         };
+
+        // Decrement the expression depth
+        *self.expr_depth.borrow_mut() -= 1;
         Ok(expr)
     }
 
     /// Generate an expression of the given type.
     /// `allow_var`: allow using variable access, this is disabled for script
     /// `allow_call`: allow using function calls
+    ///
+    /// Assumption: calling `generate_expression_of_type` will not cause infinite recursion
+    /// since `generate_expression` is already bounded
     fn generate_expression_of_type(
         &self,
         u: &mut Unstructured,
@@ -489,11 +524,7 @@ impl MoveSmith {
         // Directly generate a value for basic types
         let candidate = match typ {
             Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::U128 | Type::U256 => {
-                Expression::NumberLiteral(self.generate_number_literal(
-                    u,
-                    parent_scope,
-                    Some(typ),
-                )?)
+                Expression::NumberLiteral(self.generate_number_literal(u, Some(typ))?)
             },
             Type::Bool => Expression::Boolean(bool::arbitrary(u)?),
             Type::Struct(id) => self.generate_struct_initialization(u, parent_scope, id)?,
@@ -601,7 +632,6 @@ impl MoveSmith {
     fn generate_number_literal(
         &self,
         u: &mut Unstructured,
-        _parent_scope: &Scope,
         typ: Option<&Type>,
     ) -> Result<NumberLiteral> {
         let idx = match typ {
@@ -667,8 +697,7 @@ impl MoveSmith {
     fn get_callable_functions(&self, scope: &Scope) -> Vec<FunctionSignature> {
         let mut callable = Vec::new();
         for f in self.function_signatures.iter() {
-            let parent_scope = self.id_pool.borrow().get_parent_scope_of(&f.name).unwrap();
-            if is_in_scope(scope, &parent_scope) {
+            if self.id_pool.borrow().is_id_in_scope(&f.name, scope) {
                 callable.push(f.clone());
             }
         }

@@ -26,6 +26,13 @@ impl Identifier {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Scope(pub Option<String>);
 
+impl Scope {
+    /// Convert the scope to an identifier.
+    pub fn to_identifier(&self) -> Option<Identifier> {
+        self.0.as_ref().map(|scope| Identifier(scope.clone()))
+    }
+}
+
 /// Represents the root scope.
 pub const ROOT_SCOPE: Scope = Scope(None);
 
@@ -37,16 +44,6 @@ pub fn merge_scopes(parent: &Scope, child: &Scope) -> Scope {
         (None, Some(c)) => Some(c.clone()),
         (None, None) => None,
     })
-}
-
-/// Checks if the child scope is in the parent scope.
-pub fn is_in_scope(child: &Scope, parent: &Scope) -> bool {
-    match (&child.0, &parent.0) {
-        (Some(c), Some(p)) => c == p || c.starts_with(&format!("{}::", p)),
-        (Some(_), None) => true,
-        (None, Some(_)) => false,
-        (None, None) => true,
-    }
 }
 
 /// Keeps track of all used identifiers and the scope information.
@@ -115,11 +112,11 @@ impl IdentifierPool {
         self.insert_new_identifier(&typ, Identifier(name.clone()));
         self.scopes.insert(Identifier(name.clone()), scope.clone());
         let child_scope = Scope(Some(name.clone()));
-        let scope = merge_scopes(scope, &child_scope);
-        (Identifier(name), scope)
+        let new_scope: Scope = merge_scopes(scope, &child_scope);
+        (Identifier(name), new_scope)
     }
 
-    /// Get the scope where the given identifier is accessible.
+    /// Get the outter most scope where the given identifier is accessible.
     pub fn get_parent_scope_of(&self, id: &Identifier) -> Option<Scope> {
         self.scopes.get(id).cloned()
     }
@@ -133,10 +130,42 @@ impl IdentifierPool {
     }
 
     /// Get the flattened access for an identifier used for script generation.
-    pub fn flatten_access(&self, id: &Identifier) -> Option<Identifier> {
-        match self.get_scope_for_children(id) {
-            Scope(Some(scope)) => Some(Identifier(scope)),
-            Scope(None) => None,
+    // TODO: this currently contains _block scopes, which might cause trouble.
+    pub fn flatten_access(&self, id: &Identifier) -> Identifier {
+        match self.scopes.get(id) {
+            Some(scope) => self
+                .merge_scopes(scope, &id.to_scope())
+                .to_identifier()
+                .unwrap(),
+            None => id.clone(),
+        }
+    }
+
+    /// Check if an identifier is accessible in the given scope.
+    pub fn is_id_in_scope(&self, id: &Identifier, scope: &Scope) -> bool {
+        // let flat_id = self.flatten_access(id);
+        let parent_of_id = self.get_parent_scope_of(id);
+        match parent_of_id {
+            Some(parent) => self.is_in_scope(scope, &parent),
+            None => true,
+        }
+    }
+
+    /// Check if an Identifier is accessible within another Identifier.
+    /// The parent identifier should be function, block, struct, etc.
+    pub fn is_id_in_id(&self, child: &Identifier, parent: &Identifier) -> bool {
+        let parent_scope = self.get_parent_scope_of(parent).unwrap();
+        self.is_id_in_scope(child, &parent_scope)
+    }
+
+    /// Returns whether child is the same as or within parent
+    /// e.g. (M1::F1::B1::B2, M1::F1) ==> true
+    fn is_in_scope(&self, child: &Scope, parent: &Scope) -> bool {
+        match (&child.0, &parent.0) {
+            (Some(c), Some(p)) => c == p || c.starts_with(&format!("{}::", p)),
+            (Some(_), None) => true,
+            (None, Some(_)) => false,
+            (None, None) => true,
         }
     }
 
@@ -148,8 +177,7 @@ impl IdentifierPool {
     ) -> Vec<Identifier> {
         let mut in_scope = Vec::new();
         for id in identifiers {
-            let id_scope = self.scopes.get(id).unwrap_or(&ROOT_SCOPE);
-            if is_in_scope(id_scope, parent_scope) {
+            if self.is_id_in_scope(id, parent_scope) {
                 in_scope.push(id.clone());
             }
         }
@@ -218,5 +246,14 @@ impl IdentifierPool {
             IdentifierType::Block => "_block",
         };
         format!("{}{}", type_prefix, idx)
+    }
+
+    fn merge_scopes(&self, parent: &Scope, child: &Scope) -> Scope {
+        Scope(match (&parent.0, &child.0) {
+            (Some(p), Some(c)) => Some(format!("{}::{}", p, c)),
+            (Some(p), None) => Some(p.clone()),
+            (None, Some(c)) => Some(c.clone()),
+            (None, None) => None,
+        })
     }
 }

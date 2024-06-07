@@ -177,32 +177,38 @@ impl CodeGenerator for Function {
         };
 
         let mut code = vec![format!(
-            "{}fun {}({}){} {{",
+            "{}fun {}({}){}",
             visibility,
             self.signature.name.emit_code(),
             parameters,
             return_type
         )];
-        let mut body = match self.body {
+        let body = match self.body {
             Some(ref body) => body.emit_code_lines(),
-            None => Vec::new(),
+            None => vec!["{}".to_string()],
         };
-
-        append_code_lines_with_indentation(&mut code, body, INDENTATION_SIZE);
-        code.push("}".to_string());
+        code.extend(body);
         code
     }
 }
 
 impl CodeGenerator for Block {
     fn emit_code_lines(&self) -> Vec<String> {
-        let mut code = Vec::new();
+        let mut code = vec!["{".to_string()];
+
+        let mut body = Vec::new();
         for stmt in &self.stmts {
-            code.extend(stmt.emit_code_lines());
+            body.extend(stmt.emit_code_lines());
         }
+
         if let Some(ref expr) = self.return_expr {
-            code.push(format!("{}", expr.emit_code()));
+            // body.push(format!("{}", expr.emit_code()));
+            body.extend(expr.emit_code_lines());
         }
+
+        append_code_lines_with_indentation(&mut code, body, INDENTATION_SIZE);
+
+        code.push("}".to_string());
         code
     }
 }
@@ -211,7 +217,13 @@ impl CodeGenerator for Statement {
     fn emit_code_lines(&self) -> Vec<String> {
         match self {
             Statement::Decl(decl) => decl.emit_code_lines(),
-            Statement::Expr(expr) => vec![format!("{};", expr.emit_code())],
+            Statement::Expr(expr) => {
+                let mut code = expr.emit_code_lines();
+                if !code.is_empty() {
+                    code.last_mut().unwrap().push(';');
+                }
+                code
+            },
         }
     }
 }
@@ -239,6 +251,7 @@ impl CodeGenerator for Expression {
             Expression::Boolean(b) => vec![b.to_string()],
             Expression::FunctionCall(c) => c.emit_code_lines(),
             Expression::StructInitialization(s) => s.emit_code_lines(),
+            Expression::Block(block) => block.emit_code_lines(),
         }
     }
 }

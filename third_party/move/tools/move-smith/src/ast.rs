@@ -137,6 +137,7 @@ pub enum Expression {
     Boolean(bool),
     FunctionCall(FunctionCall),
     StructInitialization(StructInitialization),
+    Block(Box<Block>),
 }
 
 /// A number literal.

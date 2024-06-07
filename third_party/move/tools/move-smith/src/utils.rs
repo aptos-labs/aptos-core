@@ -24,7 +24,7 @@ use tempfile::{tempdir, TempDir};
 // TODO: consider using `rand::distributions::WeightedIndex` for this.
 // The current `int_in_range` doesn't seems to be evenly distributed.
 // Concern is that the fuzzer will not be able to directly control the choice
-pub fn choose_idx_weighted(u: &mut Unstructured, weights: Vec<u32>) -> Result<usize> {
+pub fn choose_idx_weighted(u: &mut Unstructured, weights: &Vec<u32>) -> Result<usize> {
     assert!(!weights.is_empty());
     let sum = weights.iter().sum::<u32>();
     let thresholds = weights
@@ -36,12 +36,11 @@ pub fn choose_idx_weighted(u: &mut Unstructured, weights: Vec<u32>) -> Result<us
         .collect::<Vec<f32>>();
 
     let choice = u.int_in_range(0..=100)? as f32 / 100.0;
-    for i in 0..thresholds.len() {
-        if choice <= thresholds[i] {
+    for (i, threshold) in thresholds.iter().enumerate() {
+        if choice <= *threshold {
             return Ok(i);
         }
     }
-    println!("searchme: hit the end, choice was: {:?}", choice);
     Ok(0)
 }
 
@@ -136,7 +135,7 @@ fn process_transactional_test_err(err: Box<dyn Error>) -> Result<(), Box<dyn Err
 mod tests {
     use super::*;
 
-    fn check_frequency(weights: &Vec<u32>, counts: &Vec<u32>, tolerance: f64) {
+    fn check_frequency(weights: &[u32], counts: &[u32], tolerance: f64) {
         let sum = weights.iter().sum::<u32>() as f64;
         let total_times = counts.iter().sum::<u32>() as f64;
         for idx in 0..weights.len() {
@@ -163,7 +162,7 @@ mod tests {
 
         let total_times = 1000;
         for _ in 0..total_times {
-            let idx = choose_idx_weighted(&mut u, weights.clone()).unwrap();
+            let idx = choose_idx_weighted(&mut u, &weights).unwrap();
             counts[idx] += 1;
         }
         assert!(counts[0] < counts[1]);
@@ -181,7 +180,7 @@ mod tests {
 
         let total_times = 1000;
         for _ in 0..total_times {
-            let idx = choose_idx_weighted(&mut u, weights.clone()).unwrap();
+            let idx = choose_idx_weighted(&mut u, &weights).unwrap();
             counts[idx] += 1;
         }
         assert_eq!(counts[1], 0);

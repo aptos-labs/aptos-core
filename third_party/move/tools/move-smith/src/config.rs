@@ -26,27 +26,32 @@ pub struct Config {
     pub max_num_stmts_in_block: usize,
 
     pub max_num_calls_in_script: usize,
+
+    // Maximum depth of nested expression
+    pub max_expr_depth: usize,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             max_num_modules: 3,
-            max_num_functions_in_module: 10,
-            max_num_structs_in_module: 10,
-            max_num_uses_in_module: 10,
-            max_num_friends_in_module: 10,
-            max_num_constants_in_module: 10,
-            max_num_specs_in_module: 10,
+            max_num_functions_in_module: 5,
+            max_num_structs_in_module: 5,
+            max_num_uses_in_module: 5,
+            max_num_friends_in_module: 5,
+            max_num_constants_in_module: 5,
+            max_num_specs_in_module: 5,
 
             max_num_fields_in_struct: 5,
 
-            max_num_stmts_in_func: 20,
-            max_num_params_in_func: 5,
+            max_num_stmts_in_func: 10,
+            max_num_params_in_func: 3,
 
             max_num_stmts_in_block: 10,
 
             max_num_calls_in_script: 20,
+
+            max_expr_depth: 5,
         }
     }
 }
