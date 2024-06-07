@@ -91,7 +91,7 @@ impl<'t> NetworkContext<'t> {
         &mut self.core
     }
 
-    pub fn check_for_success(
+    pub async fn check_for_success(
         &mut self,
         stats: &TxnStats,
         window: Duration,
@@ -101,19 +101,19 @@ impl<'t> NetworkContext<'t> {
         start_version: u64,
         end_version: u64,
     ) -> Result<()> {
-        self.runtime
-            .block_on(SuccessCriteriaChecker::check_for_success(
-                &self.success_criteria,
-                self.swarm,
-                self.report,
-                stats,
-                window,
-                latency_breakdown,
-                start_time,
-                end_time,
-                start_version,
-                end_version,
-            ))
+        SuccessCriteriaChecker::check_for_success(
+            &self.success_criteria,
+            self.swarm,
+            self.report,
+            stats,
+            window,
+            latency_breakdown,
+            start_time,
+            end_time,
+            start_version,
+            end_version,
+        )
+        .await
     }
 
     pub fn handle(&self) -> Handle {

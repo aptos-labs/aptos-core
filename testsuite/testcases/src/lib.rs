@@ -308,6 +308,7 @@ impl NetworkTest for dyn NetworkLoadTest {
                 start_version,
                 end_version,
             )
+            .await
             .context("check for success")?;
         }
 
@@ -345,7 +346,8 @@ impl dyn NetworkLoadTest + '_ {
         }
 
         info!("Starting emitting txns for {}s", duration.as_secs());
-        let mut job = emitter.start_job(
+        let mut job = emitter
+            .start_job(
                 ctx.swarm().chain_info().root_account,
                 emit_job_request,
                 stats_tracking_phases,
@@ -399,7 +401,9 @@ impl dyn NetworkLoadTest + '_ {
 
         let cooldown_used = cooldown_start.elapsed();
         if cooldown_used < cooldown_duration {
-            job = job.periodic_stat_forward(cooldown_duration - cooldown_used, 60).await;
+            job = job
+                .periodic_stat_forward(cooldown_duration - cooldown_used, 60)
+                .await;
         }
         info!("{}s cooldown finished", cooldown_duration.as_secs());
 
@@ -430,7 +434,8 @@ impl dyn NetworkLoadTest + '_ {
                 ctx.swarm(),
                 phase_timing[i].start_unixtime_s,
                 phase_timing[i].end_unixtime_s,
-            ).await?;
+            )
+            .await?;
             info!(
                 "Latency breakdown details for phase {}: from {} to {}: {:?}",
                 i,
