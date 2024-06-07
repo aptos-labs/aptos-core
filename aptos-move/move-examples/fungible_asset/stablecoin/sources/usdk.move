@@ -328,8 +328,11 @@ module stablecoin::usdk {
     // Check that the account is not denylisted by checking the frozen flag on the primary store
     fun assert_not_denylisted(account: address) {
         let metadata = metadata();
-        if (primary_fungible_store::primary_store_exists(account, metadata)) {
-            assert!(!fungible_asset::is_frozen(primary_fungible_store::primary_store(account, metadata)), EDENYLISTED);
+        let metadata_addr = object::object_address(&metadata);
+        let primary_store_address = object::create_user_derived_object_address(account, metadata_addr);
+        if (fungible_asset::store_exists(primary_store_address)) {
+            let primary_store = object::address_to_object<FungibleStore>(primary_store_address);
+            assert!(!fungible_asset::is_frozen(primary_store), EDENYLISTED);
         }
     }
 
