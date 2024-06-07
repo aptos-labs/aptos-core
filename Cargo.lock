@@ -2584,6 +2584,7 @@ name = "aptos-move-debugger"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-executor",
  "aptos-consensus",
  "aptos-crypto",
  "aptos-gas-profiling",
@@ -2596,6 +2597,7 @@ dependencies = [
  "aptos-vm-types",
  "bcs 0.1.4",
  "clap 4.4.14",
+ "itertools 0.12.1",
  "regex",
  "reqwest",
  "tokio",

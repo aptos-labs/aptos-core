@@ -5,21 +5,22 @@ use anyhow::{bail, format_err, Result};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_rest_client::Client;
 use aptos_types::{
-    account_address::AccountAddress,
-    state_store::TStateView,
-    transaction::{
+    account_address::AccountAddress, block_executor::config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig}, state_store::TStateView, transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
         Transaction, TransactionInfo, TransactionOutput, TransactionPayload, Version,
-    },
-    vm_status::VMStatus,
+    }, vm_status::VMStatus
 };
 use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM, VMExecutor};
+use aptos_vm::{aptos_vm::RAYON_EXEC_POOL, block_executor::{AptosTransactionOutput, BlockAptosVM}, data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;
-use std::{path::Path, sync::Arc};
+use std::{path::Path, sync::Arc, time::Instant};
+use itertools::Itertools;
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_types::transaction::BlockOutput;
+
 
 pub struct AptosDebugger {
     debugger: Arc<dyn AptosValidatorInterface + Send>,
@@ -45,32 +46,80 @@ impl AptosDebugger {
         version: Version,
         txns: Vec<Transaction>,
         repeat_execution_times: u64,
+        concurrency_levels: &[usize]
     ) -> Result<Vec<TransactionOutput>> {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
 
-        let result = AptosVM::execute_block_no_limit(&sig_verified_txns, &state_view)
-            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
+        let transaction_types = sig_verified_txns
+            .iter()
+            .map(|txn| txn.expect_valid().type_name().to_string())
+            // conflate same consecutive elements into one with count
+            .group_by(|k| k.clone())
+            .into_iter()
+            .map(|(k, r)| {
+                let num = r.count();
+                if num > 1 { format!("{} {}s", num, k) } else { k }
+            })
+            .collect::<Vec<_>>();
+        let entry_functions = sig_verified_txns
+            .iter()
+            .filter_map(|txn|
+                txn.expect_valid().try_as_signed_user_txn()
+                    .map(|txn| match &txn.payload() {
+                        TransactionPayload::EntryFunction(txn) => format!("entry: {:?}::{:?}", txn.module().name.as_str(), txn.function().as_str()),
+                        TransactionPayload::Script(_) => "script".to_string(),
+                        TransactionPayload::ModuleBundle(_) => panic!("deprecated module bundle"),
+                        TransactionPayload::Multisig(_) => "multisig".to_string(),
+                    })
+            )
+            // Count number of instances for each (irrsepsecitve of order)
+            .sorted()
+            .group_by(|k| k.clone())
+            .into_iter()
+            .map(|(k, r)| (r.count(), k))
+            .sorted_by_key(|(num, _k)| *num)
+            .rev()
+            .map(|(num, k)| if num > 1 { format!("{} {}s", num, k) } else { k })
+            .collect::<Vec<_>>();
+        println!("[{} txns from {}] Transaction types: {:?}", sig_verified_txns.len(), version, transaction_types);
+        println!("[{} txns from {}] Entry Functions {:?}", sig_verified_txns.len(), version, entry_functions);
 
-        for i in 1..repeat_execution_times {
-            let repeat_result = AptosVM::execute_block_no_limit(&sig_verified_txns, &state_view)
-                .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
-            println!(
-                "Finished execution round {}/{} with {} transactions",
-                i,
-                repeat_execution_times,
-                sig_verified_txns.len()
-            );
-            if !Self::ensure_output_matches(&repeat_result, &result, version) {
-                bail!(
-                    "Execution result mismatched in round {}/{}",
-                    i,
-                    repeat_execution_times
+        let mut result = None;
+
+        for concurrency_level in concurrency_levels {
+            for i in 0..repeat_execution_times {
+                let start_time = Instant::now();
+                let cur_result = execute_block_no_limit(&sig_verified_txns, &state_view, *concurrency_level)
+                    .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
+
+                println!(
+                    "[{} txns from {}] Finished execution round {}/{} with concurrency_level={} in {}ms",
+                    sig_verified_txns.len(),
+                    version,
+                    i + 1,
+                    repeat_execution_times,
+                    concurrency_level,
+                    start_time.elapsed().as_millis(),
                 );
+
+                match &result {
+                    None => result = Some(cur_result),
+                    Some(prev_result) => {
+                        if !Self::ensure_output_matches(&cur_result, prev_result, version) {
+                            bail!(
+                                "Execution result mismatched in round {}/{}",
+                                i,
+                                repeat_execution_times
+                            );
+                        }
+                    }
+                }
             }
         }
-        Ok(result)
+
+        Ok(result.unwrap())
     }
 
     pub fn execute_transaction_at_version_with_gas_profiler(
@@ -127,31 +176,43 @@ impl AptosDebugger {
         &self,
         mut begin: Version,
         mut limit: u64,
+        use_same_block_boundaries: bool,
         repeat_execution_times: u64,
+        concurrency_levels: &[usize],
     ) -> Result<Vec<TransactionOutput>> {
         let (mut txns, mut txn_infos) = self
             .debugger
             .get_committed_transactions(begin, limit)
             .await?;
 
-        let mut ret = vec![];
-        while limit != 0 {
-            println!(
-                "Starting epoch execution at {:?}, {:?} transactions remaining",
-                begin, limit
-            );
-            let mut epoch_result = self
-                .execute_transactions_by_epoch(begin, txns.clone(), repeat_execution_times)
-                .await?;
-            begin += epoch_result.len() as u64;
-            limit -= epoch_result.len() as u64;
-            txns = txns.split_off(epoch_result.len());
-            let epoch_txn_infos = txn_infos.drain(0..epoch_result.len()).collect::<Vec<_>>();
-            Self::print_mismatches(&epoch_result, &epoch_txn_infos, begin);
+        if use_same_block_boundaries {
+            // when going block by block, no need to worry about epoch boundaries
+            // as new epoch is always a new block.
+            Ok(self
+                .execute_transactions_by_block(begin, txns.clone(), repeat_execution_times, concurrency_levels)
+                .await?)
+        } else {
+            let mut ret = vec![];
+            while limit != 0 {
+                println!(
+                    "Starting epoch execution at {:?}, {:?} transactions remaining",
+                    begin, limit
+                );
 
-            ret.append(&mut epoch_result);
+                let mut epoch_result =
+                     self
+                        .execute_transactions_by_epoch(begin, txns.clone(), repeat_execution_times, concurrency_levels)
+                        .await?;
+                begin += epoch_result.len() as u64;
+                limit -= epoch_result.len() as u64;
+                txns = txns.split_off(epoch_result.len());
+                let epoch_txn_infos = txn_infos.drain(0..epoch_result.len()).collect::<Vec<_>>();
+                Self::print_mismatches(&epoch_result, &epoch_txn_infos, begin);
+
+                ret.append(&mut epoch_result);
+            }
+            Ok(ret)
         }
-        Ok(ret)
     }
 
     fn print_mismatches(
@@ -195,8 +256,9 @@ impl AptosDebugger {
         begin: Version,
         txns: Vec<Transaction>,
         repeat_execution_times: u64,
+        concurrency_levels: &[usize]
     ) -> Result<Vec<TransactionOutput>> {
-        let results = self.execute_transactions_at_version(begin, txns, repeat_execution_times)?;
+        let results = self.execute_transactions_at_version(begin, txns, repeat_execution_times, concurrency_levels)?;
         let mut ret = vec![];
         let mut is_reconfig = false;
 
@@ -209,6 +271,34 @@ impl AptosDebugger {
             }
             ret.push(result)
         }
+        Ok(ret)
+    }
+
+    pub async fn execute_transactions_by_block(
+        &self,
+        begin: Version,
+        txns: Vec<Transaction>,
+        repeat_execution_times: u64,
+        concurrency_levels: &[usize],
+    ) -> Result<Vec<TransactionOutput>> {
+        let mut ret = vec![];
+        let mut cur = vec![];
+        let mut cur_version = begin;
+        for txn in txns {
+            if txn.try_as_block_metadata().is_some() || txn.try_as_block_metadata_ext().is_some() {
+                if !cur.is_empty() {
+                    let results = self.execute_transactions_at_version(cur_version, cur.clone(), repeat_execution_times, concurrency_levels)?;
+                    assert_eq!(cur.len(), results.len());
+                    cur_version += results.len() as u64;
+                    ret.extend(results);
+                    cur.clear();
+                }
+            }
+            cur.push(txn);
+        }
+        let results = self.execute_transactions_at_version(cur_version, cur, repeat_execution_times, concurrency_levels)?;
+        ret.extend(results);
+
         Ok(ret)
     }
 
@@ -247,4 +337,22 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
         .events()
         .iter()
         .any(|event| event.event_key() == Some(&new_epoch_event_key))
+}
+
+fn execute_block_no_limit(sig_verified_txns: &[SignatureVerifiedTransaction], state_view: &DebuggerStateView, concurrency_level: usize) -> Result<Vec<TransactionOutput>, VMStatus> {
+    BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
+        Arc::clone(&RAYON_EXEC_POOL),
+        sig_verified_txns,
+        state_view,
+        BlockExecutorConfig {
+            local: BlockExecutorLocalConfig {
+                concurrency_level,
+                allow_fallback: true,
+                discard_failed_blocks: false,
+            },
+            onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        },
+        None,
+    )
+    .map(BlockOutput::into_transaction_outputs_forced)
 }

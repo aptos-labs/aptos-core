@@ -67,6 +67,7 @@ pub enum StateViewId {
     TransactionValidation { base_version: Version },
     /// For test, db-bootstrapper, etc. Usually not aimed to pass to VM.
     Miscellaneous,
+    Replay,
 }
 
 impl<R, S, K> TStateView for R
