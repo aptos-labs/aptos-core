@@ -721,7 +721,7 @@ where
 
     fn worker_loop(
         &self,
-        env: E::Environment,
+        env: &E::Environment,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
@@ -735,7 +735,7 @@ where
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(env, base_view);
+        let executor = E::init(env.clone(), base_view);
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
@@ -836,7 +836,7 @@ where
 
     pub(crate) fn execute_transactions_parallel(
         &self,
-        env: E::Environment,
+        env: &E::Environment,
         signature_verified_block: &[T],
         base_view: &S,
     ) -> Result<BlockOutput<E::Output>, ()> {
@@ -884,7 +884,7 @@ where
             for _ in 0..self.config.local.concurrency_level {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
-                        env.clone(),
+                        env,
                         signature_verified_block,
                         &last_input_output,
                         &versioned_cache,
@@ -896,7 +896,7 @@ where
                         &final_results,
                     ) {
                         // If there are multiple errors, they all get logged:
-                        // ModulePathReadWriteError and FatalVMErrorvariant is logged at construction,
+                        // ModulePathReadWriteError and FatalVMError variant is logged at construction,
                         // and below we log CodeInvariantErrors.
                         if let PanicOr::CodeInvariantError(err_msg) = err {
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
@@ -1290,11 +1290,8 @@ where
         base_view: &S,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
         if self.config.local.concurrency_level > 1 {
-            let parallel_result = self.execute_transactions_parallel(
-                env.clone(),
-                signature_verified_block,
-                base_view,
-            );
+            let parallel_result =
+                self.execute_transactions_parallel(&env, signature_verified_block, base_view);
 
             // If parallel gave us result, return it
             if let Ok(output) = parallel_result {
@@ -1312,7 +1309,7 @@ where
             info!("parallel execution requiring fallback");
         }
 
-        // If we didn't run parallel or it didn't finish successfully - run sequential
+        // If we didn't run parallel, or it didn't finish successfully - run sequential
         let sequential_result = self.execute_transactions_sequential(
             env.clone(),
             signature_verified_block,
@@ -1337,7 +1334,7 @@ where
                 init_speculative_logs(signature_verified_block.len());
 
                 let sequential_result = self.execute_transactions_sequential(
-                    env.clone(),
+                    env,
                     signature_verified_block,
                     base_view,
                     true,
