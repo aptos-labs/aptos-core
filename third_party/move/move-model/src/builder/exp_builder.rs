@@ -2397,16 +2397,50 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // Check whether the requested type is a reference. If so, we remember this and
         // the target type of the reference. The reference expectation is pushed down
         // to the arguments of the unpack if needed.
-        let (ref_expected, expected_type) = if let Type::Reference(kind, ty) = expected_type {
-            (Some(*kind), ty.as_ref().clone())
+        let (ref_expected, expected_type) =
+            if let Type::Reference(kind, ty) = self.subs.specialize(expected_type) {
+                (Some(kind), *ty)
+            } else {
+                (None, expected_type.clone())
+            };
+
+        // Determine whether expected type has variants
+        let variant_struct_info = if let Type::Struct(mid, sid, _) = &expected_type {
+            let entry = self.parent.parent.lookup_struct_entry(mid.qualified(*sid));
+            if let StructLayout::Variants(variants) = &entry.layout {
+                Some((
+                    entry,
+                    variants.iter().map(|v| v.name).collect::<BTreeSet<_>>(),
+                ))
+            } else {
+                None
+            }
         } else {
-            (None, expected_type.clone())
+            None
         };
 
-        // Resolve reference to struct
-        let (struct_name, variant) = self.parent.module_access_to_qualified_with_variant(maccess);
+        // Resolve reference to struct.
         let struct_name_loc = self.to_loc(&maccess.loc);
-        let struct_entry = self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
+        let (struct_name, variant, struct_entry) = match (&maccess.value, variant_struct_info) {
+            (EA::ModuleAccess_::Name(name), Some((struct_entry, _variants))) => {
+                // Simple name and we could infer from expected type that it is a struct with
+                // variants.
+                let variant = self.symbol_pool().make(name.value.as_str());
+                let struct_name = self
+                    .parent
+                    .parent
+                    .get_struct_name(struct_entry.module_id.qualified(struct_entry.struct_id));
+                (struct_name.clone(), Some(variant), struct_entry.clone())
+            },
+            _ => {
+                let (struct_name, variant) =
+                    self.parent.module_access_to_qualified_with_variant(maccess);
+                let struct_name_loc = self.to_loc(&maccess.loc);
+                let struct_entry =
+                    self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
+                (struct_name, variant, struct_entry)
+            },
+        };
 
         // Resolve type instantiation.
         let instantiation = self.make_instantiation_or_report(

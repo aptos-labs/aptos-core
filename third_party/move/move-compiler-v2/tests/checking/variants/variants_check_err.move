@@ -10,16 +10,6 @@ module 0x815::m {
         red: u64
     }
 
-    fun unqualified_variant(self: Color): bool {
-        match (self) {
-            // We may want to fix this later and allow it if it can be
-            // derived from the context type.
-            RGB{red, green, blue} => false,
-            Color::Red => true,
-            Color::Blue => false,
-        }
-    }
-
     fun misspelled_variant(self: Color): bool {
         match (self) {
             Color::Rgb{red, green, blue} => false,
