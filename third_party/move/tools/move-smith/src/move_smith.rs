@@ -500,6 +500,7 @@ impl MoveSmith {
             1,                // Block
             func_call_weight, // FunctionCall
             assign_weight,
+            1, // BinaryOperation
         ];
 
         let expr = loop {
@@ -538,6 +539,11 @@ impl MoveSmith {
                         Some(a) => break Expression::Assign(Box::new(a)),
                         None => panic!("No assignable variables"),
                     }
+                },
+                5 => {
+                    break Expression::BinaryOperation(Box::new(
+                        self.generate_binary_operation(u, parent_scope)?,
+                    ));
                 },
                 _ => panic!("Invalid expression type"),
             }
@@ -607,8 +613,53 @@ impl MoveSmith {
         Ok(u.choose(&choices)?.clone())
     }
 
+    // Generate a random binary operation.
+    fn generate_binary_operation(
+        &self,
+        u: &mut Unstructured,
+        parent_scope: &Scope,
+    ) -> Result<BinaryOperation> {
+        match bool::arbitrary(u)? {
+            true => self.generate_numerical_biop(u, parent_scope),
+            false => self.generate_boolean_biop(u, parent_scope),
+        }
+    }
+
+    // Generate a random binary operation for numerical types
+    fn generate_numerical_biop(
+        &self,
+        u: &mut Unstructured,
+        parent_scope: &Scope,
+    ) -> Result<BinaryOperation> {
+        let op = NumericalBinaryOperator::arbitrary(u)?;
+        let lhs = self.generate_expression_of_type(u, parent_scope, &Type::U8, true, true)?;
+        let rhs = self.generate_expression_of_type(u, parent_scope, &Type::U8, true, true)?;
+        Ok(BinaryOperation {
+            op: BinaryOperator::Numerical(op),
+            lhs,
+            rhs,
+        })
+    }
+
+    // Generate a random binary operation for boolean
+    fn generate_boolean_biop(
+        &self,
+        u: &mut Unstructured,
+        parent_scope: &Scope,
+    ) -> Result<BinaryOperation> {
+        let op = BooleanBinaryOperator::arbitrary(u)?;
+        let lhs = self.generate_expression_of_type(u, parent_scope, &Type::Bool, true, true)?;
+        let rhs = self.generate_expression_of_type(u, parent_scope, &Type::Bool, true, true)?;
+        Ok(BinaryOperation {
+            op: BinaryOperator::Boolean(op),
+            lhs,
+            rhs,
+        })
+    }
+
     /// Generate a struct initialization expression.
     /// This is `pack` in the parser AST.
+    // TODO: this is currently only used in `generate_expression_of_type`. Consider add to `generate_expression`.
     fn generate_struct_initialization(
         &self,
         u: &mut Unstructured,

@@ -138,7 +138,48 @@ pub enum Expression {
     StructInitialization(StructInitialization),
     Block(Box<Block>),
     Assign(Box<Assignment>),
+    BinaryOperation(Box<BinaryOperation>),
 }
+
+#[derive(Debug, Clone)]
+pub struct BinaryOperation {
+    pub op: BinaryOperator,
+    pub lhs: Expression,
+    pub rhs: Expression,
+}
+
+#[derive(Debug, Clone)]
+pub enum BinaryOperator {
+    Numerical(NumericalBinaryOperator),
+    Boolean(BooleanBinaryOperator),
+}
+
+#[derive(Debug, Clone, Arbitrary)]
+pub enum NumericalBinaryOperator {
+    Add,
+    Sub,
+    Mul,
+    Mod,
+    Div,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
+    Le,
+    Ge,
+    Leq,
+    Geq,
+    Eq,
+    Neq,
+}
+
+#[derive(Debug, Clone, Arbitrary)]
+pub enum BooleanBinaryOperator {
+    And,
+    Or,
+}
+
 /// An assignment expression
 #[derive(Debug, Clone)]
 pub struct Assignment {

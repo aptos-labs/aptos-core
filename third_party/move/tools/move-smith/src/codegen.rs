@@ -7,9 +7,19 @@ use std::vec;
 /// Generates Move source code from an AST.
 /// `emit_code_lines` should be implemented for each AST node.
 pub trait CodeGenerator {
+    /// Generate Move source code.
     fn emit_code(&self) -> String {
         self.emit_code_lines().join("\n")
     }
+
+    /// Generate a single line for subtree.
+    fn inline(&self) -> String {
+        self.emit_code_lines().join(" ")
+    }
+
+    /// Each AST node should implement this
+    /// Each element should be a line of code.
+    /// The string should not contain any newlines.
     fn emit_code_lines(&self) -> Vec<String>;
 }
 
@@ -272,7 +282,19 @@ impl CodeGenerator for Expression {
             Expression::StructInitialization(s) => s.emit_code_lines(),
             Expression::Block(block) => block.emit_code_lines(),
             Expression::Assign(assignment) => assignment.emit_code_lines(),
+            Expression::BinaryOperation(binop) => binop.emit_code_lines(),
         }
+    }
+}
+
+impl CodeGenerator for BinaryOperation {
+    fn emit_code_lines(&self) -> Vec<String> {
+        vec![format!(
+            "{} {} {}",
+            self.lhs.inline(),
+            self.op.emit_code(),
+            self.rhs.inline()
+        )]
     }
 }
 
@@ -330,6 +352,48 @@ impl CodeGenerator for FunctionCall {
 impl CodeGenerator for NumberLiteral {
     fn emit_code_lines(&self) -> Vec<String> {
         vec![format!("{}{}", self.value, self.typ.emit_code())]
+    }
+}
+
+impl CodeGenerator for BinaryOperator {
+    fn emit_code_lines(&self) -> Vec<String> {
+        match self {
+            BinaryOperator::Numerical(op) => op.emit_code_lines(),
+            BinaryOperator::Boolean(op) => op.emit_code_lines(),
+        }
+    }
+}
+
+impl CodeGenerator for NumericalBinaryOperator {
+    fn emit_code_lines(&self) -> Vec<String> {
+        use NumericalBinaryOperator as OP;
+        vec![match self {
+            OP::Add => "+".to_string(),
+            OP::Sub => "-".to_string(),
+            OP::Mul => "*".to_string(),
+            OP::Mod => "%".to_string(),
+            OP::Div => "/".to_string(),
+            OP::BitAnd => "&".to_string(),
+            OP::BitOr => "|".to_string(),
+            OP::BitXor => "^".to_string(),
+            OP::Shl => "<<".to_string(),
+            OP::Shr => ">>".to_string(),
+            OP::Le => "<".to_string(),
+            OP::Ge => ">".to_string(),
+            OP::Leq => "<=".to_string(),
+            OP::Geq => ">=".to_string(),
+            OP::Eq => "==".to_string(),
+            OP::Neq => "!=".to_string(),
+        }]
+    }
+}
+
+impl CodeGenerator for BooleanBinaryOperator {
+    fn emit_code_lines(&self) -> Vec<String> {
+        vec![match self {
+            BooleanBinaryOperator::And => "&&".to_string(),
+            BooleanBinaryOperator::Or => "||".to_string(),
+        }]
     }
 }
 
