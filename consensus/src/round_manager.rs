@@ -1232,6 +1232,7 @@ impl RoundManager {
             )
             .await
             .context("RoundManager] Failed to process QC in order Cert")?;
+        self.process_certificates().await?;
         self.block_store
             .insert_ordered_cert(&ordered_cert)
             .await
