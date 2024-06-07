@@ -197,13 +197,10 @@ impl MetricsEndpoint {
                     panic!(
                         "environment variable {} is missing secret for {}",
                         self.keys_env_var.clone(),
-                        name,
+                        name
                     )
                 });
-                (
-                    name.clone(),
-                    MetricsClient::new(url.clone(), secret.clone()),
-                )
+                (name.clone(), MetricsClient::new(url.clone(), secret.into()))
             })
             .collect()
     }
