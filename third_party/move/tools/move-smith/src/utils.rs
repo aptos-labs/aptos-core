@@ -114,7 +114,7 @@ pub fn run_transactional_test(code: String) -> Result<(), Box<dyn Error>> {
 }
 
 // TODO: Find a better place for this: config or in fuzz target
-const IGNORE_ERRORS: [&str; 1] = ["cyclic data"];
+const IGNORE_ERRORS: [&str; 1] = ["unbound module"];
 
 /// Filtering the error messages from the transactional test.
 /// Currently only treat `error[Exxxx]` as a real error to ignore warnings.
