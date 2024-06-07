@@ -89,3 +89,24 @@ impl Environment {
         }
     }
 }
+
+#[cfg(test)]
+pub mod test {
+    use super::*;
+    use aptos_language_e2e_tests::data_store::FakeDataStore;
+
+    #[test]
+    fn test_environment() {
+        // This creates an empty state.
+        let state_view = FakeDataStore::default();
+        let mut env = Environment::new(&state_view);
+
+        // Check default values.
+        assert_eq!(&env.features, &Features::default());
+        assert_eq!(env.chain_id.id(), ChainId::test().id());
+        assert!(!env.vm_config.delayed_field_optimization_enabled);
+
+        let env = env.try_enable_delayed_field_optimization();
+        assert!(env.vm_config.delayed_field_optimization_enabled);
+    }
+}
