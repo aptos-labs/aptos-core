@@ -43,7 +43,7 @@ use std::{
     ops::DerefMut,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 
 const WARMUP_DURATION_FRACTION: f32 = 0.07;
 const COOLDOWN_DURATION_FRACTION: f32 = 0.04;
@@ -334,7 +334,6 @@ impl dyn NetworkLoadTest + '_ {
             create_emitter_and_request(ctx.swarm(), emit_job_request, &nodes_to_send_load_to, rng)
                 .context("create emitter")?;
 
-        let rt = traffic_emitter_runtime()?;
         let clients = ctx
             .swarm()
             .get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));
@@ -346,12 +345,12 @@ impl dyn NetworkLoadTest + '_ {
         }
 
         info!("Starting emitting txns for {}s", duration.as_secs());
-        let mut job = rt
-            .block_on(emitter.start_job(
+        let mut job = emitter.start_job(
                 ctx.swarm().chain_info().root_account,
                 emit_job_request,
                 stats_tracking_phases,
-            ))
+            )
+            .await
             .context("start emitter job")?;
 
         let total_start = PhaseTimingStart::now();
@@ -361,14 +360,14 @@ impl dyn NetworkLoadTest + '_ {
         let test_duration = duration - warmup_duration - cooldown_duration;
         let phase_duration = test_duration.div_f32((stats_tracking_phases - 2) as f32);
 
-        job = rt.block_on(job.periodic_stat_forward(warmup_duration, 60));
+        job = job.periodic_stat_forward(warmup_duration, 60).await;
         info!("{}s warmup finished", warmup_duration.as_secs());
 
         let mut phase_timing = Vec::new();
         let mut phase_start_network_state = Vec::new();
         let test_start = Instant::now();
         for i in 0..stats_tracking_phases - 2 {
-            phase_start_network_state.push(rt.block_on(NetworkState::new(&clients)));
+            phase_start_network_state.push(NetworkState::new(&clients).await);
             job.start_next_phase();
 
             if i > 0 {
@@ -380,11 +379,11 @@ impl dyn NetworkLoadTest + '_ {
             }
             let phase_start = PhaseTimingStart::now();
 
-            let join_stats = rt.spawn(job.periodic_stat_forward(phase_duration, 60));
+            let join_stats = Handle::current().spawn(job.periodic_stat_forward(phase_duration, 60));
             self.test(ctx.swarm, ctx.report, phase_duration)
                 .await
                 .context("test NetworkLoadTest")?;
-            job = rt.block_on(join_stats).context("join stats")?;
+            job = join_stats.await.context("join stats")?;
             phase_timing.push(phase_start.elapsed());
         }
         let actual_test_duration = test_start.elapsed();
@@ -394,13 +393,13 @@ impl dyn NetworkLoadTest + '_ {
             actual_test_duration.as_secs()
         );
 
-        phase_start_network_state.push(rt.block_on(NetworkState::new(&clients)));
+        phase_start_network_state.push(NetworkState::new(&clients).await);
         job.start_next_phase();
         let cooldown_start = Instant::now();
 
         let cooldown_used = cooldown_start.elapsed();
         if cooldown_used < cooldown_duration {
-            job = rt.block_on(job.periodic_stat_forward(cooldown_duration - cooldown_used, 60));
+            job = job.periodic_stat_forward(cooldown_duration - cooldown_used, 60).await;
         }
         info!("{}s cooldown finished", cooldown_duration.as_secs());
 
@@ -411,7 +410,7 @@ impl dyn NetworkLoadTest + '_ {
             total_timing.start_unixtime_s,
             total_timing.end_unixtime_s,
         );
-        let stats_by_phase = rt.block_on(job.stop_job());
+        let stats_by_phase = job.stop_job().await;
 
         info!("Stopped job");
         info!("Warmup stats: {}", stats_by_phase[0].rate());
@@ -427,11 +426,11 @@ impl dyn NetworkLoadTest + '_ {
             } else {
                 Some(cur.clone())
             };
-            let latency_breakdown = rt.block_on(fetch_latency_breakdown(
+            let latency_breakdown = fetch_latency_breakdown(
                 ctx.swarm(),
                 phase_timing[i].start_unixtime_s,
                 phase_timing[i].end_unixtime_s,
-            ))?;
+            ).await?;
             info!(
                 "Latency breakdown details for phase {}: from {} to {}: {:?}",
                 i,
