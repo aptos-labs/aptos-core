@@ -344,7 +344,9 @@ impl RoundManager {
         };
         info!(
             self.new_log(LogEvent::NewRound),
-            reason = new_round_event.reason
+            reason = new_round_event.reason,
+            "{}",
+            new_round_event.reason
         );
         self.pending_order_votes
             .garbage_collect(self.block_store.sync_info().highest_ordered_round());
@@ -586,12 +588,16 @@ impl RoundManager {
         if message_round < self.round_state.current_round() {
             return Ok(false);
         }
+        let round_before_sync = self.round_state.current_round();
+        let previous_sync_info = self.block_store.sync_info();
         self.sync_up(sync_info, author).await?;
         ensure!(
             message_round == self.round_state.current_round(),
-            "After sync, round {} doesn't match local {}. Local Sync Info: {}. Remote Sync Info: {}",
+            "After sync, round {} doesn't match local {}. Round before sync {}.\n Previous sync info: {}\n Local Sync Info: {}.\n Remote Sync Info: {}",
             message_round,
             self.round_state.current_round(),
+            round_before_sync,
+            previous_sync_info,
             self.block_store.sync_info(),
             sync_info,
         );
@@ -609,7 +615,7 @@ impl RoundManager {
         });
         info!(
             self.new_log(LogEvent::ReceiveSyncInfo).remote_peer(peer),
-            "{}", sync_info
+            "Received {}", sync_info
         );
         self.ensure_round_and_sync_up(checked!((sync_info.highest_round()) + 1)?, &sync_info, peer)
             .await
@@ -913,7 +919,7 @@ impl RoundManager {
             .await;
 
         if self.local_config.broadcast_vote {
-            info!(self.new_log(LogEvent::Vote), "{}", vote);
+            info!(self.new_log(LogEvent::Vote), "Sent {}", vote);
             PROPOSAL_VOTE_BROADCASTED.inc();
             self.network.broadcast_vote(vote_msg).await;
         } else {
@@ -922,7 +928,7 @@ impl RoundManager {
                 .get_valid_proposer(proposal_round + 1);
             info!(
                 self.new_log(LogEvent::Vote).remote_peer(recipient),
-                "{}", vote
+                "Sent {}", vote
             );
             self.network.send_vote(vote_msg, vec![recipient]).await;
         }
@@ -980,7 +986,7 @@ impl RoundManager {
             });
             info!(
                 self.new_log(LogEvent::ReceiveOrderVote),
-                "{}", order_vote_msg
+                "Received {}", order_vote_msg
             );
 
             if self
@@ -1035,7 +1041,7 @@ impl RoundManager {
             let order_vote_msg = OrderVoteMsg::new(order_vote.clone(), qc.as_ref().clone());
             info!(
                 self.new_log(LogEvent::BroadcastOrderVote),
-                "{}", order_vote_msg
+                "Sent {}", order_vote_msg
             );
             self.network.broadcast_order_vote(order_vote_msg).await;
             ORDER_VOTE_BROADCASTED.inc();
@@ -1080,12 +1086,7 @@ impl RoundManager {
         info!(
             self.new_log(LogEvent::ReceiveVote)
                 .remote_peer(vote.author()),
-            vote = %vote,
-            vote_epoch = vote.vote_data().proposed().epoch(),
-            vote_round = vote.vote_data().proposed().round(),
-            vote_id = vote.vote_data().proposed().id(),
-            vote_state = vote.vote_data().proposed().executed_state_id(),
-            is_timeout = vote.is_timeout(),
+            "Received {}", vote
         );
 
         if !self.local_config.broadcast_vote && !vote.is_timeout() {
@@ -1128,6 +1129,11 @@ impl RoundManager {
                     observe_block(
                         qc.certified_block().timestamp_usecs(),
                         BlockStage::QC_AGGREGATED,
+                    );
+                    info!(
+                        self.new_log(LogEvent::CreatedQC),
+                        "Created QC {}",
+                        qc.certified_block()
                     );
                 }
                 QC_AGGREGATED_FROM_VOTES.inc();

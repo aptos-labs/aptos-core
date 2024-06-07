@@ -27,6 +27,7 @@ pub enum LogEvent {
     NetworkReceiveProposal,
     NewEpoch,
     NewRound,
+    CreatedQC,
     ProofOfStoreInit,
     ProofOfStoreReady,
     ProofOfStoreCommit,
