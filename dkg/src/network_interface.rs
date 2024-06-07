@@ -8,7 +8,8 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_types::PeerId;
-use std::time::Duration;
+use bytes::Bytes;
+use std::{collections::HashMap, time::Duration};
 
 pub const RPC: &[ProtocolId] = &[
     ProtocolId::DKGRpcCompressed,
@@ -34,16 +35,33 @@ impl<NetworkClient: NetworkClientInterface<DKGMessage>> DKGNetworkClient<Network
     }
 
     /// Send a RPC to the destination peer
-    pub async fn send_rpc(
+    pub async fn send_rpc_raw(
         &self,
         peer: PeerId,
-        message: DKGMessage,
+        message: Bytes,
         rpc_timeout: Duration,
     ) -> Result<DKGMessage, Error> {
         let peer_network_id = self.get_peer_network_id_for_peer(peer);
         self.network_client
-            .send_to_peer_rpc(message, rpc_timeout, peer_network_id)
+            .send_to_peer_rpc_raw(message, rpc_timeout, peer_network_id)
             .await
+    }
+
+    pub fn to_bytes(
+        &self,
+        peers: Vec<PeerId>,
+        message: DKGMessage,
+    ) -> anyhow::Result<HashMap<PeerId, Bytes>> {
+        let peer_network_ids: Vec<PeerNetworkId> = peers
+            .into_iter()
+            .map(|peer| self.get_peer_network_id_for_peer(peer))
+            .collect();
+        Ok(self
+            .network_client
+            .to_bytes(peer_network_ids, message)?
+            .into_iter()
+            .map(|(peer_network_id, bytes)| (peer_network_id.peer_id(), bytes))
+            .collect())
     }
 
     // TODO: we shouldn't need to expose this. Migrate the code to handle peer and network ids.

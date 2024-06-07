@@ -28,8 +28,7 @@ use futures_util::{
 };
 #[cfg(test)]
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::timeout;
+use std::{collections::HashMap, time::Duration};
 
 pub struct IncomingRpcRequest {
     pub msg: JWKConsensusMsg,
@@ -61,29 +60,40 @@ impl NetworkSender {
 impl RBNetworkSender<JWKConsensusMsg> for NetworkSender {
     async fn send_rb_rpc(
         &self,
-        receiver: Author,
-        msg: JWKConsensusMsg,
-        time_limit: Duration,
+        receiver: AccountAddress,
+        raw_message: Bytes,
+        timeout: Duration,
     ) -> anyhow::Result<JWKConsensusMsg> {
-        if receiver == self.author {
-            let (tx, rx) = oneshot::channel();
-            let protocol = RPC[0];
-            let self_msg = Event::RpcRequest(receiver, msg, protocol, tx);
-            self.self_sender.clone().send(self_msg).await?;
-            if let Ok(Ok(Ok(bytes))) = timeout(time_limit, rx).await {
-                let response_msg =
-                    tokio::task::spawn_blocking(move || protocol.from_bytes(&bytes)).await??;
-                Ok(response_msg)
-            } else {
-                bail!("self rpc failed");
-            }
+        Ok(self
+            .jwk_network_client
+            .send_rpc_raw(receiver, raw_message, timeout)
+            .await?)
+    }
+
+    async fn send_rb_rpc_to_self(
+        &self,
+        message: JWKConsensusMsg,
+        timeout: Duration,
+    ) -> anyhow::Result<JWKConsensusMsg> {
+        let (tx, rx) = oneshot::channel();
+        let protocol = RPC[0];
+        let self_msg = Event::RpcRequest(self.author, message, protocol, tx);
+        self.self_sender.clone().send(self_msg).await?;
+        if let Ok(Ok(Ok(bytes))) = tokio::time::timeout(timeout, rx).await {
+            let response_msg =
+                tokio::task::spawn_blocking(move || protocol.from_bytes(&bytes)).await??;
+            Ok(response_msg)
         } else {
-            let result = self
-                .jwk_network_client
-                .send_rpc(receiver, msg, time_limit)
-                .await?;
-            Ok(result)
+            bail!("self rpc failed");
         }
+    }
+
+    fn to_bytes(
+        &self,
+        peers: Vec<Author>,
+        message: JWKConsensusMsg,
+    ) -> Result<HashMap<Author, bytes::Bytes>, anyhow::Error> {
+        self.jwk_network_client.to_bytes(peers, message)
     }
 }
 

@@ -36,9 +36,10 @@ use aptos_types::{
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
 };
 use async_trait::async_trait;
+use bytes::Bytes;
 use claims::{assert_ok, assert_ok_eq};
 use futures_channel::mpsc::unbounded;
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{runtime::Handle, sync::oneshot};
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -51,10 +52,26 @@ impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockNetworkSender {
     async fn send_rb_rpc(
         &self,
         _receiver: Author,
-        _messagee: DAGMessage,
+        _messages: Bytes,
         _timeout: Duration,
     ) -> anyhow::Result<DAGRpcResult> {
         Ok(DAGRpcResult(Ok(DAGMessage::TestAck(TestAck(Vec::new())))))
+    }
+
+    async fn send_rb_rpc_to_self(
+        &self,
+        _message: DAGMessage,
+        _timeout: Duration,
+    ) -> anyhow::Result<DAGRpcResult> {
+        Ok(DAGRpcResult(Ok(DAGMessage::TestAck(TestAck(Vec::new())))))
+    }
+
+    fn to_bytes(
+        &self,
+        peers: Vec<Author>,
+        _message: DAGMessage,
+    ) -> anyhow::Result<HashMap<Author, Bytes>> {
+        Ok(peers.into_iter().map(|peer| (peer, Bytes::new())).collect())
     }
 }
 
@@ -134,8 +151,10 @@ fn setup(
         TEST_DAG_WINDOW,
     ));
 
+    let validators: Vec<_> = signers.iter().map(|s| s.author()).collect();
     let rb = Arc::new(ReliableBroadcast::new(
-        signers.iter().map(|s| s.author()).collect(),
+        validators[0].clone(),
+        validators,
         network_sender.clone(),
         ExponentialBackoff::from_millis(10),
         aptos_time_service::TimeService::mock(),

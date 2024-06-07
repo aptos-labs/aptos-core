@@ -13,6 +13,7 @@ use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
+use bytes::Bytes;
 use claims::{assert_err, assert_ok};
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -35,9 +36,25 @@ impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockDAGNetworkSender {
     async fn send_rb_rpc(
         &self,
         _receiver: Author,
-        _message: DAGMessage,
+        _message: Bytes,
         _timeout: Duration,
     ) -> anyhow::Result<DAGRpcResult> {
+        unimplemented!()
+    }
+
+    async fn send_rb_rpc_to_self(
+        &self,
+        message: DAGMessage,
+        timeout: Duration,
+    ) -> anyhow::Result<DAGRpcResult> {
+        unimplemented!()
+    }
+
+    fn to_bytes(
+        &self,
+        peers: Vec<Author>,
+        message: DAGMessage,
+    ) -> anyhow::Result<HashMap<Author, Bytes>> {
         unimplemented!()
     }
 }

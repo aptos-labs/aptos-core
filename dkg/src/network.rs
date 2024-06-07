@@ -24,7 +24,7 @@ use futures::{
 };
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::timeout;
 
 pub struct IncomingRpcRequest {
@@ -60,29 +60,21 @@ impl NetworkSender {
         self.author
     }
 
-    pub async fn send_rpc(
+    pub async fn send_rpc_to_self(
         &self,
-        receiver: AccountAddress,
         msg: DKGMessage,
         timeout_duration: Duration,
     ) -> anyhow::Result<DKGMessage> {
-        if receiver == self.author() {
-            let (tx, rx) = oneshot::channel();
-            let protocol = RPC[0];
-            let self_msg = Event::RpcRequest(receiver, msg.clone(), RPC[0], tx);
-            self.self_sender.clone().send(self_msg).await?;
-            if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
-                let response_msg =
-                    tokio::task::spawn_blocking(move || protocol.from_bytes(&bytes)).await??;
-                Ok(response_msg)
-            } else {
-                bail!("self rpc failed");
-            }
+        let (tx, rx) = oneshot::channel();
+        let protocol = RPC[0];
+        let self_msg = Event::RpcRequest(self.author, msg.clone(), RPC[0], tx);
+        self.self_sender.clone().send(self_msg).await?;
+        if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
+            let response_msg =
+                tokio::task::spawn_blocking(move || protocol.from_bytes(&bytes)).await??;
+            Ok(response_msg)
         } else {
-            Ok(self
-                .dkg_network_client
-                .send_rpc(receiver, msg, timeout_duration)
-                .await?)
+            bail!("self rpc failed");
         }
     }
 }
@@ -92,10 +84,29 @@ impl RBNetworkSender<DKGMessage> for NetworkSender {
     async fn send_rb_rpc(
         &self,
         receiver: AccountAddress,
+        raw_message: Bytes,
+        timeout: Duration,
+    ) -> anyhow::Result<DKGMessage> {
+        Ok(self
+            .dkg_network_client
+            .send_rpc_raw(receiver, raw_message, timeout)
+            .await?)
+    }
+
+    async fn send_rb_rpc_to_self(
+        &self,
         message: DKGMessage,
         timeout: Duration,
     ) -> anyhow::Result<DKGMessage> {
-        self.send_rpc(receiver, message, timeout).await
+        self.send_rpc_to_self(message, timeout).await
+    }
+
+    fn to_bytes(
+        &self,
+        peers: Vec<AccountAddress>,
+        message: DKGMessage,
+    ) -> anyhow::Result<HashMap<AccountAddress, Bytes>> {
+        self.dkg_network_client.to_bytes(peers, message)
     }
 }
 

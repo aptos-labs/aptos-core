@@ -10,6 +10,8 @@ use aptos_infallible::Mutex;
 use aptos_time_service::TimeService;
 use aptos_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
+use bytes::Bytes;
+use claims::assert_ok_eq;
 use futures::{
     stream::{AbortHandle, Abortable},
     FutureExt,
@@ -64,6 +66,7 @@ where
 }
 
 struct TestRBSender<M> {
+    self_author: Author,
     failures: Mutex<HashMap<Author, u8>>,
     received: Mutex<HashMap<Author, TestMessage>>,
     _marker: PhantomData<M>,
@@ -73,8 +76,9 @@ impl<M> TestRBSender<M>
 where
     M: Send + Sync,
 {
-    fn new(failures: HashMap<Author, u8>) -> Self {
+    fn new(self_author: Author, failures: HashMap<Author, u8>) -> Self {
         Self {
+            self_author,
             failures: Mutex::new(failures),
             received: Mutex::new(HashMap::new()),
             _marker: PhantomData,
@@ -92,7 +96,7 @@ where
     async fn send_rb_rpc(
         &self,
         receiver: Author,
-        message: M,
+        raw_message: Bytes,
         _timeout: Duration,
     ) -> anyhow::Result<M> {
         match self.failures.lock().entry(receiver) {
@@ -106,9 +110,25 @@ where
             },
             Entry::Vacant(_) => (),
         };
-        let message: TestMessage = message.try_into()?;
+        let message = TestMessage(raw_message.to_vec());
         self.received.lock().insert(receiver, message.clone());
         Ok(TestAck(message.0).into())
+    }
+
+    async fn send_rb_rpc_to_self(&self, message: M, timeout: Duration) -> anyhow::Result<M> {
+        let message: TestMessage = message.try_into()?;
+        let raw_message: Bytes = message.0.into();
+        self.send_rb_rpc(self.self_author, raw_message, timeout)
+            .await
+    }
+
+    fn to_bytes(&self, peers: Vec<Author>, message: M) -> anyhow::Result<HashMap<Author, Bytes>> {
+        let message: TestMessage = message.try_into()?;
+        let raw_message: Bytes = message.0.into();
+        Ok(peers
+            .into_iter()
+            .map(|peer| (peer, raw_message.clone()))
+            .collect())
     }
 }
 
@@ -116,9 +136,11 @@ where
 async fn test_reliable_broadcast() {
     let (_, validator_verifier) = random_validator_verifier(5, None, false);
     let validators = validator_verifier.get_ordered_account_addresses();
+    let self_author = validators[0].clone();
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
-    let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
+    let sender = Arc::new(TestRBSender::<TestRBMessage>::new(self_author, failures));
     let rb = ReliableBroadcast::new(
+        self_author,
         validators.clone(),
         sender,
         FixedInterval::from_millis(10),
@@ -132,16 +154,18 @@ async fn test_reliable_broadcast() {
         received: Arc::new(Mutex::new(HashSet::new())),
     });
     let fut = rb.broadcast(message, aggregating);
-    assert_eq!(fut.await, validators.into_iter().collect());
+    assert_ok_eq!(fut.await, validators.into_iter().collect());
 }
 
 #[tokio::test]
 async fn test_chaining_reliable_broadcast() {
     let (_, validator_verifier) = random_validator_verifier(5, None, false);
     let validators = validator_verifier.get_ordered_account_addresses();
+    let self_author = validators[0].clone();
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
-    let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
+    let sender = Arc::new(TestRBSender::<TestRBMessage>::new(self_author, failures));
     let rb = Arc::new(ReliableBroadcast::new(
+        self_author,
         validators.clone(),
         sender,
         FixedInterval::from_millis(10),
@@ -159,23 +183,25 @@ async fn test_chaining_reliable_broadcast() {
     let fut = rb1
         .broadcast(message.clone(), aggregating)
         .then(|aggregated| async move {
-            assert_eq!(aggregated, expected);
+            assert_ok_eq!(aggregated, expected);
             let aggregating = Arc::new(TestBroadcastStatus {
                 threshold: validator_verifier.len(),
                 received: Arc::new(Mutex::new(HashSet::new())),
             });
             rb.broadcast(message, aggregating).await
         });
-    assert_eq!(fut.await, validators.into_iter().collect());
+    assert_ok_eq!(fut.await, validators.into_iter().collect());
 }
 
 #[tokio::test]
 async fn test_abort_reliable_broadcast() {
     let (_, validator_verifier) = random_validator_verifier(5, None, false);
     let validators = validator_verifier.get_ordered_account_addresses();
+    let self_author = validators[0].clone();
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
-    let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
+    let sender = Arc::new(TestRBSender::<TestRBMessage>::new(self_author, failures));
     let rb = Arc::new(ReliableBroadcast::new(
+        self_author,
         validators.clone(),
         sender,
         FixedInterval::from_millis(10),
