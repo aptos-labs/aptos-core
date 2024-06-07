@@ -194,7 +194,7 @@ pub(crate) struct Loader {
     // other transactions.
     module_cache_hits: RwLock<BTreeSet<ModuleId>>,
 
-    pub(crate) vm_config: VMConfig,
+    vm_config: VMConfig,
 }
 
 impl Clone for Loader {

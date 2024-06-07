@@ -78,7 +78,7 @@ impl VMRuntime {
             .map(|blob| {
                 CompiledModule::deserialize_with_config(
                     blob,
-                    &self.loader.vm_config.deserializer_config,
+                    &self.loader.vm_config().deserializer_config,
                 )
             })
             .collect::<PartialVMResult<Vec<_>>>()

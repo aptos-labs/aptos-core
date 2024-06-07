@@ -116,7 +116,7 @@ impl MoveVmExt {
         Self {
             inner: WarmVmCache::get_warm_vm(
                 builder,
-                &env.vm_config,
+                env.vm_config.clone(),
                 resolver,
                 env.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
             )

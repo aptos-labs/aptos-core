@@ -86,7 +86,11 @@ impl MoveVM {
         Session {
             move_vm: self,
             data_cache: TransactionDataCache::new(
-                self.runtime.loader().vm_config.deserializer_config.clone(),
+                self.runtime
+                    .loader()
+                    .vm_config()
+                    .deserializer_config
+                    .clone(),
                 remote,
             ),
             module_store: ModuleStorageAdapter::new(self.runtime.module_storage()),
@@ -104,7 +108,11 @@ impl MoveVM {
         Session {
             move_vm: self,
             data_cache: TransactionDataCache::new(
-                self.runtime.loader().vm_config.deserializer_config.clone(),
+                self.runtime
+                    .loader()
+                    .vm_config()
+                    .deserializer_config
+                    .clone(),
                 remote,
             ),
             module_store: ModuleStorageAdapter::new(module_storage),
@@ -123,7 +131,11 @@ impl MoveVM {
             .load_module(
                 module_id,
                 &mut TransactionDataCache::new(
-                    self.runtime.loader().vm_config.deserializer_config.clone(),
+                    self.runtime
+                        .loader()
+                        .vm_config()
+                        .deserializer_config
+                        .clone(),
                     remote,
                 ),
                 &ModuleStorageAdapter::new(self.runtime.module_storage()),

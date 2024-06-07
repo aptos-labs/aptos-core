@@ -33,7 +33,7 @@ static WARM_VM_CACHE: Lazy<WarmVmCache> = Lazy::new(|| WarmVmCache {
 impl WarmVmCache {
     pub(crate) fn get_warm_vm(
         native_builder: SafeNativeBuilder,
-        vm_config: &VMConfig,
+        vm_config: VMConfig,
         resolver: &impl AptosMoveResolver,
         bin_v7_enabled: bool,
     ) -> VMResult<MoveVM> {
@@ -43,14 +43,14 @@ impl WarmVmCache {
     fn get(
         &self,
         mut native_builder: SafeNativeBuilder,
-        vm_config: &VMConfig,
+        vm_config: VMConfig,
         resolver: &impl AptosMoveResolver,
         bin_v7_enabled: bool,
     ) -> VMResult<MoveVM> {
         let _timer = TIMER.timer_with(&["warm_vm_get"]);
         let id = {
             let _timer = TIMER.timer_with(&["get_warm_vm_id"]);
-            WarmVmId::new(&native_builder, vm_config, resolver, bin_v7_enabled)?
+            WarmVmId::new(&native_builder, &vm_config, resolver, bin_v7_enabled)?
         };
 
         if let Some(vm) = self.cache.read().get(&id) {
@@ -66,10 +66,8 @@ impl WarmVmCache {
                 return Ok(vm.clone());
             }
 
-            let vm = MoveVM::new_with_config(
-                aptos_natives_with_builder(&mut native_builder),
-                vm_config.clone(),
-            );
+            let vm =
+                MoveVM::new_with_config(aptos_natives_with_builder(&mut native_builder), vm_config);
             Self::warm_vm_up(&vm, resolver);
 
             // Not using LruCache because its `::get()` requires &mut self
