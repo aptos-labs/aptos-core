@@ -17,10 +17,7 @@ use aptos_types::{
 };
 use itertools::Itertools;
 use maplit::btreemap;
-use std::{
-    thread::sleep,
-    time::{Duration, Instant, SystemTime},
-};
+use std::time::{Duration, Instant, SystemTime};
 
 #[test]
 fn test_transaction_ordering_only_seqnos() {
