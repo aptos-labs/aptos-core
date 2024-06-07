@@ -18,7 +18,7 @@ module std::acl {
 
     /// Return an empty ACL.
     public fun empty(): ACL {
-        ACL{ list: vector::empty<address>() }
+        ACL { list: vector::empty<address>() }
     }
 
     /// Add the address to the ACL.

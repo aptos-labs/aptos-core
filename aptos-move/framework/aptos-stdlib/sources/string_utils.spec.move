@@ -39,10 +39,12 @@ spec aptos_std::string_utils {
         ensures result == spec_native_format_list(fmt, list4(a, b, c, d));
     }
 
-    spec native_format<T>(s: &T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): String {
+    spec native_format<T>(s: &T, type_tag: bool, canonicalize: bool, single_line: bool,
+        include_int_types: bool): String {
         pragma opaque;
         aborts_if false;
-        ensures result == spec_native_format(s, type_tag, canonicalize, single_line, include_int_types);
+        ensures result
+            == spec_native_format(s, type_tag, canonicalize, single_line, include_int_types);
     }
 
     spec native_format_list<T>(fmt: &vector<u8>, val: &T): String {
@@ -51,7 +53,10 @@ spec aptos_std::string_utils {
         ensures result == spec_native_format_list(fmt, val);
     }
 
-    spec fun spec_native_format<T>(s: T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): String;
+    spec fun spec_native_format<T>(s: T, type_tag: bool, canonicalize: bool, single_line: bool,
+        include_int_types: bool): String;
+
     spec fun spec_native_format_list<T>(fmt: vector<u8>, val: T): String;
+
     spec fun args_mismatch_or_invalid_format<T>(fmt: vector<u8>, val: T): bool;
 }

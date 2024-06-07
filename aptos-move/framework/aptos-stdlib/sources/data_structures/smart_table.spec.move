@@ -15,10 +15,11 @@ spec aptos_std::smart_table {
             map_spec_set = spec_set,
             map_spec_del = spec_remove,
             map_spec_len = spec_len,
-        map_spec_has_key = spec_contains;
+            map_spec_has_key = spec_contains;
     }
 
-    spec new_with_config<K: copy + drop + store, V: store>(num_initial_buckets: u64, split_load_threshold: u8, target_bucket_size: u64): SmartTable<K, V> {
+    spec new_with_config<K: copy + drop + store, V: store>(num_initial_buckets: u64, split_load_threshold: u8,
+        target_bucket_size: u64): SmartTable<K, V> {
         pragma verify = false;
     }
 
@@ -46,9 +47,7 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
-    spec to_simple_map<K: store + copy + drop, V: store + copy>(
-    table: &SmartTable<K, V>,
-    ): SimpleMap<K, V> {
+    spec to_simple_map<K: store + copy + drop, V: store + copy>(table: &SmartTable<K, V>,): SimpleMap<K, V> {
         pragma verify = false;
     }
 
@@ -56,16 +55,11 @@ spec aptos_std::smart_table {
         pragma verify = false;
     }
 
-    spec keys_paginated<K: store + copy + drop, V: store + copy>(
-        table_ref: &SmartTable<K, V>,
+    spec keys_paginated<K: store + copy + drop, V: store + copy>(table_ref: &SmartTable<K, V>,
         starting_bucket_index: u64,
         starting_vector_index: u64,
         num_keys_to_get: u64,
-    ): (
-        vector<K>,
-        Option<u64>,
-        Option<u64>,
-    ) {
+    ): (vector<K>, Option<u64>, Option<u64>,) {
         pragma verify = false;
     }
 
@@ -103,8 +97,12 @@ spec aptos_std::smart_table {
 
     // Specification functions for tables
     spec native fun spec_len<K, V>(t: SmartTable<K, V>): num;
+
     spec native fun spec_contains<K, V>(t: SmartTable<K, V>, k: K): bool;
+
     spec native fun spec_set<K, V>(t: SmartTable<K, V>, k: K, v: V): SmartTable<K, V>;
+
     spec native fun spec_remove<K, V>(t: SmartTable<K, V>, k: K): SmartTable<K, V>;
+
     spec native fun spec_get<K, V>(t: SmartTable<K, V>, k: K): V;
 }

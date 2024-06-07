@@ -24,18 +24,13 @@ module aptos_framework::optional_aggregator {
 
     /// Creates a new integer which overflows on exceeding a `limit`.
     fun new_integer(limit: u128): Integer {
-        Integer {
-            value: 0,
-            limit,
-        }
+        Integer { value: 0, limit, }
     }
 
     /// Adds `value` to integer. Aborts on overflowing the limit.
     fun add_integer(integer: &mut Integer, value: u128) {
-        assert!(
-            value <= (integer.limit - integer.value),
-            error::out_of_range(EAGGREGATOR_OVERFLOW)
-        );
+        assert!(value <= (integer.limit - integer.value),
+            error::out_of_range(EAGGREGATOR_OVERFLOW));
         integer.value = integer.value + value;
     }
 
@@ -72,7 +67,8 @@ module aptos_framework::optional_aggregator {
     public(friend) fun new(limit: u128, parallelizable: bool): OptionalAggregator {
         if (parallelizable) {
             OptionalAggregator {
-                aggregator: option::some(aggregator_factory::create_aggregator_internal(limit)),
+                aggregator: option::some(
+                    aggregator_factory::create_aggregator_internal(limit)),
                 integer: option::none(),
             }
         } else {
@@ -136,7 +132,9 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Destroys parallelizable optional aggregator and returns its limit.
-    fun destroy_optional_aggregator(optional_aggregator: OptionalAggregator): u128 {
+    fun destroy_optional_aggregator(
+        optional_aggregator: OptionalAggregator
+    ): u128 {
         let OptionalAggregator { aggregator, integer } = optional_aggregator;
         let limit = aggregator::limit(option::borrow(&aggregator));
         aggregator::destroy(option::destroy_some(aggregator));

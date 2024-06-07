@@ -105,7 +105,8 @@ module std::bit_vector_tests {
         };
         assert!(bit_vector::longest_set_sequence_starting_at(&bitvector, 0) == 20, 0);
         assert!(bit_vector::longest_set_sequence_starting_at(&bitvector, 20) == 0, 0);
-        assert!(bit_vector::longest_set_sequence_starting_at(&bitvector, 21) == 100 - 21, 0);
+        assert!(bit_vector::longest_set_sequence_starting_at(&bitvector, 21) == 100 - 21,
+            0);
     }
 
     #[test]
@@ -123,7 +124,7 @@ module std::bit_vector_tests {
         while (i > 0) {
             assert!(bit_vector::is_index_set(&bitvector, i), 0);
             bit_vector::shift_left(&mut bitvector, 1);
-            assert!(!bit_vector::is_index_set(&bitvector,  i), 1);
+            assert!(!bit_vector::is_index_set(&bitvector, i), 1);
             i = i - 1;
         };
     }
@@ -142,7 +143,7 @@ module std::bit_vector_tests {
         assert!(!bit_vector::is_index_set(&bitvector, 201), 2);
 
         // Make sure this shift clears all the bits
-        bit_vector::shift_left(&mut bitvector, bitlen  - 1);
+        bit_vector::shift_left(&mut bitvector, bitlen - 1);
 
         let i = 0;
         while (i < bitlen) {
@@ -197,7 +198,7 @@ module std::bit_vector_tests {
         bit_vector::shift_left(&mut bitvector, bitlen - 1);
         i = bitlen - 1;
         while (i > 0) {
-            assert!(!bit_vector::is_index_set(&bitvector,  i), 1);
+            assert!(!bit_vector::is_index_set(&bitvector, i), 1);
             i = i - 1;
         };
     }

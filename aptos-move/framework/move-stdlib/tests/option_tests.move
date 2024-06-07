@@ -226,6 +226,4 @@ module std::option_tests {
         let r = option::any(&option::some(1), |e| *e == 1);
         assert!(r, 0);
     }
-
-
 }

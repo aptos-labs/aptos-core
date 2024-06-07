@@ -11,8 +11,7 @@ module aptos_framework::aptos_coin_tests {
     }
 
     public fun mint_apt_fa_to_primary_fungible_store_for_test(
-        owner: address,
-        amount: u64,
+        owner: address, amount: u64,
     ) {
         primary_fungible_store::deposit(owner, aptos_coin::mint_apt_fa_for_test(amount));
     }
@@ -24,12 +23,9 @@ module aptos_framework::aptos_coin_tests {
         let fa = coin::coin_to_fungible_asset(coin);
         primary_fungible_store::deposit(@aptos_framework, fa);
         assert!(
-            primary_fungible_store::balance(
-                @aptos_framework,
-                object::address_to_object<Metadata>(@aptos_fungible_asset)
-            ) == 100,
-            0
-        );
+            primary_fungible_store::balance(@aptos_framework,
+                object::address_to_object<Metadata>(@aptos_fungible_asset)) == 100,
+            0);
         coin::destroy_mint_cap(mint_cap);
         coin::destroy_burn_cap(burn_cap);
     }
@@ -42,7 +38,8 @@ module aptos_framework::aptos_coin_tests {
         mint_apt_fa_to_primary_fungible_store_for_test(@aptos_framework, 100);
         let metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
         assert!(primary_fungible_store::balance(@aptos_framework, metadata) == 100, 0);
-        let store_addr = primary_fungible_store::primary_store_address(@aptos_framework, metadata);
+        let store_addr =
+            primary_fungible_store::primary_store_address(@aptos_framework, metadata);
         mint_apt_fa_to_for_test(object::address_to_object<FungibleStore>(store_addr), 100);
         assert!(primary_fungible_store::balance(@aptos_framework, metadata) == 200, 0);
     }

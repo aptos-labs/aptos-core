@@ -13,7 +13,15 @@
 /// fungible asset to it. This emits an deposit event.
 module aptos_framework::primary_fungible_store {
     use aptos_framework::dispatchable_fungible_asset;
-    use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata, MintRef, TransferRef, BurnRef};
+    use aptos_framework::fungible_asset::{
+        Self,
+        FungibleAsset,
+        FungibleStore,
+        Metadata,
+        MintRef,
+        TransferRef,
+        BurnRef
+    };
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
     use std::option::Option;
@@ -50,15 +58,13 @@ module aptos_framework::primary_fungible_store {
             project_uri,
         );
         let metadata_obj = &object::generate_signer(constructor_ref);
-        move_to(metadata_obj, DeriveRefPod {
-            metadata_derive_ref: object::generate_derive_ref(constructor_ref),
-        });
+        move_to(metadata_obj,
+            DeriveRefPod { metadata_derive_ref: object::generate_derive_ref(constructor_ref), });
     }
 
     /// Ensure that the primary store object for the given address exists. If it doesn't, create it.
     public fun ensure_primary_store_exists<T: key>(
-        owner: address,
-        metadata: Object<T>,
+        owner: address, metadata: Object<T>,
     ): Object<FungibleStore> acquires DeriveRefPod {
         let store_addr = primary_store_address(owner, metadata);
         if (fungible_asset::store_exists(store_addr)) {
@@ -70,8 +76,7 @@ module aptos_framework::primary_fungible_store {
 
     /// Create a primary store object to hold fungible asset for the given address.
     public fun create_primary_store<T: key>(
-        owner_addr: address,
-        metadata: Object<T>,
+        owner_addr: address, metadata: Object<T>,
     ): Object<FungibleStore> acquires DeriveRefPod {
         let metadata_addr = object::object_address(&metadata);
         object::address_to_object<Metadata>(metadata_addr);
@@ -86,21 +91,26 @@ module aptos_framework::primary_fungible_store {
 
     #[view]
     /// Get the address of the primary store for the given account.
-    public fun primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
+    public fun primary_store_address<T: key>(
+        owner: address, metadata: Object<T>
+    ): address {
         let metadata_addr = object::object_address(&metadata);
         object::create_user_derived_object_address(owner, metadata_addr)
     }
 
     #[view]
     /// Get the primary store object for the given account.
-    public fun primary_store<T: key>(owner: address, metadata: Object<T>): Object<FungibleStore> {
+    public fun primary_store<T: key>(owner: address, metadata: Object<T>)
+        : Object<FungibleStore> {
         let store = primary_store_address(owner, metadata);
         object::address_to_object<FungibleStore>(store)
     }
 
     #[view]
     /// Return whether the given account's primary store exists.
-    public fun primary_store_exists<T: key>(account: address, metadata: Object<T>): bool {
+    public fun primary_store_exists<T: key>(
+        account: address, metadata: Object<T>
+    ): bool {
         fungible_asset::store_exists(primary_store_address(account, metadata))
     }
 
@@ -109,13 +119,13 @@ module aptos_framework::primary_fungible_store {
     public fun balance<T: key>(account: address, metadata: Object<T>): u64 {
         if (primary_store_exists(account, metadata)) {
             fungible_asset::balance(primary_store(account, metadata))
-        } else {
-            0
-        }
+        } else { 0 }
     }
 
     #[view]
-    public fun is_balance_at_least<T: key>(account: address, metadata: Object<T>, amount: u64): bool {
+    public fun is_balance_at_least<T: key>(
+        account: address, metadata: Object<T>, amount: u64
+    ): bool {
         if (primary_store_exists(account, metadata)) {
             fungible_asset::is_balance_at_least(primary_store(account, metadata), amount)
         } else {
@@ -128,13 +138,12 @@ module aptos_framework::primary_fungible_store {
     public fun is_frozen<T: key>(account: address, metadata: Object<T>): bool {
         if (primary_store_exists(account, metadata)) {
             fungible_asset::is_frozen(primary_store(account, metadata))
-        } else {
-            false
-        }
+        } else { false }
     }
 
     /// Withdraw `amount` of fungible asset from the given account's primary store.
-    public fun withdraw<T: key>(owner: &signer, metadata: Object<T>, amount: u64): FungibleAsset acquires DeriveRefPod {
+    public fun withdraw<T: key>(owner: &signer, metadata: Object<T>, amount: u64)
+        : FungibleAsset acquires DeriveRefPod {
         let store = ensure_primary_store_exists(signer::address_of(owner), metadata);
         // Check if the store object has been burnt or not. If so, unburn it first.
         may_be_unburn(owner, store);
@@ -157,12 +166,10 @@ module aptos_framework::primary_fungible_store {
 
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.
     public entry fun transfer<T: key>(
-        sender: &signer,
-        metadata: Object<T>,
-        recipient: address,
-        amount: u64,
+        sender: &signer, metadata: Object<T>, recipient: address, amount: u64,
     ) acquires DeriveRefPod {
-        let sender_store = ensure_primary_store_exists(signer::address_of(sender), metadata);
+        let sender_store =
+            ensure_primary_store_exists(signer::address_of(sender), metadata);
         // Check if the sender store object has been burnt or not. If so, unburn it first.
         may_be_unburn(sender, sender_store);
         let recipient_store = ensure_primary_store_exists(recipient, metadata);
@@ -178,62 +185,69 @@ module aptos_framework::primary_fungible_store {
         amount: u64,
         expected: u64,
     ) acquires DeriveRefPod {
-        let sender_store = ensure_primary_store_exists(signer::address_of(sender), metadata);
+        let sender_store =
+            ensure_primary_store_exists(signer::address_of(sender), metadata);
         // Check if the sender store object has been burnt or not. If so, unburn it first.
         may_be_unburn(sender, sender_store);
         let recipient_store = ensure_primary_store_exists(recipient, metadata);
-        dispatchable_fungible_asset::transfer_assert_minimum_deposit(
-            sender,
-            sender_store,
-            recipient_store,
-            amount,
-            expected
-        );
+        dispatchable_fungible_asset::transfer_assert_minimum_deposit(sender, sender_store,
+            recipient_store, amount, expected);
     }
 
     /// Mint to the primary store of `owner`.
     public fun mint(mint_ref: &MintRef, owner: address, amount: u64) acquires DeriveRefPod {
-        let primary_store = ensure_primary_store_exists(owner, fungible_asset::mint_ref_metadata(mint_ref));
+        let primary_store =
+            ensure_primary_store_exists(owner, fungible_asset::mint_ref_metadata(mint_ref));
         fungible_asset::mint_to(mint_ref, primary_store, amount);
     }
 
     /// Burn from the primary store of `owner`.
     public fun burn(burn_ref: &BurnRef, owner: address, amount: u64) {
-        let primary_store = primary_store(owner, fungible_asset::burn_ref_metadata(burn_ref));
+        let primary_store =
+            primary_store(owner, fungible_asset::burn_ref_metadata(burn_ref));
         fungible_asset::burn_from(burn_ref, primary_store, amount);
     }
 
     /// Freeze/Unfreeze the primary store of `owner`.
-    public fun set_frozen_flag(transfer_ref: &TransferRef, owner: address, frozen: bool) acquires DeriveRefPod {
-        let primary_store = ensure_primary_store_exists(owner, fungible_asset::transfer_ref_metadata(transfer_ref));
+    public fun set_frozen_flag(
+        transfer_ref: &TransferRef, owner: address, frozen: bool
+    ) acquires DeriveRefPod {
+        let primary_store =
+            ensure_primary_store_exists(owner,
+                fungible_asset::transfer_ref_metadata(transfer_ref));
         fungible_asset::set_frozen_flag(transfer_ref, primary_store, frozen);
     }
 
     /// Withdraw from the primary store of `owner` ignoring frozen flag.
-    public fun withdraw_with_ref(transfer_ref: &TransferRef, owner: address, amount: u64): FungibleAsset {
-        let from_primary_store = primary_store(owner, fungible_asset::transfer_ref_metadata(transfer_ref));
+    public fun withdraw_with_ref(
+        transfer_ref: &TransferRef, owner: address, amount: u64
+    ): FungibleAsset {
+        let from_primary_store =
+            primary_store(owner, fungible_asset::transfer_ref_metadata(transfer_ref));
         fungible_asset::withdraw_with_ref(transfer_ref, from_primary_store, amount)
     }
 
     /// Deposit from the primary store of `owner` ignoring frozen flag.
-    public fun deposit_with_ref(transfer_ref: &TransferRef, owner: address, fa: FungibleAsset) acquires DeriveRefPod {
-        let from_primary_store = ensure_primary_store_exists(
-            owner,
-            fungible_asset::transfer_ref_metadata(transfer_ref)
-        );
+    public fun deposit_with_ref(
+        transfer_ref: &TransferRef, owner: address, fa: FungibleAsset
+    ) acquires DeriveRefPod {
+        let from_primary_store =
+            ensure_primary_store_exists(owner,
+                fungible_asset::transfer_ref_metadata(transfer_ref));
         fungible_asset::deposit_with_ref(transfer_ref, from_primary_store, fa);
     }
 
     /// Transfer `amount` of FA from the primary store of `from` to that of `to` ignoring frozen flag.
     public fun transfer_with_ref(
-        transfer_ref: &TransferRef,
-        from: address,
-        to: address,
-        amount: u64
+        transfer_ref: &TransferRef, from: address, to: address, amount: u64
     ) acquires DeriveRefPod {
-        let from_primary_store = primary_store(from, fungible_asset::transfer_ref_metadata(transfer_ref));
-        let to_primary_store = ensure_primary_store_exists(to, fungible_asset::transfer_ref_metadata(transfer_ref));
-        fungible_asset::transfer_with_ref(transfer_ref, from_primary_store, to_primary_store, amount);
+        let from_primary_store =
+            primary_store(from, fungible_asset::transfer_ref_metadata(transfer_ref));
+        let to_primary_store =
+            ensure_primary_store_exists(to,
+                fungible_asset::transfer_ref_metadata(transfer_ref));
+        fungible_asset::transfer_with_ref(transfer_ref, from_primary_store, to_primary_store,
+            amount);
     }
 
     fun may_be_unburn(owner: &signer, store: Object<FungibleStore>) {
@@ -292,12 +306,10 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    fun test_basic_flow(
-        creator: &signer,
-        aaron: &signer,
-    ) acquires DeriveRefPod {
+    fun test_basic_flow(creator: &signer, aaron: &signer,) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(creator);
-        let (mint_ref, transfer_ref, burn_ref) = init_test_metadata_with_primary_store_enabled(&creator_ref);
+        let (mint_ref, transfer_ref, burn_ref) = init_test_metadata_with_primary_store_enabled(
+            &creator_ref);
         let creator_address = signer::address_of(creator);
         let aaron_address = signer::address_of(aaron);
         assert!(balance(creator_address, metadata) == 0, 1);
@@ -320,10 +332,7 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    fun test_basic_flow_with_min_balance(
-        creator: &signer,
-        aaron: &signer,
-    ) acquires DeriveRefPod {
+    fun test_basic_flow_with_min_balance(creator: &signer, aaron: &signer,) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(creator);
         let (mint_ref, _transfer_ref, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
         let creator_address = signer::address_of(creator);
@@ -339,10 +348,7 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[test(user_1 = @0xcafe, user_2 = @0xface)]
-    fun test_transfer_to_burnt_store(
-        user_1: &signer,
-        user_2: &signer,
-    ) acquires DeriveRefPod {
+    fun test_transfer_to_burnt_store(user_1: &signer, user_2: &signer,) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(user_1);
         let (mint_ref, _, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
         let user_1_address = signer::address_of(user_1);
@@ -363,10 +369,7 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[test(user_1 = @0xcafe, user_2 = @0xface)]
-    fun test_withdraw_from_burnt_store(
-        user_1: &signer,
-        user_2: &signer,
-    ) acquires DeriveRefPod {
+    fun test_withdraw_from_burnt_store(user_1: &signer, user_2: &signer,) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(user_1);
         let (mint_ref, _, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
         let user_1_address = signer::address_of(user_1);

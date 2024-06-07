@@ -36,7 +36,8 @@ spec aptos_framework::chain_status {
         /// [high-level-req-3]
         aborts_if exists<GenesisEndMarker>(@aptos_framework);
         /// [high-level-req-1]
-        ensures global<GenesisEndMarker>(@aptos_framework) == GenesisEndMarker {};
+        ensures global<GenesisEndMarker>(@aptos_framework)
+            == GenesisEndMarker {};
     }
 
     spec schema RequiresIsOperating {

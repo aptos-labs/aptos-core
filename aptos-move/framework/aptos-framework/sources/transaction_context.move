@@ -63,9 +63,7 @@ module aptos_framework::transaction_context {
     /// This method runs `generate_unique_address` native function and returns
     /// the generated unique address wrapped in the AUID class.
     public fun generate_auid(): AUID {
-        return AUID {
-            unique_address: generate_unique_address()
-        }
+        return AUID { unique_address: generate_unique_address() }
     }
 
     /// Returns the unique address wrapped in the given AUID struct.
@@ -76,18 +74,22 @@ module aptos_framework::transaction_context {
     /// Returns the sender's address for the current transaction.
     /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
     public fun sender(): address {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         sender_internal()
     }
+
     native fun sender_internal(): address;
 
     /// Returns the list of the secondary signers for the current transaction.
     /// If the current transaction has no secondary signers, this function returns an empty vector.
     /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
     public fun secondary_signers(): vector<address> {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         secondary_signers_internal()
     }
+
     native fun secondary_signers_internal(): vector<address>;
 
     /// Returns the gas payer address for the current transaction.
@@ -95,90 +97,110 @@ module aptos_framework::transaction_context {
     /// or the address of the separate gas fee payer if one is specified.
     /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
     public fun gas_payer(): address {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         gas_payer_internal()
     }
+
     native fun gas_payer_internal(): address;
 
     /// Returns the max gas amount in units which is specified for the current transaction.
     /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
     public fun max_gas_amount(): u64 {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         max_gas_amount_internal()
     }
+
     native fun max_gas_amount_internal(): u64;
 
     /// Returns the gas unit price in Octas which is specified for the current transaction.
     /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
     public fun gas_unit_price(): u64 {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         gas_unit_price_internal()
     }
+
     native fun gas_unit_price_internal(): u64;
 
     /// Returns the chain ID specified for the current transaction.
     /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
     public fun chain_id(): u8 {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         chain_id_internal()
     }
+
     native fun chain_id_internal(): u8;
 
     /// Returns the entry function payload if the current transaction has such a payload. Otherwise, return `None`.
     /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
     public fun entry_function_payload(): Option<EntryFunctionPayload> {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         entry_function_payload_internal()
     }
+
     native fun entry_function_payload_internal(): Option<EntryFunctionPayload>;
 
     /// Returns the account address of the entry function payload.
     public fun account_address(payload: &EntryFunctionPayload): address {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         payload.account_address
     }
 
     /// Returns the module name of the entry function payload.
     public fun module_name(payload: &EntryFunctionPayload): String {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         payload.module_name
     }
 
     /// Returns the function name of the entry function payload.
     public fun function_name(payload: &EntryFunctionPayload): String {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         payload.function_name
     }
 
     /// Returns the type arguments names of the entry function payload.
     public fun type_arg_names(payload: &EntryFunctionPayload): vector<String> {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         payload.ty_args_names
     }
 
     /// Returns the arguments of the entry function payload.
     public fun args(payload: &EntryFunctionPayload): vector<vector<u8>> {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         payload.args
     }
 
     /// Returns the multisig payload if the current transaction has such a payload. Otherwise, return `None`.
     /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
     public fun multisig_payload(): Option<MultisigPayload> {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         multisig_payload_internal()
     }
+
     native fun multisig_payload_internal(): Option<MultisigPayload>;
 
     /// Returns the multisig account address of the multisig payload.
     public fun multisig_address(payload: &MultisigPayload): address {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         payload.multisig_address
     }
 
     /// Returns the inner entry function payload of the multisig payload.
-    public fun inner_entry_function_payload(payload: &MultisigPayload): Option<EntryFunctionPayload> {
-        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+    public fun inner_entry_function_payload(payload: &MultisigPayload)
+        : Option<EntryFunctionPayload> {
+        assert!(features::transaction_context_extension_enabled(),
+            error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         payload.entry_function_payload
     }
 
@@ -205,56 +227,56 @@ module aptos_framework::transaction_context {
     }
 
     #[test]
-    #[expected_failure(abort_code=196609, location = Self)]
+    #[expected_failure(abort_code = 196609, location = Self)]
     fun test_call_sender() {
         // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
         let _sender = sender();
     }
 
     #[test]
-    #[expected_failure(abort_code=196609, location = Self)]
+    #[expected_failure(abort_code = 196609, location = Self)]
     fun test_call_secondary_signers() {
         // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
         let _secondary_signers = secondary_signers();
     }
 
     #[test]
-    #[expected_failure(abort_code=196609, location = Self)]
+    #[expected_failure(abort_code = 196609, location = Self)]
     fun test_call_gas_payer() {
         // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
         let _gas_payer = gas_payer();
     }
 
     #[test]
-    #[expected_failure(abort_code=196609, location = Self)]
+    #[expected_failure(abort_code = 196609, location = Self)]
     fun test_call_max_gas_amount() {
         // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
         let _max_gas_amount = max_gas_amount();
     }
 
     #[test]
-    #[expected_failure(abort_code=196609, location = Self)]
+    #[expected_failure(abort_code = 196609, location = Self)]
     fun test_call_gas_unit_price() {
         // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
         let _gas_unit_price = gas_unit_price();
     }
 
     #[test]
-    #[expected_failure(abort_code=196609, location = Self)]
+    #[expected_failure(abort_code = 196609, location = Self)]
     fun test_call_chain_id() {
         // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
         let _chain_id = chain_id();
     }
 
     #[test]
-    #[expected_failure(abort_code=196609, location = Self)]
+    #[expected_failure(abort_code = 196609, location = Self)]
     fun test_call_entry_function_payload() {
         // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
         let _entry_fun = entry_function_payload();
     }
 
     #[test]
-    #[expected_failure(abort_code=196609, location = Self)]
+    #[expected_failure(abort_code = 196609, location = Self)]
     fun test_call_multisig_payload() {
         // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
         let _multisig = multisig_payload();

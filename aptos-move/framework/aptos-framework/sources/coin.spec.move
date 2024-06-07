@@ -62,35 +62,42 @@ spec aptos_framework::coin {
         pragma verify = true;
         global supply<CoinType>: num;
         global aggregate_supply<CoinType>: num;
-        apply TotalSupplyTracked<CoinType> to *<CoinType> except
-        initialize, initialize_internal, initialize_with_parallelizable_supply;
+        apply TotalSupplyTracked<CoinType> to *<CoinType> except initialize, initialize_internal, initialize_with_parallelizable_supply;
         // TODO(fa_migration)
         // apply TotalSupplyNoChange<CoinType> to *<CoinType> except mint,
         //     burn, burn_from, initialize, initialize_internal, initialize_with_parallelizable_supply;
     }
 
     spec fun spec_fun_supply_tracked<CoinType>(val: u64, supply: Option<OptionalAggregator>): bool {
-        option::spec_is_some(supply) ==> val == optional_aggregator::optional_aggregator_value
-            (option::spec_borrow(supply))
+        option::spec_is_some(supply) ==>
+            val
+                == optional_aggregator::optional_aggregator_value(
+                    option::spec_borrow(supply))
     }
 
     spec schema TotalSupplyTracked<CoinType> {
-        ensures old(spec_fun_supply_tracked<CoinType>(supply<CoinType> + aggregate_supply<CoinType>,
-            global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply)) ==>
+        ensures old(
             spec_fun_supply_tracked<CoinType>(supply<CoinType> + aggregate_supply<CoinType>,
-                global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply);
+                global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address)
+                .supply)) ==>
+            spec_fun_supply_tracked<CoinType>(supply<CoinType> + aggregate_supply<CoinType>,
+                global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address)
+                .supply);
     }
 
-    spec fun spec_fun_supply_no_change<CoinType>(old_supply: Option<OptionalAggregator>,
-                                                 supply: Option<OptionalAggregator>): bool {
-        option::spec_is_some(old_supply) ==> optional_aggregator::optional_aggregator_value
-            (option::spec_borrow(old_supply)) == optional_aggregator::optional_aggregator_value
-            (option::spec_borrow(supply))
+    spec fun spec_fun_supply_no_change<CoinType>(old_supply: Option<OptionalAggregator>, supply: Option<
+            OptionalAggregator>): bool {
+        option::spec_is_some(old_supply) ==>
+            optional_aggregator::optional_aggregator_value(option::spec_borrow(old_supply))
+                == optional_aggregator::optional_aggregator_value(
+                    option::spec_borrow(supply))
     }
 
     spec schema TotalSupplyNoChange<CoinType> {
-        let old_supply = global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply;
-        let post supply = global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply;
+        let old_supply = global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address)
+            .supply;
+        let post supply = global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address)
+            .supply;
         ensures spec_fun_supply_no_change<CoinType>(old_supply, supply);
     }
 
@@ -162,7 +169,8 @@ spec aptos_framework::coin {
 
     spec fun spec_paired_metadata<CoinType>(): Option<Object<Metadata>> {
         if (exists<CoinConversionMap>(@aptos_framework)) {
-            let map = global<CoinConversionMap>(@aptos_framework).coin_to_fungible_asset_map;
+            let map =
+                global<CoinConversionMap>(@aptos_framework).coin_to_fungible_asset_map;
             if (table::spec_contains(map, type_info::type_of<CoinType>())) {
                 let metadata = table::spec_get(map, type_info::type_of<CoinType>());
                 option::spec_some(metadata)
@@ -176,9 +184,10 @@ spec aptos_framework::coin {
 
     spec fun spec_is_account_registered<CoinType>(account_addr: address): bool {
         let paired_metadata_opt = spec_paired_metadata<CoinType>();
-        exists<CoinStore<CoinType>>(account_addr) || (option::spec_is_some(
-            paired_metadata_opt
-        ) && primary_fungible_store::spec_primary_store_exists(account_addr, option::spec_borrow(paired_metadata_opt)))
+        exists<CoinStore<CoinType>>(account_addr)
+            || (option::spec_is_some(paired_metadata_opt)
+                && primary_fungible_store::spec_primary_store_exists(account_addr,
+                    option::spec_borrow(paired_metadata_opt)))
     }
 
     spec schema CoinSubAbortsIf<CoinType> {
@@ -186,9 +195,11 @@ spec aptos_framework::coin {
         amount: u64;
         let addr = type_info::type_of<CoinType>().account_address;
         let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        include (option::is_some(
-            maybe_supply
-        )) ==> optional_aggregator::SubAbortsIf { optional_aggregator: option::borrow(maybe_supply), value: amount };
+        include (option::is_some(maybe_supply)) ==>
+            optional_aggregator::SubAbortsIf {
+                optional_aggregator: option::borrow(maybe_supply),
+                value: amount
+            };
     }
 
     spec schema CoinAddAbortsIf<CoinType> {
@@ -196,9 +207,11 @@ spec aptos_framework::coin {
         amount: u64;
         let addr = type_info::type_of<CoinType>().account_address;
         let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        include (option::is_some(
-            maybe_supply
-        )) ==> optional_aggregator::AddAbortsIf { optional_aggregator: option::borrow(maybe_supply), value: amount };
+        include (option::is_some(maybe_supply)) ==>
+            optional_aggregator::AddAbortsIf {
+                optional_aggregator: option::borrow(maybe_supply),
+                value: amount
+            };
     }
 
     spec schema AbortsIfNotExistCoinInfo<CoinType> {
@@ -240,10 +253,7 @@ spec aptos_framework::coin {
         };
     }
 
-    spec burn<CoinType>(
-    coin: Coin<CoinType>,
-    _cap: &BurnCapability<CoinType>,
-    ) {
+    spec burn<CoinType>(coin: Coin<CoinType>, _cap: &BurnCapability<CoinType>,) {
         // TODO(fa_migration)
         pragma verify = false;
         let addr = type_info::type_of<CoinType>().account_address;
@@ -261,11 +271,7 @@ spec aptos_framework::coin {
         modifies global<CoinInfo<CoinType>>(addr);
     }
 
-    spec burn_from<CoinType>(
-    account_addr: address,
-    amount: u64,
-    burn_cap: &BurnCapability<CoinType>,
-    ) {
+    spec burn_from<CoinType>(account_addr: address, amount: u64, burn_cap: &BurnCapability<CoinType>,) {
         // TODO(fa_migration)
         pragma verify = false;
         let addr = type_info::type_of<CoinType>().account_address;
@@ -307,9 +313,8 @@ spec aptos_framework::coin {
         modifies global<CoinInfo<CoinType>>(account_addr);
         /// [high-level-req-8.3]
         include DepositAbortsIf<CoinType>;
-        ensures global<CoinStore<CoinType>>(account_addr).coin.value == old(
-            global<CoinStore<CoinType>>(account_addr)
-        ).coin.value + coin.value;
+        ensures global<CoinStore<CoinType>>(account_addr).coin.value
+            == old(global<CoinStore<CoinType>>(account_addr)).coin.value + coin.value;
     }
 
     spec coin_to_fungible_asset<CoinType>(coin: Coin<CoinType>): FungibleAsset {
@@ -343,9 +348,8 @@ spec aptos_framework::coin {
         pragma verify = false;
         modifies global<CoinStore<CoinType>>(account_addr);
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
-        ensures global<CoinStore<CoinType>>(account_addr).coin.value == old(
-            global<CoinStore<CoinType>>(account_addr)
-        ).coin.value + coin.value;
+        ensures global<CoinStore<CoinType>>(account_addr).coin.value
+            == old(global<CoinStore<CoinType>>(account_addr)).coin.value + coin.value;
     }
 
     /// The value of `zero_coin` must be 0.
@@ -364,10 +368,7 @@ spec aptos_framework::coin {
         ensures coin.value == 0;
     }
 
-    spec freeze_coin_store<CoinType>(
-    account_addr: address,
-    _freeze_cap: &FreezeCapability<CoinType>,
-    ) {
+    spec freeze_coin_store<CoinType>(account_addr: address, _freeze_cap: &FreezeCapability<CoinType>,) {
         // TODO(fa_migration)
         pragma verify = false;
         // pragma opaque;
@@ -378,10 +379,7 @@ spec aptos_framework::coin {
         ensures coin_store.frozen;
     }
 
-    spec unfreeze_coin_store<CoinType>(
-    account_addr: address,
-    _freeze_cap: &FreezeCapability<CoinType>,
-    ) {
+    spec unfreeze_coin_store<CoinType>(account_addr: address, _freeze_cap: &FreezeCapability<CoinType>,) {
         // TODO(fa_migration)
         pragma verify = false;
         // pragma opaque;
@@ -414,10 +412,11 @@ spec aptos_framework::coin {
         let post post_supply = option::spec_borrow(post_maybe_supply);
         let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
 
-        let supply_no_parallel = option::spec_is_some(maybe_supply) &&
-            !optional_aggregator::is_parallelizable(supply);
+        let supply_no_parallel = option::spec_is_some(maybe_supply) && !optional_aggregator::is_parallelizable(
+            supply);
 
-        aborts_if supply_no_parallel && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
+        aborts_if supply_no_parallel && !exists<aggregator_factory::AggregatorFactory>(
+            @aptos_framework);
         ensures supply_no_parallel ==>
             optional_aggregator::is_parallelizable(post_supply) && post_value == value;
     }
@@ -433,21 +432,18 @@ spec aptos_framework::coin {
     }
 
     // `account` must be `@aptos_framework`.
-    spec initialize_with_parallelizable_supply<CoinType>(
-    account: &signer,
-    name: string::String,
-    symbol: string::String,
-    decimals: u8,
-    monitor_supply: bool,
+    spec initialize_with_parallelizable_supply<CoinType>(account: &signer,
+        name: string::String,
+        symbol: string::String,
+        decimals: u8,
+        monitor_supply: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         use aptos_framework::aggregator_factory;
         let addr = signer::address_of(account);
         aborts_if addr != @aptos_framework;
-        aborts_if monitor_supply && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
-        include InitializeInternalSchema<CoinType> {
-            name: name.bytes,
-            symbol: symbol.bytes
-        };
+        aborts_if monitor_supply && !exists<aggregator_factory::AggregatorFactory>(
+            @aptos_framework);
+        include InitializeInternalSchema<CoinType> { name: name.bytes, symbol: symbol.bytes };
         ensures exists<CoinInfo<CoinType>>(addr);
     }
 
@@ -465,34 +461,30 @@ spec aptos_framework::coin {
         aborts_if len(symbol) > MAX_COIN_SYMBOL_LENGTH;
     }
 
-    spec initialize_internal<CoinType>(
-    account: &signer,
-    name: string::String,
-    symbol: string::String,
-    decimals: u8,
-    monitor_supply: bool,
-    parallelizable: bool,
+    spec initialize_internal<CoinType>(account: &signer,
+        name: string::String,
+        symbol: string::String,
+        decimals: u8,
+        monitor_supply: bool,
+        parallelizable: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
-        include InitializeInternalSchema<CoinType> {
-            name: name.bytes,
-            symbol: symbol.bytes
-        };
+        include InitializeInternalSchema<CoinType> { name: name.bytes, symbol: symbol.bytes };
         let account_addr = signer::address_of(account);
         let post coin_info = global<CoinInfo<CoinType>>(account_addr);
         let post supply = option::spec_borrow(coin_info.supply);
         let post value = optional_aggregator::optional_aggregator_value(supply);
         let post limit = optional_aggregator::optional_aggregator_limit(supply);
         modifies global<CoinInfo<CoinType>>(account_addr);
-        aborts_if monitor_supply && parallelizable
-            && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
+        aborts_if monitor_supply
+            && parallelizable && !exists<aggregator_factory::AggregatorFactory>(
+            @aptos_framework);
         /// [managed_coin::high-level-req-2]
-        ensures exists<CoinInfo<CoinType>>(account_addr)
-            && coin_info.name == name
-            && coin_info.symbol == symbol
-            && coin_info.decimals == decimals;
+        ensures exists<CoinInfo<CoinType>>(account_addr) && coin_info.name == name && coin_info
+            .symbol == symbol && coin_info.decimals == decimals;
         ensures if (monitor_supply) {
-            value == 0 && limit == MAX_U128
-                && (parallelizable == optional_aggregator::is_parallelizable(supply))
+            value == 0
+                && limit == MAX_U128 && (parallelizable
+                == optional_aggregator::is_parallelizable(supply))
         } else {
             option::spec_is_none(coin_info.supply)
         };
@@ -523,11 +515,7 @@ spec aptos_framework::coin {
     /// `from` and `to` account not frozen.
     /// `from` and `to` not the same address.
     /// `from` account sufficient balance.
-    spec transfer<CoinType>(
-    from: &signer,
-    to: address,
-    amount: u64,
-    ) {
+    spec transfer<CoinType>(from: &signer, to: address, amount: u64,) {
         // TODO(fa_migration)
         pragma verify = false;
         let account_addr_from = signer::address_of(from);
@@ -544,17 +532,18 @@ spec aptos_framework::coin {
         aborts_if coin_store_to.frozen;
         aborts_if coin_store_from.coin.value < amount;
 
-        ensures account_addr_from != to ==> coin_store_post_from.coin.value ==
-            coin_store_from.coin.value - amount;
-        ensures account_addr_from != to ==> coin_store_post_to.coin.value == coin_store_to.coin.value + amount;
-        ensures account_addr_from == to ==> coin_store_post_from.coin.value == coin_store_from.coin.value;
+        ensures account_addr_from != to ==>
+            coin_store_post_from.coin.value
+                == coin_store_from.coin.value - amount;
+        ensures account_addr_from != to ==>
+            coin_store_post_to.coin.value
+                == coin_store_to.coin.value + amount;
+        ensures account_addr_from == to ==>
+            coin_store_post_from.coin.value == coin_store_from.coin.value;
     }
 
     /// Account is not frozen and sufficient balance.
-    spec withdraw<CoinType>(
-    account: &signer,
-    amount: u64,
-    ): Coin<CoinType> {
+    spec withdraw<CoinType>(account: &signer, amount: u64,): Coin<CoinType> {
         // TODO(fa_migration)
         pragma verify = false;
         include WithdrawAbortsIf<CoinType>;
@@ -566,6 +555,7 @@ spec aptos_framework::coin {
         ensures coin_post == balance - amount;
         ensures result == Coin<CoinType> { value: amount };
     }
+
     spec schema WithdrawAbortsIf<CoinType> {
         account: &signer;
         amount: u64;
@@ -591,17 +581,18 @@ spec aptos_framework::coin {
 
     spec drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
         aborts_if aggregator::spec_read(coin.value) > MAX_U64;
-        ensures result.value == aggregator::spec_aggregator_get_val(old(coin).value);
+        ensures result.value
+            == aggregator::spec_aggregator_get_val(old(coin).value);
     }
 
     spec merge_aggregatable_coin<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
         let aggr = dst_coin.value;
         let post p_aggr = dst_coin.value;
-        aborts_if aggregator::spec_aggregator_get_val(aggr)
-            + coin.value > aggregator::spec_get_limit(aggr);
-        aborts_if aggregator::spec_aggregator_get_val(aggr)
-            + coin.value > MAX_U128;
-        ensures aggregator::spec_aggregator_get_val(aggr) + coin.value == aggregator::spec_aggregator_get_val(p_aggr);
+        aborts_if aggregator::spec_aggregator_get_val(aggr) + coin.value > aggregator::spec_get_limit(
+            aggr);
+        aborts_if aggregator::spec_aggregator_get_val(aggr) + coin.value > MAX_U128;
+        ensures aggregator::spec_aggregator_get_val(aggr) + coin.value
+            == aggregator::spec_aggregator_get_val(p_aggr);
     }
 
     spec collect_into_aggregatable_coin<CoinType>(account_addr: address, amount: u64, dst_coin: &mut AggregatableCoin<CoinType>) {
@@ -613,11 +604,13 @@ spec aptos_framework::coin {
         let post p_coin_store = global<CoinStore<CoinType>>(account_addr);
         aborts_if amount > 0 && !exists<CoinStore<CoinType>>(account_addr);
         aborts_if amount > 0 && coin_store.coin.value < amount;
-        aborts_if amount > 0 && aggregator::spec_aggregator_get_val(aggr)
-            + amount > aggregator::spec_get_limit(aggr);
-        aborts_if amount > 0 && aggregator::spec_aggregator_get_val(aggr)
-            + amount > MAX_U128;
-        ensures aggregator::spec_aggregator_get_val(aggr) + amount == aggregator::spec_aggregator_get_val(p_aggr);
+        aborts_if amount > 0
+            && aggregator::spec_aggregator_get_val(aggr) + amount > aggregator::spec_get_limit(
+                aggr);
+        aborts_if amount > 0
+            && aggregator::spec_aggregator_get_val(aggr) + amount > MAX_U128;
+        ensures aggregator::spec_aggregator_get_val(aggr) + amount
+            == aggregator::spec_aggregator_get_val(p_aggr);
         ensures coin_store.coin.value - amount == p_coin_store.coin.value;
     }
 }

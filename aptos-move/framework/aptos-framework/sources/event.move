@@ -41,15 +41,14 @@ module aptos_framework::event {
     #[deprecated]
     /// Use EventHandleGenerator to generate a unique event handle for `sig`
     public(friend) fun new_event_handle<T: drop + store>(guid: GUID): EventHandle<T> {
-        EventHandle<T> {
-            counter: 0,
-            guid,
-        }
+        EventHandle<T> { counter: 0, guid, }
     }
 
     #[deprecated]
     /// Emit an event with payload `msg` by using `handle_ref`'s key and counter.
-    public fun emit_event<T: drop + store>(handle_ref: &mut EventHandle<T>, msg: T) {
+    public fun emit_event<T: drop + store>(
+        handle_ref: &mut EventHandle<T>, msg: T
+    ) {
         write_to_event_store<T>(bcs::to_bytes(&handle_ref.guid), handle_ref.counter, msg);
         spec {
             assume handle_ref.counter + 1 <= MAX_U64;
@@ -85,7 +84,9 @@ module aptos_framework::event {
 
     #[deprecated]
     #[test_only]
-    public fun was_event_emitted_by_handle<T: drop + store>(handle: &EventHandle<T>, msg: &T): bool {
+    public fun was_event_emitted_by_handle<T: drop + store>(
+        handle: &EventHandle<T>, msg: &T
+    ): bool {
         use std::vector;
         vector::contains(&emitted_events_by_handle(handle), msg)
     }

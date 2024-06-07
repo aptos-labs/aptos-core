@@ -36,16 +36,19 @@ module aptos_framework::aptos_coin {
     }
 
     /// Can only called during genesis to initialize the Aptos coin.
-    public(friend) fun initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
+    public(friend) fun initialize(aptos_framework: &signer)
+        : (BurnCapability<AptosCoin>,
+        MintCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let (burn_cap, freeze_cap, mint_cap) = coin::initialize_with_parallelizable_supply<AptosCoin>(
-            aptos_framework,
-            string::utf8(b"Aptos Coin"),
-            string::utf8(b"APT"),
-            8, // decimals
-            true, // monitor_supply
-        );
+        let (burn_cap, freeze_cap, mint_cap) =
+            coin::initialize_with_parallelizable_supply<AptosCoin>(
+                aptos_framework,
+                string::utf8(b"Aptos Coin"),
+                string::utf8(b"APT"),
+                8, // decimals
+                true, // monitor_supply
+            );
 
         // Aptos framework needs mint cap to mint coins to initial validators. This will be revoked once the validators
         // have been initialized.
@@ -71,17 +74,13 @@ module aptos_framework::aptos_coin {
     /// accounts.
     /// Expects account and APT store to be registered before calling.
     public(friend) fun configure_accounts_for_test(
-        aptos_framework: &signer,
-        core_resources: &signer,
-        mint_cap: MintCapability<AptosCoin>,
+        aptos_framework: &signer, core_resources: &signer, mint_cap: MintCapability<AptosCoin>,
     ) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         // Mint the core resource account AptosCoin for gas so it can execute system transactions.
-        let coins = coin::mint<AptosCoin>(
-            18446744073709551615,
-            &mint_cap,
-        );
+        let coins =
+            coin::mint<AptosCoin>(18446744073709551615, &mint_cap,);
         coin::deposit<AptosCoin>(signer::address_of(core_resources), coins);
 
         move_to(core_resources, MintCapStore { mint_cap });
@@ -90,17 +89,10 @@ module aptos_framework::aptos_coin {
 
     /// Only callable in tests and testnets where the core resources account exists.
     /// Create new coins and deposit them into dst_addr's account.
-    public entry fun mint(
-        account: &signer,
-        dst_addr: address,
-        amount: u64,
-    ) acquires MintCapStore {
+    public entry fun mint(account: &signer, dst_addr: address, amount: u64,) acquires MintCapStore {
         let account_addr = signer::address_of(account);
 
-        assert!(
-            exists<MintCapStore>(account_addr),
-            error::not_found(ENO_CAPABILITIES),
-        );
+        assert!(exists<MintCapStore>(account_addr), error::not_found(ENO_CAPABILITIES),);
 
         let mint_cap = &borrow_global<MintCapStore>(account_addr).mint_cap;
         let coins_minted = coin::mint<AptosCoin>(amount, mint_cap);
@@ -112,10 +104,11 @@ module aptos_framework::aptos_coin {
     public entry fun delegate_mint_capability(account: signer, to: address) acquires Delegations {
         system_addresses::assert_core_resource(&account);
         let delegations = &mut borrow_global_mut<Delegations>(@core_resources).inner;
-        vector::for_each_ref(delegations, |element| {
-            let element: &DelegatedMintCapability = element;
-            assert!(element.to != to, error::invalid_argument(EALREADY_DELEGATED));
-        });
+        vector::for_each_ref(delegations,
+            |element| {
+                let element: &DelegatedMintCapability = element;
+                assert!(element.to != to, error::invalid_argument(EALREADY_DELEGATED));
+            });
         vector::push_back(delegations, DelegatedMintCapability { to });
     }
 
@@ -160,11 +153,7 @@ module aptos_framework::aptos_coin {
     public fun mint_apt_fa_for_test(amount: u64): FungibleAsset acquires MintCapStore {
         ensure_initialized_with_apt_fa_metadata_for_test();
         coin::coin_to_fungible_asset(
-            coin::mint(
-                amount,
-                &borrow_global<MintCapStore>(@aptos_framework).mint_cap
-            )
-        )
+            coin::mint(amount, &borrow_global<MintCapStore>(@aptos_framework).mint_cap))
     }
 
     #[test_only]
@@ -183,7 +172,9 @@ module aptos_framework::aptos_coin {
     }
 
     #[test_only]
-    public fun initialize_for_test(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
+    public fun initialize_for_test(aptos_framework: &signer)
+        : (BurnCapability<AptosCoin>,
+        MintCapability<AptosCoin>) {
         aggregator_factory::initialize_aggregator_factory_for_test(aptos_framework);
         let (burn_cap, mint_cap) = initialize(aptos_framework);
         coin::create_coin_conversion_map(aptos_framework);

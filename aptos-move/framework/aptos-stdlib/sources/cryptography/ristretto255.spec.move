@@ -130,9 +130,10 @@ spec aptos_std::ristretto255 {
 
     spec new_scalar_from_bytes {
         aborts_if false;
-        ensures spec_scalar_is_canonical_internal(bytes) ==> (std::option::spec_is_some(result)
-            && std::option::spec_borrow(result).data == bytes);
-        ensures !spec_scalar_is_canonical_internal(bytes) ==> std::option::spec_is_none(result);
+        ensures spec_scalar_is_canonical_internal(bytes) ==>
+            (std::option::spec_is_some(result) && std::option::spec_borrow(result).data == bytes);
+        ensures !spec_scalar_is_canonical_internal(bytes) ==>
+            std::option::spec_is_none(result);
     }
 
     spec scalar_from_sha512_internal {
@@ -169,12 +170,16 @@ spec aptos_std::ristretto255 {
 
     spec new_scalar_reduced_from_32_bytes {
         ensures len(bytes) != 32 ==> std::option::spec_is_none(result);
-        ensures len(bytes) == 32 ==> std::option::spec_borrow(result).data == spec_scalar_reduced_from_32_bytes_internal(bytes);
+        ensures len(bytes) == 32 ==>
+            std::option::spec_borrow(result).data
+                == spec_scalar_reduced_from_32_bytes_internal(bytes);
     }
 
     spec new_scalar_uniform_from_64_bytes {
         ensures len(bytes) != 64 ==> std::option::spec_is_none(result);
-        ensures len(bytes) == 64 ==> std::option::spec_borrow(result).data == spec_scalar_uniform_from_64_bytes_internal(bytes);
+        ensures len(bytes) == 64 ==>
+            std::option::spec_borrow(result).data
+                == spec_scalar_uniform_from_64_bytes_internal(bytes);
     }
 
     spec scalar_zero {
@@ -201,7 +206,10 @@ spec aptos_std::ristretto255 {
     spec scalar_invert {
         aborts_if false;
         ensures spec_scalar_is_zero(s) ==> std::option::spec_is_none(result);
-        ensures !spec_scalar_is_zero(s) ==> (std::option::spec_is_some(result) && std::option::spec_borrow(result).data == spec_scalar_invert_internal(s.data));
+        ensures !spec_scalar_is_zero(s) ==>
+            (std::option::spec_is_some(result)
+                && std::option::spec_borrow(result).data
+                == spec_scalar_invert_internal(s.data));
     }
 
     spec scalar_mul_internal {
@@ -277,11 +285,13 @@ spec aptos_std::ristretto255 {
     /// # Helper functions
 
     spec fun spec_scalar_is_zero(s: Scalar): bool {
-        s.data == x"0000000000000000000000000000000000000000000000000000000000000000"
+        s.data
+            == x"0000000000000000000000000000000000000000000000000000000000000000"
     }
 
     spec fun spec_scalar_is_one(s: Scalar): bool {
-        s.data == x"0100000000000000000000000000000000000000000000000000000000000000"
+        s.data
+            == x"0100000000000000000000000000000000000000000000000000000000000000"
     }
 
     spec fun spec_point_is_canonical_internal(bytes: vector<u8>): bool;

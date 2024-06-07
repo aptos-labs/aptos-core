@@ -85,13 +85,15 @@ module aptos_std::type_info {
         let type_info = type_of<Table<String, String>>();
         assert!(account_address(&type_info) == @aptos_std, 0);
         assert!(module_name(&type_info) == b"table", 1);
-        assert!(struct_name(&type_info) == b"Table<0x1::string::String, 0x1::string::String>", 2);
+        assert!(struct_name(&type_info)
+            == b"Table<0x1::string::String, 0x1::string::String>", 2);
     }
 
     #[test(fx = @std)]
     fun test_chain_id(fx: signer) {
         // We need to enable the feature in order for the native call to be allowed.
-        features::change_feature_flags_for_testing(&fx, vector[features::get_aptos_stdlib_chain_id_feature()], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[features::get_aptos_stdlib_chain_id_feature()],
+            vector[]);
 
         // The testing environment chain ID is 4u8.
         assert!(chain_id() == 4u8, 1);
@@ -99,7 +101,6 @@ module aptos_std::type_info {
 
     #[test]
     fun test_type_name() {
-
 
         assert!(type_name<bool>() == string::utf8(b"bool"), 0);
         assert!(type_name<u8>() == string::utf8(b"u8"), 1);
@@ -110,18 +111,20 @@ module aptos_std::type_info {
 
         // vector
         assert!(type_name<vector<u8>>() == string::utf8(b"vector<u8>"), 6);
-        assert!(type_name<vector<vector<u8>>>() == string::utf8(b"vector<vector<u8>>"), 7);
-        assert!(type_name<vector<vector<TypeInfo>>>() == string::utf8(b"vector<vector<0x1::type_info::TypeInfo>>"), 8);
-
+        assert!(type_name<vector<vector<u8>>>()
+            == string::utf8(b"vector<vector<u8>>"), 7);
+        assert!(type_name<vector<vector<TypeInfo>>>()
+            == string::utf8(b"vector<vector<0x1::type_info::TypeInfo>>"),
+            8);
 
         // struct
-        assert!(type_name<TypeInfo>() == string::utf8(b"0x1::type_info::TypeInfo"), 9);
-        assert!(type_name<
-            Table<
-                TypeInfo,
-                Table<u8, vector<TypeInfo>>
-            >
-        >() == string::utf8(b"0x1::table::Table<0x1::type_info::TypeInfo, 0x1::table::Table<u8, vector<0x1::type_info::TypeInfo>>>"), 10);
+        assert!(type_name<TypeInfo>()
+            == string::utf8(b"0x1::type_info::TypeInfo"), 9);
+        assert!(
+            type_name<Table<TypeInfo, Table<u8, vector<TypeInfo>>>>()
+            == string::utf8(
+                b"0x1::table::Table<0x1::type_info::TypeInfo, 0x1::table::Table<u8, vector<0x1::type_info::TypeInfo>>>"),
+            10);
     }
 
     #[verify_only]
@@ -149,6 +152,7 @@ module aptos_std::type_info {
             assert struct_name == type_of<T>().struct_name;
         };
     }
+
     spec verify_type_of_generic {
         aborts_if !spec_is_struct<T>();
     }
@@ -182,9 +186,7 @@ module aptos_std::type_info {
 
     #[test(account = @0x0)]
     /// Ensure valid returns across native types and nesting schemas.
-    fun test_size_of_val(
-        account: &signer
-    ) {
+    fun test_size_of_val(account: &signer) {
         assert!(size_of_val(&false) == 1, 0); // Bool takes 1 byte.
         assert!(size_of_val<u8>(&0) == 1, 0); // u8 takes 1 byte.
         assert!(size_of_val<u64>(&0) == 8, 0); // u64 takes 8 bytes.
@@ -193,12 +195,12 @@ module aptos_std::type_info {
         assert!(size_of_val(&@0x0) == 32, 0);
         assert!(size_of_val(account) == 32, 0); // Signer is an address.
         // Assert custom type without fields has size 1.
-        assert!(size_of_val(&CustomType{}) == 1, 0);
+        assert!(size_of_val(&CustomType {}) == 1, 0);
         // Declare a simple struct with a 1-byte field.
-        let simple_struct = SimpleStruct{field: 0};
+        let simple_struct = SimpleStruct { field: 0 };
         // Assert size is indicated as 1 byte.
         assert!(size_of_val(&simple_struct) == 1, 0);
-        let complex_struct = ComplexStruct<u128>{
+        let complex_struct = ComplexStruct<u128> {
             field_1: false,
             field_2: 0,
             field_3: 0,
@@ -209,7 +211,7 @@ module aptos_std::type_info {
         // Assert size is bytewise sum of components.
         assert!(size_of_val(&complex_struct) == (1 + 1 + 8 + 16 + 1 + 16), 0);
         // Declare a struct with two boolean values.
-        let two_bools = TwoBools{bool_1: false, bool_2: false};
+        let two_bools = TwoBools { bool_1: false, bool_2: false };
         // Assert size is two bytes.
         assert!(size_of_val(&two_bools) == 2, 0);
         // Declare an empty vector of element type u64.
@@ -309,12 +311,12 @@ module aptos_std::type_info {
         // Repeat for custom struct.
         let vector_complex = vector::empty<ComplexStruct<address>>();
         // Declare a null element.
-        let null_element = ComplexStruct{
+        let null_element = ComplexStruct {
             field_1: false,
             field_2: 0,
             field_3: 0,
             field_4: 0,
-            field_5: SimpleStruct{field: 0},
+            field_5: SimpleStruct { field: 0 },
             field_6: @0x0
         };
         element_size = size_of_val(&null_element); // Get element size.
@@ -326,25 +328,24 @@ module aptos_std::type_info {
             vector::push_back(&mut vector_complex, copy null_element);
             i = i + 1; // Increment counter.
         };
-        assert!( // Vector base size is still 1 byte.
+        assert!(// Vector base size is still 1 byte.
             size_of_val(&vector_complex) - element_size * i == base_size_1, 0);
         // Add another element, exceeding the cutoff.
         vector::push_back(&mut vector_complex, null_element);
         i = i + 1; // Increment counter.
-        assert!( // Vector base size is now 2 bytes.
+        assert!(// Vector base size is now 2 bytes.
             size_of_val(&vector_complex) - element_size * i == base_size_2, 0);
         while (i < n_elems_cutoff_2) { // Iterate until second cutoff:
             // Add an element.
             vector::push_back(&mut vector_complex, copy null_element);
             i = i + 1; // Increment counter.
         };
-        assert!( // Vector base size is still 2 bytes.
+        assert!(// Vector base size is still 2 bytes.
             size_of_val(&vector_complex) - element_size * i == base_size_2, 0);
         // Add another element, exceeding the cutoff.
         vector::push_back(&mut vector_complex, null_element);
         i = i + 1; // Increment counter.
-        assert!( // Vector base size is now 3 bytes.
+        assert!(// Vector base size is now 3 bytes.
             size_of_val(&vector_complex) - element_size * i == base_size_3, 0);
     }
-
 }
