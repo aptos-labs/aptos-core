@@ -3,6 +3,7 @@
 
 use crate::{
     clients::{big_query::TableWriteClient, humio, victoria_metrics_api::Client as MetricsClient},
+    peer_location::PeerLocation,
     types::common::EpochedPeerStore,
     LogIngestConfig, MetricsEndpointsConfig,
 };
@@ -165,6 +166,7 @@ pub struct Context {
     jwt_service: JsonWebTokenService,
     log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
     peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
+    peer_locations: Arc<RwLock<HashMap<PeerId, PeerLocation>>>,
 }
 
 impl Context {
@@ -175,6 +177,7 @@ impl Context {
         jwt_service: JsonWebTokenService,
         log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
         peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
+        peer_locations: Arc<RwLock<HashMap<PeerId, PeerLocation>>>,
     ) -> Self {
         Self {
             noise_config: Arc::new(noise::NoiseConfig::new(private_key)),
@@ -183,6 +186,7 @@ impl Context {
             jwt_service,
             log_env_map,
             peer_identities,
+            peer_locations,
         }
     }
 
@@ -221,6 +225,10 @@ impl Context {
 
     pub(crate) fn peer_identities(&self) -> &HashMap<ChainId, HashMap<PeerId, String>> {
         &self.peer_identities
+    }
+
+    pub(crate) fn peer_locations(&self) -> &Arc<RwLock<HashMap<PeerId, PeerLocation>>> {
+        &self.peer_locations
     }
 
     pub fn chain_set(&self) -> HashSet<ChainId> {
