@@ -176,9 +176,13 @@ impl MoveSmith {
     ) -> Result<StructDefinition> {
         let (name, _) = self.get_next_identifier(IDType::Struct, parent_scope);
 
-        let mut ability_choices = vec![Ability::Copy, Ability::Drop, Ability::Store, Ability::Key];
-        let mut abilities = Vec::new();
-        for _ in 0..u.int_in_range(0..=3)? {
+        let mut ability_choices = vec![Ability::Store, Ability::Key];
+        // TODO: Drop is added for all struct to avoid E05001 for now
+        // TODO: this should be properly handled
+        // TODO: Copy is added to avoid "use moved value"
+        // TODO: Copy should be removed after copy/move is properly handled
+        let mut abilities = vec![Ability::Drop, Ability::Copy];
+        for _ in 0..u.int_in_range(0..=0)? {
             let idx = u.int_in_range(0..=(ability_choices.len() - 1))?;
             abilities.push(ability_choices.remove(idx));
         }
@@ -207,7 +211,7 @@ impl MoveSmith {
             let typ = loop {
                 match u.int_in_range(0..=2)? {
                     // More chance to use basic types than struct types
-                    0 | 1 => break self.generate_basic_type(u)?,
+                    0 | 1 => break self.get_random_type(u, parent_scope, false)?,
                     2 => {
                         let candidates = self.get_usable_struct_type(
                             st.borrow().abilities.clone(),
@@ -332,13 +336,17 @@ impl MoveSmith {
         for _ in 0..num_params {
             let (name, _) = self.get_next_identifier(IDType::Var, parent_scope);
 
-            let typ = self.generate_basic_type(u)?;
+            // TODO: currently struct is not allowed in signature because script
+            // TODO: cannot create structs
+            // TODO: should remove this after visibility check is implemented
+            // TODO: structs should be allowed for non-public functions
+            let typ = self.get_random_type(u, parent_scope, false)?;
             self.type_pool.borrow_mut().insert_mapping(&name, &typ);
             parameters.push((name, typ));
         }
 
         let return_type = match bool::arbitrary(u)? {
-            true => Some(self.generate_basic_type(u)?),
+            true => Some(self.get_random_type(u, parent_scope, true)?),
             false => None,
         };
 
@@ -420,7 +428,7 @@ impl MoveSmith {
     ) -> Result<Declaration> {
         let (name, _) = self.get_next_identifier(IDType::Var, parent_scope);
 
-        let typ = self.generate_basic_type(u)?;
+        let typ = self.get_random_type(u, parent_scope, true)?;
         // let value = match bool::arbitrary(u)? {
         //     true => Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?),
         //     false => None,
@@ -481,7 +489,7 @@ impl MoveSmith {
                 // Generate a block
                 2 => {
                     let ret_typ = match bool::arbitrary(u)? {
-                        true => Some(self.generate_basic_type(u)?),
+                        true => Some(self.get_random_type(u, parent_scope, true)?),
                         false => None,
                     };
                     let block = self.generate_block(u, parent_scope, None, ret_typ)?;
@@ -677,19 +685,39 @@ impl MoveSmith {
     }
 
     /// Returns one of the basic types that does not require a type argument.
-    pub fn generate_basic_type(&self, u: &mut Unstructured) -> Result<Type> {
-        Ok(match u.int_in_range(0..=6)? {
-            0 => Type::U8,
-            1 => Type::U16,
-            2 => Type::U32,
-            3 => Type::U64,
-            4 => Type::U128,
-            5 => Type::U256,
-            6 => Type::Bool,
-            // x => Type::Address, // Leave these two until the end
-            // x => Type::Signer,
-            _ => panic!("Unsupported basic type"),
-        })
+    ///
+    /// First choose a category of types, then choose a type from that category.
+    /// Categories include:
+    ///     * basic (number and boolean)
+    ///     * structs (each struct definition is considered a type)
+    pub fn get_random_type(
+        &self,
+        u: &mut Unstructured,
+        scope: &Scope,
+        allow_struct: bool,
+    ) -> Result<Type> {
+        let basics = vec![
+            Type::U8,
+            Type::U16,
+            Type::U32,
+            Type::U64,
+            Type::U128,
+            Type::U256,
+            Type::Bool,
+        ];
+        let mut categories = vec![basics];
+
+        if allow_struct {
+            let struct_ids = self.get_filtered_identifiers(None, Some(IDType::Struct), Some(scope));
+            let structs = struct_ids
+                .iter()
+                .map(|id| Type::Struct(id.clone()))
+                .collect::<Vec<Type>>();
+            categories.push(structs);
+        }
+
+        let chosen_cat = u.choose(&categories)?;
+        u.choose(chosen_cat).cloned()
     }
 
     /// Get all callable functions in the given scope.

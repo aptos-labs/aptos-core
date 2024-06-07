@@ -63,18 +63,17 @@ fn simple_compile_unit() -> CompileUnit {
 fn test_emit_code() {
     let lines = simple_module().emit_code_lines();
     println!("{}", lines.join("\n"));
-    assert_eq!(lines.len(), 8);
+    assert_eq!(lines.len(), 7);
     assert_eq!(lines[0], "//# publish");
     assert_eq!(lines[1], "module 0xCAFE::SimpleModule {");
     assert_eq!(
         lines[2],
-        "    public fun fun1(param1: u64, param2: u8): u32"
+        "    public fun fun1(param1: u64, param2: u8): u32 {"
     );
-    assert_eq!(lines[3], "    {");
-    assert_eq!(lines[4], "        42u32;");
-    assert_eq!(lines[5], "        111u32");
-    assert_eq!(lines[6], "    }");
-    assert_eq!(lines[7], "}\n");
+    assert_eq!(lines[3], "        42u32;");
+    assert_eq!(lines[4], "        111u32");
+    assert_eq!(lines[5], "    }");
+    assert_eq!(lines[6], "}\n");
 }
 
 #[test]

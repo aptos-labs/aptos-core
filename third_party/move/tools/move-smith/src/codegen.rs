@@ -27,6 +27,21 @@ fn append_code_lines_with_indentation(
     }
 }
 
+fn append_block(program: &mut Vec<String>, mut block: Vec<String>, indentation: usize) {
+    if program.is_empty() || block.is_empty() {
+        return;
+    }
+
+    let suffix = format!(" {}", block.remove(0));
+    program.last_mut().unwrap().push_str(&suffix);
+    if block.is_empty() {
+        return;
+    }
+    let last_line = block.remove(block.len() - 1);
+    append_code_lines_with_indentation(program, block, indentation);
+    program.push(last_line);
+}
+
 impl CodeGenerator for Identifier {
     fn emit_code_lines(&self) -> Vec<String> {
         vec![self.0.clone()]
@@ -187,7 +202,7 @@ impl CodeGenerator for Function {
             Some(ref body) => body.emit_code_lines(),
             None => vec!["{}".to_string()],
         };
-        code.extend(body);
+        append_block(&mut code, body, 0);
         code
     }
 }
@@ -230,16 +245,18 @@ impl CodeGenerator for Statement {
 
 impl CodeGenerator for Declaration {
     fn emit_code_lines(&self) -> Vec<String> {
-        let rhs = match self.value {
-            Some(ref expr) => format!(" = {}", expr.emit_code()),
-            None => "".to_string(),
-        };
-        vec![format!(
-            "let {}: {}{};",
+        let mut code = vec![format!(
+            "let {}: {}",
             self.name.emit_code(),
-            self.typ.emit_code(),
-            rhs
-        )]
+            self.typ.emit_code()
+        )];
+        if let Some(ref expr) = self.value {
+            code[0].push_str(" = ");
+            let rhs = expr.emit_code_lines();
+            append_block(&mut code, rhs, INDENTATION_SIZE);
+        }
+        code.last_mut().unwrap().push(';');
+        code
     }
 }
 
@@ -258,14 +275,22 @@ impl CodeGenerator for Expression {
 
 impl CodeGenerator for StructInitialization {
     fn emit_code_lines(&self) -> Vec<String> {
-        let mut code = vec![format!("{} {{", self.name.emit_code())];
+        let mut code = vec![format!("{}", self.name.emit_code())];
 
-        let mut field_code = Vec::new();
+        let mut body = vec!["{".to_string()];
+
+        let mut field_inside = Vec::new();
         for (field, expr) in &self.fields {
-            field_code.push(format!("{}: {}", field.emit_code(), expr.emit_code()));
+            let mut curr_field = vec![format!("{}:", field.emit_code())];
+            let rhs = expr.emit_code_lines();
+            append_block(&mut curr_field, rhs, INDENTATION_SIZE);
+            field_inside.extend(curr_field);
+            field_inside.last_mut().unwrap().push(',');
         }
-        append_code_lines_with_indentation(&mut code, field_code, INDENTATION_SIZE);
-        code.push("}\n".to_string());
+        append_code_lines_with_indentation(&mut body, field_inside, INDENTATION_SIZE);
+        body.push("}".to_string());
+
+        append_block(&mut code, body, INDENTATION_SIZE);
         code
     }
 }
