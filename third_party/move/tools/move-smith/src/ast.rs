@@ -112,7 +112,6 @@ pub enum Statement {
     // For(For),
     // Break,
     // Continue,
-    // Assign(Assign),
     Decl(Declaration),
     Expr(Expression),
 }
@@ -138,6 +137,13 @@ pub enum Expression {
     FunctionCall(FunctionCall),
     StructInitialization(StructInitialization),
     Block(Box<Block>),
+    Assign(Box<Assignment>),
+}
+/// An assignment expression
+#[derive(Debug, Clone)]
+pub struct Assignment {
+    pub name: Identifier,
+    pub value: Expression,
 }
 
 /// A number literal.

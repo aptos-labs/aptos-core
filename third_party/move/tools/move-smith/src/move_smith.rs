@@ -420,6 +420,25 @@ impl MoveSmith {
         }
     }
 
+    /// Generate an assignment to an existing variable.
+    fn generate_assignment(
+        &self,
+        u: &mut Unstructured,
+        parent_scope: &Scope,
+    ) -> Result<Option<Assignment>> {
+        let idents = self.get_filtered_identifiers(None, Some(IDType::Var), Some(parent_scope));
+        if idents.is_empty() {
+            return Ok(None);
+        }
+        let ident = u.choose(&idents)?.clone();
+        let typ = self.type_pool.borrow().get_type(&ident).unwrap();
+        let expr = self.generate_expression_of_type(u, parent_scope, &typ, true, true)?;
+        Ok(Some(Assignment {
+            name: ident,
+            value: expr,
+        }))
+    }
+
     /// Generate a random declaration.
     fn generate_declaration(
         &self,
@@ -459,18 +478,28 @@ impl MoveSmith {
             ));
         }
 
+        // If no function is callable, then skip generating function calls.
+        let func_call_weight = match self.get_callable_functions(parent_scope).is_empty() {
+            true => 0,
+            false => 1,
+        };
+
+        let assign_weight = match self
+            .get_filtered_identifiers(None, Some(IDType::Var), Some(parent_scope))
+            .is_empty()
+        {
+            true => 0,
+            false => 1,
+        };
+
         let weights = vec![
             1, // NumberLiteral
             1, // Variable
             // Boolean
             // StructInitialization
-            1, // Block
-            // FunctionCall
-            // If no function is callable, then skip generating function calls.
-            match self.get_callable_functions(parent_scope).is_empty() {
-                true => 0,
-                false => 1,
-            },
+            1,                // Block
+            func_call_weight, // FunctionCall
+            assign_weight,
         ];
 
         let expr = loop {
@@ -501,6 +530,13 @@ impl MoveSmith {
                     match call {
                         Some(c) => break Expression::FunctionCall(c),
                         None => panic!("No callable functions"),
+                    }
+                },
+                4 => {
+                    let assign = self.generate_assignment(u, parent_scope)?;
+                    match assign {
+                        Some(a) => break Expression::Assign(Box::new(a)),
+                        None => panic!("No assignable variables"),
                     }
                 },
                 _ => panic!("Invalid expression type"),

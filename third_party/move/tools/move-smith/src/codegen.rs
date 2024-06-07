@@ -245,7 +245,6 @@ impl CodeGenerator for Statement {
         }
     }
 }
-
 impl CodeGenerator for Declaration {
     fn emit_code_lines(&self) -> Vec<String> {
         let mut code = vec![format!(
@@ -272,7 +271,17 @@ impl CodeGenerator for Expression {
             Expression::FunctionCall(c) => c.emit_code_lines(),
             Expression::StructInitialization(s) => s.emit_code_lines(),
             Expression::Block(block) => block.emit_code_lines(),
+            Expression::Assign(assignment) => assignment.emit_code_lines(),
         }
+    }
+}
+
+impl CodeGenerator for Assignment {
+    fn emit_code_lines(&self) -> Vec<String> {
+        let mut code = vec![format!("{} = ", self.name.emit_code(),)];
+        let value = self.value.emit_code_lines();
+        append_block(&mut code, value, 0);
+        code
     }
 }
 
