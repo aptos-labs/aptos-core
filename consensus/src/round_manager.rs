@@ -1232,11 +1232,13 @@ impl RoundManager {
             )
             .await
             .context("RoundManager] Failed to process QC in order Cert")?;
-        self.process_certificates().await?;
-        self.block_store
+        let result = self
+            .block_store
             .insert_ordered_cert(&ordered_cert)
             .await
-            .context("[RoundManager] Failed to process a new OrderCert formed by order votes")
+            .context("[RoundManager] Failed to process a new OrderCert formed by order votes");
+        self.process_certificates().await?;
+        result
     }
 
     async fn new_2chain_tc_aggregated(
