@@ -2447,7 +2447,7 @@ fn pfn_const_tps(
 
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
-        .with_initial_fullnode_count(2)
+        .with_initial_fullnode_count(7)
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
             optimize_state_sync_for_throughput(config);
