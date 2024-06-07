@@ -44,13 +44,6 @@ impl Environment {
         Self::initialize(features, timed_features, chain_id)
     }
 
-    pub fn genesis() -> Arc<Self> {
-        let chain_id = ChainId::test();
-        let features = Features::default();
-        let timed_features = TimedFeaturesBuilder::enable_all().build();
-        Arc::new(Self::initialize(features, timed_features, chain_id))
-    }
-
     pub fn testing(chain_id: ChainId) -> Arc<Self> {
         let features = Features::default();
 
