@@ -1292,7 +1292,7 @@ impl AstDebug for StructDefinition {
             abilities,
             name,
             type_parameters,
-            layout: fields,
+            layout,
         } = self;
         attributes.ast_debug(w);
 
@@ -1301,19 +1301,21 @@ impl AstDebug for StructDefinition {
             false
         });
 
-        if let StructLayout::Native(_) = fields {
+        if let StructLayout::Native(_) = layout {
             w.write("native ");
         }
 
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
-        if let StructLayout::Singleton(fields) = fields {
-            w.block(|w| {
+        match layout {
+            StructLayout::Singleton(fields) => w.block(|w| {
                 w.semicolon(fields, |w, (f, st)| {
                     w.write(&format!("{}: ", f));
                     st.ast_debug(w);
                 });
-            })
+            }),
+            StructLayout::Variants(_) => w.writeln("variant printing NYI"),
+            StructLayout::Native(_) => {},
         }
     }
 }

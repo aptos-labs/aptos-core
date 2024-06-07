@@ -9,7 +9,7 @@ use crate::{
     diagnostics::{codes::DeprecatedItem, Diagnostic},
     expansion::{
         aliases::{AliasMap, AliasSet},
-        ast::{self as E, Address, Fields, ModuleIdent, ModuleIdent_, SpecId},
+        ast::{self as E, Address, Fields, ModuleAccess_, ModuleIdent, ModuleIdent_, SpecId},
         byte_string, hex_string,
     },
     parser::ast::{
@@ -1433,6 +1433,15 @@ fn struct_layout(
                 variants
                     .into_iter()
                     .map(|v| {
+                        if !is_valid_struct_constant_or_schema_name(v.name.0.value.as_str()) {
+                            let msg = format!(
+                                "Invalid variant name '{}'. variant names must start with 'A'..'Z'",
+                                v.name
+                            );
+                            context
+                                .env
+                                .add_diag(diag!(Declarations::InvalidName, (v.loc, msg)));
+                        }
                         if let Some(old_loc) = previous_variants.insert(v.name, v.loc) {
                             context.env.add_diag(diag!(
                                 Declarations::DuplicateItem,
@@ -2884,8 +2893,15 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
     use P::Bind_ as PB;
     let b_ = match pb_ {
         PB::Var(v) => {
-            check_valid_local_name(context, &v);
-            EL::Var(sp(loc, E::ModuleAccess_::Name(v.0)), None)
+            if context.env.is_move_2()
+                && is_valid_struct_constant_or_schema_name(v.value().as_str())
+            {
+                // Interpret as an unqualified module access
+                EL::Unpack(sp(v.loc(), ModuleAccess_::Name(v.0)), None, Fields::new())
+            } else {
+                check_valid_local_name(context, &v);
+                EL::Var(sp(loc, E::ModuleAccess_::Name(v.0)), None)
+            }
         },
         PB::Unpack(ptn, ptys_opt, pfields) => {
             // check for type use

@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: tuple type `(integer, integer)` is not allowed as a type instantiation (type was inferred)
+error: tuple type `(integer, integer)` is not allowed as a type argument (type was inferred)
   ┌─ tests/checking/typing/pack_multiple.move:5:9
   │
 2 │     struct Box<T> has drop { f: T }
@@ -11,7 +11,7 @@ error: tuple type `(integer, integer)` is not allowed as a type instantiation (t
   │
   = required by instantiating type parameter `T` of struct `Box`
 
-error: tuple type `(integer, integer, integer)` is not allowed as a type instantiation (type was inferred)
+error: tuple type `(integer, integer, integer)` is not allowed as a type argument (type was inferred)
   ┌─ tests/checking/typing/pack_multiple.move:6:9
   │
 2 │     struct Box<T> has drop { f: T }
@@ -22,7 +22,7 @@ error: tuple type `(integer, integer, integer)` is not allowed as a type instant
   │
   = required by instantiating type parameter `T` of struct `Box`
 
-error: tuple type `(bool, Box<integer>)` is not allowed as a type instantiation (type was inferred)
+error: tuple type `(bool, Box<integer>)` is not allowed as a type argument (type was inferred)
   ┌─ tests/checking/typing/pack_multiple.move:7:9
   │
 2 │     struct Box<T> has drop { f: T }

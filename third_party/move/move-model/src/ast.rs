@@ -1706,8 +1706,8 @@ pub enum Pattern {
     Var(NodeId, Symbol),
     Wildcard(NodeId),
     Tuple(NodeId, Vec<Pattern>),
-    // Struct(_, struct_id, optional_variant, patterns)
     Struct(
+        // Struct(_, struct_id, optional_variant, patterns)
         NodeId,
         QualifiedInstId<StructId>,
         Option<Symbol>,

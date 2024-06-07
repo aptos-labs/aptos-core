@@ -11,7 +11,7 @@ error: type `R` is missing required ability `drop`
    │
    = required by instantiating type parameter `T:drop` of struct `S`
 
-error: reference type `&u64` is not allowed as a type instantiation
+error: reference type `&u64` is not allowed as a type argument
    ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:12:15
    │
  3 │     struct S<T: drop> has drop { f: T }
@@ -30,7 +30,7 @@ error: reference type `&&u64` is not allowed as a field type
    │
    = required by declaration of field `f3`
 
-error: tuple type `(u64, u64)` is not allowed as a type instantiation
+error: tuple type `(u64, u64)` is not allowed as a type argument
    ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:14:15
    │
  3 │     struct S<T: drop> has drop { f: T }
@@ -52,7 +52,7 @@ error: type `R` is missing required ability `drop`
    │
    = required by instantiating type parameter `T:drop` of struct `S`
 
-error: reference type `&u64` is not allowed as a type instantiation
+error: reference type `&u64` is not allowed as a type argument
    ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:19:16
    │
  3 │     struct S<T: drop> has drop { f: T }
@@ -63,7 +63,7 @@ error: reference type `&u64` is not allowed as a type instantiation
    │
    = required by instantiating type parameter `T:drop` of struct `S`
 
-error: tuple type `(u64, u64)` is not allowed as a type instantiation
+error: tuple type `(u64, u64)` is not allowed as a type argument
    ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:21:16
    │
  3 │     struct S<T: drop> has drop { f: T }
@@ -85,7 +85,7 @@ error: type `R` is missing required ability `drop`
    │
    = required by instantiating type parameter `T:drop` of struct `S`
 
-error: reference type `&u64` is not allowed as a type instantiation
+error: reference type `&u64` is not allowed as a type argument
    ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:33:19
    │
  3 │     struct S<T: drop> has drop { f: T }
@@ -96,7 +96,7 @@ error: reference type `&u64` is not allowed as a type instantiation
    │
    = required by instantiating type parameter `T:drop` of struct `S`
 
-error: tuple type `(u64, u64)` is not allowed as a type instantiation
+error: tuple type `(u64, u64)` is not allowed as a type argument
    ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:35:19
    │
  3 │     struct S<T: drop> has drop { f: T }
@@ -107,7 +107,7 @@ error: tuple type `(u64, u64)` is not allowed as a type instantiation
    │
    = required by instantiating type parameter `T:drop` of struct `S`
 
-error: reference type `&&u64` is not allowed as a type instantiation
+error: reference type `&&u64` is not allowed as a type argument
    ┌─ tests/ability-check/v1-typing/instantiate_signatures.move:39:12
    │
  5 │     fun id<T>(x: T): T { x }

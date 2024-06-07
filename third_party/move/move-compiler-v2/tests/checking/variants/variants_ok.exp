@@ -174,4 +174,18 @@ module 0x815::m {
           Add<u64>(Add<u64>(red, green), blue)
         }
     }
+    private fun unqualified_variant(self: m::Color): bool {
+        match (self) {
+          m::Color::RGB{ red, green, blue } => {
+            And(Neq<u64>(red, green), Neq<u64>(green, blue))
+          }
+          m::Color::Red{  } => {
+            true
+          }
+          m::Color::Blue{  } => {
+            false
+          }
+        }
+
+    }
 } // end 0x815::m

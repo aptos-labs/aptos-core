@@ -106,4 +106,11 @@ module 0x815::m {
         red + green + blue
     }
 
+    fun unqualified_variant(self: Color): bool {
+        match (self) {
+            RGB{red, green, blue} => red != green && green != blue,
+            Red => true,
+            Blue => false,
+        }
+    }
 }

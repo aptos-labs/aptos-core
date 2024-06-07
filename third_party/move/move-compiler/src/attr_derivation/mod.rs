@@ -163,7 +163,7 @@ pub(crate) fn new_fun(
 }
 
 /// Helper to create a new struct declaration.
-pub(crate) fn new_struct(loc: Loc, name: StructName, fields: StructLayout) -> StructDefinition {
+pub(crate) fn new_struct(loc: Loc, name: StructName, layout: StructLayout) -> StructDefinition {
     StructDefinition {
         attributes: vec![sp(
             // #[event]
@@ -174,7 +174,7 @@ pub(crate) fn new_struct(loc: Loc, name: StructName, fields: StructLayout) -> St
         abilities: vec![],
         name,
         type_parameters: vec![],
-        layout: fields,
+        layout,
     }
 }
 

@@ -821,6 +821,11 @@ impl Type {
         matches!(self, Type::Struct(..))
     }
 
+    /// Determines whether this is a variant struct
+    pub fn is_variant_struct(&self, env: &GlobalEnv) -> bool {
+        self.is_struct() && self.get_struct(env).expect("struct").0.has_variants()
+    }
+
     /// Determines whether this is the error type.
     pub fn is_error(&self) -> bool {
         matches!(self, Type::Error)
@@ -2809,7 +2814,7 @@ impl TypeUnificationError {
                         origin: ConstraintOrigin::TupleElement(_, _),
                         ..
                     }) => "as a tuple element",
-                    _ => "as a type instantiation",
+                    _ => "as a type argument",
                 };
                 let (mut note, mut hints, mut labels) = ctx_opt
                     .as_ref()

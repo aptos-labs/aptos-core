@@ -2635,7 +2635,7 @@ fn parse_struct_decl(
             consume_token(context.tokens, Tok::Semicolon)?;
             StructLayout::Native(loc)
         },
-        _ => {
+        None => {
             if is_enum {
                 let mut list = vec![];
                 consume_token(context.tokens, Tok::LBrace)?;
