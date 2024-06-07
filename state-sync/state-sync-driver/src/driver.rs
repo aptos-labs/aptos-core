@@ -306,9 +306,10 @@ impl<
     ) -> Result<(), Error> {
         info!(
             LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
-                "Received a consensus commit notification! Total transactions: {:?}, events: {:?}",
+                "Received a consensus commit notification! Total transactions: {:?}, events: {:?}, transactions {:?}",
                 consensus_commit_notification.transactions.len(),
-                consensus_commit_notification.subscribable_events.len()
+                consensus_commit_notification.subscribable_events.len(),
+                consensus_commit_notification.transactions
             ))
         );
         self.update_consensus_commit_metrics(&consensus_commit_notification);

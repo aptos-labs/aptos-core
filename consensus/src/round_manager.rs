@@ -703,7 +703,9 @@ impl RoundManager {
     /// This function is called only after all the dependencies of the given QC have been retrieved.
     async fn process_certificates(&mut self) -> anyhow::Result<()> {
         let sync_info = self.block_store.sync_info();
+        info!("process_certificates: {}", sync_info);
         if let Some(new_round_event) = self.round_state.process_certificates(sync_info) {
+            info!("new round event");
             self.process_new_round_event(new_round_event).await?;
         }
         Ok(())
@@ -1204,11 +1206,13 @@ impl RoundManager {
         qc: Arc<QuorumCert>,
         preferred_peer: Author,
     ) -> anyhow::Result<()> {
+        info!("Inserting aggregated QC {}", qc);
         let result = self
             .block_store
             .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer))
             .await
             .context("[RoundManager] Failed to process a newly aggregated QC");
+        info!("Calling process certificates after inserting qc {}", qc);
         self.process_certificates().await?;
         result
     }
@@ -1231,6 +1235,10 @@ impl RoundManager {
         {
             ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE.inc();
         }
+        info!(
+            "Inserting aggregated QC {} due to order vote qc {}",
+            quorum_cert, ordered_cert
+        );
         self.block_store
             .insert_quorum_cert(
                 quorum_cert,
@@ -1238,6 +1246,7 @@ impl RoundManager {
             )
             .await
             .context("RoundManager] Failed to process QC in order Cert")?;
+        info!("Inserting ordered cert {}", ordered_cert);
         self.block_store
             .insert_ordered_cert(&ordered_cert)
             .await
