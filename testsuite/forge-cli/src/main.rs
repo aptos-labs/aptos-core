@@ -1419,7 +1419,7 @@ fn graceful_overload() -> ForgeConfig {
 
 fn realistic_env_graceful_overload() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(50).unwrap())
         .with_initial_fullnode_count(20)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
