@@ -234,13 +234,14 @@ impl NetworkTest for dyn NetworkLoadTest {
     async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         let mut ctx_locker = ctx.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
-        let runtime = Runtime::new().unwrap();
         let start_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
-        let (start_version, _) = runtime
-            .block_on(ctx.swarm().get_client_with_newest_ledger_version())
+        let (start_version, _) = ctx
+            .swarm()
+            .get_client_with_newest_ledger_version()
+            .await
             .context("no clients replied for start version")?;
         let emit_job_request = ctx.emit_job.clone();
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
@@ -289,8 +290,10 @@ impl NetworkTest for dyn NetworkLoadTest {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
-        let (end_version, _) = runtime
-            .block_on(ctx.swarm().get_client_with_newest_ledger_version())
+        let (end_version, _) = ctx
+            .swarm()
+            .get_client_with_newest_ledger_version()
+            .await
             .context("no clients replied for end version")?;
 
         self.finish(ctx).await.context("finish NetworkLoadTest ")?;
