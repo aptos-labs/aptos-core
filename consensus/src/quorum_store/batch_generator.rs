@@ -454,7 +454,7 @@ impl BatchGenerator {
                     if (!self.back_pressure.proof_count
                         && since_last_non_empty_pull_ms >= self.config.batch_generation_min_non_empty_interval_ms)
                         || since_last_non_empty_pull_ms == self.config.batch_generation_max_interval_ms
-                        || last_pulled_num_txns >= self.config.sender_max_batch_txns as u64
+                        || last_pulled_num_txns >= 50 as u64
                         || last_pulled_num_txns > (last_pulled_max_txn as f64 / 2.0) as u64 {
 
                         let dynamic_pull_max_txn = std::cmp::max(
