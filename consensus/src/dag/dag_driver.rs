@@ -346,7 +346,9 @@ impl DagDriver {
                 certified_node,
                 latest_ledger_info.get_latest_ledger_info(),
             );
-            rb2.broadcast(certified_node_msg, cert_ack_set).await
+            rb2.broadcast(certified_node_msg, cert_ack_set)
+                .await
+                .expect("Broadcast cannot fail until cancelled")
         };
         let core_task = join(node_broadcast, certified_broadcast);
         let author = self.author;

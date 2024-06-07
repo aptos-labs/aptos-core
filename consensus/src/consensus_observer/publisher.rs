@@ -41,6 +41,6 @@ impl Publisher {
         for peer in &downstream_peers {
             info!("[Publisher] Sending {} to {}", msg, peer);
         }
-        let _ = self.network_client.send_to_peers(msg, &downstream_peers);
+        let _ = self.network_client.send_to_peers(msg, downstream_peers);
     }
 }

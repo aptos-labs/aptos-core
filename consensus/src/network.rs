@@ -53,6 +53,7 @@ use futures::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
+    collections::HashMap,
     mem::{discriminant, Discriminant},
     sync::Arc,
     time::Duration,
@@ -197,7 +198,7 @@ pub trait QuorumStoreSender: Send + Clone {
 #[derive(Clone)]
 pub struct NetworkSender {
     author: Author,
-    consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
+    pub(crate) consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
@@ -430,7 +431,11 @@ impl NetworkSender {
 
     pub async fn broadcast_fast_share(&self, share: FastShare<Share>) {
         fail_point!("consensus::send::broadcast_share", |_| ());
-        let msg = RandMessage::<Share, AugmentedData>::FastShare(share).into_network_message();
+        let msg = tokio::task::spawn_blocking(|| {
+            RandMessage::<Share, AugmentedData>::FastShare(share).into_network_message()
+        })
+        .await
+        .expect("task cannot fail to execute");
         self.broadcast(msg).await
     }
 
@@ -595,15 +600,24 @@ impl<Req: TConsensusMsg + RBMessage + 'static, Res: TConsensusMsg + RBMessage + 
     async fn send_rb_rpc(
         &self,
         receiver: Author,
-        message: Req,
+        raw_message: Bytes,
         timeout: Duration,
     ) -> anyhow::Result<Res> {
-        let outbound_msg = tokio::task::spawn_blocking(|| message.into_network_message()).await?;
         let response_msg = self
-            .send_rpc(receiver, outbound_msg, timeout)
+            .consensus_network_client
+            .send_rpc_raw(receiver, raw_message, timeout)
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))?;
         tokio::task::spawn_blocking(|| TConsensusMsg::from_network_message(response_msg)).await?
+    }
+
+    fn to_bytes(
+        &self,
+        peers: Vec<Author>,
+        message: Req,
+    ) -> anyhow::Result<HashMap<Author, Box<Bytes>>> {
+        let consensus_msg = message.into_network_message();
+        self.consensus_network_client.to_bytes(peers, consensus_msg)
     }
 }
 

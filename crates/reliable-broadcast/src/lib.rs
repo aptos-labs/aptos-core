@@ -6,6 +6,7 @@ use aptos_consensus_types::common::Author;
 use aptos_logger::{debug, sample, sample::SampleRate, warn};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use async_trait::async_trait;
+use bytes::Bytes;
 use futures::{
     stream::{AbortHandle, FuturesUnordered},
     Future, FutureExt, StreamExt,
@@ -19,9 +20,15 @@ pub trait RBNetworkSender<Req: RBMessage, Res: RBMessage = Req>: Send + Sync {
     async fn send_rb_rpc(
         &self,
         receiver: Author,
-        message: Req,
+        message: Bytes,
         timeout: Duration,
     ) -> anyhow::Result<Res>;
+
+    fn to_bytes(
+        &self,
+        peers: Vec<Author>,
+        message: Req,
+    ) -> anyhow::Result<HashMap<Author, Box<Bytes>>>;
 }
 
 pub trait BroadcastStatus<Req: RBMessage, Res: RBMessage = Req>: Send + Sync + Clone {
@@ -73,7 +80,7 @@ where
         &self,
         message: S::Message,
         aggregating: S,
-    ) -> impl Future<Output = S::Aggregated> + 'static
+    ) -> impl Future<Output = anyhow::Result<S::Aggregated>> + 'static
     where
         <<S as BroadcastStatus<Req, Res>>::Response as TryFrom<Res>>::Error: Debug,
     {
@@ -86,7 +93,7 @@ where
         message: S::Message,
         aggregating: S,
         receivers: Vec<Author>,
-    ) -> impl Future<Output = S::Aggregated> + 'static
+    ) -> impl Future<Output = anyhow::Result<S::Aggregated>> + 'static
     where
         <<S as BroadcastStatus<Req, Res>>::Response as TryFrom<Res>>::Error: Debug,
     {
@@ -118,10 +125,20 @@ where
                 .boxed()
             };
             let message: Req = message.into();
+
+            let peers = receivers.clone();
+            let sender = network_sender.clone();
+            let protocols =
+                tokio::task::spawn_blocking(move || sender.to_bytes(peers, message)).await??;
+
             let mut rpc_futures = FuturesUnordered::new();
             let mut aggregate_futures = FuturesUnordered::new();
             for receiver in receivers {
-                rpc_futures.push(send_message(receiver, message.clone(), None));
+                rpc_futures.push(send_message(
+                    receiver,
+                    *protocols.get(&receiver).unwrap().clone(),
+                    None,
+                ));
             }
             loop {
                 tokio::select! {
@@ -144,7 +161,7 @@ where
                         match result {
                             Ok(may_be_aggragated) => {
                                 if let Some(aggregated) = may_be_aggragated {
-                                    return aggregated;
+                                    return Ok(aggregated);
                                 }
                             },
                             Err(e) => {
@@ -155,7 +172,7 @@ where
                                     .expect("should be present");
                                 let duration = backoff_strategy.next().expect("should produce value");
                                 rpc_futures
-                                    .push(send_message(receiver, message.clone(), Some(duration)));
+                                    .push(send_message(receiver, *protocols.get(&receiver).unwrap().clone(), Some(duration)));
                             },
                         }
                     },

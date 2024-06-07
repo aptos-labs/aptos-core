@@ -3264,6 +3264,8 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "async-trait",
+ "bytes",
+ "claims",
  "futures",
  "futures-channel",
  "tokio",

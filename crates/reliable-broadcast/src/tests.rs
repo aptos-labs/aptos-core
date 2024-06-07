@@ -10,6 +10,8 @@ use aptos_infallible::Mutex;
 use aptos_time_service::TimeService;
 use aptos_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
+use bytes::Bytes;
+use claims::assert_ok_eq;
 use futures::{
     stream::{AbortHandle, Abortable},
     FutureExt,
@@ -92,7 +94,7 @@ where
     async fn send_rb_rpc(
         &self,
         receiver: Author,
-        message: M,
+        raw_message: Bytes,
         _timeout: Duration,
     ) -> anyhow::Result<M> {
         match self.failures.lock().entry(receiver) {
@@ -106,9 +108,22 @@ where
             },
             Entry::Vacant(_) => (),
         };
-        let message: TestMessage = message.try_into()?;
+        let message = TestMessage(raw_message.to_vec());
         self.received.lock().insert(receiver, message.clone());
         Ok(TestAck(message.0).into())
+    }
+
+    fn to_bytes(
+        &self,
+        peers: Vec<Author>,
+        message: M,
+    ) -> anyhow::Result<HashMap<Author, Box<Bytes>>> {
+        let message: TestMessage = message.try_into()?;
+        let raw_message: Box<Bytes> = Box::new(message.0.into());
+        Ok(peers
+            .into_iter()
+            .map(|peer| (peer, raw_message.clone()))
+            .collect())
     }
 }
 
@@ -132,7 +147,7 @@ async fn test_reliable_broadcast() {
         received: Arc::new(Mutex::new(HashSet::new())),
     });
     let fut = rb.broadcast(message, aggregating);
-    assert_eq!(fut.await, validators.into_iter().collect());
+    assert_ok_eq!(fut.await, validators.into_iter().collect());
 }
 
 #[tokio::test]
@@ -159,14 +174,14 @@ async fn test_chaining_reliable_broadcast() {
     let fut = rb1
         .broadcast(message.clone(), aggregating)
         .then(|aggregated| async move {
-            assert_eq!(aggregated, expected);
+            assert_ok_eq!(aggregated, expected);
             let aggregating = Arc::new(TestBroadcastStatus {
                 threshold: validator_verifier.len(),
                 received: Arc::new(Mutex::new(HashSet::new())),
             });
             rb.broadcast(message, aggregating).await
         });
-    assert_eq!(fut.await, validators.into_iter().collect());
+    assert_ok_eq!(fut.await, validators.into_iter().collect());
 }
 
 #[tokio::test]

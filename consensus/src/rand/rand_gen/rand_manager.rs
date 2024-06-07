@@ -319,7 +319,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             info!(LogSchema::new(LogEvent::BroadcastAugData)
                 .author(*data.author())
                 .epoch(data.epoch()));
-            let certified_data = rb.broadcast(data, aug_ack).await;
+            let certified_data = rb.broadcast(data, aug_ack).await.expect("cannot fail");
             info!("[RandManager] Finish broadcasting aug data");
             certified_data
         };
