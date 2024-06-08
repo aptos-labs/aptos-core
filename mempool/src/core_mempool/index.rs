@@ -95,7 +95,8 @@ impl Ord for OrderedQueueKey {
             return self
                 .sequence_number
                 .transaction_sequence_number
-                .cmp(&other.sequence_number.transaction_sequence_number);
+                .cmp(&other.sequence_number.transaction_sequence_number)
+                .reverse();
         }
         match self.gas_ranking_score.cmp(&other.gas_ranking_score) {
             Ordering::Equal => {},
@@ -113,6 +114,7 @@ impl Ord for OrderedQueueKey {
             .sequence_number
             .transaction_sequence_number
             .cmp(&other.sequence_number.transaction_sequence_number)
+            .reverse()
         {
             Ordering::Equal => {},
             ordering => return ordering,
