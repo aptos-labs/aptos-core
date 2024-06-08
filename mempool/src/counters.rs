@@ -209,6 +209,30 @@ pub static MEMPOOL_GET_BATCH_INITIAL_NUM_TXNS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static MEMPOOL_SKIPPED_TXNS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_mempool_skipped_txns",
+        "Number of txns skipped in mempool due to being duplicates or gas upgrades"
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_REMAINING_TXNS_NOT_SKIPPED: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_mempool_remaining_txns_not_skipped",
+        "Number of txns remaining in mempool after skipping duplicates or gas upgrades"
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_UNABLE_TO_FIND_TXNS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_mempool_unable_to_find_txns",
+        "Number of txns requested in get batch request that were not found in mempool"
+    )
+    .unwrap()
+});
+
 pub static MEMPOOL_GET_BATCH_INITIAL_NUM_BYTES: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_mempool_get_batch_initial_num_bytes",

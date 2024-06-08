@@ -2020,8 +2020,7 @@ fn realistic_env_max_load_test(
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
-            helm_values["chain"]["epoch_duration_secs"] =
-                (if long_running { 600 } else { 300 }).into();
+            helm_values["chain"]["epoch_duration_secs"] = (1500).into();
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
                     .expect("must serialize");

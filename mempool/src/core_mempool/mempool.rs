@@ -325,7 +325,7 @@ impl Mempool {
         let mut inserted = HashSet::new();
 
         let gas_end_time = start_time.elapsed();
-
+        info!("MempoolGetBatchRequest");
         let mut result = vec![];
         // Helper DS. Helps to mitigate scenarios where account submits several transactions
         // with increasing gas price (e.g. user submits transactions with sequence number 1, 2
@@ -370,9 +370,14 @@ impl Mempool {
                     skipped_txn = (skipped_txn.0, skipped_txn.1 + 1);
                 }
             } else {
+                info!(
+                    "txn_in_sequence: {}, account_sequence_number: {:?}, txn_seq: {}, txn_seq_numbers: {:?}",
+                    txn_in_sequence, account_sequence_number, tx_seq, self.transactions.get_account_sequence_numbers(&txn.address)
+                );
                 skipped.insert((txn.address, tx_seq));
             }
         }
+        counters::MEMPOOL_SKIPPED_TXNS.set(skipped.len() as i64);
         counters::MEMPOOL_GET_BATCH_INITIAL_NUM_TXNS.observe(result.len() as f64);
         counters::MEMPOOL_GET_BATCH_INITIAL_NUM_BYTES.observe(
             result
@@ -395,6 +400,7 @@ impl Mempool {
 
         let mut block = Vec::with_capacity(result_size);
         let mut full_bytes = false;
+        let mut unable_to_get_txns = 0;
         for (sender, sequence_number) in result {
             if let Some((txn, ranking_score)) = self
                 .transactions
@@ -416,8 +422,11 @@ impl Mempool {
                     self.transactions.get_bucket(ranking_score),
                     ranking_score,
                 );
+            } else {
+                unable_to_get_txns += 1;
             }
         }
+        counters::MEMPOOL_UNABLE_TO_FIND_TXNS.set(unable_to_get_txns as i64);
         let block_end_time = start_time.elapsed();
         let block_time = block_end_time.saturating_sub(result_end_time);
 
@@ -467,6 +476,11 @@ impl Mempool {
         counters::MEMPOOL_GET_BATCH_FINAL_NUM_BYTES.observe(total_bytes as f64);
         counters::MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH
             .observe((mempool_total_txns_excluding_progressing - block.len() as u64) as f64);
+        counters::MEMPOOL_REMAINING_TXNS_NOT_SKIPPED.set(
+            (mempool_total_txns_excluding_progressing
+                - (block.len() as u64)
+                - (skipped.len() as u64)) as i64,
+        );
         counters::MEMPOOL_UNFILLED_TXNS_IN_GET_BATCH
             .observe((max_txns.saturating_sub(block.len() as u64)) as f64);
         counters::MEMPOOL_UNFILLED_BYTES_IN_GET_BATCH
