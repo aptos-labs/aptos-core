@@ -474,8 +474,13 @@ impl Mempool {
         }
         counters::MEMPOOL_GET_BATCH_FINAL_NUM_TXNS.observe(block.len() as f64);
         counters::MEMPOOL_GET_BATCH_FINAL_NUM_BYTES.observe(total_bytes as f64);
-        counters::MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH
-            .set((mempool_total_txns_excluding_progressing - block.len() as u64) as i64);
+        counters::MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH.set(
+            if mempool_total_txns_excluding_progressing > (block.len() as u64) {
+                (mempool_total_txns_excluding_progressing - block.len() as u64) as i64
+            } else {
+                0
+            },
+        );
         counters::MEMPOOL_BLOCK_AND_SKIPPED
             .set(((block.len() as u64) + (skipped.len() as u64)) as i64);
         counters::MEMPOOL_UNFILLED_TXNS_IN_GET_BATCH
