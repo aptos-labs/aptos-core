@@ -109,6 +109,16 @@ pub enum FeatureFlag {
     DelegationPoolAllowlisting,
     ModuleEventMigration,
     RejectUnstableBytecode,
+    TransactionContextExtension,
+    CoinToFungibleAssetMigration,
+    PrimaryAPTFungibleStoreAtUserAddress,
+    ObjectNativeDerivedAddress,
+    DispatchableFungibleAsset,
+    NewAccountsDefaultToFaAptStore,
+    OperationsDefaultToFaAptStore,
+    AggregatorV2IsAtLeastApi,
+    ConcurrentFungibleBalance,
+    DefaultToConcurrentFungibleBalance,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -274,6 +284,32 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::ModuleEventMigration => AptosFeatureFlag::MODULE_EVENT_MIGRATION,
             FeatureFlag::RejectUnstableBytecode => AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE,
+            FeatureFlag::TransactionContextExtension => {
+                AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION
+            },
+            FeatureFlag::CoinToFungibleAssetMigration => {
+                AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION
+            },
+            FeatureFlag::PrimaryAPTFungibleStoreAtUserAddress => {
+                AptosFeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS
+            },
+            FeatureFlag::ObjectNativeDerivedAddress => {
+                AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS
+            },
+            FeatureFlag::DispatchableFungibleAsset => AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
+            FeatureFlag::NewAccountsDefaultToFaAptStore => {
+                AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE
+            },
+            FeatureFlag::OperationsDefaultToFaAptStore => {
+                AptosFeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE
+            },
+            FeatureFlag::AggregatorV2IsAtLeastApi => {
+                AptosFeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API
+            },
+            FeatureFlag::ConcurrentFungibleBalance => AptosFeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
+            FeatureFlag::DefaultToConcurrentFungibleBalance => {
+                AptosFeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE
+            },
         }
     }
 }
@@ -368,6 +404,32 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::MODULE_EVENT_MIGRATION => FeatureFlag::ModuleEventMigration,
             AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE => FeatureFlag::RejectUnstableBytecode,
+            AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION => {
+                FeatureFlag::TransactionContextExtension
+            },
+            AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION => {
+                FeatureFlag::CoinToFungibleAssetMigration
+            },
+            AptosFeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS => {
+                FeatureFlag::PrimaryAPTFungibleStoreAtUserAddress
+            },
+            AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS => {
+                FeatureFlag::ObjectNativeDerivedAddress
+            },
+            AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET => FeatureFlag::DispatchableFungibleAsset,
+            AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE => {
+                FeatureFlag::NewAccountsDefaultToFaAptStore
+            },
+            AptosFeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE => {
+                FeatureFlag::OperationsDefaultToFaAptStore
+            },
+            AptosFeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API => {
+                FeatureFlag::AggregatorV2IsAtLeastApi
+            },
+            AptosFeatureFlag::CONCURRENT_FUNGIBLE_BALANCE => FeatureFlag::ConcurrentFungibleBalance,
+            AptosFeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE => {
+                FeatureFlag::DefaultToConcurrentFungibleBalance
+            },
         }
     }
 }

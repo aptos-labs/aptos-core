@@ -8,7 +8,7 @@ use crate::{errors::AptosDbError, DbReader, DbWriter, Result};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        state_key::{StateKey, StateKeyInner},
+        state_key::{inner::StateKeyInner, StateKey},
         state_value::StateValue,
     },
     transaction::Version,
@@ -27,6 +27,7 @@ impl DbReader for MockDbReaderWriter {
         &self,
         _state_key: &StateKey,
         _version: Version,
+        _root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         Ok(SparseMerkleProofExt::new(None, vec![]))
     }

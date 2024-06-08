@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    consensus_observer::{network::ObserverMessage, publisher::Publisher},
     counters,
     error::StateSyncError,
     network::{IncomingCommitRequest, IncomingRandGenRequest, NetworkSender},
@@ -147,6 +148,7 @@ pub struct ExecutionProxyClient {
     // channels to buffer manager
     handle: Arc<RwLock<BufferManagerHandle>>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+    observer_network: Option<NetworkClient<ObserverMessage>>,
 }
 
 impl ExecutionProxyClient {
@@ -158,6 +160,7 @@ impl ExecutionProxyClient {
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         bounded_executor: BoundedExecutor,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+        observer_network: Option<NetworkClient<ObserverMessage>>,
     ) -> Self {
         Self {
             consensus_config,
@@ -168,6 +171,7 @@ impl ExecutionProxyClient {
             bounded_executor,
             handle: Arc::new(RwLock::new(BufferManagerHandle::new())),
             rand_storage,
+            observer_network,
         }
     }
 
@@ -177,8 +181,10 @@ impl ExecutionProxyClient {
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
+        onchain_consensus_config: &OnChainConsensusConfig,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_ordered_round: Round,
+        publisher: Option<Publisher>,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -262,6 +268,8 @@ impl ExecutionProxyClient {
             reset_buffer_manager_rx,
             epoch_state,
             self.bounded_executor.clone(),
+            onchain_consensus_config.order_vote_enabled(),
+            publisher,
         );
 
         tokio::spawn(execution_schedule_phase.start());
@@ -292,8 +300,10 @@ impl TExecutionClient for ExecutionProxyClient {
             epoch_state.clone(),
             rand_config,
             fast_rand_config,
+            onchain_consensus_config,
             rand_msg_rx,
             highest_ordered_round,
+            self.observer_network.clone().map(Publisher::new),
         );
 
         let transaction_shuffler =

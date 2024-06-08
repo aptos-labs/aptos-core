@@ -92,6 +92,13 @@ pub struct LocalAccount {
     sequence_number: AtomicU64,
 }
 
+pub fn get_apt_primary_store_address(address: AccountAddress) -> AccountAddress {
+    let mut bytes = address.to_vec();
+    bytes.append(&mut AccountAddress::ONE.to_vec());
+    bytes.push(0xFC);
+    AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
+}
+
 impl LocalAccount {
     /// Create a new representation of an account locally. Note: This function
     /// does not actually create an account on the Aptos blockchain, just a
@@ -477,8 +484,8 @@ impl EphemeralKeyPair {
         )?;
 
         Ok(Self {
-            private_key: private_key.clone(),
-            public_key: EphemeralPublicKey::ed25519(private_key.public_key()),
+            private_key,
+            public_key: epk,
             nonce,
             expiry_date_secs,
             blinder,

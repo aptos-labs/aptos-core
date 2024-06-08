@@ -38,10 +38,10 @@ impl CheckChangeSet for MockChangeSetChecker {
 
 macro_rules! as_state_key {
     ($k:ident) => {
-        StateKey::raw($k.to_string().into_bytes())
+        StateKey::raw($k.to_string().as_bytes())
     };
     ($k:expr) => {
-        StateKey::raw($k.to_string().into_bytes())
+        StateKey::raw($k.to_string().as_bytes())
     };
 }
 pub(crate) use as_state_key;
@@ -128,7 +128,7 @@ pub(crate) fn mock_tag_0() -> StructTag {
         address: AccountAddress::ONE,
         module: Identifier::new("a").unwrap(),
         name: Identifier::new("a").unwrap(),
-        type_params: vec![TypeTag::U8],
+        type_args: vec![TypeTag::U8],
     }
 }
 
@@ -137,7 +137,7 @@ pub(crate) fn mock_tag_1() -> StructTag {
         address: AccountAddress::ONE,
         module: Identifier::new("abcde").unwrap(),
         name: Identifier::new("fgh").unwrap(),
-        type_params: vec![TypeTag::U64],
+        type_args: vec![TypeTag::U64],
     }
 }
 
@@ -146,7 +146,7 @@ pub(crate) fn mock_tag_2() -> StructTag {
         address: AccountAddress::ONE,
         module: Identifier::new("abcdex").unwrap(),
         name: Identifier::new("fghx").unwrap(),
-        type_params: vec![TypeTag::U128],
+        type_args: vec![TypeTag::U128],
     }
 }
 

@@ -230,10 +230,7 @@ pub fn verify_originating_address(
             parse_struct_tag("0x1::account::OriginatingAddress").unwrap(),
         )
         .unwrap();
-    let state_key = &StateKey::table_item(
-        originating_address_handle,
-        AccountAddress::from_bytes(auth_key).unwrap().to_vec(),
-    );
+    let state_key = &StateKey::table_item(&originating_address_handle, &auth_key);
     // Verify that the value in the address redirection table is expected
     let result = harness.read_state_value_bytes(state_key).unwrap();
     assert_eq!(result, expected_address.to_vec());

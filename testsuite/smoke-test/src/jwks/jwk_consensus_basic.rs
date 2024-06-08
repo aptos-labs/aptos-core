@@ -5,7 +5,7 @@ use crate::{
     jwks::{
         dummy_provider::{
             request_handler::{EquivocatingServer, StaticContentServer},
-            DummyProvider,
+            DummyHttpServer,
         },
         get_patched_jwks, update_jwk_consensus_config,
     },
@@ -15,10 +15,8 @@ use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_types::{
     jwks::{
-        jwk::{JWKMoveStruct, JWK},
-        rsa::RSA_JWK,
-        unsupported::UnsupportedJWK,
-        AllProvidersJWKs, ProviderJWKs,
+        jwk::JWK, rsa::RSA_JWK, secure_test_rsa_jwk, unsupported::UnsupportedJWK, AllProvidersJWKs,
+        ProviderJWKs,
     },
     keyless::test_utils::get_sample_iss,
     on_chain_config::{JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig},
@@ -57,10 +55,32 @@ async fn jwk_consensus_basic() {
     assert!(patched_jwks.jwks.entries.len() == 1);
 
     info!("Adding some providers.");
-    let (provider_alice, provider_bob) =
-        tokio::join!(DummyProvider::spawn(), DummyProvider::spawn());
+    let (alice_config_server, alice_jwks_server, bob_config_server, bob_jwks_server) = tokio::join!(
+        DummyHttpServer::spawn(),
+        DummyHttpServer::spawn(),
+        DummyHttpServer::spawn(),
+        DummyHttpServer::spawn()
+    );
+    let alice_issuer_id = "https://alice.io";
+    let bob_issuer_id = "https://bob.dev";
+    alice_config_server.update_request_handler(Some(Arc::new(StaticContentServer::new_str(
+        format!(
+            r#"{{"issuer": "{}", "jwks_uri": "{}"}}"#,
+            alice_issuer_id,
+            alice_jwks_server.url()
+        )
+        .as_str(),
+    ))));
+    bob_config_server.update_request_handler(Some(Arc::new(StaticContentServer::new_str(
+        format!(
+            r#"{{"issuer": "{}", "jwks_uri": "{}"}}"#,
+            bob_issuer_id,
+            bob_jwks_server.url()
+        )
+        .as_str(),
+    ))));
 
-    provider_alice.update_request_handler(Some(Arc::new(StaticContentServer::new_str(
+    alice_jwks_server.update_request_handler(Some(Arc::new(StaticContentServer::new_str(
         r#"
 {
     "keys": [
@@ -70,18 +90,20 @@ async fn jwk_consensus_basic() {
 }
 "#,
     ))));
-    provider_bob.update_request_handler(Some(Arc::new(StaticContentServer::new(
+
+    bob_jwks_server.update_request_handler(Some(Arc::new(StaticContentServer::new(
         r#"{"keys": ["BOB_JWK_V0"]}"#.as_bytes().to_vec(),
     ))));
+
     let config = OnChainJWKConsensusConfig::V1(JWKConsensusConfigV1 {
         oidc_providers: vec![
             OIDCProvider {
-                name: "https://alice.io".to_string(),
-                config_url: provider_alice.open_id_config_url(),
+                name: alice_issuer_id.to_string(),
+                config_url: alice_config_server.url(),
             },
             OIDCProvider {
-                name: "https://bob.dev".to_string(),
-                config_url: provider_bob.open_id_config_url(),
+                name: bob_issuer_id.to_string(),
+                config_url: bob_config_server.url(),
             },
         ],
     });
@@ -97,7 +119,7 @@ async fn jwk_consensus_basic() {
         AllProvidersJWKs {
             entries: vec![
                 ProviderJWKs {
-                    issuer: b"https://alice.io".to_vec(),
+                    issuer: alice_issuer_id.as_bytes().to_vec(),
                     version: 1,
                     jwks: vec![
                         JWK::RSA(RSA_JWK::new_256_aqab("kid0", "n0")).into(),
@@ -106,7 +128,7 @@ async fn jwk_consensus_basic() {
                     ],
                 },
                 ProviderJWKs {
-                    issuer: b"https://bob.dev".to_vec(),
+                    issuer: bob_issuer_id.as_bytes().to_vec(),
                     version: 1,
                     jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
                         "\"BOB_JWK_V0\""
@@ -116,7 +138,7 @@ async fn jwk_consensus_basic() {
                 ProviderJWKs {
                     issuer: get_sample_iss().into_bytes(),
                     version: 0,
-                    jwks: vec![JWKMoveStruct::from(RSA_JWK::secure_test_jwk())],
+                    jwks: vec![secure_test_rsa_jwk().into()],
                 },
             ]
         },
@@ -124,7 +146,7 @@ async fn jwk_consensus_basic() {
     );
 
     info!("Rotating Alice keys. Also making https://alice.io gently equivocate.");
-    provider_alice.update_request_handler(Some(Arc::new(EquivocatingServer::new(
+    alice_jwks_server.update_request_handler(Some(Arc::new(EquivocatingServer::new(
         r#"{"keys": ["ALICE_JWK_V1A"]}"#.as_bytes().to_vec(),
         r#"{"keys": ["ALICE_JWK_V1B"]}"#.as_bytes().to_vec(),
         1,
@@ -138,7 +160,7 @@ async fn jwk_consensus_basic() {
         AllProvidersJWKs {
             entries: vec![
                 ProviderJWKs {
-                    issuer: b"https://alice.io".to_vec(),
+                    issuer: alice_issuer_id.as_bytes().to_vec(),
                     version: 2,
                     jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
                         "\"ALICE_JWK_V1B\""
@@ -146,7 +168,7 @@ async fn jwk_consensus_basic() {
                     .into()],
                 },
                 ProviderJWKs {
-                    issuer: b"https://bob.dev".to_vec(),
+                    issuer: bob_issuer_id.as_bytes().to_vec(),
                     version: 1,
                     jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
                         "\"BOB_JWK_V0\""
@@ -156,7 +178,7 @@ async fn jwk_consensus_basic() {
                 ProviderJWKs {
                     issuer: get_sample_iss().into_bytes(),
                     version: 0,
-                    jwks: vec![JWKMoveStruct::from(RSA_JWK::secure_test_jwk())],
+                    jwks: vec![secure_test_rsa_jwk().into()],
                 },
             ]
         },
@@ -164,5 +186,10 @@ async fn jwk_consensus_basic() {
     );
 
     info!("Tear down.");
-    provider_alice.shutdown().await;
+    tokio::join!(
+        alice_jwks_server.shutdown(),
+        alice_config_server.shutdown(),
+        bob_jwks_server.shutdown(),
+        bob_config_server.shutdown()
+    );
 }

@@ -32,13 +32,15 @@ pub type Author = AccountAddress;
 pub struct TransactionSummary {
     pub sender: AccountAddress,
     pub sequence_number: u64,
+    pub hash: HashValue,
 }
 
 impl TransactionSummary {
-    pub fn new(sender: AccountAddress, sequence_number: u64) -> Self {
+    pub fn new(sender: AccountAddress, sequence_number: u64, hash: HashValue) -> Self {
         Self {
             sender,
             sequence_number,
+            hash,
         }
     }
 }
@@ -530,6 +532,7 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                         exclude_txns.push(TransactionSummary {
                             sender: txn.sender(),
                             sequence_number: txn.sequence_number(),
+                            hash: txn.committed_hash(),
                         });
                     }
                 }

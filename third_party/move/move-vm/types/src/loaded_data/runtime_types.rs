@@ -125,18 +125,18 @@ impl DepthFormula {
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct StructType {
     pub idx: StructNameIndex,
-    pub fields: Vec<Type>,
+    pub field_tys: Vec<Type>,
     pub field_names: Vec<Identifier>,
-    pub phantom_ty_args_mask: SmallBitVec,
+    pub phantom_ty_params_mask: SmallBitVec,
     pub abilities: AbilitySet,
-    pub type_parameters: Vec<StructTypeParameter>,
+    pub ty_params: Vec<StructTypeParameter>,
     pub name: Identifier,
     pub module: ModuleId,
 }
 
 impl StructType {
-    pub fn type_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
-        self.type_parameters.iter().map(|param| &param.constraints)
+    pub fn ty_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
+        self.ty_params.iter().map(|param| &param.constraints)
     }
 
     // Check if the local struct handle is compatible with the defined struct type.
@@ -148,9 +148,9 @@ impl StructType {
             );
         }
 
-        if self.phantom_ty_args_mask.len() != struct_handle.type_parameters.len()
+        if self.phantom_ty_params_mask.len() != struct_handle.type_parameters.len()
             || !self
-                .phantom_ty_args_mask
+                .phantom_ty_params_mask
                 .iter()
                 .zip(struct_handle.type_parameters.iter())
                 .all(|(defined_is_phantom, local_type_parameter)| {

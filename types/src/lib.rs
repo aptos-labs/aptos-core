@@ -15,6 +15,7 @@ pub mod contract_event;
 pub mod dkg;
 pub mod epoch_change;
 pub mod epoch_state;
+pub mod error;
 pub mod event;
 pub mod executable;
 pub mod fee_statement;
@@ -65,3 +66,4 @@ pub mod keyless;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;
+pub mod vm;

@@ -8,20 +8,13 @@ error: unknown assertion failed
   =     at tests/sources/functional/inline-lambda.move:10: test_apply
   =         a1 = <redacted>
   =         a2 = <redacted>
+  =     at tests/sources/functional/inline-lambda.move:4: apply
+  =     at tests/sources/functional/inline-lambda.move:5: apply
   =     at tests/sources/functional/inline-lambda.move:11: test_apply
-  =     at tests/sources/functional/inline-lambda.move:2
-  =         a1 = <redacted>
-  =     at tests/sources/functional/inline-lambda.move:4
-  =     at tests/sources/functional/inline-lambda.move:5
-  =     at tests/sources/functional/inline-lambda.move:11: test_apply
-  =         a2 = <redacted>
-  =         v = <redacted>
+  =         r1 = <redacted>
   =     at tests/sources/functional/inline-lambda.move:13: test_apply
-  =     at tests/sources/functional/inline-lambda.move:16: test_apply
-  =     at tests/sources/functional/inline-lambda.move:2
-  =         <redacted> = <redacted>
-  =     at tests/sources/functional/inline-lambda.move:4
-  =     at tests/sources/functional/inline-lambda.move:5
+  =     at tests/sources/functional/inline-lambda.move:4: apply
+  =     at tests/sources/functional/inline-lambda.move:5: apply
 
 error: unknown assertion failed
    ┌─ tests/sources/functional/inline-lambda.move:18:13
@@ -32,21 +25,13 @@ error: unknown assertion failed
    =     at tests/sources/functional/inline-lambda.move:10: test_apply
    =         a1 = <redacted>
    =         a2 = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:4: apply
+   =     at tests/sources/functional/inline-lambda.move:5: apply
    =     at tests/sources/functional/inline-lambda.move:11: test_apply
-   =     at tests/sources/functional/inline-lambda.move:2
-   =         a1 = <redacted>
-   =     at tests/sources/functional/inline-lambda.move:4
-   =     at tests/sources/functional/inline-lambda.move:5
-   =     at tests/sources/functional/inline-lambda.move:11: test_apply
-   =         a2 = <redacted>
-   =         v = <redacted>
-   =     at tests/sources/functional/inline-lambda.move:13: test_apply
-   =     at tests/sources/functional/inline-lambda.move:16: test_apply
-   =     at tests/sources/functional/inline-lambda.move:2
-   =         <redacted> = <redacted>
-   =     at tests/sources/functional/inline-lambda.move:4
-   =     at tests/sources/functional/inline-lambda.move:5
-   =     at tests/sources/functional/inline-lambda.move:16: test_apply
    =         r1 = <redacted>
-   =         v = <redacted>
+   =     at tests/sources/functional/inline-lambda.move:13: test_apply
+   =     at tests/sources/functional/inline-lambda.move:4: apply
+   =     at tests/sources/functional/inline-lambda.move:5: apply
+   =     at tests/sources/functional/inline-lambda.move:16: test_apply
+   =         r2 = <redacted>
    =     at tests/sources/functional/inline-lambda.move:18: test_apply

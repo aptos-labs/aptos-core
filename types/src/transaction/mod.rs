@@ -48,6 +48,7 @@ mod module;
 mod multisig;
 mod script;
 pub mod signature_verified_transaction;
+pub mod user_transaction_context;
 pub mod webauthn;
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -475,10 +476,13 @@ pub struct SignedTransaction {
     /// Prevents serializing the same authenticator multiple times to determine size.
     #[serde(skip)]
     authenticator_size: OnceCell<usize>,
+
+    /// A cached hash of the transaction.
+    #[serde(skip)]
+    committed_hash: OnceCell<HashValue>,
 }
 
-/// PartialEq ignores the "bytes" field as this is a OnceCell that may or
-/// may not be initialized during runtime comparison.
+/// PartialEq ignores the cached OnceCell fields that may or may not be initialized.
 impl PartialEq for SignedTransaction {
     fn eq(&self, other: &Self) -> bool {
         self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
@@ -534,6 +538,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -548,6 +553,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -570,6 +576,7 @@ impl SignedTransaction {
             ),
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -584,6 +591,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -602,6 +610,7 @@ impl SignedTransaction {
             ),
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -621,6 +630,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -640,6 +650,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -652,6 +663,7 @@ impl SignedTransaction {
             authenticator: TransactionAuthenticator::single_sender(authenticator),
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -664,6 +676,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -751,9 +764,11 @@ impl SignedTransaction {
         )
     }
 
-    /// Returns the hash when the transaction is commited onchain.
-    pub fn committed_hash(self) -> HashValue {
-        Transaction::UserTransaction(self).hash()
+    /// Returns the hash when the transaction is committed onchain.
+    pub fn committed_hash(&self) -> HashValue {
+        *self
+            .committed_hash
+            .get_or_init(|| Transaction::UserTransaction(self.clone()).hash())
     }
 }
 
@@ -905,6 +920,17 @@ impl From<KeptVMStatus> for ExecutionStatus {
 impl ExecutionStatus {
     pub fn is_success(&self) -> bool {
         matches!(self, ExecutionStatus::Success)
+    }
+
+    // Used by simulation API for showing detail error message. Should not be used by production code.
+    pub fn convert_vm_status_for_simulation(vm_status: VMStatus) -> Self {
+        let mut show_error_flags = Features::default();
+        show_error_flags.disable(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH);
+        let (txn_status, _aux_data) =
+            TransactionStatus::from_vm_status(vm_status, true, &show_error_flags);
+        txn_status.status().unwrap_or_else(|discarded_code| {
+            ExecutionStatus::MiscellaneousError(Some(discarded_code))
+        })
     }
 
     pub fn remove_error_detail(self) -> Self {
@@ -1246,6 +1272,17 @@ impl TransactionOutput {
             auxiliary_data,
         } = self;
         (write_set, events, gas_used, status, auxiliary_data)
+    }
+
+    // This function is supposed to be called in various tests only
+    pub fn fill_error_status(&mut self) {
+        if let TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)) = self.status {
+            if let Some(detail) = self.auxiliary_data.get_detail_error_message() {
+                self.status = TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+                    detail.status_code(),
+                )));
+            }
+        }
     }
 
     pub fn ensure_match_transaction_info(

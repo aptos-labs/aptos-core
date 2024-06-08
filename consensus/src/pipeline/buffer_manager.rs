@@ -4,6 +4,10 @@
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
+    consensus_observer::{
+        network::{ObserverMessage, OrderedBlock as ObserverBlock},
+        publisher::Publisher,
+    },
     counters, monitor,
     network::{IncomingCommitRequest, NetworkSender},
     network_interface::ConsensusMsg,
@@ -130,6 +134,9 @@ pub struct BufferManager {
     previous_commit_time: Instant,
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
+    order_vote_enabled: bool,
+    // Publisher for downstream observers.
+    publisher: Option<Publisher>,
 }
 
 impl BufferManager {
@@ -154,6 +161,8 @@ impl BufferManager {
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
+        order_vote_enabled: bool,
+        publisher: Option<Publisher>,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -199,6 +208,8 @@ impl BufferManager {
             previous_commit_time: Instant::now(),
             reset_flag,
             bounded_executor: executor,
+            order_vote_enabled,
+            publisher,
         }
     }
 
@@ -254,6 +265,12 @@ impl BufferManager {
             ordered_blocks: ordered_blocks.clone(),
             lifetime_guard: self.create_new_request(()),
         });
+        if let Some(publisher) = &self.publisher {
+            publisher.publish(ObserverMessage::OrderedBlock(ObserverBlock {
+                blocks: ordered_blocks.clone().into_iter().map(Arc::new).collect(),
+                ordered_proof: ordered_proof.clone(),
+            }));
+        }
         self.execution_schedule_phase_tx
             .send(request)
             .await
@@ -363,6 +380,11 @@ impl BufferManager {
                     // the epoch ends, reset to avoid executing more blocks, execute after
                     // this persisting request will result in BlockNotFound
                     self.reset().await;
+                }
+                if let Some(publisher) = &self.publisher {
+                    publisher.publish(ObserverMessage::CommitDecision(CommitDecision::new(
+                        commit_proof.clone(),
+                    )));
                 }
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {
@@ -487,6 +509,7 @@ impl BufferManager {
             executed_blocks,
             &self.epoch_state.verifier,
             self.end_epoch_timestamp.get().cloned(),
+            self.order_vote_enabled,
         );
         let aggregated = new_item.is_aggregated();
         self.buffer.set(&current_cursor, new_item);

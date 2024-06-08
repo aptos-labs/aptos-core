@@ -19,14 +19,14 @@ use tokio::{
 pub(crate) mod request_handler;
 
 /// A dummy OIDC provider.
-pub struct DummyProvider {
+pub struct DummyHttpServer {
     close_tx: Sender<()>,
-    open_id_config_url: String,
+    url: String,
     handler_holder: Arc<RwLock<Option<Arc<dyn RequestHandler>>>>,
     server_join_handle: JoinHandle<()>,
 }
 
-impl DummyProvider {
+impl DummyHttpServer {
     pub(crate) async fn spawn() -> Self {
         let addr = SocketAddr::from(([127, 0, 0, 1], 0));
         let handler_holder = Arc::new(RwLock::new(None));
@@ -39,17 +39,17 @@ impl DummyProvider {
             close_rx,
         ));
         let actual_port = port_rx.await.unwrap();
-        let open_id_config_url = format!("http://127.0.0.1:{}", actual_port);
+        let url = format!("http://127.0.0.1:{}", actual_port);
         Self {
             close_tx,
-            open_id_config_url,
+            url,
             handler_holder,
             server_join_handle,
         }
     }
 
-    pub fn open_id_config_url(&self) -> String {
-        self.open_id_config_url.clone()
+    pub fn url(&self) -> String {
+        self.url.clone()
     }
 
     pub fn update_request_handler(
@@ -60,7 +60,7 @@ impl DummyProvider {
     }
 
     pub async fn shutdown(self) {
-        let DummyProvider {
+        let DummyHttpServer {
             close_tx,
             server_join_handle,
             ..
@@ -71,7 +71,7 @@ impl DummyProvider {
 }
 
 // Private functions.
-impl DummyProvider {
+impl DummyHttpServer {
     async fn run_server(
         addr: SocketAddr,
         handler_holder: Arc<RwLock<Option<Arc<dyn RequestHandler>>>>,

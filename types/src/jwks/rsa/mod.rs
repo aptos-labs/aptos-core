@@ -7,12 +7,15 @@ use aptos_crypto::poseidon_bn254;
 use base64::URL_SAFE_NO_PAD;
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use move_core_types::value::{MoveStruct, MoveValue};
+use once_cell::sync::Lazy;
+use ring::signature::RsaKeyPair;
+use rsa::{pkcs1::EncodeRsaPrivateKey, pkcs8::DecodePrivateKey};
 use serde::{Deserialize, Serialize};
 
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 /// See its doc in Move for more details.
 #[allow(non_camel_case_types)]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RSA_JWK {
     pub kid: String,
     pub kty: String,
@@ -20,6 +23,31 @@ pub struct RSA_JWK {
     pub e: String,
     pub n: String,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+struct RsaJwkSet {
+    keys: Vec<RSA_JWK>,
+}
+
+pub fn get_jwk_from_str(s: &str) -> RSA_JWK {
+    let RsaJwkSet { keys } = serde_json::from_str(s).expect("Unable to parse JSON");
+    keys[0].clone()
+}
+
+pub static SECURE_TEST_RSA_JWK: Lazy<RSA_JWK> =
+    Lazy::new(|| get_jwk_from_str(include_str!("secure_test_jwk.json")));
+
+pub static INSECURE_TEST_RSA_JWK: Lazy<RSA_JWK> =
+    Lazy::new(|| get_jwk_from_str(include_str!("insecure_test_jwk.json")));
+
+pub static INSECURE_TEST_RSA_KEY_PAIR: Lazy<RsaKeyPair> = Lazy::new(|| {
+    // TODO(keyless): Hacking around the difficulty of parsing PKCS#8-encoded PEM files with the `pem` crate
+    let der = rsa::RsaPrivateKey::from_pkcs8_pem(include_str!("insecure_test_jwk_private_key.pem"))
+        .unwrap()
+        .to_pkcs1_der()
+        .unwrap();
+    RsaKeyPair::from_der(der.as_bytes()).unwrap()
+});
 
 impl RSA_JWK {
     /// The circuit-supported RSA modulus size.
@@ -58,7 +86,7 @@ impl RSA_JWK {
         }
     }
 
-    pub fn verify_signature(&self, jwt_token: &str) -> Result<TokenData<Claims>> {
+    pub fn verify_signature_without_exp_check(&self, jwt_token: &str) -> Result<TokenData<Claims>> {
         let mut validation = Validation::new(Algorithm::RS256);
         validation.validate_exp = false;
         let key = &DecodingKey::from_rsa_components(&self.n, &self.e)?;
@@ -88,7 +116,8 @@ impl RSA_JWK {
         let mut scalars = modulus
             .chunks(24) // Pack 3 64 bit limbs per scalar, so chunk into 24 bytes per scalar
             .map(|chunk| {
-                poseidon_bn254::pack_bytes_to_one_scalar(chunk).expect("chunk converts to scalar")
+                poseidon_bn254::keyless::pack_bytes_to_one_scalar(chunk)
+                    .expect("chunk converts to scalar")
             })
             .collect::<Vec<ark_bn254::Fr>>();
         scalars.push(ark_bn254::Fr::from(Self::RSA_MODULUS_BYTES as i32));

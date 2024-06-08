@@ -72,6 +72,8 @@ pub trait Node: Send + Sync {
     fn counter(&self, counter: &str, port: u64) -> Result<f64>;
 
     fn expose_metric(&self) -> Result<u64>;
+
+    fn service_name(&self) -> Option<String>;
 }
 
 /// Trait used to represent a running Validator

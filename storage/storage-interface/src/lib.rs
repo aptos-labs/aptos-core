@@ -19,7 +19,6 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
-        state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
@@ -50,6 +49,7 @@ pub mod state_view;
 use crate::state_delta::StateDelta;
 use aptos_scratchpad::SparseMerkleTree;
 pub use aptos_types::block_info::BlockHeight;
+use aptos_types::state_store::state_key::prefix::StateKeyPrefix;
 pub use errors::AptosDbError;
 pub use executed_trees::ExecutedTrees;
 
@@ -286,8 +286,8 @@ pub trait DbReader: Send + Sync {
         /// Returns the latest ledger info, if any.
         fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
 
-        /// Returns the latest committed version, error on on non-bootstrapped/empty DB.
-        fn get_latest_version(&self) -> Result<Version>;
+        /// Returns the latest "synced" transaction version, potentially not "committed" yet.
+        fn get_synced_version(&self) -> Result<Version>;
 
         /// Returns the latest state checkpoint version if any.
         fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>>;
@@ -360,6 +360,7 @@ pub trait DbReader: Send + Sync {
             &self,
             state_key: &StateKey,
             version: Version,
+            root_depth: usize,
         ) -> Result<SparseMerkleProofExt>;
 
         /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
@@ -374,6 +375,7 @@ pub trait DbReader: Send + Sync {
             &self,
             state_key: &StateKey,
             version: Version,
+            root_depth: usize,
         ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
 
         /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
@@ -462,6 +464,13 @@ pub trait DbReader: Send + Sync {
         })
     }
 
+    /// Returns the latest committed version, error on on non-bootstrapped/empty DB.
+    /// N.b. different from `get_synced_version()`.
+    fn get_latest_ledger_info_version(&self) -> Result<Version> {
+        self.get_latest_ledger_info()
+            .map(|li| li.ledger_info().version())
+    }
+
     /// Returns the latest version and committed block timestamp
     fn get_latest_commit_metadata(&self) -> Result<(Version, u64)> {
         let ledger_info_with_sig = self.get_latest_ledger_info()?;
@@ -474,7 +483,7 @@ pub trait DbReader: Send + Sync {
         state_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        self.get_state_value_with_proof_by_version_ext(state_key, version)
+        self.get_state_value_with_proof_by_version_ext(state_key, version, 0)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 }

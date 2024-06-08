@@ -76,6 +76,7 @@ spec aptos_framework::staking_contract {
         include ContractExistsAbortsIf;
         let staking_contracts = global<Store>(staker).staking_contracts;
         ensures result == simple_map::spec_get(staking_contracts, operator).pool_address;
+
     }
 
     /// Staking_contract exists the stacker/operator pair.
@@ -185,6 +186,7 @@ spec aptos_framework::staking_contract {
     /// Account is not frozen and sufficient to withdraw.
     /// Staking_contract exists the stacker/operator pair.
     spec add_stake(staker: &signer, operator: address, amount: u64) {
+        // TODO(fa_migration)
         use aptos_framework::reconfiguration_state;
         pragma verify_duration_estimate = 600;
         // TODO: this function times out
@@ -296,6 +298,8 @@ spec aptos_framework::staking_contract {
     old_operator: address,
     new_operator: address,
     ) {
+        // TODO: These function passed locally however failed in github CI
+        pragma verify_duration_estimate = 120;
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
@@ -331,8 +335,11 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec distribute(staker: address, operator: address) {
+        // TODO: These function passed locally however failed in github CI
+        pragma verify_duration_estimate = 120;
         // TODO: Call `distribute_internal` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
+
         include ContractExistsAbortsIf;
     }
 
@@ -344,6 +351,8 @@ spec aptos_framework::staking_contract {
     staking_contract: &mut StakingContract,
     distribute_events: &mut EventHandle<DistributeEvent>,
     ) {
+        // TODO: These function passed locally however failed in github CI
+        pragma verify_duration_estimate = 120;
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let pool_address = staking_contract.pool_address;
@@ -371,6 +380,7 @@ spec aptos_framework::staking_contract {
 
     /// The StakePool exists under the pool_address of StakingContract.
     spec get_staking_contract_amounts_internal(staking_contract: &StakingContract): (u64, u64, u64) {
+        pragma verify_duration_estimate = 120;
         include GetStakingContractAmountsAbortsIf;
 
         let pool_address = staking_contract.pool_address;
