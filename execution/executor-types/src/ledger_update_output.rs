@@ -14,8 +14,8 @@ use aptos_types::{
     proof::accumulator::InMemoryTransactionAccumulator,
     state_store::{combine_or_add_sharded_state_updates, ShardedStateUpdates},
     transaction::{
-        block_epilogue::BlockEndInfo, Transaction, TransactionInfo, TransactionStatus,
-        TransactionToCommit, Version,
+        block_epilogue::BlockEndInfo, TransactionInfo, TransactionStatus, TransactionToCommit,
+        Version,
     },
 };
 use itertools::zip_eq;
@@ -64,10 +64,9 @@ impl LedgerUpdateOutput {
     /// block.
     pub fn ensure_ends_with_state_checkpoint(&self) -> Result<()> {
         ensure!(
-            self.to_commit.last().map_or(true, |txn| matches!(
-                txn.transaction(),
-                Transaction::StateCheckpoint(_)
-            )),
+            self.to_commit
+                .last()
+                .map_or(true, |txn| txn.transaction().is_non_reconfig_block_ending()),
             "Block not ending with a state checkpoint.",
         );
         Ok(())
