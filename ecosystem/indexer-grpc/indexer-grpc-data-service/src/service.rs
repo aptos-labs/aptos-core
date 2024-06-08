@@ -26,7 +26,10 @@ use aptos_indexer_grpc_utils::{
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
-    transaction::v1::{transaction::TxnData, Transaction},
+    transaction::v1::{
+        multisig_transaction_payload::Payload as MultisigPayloadType, transaction::TxnData,
+        transaction_payload::Payload as PayloadType, Transaction, UserTransactionRequest,
+    },
 };
 use futures::Stream;
 use prost::Message;
@@ -661,6 +664,10 @@ fn get_transactions_responses_builder(
 ) -> Vec<TransactionsResponse> {
     let filtered_transactions =
         filter_transactions_for_sender_addresses(transactions, sender_addresses_to_ignore);
+    let filtered_transactions = filter_transactions_by_move_module_address(
+        filtered_transactions,
+        sender_addresses_to_ignore,
+    );
     let chunks = chunk_transactions(filtered_transactions, MESSAGE_SIZE_LIMIT);
     chunks
         .into_iter()
@@ -947,9 +954,7 @@ fn filter_transactions_for_sender_addresses(
             if let Some(TxnData::User(user_transaction)) = txn.txn_data.as_mut() {
                 if let Some(utr) = user_transaction.request.as_mut() {
                     if sender_addresses_to_ignore.contains(&utr.sender) {
-                        // Wipe the payload and signature.
-                        utr.payload = None;
-                        utr.signature = None;
+                        // Wipe the events and writeset
                         user_transaction.events = vec![];
                         txn.info.as_mut().unwrap().changes = vec![];
                     }
@@ -960,9 +965,59 @@ fn filter_transactions_for_sender_addresses(
         .collect()
 }
 
+/// TODO: replace w/ generalized
+fn filter_transactions_by_move_module_address(
+    transactions: Vec<Transaction>,
+    module_addresses_to_ignore: &HashSet<String>,
+) -> Vec<Transaction> {
+    transactions
+        .into_iter()
+        .map(|mut txn| {
+            if let Some(TxnData::User(user_transaction)) = txn.txn_data.as_mut() {
+                if let Some(utr) = user_transaction.request.as_mut() {
+                    let entry_function_id_str = get_transaction_address_from_user_request(utr);
+                    if let Some(entry_function_id_str) = entry_function_id_str {
+                        for module_address in module_addresses_to_ignore {
+                            if entry_function_id_str.contains(module_address) {
+                                // Wipe the events and writesets
+                                user_transaction.events = vec![];
+                                txn.info.as_mut().unwrap().changes = vec![];
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            txn
+        })
+        .collect()
+}
+
+fn get_transaction_address_from_user_request(
+    user_request: &UserTransactionRequest,
+) -> Option<String> {
+    match &user_request.payload.as_ref().unwrap().payload {
+        Some(PayloadType::EntryFunctionPayload(payload)) => {
+            Some(payload.entry_function_id_str.clone())
+        },
+        Some(PayloadType::MultisigPayload(payload)) => {
+            if let Some(payload) = payload.transaction_payload.as_ref() {
+                match payload.payload.as_ref().unwrap() {
+                    MultisigPayloadType::EntryFunctionPayload(payload) => {
+                        Some(payload.entry_function_id_str.clone())
+                    },
+                };
+            }
+            return None;
+        },
+        _ => return None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{ensure_sequential_transactions, filter_transactions_for_sender_addresses};
+    use crate::service::filter_transactions_by_move_module_address;
     use aptos_protos::transaction::v1::{
         transaction::TxnData, Event, Signature, Transaction, TransactionInfo, TransactionPayload,
         UserTransaction, UserTransactionRequest, WriteSetChange,
@@ -1016,13 +1071,13 @@ mod tests {
 
     #[test]
     fn test_transactions_are_filter_correctly() {
-        let sender_address = "0x1234".to_string();
+        let sender_or_module_address = "0x1234".to_string();
         // Create a transaction with a user transaction
         let txn = Transaction {
             version: 1,
             txn_data: Some(TxnData::User(UserTransaction {
                 request: Some(UserTransactionRequest {
-                    sender: sender_address.clone(),
+                    sender: sender_or_module_address.clone(),
                     payload: Some(TransactionPayload::default()),
                     signature: Some(Signature::default()),
                     ..Default::default()
@@ -1036,17 +1091,17 @@ mod tests {
             ..Default::default()
         };
         // create ignore list.
-        let ignore_hash_set: HashSet<String> = vec![sender_address].into_iter().collect();
+        let ignore_hash_set: HashSet<String> = vec![sender_or_module_address].into_iter().collect();
 
         let filtered_txn = filter_transactions_for_sender_addresses(vec![txn], &ignore_hash_set);
+        let filtered_txn =
+            filter_transactions_by_move_module_address(filtered_txn, &ignore_hash_set);
         assert_eq!(filtered_txn.len(), 1);
         let txn = filtered_txn.first().unwrap();
         let user_transaction = match &txn.txn_data {
             Some(TxnData::User(user_transaction)) => user_transaction,
             _ => panic!("Expected user transaction"),
         };
-        assert_eq!(user_transaction.request.as_ref().unwrap().payload, None);
-        assert_eq!(user_transaction.request.as_ref().unwrap().signature, None);
         assert_eq!(user_transaction.events.len(), 0);
         assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
     }
