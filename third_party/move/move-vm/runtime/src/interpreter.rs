@@ -6,6 +6,7 @@ use crate::{
     access_control::AccessControlState,
     data_cache::TransactionDataCache,
     loader::{Function, Loader, ModuleStorageAdapter, Resolver},
+    module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
     trace,
@@ -21,7 +22,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{NumArgs, NumBytes, NumTypeNodes},
-    language_storage::TypeTag,
+    language_storage::{ModuleId, TypeTag},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_types::{
@@ -40,7 +41,7 @@ use move_vm_types::{
 };
 use std::{
     cmp::min,
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, HashSet, VecDeque},
     fmt::Write,
     sync::Arc,
 };
@@ -65,6 +66,8 @@ pub(crate) struct Interpreter {
     paranoid_type_checks: bool,
     /// The access control state.
     access_control: AccessControlState,
+    /// Set of modules that exists on call stack.
+    active_modules: HashSet<ModuleId>,
 }
 
 struct TypeWithLoader<'a, 'b> {
@@ -88,6 +91,7 @@ impl Interpreter {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         loader: &Loader,
     ) -> VMResult<Vec<Value>> {
@@ -96,12 +100,14 @@ impl Interpreter {
             call_stack: CallStack::new(),
             paranoid_type_checks: loader.vm_config().paranoid_type_checks,
             access_control: AccessControlState::default(),
+            active_modules: HashSet::new(),
         }
         .execute_main(
             loader,
             data_store,
             module_store,
             gas_meter,
+            traversal_context,
             extensions,
             function,
             ty_args,
@@ -121,6 +127,7 @@ impl Interpreter {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
         ty_args: Vec<Type>,
@@ -129,19 +136,18 @@ impl Interpreter {
         let mut locals = Locals::new(function.local_count());
         for (i, value) in args.into_iter().enumerate() {
             locals
-                .store_loc(
-                    i,
-                    value,
-                    loader
-                        .vm_config()
-                        .enable_invariant_violation_check_in_swap_loc,
-                )
+                .store_loc(i, value, loader.vm_config().check_invariant_in_swap_loc)
                 .map_err(|e| self.set_location(e))?;
+        }
+
+        if let Some(module_id) = function.module_id() {
+            self.active_modules.insert(module_id.clone());
         }
 
         let mut current_frame = self
             .make_new_frame(gas_meter, loader, module_store, function, ty_args, locals)
             .map_err(|err| self.set_location(err))?;
+
         // Access control for the new frame.
         self.access_control
             .enter_function(&current_frame, current_frame.function.as_ref())
@@ -170,6 +176,11 @@ impl Interpreter {
                         .map_err(|e| self.set_location(e))?;
 
                     if let Some(frame) = self.call_stack.pop() {
+                        if frame.function.module_id() != current_frame.function.module_id() {
+                            if let Some(module_id) = current_frame.function.module_id() {
+                                self.active_modules.remove(module_id);
+                            }
+                        }
                         // Note: the caller will find the callee's return values at the top of the shared operand stack
                         current_frame = frame;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
@@ -204,7 +215,7 @@ impl Interpreter {
                             module_id,
                             func.name(),
                             self.operand_stack
-                                .last_n(func.arg_count())
+                                .last_n(func.param_count())
                                 .map_err(|e| set_err_info!(current_frame, e))?,
                             (func.local_count() as u64).into(),
                         )
@@ -212,37 +223,26 @@ impl Interpreter {
 
                     if func.is_native() {
                         self.call_native(
+                            &mut current_frame,
                             &resolver,
                             data_store,
+                            module_store,
                             gas_meter,
+                            traversal_context,
                             extensions,
                             func,
                             vec![],
                         )?;
-                        current_frame.pc += 1; // advance past the Call instruction in the caller
                         continue;
                     }
-                    let frame = self
-                        .make_call_frame(gas_meter, loader, module_store, func, vec![])
-                        .map_err(|err| {
-                            self.attach_state_if_invariant_violation(
-                                self.set_location(err),
-                                &current_frame,
-                            )
-                        })?;
-
-                    // Access control for the new frame.
-                    self.access_control
-                        .enter_function(&frame, frame.function.as_ref())
-                        .map_err(|e| self.set_location(e))?;
-
-                    self.call_stack.push(current_frame).map_err(|frame| {
-                        let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
-                        let err = set_err_info!(frame, err);
-                        self.attach_state_if_invariant_violation(err, &frame)
-                    })?;
-                    // Note: the caller will find the the callee's return values at the top of the shared operand stack
-                    current_frame = frame;
+                    self.set_new_call_frame(
+                        &mut current_frame,
+                        gas_meter,
+                        loader,
+                        module_store,
+                        func,
+                        vec![],
+                    )?;
                 },
                 ExitCode::CallGeneric(idx) => {
                     let ty_args = resolver
@@ -270,7 +270,7 @@ impl Interpreter {
                             func.name(),
                             ty_args.iter().map(|ty| TypeWithLoader { ty, loader }),
                             self.operand_stack
-                                .last_n(func.arg_count())
+                                .last_n(func.param_count())
                                 .map_err(|e| set_err_info!(current_frame, e))?,
                             (func.local_count() as u64).into(),
                         )
@@ -278,34 +278,78 @@ impl Interpreter {
 
                     if func.is_native() {
                         self.call_native(
-                            &resolver, data_store, gas_meter, extensions, func, ty_args,
+                            &mut current_frame,
+                            &resolver,
+                            data_store,
+                            module_store,
+                            gas_meter,
+                            traversal_context,
+                            extensions,
+                            func,
+                            ty_args,
                         )?;
-                        current_frame.pc += 1; // advance past the Call instruction in the caller
                         continue;
                     }
-                    let frame = self
-                        .make_call_frame(gas_meter, loader, module_store, func, ty_args)
-                        .map_err(|err| {
-                            self.attach_state_if_invariant_violation(
-                                self.set_location(err),
-                                &current_frame,
-                            )
-                        })?;
-
-                    // Access control for the new frame.
-                    self.access_control
-                        .enter_function(&frame, frame.function.as_ref())
-                        .map_err(|e| self.set_location(e))?;
-
-                    self.call_stack.push(current_frame).map_err(|frame| {
-                        let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
-                        let err = set_err_info!(frame, err);
-                        self.attach_state_if_invariant_violation(err, &frame)
-                    })?;
-                    current_frame = frame;
+                    self.set_new_call_frame(
+                        &mut current_frame,
+                        gas_meter,
+                        loader,
+                        module_store,
+                        func,
+                        ty_args,
+                    )?;
                 },
             }
         }
+    }
+
+    fn set_new_call_frame(
+        &mut self,
+        current_frame: &mut Frame,
+        gas_meter: &mut impl GasMeter,
+        loader: &Loader,
+        module_store: &ModuleStorageAdapter,
+        func: Arc<Function>,
+        ty_args: Vec<Type>,
+    ) -> VMResult<()> {
+        match (func.module_id(), current_frame.function.module_id()) {
+            (Some(module_id), Some(current_module_id)) if module_id != current_module_id => {
+                if self.active_modules.contains(module_id) {
+                    return Err(self.set_location(
+                        PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR).with_message(
+                            format!(
+                                "Re-entrancy detected: {} already exists on top of the stack",
+                                module_id
+                            ),
+                        ),
+                    ));
+                }
+                self.active_modules.insert(module_id.clone());
+            },
+            (Some(module_id), None) => {
+                self.active_modules.insert(module_id.clone());
+            },
+            _ => (),
+        }
+
+        let mut frame = self
+            .make_call_frame(gas_meter, loader, module_store, func, ty_args)
+            .map_err(|err| {
+                self.attach_state_if_invariant_violation(self.set_location(err), current_frame)
+            })?;
+
+        // Access control for the new frame.
+        self.access_control
+            .enter_function(&frame, frame.function.as_ref())
+            .map_err(|e| self.set_location(e))?;
+
+        std::mem::swap(current_frame, &mut frame);
+        self.call_stack.push(frame).map_err(|frame| {
+            let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
+            let err = set_err_info!(frame, err);
+            self.attach_state_if_invariant_violation(err, &frame)
+        })?;
+        Ok(())
     }
 
     /// Returns a `Frame` if the call is to a Move function. Calls to native functions are
@@ -322,16 +366,14 @@ impl Interpreter {
         ty_args: Vec<Type>,
     ) -> PartialVMResult<Frame> {
         let mut locals = Locals::new(func.local_count());
-        let arg_count = func.arg_count();
+        let param_count = func.param_count();
         let is_generic = !ty_args.is_empty();
 
-        for i in 0..arg_count {
+        for i in 0..param_count {
             locals.store_loc(
-                arg_count - i - 1,
+                param_count - i - 1,
                 self.operand_stack.pop()?,
-                loader
-                    .vm_config()
-                    .enable_invariant_violation_check_in_swap_loc,
+                loader.vm_config().check_invariant_in_swap_loc,
             )?;
 
             if self.paranoid_type_checks {
@@ -339,11 +381,11 @@ impl Interpreter {
                 let resolver = func.get_resolver(loader, module_store);
                 if is_generic {
                     ty.check_eq(
-                        &resolver.subst(&func.local_types()[arg_count - i - 1], &ty_args)?,
+                        &resolver.subst(&func.local_tys()[param_count - i - 1], &ty_args)?,
                     )?;
                 } else {
                     // Directly check against the expected type to save a clone here.
-                    ty.check_eq(&func.local_types()[arg_count - i - 1])?;
+                    ty.check_eq(&func.local_tys()[param_count - i - 1])?;
                 }
             }
         }
@@ -362,18 +404,18 @@ impl Interpreter {
         ty_args: Vec<Type>,
         locals: Locals,
     ) -> PartialVMResult<Frame> {
-        for ty in function.local_types() {
+        for ty in function.local_tys() {
             gas_meter
                 .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(&ty_args)? as u64))?;
         }
 
         let local_tys = if self.paranoid_type_checks {
             if ty_args.is_empty() {
-                function.local_types().to_vec()
+                function.local_tys().to_vec()
             } else {
                 let resolver = function.get_resolver(loader, module_store);
                 function
-                    .local_types()
+                    .local_tys()
                     .iter()
                     .map(|ty| resolver.subst(ty, &ty_args))
                     .collect::<PartialVMResult<Vec<_>>>()?
@@ -394,18 +436,24 @@ impl Interpreter {
     /// Call a native functions.
     fn call_native(
         &mut self,
+        current_frame: &mut Frame,
         resolver: &Resolver,
         data_store: &mut TransactionDataCache,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
         ty_args: Vec<Type>,
     ) -> VMResult<()> {
         // Note: refactor if native functions push a frame on the stack
         self.call_native_impl(
+            current_frame,
             resolver,
             data_store,
+            module_store,
             gas_meter,
+            traversal_context,
             extensions,
             function.clone(),
             ty_args,
@@ -430,26 +478,35 @@ impl Interpreter {
 
     fn call_native_impl(
         &mut self,
+        current_frame: &mut Frame,
         resolver: &Resolver,
         data_store: &mut TransactionDataCache,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
         ty_args: Vec<Type>,
     ) -> PartialVMResult<()> {
-        let return_type_count = function.return_type_count();
+        let is_generic = !ty_args.is_empty();
         let mut args = VecDeque::new();
-        let expected_args = function.arg_count();
+        let expected_args = function.param_count();
         for _ in 0..expected_args {
             args.push_front(self.operand_stack.pop()?);
         }
+        let mut args_ty = VecDeque::new();
 
         if self.paranoid_type_checks {
             for i in 0..expected_args {
-                let expected_ty =
-                    resolver.subst(&function.parameter_types()[expected_args - i - 1], &ty_args)?;
                 let ty = self.operand_stack.pop_ty()?;
-                ty.check_eq(&expected_ty)?;
+                if is_generic {
+                    let expected_ty =
+                        resolver.subst(&function.param_tys()[expected_args - i - 1], &ty_args)?;
+                    ty.check_eq(&expected_ty)?;
+                } else {
+                    ty.check_eq(&function.param_tys()[expected_args - i - 1])?;
+                }
+                args_ty.push_front(ty);
             }
         }
 
@@ -459,6 +516,7 @@ impl Interpreter {
             resolver,
             extensions,
             gas_meter.balance_internal(),
+            traversal_context,
         );
         let native_function = function.get_native()?;
 
@@ -474,14 +532,42 @@ impl Interpreter {
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!
-        let return_values = match result {
-            NativeResult::Success { cost, ret_vals } => {
-                gas_meter.charge_native_function(cost, Some(ret_vals.iter()))?;
-                ret_vals
+        match result {
+            NativeResult::Success {
+                cost,
+                ret_vals: return_values,
+            } => {
+                gas_meter.charge_native_function(cost, Some(return_values.iter()))?;
+                // Paranoid check to protect us against incorrect native function implementations. A native function that
+                // returns a different number of values than its declared types will trigger this check.
+                if return_values.len() != function.return_tys().len() {
+                    return Err(
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message(
+                            "Arity mismatch: return value count does not match return type count"
+                                .to_string(),
+                        ),
+                    );
+                }
+                // Put return values on the top of the operand stack, where the caller will find them.
+                // This is one of only two times the operand stack is shared across call stack frames; the other is in handling
+                // the Return instruction for normal calls
+                for value in return_values {
+                    self.operand_stack.push(value)?;
+                }
+
+                if self.paranoid_type_checks {
+                    for ty in function.return_tys() {
+                        self.operand_stack.push_ty(resolver.subst(ty, &ty_args)?)?;
+                    }
+                }
+
+                current_frame.pc += 1; // advance past the Call instruction in the caller
+                Ok(())
             },
             NativeResult::Abort { cost, abort_code } => {
                 gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
-                return Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(abort_code));
+                Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(abort_code))
             },
             NativeResult::OutOfGas { partial_cost } => {
                 let err = match gas_meter.charge_native_function(
@@ -494,33 +580,111 @@ impl Interpreter {
                     ),
                 };
 
-                return Err(err);
+                Err(err)
             },
-        };
+            NativeResult::CallFunction {
+                cost,
+                module_name,
+                func_name,
+                ty_args,
+                args,
+            } => {
+                gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
 
-        // Paranoid check to protect us against incorrect native function implementations. A native function that
-        // returns a different number of values than its declared types will trigger this check
-        if return_values.len() != return_type_count {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                    "Arity mismatch: return value count does not match return type count"
-                        .to_string(),
-                ),
-            );
-        }
-        // Put return values on the top of the operand stack, where the caller will find them.
-        // This is one of only two times the operand stack is shared across call stack frames; the other is in handling
-        // the Return instruction for normal calls
-        for value in return_values {
-            self.operand_stack.push(value)?;
-        }
+                // Load the module that contains this function regardless of the traversal context.
+                //
+                // This is just a precautionary step to make sure that caching status of the VM will not alter execution
+                // result in case framework code forgot to use LoadFunction result to load the modules into cache
+                // and charge properly.
+                resolver
+                    .loader()
+                    .load_module(&module_name, data_store, module_store)
+                    .map_err(|_| {
+                        PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                            .with_message(format!("Module {} doesn't exist", module_name))
+                    })?;
 
-        if self.paranoid_type_checks {
-            for ty in function.return_types() {
-                self.operand_stack.push_ty(resolver.subst(ty, &ty_args)?)?;
-            }
+                let target_func = resolver.function_from_name(&module_name, &func_name)?;
+
+                if target_func.is_friend_or_private()
+                    || target_func.module_id() == function.module_id()
+                {
+                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                        .with_message(
+                            "Invoking private or friend function during dispatch".to_string(),
+                        ));
+                }
+
+                // Checking type of the dispatch target function
+                //
+                // MoveVM will check that the native function that performs the dispatch will have the same
+                // type signature as the dispatch target function except the native function will have an extra argument
+                // in the end to determine which function to jump to. The native function shouldn't switch ordering of arguments.
+                //
+                // Runtime will use such convention to reconstruct the type stack required to perform paranoid mode checks.
+                if function.ty_param_abilities != target_func.ty_param_abilities
+                    || function.return_tys != target_func.return_tys
+                    || function.param_tys[0..function.param_tys.len() - 1] != target_func.param_tys
+                {
+                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                        .with_message(
+                            "Invoking private or friend function during dispatch".to_string(),
+                        ));
+                }
+
+                for value in args {
+                    self.operand_stack.push(value)?;
+                }
+
+                // Maintaining the type stack for the paranoid mode using calling convention mentioned above.
+                if self.paranoid_type_checks {
+                    args_ty.pop_back();
+                    for ty in args_ty {
+                        self.operand_stack.push_ty(ty)?;
+                    }
+                }
+
+                self.set_new_call_frame(
+                    current_frame,
+                    gas_meter,
+                    resolver.loader(),
+                    module_store,
+                    target_func,
+                    ty_args,
+                )
+                .map_err(|err| err.to_partial())
+            },
+            NativeResult::LoadModule { module_name } => {
+                let arena_id = traversal_context
+                    .referenced_module_ids
+                    .alloc(module_name.clone());
+                resolver
+                    .loader()
+                    .check_dependencies_and_charge_gas(
+                        module_store,
+                        data_store,
+                        gas_meter,
+                        &mut traversal_context.visited,
+                        traversal_context.referenced_modules,
+                        [(arena_id.address(), arena_id.name())],
+                    )
+                    .map_err(|err| err
+                        .to_partial()
+                        .append_message_with_separator('.',
+                            format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
+                        ))?;
+                resolver
+                    .loader()
+                    .load_module(&module_name, data_store, module_store)
+                    .map_err(|_| {
+                        PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                            .with_message(format!("Module {} doesn't exist", module_name))
+                    })?;
+
+                current_frame.pc += 1; // advance past the Call instruction in the caller
+                Ok(())
+            },
         }
-        Ok(())
     }
 
     /// Make sure only private/friend function can only be invoked by modules under the same address.
@@ -1043,7 +1207,7 @@ impl Stack {
         Ok(self.value[(self.value.len() - n)..].iter())
     }
 
-    /// Push a `Value` on the stack if the max stack size has not been reached. Abort execution
+    /// Push a type on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
     fn push_ty(&mut self, ty: Type) -> PartialVMResult<()> {
         if self.types.len() < OPERAND_STACK_SIZE_LIMIT {
@@ -1054,14 +1218,14 @@ impl Stack {
         }
     }
 
-    /// Pop a `Value` off the stack or abort execution if the stack is empty.
+    /// Pop a type off the stack or abort execution if the stack is empty.
     fn pop_ty(&mut self) -> PartialVMResult<Type> {
         self.types
             .pop()
             .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))
     }
 
-    /// Pop n values off the stack.
+    /// Pop n types off the stack.
     fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
         let remaining_stack_size = self
             .types
@@ -1095,7 +1259,7 @@ impl CallStack {
     }
 
     /// Push a `Frame` on the call stack.
-    fn push(&mut self, frame: Frame) -> ::std::result::Result<(), Frame> {
+    fn push(&mut self, frame: Frame) -> Result<(), Frame> {
         if self.0.len() < CALL_STACK_SIZE_LIMIT {
             self.0.push(frame);
             Ok(())
@@ -1261,21 +1425,15 @@ impl FrameTypeCache {
         resolver: &Resolver,
         ty_args: &[Type],
     ) -> PartialVMResult<((&Type, NumTypeNodes), (&Type, NumTypeNodes))> {
-        let ((field_ty, field_type_count), (struct_ty, struct_type_count)) =
+        let ((field_ty, field_ty_count), (struct_ty, struct_ty_count)) =
             Self::get_or(&mut self.field_instantiation, idx, |idx| {
                 let struct_type = resolver.field_instantiation_to_struct(idx, ty_args)?;
-                let struct_type_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
-                let field_type = resolver.get_field_type_generic(idx, ty_args)?;
-                let field_type_count = NumTypeNodes::new(field_type.num_nodes() as u64);
-                Ok((
-                    (field_type, field_type_count),
-                    (struct_type, struct_type_count),
-                ))
+                let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                let field_ty = resolver.get_field_type_generic(idx, ty_args)?;
+                let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
+                Ok(((field_ty, field_ty_count), (struct_type, struct_ty_count)))
             })?;
-        Ok((
-            (field_ty, *field_type_count),
-            (struct_ty, *struct_type_count),
-        ))
+        Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
     }
 
     #[inline(always)]
@@ -1578,7 +1736,7 @@ impl Frame {
             },
             Bytecode::Pack(idx) => {
                 let field_count = resolver.field_count(*idx);
-                let args_ty = resolver.get_struct_fields(*idx)?;
+                let args_ty = resolver.get_struct_field_tys(*idx)?;
                 let output_ty = resolver.get_struct_type(*idx)?;
                 let ability = output_ty.abilities()?;
 
@@ -1591,7 +1749,7 @@ impl Frame {
                     ability
                 };
 
-                if field_count as usize != args_ty.fields.len() {
+                if field_count as usize != args_ty.field_tys.len() {
                     return Err(
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .with_message("Args count mismatch".to_string()),
@@ -1602,7 +1760,7 @@ impl Frame {
                     .operand_stack
                     .popn_tys(field_count)?
                     .into_iter()
-                    .zip(args_ty.fields.iter())
+                    .zip(args_ty.field_tys.iter())
                 {
                     // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
                     // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
@@ -1651,8 +1809,8 @@ impl Frame {
             Bytecode::Unpack(idx) => {
                 let struct_ty = interpreter.operand_stack.pop_ty()?;
                 struct_ty.check_eq(&resolver.get_struct_type(*idx)?)?;
-                let struct_decl = resolver.get_struct_fields(*idx)?;
-                for ty in struct_decl.fields.iter() {
+                let struct_decl = resolver.get_struct_field_tys(*idx)?;
+                for ty in struct_decl.field_tys.iter() {
                     interpreter.operand_stack.push_ty(ty.clone())?;
                 }
             },
@@ -2118,10 +2276,7 @@ impl Frame {
                     Bytecode::MoveLoc(idx) => {
                         let local = self.locals.move_loc(
                             *idx as usize,
-                            resolver
-                                .loader()
-                                .vm_config()
-                                .enable_invariant_violation_check_in_swap_loc,
+                            resolver.loader().vm_config().check_invariant_in_swap_loc,
                         )?;
                         gas_meter.charge_move_loc(&local)?;
 
@@ -2133,10 +2288,7 @@ impl Frame {
                         self.locals.store_loc(
                             *idx as usize,
                             value_to_store,
-                            resolver
-                                .loader()
-                                .vm_config()
-                                .enable_invariant_violation_check_in_swap_loc,
+                            resolver.loader().vm_config().check_invariant_in_swap_loc,
                         )?;
                     },
                     Bytecode::Call(idx) => {
@@ -2536,7 +2688,6 @@ impl Frame {
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
                         let ty = resolver.get_struct_type(*sd_idx)?;
-                        // REVIEW: Can we simplify Interpreter::move_to?
                         interpreter.move_to(
                             false,
                             resolver.loader(),

@@ -94,6 +94,25 @@ module 0xcafe::vectors {
           }
         }
     }
+    private inline fun loops_with_break(flips: &vector<u8>) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<u8>(flips)) {
+              if Neq<u8>(Deref(vector::borrow<u8>(flips, i)), 0) {
+                break
+              } else {
+                Tuple()
+              };
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          };
+          Tuple()
+        }
+    }
     private fun loops_with_break_no_inline(flips: &vector<u8>) {
         {
           let i: u64 = 0;
@@ -103,6 +122,25 @@ module 0xcafe::vectors {
                 break
               } else {
                 Tuple()
+              };
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          };
+          Tuple()
+        }
+    }
+    private inline fun loops_without_break(flips: &vector<u8>) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<u8>(flips)) {
+              if Eq<u8>(Deref(vector::borrow<u8>(flips, i)), 0) {
+                Tuple()
+              } else {
+                Abort(3)
               };
               i: u64 = Add<u64>(i, 1);
               Tuple()
@@ -130,3 +168,6 @@ module 0xcafe::vectors {
         Tuple()
     }
 } // end 0xcafe::vectors
+
+
+============ bytecode verification succeeded ========

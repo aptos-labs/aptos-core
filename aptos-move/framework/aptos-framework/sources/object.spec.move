@@ -56,6 +56,7 @@ spec aptos_framework::object {
         ensures [abstract] result == spec_exists_at<T>(object);
     }
 
+
     spec address_to_object<T: key>(object: address): Object<T> {
         aborts_if !exists<ObjectCore>(object);
         aborts_if !spec_exists_at<T>(object);
@@ -115,6 +116,13 @@ spec aptos_framework::object {
         pragma aborts_if_is_strict = false;
         aborts_if [abstract] false;
         ensures [abstract] result == spec_create_object_address(source, seed);
+    }
+
+    spec fun spec_create_user_derived_object_address_impl(source: address, derive_from: address): address;
+
+    spec create_user_derived_object_address_impl(source: address, derive_from: address): address {
+        pragma opaque;
+        ensures [abstract] result == spec_create_user_derived_object_address_impl(source, derive_from);
     }
 
     spec create_user_derived_object_address(source: address, derive_from: address): address {
@@ -298,6 +306,11 @@ spec aptos_framework::object {
         ensures result == ConstructorRef { self: obj_addr, can_delete: true };
     }
 
+    spec create_sticky_object_at_address(owner_address: address, object_address: address): ConstructorRef {
+        // TODO(fa_migration)
+        pragma verify = false;
+    }
+
     spec create_object_internal(
     creator_address: address,
     object: address,
@@ -373,12 +386,28 @@ spec aptos_framework::object {
         ensures !exists<ObjectCore>(ref.self);
     }
 
+    spec set_untransferable(ref: &ConstructorRef) {
+        aborts_if !exists<ObjectCore>(ref.self);
+        aborts_if exists<Untransferable>(ref.self);
+        ensures exists<Untransferable>(ref.self);
+        ensures global<ObjectCore>(ref.self).allow_ungated_transfer == false;
+    }
+
     spec enable_ungated_transfer(ref: &TransferRef) {
+        aborts_if exists<Untransferable>(ref.self);
         aborts_if !exists<ObjectCore>(ref.self);
         ensures global<ObjectCore>(ref.self).allow_ungated_transfer == true;
     }
 
+    spec generate_transfer_ref(ref: &ConstructorRef): TransferRef {
+        aborts_if exists<Untransferable>(ref.self);
+        ensures result == TransferRef {
+            self: ref.self,
+        };
+    }
+
     spec generate_linear_transfer_ref(ref: &TransferRef): LinearTransferRef {
+        aborts_if exists<Untransferable>(ref.self);
         aborts_if !exists<ObjectCore>(ref.self);
         let owner = global<ObjectCore>(ref.self).owner;
         ensures result == LinearTransferRef {
@@ -388,6 +417,7 @@ spec aptos_framework::object {
     }
 
     spec transfer_with_ref(ref: LinearTransferRef, to: address) {
+        aborts_if exists<Untransferable>(ref.self);
         let object = global<ObjectCore>(ref.self);
         aborts_if !exists<ObjectCore>(ref.self);
         /// [high-level-req-5]
@@ -508,6 +538,10 @@ spec aptos_framework::object {
         let current_address = object_0.owner;
         aborts_if object.inner != owner && !exists<ObjectCore>(object.inner);
         ensures current_address_0 == owner ==> result == true;
+    }
+
+    spec root_owner<T: key>(object: Object<T>): address {
+        pragma aborts_if_is_partial;
     }
 
     // Helper function

@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use self::jwk::JWK;
+use self::{
+    jwk::JWK,
+    rsa::{INSECURE_TEST_RSA_JWK, RSA_JWK, SECURE_TEST_RSA_JWK},
+};
 use crate::{
     aggregate_signature::AggregateSignature, move_utils::as_move_value::AsMoveValue,
     on_chain_config::OnChainConfig,
@@ -24,10 +27,19 @@ use std::{
 };
 
 pub mod jwk;
+pub mod patch;
 pub mod rsa;
 pub mod unsupported;
 
 pub type Issuer = Vec<u8>;
+
+pub fn secure_test_rsa_jwk() -> RSA_JWK {
+    SECURE_TEST_RSA_JWK.clone()
+}
+
+pub fn insecure_test_rsa_jwk() -> RSA_JWK {
+    INSECURE_TEST_RSA_JWK.clone()
+}
 
 pub fn issuer_from_str(s: &str) -> Issuer {
     s.as_bytes().to_vec()

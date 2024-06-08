@@ -25,6 +25,5 @@ async-recursion = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 lru = { workspace = true }
-move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 tokio = { workspace = true }

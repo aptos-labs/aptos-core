@@ -24,10 +24,19 @@ module aptos_framework::reconfiguration {
     friend aptos_framework::version;
     friend aptos_framework::reconfiguration_with_dkg;
 
+    #[event]
     /// Event that signals consensus to start a new epoch,
     /// with new configuration information. This is also called a
     /// "reconfiguration event"
     struct NewEpochEvent has drop, store {
+        epoch: u64,
+    }
+
+    #[event]
+    /// Event that signals consensus to start a new epoch,
+    /// with new configuration information. This is also called a
+    /// "reconfiguration event"
+    struct NewEpoch has drop, store {
         epoch: u64,
     }
 
@@ -147,6 +156,13 @@ module aptos_framework::reconfiguration {
         };
         config_ref.epoch = config_ref.epoch + 1;
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                NewEpoch {
+                    epoch: config_ref.epoch,
+                },
+            );
+        };
         event::emit_event<NewEpochEvent>(
             &mut config_ref.events,
             NewEpochEvent {
@@ -172,6 +188,13 @@ module aptos_framework::reconfiguration {
         assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, error::invalid_state(ECONFIGURATION));
         config_ref.epoch = 1;
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                NewEpoch {
+                    epoch: config_ref.epoch,
+                },
+            );
+        };
         event::emit_event<NewEpochEvent>(
             &mut config_ref.events,
             NewEpochEvent {

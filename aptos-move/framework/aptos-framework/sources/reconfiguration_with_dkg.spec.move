@@ -18,9 +18,10 @@ spec aptos_framework::reconfiguration_with_dkg {
         pragma verify_duration_estimate = 600; // TODO: set because of timeout (property proved).
     }
 
-    spec finish(account: &signer) {
-        pragma verify = false; // TODO: set because of timeout (property proved).
+    spec finish(framework: &signer) {
+        pragma verify_duration_estimate = 1500;
         include FinishRequirement;
+        aborts_if false;
     }
 
     spec schema FinishRequirement {
@@ -40,8 +41,8 @@ spec aptos_framework::reconfiguration_with_dkg {
         use aptos_framework::jwks;
         use aptos_framework::randomness_config;
         use aptos_framework::jwk_consensus_config;
-        account: signer;
-        requires signer::address_of(account) == @aptos_framework;
+        framework: signer;
+        requires signer::address_of(framework) == @aptos_framework;
         requires chain_status::is_operating();
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include staking_config::StakingRewardsConfigRequirement;
@@ -54,15 +55,20 @@ spec aptos_framework::reconfiguration_with_dkg {
         include config_buffer::OnNewEpochRequirement<consensus_config::ConsensusConfig>;
         include config_buffer::OnNewEpochRequirement<jwks::SupportedOIDCProviders>;
         include config_buffer::OnNewEpochRequirement<randomness_config::RandomnessConfig>;
+        include config_buffer::OnNewEpochRequirement<randomness_config_seqnum::RandomnessConfigSeqNum>;
+        include config_buffer::OnNewEpochRequirement<randomness_api_v0_config::AllowCustomMaxGasFlag>;
+        include config_buffer::OnNewEpochRequirement<randomness_api_v0_config::RequiredGasDeposit>;
         include config_buffer::OnNewEpochRequirement<jwk_consensus_config::JWKConsensusConfig>;
-
-        aborts_if false;
+        include config_buffer::OnNewEpochRequirement<keyless_account::Configuration>;
+        include config_buffer::OnNewEpochRequirement<keyless_account::Groth16VerificationKey>;
     }
 
     spec finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
         use aptos_framework::dkg;
-        pragma verify = false; // TODO: set because of timeout (property proved).
-        include FinishRequirement;
+        pragma verify_duration_estimate = 1500;
+        include FinishRequirement {
+            framework: account
+        };
         requires dkg::has_incomplete_session();
         aborts_if false;
     }

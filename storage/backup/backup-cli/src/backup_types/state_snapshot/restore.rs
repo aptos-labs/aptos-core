@@ -30,15 +30,15 @@ use aptos_storage_interface::StateSnapshotReceiver;
 use aptos_types::{
     access_path::Path,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{Features, TimedFeatureOverride, TimedFeaturesBuilder},
+    on_chain_config::Features,
     proof::TransactionInfoWithProof,
     state_store::{
-        state_key::{StateKey, StateKeyInner},
+        state_key::{inner::StateKeyInner, StateKey},
         state_value::StateValue,
     },
     transaction::Version,
+    vm::configs::aptos_prod_verifier_config,
 };
-use aptos_vm::move_vm_ext::verifier_config;
 use clap::Parser;
 use futures::{stream, TryStreamExt};
 use move_binary_format::CompiledModule;
@@ -233,13 +233,10 @@ impl StateSnapshotRestoreController {
     }
 
     fn validate_modules(blob: &[(StateKey, StateValue)]) {
-        let config = verifier_config(
-            &Features::default(),
-            // FIXME: feed chain id & timestamp from the state.
-            &TimedFeaturesBuilder::enable_all()
-                .with_override_profile(TimedFeatureOverride::Replay)
-                .build(),
-        );
+        // TODO: Instead of using default features, fetch them from the the state.
+        let features = Features::default();
+
+        let config = aptos_prod_verifier_config(&features);
         for (key, value) in blob {
             if let StateKeyInner::AccessPath(p) = key.inner() {
                 if let Path::Code(module_id) = p.get_path() {

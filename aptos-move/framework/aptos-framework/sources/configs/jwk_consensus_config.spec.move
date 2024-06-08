@@ -1,8 +1,7 @@
 spec aptos_framework::jwk_consensus_config {
-
-    spec module {
-        use aptos_framework::chain_status;
-        invariant [suspendable] chain_status::is_operating() ==> exists<JWKConsensusConfig>(@aptos_framework);
+    spec on_new_epoch(framework: &signer) {
+        requires @aptos_framework == std::signer::address_of(framework);
+        include config_buffer::OnNewEpochRequirement<JWKConsensusConfig>;
+        aborts_if false;
     }
-
 }

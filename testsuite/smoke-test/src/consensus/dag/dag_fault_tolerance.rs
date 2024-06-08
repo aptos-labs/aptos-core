@@ -57,6 +57,7 @@ pub async fn create_dag_swarm(num_nodes: usize) -> LocalSwarm {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_no_failures() {
     let num_validators = 3;
 

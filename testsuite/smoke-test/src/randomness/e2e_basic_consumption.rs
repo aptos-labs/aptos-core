@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::{move_tool::MemberId, test::CliTestFramework};
+use aptos::{common::types::GasOptions, move_tool::MemberId, test::CliTestFramework};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::info;
 use aptos_types::on_chain_config::OnChainRandomnessConfig;
@@ -48,8 +48,13 @@ async fn e2e_basic_consumption() {
     let account = cli.account_id(0).to_hex_literal();
     let roll_func_id = MemberId::from_str(&format!("{}::dice::roll", account)).unwrap();
     for _ in 0..10 {
+        let gas_options = GasOptions {
+            gas_unit_price: Some(100),
+            max_gas: Some(10_000), // should match the default required gas deposit.
+            expiration_secs: 60,
+        };
         let txn_summary = cli
-            .run_function(0, None, roll_func_id.clone(), vec![], vec![])
+            .run_function(0, Some(gas_options), roll_func_id.clone(), vec![], vec![])
             .await
             .unwrap();
         info!("Roll txn summary: {:?}", txn_summary);
@@ -73,7 +78,10 @@ struct DiceRollHistory {
     rolls: Vec<u64>,
 }
 
-async fn publish_on_chain_dice_module(cli: &mut CliTestFramework, publisher_account_idx: usize) {
+pub async fn publish_on_chain_dice_module(
+    cli: &mut CliTestFramework,
+    publisher_account_idx: usize,
+) {
     cli.init_move_dir();
     let mut package_addresses = BTreeMap::new();
     package_addresses.insert("module_owner", "_");

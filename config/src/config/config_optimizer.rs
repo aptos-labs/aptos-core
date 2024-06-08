@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{Identity, IdentityFromConfig, IdentitySource, IndexerGrpcConfig};
+use super::{
+    ConsensusObserverConfig, Identity, IdentityFromConfig, IdentitySource, IndexerGrpcConfig,
+};
 use crate::{
     config::{
         node_config_loader::NodeType, utils::get_config_name, AdminServiceConfig, Error,
-        IndexerConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig, Peer,
-        PeerRole, PeerSet, StateSyncConfig,
+        ExecutionConfig, IndexerConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig,
+        NodeConfig, Peer, PeerRole, PeerSet, StateSyncConfig,
     },
     network_id::NetworkId,
 };
@@ -105,14 +107,20 @@ impl ConfigOptimizer for NodeConfig {
 
         // Optimize only the relevant sub-configs
         let mut optimizers_with_modifications = vec![];
+        if AdminServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(AdminServiceConfig::get_optimizer_name());
+        }
+        if ConsensusObserverConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(ConsensusObserverConfig::get_optimizer_name());
+        }
+        if ExecutionConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(ExecutionConfig::get_optimizer_name());
+        }
         if IndexerConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(IndexerConfig::get_optimizer_name());
         }
         if IndexerGrpcConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(IndexerGrpcConfig::get_optimizer_name());
-        }
-        if AdminServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
-            optimizers_with_modifications.push(AdminServiceConfig::get_optimizer_name());
         }
         if InspectionServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(InspectionServiceConfig::get_optimizer_name());
@@ -308,11 +316,13 @@ fn build_seed_peer(
 mod tests {
     use super::*;
     use crate::{
-        config::{node_startup_config::NodeStartupConfig, NetworkConfig, StorageConfig},
+        config::{
+            node_startup_config::NodeStartupConfig, NetworkConfig, StorageConfig, WaypointConfig,
+        },
         network_id::NetworkId,
     };
     use aptos_crypto::{Uniform, ValidCryptoMaterial};
-    use aptos_types::account_address::AccountAddress;
+    use aptos_types::{account_address::AccountAddress, waypoint::Waypoint};
     use rand::rngs::OsRng;
     use std::{io::Write, path::PathBuf};
     use tempfile::{tempdir, NamedTempFile};
@@ -328,6 +338,9 @@ mod tests {
     fn test_disable_optimizer() {
         // Create a default node config (with optimization enabled)
         let mut node_config = NodeConfig::default();
+
+        // Set the base waypoint config
+        node_config.base.waypoint = WaypointConfig::FromConfig(Waypoint::default());
 
         // Optimize the node config for mainnet VFNs and verify modifications are made
         let modified_config = NodeConfig::optimize(

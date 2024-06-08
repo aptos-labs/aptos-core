@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{
-    ERROR_COUNT, LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
-    PROCESSED_VERSIONS_COUNT, WAIT_FOR_FILE_STORE_COUNTER,
-};
+use crate::metrics::{ERROR_COUNT, WAIT_FOR_FILE_STORE_COUNTER};
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
     cache_operator::CacheOperator,
@@ -80,7 +77,7 @@ impl Worker {
         enable_cache_compression: bool,
     ) -> Result<Self> {
         let cache_storage_format = if enable_cache_compression {
-            StorageFormat::GzipCompressedProto
+            StorageFormat::Lz4CompressedProto
         } else {
             StorageFormat::Base64UncompressedProto
         };
@@ -403,10 +400,6 @@ async fn process_streaming_response(
                     transaction_count += num_of_transactions;
                     tps_calculator.tick_now(num_of_transactions);
 
-                    PROCESSED_VERSIONS_COUNT.inc_by(num_of_transactions);
-                    // TODO: Reasses whether this metric useful
-                    LATEST_PROCESSED_VERSION_OLD.set(current_version as i64);
-                    PROCESSED_BATCH_SIZE.set(num_of_transactions as i64);
                     tasks_to_run.push(task);
                 },
                 GrpcDataStatus::StreamInit(new_version) => {
@@ -437,11 +430,6 @@ async fn process_streaming_response(
                     }
                     // Cleanup.
                     tasks_to_run = vec![];
-                    info!(
-                        start_version = start_version,
-                        num_of_transactions = num_of_transactions,
-                        "[Indexer Cache] End signal received for current batch.",
-                    );
                     if current_version != start_version + num_of_transactions {
                         error!(
                             current_version = current_version,

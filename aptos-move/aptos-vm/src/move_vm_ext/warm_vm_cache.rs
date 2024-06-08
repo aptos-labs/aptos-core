@@ -8,7 +8,10 @@ use aptos_framework::natives::code::PackageRegistry;
 use aptos_infallible::RwLock;
 use aptos_metrics_core::TimerHelper;
 use aptos_native_interface::SafeNativeBuilder;
-use aptos_types::on_chain_config::{FeatureFlag, Features, OnChainConfig};
+use aptos_types::{
+    on_chain_config::{FeatureFlag, Features, OnChainConfig},
+    state_store::state_key::StateKey,
+};
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
@@ -134,7 +137,13 @@ impl WarmVmId {
     fn core_packages_id_bytes(resolver: &impl AptosMoveResolver) -> VMResult<Option<Bytes>> {
         let bytes = {
             let _timer = TIMER.timer_with(&["fetch_pkgreg"]);
-            resolver.fetch_config(PackageRegistry::access_path().expect("Get AP failed."))
+            resolver.fetch_config_bytes(&StateKey::on_chain_config::<PackageRegistry>().map_err(
+                |err| {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!("failed to create StateKey: {}", err))
+                        .finish(Location::Undefined)
+                },
+            )?)
         };
 
         let core_package_registry = {

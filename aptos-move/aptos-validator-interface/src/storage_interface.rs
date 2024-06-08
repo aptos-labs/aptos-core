@@ -3,18 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{AptosValidatorInterface, FilterCondition};
-use anyhow::{bail, ensure, Result};
+use anyhow::{ensure, Result};
 use aptos_config::config::{
     RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::AptosDB;
 use aptos_framework::natives::code::PackageMetadata;
-use aptos_storage_interface::{AptosDbError, DbReader, MAX_REQUEST_LIMIT};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_address::AccountAddress,
-    account_state::AccountState,
-    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
 };
 use move_core_types::language_storage::ModuleId;
@@ -41,29 +40,6 @@ impl DBDebuggerInterface {
 
 #[async_trait::async_trait]
 impl AptosValidatorInterface for DBDebuggerInterface {
-    async fn get_account_state_by_version(
-        &self,
-        account: AccountAddress,
-        version: Version,
-    ) -> Result<Option<AccountState>> {
-        let key_prefix = StateKeyPrefix::from(account);
-        let mut iter = self
-            .0
-            .get_prefixed_state_value_iterator(&key_prefix, None, version)?;
-        let kvs = iter
-            .by_ref()
-            .take(MAX_REQUEST_LIMIT as usize)
-            .collect::<Result<_, AptosDbError>>()
-            .map_err(Into::<anyhow::Error>::into)?;
-        if iter.next().is_some() {
-            bail!(
-                "Too many state items under state key prefix {:?}.",
-                key_prefix
-            );
-        }
-        AccountState::from_access_paths_and_values(account, &kvs)
-    }
-
     async fn get_state_value_by_version(
         &self,
         state_key: &StateKey,
@@ -118,8 +94,8 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         unimplemented!();
     }
 
-    async fn get_latest_version(&self) -> Result<Version> {
-        self.0.get_latest_version().map_err(Into::into)
+    async fn get_latest_ledger_info_version(&self) -> Result<Version> {
+        self.0.get_latest_ledger_info_version().map_err(Into::into)
     }
 
     async fn get_version_by_account_sequence(
@@ -127,7 +103,7 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         account: AccountAddress,
         seq: u64,
     ) -> Result<Option<Version>> {
-        let ledger_version = self.get_latest_version().await?;
+        let ledger_version = self.get_latest_ledger_info_version().await?;
         self.0
             .get_account_transaction(account, seq, false, ledger_version)
             .map_or_else(

@@ -27,7 +27,7 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{self, AbilitySet};
 use move_compiler::{
-    expansion::ast as EA,
+    expansion::{ast as EA, ast::SequenceItem},
     hlir::ast as HA,
     naming::ast as NA,
     parser::{ast as PA, ast::CallKind},
@@ -481,13 +481,25 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if let Type::TypeParameter(..) = &ty {
             if self.type_params_table.insert(name, ty.clone()).is_some() && report_errors {
                 let param_name = name.display(self.symbol_pool());
-                self.error(
+                let prev_loc = self
+                    .type_params
+                    .iter()
+                    .find_map(
+                        |(prev_name, _ty, _kind, loc)| {
+                            if prev_name == &name {
+                                Some(loc)
+                            } else {
+                                None
+                            }
+                        },
+                    );
+                self.error_with_labels(
                     loc,
-                    &format!(
-                        "duplicate declaration of type parameter `{}`, \
-                        previously found in type parameters",
-                        param_name
-                    ),
+                    &format!("duplicate declaration of type parameter `{}`", param_name),
+                    vec![(
+                        prev_loc.expect("location").clone(),
+                        "previously declared here".to_string(),
+                    )],
                 );
                 return;
             }
@@ -2214,7 +2226,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     let specialized_expected_type = self.subs.specialize(expected_type);
                     if let Type::Tuple(tys) = specialized_expected_type {
                         if tys.len() != 1 {
-                            self.error(loc, &context.arity_mismatch(false, 1, tys.len()));
+                            self.error(loc, &context.arity_mismatch(false, tys.len(), 1));
                             return self.new_error_pat(loc);
                         }
                     }
@@ -2750,43 +2762,60 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.exit_scope();
                     self.new_bind_exp(loc, pat, binding, rest.into_exp())
                 },
-                Seq(exp) if items.len() > 1 => {
-                    // This is an actual impl language sequence `s;rest`.
-                    self.require_impl_language(loc);
-                    // There is an item after this one, so the value can be dropped. The default
-                    // type of the expression is `()`.
-                    let exp_loc = self.to_loc(&exp.loc);
-                    let var = self.fresh_type_var_idx();
-
-                    let item_type = Type::Var(var);
-                    let exp = self.translate_exp(exp, &item_type);
-                    let item_type = self.subs.specialize(&item_type);
-                    if self.subs.is_free_var_without_constraints(&item_type) {
-                        // If this is a totally unbound item, assign default unit type.
-                        self.add_constraint(
-                            &exp_loc,
-                            &Type::Var(var),
-                            WideningOrder::LeftToRight,
-                            Constraint::WithDefault(Type::unit()),
-                            Some(ConstraintContext::inferred()),
-                        )
-                        .expect("success on fresh var");
-                    }
-                    let rest =
-                        self.translate_seq_recursively(loc, &items[1..], expected_type, context);
-                    let id = self.new_node_id_with_type_loc(expected_type, loc);
-                    let exps = match exp {
-                        ExpData::Sequence(_, mut exps) => {
-                            exps.push(rest.into_exp());
-                            exps
-                        },
-                        _ => vec![exp.into_exp(), rest.into_exp()],
-                    };
-                    ExpData::Sequence(id, exps)
+                Seq(_) if items.len() > 1 => {
+                    self.translate_seq_items(loc, items, expected_type, context)
                 },
                 Seq(exp) => self.translate_exp_in_context(exp, expected_type, context),
             }
         }
+    }
+
+    fn translate_seq_items(
+        &mut self,
+        loc: &Loc,
+        items: &[&SequenceItem],
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        // This is an actual impl language sequence `s;rest`.
+        self.require_impl_language(loc);
+        let mut exps = vec![];
+        let mut k = 0;
+        while k < items.len() - 1 {
+            use EA::SequenceItem_::*;
+            if let Seq(exp) = &items[k].value {
+                // There is an item after this one, so the value can be dropped. The default
+                // type of the expression is `()`.
+                let exp_loc = self.to_loc(&exp.loc);
+                let var = self.fresh_type_var_idx();
+                let item_type = Type::Var(var);
+                let exp = self.translate_exp(exp, &item_type);
+                let item_type = self.subs.specialize(&item_type);
+                if self.subs.is_free_var_without_constraints(&item_type) {
+                    // If this is a totally unbound item, assign default unit type.
+                    self.add_constraint(
+                        &exp_loc,
+                        &Type::Var(var),
+                        WideningOrder::LeftToRight,
+                        Constraint::WithDefault(Type::unit()),
+                        Some(ConstraintContext::inferred()),
+                    )
+                    .expect("success on fresh var");
+                }
+                if let ExpData::Sequence(_, mut es) = exp {
+                    exps.append(&mut es);
+                } else {
+                    exps.push(exp.into_exp());
+                }
+            } else {
+                break;
+            }
+            k += 1;
+        }
+        let rest = self.translate_seq_recursively(loc, &items[k..], expected_type, context);
+        exps.push(rest.into_exp());
+        let id = self.new_node_id_with_type_loc(expected_type, loc);
+        ExpData::Sequence(id, exps)
     }
 
     /// Create binding expression.

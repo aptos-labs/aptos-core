@@ -6,14 +6,10 @@ mod rest_interface;
 mod storage_interface;
 
 pub use crate::{rest_interface::RestDebuggerInterface, storage_interface::DBDebuggerInterface};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::CORE_CODE_ADDRESS,
-    account_state::AccountState,
-    account_view::AccountView,
-    on_chain_config::ValidatorSet,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
         Result as StateViewResult, TStateView,
@@ -21,7 +17,6 @@ use aptos_types::{
     transaction::{Transaction, TransactionInfo, Version},
 };
 use lru::LruCache;
-use move_binary_format::file_format::CompiledModule;
 use move_core_types::language_storage::ModuleId;
 use std::{
     collections::HashMap,
@@ -41,12 +36,6 @@ pub struct FilterCondition {
 // key-value interface with fine grained storage project
 #[async_trait::async_trait]
 pub trait AptosValidatorInterface: Sync {
-    async fn get_account_state_by_version(
-        &self,
-        account: AccountAddress,
-        version: Version,
-    ) -> Result<Option<AccountState>>;
-
     async fn get_state_value_by_version(
         &self,
         state_key: &StateKey,
@@ -84,71 +73,13 @@ pub trait AptosValidatorInterface: Sync {
         )>,
     >;
 
-    async fn get_latest_version(&self) -> Result<Version>;
+    async fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
     async fn get_version_by_account_sequence(
         &self,
         account: AccountAddress,
         seq: u64,
     ) -> Result<Option<Version>>;
-
-    async fn get_framework_modules_by_version(
-        &self,
-        version: Version,
-    ) -> Result<Vec<CompiledModule>> {
-        let mut acc = vec![];
-        for module_bytes in self
-            .get_account_state_by_version(CORE_CODE_ADDRESS, version)
-            .await?
-            .ok_or_else(|| anyhow!("Failure reading aptos root address state"))?
-            .get_modules()
-        {
-            acc.push(
-                CompiledModule::deserialize(module_bytes)
-                    .map_err(|e| anyhow!("Failure deserializing module: {:?}", e))?,
-            )
-        }
-        Ok(acc)
-    }
-
-    /// Get the account states of the most critical accounts, including:
-    /// 1. Aptos Framework code address
-    /// 2. All validator addresses
-    async fn get_admin_accounts(
-        &self,
-        version: Version,
-    ) -> Result<Vec<(AccountAddress, AccountState)>> {
-        let mut result = vec![];
-        let aptos_framework = self
-            .get_account_state_by_version(CORE_CODE_ADDRESS, version)
-            .await?
-            .ok_or_else(|| anyhow!("Aptos framework account doesn't exist"))?;
-
-        // Get all validator accounts
-        let validators = aptos_framework
-            .get_config::<ValidatorSet>()?
-            .ok_or_else(|| anyhow!("validator_config doesn't exist"))?;
-
-        // Get code account
-        result.push((
-            CORE_CODE_ADDRESS,
-            self.get_account_state_by_version(CORE_CODE_ADDRESS, version)
-                .await?
-                .ok_or_else(|| anyhow!("core_code_address doesn't exist"))?,
-        ));
-
-        // Get all validator accounts
-        for validator_info in validators.payload() {
-            let addr = *validator_info.account_address();
-            result.push((
-                addr,
-                self.get_account_state_by_version(addr, version)
-                    .await?
-                    .ok_or_else(|| anyhow!("validator {:?} doesn't exist", addr))?,
-            ));
-        }
-        Ok(result)
-    }
 }
 
 pub struct DebuggerStateView {

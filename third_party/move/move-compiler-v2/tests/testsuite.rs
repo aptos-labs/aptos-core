@@ -8,7 +8,8 @@ use itertools::Itertools;
 use log::debug;
 use move_compiler_v2::{
     annotate_units, disassemble_compiled_units, env_pipeline::rewrite_target::RewritingScope,
-    logging, pipeline, run_bytecode_verifier, run_file_format_gen, Experiment, Options,
+    logging, pipeline, plan_builder, run_bytecode_verifier, run_file_format_gen, Experiment,
+    Options,
 };
 use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_prover_test_utils::{baseline_test, extract_test_directives};
@@ -38,8 +39,8 @@ struct TestConfig {
     runner: fn(&Path) -> datatest_stable::Result<()>,
     /// Path substring for tests to include.
     include: Vec<&'static str>,
-    /// Path substring for tests to exclude. The set of tests included is that
-    /// which match any of the include strings and do _not_ match ony of
+    /// Path substring for tests to exclude. The set of tests included are those
+    /// which match any of the include strings and do _not_ match any of
     /// the exclude strings.
     exclude: Vec<&'static str>,
     /// If set, a suffix for the baseline file used for these tests.
@@ -176,12 +177,9 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exp_suffix: None,
             options: opts
                 .clone()
-                .set_experiment(Experiment::AST_SIMPLIFY_FULL, true)
-                // TODO: this check should not need to be turned off, but some
-                //   tests rely on it. Those tests should be fixed.
-                .set_experiment(Experiment::UNINITIALIZED_CHECK, false),
-            // Run the full bytecode pipeline as well for double-checking the result
-            stop_after: StopAfter::BytecodePipeline(None),
+                .set_experiment(Experiment::AST_SIMPLIFY_FULL, true),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::None, // do not dump anything
             dump_bytecode_filter: None,
@@ -194,8 +192,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec![],
             exp_suffix: None,
             options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
-            // Run the bytecode pipeline as well for double-checking the result
-            stop_after: StopAfter::BytecodePipeline(None),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::None, // do not dump anything
             dump_bytecode_filter: None,
@@ -208,8 +206,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec![],
             exp_suffix: None,
             options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, false),
-            // Run the bytecode pipeline as well for double-checking the result
-            stop_after: StopAfter::BytecodePipeline(None),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::None, // do not dump anything
             dump_bytecode_filter: None,
@@ -222,11 +220,11 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec![],
             exp_suffix: None,
             options: opts.clone(),
-            // Run the bytecode pipeline as well for double-checking the result
-            stop_after: StopAfter::BytecodeGen,
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::EndStage,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE]),
         },
         // -- Tests for stages in the bytecode pipeline
         // Live-var tests
@@ -249,7 +247,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/reference-safety/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts.clone(),
+            // TODO(#13485): Need to turn off acquires check for now to test 2.0 access specifiers
+            options: opts.clone().set_experiment(Experiment::ACQUIRES_CHECK, false),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
@@ -271,7 +270,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             // Some reference tests create different errors since variable names are
             // known without optimizations, so we need to have a different exp file
             exp_suffix: Some("no-opt.exp"),
-            options: opts.clone().set_experiment(Experiment::OPTIMIZE, false),
+            options: opts.clone().set_experiment(Experiment::OPTIMIZE, false)
+                .set_experiment(Experiment::ACQUIRES_CHECK, false),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
@@ -305,7 +305,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec![],
             exp_suffix: None,
             options: opts.clone(),
-            stop_after: StopAfter::BytecodePipeline(None),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
@@ -335,8 +336,10 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/acquires-checker/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts.clone(),
-            stop_after: StopAfter::AstPipeline,
+            // Skip access check to avoid error message change in the acquires-checker
+            options: opts.clone().set_experiment(Experiment::ACCESS_CHECK, false),
+            // Run the full compiler pipeline to double-check the result.
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
@@ -433,10 +436,9 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/unreachable-code-remover/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts
-                .clone()
-                .set_experiment(Experiment::ABILITY_CHECK, false),
-            stop_after: StopAfter::BytecodePipeline(None),
+            options: opts.clone(),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
             dump_bytecode_filter: Some(vec![
@@ -501,7 +503,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .clone()
                 .set_experiment(Experiment::AST_SIMPLIFY, true)
                 .set_compile_test_code(true),
-            stop_after: StopAfter::BytecodePipeline(None),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
@@ -516,7 +519,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .clone()
                 .set_experiment(Experiment::AST_SIMPLIFY, true)
                 .set_compile_test_code(false),
-            stop_after: StopAfter::BytecodePipeline(None),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
@@ -531,7 +535,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .clone()
                 .set_experiment(Experiment::AST_SIMPLIFY, true)
                 .set_skip_attribute_checks(true),
-            stop_after: StopAfter::BytecodePipeline(None),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
@@ -555,8 +560,8 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     let path_str = path.display().to_string();
     let mut options = config.options.clone();
     options.warn_unused = path_str.contains("/unused/");
-    options.sources = extract_test_directives(path, "// dep:")?;
-    options.sources.push(path_str.clone());
+    options.sources_deps = extract_test_directives(path, "// dep:")?;
+    options.sources = vec![path_str.clone()];
     options.dependencies = if extract_test_directives(path, "// no-stdlib")?.is_empty() {
         vec![path_from_crate_root("../move-stdlib/sources")]
     } else {
@@ -605,6 +610,14 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 ));
             }
         }
+    }
+
+    if options.compile_test_code {
+        // Build the test plan here to parse and validate any test-related attributes in the AST.
+        // In real use, this is run outside of the compilation process, but the needed info is
+        // available in `env` once we finish the AST.
+        plan_builder::construct_test_plan(&env, None);
+        ok = check_diags(&mut test_output.borrow_mut(), &env);
     }
 
     if ok && config.stop_after > StopAfter::AstPipeline {
@@ -667,7 +680,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 },
             );
             if *ok.borrow() && config.stop_after == StopAfter::FileFormat {
-                let units = run_file_format_gen(&env, &targets);
+                let units = run_file_format_gen(&mut env, &targets);
                 let out = &mut test_output.borrow_mut();
                 update_diags(ok.borrow_mut(), out, &env);
                 if *ok.borrow() {

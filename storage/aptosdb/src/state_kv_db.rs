@@ -89,7 +89,7 @@ impl StateKvDb {
         };
 
         if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
-            truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress, None)?;
+            truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
         }
 
         Ok(state_kv_db)
@@ -194,6 +194,14 @@ impl StateKvDb {
 
     pub(crate) fn num_shards(&self) -> u8 {
         NUM_STATE_SHARDS as u8
+    }
+
+    pub(crate) fn hack_num_real_shards(&self) -> usize {
+        if self.enabled_sharding {
+            NUM_STATE_SHARDS
+        } else {
+            1
+        }
     }
 
     pub(crate) fn commit_single_shard(

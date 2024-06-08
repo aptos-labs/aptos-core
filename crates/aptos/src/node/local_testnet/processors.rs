@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalTestnet};
+use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalnet};
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
@@ -30,7 +30,7 @@ static RUN_MIGRATIONS_ONCE: OnceCell<bool> = OnceCell::const_new();
 pub struct ProcessorArgs {
     /// The value of this flag determines which processors we will run if
     /// --with-indexer-api is set. Note that some processors are not supported in the
-    /// local testnet (e.g. ANS). If you try to set those an error will be thrown
+    /// localnet (e.g. ANS). If you try to set those an error will be thrown
     /// immediately.
     #[clap(
         long,
@@ -71,17 +71,17 @@ impl ProcessorManager {
                 ProcessorConfig::AccountTransactionsProcessor
             },
             ProcessorName::AnsProcessor => {
-                bail!("ANS processor is not supported in the local testnet")
+                bail!("ANS processor is not supported in the localnet")
             },
             ProcessorName::CoinProcessor => ProcessorConfig::CoinProcessor,
             ProcessorName::DefaultProcessor => ProcessorConfig::DefaultProcessor,
             ProcessorName::EventsProcessor => ProcessorConfig::EventsProcessor,
             ProcessorName::FungibleAssetProcessor => ProcessorConfig::FungibleAssetProcessor,
             ProcessorName::MonitoringProcessor => {
-                bail!("Monitoring processor is not supported in the local testnet")
+                bail!("Monitoring processor is not supported in the localnet")
             },
             ProcessorName::NftMetadataProcessor => {
-                bail!("NFT Metadata processor is not supported in the local testnet")
+                bail!("NFT Metadata processor is not supported in the localnet")
             },
             ProcessorName::ObjectsProcessor => {
                 ProcessorConfig::ObjectsProcessor(ObjectsProcessorConfig {
@@ -97,7 +97,7 @@ impl ProcessorManager {
             },
             ProcessorName::TokenProcessor => {
                 ProcessorConfig::TokenProcessor(TokenProcessorConfig {
-                    // This NFT points contract doesn't exist on local testnets.
+                    // This NFT points contract doesn't exist on localnets.
                     nft_points_contract: None,
                     query_retries: Default::default(),
                     query_retry_delay_ms: Default::default(),
@@ -125,12 +125,13 @@ impl ProcessorManager {
             number_concurrent_processing_tasks: None,
             enable_verbose_logging: None,
             // The default at the time of writing is 30 but we don't need that
-            // many in a local testnet environment.
+            // many in a localnet environment.
             db_pool_size: Some(8),
             gap_detection_batch_size: 50,
             pb_channel_txn_chunk_size: 100_000,
             per_table_chunk_sizes: Default::default(),
             transaction_filter: Default::default(),
+            grpc_response_item_timeout_in_secs: 10,
         };
         let manager = Self {
             config,
@@ -141,7 +142,7 @@ impl ProcessorManager {
 
     /// This function returns many new ProcessorManagers, one for each processor.
     pub fn many_new(
-        args: &RunLocalTestnet,
+        args: &RunLocalnet,
         prerequisite_health_checkers: HashSet<HealthChecker>,
         data_service_url: Url,
         postgres_connection_string: String,

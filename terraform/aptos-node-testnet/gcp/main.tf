@@ -44,8 +44,10 @@ module "validator" {
   validator_name = "aptos-node"
 
   # K8s config
-  k8s_api_sources         = var.k8s_api_sources
-  cluster_ipv4_cidr_block = var.cluster_ipv4_cidr_block
+  k8s_api_sources                     = var.k8s_api_sources
+  cluster_ipv4_cidr_block             = var.cluster_ipv4_cidr_block
+  router_nat_ip_allocate_option       = var.router_nat_ip_allocate_option
+  enable_endpoint_independent_mapping = var.enable_endpoint_independent_mapping
 
   # autoscaling
   gke_enable_node_autoprovisioning     = var.gke_enable_node_autoprovisioning
@@ -91,7 +93,7 @@ locals {
 
   default_helm_values = {
     cluster_name            = module.validator.gke_cluster_name
-    genesis_blob_upload_url = var.enable_forge ? google_cloudfunctions2_function.signed-url[0].service_config[0].uri : ""
+    genesis_blob_upload_url = var.enable_forge ? "${google_cloudfunctions2_function.signed-url[0].service_config[0].uri}?cluster_name=${module.validator.gke_cluster_name}&era=${var.era}" : ""
   }
 
   merged_helm_values = merge(
@@ -126,7 +128,7 @@ resource "helm_release" "genesis" {
           # internet facing network addresses for the fullnodes
           enable_onchain_discovery = var.zone_name != ""
         }
-        genesis_blob_upload_url = google_cloudfunctions2_function.signed-url[0].service_config[0].uri
+        genesis_blob_upload_url = var.enable_forge ? "${google_cloudfunctions2_function.signed-url[0].service_config[0].uri}?cluster_name=${module.validator.gke_cluster_name}&era=${var.era}" : ""
         cluster_name            = module.validator.gke_cluster_name
       }
     }),

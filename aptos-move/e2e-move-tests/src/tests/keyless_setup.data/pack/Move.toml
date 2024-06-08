@@ -1,5 +1,5 @@
 [package]
-name = 'InsertJwk'
+name = 'InsertJwkAndUpdateMaxExpHorizon'
 version = "0.0.0"
 
 [dependencies]

@@ -247,9 +247,15 @@ module aptos_framework::jwks {
     }
 
     /// Only used in reconfigurations to apply the pending `SupportedOIDCProviders`, if there is any.
-    public(friend) fun on_new_epoch() acquires SupportedOIDCProviders {
+    public(friend) fun on_new_epoch(framework: &signer) acquires SupportedOIDCProviders {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<SupportedOIDCProviders>()) {
-            *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework) = config_buffer::extract();
+            let new_config = config_buffer::extract<SupportedOIDCProviders>();
+            if (exists<SupportedOIDCProviders>(@aptos_framework)) {
+                *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework) = new_config;
+            } else {
+                move_to(framework, new_config);
+            }
         }
     }
 
@@ -575,7 +581,7 @@ module aptos_framework::jwks {
         let jwk_2 = new_unsupported_jwk(b"key_id_2", b"key_payload_2");
         let jwk_3 = new_unsupported_jwk(b"key_id_3", b"key_payload_3");
         let jwk_4 = new_unsupported_jwk(b"key_id_4", b"key_payload_4");
-        let expected = AllProvidersJWKs{ entries: vector[] };
+        let expected = AllProvidersJWKs { entries: vector[] };
         assert!(expected == borrow_global<ObservedJWKs>(@aptos_framework).jwks, 1);
 
         let alice_jwks_v1 = ProviderJWKs {
@@ -590,7 +596,7 @@ module aptos_framework::jwks {
         };
         upsert_into_observed_jwks(fx, vector[bob_jwks_v1]);
         upsert_into_observed_jwks(fx, vector[alice_jwks_v1]);
-        let expected = AllProvidersJWKs{ entries: vector[
+        let expected = AllProvidersJWKs { entries: vector[
             alice_jwks_v1,
             bob_jwks_v1,
         ] };
@@ -602,14 +608,14 @@ module aptos_framework::jwks {
             jwks: vector[jwk_1, jwk_4],
         };
         upsert_into_observed_jwks(fx, vector[alice_jwks_v2]);
-        let expected = AllProvidersJWKs{ entries: vector[
+        let expected = AllProvidersJWKs { entries: vector[
             alice_jwks_v2,
             bob_jwks_v1,
         ] };
         assert!(expected == borrow_global<ObservedJWKs>(@aptos_framework).jwks, 3);
 
         remove_issuer_from_observed_jwks(fx, b"alice");
-        let expected = AllProvidersJWKs{ entries: vector[bob_jwks_v1] };
+        let expected = AllProvidersJWKs { entries: vector[bob_jwks_v1] };
         assert!(expected == borrow_global<ObservedJWKs>(@aptos_framework).jwks, 4);
     }
 
