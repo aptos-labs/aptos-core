@@ -854,7 +854,7 @@ impl MoveSmith {
     ) -> Result<Type> {
         // Try to use smaller ints more often to reduce input consumption
         let bool_weight = match allow_bool {
-            true => 1,
+            true => 10,
             false => 0,
         };
         let basics = vec![

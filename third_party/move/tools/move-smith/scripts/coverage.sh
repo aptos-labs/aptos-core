@@ -26,9 +26,17 @@ function generate_coverage() {
     echo "Generating coverage report for $corpus_dir"
     echo "Output directory: $target_dir"
 
+    # Disable ASAN only on Linux
+    # Disabling ASAN on macOS fails to build
+    local asan_flag=""
+    if [[ "$OSTYPE" == "linux-gnu" ]]; then
+        asan_flag="-s=none"
+    fi
+
+    echo "ASAN flag: $asan_flag" | tee -a $log_file
     echo "Collecting coverage data for $fuzz_target"
     export RUSTFLAGS="$RUSTFLAGS -Zcoverage-options=branch"
-    cargo fuzz coverage $fuzz_target $corpus_dir
+    cargo fuzz coverage $asan_flag $fuzz_target $corpus_dir -- -rss_limit_mb=4096 -timeout=20
 
     fuzz_target_bin=$(find target/*/coverage -name $fuzz_target -type f)
     echo "Found fuzz target binary: $fuzz_target_bin"

@@ -48,7 +48,7 @@ def draw_comparison(wkd: Path):
     plt.grid(True)
     for log in wkd.rglob('fuzz.log'):
         log = log.absolute()
-        run_name = log.parent.parent.name
+        run_name = log.parent.name
 
         output = open(log).readlines()
         time_pass, coverage = parse_libfuzzer_output(output)
