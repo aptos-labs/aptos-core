@@ -697,6 +697,13 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
             );
         let package = BuiltPackage::build(package_path, options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+
+        if package.package.root_compiled_units.is_empty() {
+            return Err(CliError::MoveCompilationError(
+                "prevent publishing the package with no modules".to_string(),
+            ));
+        }
+
         let compiled_units = package.extract_code();
         let metadata_serialized =
             bcs::to_bytes(&package.extract_metadata()?).expect("PackageMetadata has BCS");
