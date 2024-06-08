@@ -217,9 +217,9 @@ pub static MEMPOOL_SKIPPED_TXNS: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static MEMPOOL_REMAINING_TXNS_NOT_SKIPPED: Lazy<IntGauge> = Lazy::new(|| {
+pub static MEMPOOL_BLOCK_AND_SKIPPED: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_mempool_remaining_txns_not_skipped",
+        "aptos_mempool_block_and_skipped",
         "Number of txns remaining in mempool after skipping duplicates or gas upgrades"
     )
     .unwrap()
@@ -296,11 +296,10 @@ pub static MEMPOOL_UNFILLED_BYTES_IN_GET_BATCH: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
+pub static MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
         "aptos_mempool_remaining_txns_after_get_batch",
         "Number of txns remaining in mempool after get batch response is sent",
-        TRANSACTION_COUNT_BUCKETS.to_vec()
     )
     .unwrap()
 });
