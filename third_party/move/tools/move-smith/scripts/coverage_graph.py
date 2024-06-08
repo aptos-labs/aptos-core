@@ -46,7 +46,7 @@ def draw_comparison(wkd: Path):
     plt.ylabel('Block Coverage')
     plt.title('Coverage Over Time')
     plt.grid(True)
-    for log in wkd.rglob('fuzz-*.log'):
+    for log in wkd.rglob('fuzz.log'):
         log = log.absolute()
         run_name = log.parent.parent.name
 
