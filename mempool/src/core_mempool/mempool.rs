@@ -371,8 +371,8 @@ impl Mempool {
                 }
             } else {
                 info!(
-                    "txn_in_sequence: {}, account_sequence_number: {:?}, txn_seq: {}, txn_seq_numbers: {:?}",
-                    txn_in_sequence, account_sequence_number, tx_seq, self.transactions.get_account_sequence_numbers(&txn.address)
+                    "txn_in_sequence: {}, account_sequence_number: {:?}, txn_seq: {}, txn_seq_numbers: {:?}, txn_address: {:?}",
+                    txn_in_sequence, account_sequence_number, tx_seq, self.transactions.get_account_sequence_numbers(&txn.address), txn.address
                 );
                 skipped.insert((txn.address, tx_seq));
             }
