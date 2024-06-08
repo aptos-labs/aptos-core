@@ -481,8 +481,25 @@ impl Mempool {
                 0
             },
         );
+        counters::MEMPOOL_BLOCK_BIGGER_THAN_MEMPOOL.observe(
+            if block.len() as u64 > mempool_total_txns_excluding_progressing {
+                1.0
+            } else {
+                0.0
+            },
+        );
         counters::MEMPOOL_BLOCK_AND_SKIPPED
             .set(((block.len() as u64) + (skipped.len() as u64)) as i64);
+        counters::MEMPOOL_BLOCK_AND_SKIPPED_BIGGER_THAN_MEMPOOL.observe(
+            if (block.len() as u64) + (skipped.len() as u64)
+                > mempool_total_txns_excluding_progressing
+            {
+                1.0
+            } else {
+                0.0
+            },
+        );
+
         counters::MEMPOOL_UNFILLED_TXNS_IN_GET_BATCH
             .observe((max_txns.saturating_sub(block.len() as u64)) as f64);
         counters::MEMPOOL_UNFILLED_BYTES_IN_GET_BATCH

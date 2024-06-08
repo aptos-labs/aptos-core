@@ -233,6 +233,24 @@ pub static MEMPOOL_UNABLE_TO_FIND_TXNS: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static MEMPOOL_BLOCK_BIGGER_THAN_MEMPOOL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_block_bigger_than_mempool",
+        "Number of txns in block that were not found in mempool",
+        vec![0.5],
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_BLOCK_AND_SKIPPED_BIGGER_THAN_MEMPOOL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_block_and_skipped_bigger_than_mempool",
+        "Number of txns in block that were not found in mempool after skipping duplicates or gas upgrades",
+        vec![0.5],
+    )
+    .unwrap()
+});
+
 pub static MEMPOOL_GET_BATCH_INITIAL_NUM_BYTES: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_mempool_get_batch_initial_num_bytes",
