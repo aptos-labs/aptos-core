@@ -211,7 +211,7 @@ impl MoveSmith {
             let typ = loop {
                 match u.int_in_range(0..=2)? {
                     // More chance to use basic types than struct types
-                    0 | 1 => break self.get_random_type(u, parent_scope, false)?,
+                    0 | 1 => break self.get_random_type(u, parent_scope, true, false)?,
                     2 => {
                         let candidates = self.get_usable_struct_type(
                             st.borrow().abilities.clone(),
@@ -340,13 +340,13 @@ impl MoveSmith {
             // TODO: cannot create structs
             // TODO: should remove this after visibility check is implemented
             // TODO: structs should be allowed for non-public functions
-            let typ = self.get_random_type(u, parent_scope, false)?;
+            let typ = self.get_random_type(u, parent_scope, true, false)?;
             self.type_pool.borrow_mut().insert_mapping(&name, &typ);
             parameters.push((name, typ));
         }
 
         let return_type = match bool::arbitrary(u)? {
-            true => Some(self.get_random_type(u, parent_scope, true)?),
+            true => Some(self.get_random_type(u, parent_scope, true, true)?),
             false => None,
         };
 
@@ -447,7 +447,7 @@ impl MoveSmith {
     ) -> Result<Declaration> {
         let (name, _) = self.get_next_identifier(IDType::Var, parent_scope);
 
-        let typ = self.get_random_type(u, parent_scope, true)?;
+        let typ = self.get_random_type(u, parent_scope, true, true)?;
         // let value = match bool::arbitrary(u)? {
         //     true => Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?),
         //     false => None,
@@ -474,7 +474,7 @@ impl MoveSmith {
         if *self.expr_depth.borrow() >= self.config.max_expr_depth {
             *self.expr_depth.borrow_mut() -= 1;
             return Ok(Expression::NumberLiteral(
-                self.generate_number_literal(u, None)?,
+                self.generate_number_literal(u, None, None, None)?,
             ));
         }
 
@@ -484,6 +484,7 @@ impl MoveSmith {
             false => 1,
         };
 
+        // Check if there are any assignable variables in the current scope
         let assign_weight = match self
             .get_filtered_identifiers(None, Some(IDType::Var), Some(parent_scope))
             .is_empty()
@@ -492,6 +493,7 @@ impl MoveSmith {
             false => 1,
         };
 
+        // Decides how often each expression type should be generated
         let weights = vec![
             1, // NumberLiteral
             1, // Variable
@@ -506,7 +508,11 @@ impl MoveSmith {
         let expr = loop {
             match choose_idx_weighted(u, &weights)? {
                 // Generate a number literal
-                0 => break Expression::NumberLiteral(self.generate_number_literal(u, None)?),
+                0 => {
+                    break Expression::NumberLiteral(
+                        self.generate_number_literal(u, None, None, None)?,
+                    )
+                },
                 // Generate a variable access
                 1 => {
                     let idents =
@@ -519,7 +525,7 @@ impl MoveSmith {
                 // Generate a block
                 2 => {
                     let ret_typ = match bool::arbitrary(u)? {
-                        true => Some(self.get_random_type(u, parent_scope, true)?),
+                        true => Some(self.get_random_type(u, parent_scope, true, true)?),
                         false => None,
                     };
                     let block = self.generate_block(u, parent_scope, None, ret_typ)?;
@@ -574,7 +580,7 @@ impl MoveSmith {
         // Directly generate a value for basic types
         let candidate = match typ {
             Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::U128 | Type::U256 => {
-                Expression::NumberLiteral(self.generate_number_literal(u, Some(typ))?)
+                Expression::NumberLiteral(self.generate_number_literal(u, Some(typ), None, None)?)
             },
             Type::Bool => Expression::Boolean(bool::arbitrary(u)?),
             Type::Struct(id) => self.generate_struct_initialization(u, parent_scope, id)?,
@@ -620,20 +626,91 @@ impl MoveSmith {
         parent_scope: &Scope,
     ) -> Result<BinaryOperation> {
         match bool::arbitrary(u)? {
-            true => self.generate_numerical_biop(u, parent_scope),
-            false => self.generate_boolean_biop(u, parent_scope),
+            true => self.generate_numerical_binop(u, parent_scope),
+            false => self.generate_boolean_binop(u, parent_scope),
         }
     }
 
     // Generate a random binary operation for numerical types
-    fn generate_numerical_biop(
+    // Tries to reduce the chance of abort, but aborts can still happen
+    fn generate_numerical_binop(
         &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<BinaryOperation> {
-        let op = NumericalBinaryOperator::arbitrary(u)?;
-        let lhs = self.generate_expression_of_type(u, parent_scope, &Type::U8, true, true)?;
-        let rhs = self.generate_expression_of_type(u, parent_scope, &Type::U8, true, true)?;
+        use NumericalBinaryOperator as OP;
+        let op = OP::arbitrary(u)?;
+        let typ = self.get_random_type(u, parent_scope, false, false)?;
+        let (lhs, rhs) = match op {
+            // Sum can overflow. Sub can underflow.
+            // To reduce the chance these happend, only pick a RHS from a smaller type.
+            // TODO: currently RHS can only be a number literal
+            // TODO: once casting is supported, we can pick a variable with a smaller type
+            OP::Add | OP::Sub => {
+                let lhs = self.generate_expression_of_type(u, parent_scope, &typ, true, true)?;
+                let value = match typ {
+                    Type::U8 => BigUint::from(u.int_in_range(0..=127)? as u32),
+                    Type::U16 => BigUint::from(u8::arbitrary(u)?),
+                    Type::U32 => BigUint::from(u16::arbitrary(u)?),
+                    Type::U64 => BigUint::from(u32::arbitrary(u)?),
+                    Type::U128 => BigUint::from(u64::arbitrary(u)?),
+                    Type::U256 => BigUint::from(u128::arbitrary(u)?),
+                    _ => panic!("Invalid type"),
+                };
+                let rhs = Expression::NumberLiteral(NumberLiteral {
+                    value,
+                    typ: typ.clone(),
+                });
+                (lhs, rhs)
+            },
+            // The result can overflow, we choose u8 for RHS to be extra safe
+            // TODO: can also try casting
+            OP::Mul => {
+                let lhs = self.generate_expression_of_type(u, parent_scope, &typ, true, true)?;
+                let rhs = Expression::NumberLiteral(NumberLiteral {
+                    value: BigUint::from(u.int_in_range(0..=255)? as u32),
+                    typ: typ.clone(),
+                });
+                (lhs, rhs)
+            },
+            // RHS cannot be 0
+            OP::Mod | OP::Div => {
+                let lhs = self.generate_expression_of_type(u, parent_scope, &typ, true, true)?;
+                let rhs = Expression::NumberLiteral(self.generate_number_literal(
+                    u,
+                    Some(&typ),
+                    Some(BigUint::from(1u32)),
+                    None,
+                )?);
+                (lhs, rhs)
+            },
+            // RHS should be U8
+            // Number of bits to shift should be less than the number of bits in LHS
+            OP::Shl | OP::Shr => {
+                let num_bits = match typ {
+                    Type::U8 => 8,
+                    Type::U16 => 16,
+                    Type::U32 => 32,
+                    Type::U64 => 64,
+                    Type::U128 => 128,
+                    Type::U256 => 256,
+                    _ => panic!("Invalid type"),
+                };
+                let num_shift = u.int_in_range(0..=num_bits - 1)? as u32;
+                let lhs = self.generate_expression_of_type(u, parent_scope, &typ, true, true)?;
+                let rhs = Expression::NumberLiteral(NumberLiteral {
+                    value: BigUint::from(num_shift),
+                    typ: Type::U8,
+                });
+                (lhs, rhs)
+            },
+            // The rest is ok as long as LHS and RHS are the same type
+            _ => {
+                let lhs = self.generate_expression_of_type(u, parent_scope, &typ, true, true)?;
+                let rhs = self.generate_expression_of_type(u, parent_scope, &typ, true, true)?;
+                (lhs, rhs)
+            },
+        };
         Ok(BinaryOperation {
             op: BinaryOperator::Numerical(op),
             lhs,
@@ -642,7 +719,7 @@ impl MoveSmith {
     }
 
     // Generate a random binary operation for boolean
-    fn generate_boolean_biop(
+    fn generate_boolean_binop(
         &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
@@ -724,51 +801,42 @@ impl MoveSmith {
     /// Generate a random numerical literal.
     /// If the `typ` is `None`, a random type will be chosen.
     /// If the `typ` is `Some(Type::{U8, ..., U256})`, a literal of the given type will be used.
+    ///
+    /// `min` and `max` are used to generate a number within the given range.
+    /// Both bounds are inclusive.
     fn generate_number_literal(
         &self,
         u: &mut Unstructured,
         typ: Option<&Type>,
+        min: Option<BigUint>,
+        max: Option<BigUint>,
     ) -> Result<NumberLiteral> {
-        let idx = match typ {
-            Some(t) => match t {
-                Type::U8 => 0,
-                Type::U16 => 1,
-                Type::U32 => 2,
-                Type::U64 => 3,
-                Type::U128 => 4,
-                Type::U256 => 5,
-                _ => panic!("Invalid number literal type"),
-            },
-            None => u.int_in_range(0..=5)?,
+        let typ = match typ {
+            Some(t) => t.clone(),
+            None => self.get_random_type(u, &ROOT_SCOPE, false, false)?,
         };
 
-        Ok(match idx {
-            0 => NumberLiteral {
-                value: BigUint::from(u8::arbitrary(u)?),
-                typ: Type::U8,
-            },
-            1 => NumberLiteral {
-                value: BigUint::from(u16::arbitrary(u)?),
-                typ: Type::U16,
-            },
-            2 => NumberLiteral {
-                value: BigUint::from(u32::arbitrary(u)?),
-                typ: Type::U32,
-            },
-            3 => NumberLiteral {
-                value: BigUint::from(u64::arbitrary(u)?),
-                typ: Type::U64,
-            },
-            4 => NumberLiteral {
-                value: BigUint::from(u128::arbitrary(u)?),
-                typ: Type::U128,
-            },
-            5 => NumberLiteral {
-                value: BigUint::from_bytes_be(u.bytes(32)?),
-                typ: Type::U256,
-            },
-            _ => panic!("Invalid number literal type"),
-        })
+        let mut value = match &typ {
+            Type::U8 => BigUint::from(u8::arbitrary(u)?),
+            Type::U16 => BigUint::from(u16::arbitrary(u)?),
+            Type::U32 => BigUint::from(u32::arbitrary(u)?),
+            Type::U64 => BigUint::from(u64::arbitrary(u)?),
+            Type::U128 => BigUint::from(u128::arbitrary(u)?),
+            Type::U256 => BigUint::from_bytes_be(u.bytes(32)?),
+            _ => panic!("Expecting number type"),
+        };
+
+        // Note: We are not uniformly sampling from the range [min, max].
+        // Instead, all out-of-range values are clamped to the bounds.
+        if let Some(min) = min {
+            value = value.max(min);
+        }
+
+        if let Some(max) = max {
+            value = value.min(max);
+        }
+
+        Ok(NumberLiteral { value, typ })
     }
 
     /// Returns one of the basic types that does not require a type argument.
@@ -781,9 +849,14 @@ impl MoveSmith {
         &self,
         u: &mut Unstructured,
         scope: &Scope,
+        allow_bool: bool,
         allow_struct: bool,
     ) -> Result<Type> {
         // Try to use smaller ints more often to reduce input consumption
+        let bool_weight = match allow_bool {
+            true => 1,
+            false => 0,
+        };
         let basics = vec![
             (Type::U8, 15),
             (Type::U16, 15),
@@ -791,7 +864,7 @@ impl MoveSmith {
             (Type::U64, 2),
             (Type::U128, 2),
             (Type::U256, 2),
-            (Type::Bool, 10),
+            (Type::Bool, bool_weight),
         ];
 
         let mut categories = vec![basics];

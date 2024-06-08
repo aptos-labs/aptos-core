@@ -391,6 +391,8 @@ impl CodeGenerator for NumericalBinaryOperator {
 impl CodeGenerator for BooleanBinaryOperator {
     fn emit_code_lines(&self) -> Vec<String> {
         vec![match self {
+            BooleanBinaryOperator::Eq => "==".to_string(),
+            BooleanBinaryOperator::Neq => "!=".to_string(),
             BooleanBinaryOperator::And => "&&".to_string(),
             BooleanBinaryOperator::Or => "||".to_string(),
         }]

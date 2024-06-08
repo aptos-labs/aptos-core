@@ -176,6 +176,8 @@ pub enum NumericalBinaryOperator {
 
 #[derive(Debug, Clone, Arbitrary)]
 pub enum BooleanBinaryOperator {
+    Eq,
+    Neq,
     And,
     Or,
 }
