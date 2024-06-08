@@ -7,11 +7,11 @@ use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
-    account_config::CoinStoreResource,
     transaction::{EntryFunction, TransactionPayload},
 };
 use move_core_types::{ident_str, language_storage::ModuleId, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 #[derive(Serialize, Deserialize)]
 struct ModuleData {
@@ -20,8 +20,9 @@ struct ModuleData {
     mint_cap: Vec<u8>, // placeholder for mint capability
 }
 
-const APTOS_COIN_STRUCT_STRING: &str = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
-const CHLOE_COIN_STRUCT_STRING: &str ="0x1::coin::CoinStore<0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5::simple_defi::ChloesCoin>";
+const APTOS_COIN_STRUCT_STRING: &str = "0x1::aptos_coin::AptosCoin";
+const CHLOE_COIN_STRUCT_STRING: &str =
+    "0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5::simple_defi::ChloesCoin";
 const EXCHANGE_FROM_FUNCTION: &str = "exchange_from_entry";
 const EXCHANGE_TO_FUNCTION: &str = "exchange_to_entry";
 
@@ -74,8 +75,8 @@ fn exchange_e2e_test() {
 
     // verify that exchange_to() and exchange_from() are working properly
     let test_user_account = h.new_account_with_balance_and_sequence_number(20, 10);
-    assert_coin_store_balance(
-        &h,
+    assert_coin_balance(
+        &mut h,
         test_user_account.address(),
         APTOS_COIN_STRUCT_STRING,
         20,
@@ -83,40 +84,58 @@ fn exchange_e2e_test() {
 
     // swap from 5 aptos coins to 5 chloe's coins
     run_exchange_function(&mut h, &test_user_account, EXCHANGE_TO_FUNCTION, 5, 10);
-    assert_coin_store_balance(
-        &h,
+    assert_coin_balance(
+        &mut h,
         test_user_account.address(),
         APTOS_COIN_STRUCT_STRING,
         15,
     );
-    assert_coin_store_balance(&h, test_user_account.address(), CHLOE_COIN_STRUCT_STRING, 5);
-    assert_coin_store_balance(&h, &resource_address, APTOS_COIN_STRUCT_STRING, 5);
-    assert_coin_store_balance(&h, &resource_address, CHLOE_COIN_STRUCT_STRING, 0);
+    assert_coin_balance(
+        &mut h,
+        test_user_account.address(),
+        CHLOE_COIN_STRUCT_STRING,
+        5,
+    );
+    assert_coin_balance(&mut h, &resource_address, APTOS_COIN_STRUCT_STRING, 5);
+    assert_coin_balance(&mut h, &resource_address, CHLOE_COIN_STRUCT_STRING, 0);
 
     // swap to 3 aptos coins from 3 chloe's aptos coins
     run_exchange_function(&mut h, &test_user_account, EXCHANGE_FROM_FUNCTION, 3, 11);
-    assert_coin_store_balance(
-        &h,
+    assert_coin_balance(
+        &mut h,
         test_user_account.address(),
         APTOS_COIN_STRUCT_STRING,
         18,
     );
-    assert_coin_store_balance(&h, test_user_account.address(), CHLOE_COIN_STRUCT_STRING, 2);
-    assert_coin_store_balance(&h, &resource_address, APTOS_COIN_STRUCT_STRING, 2);
-    assert_coin_store_balance(&h, &resource_address, CHLOE_COIN_STRUCT_STRING, 0);
+    assert_coin_balance(
+        &mut h,
+        test_user_account.address(),
+        CHLOE_COIN_STRUCT_STRING,
+        2,
+    );
+    assert_coin_balance(&mut h, &resource_address, APTOS_COIN_STRUCT_STRING, 2);
+    assert_coin_balance(&mut h, &resource_address, CHLOE_COIN_STRUCT_STRING, 0);
 }
 
 /// check the coin store balance of `struct_tag_string` CoinType at the given `address` is the same as the `expected_coin_amount`
-fn assert_coin_store_balance(
-    h: &MoveHarness,
+fn assert_coin_balance(
+    h: &mut MoveHarness,
     address: &AccountAddress,
     struct_tag_string: &str,
     expected_coin_amount: u64,
 ) {
-    let coin_store_balance = h
-        .read_resource::<CoinStoreResource>(address, parse_struct_tag(struct_tag_string).unwrap())
+    let bytes = h
+        .execute_view_function(
+            str::parse("0x1::coin::balance").unwrap(),
+            vec![move_core_types::language_storage::TypeTag::from_str(struct_tag_string).unwrap()],
+            vec![address.to_vec()],
+        )
+        .values
+        .unwrap()
+        .pop()
         .unwrap();
-    assert_eq!(coin_store_balance.coin(), expected_coin_amount);
+    let balance = bcs::from_bytes::<u64>(bytes.as_slice()).unwrap();
+    assert_eq!(balance, expected_coin_amount);
 }
 
 /// run the specified exchange function and check if it runs successfully

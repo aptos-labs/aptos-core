@@ -15,6 +15,7 @@ pub mod contract_event;
 pub mod dkg;
 pub mod epoch_change;
 pub mod epoch_state;
+pub mod error;
 pub mod event;
 pub mod executable;
 pub mod fee_statement;
@@ -24,7 +25,6 @@ pub mod ledger_info;
 pub mod mempool_status;
 pub mod move_any;
 pub mod move_fixed_point;
-pub mod move_resource;
 pub mod move_utils;
 pub mod network_address;
 pub mod nibble;
@@ -58,7 +58,6 @@ pub mod write_set;
 pub use account_address::AccountAddress as PeerId;
 pub use utility_coin::*;
 
-pub mod account_view;
 pub mod aggregate_signature;
 pub mod block_executor;
 pub mod bytes;
@@ -67,3 +66,4 @@ pub mod keyless;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;
+pub mod vm;

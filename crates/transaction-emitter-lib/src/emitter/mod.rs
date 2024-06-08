@@ -48,6 +48,10 @@ const MAX_TXNS: u64 = 1_000_000_000;
 
 const MAX_RETRIES: usize = 12;
 
+// TODO Transfer cost increases during Coin => FA migration, we can reduce back later.
+const EXPECTED_GAS_PER_TRANSFER: u64 = 10;
+const EXPECTED_GAS_PER_ACCOUNT_CREATE: u64 = 2000 + 8;
+
 // This retry policy is used for important client calls necessary for setting
 // up the test (e.g. account creation) and collecting its results (e.g. checking
 // account sequence numbers). If these fail, the whole test fails. We do not use
@@ -196,8 +200,8 @@ impl Default for EmitJobRequest {
             num_accounts_mode: NumAccountsMode::TransactionsPerAccount(20),
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: None,
-            expected_gas_per_transfer: 7,
-            expected_gas_per_account_create: 2000 + 5,
+            expected_gas_per_transfer: EXPECTED_GAS_PER_TRANSFER,
+            expected_gas_per_account_create: EXPECTED_GAS_PER_ACCOUNT_CREATE,
             prompt_before_spending: false,
             coordination_delay_between_instances: Duration::from_secs(0),
             latency_polling_interval: Duration::from_millis(300),
@@ -460,7 +464,7 @@ impl EmitJobRequest {
                 };
 
                 info!(
-                    " Transaction emitter targetting {} TPS, expecting {} TPS",
+                    " Transaction emitter targeting {} TPS, expecting {} TPS",
                     tps,
                     num_accounts * transactions_per_account / wait_seconds as usize
                 );

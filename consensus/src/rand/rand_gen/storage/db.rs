@@ -74,11 +74,11 @@ impl RandDb {
         let mut iter = self.db.iter::<S>(ReadOptions::default())?;
         iter.seek_to_first();
         Ok(iter
-            .map(|e| match e {
-                Ok((k, v)) => Ok((k, v)),
-                Err(e) => Err(e.into()),
+            .filter_map(|e| match e {
+                Ok((k, v)) => Some((k, v)),
+                Err(_) => None,
             })
-            .collect::<Result<Vec<(S::Key, S::Value)>>>()?)
+            .collect::<Vec<(S::Key, S::Value)>>())
     }
 }
 

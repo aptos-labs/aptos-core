@@ -15,6 +15,7 @@ pub struct SafetyLogSchema<'a> {
     round: Option<Round>,
     preferred_round: Option<u64>,
     last_voted_round: Option<u64>,
+    highest_timeout_round: Option<u64>,
     epoch: Option<u64>,
     #[schema(display)]
     error: Option<&'a Error>,
@@ -30,6 +31,7 @@ impl<'a> SafetyLogSchema<'a> {
             round: None,
             preferred_round: None,
             last_voted_round: None,
+            highest_timeout_round: None,
             epoch: None,
             error: None,
             waypoint: None,
@@ -43,7 +45,9 @@ impl<'a> SafetyLogSchema<'a> {
 pub enum LogEntry {
     ConsensusState,
     ConstructAndSignVoteTwoChain,
+    ConstructAndSignOrderVote,
     Epoch,
+    HighestTimeoutRound,
     Initialize,
     KeyReconciliation,
     LastVotedRound,
@@ -61,7 +65,9 @@ impl LogEntry {
         match self {
             LogEntry::ConsensusState => "consensus_state",
             LogEntry::ConstructAndSignVoteTwoChain => "construct_and_sign_vote_2chain",
+            LogEntry::ConstructAndSignOrderVote => "construct_and_sign_order_vote",
             LogEntry::Epoch => "epoch",
+            LogEntry::HighestTimeoutRound => "highest_timeout_round",
             LogEntry::Initialize => "initialize",
             LogEntry::LastVotedRound => "last_voted_round",
             LogEntry::KeyReconciliation => "key_reconciliation",

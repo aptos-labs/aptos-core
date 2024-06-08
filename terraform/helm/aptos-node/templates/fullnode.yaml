@@ -96,11 +96,17 @@ spec:
         {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
         app.kubernetes.io/name: fullnode
         app.kubernetes.io/instance: fullnode-{{$i}}
+        {{- if $.Values.chain.name }}
+        chain_name: {{ $.Values.chain.name }}
+        {{- end}}
         group: {{ .name }}
       annotations:
         checksum/fullnode.yaml: {{ tpl ($.Files.Get "files/configs/fullnode.yaml") $ | sha256sum }}
         prometheus.io/scrape: "true"
         prometheus.io/port: "9101"
+        {{- if $.Values.metrics.destination }}
+        aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
+        {{- end}}
     spec:
       terminationGracePeriodSeconds: 0
       securityContext:
@@ -226,6 +232,8 @@ spec:
         runAsGroup: 6180
         fsGroup: 6180
         {{- end }}
+        seccompProfile:
+          type: RuntimeDefault
       {{- end }}
       volumes:
       - name: aptos-config

@@ -69,6 +69,9 @@ static IGNORED_UNIT_PATHS: Lazy<BTreeSet<String>> = Lazy::new(|| {
 static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
     vec![
         ("reference-safety/v1-tests", "borrows"),
+        ("reference-safety/v1-borrow-tests", "borrow_tests"),
+        ("reference-safety/v1-locals", "locals"),
+        ("reference-safety/v1-typing", "typing"),
         ("friends/v1-tests", "naming"),
         ("uninit-use-checker/v1-commands", "commands"),
         ("uninit-use-checker/v1-locals", "locals"),
@@ -81,20 +84,27 @@ static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
         ("typing/v1-operators", "operators"),
         ("typing/v1-signer", "signer"),
         ("live-var/v1-commands", "commands"),
-        ("live-var/v1-liveness", "liveness"),
+        ("live-var", "liveness"),
         ("visibility-checker/v1-typing", "typing"),
+        ("visibility-checker/v1-naming", "naming"),
         (
             "cyclic-instantiation-checker/v1-tests",
             "instantiation_loops",
         ),
+        ("cyclic-instantiation-checker/v1-typing", "typing"),
         ("abilities/v1", "typing"),
         ("acquires-checker/v1-tests", "typing"),
+        ("acquires-checker/v1-borrow-tests", "borrow_tests"),
         ("attributes", "parser"),
         ("unit_test/notest", "unit_test"),
         // Map file v2../unit_test/test/foo.move
         //   to file v1../unit_test/foo.unit_test.move.
         ("unit_test/test", "unit_test.unit_test"),
         ("checking-lang-v1/v1-typing", "typing"),
+        ("ability-check/v1-typing", "typing"),
+        ("ability-check/v1-signer", "signer"),
+        ("ability-check/v1-borrow-tests", "commands"),
+        ("ability-check/v1-locals", "locals"),
     ]
 });
 

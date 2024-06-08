@@ -1,3 +1,4 @@
+{{- if $.Values.backup.enable }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -18,7 +19,7 @@ metadata:
     app.kubernetes.io/name: backup
 spec:
   serviceName: {{ include "backup.fullname" . }}-backup
-  replicas: {{ int .Values.backup.enable }}
+  replicas: 1
   podManagementPolicy: Parallel
   selector:
     matchLabels:
@@ -29,11 +30,12 @@ spec:
       labels:
         {{- include "backup.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: backup
+      annotations:
+        {{- if $.Values.metrics.destination }}
+        aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
+        {{- end}}
     spec:
       terminationGracePeriodSeconds: 0
-      securityContext:
-        seccompProfile:
-          type: RuntimeDefault
       containers:
       - name: backup
         {{- if and $backup_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
@@ -90,6 +92,8 @@ spec:
         runAsUser: 6180
         runAsGroup: 6180
         fsGroup: 6180
+        seccompProfile:
+          type: RuntimeDefault
       {{- with .nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -114,3 +118,4 @@ spec:
       imagePullSecrets:
       - name: {{.Values.imagePullSecret}}
       {{- end }}
+{{- end }}

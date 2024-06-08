@@ -4,6 +4,7 @@
 use crate::{
     account::derive_resource_account::ResourceAccountSeed,
     common::{
+        local_simulation,
         types::{
             load_account_arg, ArgWithTypeJSON, CliConfig, CliError, CliTypedResult,
             ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
@@ -30,15 +31,18 @@ use aptos_framework::{
     BuildOptions, BuiltPackage,
 };
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
-use aptos_rest_client::aptos_api_types::{
-    EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
+use aptos_move_debugger::aptos_debugger::AptosDebugger;
+use aptos_rest_client::{
+    aptos_api_types::{EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId},
+    Client,
 };
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     object_address::create_object_code_deployment_address,
     on_chain_config::aptos_test_feature_flags_genesis,
-    transaction::{TransactionArgument, TransactionPayload},
+    transaction::{Transaction, TransactionArgument, TransactionPayload, TransactionStatus},
 };
+use aptos_vm::data_cache::AsMoveResolver;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
 use itertools::Itertools;
@@ -59,6 +63,7 @@ use std::{
 };
 pub use stored_package::*;
 use tokio::task;
+use url::Url;
 
 mod aptos_debug_natives;
 mod bytecode;
@@ -99,6 +104,7 @@ pub enum MoveTool {
     Test(TestPackage),
     VerifyPackage(VerifyPackage),
     View(ViewFunction),
+    Replay(Replay),
 }
 
 impl MoveTool {
@@ -130,6 +136,7 @@ impl MoveTool {
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
             MoveTool::View(tool) => tool.execute_serialized().await,
+            MoveTool::Replay(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -1488,6 +1495,167 @@ impl CliCommand<TransactionSummary> for RunScript {
             &self.txn_options,
         )
         .await
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ReplayNetworkSelection {
+    Mainnet,
+    Testnet,
+    Devnet,
+    RestEndpoint(String),
+}
+
+/// Replay a comitted transaction using a local VM.
+#[derive(Parser, Debug)]
+pub struct Replay {
+    /// The network to replay on.
+    ///
+    /// Possible values:
+    ///     mainnet, testnet, <REST_ENDPOINT_URL>
+    #[clap(long)]
+    pub(crate) network: ReplayNetworkSelection,
+
+    /// The id of the transaction to replay. Also being referred to as "version" in some contexts.
+    #[clap(long)]
+    pub(crate) txn_id: u64,
+
+    /// If this option is set, benchmark the transaction and report the running time(s).
+    #[clap(long)]
+    pub(crate) benchmark: bool,
+
+    /// If this option is set, profile the transaction and generate a detailed report of its gas usage.
+    #[clap(long)]
+    pub(crate) profile_gas: bool,
+
+    /// If present, skip the comparison against the expected transaction output.
+    #[clap(long)]
+    pub(crate) skip_comparison: bool,
+}
+
+impl FromStr for ReplayNetworkSelection {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "mainnet" => Self::Mainnet,
+            "testnet" => Self::Testnet,
+            "devnet" => Self::Devnet,
+            _ => Self::RestEndpoint(s.to_owned()),
+        })
+    }
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for Replay {
+    fn command_name(&self) -> &'static str {
+        "Replay"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        use ReplayNetworkSelection::*;
+
+        if self.profile_gas && self.benchmark {
+            return Err(CliError::UnexpectedError(
+                "Cannot perform benchmarking and gas profiling at the same time.".to_string(),
+            ));
+        }
+
+        let rest_endpoint = match &self.network {
+            Mainnet => "https://fullnode.mainnet.aptoslabs.com",
+            Testnet => "https://fullnode.testnet.aptoslabs.com",
+            Devnet => "https://fullnode.devnet.aptoslabs.com",
+            RestEndpoint(url) => url,
+        };
+
+        let debugger = AptosDebugger::rest_client(Client::new(
+            Url::parse(rest_endpoint)
+                .map_err(|_err| CliError::UnableToParse("url", rest_endpoint.to_string()))?,
+        ))?;
+
+        // Fetch the transaction to replay.
+        let (txn, txn_info) = debugger
+            .get_committed_transaction_at_version(self.txn_id)
+            .await?;
+
+        let txn = match txn {
+            Transaction::UserTransaction(txn) => txn,
+            _ => {
+                return Err(CliError::UnexpectedError(
+                    "Unsupported transaction type. Only user transactions are supported."
+                        .to_string(),
+                ))
+            },
+        };
+
+        let hash = txn.committed_hash();
+
+        // Execute the transaction.
+        let (vm_status, vm_output) = if self.profile_gas {
+            println!("Profiling transaction...");
+            local_simulation::profile_transaction_using_debugger(
+                &debugger,
+                self.txn_id,
+                txn.clone(),
+                hash,
+            )?
+        } else if self.benchmark {
+            println!("Benchmarking transaction...");
+            local_simulation::benchmark_transaction_using_debugger(
+                &debugger,
+                self.txn_id,
+                txn.clone(),
+                hash,
+            )?
+        } else {
+            println!("Replaying transaction...");
+            local_simulation::run_transaction_using_debugger(
+                &debugger,
+                self.txn_id,
+                txn.clone(),
+                hash,
+            )?
+        };
+
+        // Materialize into transaction output and check if the outputs match.
+        let state_view = debugger.state_view_at_version(self.txn_id);
+        let resolver = state_view.as_move_resolver();
+
+        let txn_output = vm_output
+            .try_materialize_into_transaction_output(&resolver)
+            .map_err(|err| {
+                CliError::UnexpectedError(format!(
+                    "Failed to materialize into transaction output: {}",
+                    err
+                ))
+            })?;
+
+        if !self.skip_comparison {
+            txn_output
+                .ensure_match_transaction_info(self.txn_id, &txn_info, None, None)
+                .map_err(|msg| CliError::UnexpectedError(msg.to_string()))?;
+        }
+
+        // Generate the transaction summary.
+        let success = match txn_output.status() {
+            TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
+            TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
+        };
+
+        let summary = TransactionSummary {
+            transaction_hash: txn.committed_hash().into(),
+            gas_used: Some(txn_output.gas_used()),
+            gas_unit_price: Some(txn.gas_unit_price()),
+            pending: None,
+            sender: Some(txn.sender()),
+            sequence_number: Some(txn.sequence_number()),
+            success,
+            timestamp_us: None,
+            version: Some(self.txn_id),
+            vm_status: Some(vm_status.to_string()),
+        };
+
+        Ok(summary)
     }
 }
 

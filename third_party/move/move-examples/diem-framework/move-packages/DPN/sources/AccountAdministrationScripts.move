@@ -599,7 +599,7 @@ module DiemFramework::AccountAdministrationScripts {
     ///
     /// # Technical Description
     /// Publishes a `VASPDomain::VASPDomains` resource under `account`.
-    /// The The `VASPDomain::VASPDomains` resource's `domains` field is a vector
+    /// The `VASPDomain::VASPDomains` resource's `domains` field is a vector
     /// of VASPDomain, and will be empty on at the end of processing this transaction.
     ///
     /// # Parameters
@@ -647,7 +647,7 @@ module DiemFramework::AccountAdministrationScripts {
     /// | Name        | Type     | Description                                           |
     /// | ------      | ------   | -------------                                         |
     /// | `account`   | `signer` | The signer of the sending account of the transaction. |
-    /// | `crsn_size` | `u64`    | The the number of slots the published CRSN will have. |
+    /// | `crsn_size` | `u64`    | the number of slots the published CRSN will have. |
     ///
     /// # Common Abort Conditions
     /// | Error Category             | Error Reason            | Description                                                    |

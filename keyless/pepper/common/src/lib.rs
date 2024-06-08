@@ -25,6 +25,27 @@ where
     hex::decode(s).map_err(D::Error::custom)
 }
 
+/// Custom serialization function to convert Vec<u8> into a hex string with the 0x prefix.
+fn serialize_bytes_to_hex_with_0x<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let hex_string = format!("0x{}", hex::encode(bytes));
+    serializer.serialize_str(&hex_string)
+}
+
+/// Custom deserialization function to convert a hex string with the 0x prefix back into Vec<u8>.
+fn deserialize_bytes_from_hex_with_0x<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if !s.starts_with("0x") {
+        return Err(D::Error::custom("String is not prefixed by '0x'"));
+    }
+    hex::decode(&s[2..]).map_err(D::Error::custom)
+}
+
 /// Custom serialization function to convert `EphemeralPublicKey` into a hex string.
 fn serialize_epk_to_hex<S>(epk: &EphemeralPublicKey, serializer: S) -> Result<S::Ok, S::Error>
 where
@@ -68,11 +89,28 @@ pub struct PepperRequest {
     pub epk_blinder: Vec<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uid_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub derivation_path: Option<String>,
 }
 
 /// The response to `PepperRequest`, which contains either the pepper or a processing error.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PepperResponse {
+    #[serde(
+        serialize_with = "serialize_bytes_to_hex",
+        deserialize_with = "deserialize_bytes_from_hex"
+    )]
+    pub pepper: Vec<u8>,
+    #[serde(
+        serialize_with = "serialize_bytes_to_hex_with_0x",
+        deserialize_with = "deserialize_bytes_from_hex_with_0x"
+    )]
+    pub address: Vec<u8>,
+}
+
+/// The response to /signature, which contains the VUF signature.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SignatureResponse {
     #[serde(
         serialize_with = "serialize_bytes_to_hex",
         deserialize_with = "deserialize_bytes_from_hex"

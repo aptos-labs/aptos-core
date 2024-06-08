@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{experiments, DefaultValue, EXPERIMENTS};
+use crate::experiments::{DefaultValue, EXPERIMENTS};
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -19,7 +19,7 @@ use std::{
 #[derive(Parser, Clone, Debug)]
 #[clap(author, version, about)]
 pub struct Options {
-    /// Directories where to lookup dependencies.
+    /// Directories where to lookup (already compiled) dependencies.
     #[clap(
         short,
         num_args = 0..
@@ -59,8 +59,18 @@ pub struct Options {
     /// A transient cache for memoization of experiment checks.
     #[clap(skip)]
     pub experiment_cache: RefCell<BTreeMap<String, bool>>,
-    /// Sources to compile (positional arg, therefore last)
+    /// Sources to compile (positional arg, therefore last).
+    /// Each source should be a path to either (1) a Move file or (2) a directory containing Move
+    /// files, all to be compiled (e.g., not the root directory of a package---which contains
+    /// Move.toml---but a specific subdirectorysuch as `sources`, `scripts`, and/or `tests`,
+    /// depending on compilation mode).
     pub sources: Vec<String>,
+    /// Dependencies to compile but not treat as a test/docgen/warning/prover target.
+    /// Each source_dep should be a path to either (1) a Move file or (2) a directory containing
+    /// Move files, all to be compiled (e.g., not the root directory of a package---which contains
+    /// Move.toml---but a specific subdirectorysuch as `sources`).
+    #[clap(skip)]
+    pub sources_deps: Vec<String>,
     /// Show warnings about unused functions, fields, constants, etc.
     /// Note that the current value of this constant is "Wunused"
     #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
@@ -90,7 +100,7 @@ impl Options {
     pub fn set_experiment(self, name: impl AsRef<str>, on: bool) -> Self {
         let name = name.as_ref().to_string();
         assert!(
-            experiments::EXPERIMENTS.contains_key(&name),
+            EXPERIMENTS.contains_key(&name),
             "experiment `{}` not declared",
             name
         );
@@ -122,7 +132,7 @@ impl Options {
         if let Some(on) = self.experiment_cache.borrow().get(name).cloned() {
             return on;
         }
-        if let Some(exp) = experiments::EXPERIMENTS.get(&name.to_string()) {
+        if let Some(exp) = EXPERIMENTS.get(&name.to_string()) {
             // First we look at experiments provided via the command line, second
             // via the env var, and last we take the configured default.
             let on = if let Some(on) = find_experiment(&self.experiments, name) {

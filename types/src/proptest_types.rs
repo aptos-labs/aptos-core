@@ -5,7 +5,6 @@
 #![allow(clippy::arc_with_non_send_sync)]
 
 use crate::{
-    access_path::AccessPath,
     account_address::{self, AccountAddress},
     account_config::{AccountResource, CoinStoreResource},
     aggregate_signature::PartialSignatures,
@@ -43,7 +42,7 @@ use aptos_crypto::{
 };
 use arr_macro::arr;
 use bytes::Bytes;
-use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
+use move_core_types::language_storage::TypeTag;
 use proptest::{
     collection::{vec, SizeRange},
     option,
@@ -92,12 +91,13 @@ impl Arbitrary for WriteSet {
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         // XXX there's no checking for repeated access paths here, nor in write_set. Is that
         // important? Not sure.
-        vec((any::<AccessPath>(), any::<WriteOp>()), 0..64)
+        vec((vec(any::<u8>(), 1..100), any::<WriteOp>()), 0..64)
             .prop_map(|write_set| {
-                let write_set_mut =
-                    WriteSetMut::new(write_set.iter().map(|(access_path, write_op)| {
-                        (StateKey::access_path(access_path.clone()), write_op.clone())
-                    }));
+                let write_set_mut = WriteSetMut::new(
+                    write_set
+                        .iter()
+                        .map(|(raw_key, write_op)| (StateKey::raw(raw_key), write_op.clone())),
+                );
                 write_set_mut
                     .freeze()
                     .expect("generated write sets should always be valid")
@@ -681,18 +681,18 @@ impl AccountStateGen {
         account_index: Index,
         universe: &AccountInfoUniverse,
     ) -> impl IntoIterator<Item = (StateKey, Vec<u8>)> {
-        let address = universe.get_account_info(account_index).address;
+        let address = &universe.get_account_info(account_index).address;
         let account_resource = self
             .account_resource_gen
             .materialize(account_index, universe);
         let balance_resource = self.balance_resource_gen.materialize();
         vec![
             (
-                StateKey::resource(address, AccountResource::struct_tag()),
+                StateKey::resource_typed::<AccountResource>(address).unwrap(),
                 bcs::to_bytes(&account_resource).unwrap(),
             ),
             (
-                StateKey::resource(address, CoinStoreResource::struct_tag()),
+                StateKey::resource_typed::<CoinStoreResource>(address).unwrap(),
                 bcs::to_bytes(&balance_resource).unwrap(),
             ),
         ]

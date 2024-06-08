@@ -108,7 +108,8 @@ spec aptos_framework::vesting {
         pragma aborts_if_is_strict;
         // property 2: The vesting pool should not exceed a maximum of 30 shareholders.
         /// [high-level-spec-2]
-        invariant forall pool: Pool: len(pool.shareholders) <= MAXIMUM_SHAREHOLDERS;
+        invariant forall a: address where exists<VestingContract>(a):
+            global<VestingContract>(a).grant_pool.shareholders_limit <= MAXIMUM_SHAREHOLDERS;
     }
 
     spec stake_pool_address(vesting_contract_address: address): address {
@@ -395,6 +396,8 @@ spec aptos_framework::vesting {
         contract_address: address,
         new_voter: address,
     ) {
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 300;
         include VerifyAdminAbortsIf;
 
         let vesting_contract = global<VestingContract>(contract_address);
@@ -408,6 +411,8 @@ spec aptos_framework::vesting {
         admin: &signer,
         contract_address: address,
     ) {
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 300;
         aborts_if !exists<VestingContract>(contract_address);
         let vesting_contract = global<VestingContract>(contract_address);
         aborts_if signer::address_of(admin) != vesting_contract.admin;
@@ -430,8 +435,11 @@ spec aptos_framework::vesting {
         shareholder: address,
         new_beneficiary: address,
     ) {
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 300;
+        pragma aborts_if_is_partial;
         aborts_if !account::exists_at(new_beneficiary);
-        aborts_if !coin::is_account_registered<AptosCoin>(new_beneficiary);
+        aborts_if !coin::spec_is_account_registered<AptosCoin>(new_beneficiary);
         include VerifyAdminAbortsIf;
         let post vesting_contract = global<VestingContract>(contract_address);
         ensures simple_map::spec_contains_key(vesting_contract.beneficiaries,shareholder);

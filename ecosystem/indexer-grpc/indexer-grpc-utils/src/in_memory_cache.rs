@@ -8,21 +8,74 @@ use dashmap::DashMap;
 use itertools::Itertools;
 use prost::Message;
 use redis::AsyncCommands;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 // Internal lookup retry interval for in-memory cache.
 const IN_MEMORY_CACHE_LOOKUP_RETRY_INTERVAL_MS: u64 = 10;
 const IN_MEMORY_CACHE_GC_INTERVAL_MS: u64 = 100;
-// Max cache size in bytes: 3 GB.
-const IN_MEMORY_CACHE_TARGET_MAX_CAPACITY_IN_BYTES: u64 = 3_000_000_000;
-// Eviction cache size in bytes: 3.5 GB. Evict the map to 3 GB.
-const IN_MEMORY_CACHE_EVICTION_TRIGGER_SIZE_IN_BYTES: u64 = 3_500_000_000;
 // Max cache entry TTL: 30 seconds.
 // const MAX_IN_MEMORY_CACHE_ENTRY_TTL: u64 = 30;
 // Warm-up cache entries. Pre-fetch the cache entries to warm up the cache.
 pub const WARM_UP_CACHE_ENTRIES: u64 = 20_000;
 pub const MAX_REDIS_FETCH_BATCH_SIZE: usize = 500;
+
+/// Configuration for when we want to explicitly declare how large the cache should be.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+#[serde(default)]
+pub struct InMemoryCacheSizeConfig {
+    /// The maximum size of the cache in bytes.
+    cache_target_size_bytes: u64,
+    /// The maximum size of the cache in bytes before eviction is triggered, at which
+    /// point we reduce the size of the cache back to `cache_target_size_bytes`.
+    cache_eviction_trigger_size_bytes: u64,
+}
+
+impl Default for InMemoryCacheSizeConfig {
+    fn default() -> Self {
+        Self {
+            // 3 GB.
+            cache_target_size_bytes: 3_000_000_000,
+            // 3.5 GB.
+            cache_eviction_trigger_size_bytes: 3_500_000_000,
+        }
+    }
+}
+
+impl InMemoryCacheSizeConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if self.cache_target_size_bytes == 0 {
+            return Err(anyhow::anyhow!("Cache target size must be greater than 0"));
+        }
+        if self.cache_eviction_trigger_size_bytes == 0 {
+            return Err(anyhow::anyhow!(
+                "Cache eviction trigger size must be greater than 0"
+            ));
+        }
+        if self.cache_eviction_trigger_size_bytes < self.cache_target_size_bytes {
+            return Err(anyhow::anyhow!(
+                "Cache eviction trigger size must be greater than cache target size"
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Configuration for the in memory cache.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+#[serde(default)]
+pub struct InMemoryCacheConfig {
+    size_config: InMemoryCacheSizeConfig,
+}
+
+impl InMemoryCacheConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        self.size_config.validate()
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 struct CacheMetadata {
@@ -41,6 +94,7 @@ pub struct InMemoryCache {
 
 impl InMemoryCache {
     pub async fn new_with_redis_connection<C>(
+        cache_config: InMemoryCacheConfig,
         conn: C,
         storage_format: StorageFormat,
     ) -> anyhow::Result<Self>
@@ -68,6 +122,7 @@ impl InMemoryCache {
             cancellation_token.clone(),
         );
         spawn_cleanup_task(
+            cache_config.size_config.clone(),
             cache.clone(),
             cache_metadata.clone(),
             cancellation_token.clone(),
@@ -80,7 +135,7 @@ impl InMemoryCache {
         })
     }
 
-    async fn latest_version(&self) -> u64 {
+    pub async fn latest_version(&self) -> u64 {
         self.cache_metadata.read().await.latest_version
     }
 
@@ -178,7 +233,6 @@ fn spawn_update_task<C>(
 {
     tokio::spawn(async move {
         let mut conn = conn.clone();
-        let mut current_time = std::time::Instant::now();
         loop {
             if cancellation_token.is_cancelled() {
                 tracing::info!("In-memory cache update task is cancelled.");
@@ -198,8 +252,6 @@ fn spawn_update_task<C>(
                 .await;
                 continue;
             }
-            let redis_waiting_duration = current_time.elapsed().as_secs_f64();
-            let start_time = std::time::Instant::now();
             let end_version = std::cmp::min(
                 current_latest_version,
                 in_cache_latest_version + 10 * MAX_REDIS_FETCH_BATCH_SIZE as u64,
@@ -209,7 +261,6 @@ fn spawn_update_task<C>(
                 .await
                 .unwrap();
             // Ensure that transactions are ordered by version.
-            let cache_processing_start_time = std::time::Instant::now();
             let mut newly_added_bytes = 0;
             for (ind, transaction) in transactions.iter().enumerate() {
                 if transaction.version != in_cache_latest_version + ind as u64 {
@@ -220,16 +271,6 @@ fn spawn_update_task<C>(
             for transaction in transactions {
                 cache.insert(transaction.version, Arc::new(transaction));
             }
-            let processing_duration = start_time.elapsed().as_secs_f64();
-            tracing::info!(
-                redis_latest_version = current_latest_version,
-                in_memory_latest_version = in_cache_latest_version,
-                new_in_memory_latest_version = end_version,
-                processing_duration,
-                cache_processing_duration = cache_processing_start_time.elapsed().as_secs_f64(),
-                redis_waiting_duration,
-                "In-memory cache is updated"
-            );
             let mut current_cache_metadata = { *cache_metadata.read().await };
             current_cache_metadata.latest_version = end_version;
             current_cache_metadata.total_size_in_bytes += newly_added_bytes;
@@ -237,12 +278,12 @@ fn spawn_update_task<C>(
             {
                 *cache_metadata.write().await = current_cache_metadata;
             }
-            current_time = std::time::Instant::now();
         }
     });
 }
 
 fn spawn_cleanup_task(
+    cache_size_config: InMemoryCacheSizeConfig,
     cache: Arc<DashMap<u64, Arc<Transaction>>>,
     cache_metadata: Arc<RwLock<CacheMetadata>>,
     cancellation_token: tokio_util::sync::CancellationToken,
@@ -256,7 +297,7 @@ fn spawn_cleanup_task(
             let mut current_cache_metadata = { *cache_metadata.read().await };
             let should_evict = current_cache_metadata
                 .total_size_in_bytes
-                .saturating_sub(IN_MEMORY_CACHE_EVICTION_TRIGGER_SIZE_IN_BYTES)
+                .saturating_sub(cache_size_config.cache_eviction_trigger_size_bytes)
                 > 0;
             if !should_evict {
                 tokio::time::sleep(std::time::Duration::from_millis(
@@ -268,7 +309,7 @@ fn spawn_cleanup_task(
             let mut actual_bytes_removed = 0;
             let mut bytes_to_remove = current_cache_metadata
                 .total_size_in_bytes
-                .saturating_sub(IN_MEMORY_CACHE_TARGET_MAX_CAPACITY_IN_BYTES);
+                .saturating_sub(cache_size_config.cache_target_size_bytes);
             while bytes_to_remove > 0 {
                 let key_to_remove = current_cache_metadata.first_version;
                 let (_k, v) = cache
@@ -389,6 +430,7 @@ mod tests {
             Ok(0),
         )]);
         let in_memory_cache = InMemoryCache::new_with_redis_connection(
+            InMemoryCacheConfig::default(),
             mock_connection.clone(),
             StorageFormat::Base64UncompressedProto,
         )
@@ -416,6 +458,7 @@ mod tests {
             ),
         ]);
         let in_memory_cache = InMemoryCache::new_with_redis_connection(
+            InMemoryCacheConfig::default(),
             mock_connection.clone(),
             StorageFormat::Base64UncompressedProto,
         )
@@ -460,6 +503,7 @@ mod tests {
             MockCmd::new(redis::cmd("GET").arg("latest_version"), Ok(2)),
         ]);
         let in_memory_cache = InMemoryCache::new_with_redis_connection(
+            InMemoryCacheConfig::default(),
             mock_connection.clone(),
             StorageFormat::Base64UncompressedProto,
         )

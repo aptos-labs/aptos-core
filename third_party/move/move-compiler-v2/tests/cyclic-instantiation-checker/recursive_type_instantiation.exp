@@ -6,7 +6,7 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 6 │     public fun simple_recursion<T>() {
   │                ^^^^^^^^^^^^^^^^
   │
-  = `simple_recursion<T>` calls `simple_recursion<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:6
+  = `simple_recursion<T>` calls `simple_recursion<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:7
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/recursive_type_instantiation.move:10:9
@@ -14,8 +14,8 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 10 │     fun two_level_recursion_0<T>() {
    │         ^^^^^^^^^^^^^^^^^^^^^
    │
-   = `two_level_recursion_0<T>` calls `two_level_recursion_1<T>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:10
-   = `two_level_recursion_1<T>` calls `two_level_recursion_0<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:11
+   = `two_level_recursion_0<T>` calls `two_level_recursion_1<T>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:11
+   = `two_level_recursion_1<T>` calls `two_level_recursion_0<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:15
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/recursive_type_instantiation.move:14:9
@@ -23,8 +23,8 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 14 │     fun two_level_recursion_1<T>() {
    │         ^^^^^^^^^^^^^^^^^^^^^
    │
-   = `two_level_recursion_1<T>` calls `two_level_recursion_0<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:14
-   = `two_level_recursion_0<m0::S<T>>` calls `two_level_recursion_1<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:15
+   = `two_level_recursion_1<T>` calls `two_level_recursion_0<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:15
+   = `two_level_recursion_0<m0::S<T>>` calls `two_level_recursion_1<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:11
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/recursive_type_instantiation.move:18:9
@@ -32,9 +32,9 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 18 │     fun three_level_recursion_0<T>() {
    │         ^^^^^^^^^^^^^^^^^^^^^^^
    │
-   = `three_level_recursion_0<T>` calls `three_level_recursion_1<T>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:18
-   = `three_level_recursion_1<T>` calls `three_level_recursion_2<T>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:19
-   = `three_level_recursion_2<T>` calls `three_level_recursion_0<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:23
+   = `three_level_recursion_0<T>` calls `three_level_recursion_1<T>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:19
+   = `three_level_recursion_1<T>` calls `three_level_recursion_2<T>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:23
+   = `three_level_recursion_2<T>` calls `three_level_recursion_0<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:27
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/recursive_type_instantiation.move:22:9
@@ -42,9 +42,9 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 22 │     fun three_level_recursion_1<T>() {
    │         ^^^^^^^^^^^^^^^^^^^^^^^
    │
-   = `three_level_recursion_1<T>` calls `three_level_recursion_2<T>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:22
-   = `three_level_recursion_2<T>` calls `three_level_recursion_0<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:23
-   = `three_level_recursion_0<m0::S<T>>` calls `three_level_recursion_1<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:27
+   = `three_level_recursion_1<T>` calls `three_level_recursion_2<T>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:23
+   = `three_level_recursion_2<T>` calls `three_level_recursion_0<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:27
+   = `three_level_recursion_0<m0::S<T>>` calls `three_level_recursion_1<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:19
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/recursive_type_instantiation.move:26:9
@@ -52,9 +52,9 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 26 │     fun three_level_recursion_2<T>() {
    │         ^^^^^^^^^^^^^^^^^^^^^^^
    │
-   = `three_level_recursion_2<T>` calls `three_level_recursion_0<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:26
-   = `three_level_recursion_0<m0::S<T>>` calls `three_level_recursion_1<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:27
-   = `three_level_recursion_1<m0::S<T>>` calls `three_level_recursion_2<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:19
+   = `three_level_recursion_2<T>` calls `three_level_recursion_0<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:27
+   = `three_level_recursion_0<m0::S<T>>` calls `three_level_recursion_1<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:19
+   = `three_level_recursion_1<m0::S<T>>` calls `three_level_recursion_2<m0::S<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:23
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/recursive_type_instantiation.move:30:9
@@ -62,7 +62,7 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 30 │     fun recurse_at_different_position<T1, T2>() {
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   = `recurse_at_different_position<T1, T2>` calls `recurse_at_different_position<T2, m0::S<T1>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:30
+   = `recurse_at_different_position<T1, T2>` calls `recurse_at_different_position<T2, m0::S<T1>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:31
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/recursive_type_instantiation.move:44:9
@@ -70,4 +70,4 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 44 │     fun test_vec<T>() {
    │         ^^^^^^^^
    │
-   = `test_vec<T>` calls `test_vec<vector<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:44
+   = `test_vec<T>` calls `test_vec<vector<T>>` at tests/cyclic-instantiation-checker/recursive_type_instantiation.move:45

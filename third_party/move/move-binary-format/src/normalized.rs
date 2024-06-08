@@ -229,7 +229,7 @@ impl Type {
                         address,
                         module,
                         name,
-                        type_params: type_arguments
+                        type_args: type_arguments
                             .into_iter()
                             .map(|t| {
                                 t.into_type_tag().expect(
@@ -374,7 +374,7 @@ impl From<TypeTag> for Type {
                 address: s.address,
                 module: s.module,
                 name: s.name,
-                type_arguments: s.type_params.into_iter().map(|ty| ty.into()).collect(),
+                type_arguments: s.type_args.into_iter().map(|ty| ty.into()).collect(),
             },
         }
     }

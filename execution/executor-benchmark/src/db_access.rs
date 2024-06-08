@@ -4,7 +4,6 @@
 use anyhow::Result;
 use aptos_storage_interface::state_view::DbStateView;
 use aptos_types::{
-    access_path::AccessPath,
     account_address::AccountAddress,
     state_store::{state_key::StateKey, StateView},
     write_set::TOTAL_SUPPLY_STATE_KEY,
@@ -61,13 +60,13 @@ impl DbAccessUtil {
         address: AccountAddress,
         module: &str,
         name: &str,
-        type_params: Vec<TypeTag>,
+        type_args: Vec<TypeTag>,
     ) -> StructTag {
         StructTag {
             address,
             module: Identifier::from_str(module).unwrap(),
             name: Identifier::from_str(name).unwrap(),
-            type_params,
+            type_args,
         }
     }
 
@@ -76,18 +75,13 @@ impl DbAccessUtil {
         resource_address: AccountAddress,
         module: &str,
         name: &str,
-        type_params: Vec<TypeTag>,
+        type_args: Vec<TypeTag>,
     ) -> StateKey {
-        StateKey::access_path(AccessPath::new(
-            address,
-            AccessPath::resource_path_vec(Self::new_struct_tag(
-                resource_address,
-                module,
-                name,
-                type_params,
-            ))
-            .expect("access path in test"),
-        ))
+        StateKey::resource(
+            &address,
+            &Self::new_struct_tag(resource_address, module, name, type_args),
+        )
+        .unwrap()
     }
 
     pub fn new_state_key_account(address: AccountAddress) -> StateKey {

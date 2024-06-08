@@ -17,12 +17,13 @@ spec:
           labels:
             {{- include "backup.selectorLabels" . | nindent 12 }}
             app.kubernetes.io/name: backup-compaction
+          annotations:
+            {{- if $.Values.metrics.destination }}
+            aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
+            {{- end}}
         spec:
           restartPolicy: Never
           terminationGracePeriodSeconds: 0
-          securityContext:
-            seccompProfile:
-              type: RuntimeDefault
           containers:
           - name: backup-compaction
             {{- if and $backup_compaction_cronjob (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
@@ -80,6 +81,8 @@ spec:
             runAsUser: 6180
             runAsGroup: 6180
             fsGroup: 6180
+            seccompProfile:
+              type: RuntimeDefault
           {{- with .nodeSelector }}
           nodeSelector:
             {{- toYaml . | nindent 12 }}
