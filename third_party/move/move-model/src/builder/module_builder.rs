@@ -1184,68 +1184,71 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         et.define_type_params(&loc, &type_params, false);
         // Notice: duplicate field and variant declarations are currently checked in
         // the expansion phase, so don't need to do here again.
-        let layout =
-            match &def.layout {
-                EA::StructLayout::Singleton(fields) => StructLayout::Singleton(
-                    Self::build_field_map(&mut et, None, struct_abilities, &loc, fields),
-                ),
-                EA::StructLayout::Variants(variants) => {
-                    let mut variant_maps = variants
-                        .iter()
-                        .map(|v| {
-                            let variant_loc = et.to_loc(&v.loc);
-                            let variant_name = et.symbol_pool().make(v.name.0.value.as_str());
-                            let attributes = et.parent.translate_attributes(&v.attributes);
-                            let variant_fields = Self::build_field_map(
-                                &mut et,
-                                Some(variant_name),
-                                struct_abilities,
-                                &variant_loc,
-                                &v.fields,
-                            );
-                            StructVariant {
-                                loc: variant_loc,
-                                name: variant_name,
-                                attributes,
-                                fields: variant_fields,
-                            }
-                        })
-                        .collect_vec();
-                    // Identify common fields
-                    if !variant_maps.is_empty() {
-                        let mut common_fields = BTreeSet::new();
-                        let main = &variant_maps[0];
-                        for field in main.fields.values() {
-                            let mut common = true;
-                            for other in &variant_maps[1..variant_maps.len()] {
-                                if !other
-                                    .fields
-                                    .values()
-                                    .any(|f| f.name == field.name && f.ty == field.ty)
-                                {
-                                    common = false;
-                                    break;
-                                }
-                            }
-                            if common {
-                                common_fields.insert(field.name);
+        let (layout, is_empty_struct) = match &def.layout {
+            EA::StructLayout::Singleton(fields) => {
+                let (map, is_struct_empty) =
+                    Self::build_field_map(&mut et, None, struct_abilities, &loc, fields);
+                (StructLayout::Singleton(map), is_struct_empty)
+            },
+            EA::StructLayout::Variants(variants) => {
+                let mut variant_maps = variants
+                    .iter()
+                    .map(|v| {
+                        let variant_loc = et.to_loc(&v.loc);
+                        let variant_name = et.symbol_pool().make(v.name.0.value.as_str());
+                        let attributes = et.parent.translate_attributes(&v.attributes);
+                        let (variant_fields, _) = Self::build_field_map(
+                            &mut et,
+                            Some(variant_name),
+                            struct_abilities,
+                            &variant_loc,
+                            &v.fields,
+                        );
+                        StructVariant {
+                            loc: variant_loc,
+                            name: variant_name,
+                            attributes,
+                            fields: variant_fields,
+                        }
+                    })
+                    .collect_vec();
+                // Identify common fields
+                if !variant_maps.is_empty() {
+                    let mut common_fields = BTreeSet::new();
+                    let main = &variant_maps[0];
+                    for field in main.fields.values() {
+                        let mut common = true;
+                        for other in &variant_maps[1..variant_maps.len()] {
+                            if !other
+                                .fields
+                                .values()
+                                .any(|f| f.name == field.name && f.ty == field.ty)
+                            {
+                                common = false;
+                                break;
                             }
                         }
-                        for variant_map in variant_maps.iter_mut() {
-                            for field in variant_map.fields.values_mut() {
-                                field.common_for_variants = common_fields.contains(&field.name)
-                            }
+                        if common {
+                            common_fields.insert(field.name);
                         }
                     }
-                    StructLayout::Variants(variant_maps)
-                },
-                EA::StructLayout::Native(_) => StructLayout::None,
-            };
-        self.parent
+                    for variant_map in variant_maps.iter_mut() {
+                        for field in variant_map.fields.values_mut() {
+                            field.common_for_variants = common_fields.contains(&field.name)
+                        }
+                    }
+                }
+                (StructLayout::Variants(variant_maps), false)
+            },
+            EA::StructLayout::Native(_) => (StructLayout::None, false),
+        };
+        let entry = self
+            .parent
             .struct_table
             .get_mut(&qsym)
-            .expect("struct invalid")
-            .layout = layout;
+            .expect("struct invalid");
+        entry.layout = layout;
+        entry.is_empty_struct = is_empty_struct;
     }
 
     fn build_field_map(
@@ -1254,7 +1257,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         struct_abilities: AbilitySet,
         loc: &Loc,
         fields: &EA::Fields<EA::Type>,
-    ) -> BTreeMap<Symbol, FieldData> {
+    ) -> (BTreeMap<Symbol, FieldData>, bool) {
         let mut field_map = BTreeMap::new();
         for (name_loc, field_name_, (idx, ty)) in fields {
             let field_loc = et.to_loc(&name_loc);
@@ -1279,6 +1282,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 ty: field_ty,
             });
         }
+        let mut is_empty_struct = false;
         if for_variant.is_none() && field_map.is_empty() {
             // The legacy Move compiler inserts a `dummy_field: bool` here, we need to
             // simulate this behavior for now, as that is what we find in the bytecode
@@ -1293,8 +1297,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 common_for_variants: false,
                 ty: field_ty,
             });
+            is_empty_struct = true;
         }
-        field_map
+        (field_map, is_empty_struct)
     }
 
     /// The name of a dummy field the legacy Move compilers adds to zero-arity structs.

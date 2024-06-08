@@ -1869,6 +1869,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         locals
     }
 
+    /// Returns true if the struct with the name `struct_name` is originally an empty struct
+    fn is_empty_struct(&self, struct_name: &QualifiedSymbol) -> bool {
+        self.parent
+            .parent
+            .lookup_struct_entry_by_name(struct_name)
+            .is_empty_struct
+    }
+
     /// This function:
     /// 1) Post processes any placeholders which have been generated while translating expressions
     /// with this builder. This rewrites the given result expression and fills in placeholders
@@ -1921,6 +1929,22 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                     .specialize_with_defaults(struct_ty)
                                     .skip_reference()
                                 {
+                                    let field = field_name.display(self.symbol_pool()).to_string();
+                                    let struct_name =
+                                        self.parent.parent.get_struct_name(mid.qualified(*sid));
+                                    if self.is_empty_struct(struct_name) {
+                                        self.error(
+                                            &loc,
+                                            &format!(
+                                                "empty struct `{}` cannot access the field `{}`",
+                                                struct_name.display(self.env()),
+                                                field
+                                            ),
+                                        );
+                                        return RewriteResult::Rewritten(
+                                            self.new_error_exp().into_exp(),
+                                        );
+                                    }
                                     RewriteResult::RewrittenAndDescend(
                                         ExpData::Call(
                                             id,
@@ -3269,6 +3293,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
                 self.set_node_instantiation(id, vec![ty.clone()]);
                 let oper = if let Type::Struct(mid, sid, _inst) = self.subs.specialize(&ty) {
+                    let struct_name = self.parent.parent.get_struct_name(mid.qualified(sid));
+                    if self.is_empty_struct(struct_name) {
+                        self.error(
+                            &loc,
+                            &format!(
+                                "empty struct `{}` cannot access the field `{}`",
+                                struct_name.display(self.env()),
+                                n.value.as_str()
+                            ),
+                        );
+                    }
                     // Struct known at this point
                     Operation::Select(mid, sid, FieldId::new(field_name))
                 } else {
@@ -4151,14 +4186,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let mut succeed = true;
         let mut fields_not_covered: BTreeSet<Symbol> = BTreeSet::new();
         // Exclude from the covered fields the dummy_field added by legacy compiler
-        fields_not_covered.extend(
-            field_decls
-                .keys()
-                .filter(|s| *s != &self.parent.dummy_field_name()),
-        );
+        fields_not_covered.extend(field_decls.keys().filter(|s| {
+            if self.is_empty_struct(&struct_name) {
+                *s != &self.parent.dummy_field_name()
+            } else {
+                true
+            }
+        }));
         for (name_loc, name, (_, _)) in fields.iter() {
             let field_name = self.symbol_pool().make(name);
-            if field_decls.contains_key(&field_name) {
+            if !self.is_empty_struct(&struct_name) && field_decls.contains_key(&field_name) {
                 fields_not_covered.remove(&field_name);
             } else {
                 self.error(
