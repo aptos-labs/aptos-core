@@ -33,7 +33,7 @@ pub struct StateSyncConfig {
 }
 
 /// The bootstrapping mode determines how the node will bootstrap to the latest
-/// blockchain state, e.g., directly download the latest states.
+/// blockchain state, e.g., directly download the latest states!
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum BootstrappingMode {
     /// Applies transaction outputs (starting at genesis)
