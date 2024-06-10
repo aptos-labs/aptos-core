@@ -233,7 +233,7 @@ impl CliCommand<RotateSummary> for RotateKey {
         };
 
         // Submit transaction.
-        if new_derivation_path.is_some() {
+        if current_derivation_path.is_some() {
             eprintln!("Approve transaction on your Ledger device");
         };
         let txn_summary = self
