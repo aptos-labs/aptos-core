@@ -827,11 +827,7 @@ module aptos_framework::object {
     }
 
     #[test(fx = @std)]
-    fun test_correct_auid(fx: signer) {
-        use std::features;
-        let feature = features::get_auids();
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
-
+    fun test_correct_auid() {
         let auid1 = aptos_framework::transaction_context::generate_auid_address();
         let bytes = aptos_framework::transaction_context::get_transaction_hash();
         std::vector::push_back(&mut bytes, 1);

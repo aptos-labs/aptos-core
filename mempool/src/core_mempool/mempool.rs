@@ -492,8 +492,9 @@ impl Mempool {
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
+        before: Option<Instant>,
     ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
-        self.transactions.read_timeline(timeline_id, count)
+        self.transactions.read_timeline(timeline_id, count, before)
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive).
