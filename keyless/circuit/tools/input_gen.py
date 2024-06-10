@@ -422,7 +422,7 @@ jwt_payload_string = unsigned_b64_jwt_string_sha_padded[unsigned_b64_jwt_string_
 payload_value = pad_string(jwt_payload_string, jwt_max_payload_len)
 
 # Compute RSA signature over the full unsigned JWT
-with open("test_rsa_privkey.pem", 'rb') as f:
+with open("../../circuit-data/test_rsa_privkey.pem", 'rb') as f:
     privkey_str = f.read()
     f.close()
 keyPair = Crypto.PublicKey.RSA.import_key(privkey_str)

@@ -19,6 +19,8 @@ To generate a sample prover and verifier key pair, run the following commands:
 
 ## Testing
 ```commandline
+python3 -m venv /tmp/venv
+. /tmp/venv/bin/activate
 python input_gen.py
 cd templates
 circom main.circom --wasm -l .
