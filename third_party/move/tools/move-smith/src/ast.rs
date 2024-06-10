@@ -139,6 +139,23 @@ pub enum Expression {
     Block(Box<Block>),
     Assign(Box<Assignment>),
     BinaryOperation(Box<BinaryOperation>),
+    IfElse(Box<IfExpr>),
+}
+
+// If Expression
+#[derive(Debug, Clone)]
+pub struct IfExpr {
+    pub condition: Expression,
+    pub body: Block,
+    pub else_expr: Option<ElseExpr>,
+}
+
+// Else Expression
+// Should only be contained in an IfExpr
+#[derive(Debug, Clone)]
+pub struct ElseExpr {
+    pub typ: Option<Type>,
+    pub body: Block,
 }
 
 #[derive(Debug, Clone)]

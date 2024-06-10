@@ -503,6 +503,7 @@ impl MoveSmith {
             func_call_weight, // FunctionCall
             assign_weight,
             1, // BinaryOperation
+            1, // If-Else
         ];
 
         let expr = loop {
@@ -539,6 +540,7 @@ impl MoveSmith {
                         None => panic!("No callable functions"),
                     }
                 },
+                // Generate an assignment expression
                 4 => {
                     let assign = self.generate_assignment(u, parent_scope)?;
                     match assign {
@@ -546,10 +548,15 @@ impl MoveSmith {
                         None => panic!("No assignable variables"),
                     }
                 },
+                // Generate a binary operation
                 5 => {
                     break Expression::BinaryOperation(Box::new(
                         self.generate_binary_operation(u, parent_scope)?,
                     ));
+                },
+                // Generate an if-else expression with unit type
+                6 => {
+                    break Expression::IfElse(Box::new(self.generate_if(u, parent_scope, None)?));
                 },
                 _ => panic!("Invalid expression type"),
             }
@@ -599,6 +606,13 @@ impl MoveSmith {
             }
         }
 
+        // Now we have collected all candidate expressions that do not require recursion
+        // We can perform the expr_depth check here
+        *self.expr_depth.borrow_mut() += 1;
+        if *self.expr_depth.borrow() >= self.config.max_expr_depth {
+            return Ok(u.choose(&choices)?.clone());
+        }
+
         // Call functions with the given return type
         if allow_call {
             let callables: Vec<FunctionSignature> = self
@@ -616,7 +630,57 @@ impl MoveSmith {
             }
         }
 
+        // Generate an If-Else with the given type
+        let if_else = self.generate_if(u, parent_scope, Some(typ.clone()))?;
+        choices.push(Expression::IfElse(Box::new(if_else)));
+
+        // Decrement the expression depth
+        *self.expr_depth.borrow_mut() -= 1;
+
         Ok(u.choose(&choices)?.clone())
+    }
+
+    /// Generate an If expression
+    /// `typ` is the expected type of the expression.
+    /// If `typ` is None, the type of the If will be unit and whether to have an
+    /// else expression is randomly decided.
+    ///
+    /// If `typ` is not None, both If and Else will be generated with the same type.
+    fn generate_if(
+        &self,
+        u: &mut Unstructured,
+        parent_scope: &Scope,
+        typ: Option<Type>,
+    ) -> Result<IfExpr> {
+        let condition =
+            self.generate_expression_of_type(u, parent_scope, &Type::Bool, true, true)?;
+        let body = self.generate_block(u, parent_scope, None, typ.clone())?;
+
+        // When the If expression has a non-unit type
+        // We have to generate an Else expression to match the type
+        let else_expr = match (&typ, bool::arbitrary(u)?) {
+            (Some(_), _) => Some(self.generate_else(u, parent_scope, typ.clone())?),
+            (None, true) => Some(self.generate_else(u, parent_scope, None)?),
+            (None, false) => None,
+        };
+
+        Ok(IfExpr {
+            condition,
+            body,
+            else_expr,
+        })
+    }
+
+    /// Generate an Else expression.
+    /// The `typ` should be the same as the expected type of the previous If expression.
+    fn generate_else(
+        &self,
+        u: &mut Unstructured,
+        parent_scope: &Scope,
+        typ: Option<Type>,
+    ) -> Result<ElseExpr> {
+        let body = self.generate_block(u, parent_scope, None, typ.clone())?;
+        Ok(ElseExpr { typ, body })
     }
 
     // Generate a random binary operation.
@@ -875,7 +939,9 @@ impl MoveSmith {
                 .iter()
                 .map(|id| (Type::Struct(id.clone()), 1))
                 .collect::<Vec<(Type, u32)>>();
-            categories.push(structs);
+            if !structs.is_empty() {
+                categories.push(structs);
+            }
         }
 
         let chosen_cat = u.choose(&categories)?;

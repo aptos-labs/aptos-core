@@ -14,7 +14,13 @@ pub trait CodeGenerator {
 
     /// Generate a single line for subtree.
     fn inline(&self) -> String {
-        self.emit_code_lines().join(" ")
+        // Trim the leading whitespaces added for indentation
+        // and then join them with a space.
+        self.emit_code_lines()
+            .iter()
+            .map(|line| line.trim())
+            .collect::<Vec<&str>>()
+            .join(" ")
     }
 
     /// Each AST node should implement this
@@ -283,7 +289,31 @@ impl CodeGenerator for Expression {
             Expression::Block(block) => block.emit_code_lines(),
             Expression::Assign(assignment) => assignment.emit_code_lines(),
             Expression::BinaryOperation(binop) => binop.emit_code_lines(),
+            Expression::IfElse(if_expr) => if_expr.emit_code_lines(),
         }
+    }
+}
+
+impl CodeGenerator for IfExpr {
+    fn emit_code_lines(&self) -> Vec<String> {
+        let mut code = vec![format!("if ({}) ", self.condition.inline())];
+        let body = self.body.emit_code_lines();
+        append_block(&mut code, body, 0);
+
+        if let Some(else_expr) = &self.else_expr {
+            let else_code = else_expr.emit_code_lines();
+            append_block(&mut code, else_code, 0);
+        }
+        code
+    }
+}
+
+impl CodeGenerator for ElseExpr {
+    fn emit_code_lines(&self) -> Vec<String> {
+        let mut code = vec!["else".to_string()];
+        let body = self.body.emit_code_lines();
+        append_block(&mut code, body, 0);
+        code
     }
 }
 
@@ -300,7 +330,7 @@ impl CodeGenerator for BinaryOperation {
 
 impl CodeGenerator for Assignment {
     fn emit_code_lines(&self) -> Vec<String> {
-        let mut code = vec![format!("{} = ", self.name.emit_code(),)];
+        let mut code = vec![format!("{} =", self.name.emit_code(),)];
         let value = self.value.emit_code_lines();
         append_block(&mut code, value, 0);
         code
