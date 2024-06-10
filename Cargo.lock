@@ -549,6 +549,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-jellyfish-merkle",
  "aptos-logger",
+ "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-push-metrics",
  "aptos-storage-interface",

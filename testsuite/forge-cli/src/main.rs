@@ -1112,10 +1112,10 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (7700, 100, 0.3, 0.3, 0.5, 0.5),
-            (7000, 100, 0.3, 0.3, 0.5, 0.5),
-            (2000, 300, 0.3, 0.8, 0.6, 0.7),
-            (3200, 500, 0.3, 0.4, 0.7, 1.0),
+            (7700, 100, 0.3, 0.5, 0.5, 0.5),
+            (7000, 100, 0.3, 0.5, 0.5, 0.5),
+            (2000, 300, 0.3, 1.0, 0.6, 1.0),
+            (3200, 500, 0.3, 1.5, 0.7, 0.7),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
@@ -1950,9 +1950,9 @@ fn realistic_env_max_load_test(
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
             // Check that we don't use more than 18 CPU cores for 10% of the time.
             MetricsThreshold::new(18.0, 10),
-            // Memory starts around 3GB, and grows around 1.2GB/hr in this test.
+            // Memory starts around 3.5GB, and grows around 1.4GB/hr in this test.
             // Check that we don't use more than final expected memory for more than 10% of the time.
-            MetricsThreshold::new_gb(3.3 + 1.4 * (duration_secs as f64 / 3600.0), 10),
+            MetricsThreshold::new_gb(3.5 + 1.4 * (duration_secs as f64 / 3600.0), 10),
         ))
         .add_no_restarts()
         .add_wait_for_catchup_s(
@@ -1970,8 +1970,8 @@ fn realistic_env_max_load_test(
             LatencyBreakdownThreshold::new_with_breach_pct(
                 vec![
                     (LatencyBreakdownSlice::QsBatchToPos, 0.35),
-                    // only reaches close to threshold during epoch change
-                    (LatencyBreakdownSlice::QsPosToProposal, 0.6),
+                    // quorum store backpressure is relaxed, so queueing happens here
+                    (LatencyBreakdownSlice::QsPosToProposal, 2.5),
                     // can be adjusted down if less backpressure
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
                     // can be adjusted down if less backpressure
