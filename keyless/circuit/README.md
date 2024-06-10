@@ -22,7 +22,7 @@ To generate a sample prover and verifier key pair, run the following commands:
 python3 -m venv /tmp/venv
 . /tmp/venv/bin/activate
 pip install pyjwt cryptography pycryptodome
-python input_gen.py
+python tools/input_gen.py
 cd templates
 circom main.circom --wasm -l .
 node main_js/generate_witness.js main_js/main.wasm ../input.json witness.wtns
