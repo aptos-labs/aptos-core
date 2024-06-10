@@ -7,14 +7,14 @@ The scripts in this repository will not work without installing the dependencies
 To install, please run:
 
 ```
-./install-deps.sh
+./tools/install-deps.sh
 ```
 ## Generating the proving key
 
 To generate a sample prover and verifier key pair, run the following commands:
 
 ```
-./trusted-setup.sh main sample_keypair
+./tools/trusted-setup.sh sample_keypair
 ```
 
 ## Testing
