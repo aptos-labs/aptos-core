@@ -3,7 +3,7 @@
 
 use crate::{
     aptos::move_test_helpers, smoke_test_environment::SwarmBuilder,
-    test_utils::check_create_mint_transfer, workspace_builder, workspace_builder::workspace_root,
+    utils::check_create_mint_transfer, workspace_builder, workspace_builder::workspace_root,
 };
 use aptos_crypto::ValidCryptoMaterialStringExt;
 use aptos_forge::Swarm;

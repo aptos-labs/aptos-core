@@ -22,7 +22,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
-    session::LoadedFunctionInstantiation,
+    LoadedFunction,
 };
 use move_vm_types::{
     gas::{GasMeter, UnmeteredGasMeter},
@@ -105,11 +105,11 @@ pub fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
     senders: Vec<AccountAddress>,
     args: Vec<Vec<u8>>,
-    func: &LoadedFunctionInstantiation,
+    func: &LoadedFunction,
     are_struct_constructors_enabled: bool,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
-    // entry function should not return
-    if !func.return_tys.is_empty() {
+    // Entry function should not return.
+    if !func.return_tys().is_empty() {
         return Err(VMStatus::error(
             StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
             None,
@@ -117,7 +117,7 @@ pub fn validate_combine_signer_and_txn_args(
     }
     let mut signer_param_cnt = 0;
     // find all signer params at the beginning
-    for ty in func.param_tys.iter() {
+    for ty in func.param_tys() {
         match ty {
             Type::Signer => signer_param_cnt += 1,
             Type::Reference(inner_type) => {
@@ -131,8 +131,8 @@ pub fn validate_combine_signer_and_txn_args(
 
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
     // Need to keep this here to ensure we return the historic correct error code for replay
-    for ty in func.param_tys[signer_param_cnt..].iter() {
-        let valid = is_valid_txn_arg(session, &ty.subst(&func.ty_args).unwrap(), allowed_structs);
+    for ty in func.param_tys()[signer_param_cnt..].iter() {
+        let valid = is_valid_txn_arg(session, &ty.subst(func.ty_args()).unwrap(), allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -141,7 +141,7 @@ pub fn validate_combine_signer_and_txn_args(
         }
     }
 
-    if (signer_param_cnt + args.len()) != func.param_tys.len() {
+    if (signer_param_cnt + args.len()) != func.param_tys().len() {
         return Err(VMStatus::error(
             StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
             None,
@@ -164,9 +164,9 @@ pub fn validate_combine_signer_and_txn_args(
     // FAILED_TO_DESERIALIZE_ARGUMENT error.
     let args = construct_args(
         session,
-        &func.param_tys[signer_param_cnt..],
+        &func.param_tys()[signer_param_cnt..],
         args,
-        &func.ty_args,
+        func.ty_args(),
         allowed_structs,
         false,
     )?;
@@ -187,12 +187,12 @@ pub fn validate_combine_signer_and_txn_args(
 // Return whether the argument is valid/allowed and whether it needs construction.
 pub(crate) fn is_valid_txn_arg(
     session: &SessionExt,
-    typ: &Type,
+    ty: &Type,
     allowed_structs: &ConstructorMap,
 ) -> bool {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
-    match typ {
+    match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
         Vector(inner) => is_valid_txn_arg(session, inner, allowed_structs),
         Struct { idx, .. } | StructInstantiation { idx, .. } => {
@@ -420,17 +420,17 @@ fn validate_and_construct(
         *max_invocations -= 1;
     }
 
-    let (function, instantiation) = session.load_function_with_type_arg_inference(
+    let function = session.load_function_with_type_arg_inference(
         &constructor.module_id,
         constructor.func_name,
         expected_type,
     )?;
     let mut args = vec![];
-    for param_type in &instantiation.param_tys {
+    for param_ty in function.param_tys() {
         let mut arg = vec![];
         recursively_construct_arg(
             session,
-            &param_type.subst(&instantiation.ty_args).unwrap(),
+            &param_ty.subst(function.ty_args()).unwrap(),
             allowed_structs,
             cursor,
             initial_cursor_len,
@@ -441,9 +441,8 @@ fn validate_and_construct(
         args.push(arg);
     }
     let storage = TraversalStorage::new();
-    let serialized_result = session.execute_instantiated_function(
+    let serialized_result = session.execute_loaded_function(
         function,
-        instantiation,
         args,
         gas_meter,
         &mut TraversalContext::new(&storage),

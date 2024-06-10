@@ -170,12 +170,12 @@ fn log_rpc_failure(error: anyhow::Error, receiver: Author) {
     // Log a sampled warning (to prevent spam)
     sample!(
         SampleRate::Duration(Duration::from_secs(1)),
-        warn!(error = ?error, "rpc to {} failed", receiver)
+        warn!(error = ?error, "rpc to {} failed, error {}", receiver, error)
     );
 
     // Log at the debug level (this is useful for debugging
     // and won't spam the logs in a production environment).
-    debug!(error = ?error, "rpc to {} failed", receiver);
+    debug!(error = ?error, "rpc to {} failed, error {}", receiver, error);
 }
 
 pub struct DropGuard {

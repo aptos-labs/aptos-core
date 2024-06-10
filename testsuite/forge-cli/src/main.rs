@@ -1112,10 +1112,10 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (5500, 100, 0.3, 0.3, 0.8, 0.65),
-            (4500, 100, 0.3, 0.4, 1.0, 2.0),
-            (2000, 300, 0.3, 0.8, 0.8, 2.0),
-            (600, 500, 0.3, 0.3, 0.8, 2.0),
+            (7700, 100, 0.3, 0.5, 0.5, 0.5),
+            (7000, 100, 0.3, 0.5, 0.5, 0.5),
+            (2000, 300, 0.3, 1.0, 0.6, 1.0),
+            (3200, 500, 0.3, 1.5, 0.7, 0.7),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
@@ -1425,10 +1425,7 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 15000 })
                 .init_gas_price_multiplier(20),
-            // Additionally - we are not really gracefully handling overlaods,
-            // setting limits based on current reality, to make sure they
-            // don't regress, but something to investigate
-            inner_success_criteria: SuccessCriteria::new(3400),
+            inner_success_criteria: SuccessCriteria::new(7500),
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
@@ -1450,8 +1447,8 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                     // overload test uses more CPUs than others, so increase the limit
                     // Check that we don't use more than 18 CPU cores for 30% of the time.
                     MetricsThreshold::new(18.0, 40),
-                    // Check that we don't use more than 5 GB of memory for 30% of the time.
-                    MetricsThreshold::new_gb(5.0, 30),
+                    // Check that we don't use more than 6 GB of memory for more than 10% of the time.
+                    MetricsThreshold::new_gb(6.0, 10),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -1949,15 +1946,50 @@ fn realistic_env_max_load_test(
     let duration_secs = duration.as_secs();
     let long_running = duration_secs >= 2400;
 
+    let mut success_criteria = SuccessCriteria::new(95)
+        .add_system_metrics_threshold(SystemMetricsThreshold::new(
+            // Check that we don't use more than 18 CPU cores for 10% of the time.
+            MetricsThreshold::new(18.0, 10),
+            // Memory starts around 3.5GB, and grows around 1.4GB/hr in this test.
+            // Check that we don't use more than final expected memory for more than 10% of the time.
+            MetricsThreshold::new_gb(3.5 + 1.4 * (duration_secs as f64 / 3600.0), 10),
+        ))
+        .add_no_restarts()
+        .add_wait_for_catchup_s(
+            // Give at least 60s for catchup, give 10% of the run for longer durations.
+            (duration.as_secs() / 10).max(60),
+        )
+        .add_latency_threshold(3.4, LatencyType::P50)
+        .add_latency_threshold(4.5, LatencyType::P90)
+        .add_chain_progress(StateProgressThreshold {
+            max_no_progress_secs: 15.0,
+            max_round_gap: 4,
+        });
+    if !ha_proxy {
+        success_criteria = success_criteria.add_latency_breakdown_threshold(
+            LatencyBreakdownThreshold::new_with_breach_pct(
+                vec![
+                    (LatencyBreakdownSlice::QsBatchToPos, 0.35),
+                    // quorum store backpressure is relaxed, so queueing happens here
+                    (LatencyBreakdownSlice::QsPosToProposal, 2.5),
+                    // can be adjusted down if less backpressure
+                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
+                    // can be adjusted down if less backpressure
+                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 0.75),
+                ],
+                5,
+            ),
+        )
+    }
+
     // Create the test
+    let mempool_backlog = if ha_proxy { 30000 } else { 40000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 40000,
-                })
+                .mode(EmitJobMode::MaxLoad { mempool_backlog })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
@@ -1989,38 +2021,7 @@ fn realistic_env_max_load_test(
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
                 .latency_polling_interval(Duration::from_millis(100)),
         )
-        .with_success_criteria(
-            SuccessCriteria::new(95)
-                .add_no_restarts()
-                .add_wait_for_catchup_s(
-                    // Give at least 60s for catchup, give 10% of the run for longer durations.
-                    (duration.as_secs() / 10).max(60),
-                )
-                .add_latency_threshold(3.4, LatencyType::P50)
-                .add_latency_threshold(4.5, LatencyType::P90)
-                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_with_breach_pct(
-                    vec![
-                        (LatencyBreakdownSlice::QsBatchToPos, 0.35),
-                        // only reaches close to threshold during epoch change
-                        (
-                            LatencyBreakdownSlice::QsPosToProposal,
-                            if ha_proxy { 0.7 } else { 0.6 },
-                        ),
-                        // can be adjusted down if less backpressure
-                        (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
-                        // can be adjusted down if less backpressure
-                        (
-                            LatencyBreakdownSlice::ConsensusOrderedToCommit,
-                            if ha_proxy { 1.3 } else { 0.75 },
-                        ),
-                    ],
-                    5,
-                ))
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 15.0,
-                    max_round_gap: 4,
-                }),
-        )
+        .with_success_criteria(success_criteria)
 }
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {

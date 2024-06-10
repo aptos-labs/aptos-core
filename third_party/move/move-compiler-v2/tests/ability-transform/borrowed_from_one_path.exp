@@ -84,25 +84,25 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t8: &u64
      var $t9: u64
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
   0: $t5 := 0
      # live vars: $t0, $t1, $t5
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
   1: $t4 := ==($t0, $t5)
      # live vars: $t1, $t4
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
   2: if ($t4) goto 3 else goto 8
      # live vars: $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
@@ -120,53 +120,53 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      #
   5: $t6 := borrow_global<m::R>($t7)
      # live vars: $t6
-     # graph: {@500=global<m::R>[borrow_global(false, 5) -> @501],@501=derived[]}
+     # graph: {@500=global<m::R>[borrow_global_imm@5 -> @501],@501=derived[]}
      # locals: {$t6=@501}
      # globals: {m::R=@500}
      #
   6: $t3 := borrow_field<m::R>.data($t6)
      # live vars: $t3
-     # graph: {@500=global<m::R>[borrow_global(false, 5) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[]}
+     # graph: {@500=global<m::R>[borrow_global_imm@5 -> @501],@501=derived[borrow_imm.data -> @601],@601=derived[]}
      # locals: {$t3=@601}
      # globals: {m::R=@500}
      # derived-from: @601=$t6
      #
   7: goto 10
      # live vars: $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
   8: label L1
      # live vars: $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
   9: $t3 := infer($t1)
      # live vars: $t3
-     # graph: {@500=global<m::R>[borrow_global(false, 5) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[],@1000000=external[borrow(false) -> @601]}
+     # graph: {@500=global<m::R>[borrow_global_imm@5 -> @501],@501=derived[borrow_imm.data -> @601],@601=derived[],@1000000=external[borrow_imm -> @601]}
      # locals: {$t3=@601}
      # globals: {m::R=@500}
      # derived-from: @601=$t6
      #
  10: label L2
      # live vars: $t3
-     # graph: {@500=global<m::R>[borrow_global(false, 5) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[],@1000000=external[borrow(false) -> @601]}
+     # graph: {@500=global<m::R>[borrow_global_imm@5 -> @501],@501=derived[borrow_imm.data -> @601],@601=derived[],@1000000=external[borrow_imm -> @601]}
      # locals: {$t3=@601}
      # globals: {m::R=@500}
      # derived-from: @601=$t6
      #
  11: $t9 := 0
      # live vars: $t3, $t9
-     # graph: {@500=global<m::R>[borrow_global(false, 5) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[],@1000000=external[borrow(false) -> @601]}
+     # graph: {@500=global<m::R>[borrow_global_imm@5 -> @501],@501=derived[borrow_imm.data -> @601],@601=derived[],@1000000=external[borrow_imm -> @601]}
      # locals: {$t3=@601}
      # globals: {m::R=@500}
      # derived-from: @601=$t6
      #
  12: $t8 := vector::borrow<u64>($t3, $t9)
      # live vars: $t8
-     # graph: {@500=global<m::R>[borrow_global(false, 5) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[call(false, 12) -> @C00],@C00=derived[],@1000000=external[borrow(false) -> @601]}
+     # graph: {@500=global<m::R>[borrow_global_imm@5 -> @501],@501=derived[borrow_imm.data -> @601],@601=derived[call_imm@12 -> @C00],@C00=derived[],@1000000=external[borrow_imm -> @601]}
      # locals: {$t8=@C00}
      # globals: {m::R=@500}
      # derived-from: @601=$t6,@C00=$t3
@@ -194,28 +194,28 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t9: u64
      # abort state: {returns,aborts}
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
   0: $t5 := 0
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t5
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
   1: $t4 := ==($t0, $t5)
      # abort state: {returns,aborts}
      # live vars: $t1, $t4
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
   2: if ($t4) goto 3 else goto 8
      # abort state: {returns,aborts}
      # live vars: $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
@@ -236,14 +236,14 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
   5: $t6 := borrow_global<m::R>($t7)
      # abort state: {returns,aborts}
      # live vars: $t6
-     # graph: {@500=global<m::R>[borrow_global(false, 5) -> @501],@501=derived[]}
+     # graph: {@500=global<m::R>[borrow_global_imm@5 -> @501],@501=derived[]}
      # locals: {$t6=@501}
      # globals: {m::R=@500}
      #
   6: $t3 := borrow_field<m::R>.data($t6)
      # abort state: {returns,aborts}
      # live vars: $t3
-     # graph: {@500=global<m::R>[borrow_global(false, 5) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[]}
+     # graph: {@500=global<m::R>[borrow_global_imm@5 -> @501],@501=derived[borrow_imm.data -> @601],@601=derived[]}
      # locals: {$t3=@601}
      # globals: {m::R=@500}
      # derived-from: @601=$t6
@@ -251,21 +251,21 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
   7: goto 10
      # abort state: {returns,aborts}
      # live vars: $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
   8: label L1
      # abort state: {returns,aborts}
      # live vars: $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
   9: $t3 := infer($t1)
      # abort state: {returns,aborts}
      # live vars: $t3
-     # graph: {@500=global<m::R>[borrow_global(false, 5) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[],@1000000=external[borrow(false) -> @601]}
+     # graph: {@500=global<m::R>[borrow_global_imm@5 -> @501],@501=derived[borrow_imm.data -> @601],@601=derived[],@1000000=external[borrow_imm -> @601]}
      # locals: {$t3=@601}
      # globals: {m::R=@500}
      # derived-from: @601=$t6
@@ -273,7 +273,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
  10: label L2
      # abort state: {returns,aborts}
      # live vars: $t3
-     # graph: {@500=global<m::R>[borrow_global(false, 5) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[],@1000000=external[borrow(false) -> @601]}
+     # graph: {@500=global<m::R>[borrow_global_imm@5 -> @501],@501=derived[borrow_imm.data -> @601],@601=derived[],@1000000=external[borrow_imm -> @601]}
      # locals: {$t3=@601}
      # globals: {m::R=@500}
      # derived-from: @601=$t6
@@ -281,7 +281,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
  11: $t9 := 0
      # abort state: {returns,aborts}
      # live vars: $t3, $t9
-     # graph: {@500=global<m::R>[borrow_global(false, 5) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[],@1000000=external[borrow(false) -> @601]}
+     # graph: {@500=global<m::R>[borrow_global_imm@5 -> @501],@501=derived[borrow_imm.data -> @601],@601=derived[],@1000000=external[borrow_imm -> @601]}
      # locals: {$t3=@601}
      # globals: {m::R=@500}
      # derived-from: @601=$t6
@@ -289,7 +289,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
  12: $t8 := vector::borrow<u64>($t3, $t9)
      # abort state: {returns}
      # live vars: $t8
-     # graph: {@500=global<m::R>[borrow_global(false, 5) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[call(false, 12) -> @C00],@C00=derived[],@1000000=external[borrow(false) -> @601]}
+     # graph: {@500=global<m::R>[borrow_global_imm@5 -> @501],@501=derived[borrow_imm.data -> @601],@601=derived[call_imm@12 -> @C00],@C00=derived[],@1000000=external[borrow_imm -> @601]}
      # locals: {$t8=@C00}
      # globals: {m::R=@500}
      # derived-from: @601=$t6,@C00=$t3

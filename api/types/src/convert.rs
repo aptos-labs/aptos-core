@@ -33,6 +33,7 @@ use aptos_types::{
     },
     transaction::{
         EntryFunction, ExecutionStatus, Multisig, RawTransaction, Script, SignedTransaction,
+        TransactionAuxiliaryData,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -176,11 +177,16 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
         use aptos_types::transaction::Transaction::*;
+        let aux_data = self
+            .db
+            .get_transaction_auxiliary_data_by_version(data.version)
+            .ok();
         let info = self.into_transaction_info(
             data.version,
             &data.info,
             data.accumulator_root_hash,
             data.changes,
+            aux_data,
         );
         let events = self.try_into_events(&data.events)?;
         Ok(match data.transaction {
@@ -210,6 +216,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         info: &aptos_types::transaction::TransactionInfo,
         accumulator_root_hash: HashValue,
         write_set: aptos_types::write_set::WriteSet,
+        txn_aux_data: Option<TransactionAuxiliaryData>,
     ) -> TransactionInfo {
         TransactionInfo {
             version: version.into(),
@@ -219,7 +226,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             state_checkpoint_hash: info.state_checkpoint_hash().map(|h| h.into()),
             gas_used: info.gas_used().into(),
             success: info.status().is_success(),
-            vm_status: self.explain_vm_status(info.status()),
+            vm_status: self.explain_vm_status(info.status(), txn_aux_data),
             accumulator_root_hash: accumulator_root_hash.into(),
             // TODO: the resource value is interpreted by the type definition at the version of the converter, not the version of the tx: must be fixed before we allow module updates
             changes: write_set
@@ -964,7 +971,11 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         }
     }
 
-    fn explain_vm_status(&self, status: &ExecutionStatus) -> String {
+    fn explain_vm_status(
+        &self,
+        status: &ExecutionStatus,
+        txn_aux_data: Option<TransactionAuxiliaryData>,
+    ) -> String {
         match status {
             ExecutionStatus::MoveAbort {
                 location,
@@ -1016,10 +1027,20 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     func_name, code_offset
                 )
             },
-            ExecutionStatus::MiscellaneousError(code) => code.map_or(
-                "Execution failed with miscellaneous error and no status code".to_owned(),
-                |e| format!("{:#?}", e),
-            ),
+            ExecutionStatus::MiscellaneousError(code) => {
+                if txn_aux_data.is_none() && code.is_none() {
+                    "Execution failed with miscellaneous error and no status code".to_owned()
+                } else if code.is_some() {
+                    format!("{:#?}", code.unwrap())
+                } else {
+                    let aux_data = txn_aux_data.unwrap();
+                    let vm_details = aux_data.get_detail_error_message();
+                    vm_details.map_or(
+                        "Execution failed with miscellaneous error and no status code".to_owned(),
+                        |e| format!("{:#?}", e.status_code()),
+                    )
+                }
+            },
         }
     }
 

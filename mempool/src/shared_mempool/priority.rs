@@ -910,7 +910,7 @@ mod test {
             });
 
         // Create the peer monitoring metadata
-        PeerMonitoringMetadata::new(None, network_info_response, None, None)
+        PeerMonitoringMetadata::new(None, None, network_info_response, None, None)
     }
 
     /// Creates a peer monitoring metadata with the given distance and latency
@@ -928,7 +928,7 @@ mod test {
         average_ping_latency_secs: Option<f64>,
     ) -> PeerMonitoringMetadata {
         // Create the peer monitoring metadata
-        PeerMonitoringMetadata::new(average_ping_latency_secs, None, None, None)
+        PeerMonitoringMetadata::new(average_ping_latency_secs, None, None, None, None)
     }
 
     /// Creates a validator peer with a random peer ID

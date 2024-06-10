@@ -35,6 +35,7 @@ pub enum TransactionTypeArg {
     ModifyGlobalResourceAggV2,
     ModifyGlobalFlagAggV2,
     ModifyGlobalBoundedAggV2,
+    ModifyGlobalMilestoneAggV2,
     // Complex EntryPoints
     CreateObjects10,
     CreateObjects10WithPayload10k,
@@ -153,6 +154,13 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::ModifyGlobalBoundedAggV2 => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::ModifyGlobalBoundedAggV2 { step: 10 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ModifyGlobalMilestoneAggV2 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::IncGlobalMilestoneAggV2 {
+                    milestone_every: 1000,
+                },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },

@@ -89,6 +89,8 @@ spec aptos_framework::randomness {
     }
 
     spec u256_integer_internal(): u256 {
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 300;
         pragma unroll = 32;
         include NextBlobAbortsIf;
     }

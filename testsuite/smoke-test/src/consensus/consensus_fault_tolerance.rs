@@ -3,7 +3,7 @@
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
-    test_utils::{create_and_fund_account, transfer_coins_non_blocking},
+    utils::{create_and_fund_account, transfer_coins_non_blocking},
 };
 use aptos_forge::{
     test_utils::consensus_utils::{
@@ -171,6 +171,47 @@ async fn test_no_failures() {
         5.0,
         1,
         no_failure_injection(),
+        Box::new(move |_, _, executed_rounds, executed_transactions, _, _| {
+            assert!(
+                executed_transactions >= 4,
+                "no progress with active consensus, only {} transactions",
+                executed_transactions
+            );
+            assert!(
+                executed_rounds >= 2,
+                "no progress with active consensus, only {} rounds",
+                executed_rounds
+            );
+            Ok(())
+        }),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn test_ordered_only_cert() {
+    let num_validators = 3;
+
+    let mut swarm = create_swarm(num_validators, 1).await;
+
+    test_consensus_fault_tolerance(
+        &mut swarm,
+        3,
+        5.0,
+        1,
+        Box::new(FailPointFailureInjection::new(Box::new(move |cycle, _| {
+            (
+                vec![(
+                    cycle % num_validators,
+                    "consensus::ordered_only_cert".to_string(),
+                    format!("{}%return", 50),
+                )],
+                true,
+            )
+        }))),
         Box::new(move |_, _, executed_rounds, executed_transactions, _, _| {
             assert!(
                 executed_transactions >= 4,

@@ -182,13 +182,9 @@ module aptos_framework::transaction_context {
         payload.entry_function_payload
     }
 
-    #[test(fx = @std)]
-    fun test_auid_uniquess(fx: signer) {
-        use std::features;
+    #[test()]
+    fun test_auid_uniquess() {
         use std::vector;
-
-        let feature = features::get_auids();
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
 
         let auids: vector<address> = vector<address>[];
         let i: u64 = 0;
