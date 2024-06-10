@@ -8,6 +8,7 @@ edition = "2021"
 cargo-fuzz = true
 
 [dependencies]
+afl = "*"
 arbitrary = { workspace = true }
 libfuzzer-sys = { workspace = true }
 move-smith = { path = ".." }
@@ -22,6 +23,13 @@ bench = false
 [[bin]]
 name = "transactional"
 path = "fuzz_targets/transactional.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "afl-transactional"
+path = "fuzz_targets/afl_transactional.rs"
 test = false
 doc = false
 bench = false

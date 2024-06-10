@@ -17,7 +17,17 @@ function generate_coverage() {
     local fuzz_target=$1
     local base_dir=${2:-$MOVE_SMITH_DIR}
 
-    local corpus_dir="$base_dir/fuzz/corpus/$fuzz_target"
+    # Check if fuzz target start with afl
+    if [[ $fuzz_target == "afl"* ]]; then
+        local corpus_dir="$base_dir/fuzz/afl/${fuzz_target}_out/fuzzer0/queue"
+    else
+        local corpus_dir="$base_dir/fuzz/corpus/$fuzz_target"
+    fi
+
+    # Use libfuzzer target to collect coverage data
+    # Remove the afl- prefix
+    fuzz_target=${fuzz_target#afl-}
+
     local target_dir="$base_dir/coverage"
 
     mkdir -p $target_dir

@@ -8,21 +8,32 @@ Make sure you have all the necessary [dependencies](#dependencies).
 
 ## Fuzzing
 
-To start fuzzing, run
+To start a basic fuzzing session, run
 ```bash
 cargo fuzz run <fuzz_target>
 ```
+
+To run more advanced session that runs 10 workers in parallel, use the `fuzz.sh` script:
+```bash
+./scripts/fuzz.sh <fuzz_target> [total_hour] [max_input_len]
+
+# For example
+./scripts/fuzz.sh transactional 24 4
+# This will run the `transactional` target for 24 hours with randomly created
+# seeds whose size doesn't exceed 4KB.
+
+
+# If a fuzz target starts with `afl`, the script will spawn nodes in a tmux session:
+./scripts/fuzz.sh afl-transactional 24 4
+# This will create a tmux session `afl_fuzzing` where each node occupies a window.
+```
+
 
 Currently we have two fuzz targets in `fuzz/fuzz_targets`:
 
 * `compile_v1_only`: compiles the generated Move programs using compiler V1
 * `transactional`: run the generated Move programs as transactional tests so that we can cover compiler V1, V2, and the VM
-
-
-If some unwanted crash stopped the fuzzer and you want to ignore it, use:
-```bash
-cargo fuzz run <fuzz_target> -- -fork=1 -ignore_crashes=1
-```
+* `afl-transactional`: the same as transactional but uses AFL++ instead of libfuzzer
 
 All crash triggering inputs are stored in `fuzz/artifacts/<fuzz_target>`.  However, the inputs are raw bytes. To convert raw bytes to Move, you can use:
 ```bash
@@ -100,6 +111,7 @@ rustup override set nightly
 To generate human-readable coverage reports, we need `llvm` coverage tools.
 They can be installed with:
 ```bash
+cargo install cargo-binutils
 rustup component add --toolchain nightly llvm-tools-preview
 ```
 

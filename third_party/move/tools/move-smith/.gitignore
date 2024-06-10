@@ -8,3 +8,5 @@ coverage/
 output/
 *logs/
 *results/
+afl*/
+fuzz/afl*/

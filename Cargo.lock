@@ -80,6 +80,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "afl"
+version = "0.15.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df319d2080b52b5f8cfe9b685d1a70549c4fe2d12b60ecad48cf6cc202c82100"
+dependencies = [
+ "home",
+ "libc",
+ "rustc_version",
+ "xdg",
+]
+
+[[package]]
 name = "again"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11001,6 +11013,7 @@ dependencies = [
 name = "move-smith-fuzz"
 version = "0.0.0"
 dependencies = [
+ "afl",
  "arbitrary",
  "libfuzzer-sys",
  "move-smith",
@@ -17135,6 +17148,12 @@ dependencies = [
  "linux-raw-sys 0.4.12",
  "rustix 0.38.28",
 ]
+
+[[package]]
+name = "xdg"
+version = "2.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "213b7324336b53d2414b2db8537e56544d981803139155afa84f76eeebb7a546"
 
 [[package]]
 name = "yaml-rust"
