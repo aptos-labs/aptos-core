@@ -462,6 +462,7 @@ json_dict = {
     "\"signature\"": sig_value,
     "\"pubkey_modulus\"": mod_value,
     "\"aud_field\"": aud_field_value,
+    "\"aud_field_string_bodies\"": 0,
     "\"aud_field_len\"": aud_field_len_value,
     "\"aud_index\"": aud_index_value,
     "\"aud_value_index\"": aud_value_index_value,
