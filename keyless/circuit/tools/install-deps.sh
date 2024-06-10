@@ -41,10 +41,10 @@ install_circom() {
 
 install_pip3_deps() {
     echo "pip3 deps installation started."
-    pip3 install virtualenv pyjwt cryptography pycryptodome
+    sudo apt install python3-venv
     echo "pip3 deps installation finished."
 }
-  
+
 install_npm_deps() {
     echo "snarkjs installation started."
     npm install -g snarkjs

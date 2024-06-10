@@ -48,7 +48,7 @@ const RELEVANT_PACKAGES_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 2] =
 const TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE: [&str; 3] = [
     "aptos-testcases",
     "smoke-test",
-    "aptos-keyless-circuit-tests",
+    "aptos-keyless-circuit",
 ];
 
 #[derive(Args, Clone, Debug)]

@@ -1,6 +1,6 @@
 [package]
-name = "aptos-keyless-circuit-tests"
-description = "Aptos Keyless circuit tests"
+name = "aptos-keyless-circuit"
+description = "Aptos Keyless circuit"
 version = "0.1.0"
 
 # Workspace inherited keys

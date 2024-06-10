@@ -135,7 +135,7 @@ members = [
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
     "experimental/storage/layered-map",
-    "keyless/circuit-tests",
+    "keyless/circuit",
     "keyless/common",
     "keyless/pepper/common",
     "keyless/pepper/example-client-rust",

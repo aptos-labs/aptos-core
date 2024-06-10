@@ -38,7 +38,7 @@ impl TestCircuitHandle {
     /// Compile the circuit in the given file using BN254 as the underlying curve.
     pub fn new(file_name: &str) -> anyhow::Result<Self> {
         let cargo_manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-        let include_root_dir = cargo_manifest_dir.join("../circuit-data/templates");
+        let include_root_dir = cargo_manifest_dir.join("./templates");
         let src_circuit_path = include_root_dir.join("tests").join(file_name);
         let content = fs::read_to_string(src_circuit_path)?;
         Self::new_from_str(content.as_str())
@@ -47,7 +47,7 @@ impl TestCircuitHandle {
     pub fn new_from_str(circuit_src: &str) -> anyhow::Result<Self> {
         let dir = tempdir()?;
         let cargo_manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-        let include_root_dir = cargo_manifest_dir.join("../circuit-data/templates");
+        let include_root_dir = cargo_manifest_dir.join("./templates");
         let tmp_circuit_path = dir.path().to_owned().join("circuit.circom");
         let mut tmp_circuit_file = File::create(&tmp_circuit_path)?;
         let global_node_modules_path =

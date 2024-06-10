@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+# TODO: update `input_gen.py` to match the latest circuit, then provide instructions.
 # WARNING: This code is guaranteed to work only for the hardcoded JWT present, and is planned to be deprecated soon
 
 import json
@@ -422,7 +423,7 @@ jwt_payload_string = unsigned_b64_jwt_string_sha_padded[unsigned_b64_jwt_string_
 payload_value = pad_string(jwt_payload_string, jwt_max_payload_len)
 
 # Compute RSA signature over the full unsigned JWT
-with open("test_rsa_privkey.pem", 'rb') as f:
+with open(f"tools/test_rsa_privkey.pem", 'rb') as f:
     privkey_str = f.read()
     f.close()
 keyPair = Crypto.PublicKey.RSA.import_key(privkey_str)
@@ -462,6 +463,7 @@ json_dict = {
     "\"signature\"": sig_value,
     "\"pubkey_modulus\"": mod_value,
     "\"aud_field\"": aud_field_value,
+    "\"aud_field_string_bodies\"": 0,
     "\"aud_field_len\"": aud_field_len_value,
     "\"aud_index\"": aud_index_value,
     "\"aud_value_index\"": aud_value_index_value,
