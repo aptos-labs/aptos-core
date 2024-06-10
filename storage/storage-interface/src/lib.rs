@@ -170,7 +170,7 @@ pub trait DbReader: Send + Sync {
         fn get_transaction_auxiliary_data_by_version(
             &self,
             version: Version,
-        ) -> Result<TransactionAuxiliaryData>;
+        ) -> Result<Option<TransactionAuxiliaryData>>;
 
         /// See [AptosDB::get_first_txn_version].
         ///
