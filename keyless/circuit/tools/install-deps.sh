@@ -41,7 +41,7 @@ install_circom() {
 
 install_pip3_deps() {
     echo "pip3 deps installation started."
-    sudo apt install python3-venv
+    sudo apt install python3-venv -y
     echo "pip3 deps installation finished."
 }
 
