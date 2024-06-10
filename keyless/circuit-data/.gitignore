@@ -1,5 +1,0 @@
-*.r1cs
-*.sym
-../circuit-tests/templates/main_c_cpp
-../circuit-tests/templates/main_js
-aptos-keyless-trusted-setup-contributions

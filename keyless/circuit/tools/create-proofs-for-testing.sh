@@ -1,5 +1,9 @@
 #!/bin/bash
 
+#
+# TODO: update `create-proofs-for-testing.sh` to match the latest circuit, then provide instructions.
+#
+
 set -e
 
 scriptdir="$(cd "$(dirname "$0")" >/dev/null 2>&1 && pwd)"

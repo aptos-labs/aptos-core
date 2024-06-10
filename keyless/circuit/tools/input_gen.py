@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+# TODO: update `input_gen.py` to match the latest circuit, then provide instructions.
 # WARNING: This code is guaranteed to work only for the hardcoded JWT present, and is planned to be deprecated soon
 
 import json
