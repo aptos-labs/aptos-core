@@ -2446,9 +2446,11 @@ fn pfn_const_tps(
         .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_initial_fullnode_count(7)
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            optimize_state_sync_for_throughput(config);
             config.consensus_observer.publisher_enabled = true
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            optimize_state_sync_for_throughput(config);
             config.consensus_observer.observer_enabled = true
         }))
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
