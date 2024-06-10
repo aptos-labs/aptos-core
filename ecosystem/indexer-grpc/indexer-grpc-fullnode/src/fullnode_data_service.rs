@@ -110,7 +110,7 @@ impl FullnodeData for FullnodeDataService {
                     // send the response.
                     tx.send(Ok(response)).await.unwrap();
                 }
-                
+
                 // send end batch.
                 tx.send(Ok(get_status(StatusType::BatchEnd, batch_starting_version, Some(current_version - 1), ledger_chain_id)))
                     .await

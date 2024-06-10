@@ -514,7 +514,7 @@ codespan = "0.11.1"
 codespan-reporting = "0.11.1"
 colored = "2.0.0"
 concurrent-queue = "2.2.0"
-console-subscriber = "0.1.8"
+console-subscriber = "0.3.0"
 const_format = "0.2.26"
 core_affinity = "0.8.1"
 coset = "0.3"
@@ -763,6 +763,7 @@ tonic = { version = "0.11.0", features = [
     "transport",
     "prost",
     "codegen",
+    "gzip",
     "zstd",
 ] }
 tonic-reflection = "0.11.0"
@@ -860,3 +861,4 @@ debug = true
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
+tonic = { git = "https://github.com/aptos-labs/tonic.git", rev = "b584ecd7779350fc3dc55c053ea0a8cdee34893d" }
