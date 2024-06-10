@@ -3,7 +3,7 @@
 /// In the final call, the caller can optionally set `publish_to_account`, `publish_to_object`, or `upgrade_object_code`.
 /// If any of these options are set, the package will be published or upgraded inline, saving an extra transaction and additional storage costs.
 ///
-/// Note that `code_indices` must be sequential and without gaps. For example, if `code_indices` are provided as [0, 1, 3]
+/// Note that `code_indices` must not have gaps For example, if `code_indices` are provided as [0, 1, 3]
 /// (skipping index 2), the inline function `assemble_module_code` will abort. This is because `StagingArea.last_module_idx`
 /// is set to the maximum value from `code_indices`. When `assemble_module_code` iterates over the range from 0 to
 /// `StagingArea.last_module_idx`, it expects each index to be present in the `StagingArea.code` SmartTable.

@@ -15,10 +15,8 @@ use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use colored::Colorize;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
-// pub(crate) const LARGE_PACKAGES_MODULE_ADDRESS: &'static str =
-//     "0x1eca74e7baed8cfc36cd4f534019038f262bfa031cd931d80a2065c38366125b"; // mainnet
-pub(crate) const LARGE_PACKAGES_MODULE_ADDRESS: &'static str =
-    "0x4a96cb56a3c1169c8cbc065fb9ad4d6a27e230a7e37a9306075d71da63b13b37"; // testnet
+pub(crate) const LARGE_PACKAGES_MODULE_ADDRESS: &str =
+    "0x1ee85dbf6ba5232729932110df479da160988f52276533a0c45b2924d10136d1"; // mainnet and testnet
 
 /// These modes create a single transaction for publishing a package.
 pub(crate) enum PackagePublishMode {
@@ -207,6 +205,7 @@ fn large_packages_stage_code_chunk(
     ))
 }
 
+// TODO: move to `aptos_cached_packages` when `large_packages` is included in the aptos framework
 // Cleanup account's `StagingArea` resource.
 pub(crate) fn large_packages_cleanup_staging_area() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -288,11 +287,10 @@ pub(crate) async fn submit_chunked_publish_transactions(
             },
 
             Err(e) => {
-                let message = format!("An error occurred while submitting chunked publish transactions. \
+                println!("Caution: An error occurred while submitting chunked publish transactions. \
                 \nDue to this error, there may be incomplete data left in the `StagingArea` resource. \
                 \nThis could cause further errors if you attempt to run the chunked publish command again. \
-                \nTo avoid this, use the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under your account before retrying.").bold();
-                println!("{}", message);
+                \nTo avoid this, use the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under your account before retrying.");
                 return Err(e);
             },
         }
