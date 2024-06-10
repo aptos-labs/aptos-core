@@ -634,6 +634,19 @@ impl MoveSmith {
         let if_else = self.generate_if(u, parent_scope, Some(typ.clone()))?;
         choices.push(Expression::IfElse(Box::new(if_else)));
 
+        // Generate a binary operation with the given type
+        // Binary operations can output numerical and boolean values
+        if typ.is_num_or_bool() {
+            let binop = self.generate_numerical_binop(u, parent_scope, Some(typ.clone()))?;
+            choices.push(Expression::BinaryOperation(Box::new(binop)));
+        }
+
+        // Additionally, boolean ops also output boolean values
+        if typ.is_bool() {
+            let binop = self.generate_boolean_binop(u, parent_scope)?;
+            choices.push(Expression::BinaryOperation(Box::new(binop)));
+        }
+
         // Decrement the expression depth
         *self.expr_depth.borrow_mut() -= 1;
 
@@ -684,27 +697,69 @@ impl MoveSmith {
     }
 
     // Generate a random binary operation.
+    // Type is randomly selected
     fn generate_binary_operation(
         &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<BinaryOperation> {
         match bool::arbitrary(u)? {
-            true => self.generate_numerical_binop(u, parent_scope),
+            true => self.generate_numerical_binop(u, parent_scope, None),
             false => self.generate_boolean_binop(u, parent_scope),
         }
     }
 
-    // Generate a random binary operation for numerical types
-    // Tries to reduce the chance of abort, but aborts can still happen
+    /// Generate a random binary operation for numerical types
+    /// Tries to reduce the chance of abort, but aborts can still happen
+    /// If `typ` is provided, the generated expr will have this type
+    /// `typ` can only be a basic numerical type.
     fn generate_numerical_binop(
         &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
+        typ: Option<Type>,
     ) -> Result<BinaryOperation> {
         use NumericalBinaryOperator as OP;
-        let op = OP::arbitrary(u)?;
-        let typ = self.get_random_type(u, parent_scope, false, false)?;
+
+        // Select the operator
+        let op = match &typ {
+            // A desired output type is specified
+            Some(typ) => {
+                let ops = match (typ.is_numerical(), typ.is_bool()) {
+                    // The output should be numerical
+                    (true, false) => vec![
+                        OP::Add,
+                        OP::Sub,
+                        OP::Mul,
+                        OP::Mod,
+                        OP::Div,
+                        OP::BitAnd,
+                        OP::BitOr,
+                        OP::BitXor,
+                        OP::Shl,
+                        OP::Shr,
+                    ],
+                    // The output should be boolean
+                    (false, true) => vec![OP::Le, OP::Ge, OP::Leq, OP::Geq, OP::Eq, OP::Neq],
+                    // Numerical Binop cannot produce other types
+                    (false, false) => panic!("Invalid output type for num binop"),
+                    // A type cannot be both numerical and boolean
+                    (true, true) => panic!("Impossible type"),
+                };
+                u.choose(&ops)?.clone()
+            },
+            // No desired type, all operators are allowed
+            None => OP::arbitrary(u)?,
+        };
+
+        let typ = match &typ {
+            Some(Type::U8) | Some(Type::U16) | Some(Type::U32) | Some(Type::U64)
+            | Some(Type::U128) | Some(Type::U256) => typ.unwrap(),
+            // To generate a boolean, we can select any numerical type
+            // If a type is not provided, we also randomly select a numerical type
+            Some(Type::Bool) | None => self.get_random_type(u, parent_scope, false, false)?,
+            Some(_) => panic!("Invalid type"),
+        };
         let (lhs, rhs) = match op {
             // Sum can overflow. Sub can underflow.
             // To reduce the chance these happend, only pick a RHS from a smaller type.
@@ -776,7 +831,7 @@ impl MoveSmith {
             },
         };
         Ok(BinaryOperation {
-            op: BinaryOperator::Numerical(op),
+            op: BinaryOperator::Numerical(op.clone()),
             lhs,
             rhs,
         })

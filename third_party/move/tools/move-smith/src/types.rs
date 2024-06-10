@@ -30,21 +30,19 @@ pub enum Type {
 }
 
 impl Type {
-    /// A type is considered basic if it can be instantiated without the need
-    /// to check the already generated code.
-    pub fn is_basic_type(&self) -> bool {
+    pub fn is_numerical(&self) -> bool {
         matches!(
             self,
-            Type::U8
-                | Type::U16
-                | Type::U32
-                | Type::U64
-                | Type::U128
-                | Type::U256
-                | Type::Bool
-                | Type::Address
-                | Type::Signer
+            Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::U128 | Type::U256
         )
+    }
+
+    pub fn is_bool(&self) -> bool {
+        matches!(self, Type::Bool)
+    }
+
+    pub fn is_num_or_bool(&self) -> bool {
+        self.is_numerical() || self.is_bool()
     }
 }
 
