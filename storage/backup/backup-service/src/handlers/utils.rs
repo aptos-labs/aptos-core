@@ -211,6 +211,17 @@ where
     Ok(())
 }
 
+pub(super) fn size_prefixed_bcs_bytes<R: Serialize>(record: &R) -> Result<Bytes> {
+    let record_bytes = bcs::to_bytes(&record)?;
+    let size_bytes = (record_bytes.len() as u32).to_be_bytes();
+
+    let mut buf = BytesMut::with_capacity(size_bytes.len() + record_bytes.len());
+    buf.put_slice(&size_bytes);
+    buf.extend(record_bytes);
+
+    Ok(buf.freeze())
+}
+
 /// Return 500 on any error raised by the request handler.
 pub(super) fn unwrap_or_500(result: Result<Box<dyn Reply>>) -> Box<dyn Reply> {
     match result {

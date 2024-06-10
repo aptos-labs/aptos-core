@@ -597,11 +597,13 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "bytes",
+ "futures",
  "hyper",
  "once_cell",
  "reqwest",
  "serde",
  "tokio",
+ "tokio-stream",
  "warp",
 ]
 

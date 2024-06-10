@@ -2,15 +2,18 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+mod bytes_sender;
 mod utils;
 
 use crate::handlers::utils::{
     handle_rejection, reply_with_async_channel_writer, reply_with_bcs_bytes,
-    send_size_prefixed_bcs_bytes, unwrap_or_500, LATENCY_HISTOGRAM,
+    send_size_prefixed_bcs_bytes, size_prefixed_bcs_bytes, unwrap_or_500, LATENCY_HISTOGRAM,
 };
 use aptos_crypto::hash::HashValue;
 use aptos_db::backup::backup_handler::BackupHandler;
+use aptos_storage_interface::AptosDbError;
 use aptos_types::transaction::Version;
+use hyper::Body;
 use warp::{filters::BoxedFilter, reply::Reply, Filter};
 
 static DB_STATE: &str = "db_state";
@@ -45,9 +48,26 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> BoxedFilter<(impl Rep
     let bh = backup_handler.clone();
     let state_snapshot = warp::path!(Version)
         .map(move |version| {
-            reply_with_async_channel_writer(&bh, STATE_SNAPSHOT, |bh, sender| {
-                send_size_prefixed_bcs_bytes(bh.get_account_iter(version), sender)
-            })
+            let (mut sender, stream) = bytes_sender::BytesSender::new();
+
+            // spawn and forget, error will propagate through the stream
+            let bh = bh.clone();
+            let _join_handle = tokio::task::spawn_blocking(move || {
+                if let Err(err) = {
+                    for res in bh.get_account_iter(version)? {
+                        let record = res?;
+                        let bytes = size_prefixed_bcs_bytes(&record)?;
+                        sender.send_bytes(bytes)?;
+                    }
+                    Ok(())
+                } {
+                    sender.abort::<AptosDbError>(err)
+                } else {
+                    sender.finish()
+                }
+            });
+
+            Box::new(warp::reply::Response::new(Body::wrap_stream(stream)))
         })
         .recover(handle_rejection);
 
