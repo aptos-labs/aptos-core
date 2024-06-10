@@ -7,7 +7,7 @@ settings:
 dependencies:
   '@grpc/grpc-js':
     specifier: ^1.9.2
-    version: 1.9.2
+    version: 1.9.15
   long:
     specifier: ^5.2.3
     version: 5.2.3
@@ -22,8 +22,8 @@ devDependencies:
 
 packages:
 
-  /@grpc/grpc-js@1.9.2:
-    resolution: {integrity: sha512-Lf2pUhNTaviEdEaGgjU+29qw3arX7Qd/45q66F3z1EV5hroE6wM9xSHPvjB8EY+b1RmKZgwnLWXQorC6fZ9g5g==}
+  /@grpc/grpc-js@1.9.15:
+    resolution: {integrity: sha512-nqE7Hc0AzI+euzUwDAy0aY5hCp10r734gMGRdU+qOPX0XSceI2ULrcXB5U2xSc5VkWwalCj4M7GzCAygZl2KoQ==}
     engines: {node: ^8.13.0 || >=10.10.0}
     dependencies:
       '@grpc/proto-loader': 0.7.10
