@@ -76,7 +76,7 @@ if [ "$#" -ne 1 ]; then
     exit 2
 fi
 
-if [ -e "$path" ]; then
+if [ -e "$1" ]; then
   echo "Error: output path already exists."
   exit 3
 fi
