@@ -1,9 +1,9 @@
 /// This provides a framework for uploading large packages to standard accounts or objects.
 /// In each pass, the caller pushes more code by calling `stage_code_chunk`.
-/// In the final call, the caller can optionally set `publish_to_account`, `publish_to_object`, or `upgrade_object_code`.
-/// If any of these options are set, the package will be published or upgraded inline, saving an extra transaction and additional storage costs.
+/// In the final call, the caller can use `stage_code_chunk_and_publish_to_account`, `stage_code_chunk_and_publish_to_object`, or
+/// `stage_code_chunk_and_upgrade_object_code` to upload the final data chunk and publish or upgrade the package on-chain.
 ///
-/// Note that `code_indices` must not have gaps For example, if `code_indices` are provided as [0, 1, 3]
+/// Note that `code_indices` must not have gaps. For example, if `code_indices` are provided as [0, 1, 3]
 /// (skipping index 2), the inline function `assemble_module_code` will abort. This is because `StagingArea.last_module_idx`
 /// is set to the maximum value from `code_indices`. When `assemble_module_code` iterates over the range from 0 to
 /// `StagingArea.last_module_idx`, it expects each index to be present in the `StagingArea.code` SmartTable.
@@ -21,10 +21,8 @@ module large_packages::large_packages {
 
     /// code_indices and code_chunks should be the same length.
     const ECODE_MISMATCH: u64 = 1;
-    /// The publishing flags should either all be false, or only one should be true.
-    const EINVALID_PUBLISHING_FLAGS: u64 = 2;
     /// Object reference should be provided when upgrading object code.
-    const EMISSING_OBJECT_REFERENCE: u64 = 3;
+    const EMISSING_OBJECT_REFERENCE: u64 = 2;
 
     struct StagingArea has key {
         metadata_serialized: vector<u8>,
@@ -37,27 +35,42 @@ module large_packages::large_packages {
         metadata_chunk: vector<u8>,
         code_indices: vector<u16>,
         code_chunks: vector<vector<u8>>,
-        publish_to_account: bool,
-        publish_to_object: bool,
-        upgrade_object_code: bool,
-        code_object: Option<Object<PackageRegistry>>, // must be provided for upgrading object code.
     ) acquires StagingArea {
-        let publish_param_count = (if (publish_to_account) 1 else 0) + (if (publish_to_object) 1 else 0) + (if (upgrade_object_code) 1 else 0);
-        assert!(publish_param_count <= 1, error::invalid_argument(EINVALID_PUBLISHING_FLAGS));
+        stage_code_chunk_internal(owner, metadata_chunk, code_indices, code_chunks);
+    }
 
+    public entry fun stage_code_chunk_and_publish_to_account(
+        owner: &signer,
+        metadata_chunk: vector<u8>,
+        code_indices: vector<u16>,
+        code_chunks: vector<vector<u8>>,
+    ) acquires StagingArea {
         let staging_area = stage_code_chunk_internal(owner, metadata_chunk, code_indices, code_chunks);
+        publish_to_account(owner, staging_area);
+        cleanup_staging_area(owner);
+    }
 
-        if (publish_to_account) {
-            publish_to_standard_account(owner, staging_area);
-            cleanup_staging_area(owner);
-        } else if (publish_to_object) {
-            publish_to_object(owner, staging_area);
-            cleanup_staging_area(owner);
-        } else if (upgrade_object_code) {
-            assert!(option::is_some(&code_object), error::invalid_argument(EMISSING_OBJECT_REFERENCE));
-            upgrade_object_code(owner, staging_area, option::extract(&mut code_object));
-            cleanup_staging_area(owner);
-        }
+    public entry fun stage_code_chunk_and_publish_to_object(
+        owner: &signer,
+        metadata_chunk: vector<u8>,
+        code_indices: vector<u16>,
+        code_chunks: vector<vector<u8>>,
+    ) acquires StagingArea {
+        let staging_area = stage_code_chunk_internal(owner, metadata_chunk, code_indices, code_chunks);
+        publish_to_object(owner, staging_area);
+        cleanup_staging_area(owner);
+    }
+
+    public entry fun stage_code_chunk_and_upgrade_object_code(
+        owner: &signer,
+        metadata_chunk: vector<u8>,
+        code_indices: vector<u16>,
+        code_chunks: vector<vector<u8>>,
+        code_object: Option<Object<PackageRegistry>>,
+    ) acquires StagingArea {
+        let staging_area = stage_code_chunk_internal(owner, metadata_chunk, code_indices, code_chunks);
+        upgrade_object_code(owner, staging_area, option::extract(&mut code_object));
+        cleanup_staging_area(owner);
     }
 
     inline fun stage_code_chunk_internal(
@@ -106,7 +119,7 @@ module large_packages::large_packages {
         staging_area
     }
 
-    inline fun publish_to_standard_account(
+    inline fun publish_to_account(
         publisher: &signer,
         staging_area: &mut StagingArea,
     ) {
@@ -154,33 +167,5 @@ module large_packages::large_packages {
             last_module_idx: _,
         } = move_from<StagingArea>(signer::address_of(owner));
         smart_table::destroy(code);
-    }
-
-    /// Publishes the code from the staging area to a standard account.
-    public entry fun publish_staged_code_to_account(
-        publisher: &signer,
-    ) acquires StagingArea {
-        let staging_area = borrow_global_mut<StagingArea>(signer::address_of(publisher));
-        let code = assemble_module_code(staging_area);
-        code::publish_package_txn(publisher, staging_area.metadata_serialized, code);
-    }
-
-    /// Publishes the code from the staging area to an object.
-    public entry fun publish_staged_code_to_object(
-        publisher: &signer,
-    ) acquires StagingArea {
-        let staging_area = borrow_global_mut<StagingArea>(signer::address_of(publisher));
-        let code = assemble_module_code(staging_area);
-        object_code_deployment::publish(publisher, staging_area.metadata_serialized, code);
-    }
-
-    /// Upgrades the code in an object to the new code from the staging area.
-    public entry fun upgrade_object_code_with_staged_code(
-        publisher: &signer,
-        code_object: Object<PackageRegistry>,
-    ) acquires StagingArea {
-        let staging_area = borrow_global_mut<StagingArea>(signer::address_of(publisher));
-        let code = assemble_module_code(staging_area);
-        object_code_deployment::upgrade(publisher, staging_area.metadata_serialized, code, code_object);
     }
 }

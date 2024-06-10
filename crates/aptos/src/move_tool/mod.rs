@@ -1127,7 +1127,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             let payloads = create_chunked_publish_payloads_from_built_package(
                 package,
                 ChunkedPackagePublishMode::ObjectDeployChunked,
-                Some(object_address),
+                None,
             )
             .await?
             .payloads;

@@ -16,7 +16,7 @@ use colored::Colorize;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
 pub(crate) const LARGE_PACKAGES_MODULE_ADDRESS: &str =
-    "0x1ee85dbf6ba5232729932110df479da160988f52276533a0c45b2924d10136d1"; // mainnet and testnet
+    "0xa29df848eebfe5d981f708c2a5b06d31af2be53bbd8ddc94c8523f4b903f7adb"; // mainnet and testnet
 
 /// These modes create a single transaction for publishing a package.
 pub(crate) enum PackagePublishMode {
@@ -111,9 +111,7 @@ async fn chunk_package_and_create_payloads(
     let mut taken_size = metadata_chunk.len();
     let mut payloads = metadata_chunks
         .into_iter()
-        .map(|chunk| {
-            large_packages_stage_code_chunk(chunk, vec![], vec![], false, false, false, None)
-        })
+        .map(|chunk| large_packages_stage_code_chunk(chunk, vec![], vec![]))
         .collect::<Vec<_>>();
 
     let mut code_indices: Vec<u16> = vec![];
@@ -128,10 +126,6 @@ async fn chunk_package_and_create_payloads(
                     metadata_chunk,
                     code_indices.clone(),
                     code_chunks.clone(),
-                    false,
-                    false,
-                    false,
-                    None,
                 );
                 payloads.push(payload);
 
@@ -147,22 +141,31 @@ async fn chunk_package_and_create_payloads(
         }
     }
 
-    let (is_account_deploy, is_object_deploy, is_object_upgrade, object_address) =
-        match chunked_package_publish_mode {
-            ChunkedPackagePublishMode::AccountDeployChunked => (true, false, false, None),
-            ChunkedPackagePublishMode::ObjectDeployChunked => (false, true, false, None),
-            ChunkedPackagePublishMode::ObjectUpgradeChunked => (false, false, true, object_address),
-        };
-
-    let payload = large_packages_stage_code_chunk(
-        metadata_chunk,
-        code_indices,
-        code_chunks,
-        is_account_deploy,
-        is_object_deploy,
-        is_object_upgrade,
-        object_address,
-    );
+    // The final call includes staging the last metadata and code chunk, and then publishing or upgrading the package on-chain.
+    let payload = match chunked_package_publish_mode {
+        ChunkedPackagePublishMode::AccountDeployChunked => {
+            large_packages_stage_code_chunk_and_publish_to_account(
+                metadata_chunk,
+                code_indices,
+                code_chunks,
+            )
+        },
+        ChunkedPackagePublishMode::ObjectDeployChunked => {
+            large_packages_stage_code_chunk_and_publish_to_object(
+                metadata_chunk,
+                code_indices,
+                code_chunks,
+            )
+        },
+        ChunkedPackagePublishMode::ObjectUpgradeChunked => {
+            large_packages_stage_code_chunk_and_upgrade_object_code(
+                metadata_chunk,
+                code_indices,
+                code_chunks,
+                object_address,
+            )
+        },
+    };
     payloads.push(payload);
 
     payloads
@@ -175,16 +178,11 @@ pub fn create_chunks(data: Vec<u8>) -> Vec<Vec<u8>> {
         .collect()
 }
 
-// TODO: move to `aptos_cached_packages` when `large_packages` is included in the aptos framework
-// Create a transaction payload for staging or publishing the large package.
+// Create a transaction payload for staging chunked data to the staging area.
 fn large_packages_stage_code_chunk(
     metadata_chunk: Vec<u8>,
     code_indices: Vec<u16>,
     code_chunks: Vec<Vec<u8>>,
-    is_account_deploy: bool,
-    is_object_deploy: bool,
-    is_object_upgrade: bool,
-    code_object: Option<AccountAddress>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -197,15 +195,75 @@ fn large_packages_stage_code_chunk(
             bcs::to_bytes(&metadata_chunk).unwrap(),
             bcs::to_bytes(&code_indices).unwrap(),
             bcs::to_bytes(&code_chunks).unwrap(),
-            bcs::to_bytes(&is_account_deploy).unwrap(),
-            bcs::to_bytes(&is_object_deploy).unwrap(),
-            bcs::to_bytes(&is_object_upgrade).unwrap(),
+        ],
+    ))
+}
+
+// Create a transaction payload for staging chunked data and finally publishing the package to an account.
+fn large_packages_stage_code_chunk_and_publish_to_account(
+    metadata_chunk: Vec<u8>,
+    code_indices: Vec<u16>,
+    code_chunks: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::from_hex_literal(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
+            ident_str!("large_packages").to_owned(),
+        ),
+        ident_str!("stage_code_chunk_and_publish_to_account").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&metadata_chunk).unwrap(),
+            bcs::to_bytes(&code_indices).unwrap(),
+            bcs::to_bytes(&code_chunks).unwrap(),
+        ],
+    ))
+}
+
+// Create a transaction payload for staging chunked data and finally publishing the package to an object.
+fn large_packages_stage_code_chunk_and_publish_to_object(
+    metadata_chunk: Vec<u8>,
+    code_indices: Vec<u16>,
+    code_chunks: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::from_hex_literal(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
+            ident_str!("large_packages").to_owned(),
+        ),
+        ident_str!("stage_code_chunk_and_publish_to_object").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&metadata_chunk).unwrap(),
+            bcs::to_bytes(&code_indices).unwrap(),
+            bcs::to_bytes(&code_chunks).unwrap(),
+        ],
+    ))
+}
+
+// Create a transaction payload for staging chunked data and finally upgrading the object package.
+fn large_packages_stage_code_chunk_and_upgrade_object_code(
+    metadata_chunk: Vec<u8>,
+    code_indices: Vec<u16>,
+    code_chunks: Vec<Vec<u8>>,
+    code_object: Option<AccountAddress>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::from_hex_literal(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
+            ident_str!("large_packages").to_owned(),
+        ),
+        ident_str!("stage_code_chunk_and_upgrade_object_code").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&metadata_chunk).unwrap(),
+            bcs::to_bytes(&code_indices).unwrap(),
+            bcs::to_bytes(&code_chunks).unwrap(),
             bcs::to_bytes(&code_object).unwrap(),
         ],
     ))
 }
 
-// TODO: move to `aptos_cached_packages` when `large_packages` is included in the aptos framework
 // Cleanup account's `StagingArea` resource.
 pub(crate) fn large_packages_cleanup_staging_area() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
