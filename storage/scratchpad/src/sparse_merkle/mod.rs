@@ -92,6 +92,7 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_drop_helper::ArcAsyncDrop;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::IntGaugeHelper;
 use aptos_types::{
@@ -112,7 +113,7 @@ const BITS_IN_BYTE: usize = 8;
 /// The inner content of a sparse merkle tree, we have this so that even if a tree is dropped, the
 /// INNER of it can still live if referenced by a previous version.
 #[derive(Debug)]
-struct Inner<V: Send + Sync + 'static> {
+struct Inner<V: ArcAsyncDrop> {
     root: Option<SubTree<V>>,
     usage: StateStorageUsage,
     children: Mutex<Vec<Arc<Inner<V>>>>,
@@ -120,7 +121,7 @@ struct Inner<V: Send + Sync + 'static> {
     generation: u64,
 }
 
-impl<V: Send + Sync + 'static> Drop for Inner<V> {
+impl<V: ArcAsyncDrop> Drop for Inner<V> {
     fn drop(&mut self) {
         // Drop the root in a different thread, because that's the slowest part.
         SUBTREE_DROPPER.schedule_drop(self.root.take());
@@ -140,7 +141,7 @@ impl<V: Send + Sync + 'static> Drop for Inner<V> {
     }
 }
 
-impl<V: Send + Sync + 'static> Inner<V> {
+impl<V: ArcAsyncDrop> Inner<V> {
     fn new(root: SubTree<V>, usage: StateStorageUsage) -> Arc<Self> {
         let family = HashValue::random();
         let me = Arc::new(Self {
@@ -187,13 +188,13 @@ impl<V: Send + Sync + 'static> Inner<V> {
 
 /// The Sparse Merkle Tree implementation.
 #[derive(Clone, Debug)]
-pub struct SparseMerkleTree<V: Send + Sync + 'static> {
+pub struct SparseMerkleTree<V: ArcAsyncDrop> {
     inner: Arc<Inner<V>>,
 }
 
-impl<V: Send + Sync + 'static> SparseMerkleTree<V>
+impl<V> SparseMerkleTree<V>
 where
-    V: Clone + CryptoHash + Send + Sync + 'static,
+    V: Clone + CryptoHash + ArcAsyncDrop,
 {
     /// Constructs a Sparse Merkle Tree with a root hash. This is often used when we restart and
     /// the scratch pad and the storage have identical state, so we use a single root hash to
@@ -408,7 +409,7 @@ where
 #[cfg(any(feature = "fuzzing", feature = "bench", test))]
 impl<V> SparseMerkleTree<V>
 where
-    V: Clone + CryptoHash + Send + Sync,
+    V: Clone + CryptoHash + ArcAsyncDrop,
 {
     pub fn batch_update(
         &self,
@@ -428,7 +429,7 @@ where
 
 impl<V> Default for SparseMerkleTree<V>
 where
-    V: Clone + CryptoHash + Send + Sync,
+    V: Clone + CryptoHash + ArcAsyncDrop,
 {
     fn default() -> Self {
         SparseMerkleTree::new_empty()
@@ -456,7 +457,7 @@ pub enum StateStoreStatus<V> {
 /// In the entire lifetime of this, in-mem nodes won't be dropped because a reference to the oldest
 /// SMT is held inside.
 #[derive(Clone, Debug)]
-pub struct FrozenSparseMerkleTree<V: Send + Sync + 'static> {
+pub struct FrozenSparseMerkleTree<V: ArcAsyncDrop> {
     pub base_smt: SparseMerkleTree<V>,
     pub base_generation: u64,
     pub smt: SparseMerkleTree<V>,
@@ -464,7 +465,7 @@ pub struct FrozenSparseMerkleTree<V: Send + Sync + 'static> {
 
 impl<V> FrozenSparseMerkleTree<V>
 where
-    V: Clone + CryptoHash + Send + Sync + 'static,
+    V: Clone + CryptoHash + ArcAsyncDrop,
 {
     fn spawn(&self, child_root: SubTree<V>, child_usage: StateStorageUsage) -> Self {
         let smt = SparseMerkleTree {
