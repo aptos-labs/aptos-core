@@ -1091,7 +1091,14 @@ impl AptosVM {
             bcs::to_bytes(&payload).map_err(|_| invariant_violation_error())?
         } else {
             // Default to empty bytes if payload is not provided.
-            bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| invariant_violation_error())?
+            if self
+                .features()
+                .is_abort_if_multisig_payload_mismatch_enabled()
+            {
+                vec![]
+            } else {
+                bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| invariant_violation_error())?
+            }
         };
         // Failures here will be propagated back.
         let payload_bytes: Vec<Vec<u8>> = session
@@ -2353,6 +2360,7 @@ impl AptosVM {
                         session,
                         txn_data,
                         multisig_payload,
+                        self.features(),
                         log_context,
                         traversal_context,
                     )
