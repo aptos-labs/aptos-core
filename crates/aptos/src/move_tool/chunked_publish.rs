@@ -15,9 +15,9 @@ use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use colored::Colorize;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
-// const LARGE_PACKAGES_MODULE_ADDRESS: &'static str =
+// pub(crate) const LARGE_PACKAGES_MODULE_ADDRESS: &'static str =
 //     "0x1eca74e7baed8cfc36cd4f534019038f262bfa031cd931d80a2065c38366125b"; // mainnet
-const LARGE_PACKAGES_MODULE_ADDRESS: &'static str =
+pub(crate) const LARGE_PACKAGES_MODULE_ADDRESS: &'static str =
     "0x4a96cb56a3c1169c8cbc065fb9ad4d6a27e230a7e37a9306075d71da63b13b37"; // testnet
 
 /// These modes create a single transaction for publishing a package.
@@ -207,6 +207,19 @@ fn large_packages_stage_code_chunk(
     ))
 }
 
+// Cleanup account's `StagingArea` resource.
+pub(crate) fn large_packages_cleanup_staging_area() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::from_hex_literal(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
+            ident_str!("large_packages").to_owned(),
+        ),
+        ident_str!("cleanup_staging_area").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 async fn is_staging_area_empty(txn_options: &TransactionOptions) -> CliTypedResult<bool> {
     let url = txn_options.rest_options.url(&txn_options.profile_options)?;
     let client = Client::new(url);
@@ -249,9 +262,10 @@ pub(crate) async fn submit_chunked_publish_transactions(
 
     if !is_staging_area_empty(txn_options).await? {
         let message = format!(
-            "The resource {}::large_packages::StagingArea is not empty.\
-        \nThis may cause package publishing to fail if the data is unexpected.",
-            account_address
+            "The resource {}::large_packages::StagingArea under account {} is not empty.\
+        \nThis may cause package publishing to fail if the data is unexpected. \
+        \nUse the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under the account.",
+            LARGE_PACKAGES_MODULE_ADDRESS, account_address,
         )
         .bold();
         println!("{}", message);
@@ -274,6 +288,11 @@ pub(crate) async fn submit_chunked_publish_transactions(
             },
 
             Err(e) => {
+                let message = format!("An error occurred while submitting chunked publish transactions. \
+                \nDue to this error, there may be incomplete data left in the `StagingArea` resource. \
+                \nThis could cause further errors if you attempt to run the chunked publish command again. \
+                \nTo avoid this, use the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under your account before retrying.").bold();
+                println!("{}", message);
                 return Err(e);
             },
         }
