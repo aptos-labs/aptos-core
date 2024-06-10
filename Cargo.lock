@@ -2324,7 +2324,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-keyless-circuit-tests"
+name = "aptos-keyless-circuit"
 version = "0.1.0"
 dependencies = [
  "anyhow",

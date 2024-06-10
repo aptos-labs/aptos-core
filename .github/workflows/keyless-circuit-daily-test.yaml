@@ -7,8 +7,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/keyless-circuit-daily-test.yaml"
-      - "keyless/circuit-data/**"
-      - "keyless/circuit-tests/**"
+      - "keyless/circuit/**"
 env:
   CARGO_INCREMENTAL: "0"
   CARGO_TERM_COLOR: always
@@ -29,5 +28,5 @@ jobs:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/rust-setup
       - run: |
-          . keyless/circuit-data/install-deps.sh
-          cargo test -p aptos-keyless-circuit-tests -- --nocapture
+          . keyless/circuit/tools/install-deps.sh
+          cargo test -p aptos-keyless-circuit -- --nocapture
