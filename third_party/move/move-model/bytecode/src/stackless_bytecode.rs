@@ -339,6 +339,7 @@ impl Operation {
             Operation::GetField(_, _, _, _) => false,
             Operation::GetGlobal(_, _, _) => false,
             Operation::Uninit => false,
+            // return false because currently `drop` can only be applied to a reference.
             Operation::Drop => false,
             Operation::Release => false,
             Operation::ReadRef => false,
