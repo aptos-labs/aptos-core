@@ -386,14 +386,14 @@ impl MoveSmith {
         parent_scope: &Scope,
     ) -> Result<Statement> {
         match u.int_in_range(0..=1)? {
-            0 => Ok(Statement::Decl(self.generate_decalration(u, parent_scope)?)),
+            0 => Ok(Statement::Decl(self.generate_declaration(u, parent_scope)?)),
             1 => Ok(Statement::Expr(self.generate_expression(u, parent_scope)?)),
             _ => panic!("Invalid statement type"),
         }
     }
 
     /// Generate a random declaration.
-    fn generate_decalration(
+    fn generate_declaration(
         &mut self,
         u: &mut Unstructured,
         parent_scope: &Scope,
