@@ -51,7 +51,7 @@ trusted_setup() {
     {
         echo
         echo "Re-compiling circuit. This will take several seconds..."
-        circom -l . main.circom --r1cs --wasm --sym
+        circom -l . -l $(npm root -g) main.circom --r1cs --wasm --sym
 
         rm -f $outdir/prover_key.zkey
         rm -f $outdir/verification_key.json
