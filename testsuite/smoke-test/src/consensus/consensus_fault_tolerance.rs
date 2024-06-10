@@ -233,6 +233,47 @@ async fn test_ordered_only_cert() {
 }
 
 #[tokio::test]
+async fn test_execution_retry() {
+    let num_validators = 4;
+
+    let mut swarm = create_swarm(num_validators, 1).await;
+
+    test_consensus_fault_tolerance(
+        &mut swarm,
+        3,
+        5.0,
+        1,
+        Box::new(FailPointFailureInjection::new(Box::new(move |cycle, _| {
+            (
+                vec![(
+                    cycle % num_validators,
+                    "consensus::prepare_block".to_string(),
+                    format!("{}%return", 50),
+                )],
+                true,
+            )
+        }))),
+        Box::new(move |_, _, executed_rounds, executed_transactions, _, _| {
+            assert!(
+                executed_transactions >= 4,
+                "no progress with active consensus, only {} transactions",
+                executed_transactions
+            );
+            assert!(
+                executed_rounds >= 1,
+                "no progress with active consensus, only {} rounds",
+                executed_rounds
+            );
+            Ok(())
+        }),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
 async fn test_fault_tolerance_of_network_send() {
     // Randomly increase network failure rate, until network halts, and check that it comes back afterwards.
     let mut small_rng = SmallRng::from_entropy();
