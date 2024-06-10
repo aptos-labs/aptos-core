@@ -42,7 +42,6 @@ install_circom() {
 install_pip3_deps() {
     echo "pip3 deps installation started."
     sudo apt install python3-venv
-#    pip3 install pyjwt cryptography pycryptodome
     echo "pip3 deps installation finished."
 }
 

@@ -21,6 +21,7 @@ To generate a sample prover and verifier key pair, run the following commands:
 ```commandline
 python3 -m venv /tmp/venv
 . /tmp/venv/bin/activate
+pip install pyjwt cryptography pycryptodome
 python input_gen.py
 cd templates
 circom main.circom --wasm -l .
