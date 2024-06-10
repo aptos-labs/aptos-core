@@ -179,8 +179,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         use aptos_types::transaction::Transaction::*;
         let aux_data = self
             .db
-            .get_transaction_auxiliary_data_by_version(data.version)
-            .ok();
+            .get_transaction_auxiliary_data_by_version(data.version)?;
         let info = self.into_transaction_info(
             data.version,
             &data.info,
