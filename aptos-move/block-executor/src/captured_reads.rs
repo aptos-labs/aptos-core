@@ -597,7 +597,7 @@ impl<T: Transaction> CapturedReads<T> {
         self.group_reads.iter().all(|(key, group)| {
             let mut ret = true;
             if let Some(size) = group.collected_size {
-                ret &= Ok(size) == group_map.get_group_size(key, idx_to_validate);
+                ret &= group_map.validate_group_size(key, idx_to_validate, size);
             }
 
             ret && group.inner_reads.iter().all(|(tag, r)| {

@@ -3,7 +3,7 @@
 
 use crate::{
     smoke_test_environment::new_local_swarm_with_aptos,
-    test_utils::{assert_balance, create_and_fund_account, transfer_coins, MAX_HEALTHY_WAIT_SECS},
+    utils::{assert_balance, create_and_fund_account, transfer_coins, MAX_HEALTHY_WAIT_SECS},
 };
 use aptos_consensus::CONSENSUS_DB_NAME;
 use aptos_forge::{HealthCheckError, NodeExt, Swarm};
