@@ -603,6 +603,7 @@ dependencies = [
  "reqwest",
  "serde",
  "tokio",
+ "tokio-stream",
  "warp",
 ]
 
