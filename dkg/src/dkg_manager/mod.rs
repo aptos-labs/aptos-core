@@ -27,6 +27,7 @@ use futures_util::{future::AbortHandle, FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{sync::Arc, time::Duration};
+use aptos_types::dkg::real_dkg::RealDKG;
 
 #[derive(Clone, Debug)]
 enum InnerState {
@@ -146,7 +147,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                     epoch = self.epoch_state.epoch,
                     "Found unfinished and current DKG session. Continuing it."
                 );
-                if let Err(e) = self.setup_deal_broadcast(start_time_us, &metadata).await {
+                if let Err(e) = self.setup_deal_broadcast(start_time_us, &metadata) {
                     error!(epoch = self.epoch_state.epoch, "dkg resumption failed: {e}");
                 }
             } else {
@@ -287,7 +288,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     ///
     /// NOTE: the dealt DKG transcript does not have to be persisted:
     /// it is ok for a validator to equivocate on its DKG transcript, as long as the transcript is valid.
-    async fn setup_deal_broadcast(
+    fn setup_deal_broadcast(
         &mut self,
         start_time_us: u64,
         dkg_session_metadata: &DKGSessionMetadata,
@@ -308,37 +309,17 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             secs_since_dkg_start = secs_since_dkg_start,
             "[DKG] Deal transcript started.",
         );
-        let public_params = DKG::new_public_params(dkg_session_metadata);
-        if let Some(summary) = public_params.rounding_summary() {
-            info!(
-                epoch = self.epoch_state.epoch,
-                "Rounding summary: {:?}", summary
-            );
-            ROUNDING_SECONDS
-                .with_label_values(&[summary.method.as_str()])
-                .observe(summary.exec_time.as_secs_f64());
-        }
 
-        let mut rng = if cfg!(feature = "smoke-test") {
-            StdRng::from_seed(self.my_addr.into_bytes())
-        } else {
-            StdRng::from_rng(thread_rng()).unwrap()
-        };
-        let input_secret = DKG::InputSecret::generate(&mut rng);
 
-        let trx = DKG::generate_transcript(
-            &mut rng,
-            &public_params,
-            &input_secret,
-            self.my_index as u64,
-            &self.dealer_sk,
-        );
 
-        let my_transcript = DKGTranscript::new(
-            self.epoch_state.epoch,
-            self.my_addr,
-            bcs::to_bytes(&trx).map_err(|e| anyhow!("transcript serialization error: {e}"))?,
-        );
+
+
+
+        let (public_params, my_transcript) = setup_deal::<DKG>(self.my_addr, self.my_index.clone(), self.dealer_sk.clone(), dkg_session_metadata)?;
+
+
+
+
 
         let deal_finish = duration_since_epoch();
         let secs_since_dkg_start = deal_finish.as_secs_f64() - dkg_start_time.as_secs_f64();
@@ -443,7 +424,6 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             return Ok(());
         }
         self.setup_deal_broadcast(start_time_us, &session_metadata)
-            .await
     }
 
     /// Process an RPC request from DKG peers.
@@ -473,6 +453,48 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         Ok(())
     }
 }
+
+pub fn setup_deal<DKG: DKGTrait>(
+    my_addr: AccountAddress,
+    my_index: usize,
+    my_sk: Arc<DKG::DealerPrivateKey>,
+    session_metadata: &DKGSessionMetadata
+) -> Result<(DKG::PublicParams, DKGTranscript)> {
+    let public_params = DKG::new_public_params(session_metadata);
+    if let Some(summary) = public_params.rounding_summary() {
+        info!(
+                epoch = session_metadata.dealer_epoch,
+                "Rounding summary: {:?}", summary
+            );
+        ROUNDING_SECONDS
+            .with_label_values(&[summary.method.as_str()])
+            .observe(summary.exec_time.as_secs_f64());
+    }
+
+    let mut rng = if cfg!(feature = "smoke-test") {
+        StdRng::from_seed(my_addr.into_bytes())
+    } else {
+        StdRng::from_rng(thread_rng()).unwrap()
+    };
+    let input_secret = DKG::InputSecret::generate(&mut rng);
+
+    let trx = DKG::generate_transcript(
+        &mut rng,
+        &public_params,
+        &input_secret,
+        my_index as u64,
+        &my_sk,
+    );
+
+    let my_transcript = DKGTranscript::new(
+        session_metadata.dealer_epoch.clone(),
+        my_addr,
+        bcs::to_bytes(&trx).map_err(|e| anyhow!("transcript serialization error: {e}"))?,
+    );
+
+    Ok((public_params, my_transcript))
+}
+
 
 #[cfg(test)]
 mod tests;

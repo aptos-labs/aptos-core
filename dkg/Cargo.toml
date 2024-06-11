@@ -45,5 +45,12 @@ serde = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
 
+[dev-dependencies]
+criterion = { workspace = true }
+
 [features]
 smoke-test = []
+
+[[bench]]
+name = "foo"
+harness = false

@@ -3,7 +3,7 @@
 
 mod agg_trx_producer;
 mod counters;
-mod dkg_manager;
+pub mod dkg_manager;
 pub mod epoch_manager;
 pub mod network;
 pub mod network_interface;
