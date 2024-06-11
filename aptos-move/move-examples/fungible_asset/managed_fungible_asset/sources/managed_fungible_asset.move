@@ -275,6 +275,22 @@ module example_addr::managed_fungible_asset {
         deposit(admin, fa, primary_stores, amounts);
     }
 
+    /// Deposit as the owner of metadata object ignoring `frozen` field to primary fungible stores of accounts from a
+    /// single source of fungible asset.
+    public fun deposit_to_primary_stores_owned(
+        admin: &signer,
+        fa: FungibleAsset,
+        from: vector<address>,
+        amounts: vector<u64>,
+    ) acquires ManagingRefs {
+        let primary_stores = vector::map(
+            from,
+            |addr| primary_fungible_store::ensure_primary_store_exists(addr, fungible_asset::asset_metadata(&fa))
+        );
+        deposit(admin, &mut fa, primary_stores, amounts);
+        fungible_asset::destroy_zero(fa);
+    }
+
     /// Deposit as the owner of metadata object ignoring `frozen` field from fungible stores. The amount left in `fa`
     /// is `fa.amount - sum(amounts)`.
     public fun deposit(

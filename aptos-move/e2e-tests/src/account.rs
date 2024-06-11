@@ -17,7 +17,8 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{
         authenticator::{AnyPublicKey, AuthenticationKey},
-        EntryFunction, RawTransaction, Script, SignedTransaction, TransactionPayload,
+        BatchedFunctionCall, EntryFunction, RawTransaction, Script, SignedTransaction,
+        TransactionPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -259,6 +260,11 @@ impl TransactionBuilder {
 
     pub fn script(mut self, s: Script) -> Self {
         self.program = Some(TransactionPayload::Script(s));
+        self
+    }
+
+    pub fn batched_transaction(mut self, payload: Vec<BatchedFunctionCall>) -> Self {
+        self.program = Some(TransactionPayload::BatchedCalls(payload));
         self
     }
 

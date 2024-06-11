@@ -60,6 +60,7 @@ impl TransactionMetadata {
             script_hash: match txn.payload() {
                 TransactionPayload::Script(s) => HashValue::sha3_256_of(s.code()).to_vec(),
                 TransactionPayload::EntryFunction(_) => vec![],
+                TransactionPayload::BatchedCalls(_) => vec![],
                 TransactionPayload::Multisig(_) => vec![],
 
                 // Deprecated. Return an empty vec because we cannot do anything
