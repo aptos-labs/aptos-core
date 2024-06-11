@@ -78,6 +78,14 @@ fn serialization() {
     assert_eq!(key_pair.public_key, public_key_deserialized);
 }
 
+fn from_u32_be(val: u32) -> [u8; 4] {
+    let res_0 = (val >> 24) as u8;
+    let res_1 = (val >> 16) as u8;
+    let res_2 = (val >> 8) as u8;
+    let res_3 = val as u8; 
+    [res_0, res_1, res_2, res_3]
+}
+
 /// Tests malleability
 #[test]
 fn malleability() {
@@ -109,6 +117,21 @@ fn malleability() {
     high_signature
         .verify_arbitrary_msg(message, &key_pair.public_key)
         .unwrap_err();
+
+    const SECP256K1_HALF_ORDER_FLOOR: [u32; 8] = [0x681B20A0, 0xDFE92F46, 0x57A4501D, 0x5D576E73, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF];
+    let arr_0 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[0]);
+    let arr_1 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[1]); 
+    let arr_2 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[2]); 
+    let arr_3 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[3]); 
+    let arr_4 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[4]); 
+    let arr_5 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[5]); 
+    let arr_6 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[6]); 
+    let arr_7 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[7]); 
+    let arr_list = [arr_0, arr_1, arr_2, arr_3, arr_4, arr_5, arr_6, arr_7];
+    //let bytes = arr_list.iter().flat_map(|s| s.iter()).collect();
+    let vector = vec!();
+    
+
 }
 
 /// Test deserialization_failures

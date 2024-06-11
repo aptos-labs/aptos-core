@@ -199,12 +199,13 @@ pub struct Signature(pub(crate) libsecp256k1::Signature);
 // floor(n/2) where n is the secp256k1 scalar field order
 const SECP256K1_HALF_ORDER_FLOOR: [u32; 8] = [0x681B20A0, 0xDFE92F46, 0x57A4501D, 0x5D576E73, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF];
 
-    fn as_u32_be(array: &[u8; 4]) -> u32 {
-        ((array[0] as u32) << 24) +
-        ((array[1] as u32) << 16) +
-        ((array[2] as u32) <<  8) +
-        ((array[3] as u32) <<  0)
-    }
+fn as_u32_be(array: &[u8; 4]) -> u32 {
+    ((array[0] as u32) << 24) +
+    ((array[1] as u32) << 16) +
+    ((array[2] as u32) <<  8) +
+    ((array[3] as u32) <<  0)
+}
+
 
 impl Signature {
     /// Serialize the signature into a byte vector
