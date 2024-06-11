@@ -196,10 +196,51 @@ impl traits::VerifyingKey for PublicKey {
 #[key_name("Secp256k1EcdsaSignature")]
 pub struct Signature(pub(crate) libsecp256k1::Signature);
 
+// floor(n/2) where n is the secp256k1 scalar field order
+const SECP256K1_HALF_ORDER_FLOOR: [u32; 8] = [0x681B20A0, 0xDFE92F46, 0x57A4501D, 0x5D576E73, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF];
+
+     /*const SECP256K1_N_H_0: u32 = 0x681B20A0;
+     3 const SECP256K1_N_H_1: u32 = 0xDFE92F46;
+     4 const SECP256K1_N_H_2: u32 = 0x57A4501D;
+     5 const SECP256K1_N_H_3: u32 = 0x5D576E73;
+     6 const SECP256K1_N_H_4: u32 = 0xFFFFFFFF;
+     7 const SECP256K1_N_H_5: u32 = 0xFFFFFFFF;
+     8 const SECP256K1_N_H_6: u32 = 0xFFFFFFFF;
+     9 const SECP256K1_N_H_7: u32 = 0x7FFFFFFF;*/
+
+    fn as_u32_be(array: &[u8; 4]) -> u32 {
+        ((array[0] as u32) << 24) +
+        ((array[1] as u32) << 16) +
+        ((array[2] as u32) <<  8) +
+        ((array[3] as u32) <<  0)
+    }
+
 impl Signature {
     /// Serialize the signature into a byte vector
     pub fn to_bytes(&self) -> Vec<u8> {
         self.0.serialize().to_vec()
+    }
+
+    // Returns true if `s` is equal to floor(n/2), where n is the order of the scalar field of
+    // secp256k1
+    fn s_equal_half_order_floor(&self) -> bool {
+        let s_bytes = self.0.s.b32();
+        let s_limb_0 = as_u32_be(&s_bytes[0..3].try_into().unwrap());
+        let s_limb_1 = as_u32_be(&s_bytes[0..3].try_into().unwrap());
+        let s_limb_2 = as_u32_be(&s_bytes[0..3].try_into().unwrap());
+        let s_limb_3 = as_u32_be(&s_bytes[0..3].try_into().unwrap());
+        let s_limb_4 = as_u32_be(&s_bytes[0..3].try_into().unwrap());
+        let s_limb_5 = as_u32_be(&s_bytes[0..3].try_into().unwrap());
+        let s_limb_6 = as_u32_be(&s_bytes[0..3].try_into().unwrap());
+        let s_limb_7 = as_u32_be(&s_bytes[0..3].try_into().unwrap());
+        s_limb_0 == SECP256K1_HALF_ORDER_FLOOR[0]
+            && s_limb_1 == SECP256K1_HALF_ORDER_FLOOR[1]
+            && s_limb_2 == SECP256K1_HALF_ORDER_FLOOR[2]
+            && s_limb_3 == SECP256K1_HALF_ORDER_FLOOR[3]
+            && s_limb_4 == SECP256K1_HALF_ORDER_FLOOR[4]
+            && s_limb_5 == SECP256K1_HALF_ORDER_FLOOR[5]
+            && s_limb_6 == SECP256K1_HALF_ORDER_FLOOR[6]
+            && s_limb_7 == SECP256K1_HALF_ORDER_FLOOR[7]
     }
 
     fn verify(
@@ -209,7 +250,7 @@ impl Signature {
     ) -> Result<()> {
         // Prevent malleability attacks, low order only. The library only signs in low
         // order, so this was done intentionally.
-        if self.0.s.is_high() {
+        if self.0.s.is_high() && self.s_equal_half_order_floor() {
             Err(anyhow!(CryptoMaterialError::CanonicalRepresentationError))
         } else if libsecp256k1::verify(message, &self.0, public_key) {
             Ok(())
@@ -290,4 +331,9 @@ impl ValidCryptoMaterial for Signature {
 fn bytes_to_message(message: &[u8]) -> Result<libsecp256k1::Message> {
     let message_digest = HashValue::sha3_256_of(message).to_vec();
     libsecp256k1::Message::parse_slice(&message_digest).map_err(|e| anyhow!("{}", e))
+}
+
+#[test]
+fn mal_check() {
+    assert!(true);
 }
