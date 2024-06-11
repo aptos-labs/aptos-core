@@ -48,6 +48,7 @@ impl BatchRequesterState {
             // make sure nodes request from the different set of nodes
             self.next_index = rng.gen::<usize>() % self.signers.len();
             counters::SENT_BATCH_REQUEST_COUNT.inc_by(num_peers as u64);
+            counters::SENT_INDIVIDUAL_BATCH_REQUEST_COUNT.inc(1);
         } else {
             counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc_by(num_peers as u64);
         }
