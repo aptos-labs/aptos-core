@@ -2,8 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::handlers::utils::size_prefixed_bcs_bytes;
 use aptos_storage_interface::{AptosDbError, Result as DbResult};
 use bytes::{Bytes, BytesMut};
+use serde::Serialize;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 type BytesResult = Result<Bytes, BoxError>;
@@ -43,6 +45,13 @@ impl BytesSender {
         }
 
         Ok(())
+    }
+
+    pub fn send_size_prefixed_bcs_bytes<Record: Serialize>(
+        &mut self,
+        record: Record,
+    ) -> DbResult<()> {
+        self.send_bytes(size_prefixed_bcs_bytes(&record)?)
     }
 
     pub fn flush_buffer(&mut self) -> DbResult<()> {

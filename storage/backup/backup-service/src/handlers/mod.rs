@@ -5,7 +5,11 @@
 mod bytes_sender;
 mod utils;
 
-use crate::handlers::utils::{handle_rejection, reply_with_async_channel_writer, reply_with_bcs_bytes, send_size_prefixed_bcs_bytes, size_prefixed_bcs_bytes, unwrap_or_500, LATENCY_HISTOGRAM, reply_with_bytes_sender};
+use crate::handlers::utils::{
+    abort_on_error, handle_rejection, reply_with_async_channel_writer, reply_with_bcs_bytes,
+    reply_with_bytes_sender, send_size_prefixed_bcs_bytes, size_prefixed_bcs_bytes, unwrap_or_500,
+    LATENCY_HISTOGRAM,
+};
 use aptos_crypto::hash::HashValue;
 use aptos_db::backup::backup_handler::BackupHandler;
 use aptos_storage_interface::AptosDbError;
@@ -81,21 +85,14 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> BoxedFilter<(impl Rep
     let bh = backup_handler.clone();
     let epoch_ending_ledger_infos = warp::path!(u64 / u64)
         .map(move |start_epoch, end_epoch| {
-            reply_with_bytes_sender(&bh, EPOCH_ENDING_LEDGER_INFOS, |bh, mut sender| {
-                move || {
-                    let _res = match (|| {
-                        for res in bh.get_epoch_ending_ledger_info_iter(start_epoch, end_epoch)? {
-                            let record = res?;
-                            let bytes = size_prefixed_bcs_bytes(&record)?;
-                            sender.send_bytes(bytes)?;
-                        }
-                        Ok(())
-                    })(){
-                        Err(err) => sender.abort::<AptosDbError>(err),
-                        Ok(()) => sender.finish(),
-                    };
-                }
-            })
+            reply_with_bytes_sender(
+                &bh,
+                EPOCH_ENDING_LEDGER_INFOS,
+                abort_on_error(move |bh, sender| {
+                    bh.get_epoch_ending_ledger_info_iter(start_epoch, end_epoch)?
+                        .try_for_each(|record_res| sender.send_size_prefixed_bcs_bytes(record_res?))
+                }),
+            )
         })
         .recover(handle_rejection);
 

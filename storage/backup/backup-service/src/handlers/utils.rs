@@ -2,19 +2,19 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::handlers::bytes_sender;
 use aptos_db::backup::backup_handler::BackupHandler;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterHelper, IntCounterVec,
 };
-use aptos_storage_interface::{AptosDbError, Result};
+use aptos_storage_interface::{AptosDbError, Result, Result as DbResult};
 use bytes::{BufMut, Bytes, BytesMut};
 use hyper::Body;
 use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::{convert::Infallible, future::Future};
 use warp::{reply::Response, Rejection, Reply};
-use crate::handlers::bytes_sender;
 
 pub(super) static LATENCY_HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
@@ -223,21 +223,36 @@ pub(super) fn size_prefixed_bcs_bytes<R: Serialize>(record: &R) -> Result<Bytes>
     Ok(buf.freeze())
 }
 
-pub(super) fn reply_with_bytes_sender<G, F>(
+pub(super) fn reply_with_bytes_sender<F>(
     backup_handler: &BackupHandler,
     _endpoint: &'static str,
-    get_bytes_sender: G,
+    f: F,
 ) -> Box<dyn Reply>
-    where
-        G: FnOnce(BackupHandler, bytes_sender::BytesSender) -> F,
-        F: FnOnce() + Send + 'static,
+where
+    F: FnOnce(BackupHandler, bytes_sender::BytesSender) + Send + 'static,
 {
     let (sender, stream) = bytes_sender::BytesSender::new();
 
     // spawn and forget, error propagates through the `stream: TryStream<_>`
-    let _join_handle = tokio::task::spawn_blocking(get_bytes_sender(backup_handler.clone(), sender));
+    let bh = backup_handler.clone();
+    let _join_handle = tokio::task::spawn_blocking(move || f(bh, sender));
 
     Box::new(Response::new(Body::wrap_stream(stream)))
+}
+
+pub(super) fn abort_on_error<F>(
+    f: F,
+) -> impl FnOnce(BackupHandler, bytes_sender::BytesSender) + Send + 'static
+where
+    F: FnOnce(BackupHandler, &mut bytes_sender::BytesSender) -> DbResult<()> + Send + 'static,
+{
+    move |bh: BackupHandler, mut sender: bytes_sender::BytesSender| {
+        // ignore error from finish() and abort()
+        let _res = match f(bh, &mut sender) {
+            Ok(()) => sender.finish(),
+            Err(e) => sender.abort(e),
+        };
+    }
 }
 
 /// Return 500 on any error raised by the request handler.
