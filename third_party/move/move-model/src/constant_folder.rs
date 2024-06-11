@@ -402,7 +402,13 @@ impl<'env> ExpRewriterFunctions for ConstantFolder<'env> {
                 None
             }
         } else if matches!(oper, Operation::Vector) {
-            self.fold_vector_exp(id, Value::Vector, "vector", args)
+            // Note that creating an empty vector is less gas than `ld_const_base`,
+            // so if we are optimizing we leave an empty vector as a vector op.
+            if self.in_constant_declaration || !args.is_empty() {
+                self.fold_vector_exp(id, Value::Vector, "vector", args)
+            } else {
+                None
+            }
         } else if args.len() == 1 {
             // unary op
             self.fold_unary_exp(id, oper, &args[0])
