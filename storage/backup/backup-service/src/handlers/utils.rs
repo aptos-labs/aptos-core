@@ -229,13 +229,13 @@ pub(super) fn reply_with_bytes_sender<F>(
     f: F,
 ) -> Box<dyn Reply>
 where
-    F: FnOnce(BackupHandler, bytes_sender::BytesSender) + Send + 'static,
+    F: FnOnce(BackupHandler, &mut bytes_sender::BytesSender) -> DbResult<()> + Send + 'static,
 {
     let (sender, stream) = bytes_sender::BytesSender::new();
 
     // spawn and forget, error propagates through the `stream: TryStream<_>`
     let bh = backup_handler.clone();
-    let _join_handle = tokio::task::spawn_blocking(move || f(bh, sender));
+    let _join_handle = tokio::task::spawn_blocking(move || abort_on_error(f)(bh, sender));
 
     Box::new(Response::new(Body::wrap_stream(stream)))
 }
