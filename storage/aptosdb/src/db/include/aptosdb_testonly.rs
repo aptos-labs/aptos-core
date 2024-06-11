@@ -102,7 +102,7 @@ pub fn gather_state_updates_until_last_checkpoint(
         if latest_checkpoint_version >= first_version {
             let idx = (latest_checkpoint_version - first_version) as usize;
             assert!(
-                    txns_to_commit[idx].is_state_checkpoint(),
+                    txns_to_commit[idx].has_state_checkpoint_hash(),
                     "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
                     latest_checkpoint_version,
                     first_version + idx as u64

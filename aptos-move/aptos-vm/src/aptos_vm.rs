@@ -2494,6 +2494,11 @@ impl AptosVM {
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output)
             },
+            Transaction::BlockEpilogue(_) => {
+                let status = TransactionStatus::Keep(ExecutionStatus::Success);
+                let output = VMOutput::empty_with_status(status);
+                (VMStatus::Executed, output)
+            },
             Transaction::ValidatorTransaction(txn) => {
                 let (vm_status, output) =
                     self.process_validator_transaction(resolver, txn.clone(), log_context)?;
@@ -2812,11 +2817,7 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
             && resolver
                 .get_resource(&txn_data.sender(), &AccountResource::struct_tag())
                 .map(|data| data.is_none())
-                .map_err(|e| {
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!("{}", e))
-                        .finish(Location::Undefined)
-                })?,
+                .map_err(|e| e.finish(Location::Undefined))?,
     )
 }
 

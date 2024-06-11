@@ -186,7 +186,7 @@ impl VMExecutor for MockVM {
             }
         }
 
-        Ok(BlockOutput::new(outputs))
+        Ok(BlockOutput::new(outputs, None))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(

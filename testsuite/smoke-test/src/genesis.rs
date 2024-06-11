@@ -5,7 +5,7 @@
 use crate::{
     smoke_test_environment::SwarmBuilder,
     storage::{db_backup, db_restore},
-    test_utils::{
+    utils::{
         check_create_mint_transfer_node, create_test_accounts, execute_transactions,
         execute_transactions_and_wait, swarm_utils::insert_waypoint, MAX_CATCH_UP_WAIT_SECS,
         MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
