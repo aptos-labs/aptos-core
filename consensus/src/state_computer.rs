@@ -111,7 +111,7 @@ impl ExecutionProxy {
                 ) {
                     error!(error = ?e, "Failed to notify state synchronizer");
                 }
-
+                error!("Transaction commit notification to state sync");
                 callback();
             }
         });
