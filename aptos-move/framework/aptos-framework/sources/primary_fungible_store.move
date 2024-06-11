@@ -104,6 +104,17 @@ module aptos_framework::primary_fungible_store {
         fungible_asset::store_exists(primary_store_address(account, metadata))
     }
 
+    /// Get the primary store object for the given account.
+    public inline fun primary_store_inlined<T: key>(owner: address, metadata: Object<T>): Object<FungibleStore> {
+        let store = primary_store_address(owner, metadata);
+        object::address_to_object<FungibleStore>(store)
+    }
+
+    /// Return whether the given account's primary store exists.
+    public inline fun primary_store_exists_inlined<T: key>(account: address, metadata: Object<T>): bool {
+        fungible_asset::store_exists(primary_store_address(account, metadata))
+    }
+
     #[view]
     /// Get the balance of `account`'s primary store.
     public fun balance<T: key>(account: address, metadata: Object<T>): u64 {
