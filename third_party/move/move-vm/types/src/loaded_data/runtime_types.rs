@@ -17,6 +17,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
+use serde::Serialize;
 use smallbitvec::SmallBitVec;
 use smallvec::{smallvec, SmallVec};
 use std::{
@@ -674,13 +675,13 @@ impl fmt::Display for Type {
 
 /// Controls creation of runtime types, i.e., methods offered by this struct
 /// should be the only way to construct any type.
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub enum TypeBuilder {
     // Legacy configurations only limits type depth during type substitution. Will
     // be removed in the nearest future when the new one stabilizes. The enum can
     // be converted into the struct at that point.
     Legacy,
-    New {
+    WithLimits {
         // Maximum number of nodes a fully-instantiated type has.
         max_ty_size: u64,
         // Maximum depth (in terms of number of nodes) a fully-instantiated type has.
@@ -696,8 +697,8 @@ impl TypeBuilder {
         matches!(self, Self::Legacy)
     }
 
-    pub fn new(max_ty_size: u64, max_ty_depth: u64) -> Self {
-        Self::New {
+    pub fn with_limits(max_ty_size: u64, max_ty_depth: u64) -> Self {
+        Self::WithLimits {
             max_ty_size,
             max_ty_depth,
         }
@@ -983,7 +984,7 @@ impl TypeBuilder {
 
     fn check(&self, count: &mut u64, depth: u64) -> PartialVMResult<()> {
         match self {
-            Self::New {
+            Self::WithLimits {
                 max_ty_size,
                 max_ty_depth,
             } => {
@@ -1363,7 +1364,7 @@ mod unit_tests {
     fn test_num_nodes_in_subst() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::new(11, 5);
+        let ty_builder = TypeBuilder::with_limits(11, 5);
         let cases: Vec<(Type, Vec<Type>, usize)> = vec![
             (TyParam(0), vec![Bool], 1),
             (TyParam(0), vec![Vector(TriompheArc::new(Bool))], 2),
@@ -1394,7 +1395,7 @@ mod unit_tests {
     fn test_substitution_large_depth() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::new(11, 5);
+        let ty_builder = TypeBuilder::with_limits(11, 5);
 
         let ty = Vector(TriompheArc::new(Vector(TriompheArc::new(TyParam(0)))));
         let ty_arg = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
@@ -1409,7 +1410,7 @@ mod unit_tests {
     fn test_substitution_large_count() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::new(11, 5);
+        let ty_builder = TypeBuilder::with_limits(11, 5);
 
         let ty_params: Vec<Type> = (0..5).map(TyParam).collect();
         let ty = struct_instantiation_ty_for_test(ty_params);
@@ -1436,7 +1437,7 @@ mod unit_tests {
     #[test]
     fn test_create_primitive_tys() {
         // Limits are irrelevant here.
-        let ty_builder = TypeBuilder::new(1, 1);
+        let ty_builder = TypeBuilder::with_limits(1, 1);
         let legacy_ty_builder = TypeBuilder::legacy();
 
         assert_matches!(ty_builder.create_u8_ty(), Type::U8);
@@ -1464,7 +1465,7 @@ mod unit_tests {
     #[test]
     fn test_create_struct_ty() {
         // Limits are not relevant here.
-        let ty_builder = TypeBuilder::new(1, 1);
+        let ty_builder = TypeBuilder::with_limits(1, 1);
         let legacy_ty_builder = TypeBuilder::legacy();
 
         let idx = StructNameIndex(0);
@@ -1478,13 +1479,13 @@ mod unit_tests {
 
     #[test]
     fn test_create_struct_instantiation_ty() {
-        todo!()
+        // TODO: add a test here!
     }
 
     #[test]
     fn test_create_vec_ty() {
         let max_ty_depth = 5;
-        let ty_builder = TypeBuilder::new(100, max_ty_depth);
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
         let legacy_ty_builder = TypeBuilder::legacy();
 
         let mut depth = 1;
@@ -1508,7 +1509,7 @@ mod unit_tests {
     #[test]
     fn test_create_ref_ty() {
         let max_ty_depth = 5;
-        let ty_builder = TypeBuilder::new(100, max_ty_depth);
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
         let legacy_ty_builder = TypeBuilder::legacy();
 
         let mut depth = 1;
@@ -1532,7 +1533,7 @@ mod unit_tests {
     #[test]
     fn test_create_mut_ref_ty() {
         let max_ty_depth = 5;
-        let ty_builder = TypeBuilder::new(100, max_ty_depth);
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
         let legacy_ty_builder = TypeBuilder::legacy();
 
         let mut depth = 1;
@@ -1559,7 +1560,7 @@ mod unit_tests {
 
         let max_ty_depth = 5;
         // Maximum type size is irrelevant for constant construction.
-        let ty_builder = TypeBuilder::new(100, max_ty_depth);
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
         let legacy_ty_builder = TypeBuilder::legacy();
 
         assert_matches!(assert_ok!(ty_builder.create_constant_ty(&S::U8)), Type::U8);
@@ -1681,7 +1682,7 @@ mod unit_tests {
 
         let max_ty_size = 11;
         let max_ty_depth = 5;
-        let ty_builder = TypeBuilder::new(max_ty_size, max_ty_depth);
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, max_ty_depth);
         let legacy_ty_builder = TypeBuilder::legacy();
 
         let no_op = |_: &StructTag| unreachable!("Should not be called");
@@ -1759,7 +1760,7 @@ mod unit_tests {
 
         // Vectors.
 
-        todo!()
+        // TODO: add more tests
 
         // Structs.
     }

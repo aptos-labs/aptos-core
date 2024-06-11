@@ -20,7 +20,6 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
-use move_vm_types::loaded_data::runtime_types::TypeBuilder;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
@@ -38,17 +37,15 @@ impl WarmVmCache {
     pub(crate) fn get_warm_vm(
         native_builder: SafeNativeBuilder,
         vm_config: VMConfig,
-        ty_builder: TypeBuilder,
         resolver: &impl AptosMoveResolver,
     ) -> VMResult<MoveVM> {
-        WARM_VM_CACHE.get(native_builder, vm_config, ty_builder, resolver)
+        WARM_VM_CACHE.get(native_builder, vm_config, resolver)
     }
 
     fn get(
         &self,
         mut native_builder: SafeNativeBuilder,
         vm_config: VMConfig,
-        ty_builder: TypeBuilder,
         resolver: &impl AptosMoveResolver,
     ) -> VMResult<MoveVM> {
         let _timer = TIMER.timer_with(&["warm_vm_get"]);
@@ -70,10 +67,9 @@ impl WarmVmCache {
                 return Ok(vm.clone());
             }
 
-            let vm = MoveVM::new_with_ty_builder(
+            let vm = MoveVM::new_with_config(
                 aptos_natives_with_builder(&mut native_builder),
                 vm_config,
-                ty_builder,
             )?;
             Self::warm_vm_up(&vm, resolver);
 

@@ -19,7 +19,6 @@ use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     metadata::Metadata, resolver::MoveResolver,
 };
-use move_vm_types::loaded_data::runtime_types::TypeBuilder;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -38,16 +37,8 @@ impl MoveVM {
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
     ) -> VMResult<Self> {
-        Self::new_with_ty_builder(natives, vm_config, TypeBuilder::Legacy)
-    }
-
-    pub fn new_with_ty_builder(
-        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-        vm_config: VMConfig,
-        ty_builder: TypeBuilder,
-    ) -> VMResult<Self> {
         Ok(Self {
-            runtime: VMRuntime::new(natives, vm_config, ty_builder)
+            runtime: VMRuntime::new(natives, vm_config)
                 .map_err(|err| err.finish(Location::Undefined))?,
         })
     }

@@ -4,7 +4,7 @@
 
 use anyhow::format_err;
 use aptos_crypto::HashValue;
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
@@ -13,7 +13,6 @@ use aptos_types::{
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
-    aptos_vm::aptos_default_ty_builder,
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
@@ -111,20 +110,14 @@ where
     F: FnOnce(&mut GenesisSession),
 {
     let resolver = state_view.as_move_resolver();
-
-    let features = Features::default();
-    let ty_builder = aptos_default_ty_builder(&features);
-
     let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        Ok(&AptosGasParameters::zeros()),
         chain_id,
-        features,
+        Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &resolver,
         false,
-        ty_builder,
     )
     .unwrap();
     let change_set = {

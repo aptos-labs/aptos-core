@@ -32,7 +32,10 @@ use aptos_framework::{
 };
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
-use aptos_gas_schedule::{AptosGasParameters, TransactionGasParameters, VMGasParameters};
+use aptos_gas_schedule::{
+    gas_feature_versions::RELEASE_V1_14, AptosGasParameters, TransactionGasParameters,
+    VMGasParameters,
+};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
@@ -221,26 +224,24 @@ fn is_approved_gov_script(
 // TODO(George): move to config file when it is moved from types crate.
 pub fn aptos_prod_ty_builder(
     features: &Features,
-    gas_params: &Result<AptosGasParameters, String>,
+    gas_feature_version: u64,
+    gas_params: &AptosGasParameters,
 ) -> TypeBuilder {
-    if !features.is_limit_type_size_enabled() {
-        return TypeBuilder::Legacy;
-    };
-
-    gas_params
-        .as_ref()
-        .map(|gas_params| {
-            let max_ty_size = gas_params.vm.txn.max_ty_size;
-            let max_ty_depth = gas_params.vm.txn.max_ty_depth;
-            TypeBuilder::new(max_ty_size.into(), max_ty_depth.into())
-        })
-        .unwrap_or(aptos_default_ty_builder(features))
+    if features.is_limit_type_size_enabled() && gas_feature_version >= RELEASE_V1_14 {
+        let max_ty_size = gas_params.vm.txn.max_ty_size;
+        let max_ty_depth = gas_params.vm.txn.max_ty_depth;
+        TypeBuilder::with_limits(max_ty_size.into(), max_ty_depth.into())
+    } else {
+        aptos_default_ty_builder(features)
+    }
 }
 
 pub fn aptos_default_ty_builder(features: &Features) -> TypeBuilder {
     if features.is_limit_type_size_enabled() {
-        // Some default values in case there is no access to gas schedule.
-        TypeBuilder::new(256, 128)
+        // Type builder to use when:
+        //   1. Type size gas parameters are not yet in gas schedule (before V14).
+        //   2. No gas parameters are found on-chain.
+        TypeBuilder::with_limits(256, 128)
     } else {
         TypeBuilder::Legacy
     }
@@ -266,13 +267,8 @@ impl AptosVM {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
         let features = Features::fetch_config(resolver).unwrap_or_default();
         let randomness_config = RandomnessConfig::fetch(resolver);
-        let (
-            gas_params,
-            storage_gas_params,
-            native_gas_params,
-            misc_gas_params,
-            gas_feature_version,
-        ) = get_gas_parameters(&features, resolver);
+        let (gas_params, storage_gas_params, gas_feature_version) =
+            get_gas_parameters(&features, resolver);
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
         let chain_id = ChainId::fetch_config(resolver).unwrap_or_else(ChainId::test);
@@ -295,17 +291,14 @@ impl AptosVM {
         let aggregator_v2_type_tagging = override_is_delayed_field_optimization_capable
             && features.is_aggregator_v2_delayed_fields_enabled();
 
-        let ty_builder = aptos_prod_ty_builder(&features, &gas_params);
         let move_vm = MoveVmExt::new(
-            native_gas_params,
-            misc_gas_params,
             gas_feature_version,
+            gas_params.as_ref(),
             chain_id.id(),
             features,
             timed_features.clone(),
             resolver,
             aggregator_v2_type_tagging,
-            ty_builder,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 

@@ -14,8 +14,7 @@ use aptos_crypto::{
 };
 use aptos_framework::{ReleaseBundle, ReleasePackage};
 use aptos_gas_schedule::{
-    AptosGasParameters, InitialGasSchedule, MiscGasParameters, NativeGasParameters,
-    ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
+    AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
@@ -40,7 +39,6 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm::{
-    aptos_vm::aptos_default_ty_builder,
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
@@ -130,20 +128,14 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         state_view.add_module(&module.self_id(), module_bytes);
     }
     let data_cache = state_view.as_move_resolver();
-
-    let features = Features::default();
-    let ty_builder = aptos_default_ty_builder(&features);
-
     let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        Ok(&AptosGasParameters::zeros()),
         ChainId::test().id(),
-        features,
+        Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
         false,
-        ty_builder,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -253,20 +245,14 @@ pub fn encode_genesis_change_set(
         state_view.add_module(&module.self_id(), module_bytes);
     }
     let data_cache = state_view.as_move_resolver();
-
-    let features = Features::default();
-    let ty_builder = aptos_default_ty_builder(&features);
-
     let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        Ok(&AptosGasParameters::zeros()),
         ChainId::test().id(),
-        features,
+        Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
         false,
-        ty_builder,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -1096,19 +1082,14 @@ pub fn test_genesis_module_publishing() {
     }
     let data_cache = state_view.as_move_resolver();
 
-    let features = Features::default();
-    let ty_builder = aptos_default_ty_builder(&features);
-
     let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        Ok(&AptosGasParameters::zeros()),
         ChainId::test().id(),
-        features,
+        Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
         false,
-        ty_builder,
     )
     .unwrap();
     let id1 = HashValue::zero();

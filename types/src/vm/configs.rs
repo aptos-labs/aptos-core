@@ -8,6 +8,7 @@ use crate::on_chain_config::{
 use move_binary_format::deserializer::DeserializerConfig;
 use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::config::VMConfig;
+use move_vm_types::loaded_data::runtime_types::TypeBuilder;
 
 pub fn aptos_prod_deserializer_config(features: &Features) -> DeserializerConfig {
     DeserializerConfig::new(
@@ -47,6 +48,7 @@ pub fn aptos_prod_vm_config(
     features: &Features,
     timed_features: &TimedFeatures,
     aggregator_v2_type_tagging: bool,
+    ty_builder: TypeBuilder,
     paranoid_type_checks: bool,
 ) -> VMConfig {
     let check_invariant_in_swap_loc =
@@ -75,6 +77,7 @@ pub fn aptos_prod_vm_config(
         type_base_cost,
         type_byte_cost,
         aggregator_v2_type_tagging,
+        ty_builder,
     }
 }
 

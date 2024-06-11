@@ -9,7 +9,8 @@
 ///
 /// Change log:
 /// - V19
-///   - gas for aggregator_v2::is_at_least native function
+///   - Gas for aggregator_v2::is_at_least native function
+///   - Limits for bounding MoveVM type sizes
 /// - V18
 ///   - Separate limits for governance scripts
 ///   - Function info & dispatchable token gas params

@@ -196,7 +196,6 @@ pub(crate) struct Loader {
     module_cache_hits: RwLock<BTreeSet<ModuleId>>,
 
     vm_config: VMConfig,
-    ty_builder: TypeBuilder,
 }
 
 impl Clone for Loader {
@@ -209,17 +208,12 @@ impl Clone for Loader {
             invalidated: RwLock::new(*self.invalidated.read()),
             module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
             vm_config: self.vm_config.clone(),
-            ty_builder: self.ty_builder.clone(),
         }
     }
 }
 
 impl Loader {
-    pub(crate) fn new(
-        natives: NativeFunctions,
-        vm_config: VMConfig,
-        ty_builder: TypeBuilder,
-    ) -> Self {
+    pub(crate) fn new(natives: NativeFunctions, vm_config: VMConfig) -> Self {
         Self {
             scripts: RwLock::new(ScriptCache::new()),
             type_cache: RwLock::new(TypeCache::new()),
@@ -228,7 +222,6 @@ impl Loader {
             invalidated: RwLock::new(false),
             module_cache_hits: RwLock::new(BTreeSet::new()),
             vm_config,
-            ty_builder,
         }
     }
 
@@ -237,7 +230,7 @@ impl Loader {
     }
 
     pub(crate) fn ty_builder(&self) -> &TypeBuilder {
-        &self.ty_builder
+        &self.vm_config.ty_builder
     }
 
     /// Flush this cache if it is marked as invalidated.
@@ -333,7 +326,7 @@ impl Loader {
             .collect::<VMResult<Vec<_>>>()?;
 
         #[allow(clippy::collapsible_if)]
-        if self.ty_builder.is_legacy() {
+        if self.ty_builder().is_legacy() {
             if ty_args.iter().map(legacy_count_type_nodes).sum::<u64>()
                 > TypeBuilder::LEGACY_MAX_TYPE_INSTANTIATION_NODES
             {

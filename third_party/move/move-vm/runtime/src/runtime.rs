@@ -25,7 +25,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::{Type, TypeBuilder},
+    loaded_data::runtime_types::Type,
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
@@ -49,10 +49,9 @@ impl VMRuntime {
     pub(crate) fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
-        ty_builder: TypeBuilder,
     ) -> PartialVMResult<Self> {
         Ok(VMRuntime {
-            loader: Loader::new(NativeFunctions::new(natives)?, vm_config, ty_builder),
+            loader: Loader::new(NativeFunctions::new(natives)?, vm_config),
             module_cache: Arc::new(ModuleCache::new()),
         })
     }
