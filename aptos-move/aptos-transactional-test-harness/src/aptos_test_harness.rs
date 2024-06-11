@@ -517,9 +517,10 @@ impl<'a> AptosTestAdapter<'a> {
         let sig_verified_block = into_signature_verified_block(txn_block);
         let onchain_config = BlockExecutorConfigFromOnchain {
             // TODO fetch values from state?
+            // Or should we just use execute_block_no_limit ?
             block_gas_limit_type: BlockGasLimitType::Limit(30000),
         };
-        let mut outputs =
+        let (mut outputs, _) =
             AptosVM::execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?
                 .into_inner();
 

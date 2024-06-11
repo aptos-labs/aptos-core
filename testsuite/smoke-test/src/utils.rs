@@ -9,7 +9,7 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use aptos_types::on_chain_config::OnChainConsensusConfig;
+use aptos_types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig};
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use rand::random;
 use std::time::Duration;
@@ -186,6 +186,22 @@ pub async fn get_current_consensus_config(rest_client: &RestClient) -> OnChainCo
             .get_account_resource_bcs::<Vec<u8>>(
                 CORE_CODE_ADDRESS,
                 "0x1::consensus_config::ConsensusConfig",
+            )
+            .await
+            .unwrap()
+            .into_inner(),
+    )
+    .unwrap()
+}
+
+pub(crate) async fn get_current_execution_config(
+    rest_client: &RestClient,
+) -> OnChainExecutionConfig {
+    bcs::from_bytes(
+        &rest_client
+            .get_account_resource_bcs::<Vec<u8>>(
+                CORE_CODE_ADDRESS,
+                "0x1::execution_config::ExecutionConfig",
             )
             .await
             .unwrap()

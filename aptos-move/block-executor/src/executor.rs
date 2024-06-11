@@ -38,7 +38,9 @@ use aptos_types::{
     executable::Executable,
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
-    transaction::{BlockExecutableTransaction as Transaction, BlockOutput},
+    transaction::{
+        block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
+    },
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
@@ -877,7 +879,7 @@ where
         let shared_counter = AtomicU32::new(start_shared_counter);
 
         if signature_verified_block.is_empty() {
-            return Ok(BlockOutput::new(vec![]));
+            return Ok(BlockOutput::new(vec![], self.empty_block_end_info()));
         }
 
         let num_txns = signature_verified_block.len();
@@ -938,11 +940,19 @@ where
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
-        // TODO add block end info to output.
-        // block_limit_processor.is_block_limit_reached();
+        let block_end_info = if self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            Some(shared_commit_state.into_inner().get_block_end_info())
+        } else {
+            None
+        };
 
         (!shared_maybe_error.load(Ordering::SeqCst))
-            .then(|| BlockOutput::new(final_results.into_inner()))
+            .then(|| BlockOutput::new(final_results.into_inner(), block_end_info))
             .ok_or(())
     }
 
@@ -1299,10 +1309,36 @@ where
 
         counters::update_state_counters(unsync_map.stats(), false);
 
-        // TODO add block end info to output.
-        // block_limit_processor.is_block_limit_reached();
+        let block_end_info = if self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            Some(block_limit_processor.get_block_end_info())
+        } else {
+            None
+        };
 
-        Ok(BlockOutput::new(ret))
+        Ok(BlockOutput::new(ret, block_end_info))
+    }
+
+    fn empty_block_end_info(&self) -> Option<BlockEndInfo> {
+        if self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            Some(BlockEndInfo::V0 {
+                block_gas_limit_reached: false,
+                block_output_limit_reached: false,
+                block_effective_block_gas_units: 0,
+                block_approx_output_size: 0,
+            })
+        } else {
+            None
+        }
     }
 
     pub fn execute_block(
@@ -1397,7 +1433,7 @@ where
                 .iter()
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(BlockOutput::new(ret));
+            return Ok(BlockOutput::new(ret, self.empty_block_end_info()));
         }
 
         Err(sequential_error)
