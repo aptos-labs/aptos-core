@@ -14,6 +14,7 @@ use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::{convert::Infallible, future::Future};
 use warp::{reply::Response, Rejection, Reply};
+use crate::handlers::bytes_sender;
 
 pub(super) static LATENCY_HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
@@ -220,6 +221,23 @@ pub(super) fn size_prefixed_bcs_bytes<R: Serialize>(record: &R) -> Result<Bytes>
     buf.extend(record_bytes);
 
     Ok(buf.freeze())
+}
+
+pub(super) fn reply_with_bytes_sender<G, F>(
+    backup_handler: &BackupHandler,
+    _endpoint: &'static str,
+    get_bytes_sender: G,
+) -> Box<dyn Reply>
+    where
+        G: FnOnce(BackupHandler, bytes_sender::BytesSender) -> F,
+        F: FnOnce() + Send + 'static,
+{
+    let (sender, stream) = bytes_sender::BytesSender::new();
+
+    // spawn and forget, error propagates through the `stream: TryStream<_>`
+    let _join_handle = tokio::task::spawn_blocking(get_bytes_sender(backup_handler.clone(), sender));
+
+    Box::new(Response::new(Body::wrap_stream(stream)))
 }
 
 /// Return 500 on any error raised by the request handler.

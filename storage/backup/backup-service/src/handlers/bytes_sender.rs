@@ -9,6 +9,8 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 type BytesResult = Result<Bytes, BoxError>;
 
 pub(super) struct BytesSender {
+    /// Buffers bytes instead of relying on the channel's backlog to provide backpressure, so
+    /// the max pending bytes are more predictable.
     buffer: BytesMut,
     bytes_tx: tokio::sync::mpsc::Sender<BytesResult>,
 }
@@ -18,7 +20,7 @@ impl BytesSender {
     #[cfg(not(test))]
     const TARGET_BATCH_SIZE: usize = 1024 * 1024;
     #[cfg(test)]
-    const TARGET_BATCH_SIZE: usize = 100;
+    const TARGET_BATCH_SIZE: usize = 10;
 
     pub fn new() -> (Self, tokio_stream::wrappers::ReceiverStream<BytesResult>) {
         let (bytes_tx, bytes_rx) = tokio::sync::mpsc::channel(Self::MAX_BATCHES);
