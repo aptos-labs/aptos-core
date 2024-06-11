@@ -523,7 +523,7 @@ impl StateStore {
                 .collect::<Result<Vec<_>>>()?
                 .into_iter()
                 .enumerate()
-                .filter(|(_idx, txn_info)| txn_info.is_state_checkpoint())
+                .filter(|(_idx, txn_info)| txn_info.has_state_checkpoint_hash())
                 .last()
                 .map(|(idx, _)| idx);
             latest_snapshot_state_view.prime_cache_by_write_set(&write_sets)?;

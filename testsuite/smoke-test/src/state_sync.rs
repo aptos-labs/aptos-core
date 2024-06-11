@@ -5,38 +5,29 @@
 use crate::{
     smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
     state_sync_utils,
-    test_utils::{
+    utils::{
         create_test_accounts, execute_transactions, execute_transactions_and_wait,
         wait_for_all_nodes, MAX_CATCH_UP_WAIT_SECS,
     },
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
-use aptos_db::AptosDB;
-use aptos_forge::{LocalNode, LocalSwarm, Node, NodeExt};
-use aptos_inspection_service::inspection_client::InspectionClient;
-use aptos_rest_client::Client as RestClient;
-use aptos_storage_interface::DbReader;
-use aptos_types::{
-    account_address::AccountAddress,
-    on_chain_config::{
-        ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
-        ProposerElectionType,
-    },
+use aptos_forge::{LocalSwarm, NodeExt};
+use aptos_types::on_chain_config::{
+    ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
+    ProposerElectionType,
 };
 use std::{sync::Arc, time::Duration};
-
-// TODO: Go through the existing tests, identify any gaps, and clean up the rest.
 
 #[tokio::test]
 async fn test_fullnode_fast_sync_epoch_changes() {
     // Test fast syncing in the presence of epoch changes
-    test_fullnode_fast_sync(true).await;
+    state_sync_utils::test_fullnode_fast_sync(true, false).await;
 }
 
 #[tokio::test]
 async fn test_fullnode_fast_sync_no_epoch_changes() {
     // Test fast syncing without epoch changes
-    test_fullnode_fast_sync(false).await;
+    state_sync_utils::test_fullnode_fast_sync(false, false).await;
 }
 
 #[tokio::test]
@@ -565,44 +556,6 @@ async fn test_all_validators_fast_and_execution_sync() {
     test_all_validator_failures(swarm).await;
 }
 
-/// A test method that verifies that a fullnode can fast sync from
-/// a validator after a data wipe. If `epoch_changes` are enabled
-/// then epoch changes can occur during test execution and fullnode syncing.
-async fn test_fullnode_fast_sync(epoch_changes: bool) {
-    // Create a swarm with 2 validators
-    let mut swarm = SwarmBuilder::new_local(2)
-        .with_aptos()
-        .with_init_config(Arc::new(|_, config, _| {
-            config.state_sync.state_sync_driver.bootstrapping_mode =
-                BootstrappingMode::DownloadLatestStates;
-        }))
-        .with_init_genesis_config(Arc::new(|genesis_config| {
-            genesis_config.epoch_duration_secs = 10_000; // Prevent epoch changes from occurring unnecessarily
-        }))
-        .build()
-        .await;
-
-    // Verify the oldest ledger info and pruning metrics for the validators
-    for validator in swarm.validators_mut() {
-        verify_fast_sync_version_and_metrics(validator, true).await;
-    }
-
-    // Create a fullnode config that uses fast syncing
-    let mut vfn_config = NodeConfig::get_default_vfn_config();
-    vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
-        BootstrappingMode::DownloadLatestStates;
-
-    // Test the ability of a fullnode to sync
-    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
-    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, epoch_changes, true).await;
-
-    // Verify the oldest ledger info and pruning metrics for the fullnode
-    if epoch_changes {
-        let fullnode = swarm.fullnode_mut(vfn_peer_id).unwrap();
-        verify_fast_sync_version_and_metrics(fullnode, false).await;
-    }
-}
-
 /// A test method that verifies that a validator can fast sync from other
 /// validators after a data wipe and while requiring exponential backoff.
 /// If `epoch_changes` are enabled then epoch changes can occur during
@@ -654,7 +607,7 @@ async fn test_validator_sync(
 
     // Stop the specified validator and delete the storage
     let validator = validator_peer_ids[validator_index_to_test];
-    stop_validator_and_delete_storage(swarm, validator).await;
+    state_sync_utils::stop_validator_and_delete_storage(swarm, validator, true).await;
 
     // Execute more transactions
     execute_transactions(
@@ -750,7 +703,7 @@ async fn test_validator_sync_and_participate(fast_sync: bool, epoch_changes: boo
     // Verify the oldest ledger info and pruning metrics for the second validator
     if fast_sync && epoch_changes {
         let validator = swarm.validators_mut().nth(validator_index_to_test).unwrap();
-        verify_fast_sync_version_and_metrics(validator, false).await;
+        state_sync_utils::verify_fast_sync_version_and_metrics(validator, false).await;
     }
 
     // Execute multiple transactions through the first validator
@@ -805,7 +758,7 @@ pub async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 
     // Go through each validator, stop the node, delete the storage and wait for it to come back
     for validator in validator_peer_ids.clone() {
-        stop_validator_and_delete_storage(&mut swarm, validator).await;
+        state_sync_utils::stop_validator_and_delete_storage(&mut swarm, validator, true).await;
         swarm.validator_mut(validator).unwrap().start().unwrap();
         wait_for_all_nodes(&mut swarm).await;
     }
@@ -822,7 +775,7 @@ pub async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 
     // Go through each validator, stop the node, delete the storage and wait for it to come back
     for validator in validator_peer_ids.clone() {
-        stop_validator_and_delete_storage(&mut swarm, validator).await;
+        state_sync_utils::stop_validator_and_delete_storage(&mut swarm, validator, true).await;
         swarm.validator_mut(validator).unwrap().start().unwrap();
         wait_for_all_nodes(&mut swarm).await;
     }
@@ -840,103 +793,4 @@ pub async fn test_all_validator_failures(mut swarm: LocalSwarm) {
         true,
     )
     .await;
-}
-
-/// Stops the specified validator and deletes storage
-async fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountAddress) {
-    let validator = swarm.validator_mut(validator).unwrap();
-
-    // The validator is stopped during the clear_storage() call
-    validator.clear_storage().await.unwrap();
-}
-
-/// Verifies that the oldest ledger info, pruning metrics and first
-/// ledger info are all correctly aligned after a fast sync.
-async fn verify_fast_sync_version_and_metrics(node: &mut LocalNode, sync_to_genesis: bool) {
-    // Verify the oldest ledger info for the node
-    verify_oldest_version_after_fast_sync(node.rest_client(), sync_to_genesis).await;
-
-    // Verify the node's pruning metrics
-    let inspection_client = node.inspection_client();
-    verify_pruning_metrics_after_fast_sync(inspection_client, sync_to_genesis).await;
-
-    // Verify that the ledger info exists at version 0
-    verify_first_ledger_info(node);
-}
-
-/// Verifies that the ledger info at version 0 exists in the given node's DB
-fn verify_first_ledger_info(node: &mut LocalNode) {
-    // Get the DB path for the node
-    let db_path = node.config().base.data_dir.as_path();
-    let mut db_path_buf = db_path.to_path_buf();
-    db_path_buf.push("db");
-
-    // Stop the node to prevent any DB contention
-    node.stop();
-
-    // Verify that the ledger info exists at version 0
-    let aptos_db = AptosDB::new_for_test(db_path_buf.as_path());
-    aptos_db.get_epoch_ending_ledger_info(0).unwrap();
-
-    // Restart the node
-    node.start().unwrap();
-}
-
-/// Verifies the oldest ledger version on a node after fast syncing
-async fn verify_oldest_version_after_fast_sync(
-    node_rest_client: RestClient,
-    sync_to_genesis: bool,
-) {
-    // Fetch the oldest ledger version from the node
-    let ledger_information = node_rest_client.get_ledger_information().await.unwrap();
-    let oldest_ledger_version = ledger_information.inner().oldest_ledger_version;
-
-    // Verify the oldest ledger version after fast syncing
-    if sync_to_genesis {
-        // The node should have fast synced to genesis
-        assert_eq!(oldest_ledger_version, 0);
-    } else {
-        // The node should have fast synced to the latest epoch
-        assert!(oldest_ledger_version > 0);
-    }
-}
-
-/// Verifies the pruning metrics on a node after fast syncing
-async fn verify_pruning_metrics_after_fast_sync(
-    node_inspection_client: InspectionClient,
-    sync_to_genesis: bool,
-) {
-    // Fetch the pruning metrics from the node
-    let state_merkle_pruner_version = node_inspection_client
-        .get_node_metric_i64(
-            "aptos_pruner_versions{pruner_name=state_merkle_pruner,tag=min_readable}",
-        )
-        .await
-        .unwrap()
-        .unwrap();
-    let epoch_snapshot_pruner_version = node_inspection_client
-        .get_node_metric_i64(
-            "aptos_pruner_versions{pruner_name=epoch_snapshot_pruner,tag=min_readable}",
-        )
-        .await
-        .unwrap()
-        .unwrap();
-    let ledger_pruner_version = node_inspection_client
-        .get_node_metric_i64("aptos_pruner_versions{pruner_name=ledger_pruner,tag=min_readable}")
-        .await
-        .unwrap()
-        .unwrap();
-
-    // Verify that the pruning metrics are valid
-    if sync_to_genesis {
-        // The node should have fast synced to genesis
-        assert_eq!(state_merkle_pruner_version, 0);
-        assert_eq!(epoch_snapshot_pruner_version, 0);
-        assert_eq!(ledger_pruner_version, 0);
-    } else {
-        // The node should have fast synced to the latest epoch
-        assert!(state_merkle_pruner_version > 0);
-        assert!(epoch_snapshot_pruner_version > 0);
-        assert!(ledger_pruner_version > 0);
-    }
 }

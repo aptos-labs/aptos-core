@@ -28,6 +28,7 @@ use aptos_types::{
     epoch_state::EpochState,
     transaction::{
         authenticator::AccountAuthenticator,
+        block_epilogue::BlockEndInfo,
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
         BlockOutput, ExecutionStatus, Transaction, TransactionOutput, TransactionOutputProvider,
         TransactionStatus,
@@ -47,6 +48,8 @@ pub struct ChunkOutput {
     /// execution result is processed; as well as all the accounts touched during execution, together
     /// with their proofs.
     pub state_cache: StateCache,
+    /// Optional StateCheckpoint payload
+    pub block_end_info: Option<BlockEndInfo>,
 }
 
 impl ChunkOutput {
@@ -72,12 +75,12 @@ impl ChunkOutput {
     ) -> Result<Self> {
         let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
 
-        let transaction_outputs = block_output.into_inner();
-        // TODO add block_limit_info to ChunkOutput, to add it to StateCheckpoint
+        let (transaction_outputs, block_end_info) = block_output.into_inner();
         Ok(Self {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
+            block_end_info,
         })
     }
 
@@ -105,6 +108,7 @@ impl ChunkOutput {
                 .collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
+            block_end_info: None,
         })
     }
 
@@ -130,6 +134,7 @@ impl ChunkOutput {
             transactions,
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
+            block_end_info: None,
         })
     }
 
@@ -327,6 +332,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
             Some(Transaction::BlockMetadata(_)) => "block_metadata",
             Some(Transaction::BlockMetadataExt(_)) => "block_metadata_ext",
             Some(Transaction::StateCheckpoint(_)) => "state_checkpoint",
+            Some(Transaction::BlockEpilogue(_)) => "block_epilogue",
             Some(Transaction::ValidatorTransaction(_)) => "validator_transaction",
             None => "unknown",
         };
