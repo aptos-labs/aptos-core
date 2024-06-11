@@ -8,7 +8,7 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
 };
-use aptos_storage_interface::{AptosDbError, Result, Result as DbResult};
+use aptos_storage_interface::Result as DbResult;
 use hyper::Body;
 use once_cell::sync::Lazy;
 use serde::Serialize;
@@ -36,7 +36,7 @@ pub(super) static THROUGHPUT_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
 pub(super) fn reply_with_bcs_bytes<R: Serialize>(
     endpoint: &str,
     record: &R,
-) -> Result<Box<dyn Reply>> {
+) -> DbResult<Box<dyn Reply>> {
     let bytes = bcs::to_bytes(record)?;
     THROUGHPUT_COUNTER
         .with_label_values(&[endpoint])
@@ -77,7 +77,7 @@ where
 }
 
 /// Return 500 on any error raised by the request handler.
-pub(super) fn unwrap_or_500(result: Result<Box<dyn Reply>>) -> Box<dyn Reply> {
+pub(super) fn unwrap_or_500(result: DbResult<Box<dyn Reply>>) -> Box<dyn Reply> {
     match result {
         Ok(resp) => resp,
         Err(e) => {
@@ -88,17 +88,7 @@ pub(super) fn unwrap_or_500(result: Result<Box<dyn Reply>>) -> Box<dyn Reply> {
 }
 
 /// Return 400 on any rejections (parameter parsing errors).
-pub(super) async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
+pub(super) async fn handle_rejection(err: Rejection) -> DbResult<impl Reply, Infallible> {
     warn!("bad request: {:?}", err);
     Ok(warp::http::StatusCode::BAD_REQUEST)
-}
-
-trait IntoDbResult<T> {
-    fn into_db_res(self) -> Result<T>;
-}
-
-impl<T, E: std::error::Error> IntoDbResult<T> for std::result::Result<T, E> {
-    fn into_db_res(self) -> Result<T> {
-        self.map_err(|e| AptosDbError::Other(e.to_string()))
-    }
 }
