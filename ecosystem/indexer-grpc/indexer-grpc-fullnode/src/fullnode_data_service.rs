@@ -82,6 +82,7 @@ impl FullnodeData for FullnodeDataService {
 
             loop {
                 // Nothing for now.
+                let batch_starting_version = current_version;
                 for _ in 0..processor_task_count {
                     let mut transactions = vec![CULPRIT_TRANSACTION.clone(); (processor_batch_size as usize)];
                     // update the versions.
@@ -102,7 +103,7 @@ impl FullnodeData for FullnodeDataService {
                 }
                 
                 // send end batch.
-                tx.send(Ok(get_status(StatusType::BatchEnd, current_version, None, ledger_chain_id)))
+                tx.send(Ok(get_status(StatusType::BatchEnd, batch_starting_version, Some(current_version - 1), ledger_chain_id)))
                     .await
                     .unwrap();
             }
