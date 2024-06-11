@@ -84,6 +84,7 @@ impl FullnodeData for FullnodeDataService {
                 // Nothing for now.
                 let batch_starting_version = current_version;
                 for _ in 0..processor_task_count {
+                    let start_time = std::time::Instant::now();
                     let mut transactions = vec![CULPRIT_TRANSACTION.clone(); (processor_batch_size as usize)];
                     // update the versions.
                     for (i, transaction) in transactions.iter_mut().enumerate() {
@@ -98,6 +99,14 @@ impl FullnodeData for FullnodeDataService {
                             TransactionsOutput { transactions },
                         )),
                     };
+                    aptos_logger::info!(
+                        start_version = batch_starting_version,
+                        end_version = current_version - 1,
+                        chain_id = ledger_chain_id,
+                        service_type = SERVICE_TYPE,
+                        duration = start_time.elapsed().as_secs_f64(),
+                        "[Indexer Fullnode] building batch"
+                    );
                     // send the response.
                     tx.send(Ok(response)).await.unwrap();
                 }
