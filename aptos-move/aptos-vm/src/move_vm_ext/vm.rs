@@ -74,8 +74,8 @@ impl MoveVmExt {
 
         let mut builder = SafeNativeBuilder::new(
             gas_feature_version,
-            native_gas_params.clone(),
-            misc_gas_params.clone(),
+            native_gas_params,
+            misc_gas_params,
             timed_features.clone(),
             features.clone(),
         );
