@@ -14146,6 +14146,31 @@
           }
         }
       },
+      "BlockEndInfo": {
+        "type": "object",
+        "required": [
+          "block_gas_limit_reached",
+          "block_output_limit_reached",
+          "block_effective_block_gas_units",
+          "block_approx_output_size"
+        ],
+        "properties": {
+          "block_gas_limit_reached": {
+            "type": "boolean"
+          },
+          "block_output_limit_reached": {
+            "type": "boolean"
+          },
+          "block_effective_block_gas_units": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "block_approx_output_size": {
+            "type": "integer",
+            "format": "uint64"
+          }
+        }
+      },
       "BlockEpilogueTransaction": {
         "type": "object",
         "description": "A block epilogue transaction",
@@ -14200,6 +14225,9 @@
           },
           "timestamp": {
             "$ref": "#/components/schemas/U64"
+          },
+          "block_end_info": {
+            "$ref": "#/components/schemas/BlockEndInfo"
           }
         }
       },

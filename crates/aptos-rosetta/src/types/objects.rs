@@ -856,6 +856,7 @@ pub enum TransactionType {
     BlockMetadataExt,
     StateCheckpoint,
     Validator,
+    BlockEpilogue,
 }
 
 impl Display for TransactionType {
@@ -868,6 +869,7 @@ impl Display for TransactionType {
             BlockMetadataExt => "BlockResourceExt",
             StateCheckpoint => "StateCheckpoint",
             Validator => "Validator",
+            BlockEpilogue => "BlockEpilogue",
         })
     }
 }
@@ -890,10 +892,9 @@ impl Transaction {
                 txn.info,
                 txn.events,
             ),
-            StateCheckpoint(_) | BlockEpilogue(_) => {
-                (TransactionType::StateCheckpoint, None, txn.info, vec![])
-            },
+            StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
             ValidatorTransaction(_) => (TransactionType::Validator, None, txn.info, txn.events),
+            BlockEpilogue(_) => (TransactionType::BlockEpilogue, None, txn.info, vec![]),
         };
 
         // Operations must be sequential and operation index must always be in the same order
