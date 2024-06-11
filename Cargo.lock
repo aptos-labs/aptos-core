@@ -2069,6 +2069,7 @@ dependencies = [
  "hex",
  "hyper",
  "itertools 0.12.1",
+ "lazy_static",
  "move-binary-format",
  "move-core-types",
  "move-package",
