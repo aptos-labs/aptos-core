@@ -1,0 +1,11 @@
+---
+remote_endpoint: ~
+name: "20240610-testnet-oidc-provider-updates"
+proposals:
+  - name: main
+    metadata:
+      title: "main"
+      description: "main"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/20240610-testnet-oidc-provider-updates.move
