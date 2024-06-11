@@ -837,15 +837,11 @@ impl TransactionsApi {
                 .context("Failed to join task to read transaction by hash")?
                 .context("Failed to read transaction by hash from DB")?;
         Ok(match from_db {
-            None => {
-                let res = self
+            None => self
                 .context
                 .get_pending_transaction_by_hash(hash)
                 .await?
-                .map(|t| t.into());
-                println!("pending_transaction: {:?}", res);
-                res
-            },
+                .map(|t| t.into()),
             _ => from_db.map(|t| t.into()),
         })
     }

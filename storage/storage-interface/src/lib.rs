@@ -45,6 +45,7 @@ pub mod block_info;
 pub mod cached_state_view;
 pub mod errors;
 mod executed_trees;
+pub mod finality_view;
 mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod mock;
@@ -480,6 +481,12 @@ pub trait DbReader: Send + Sync {
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         self.get_state_value_with_proof_by_version_ext(state_key, version)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
+    }
+}
+
+impl DbReader for Arc<dyn DbReader> {
+    fn get_read_delegatee(&self) -> &dyn DbReader {
+        &**self
     }
 }
 
