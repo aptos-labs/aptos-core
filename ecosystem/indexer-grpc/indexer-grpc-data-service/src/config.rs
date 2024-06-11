@@ -5,7 +5,8 @@ use crate::service::RawDataServerWrapper;
 use anyhow::{bail, Result};
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use aptos_indexer_grpc_utils::{
-    compression_util::StorageFormat, config::IndexerGrpcFileStoreConfig, types::RedisUrl,
+    compression_util::StorageFormat, config::IndexerGrpcFileStoreConfig,
+    in_memory_cache::InMemoryCacheConfig, types::RedisUrl,
 };
 use aptos_protos::{
     indexer::v1::FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
@@ -66,6 +67,8 @@ pub struct IndexerGrpcDataServiceConfig {
     /// Support compressed cache data.
     #[serde(default = "IndexerGrpcDataServiceConfig::default_enable_cache_compression")]
     pub enable_cache_compression: bool,
+    #[serde(default)]
+    pub in_memory_cache_config: InMemoryCacheConfig,
     /// Sender addresses to ignore. Transactions from these addresses will not be indexed.
     #[serde(default = "IndexerGrpcDataServiceConfig::default_sender_addresses_to_ignore")]
     pub sender_addresses_to_ignore: Vec<String>,
@@ -80,6 +83,7 @@ impl IndexerGrpcDataServiceConfig {
         file_store_config: IndexerGrpcFileStoreConfig,
         redis_read_replica_address: RedisUrl,
         enable_cache_compression: bool,
+        in_memory_cache_config: InMemoryCacheConfig,
         sender_addresses_to_ignore: Vec<String>,
     ) -> Self {
         Self {
@@ -92,6 +96,7 @@ impl IndexerGrpcDataServiceConfig {
             file_store_config,
             redis_read_replica_address,
             enable_cache_compression,
+            in_memory_cache_config,
             sender_addresses_to_ignore,
         }
     }
@@ -117,6 +122,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         {
             bail!("At least one of data_service_grpc_non_tls_config and data_service_grpc_tls_config must be set");
         }
+        self.in_memory_cache_config.validate()?;
         Ok(())
     }
 
@@ -146,6 +152,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         // InMemoryCache.
         let in_memory_cache =
             aptos_indexer_grpc_utils::in_memory_cache::InMemoryCache::new_with_redis_connection(
+                self.in_memory_cache_config.clone(),
                 redis_conn,
                 cache_storage_format,
             )

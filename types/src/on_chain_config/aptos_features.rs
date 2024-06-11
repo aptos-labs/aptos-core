@@ -11,10 +11,9 @@ use move_core_types::{
     language_storage::CORE_CODE_ADDRESS,
 };
 use serde::{Deserialize, Serialize};
-use strum_macros::FromRepr;
-
+use strum_macros::{EnumString, FromRepr};
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr, EnumString)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
@@ -169,6 +168,7 @@ impl Default for Features {
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
         }
+
         features
     }
 }

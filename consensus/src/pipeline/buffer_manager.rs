@@ -5,8 +5,7 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     consensus_observer::{
-        network::{ObserverMessage, OrderedBlock as ObserverBlock},
-        publisher::Publisher,
+        network_message::ConsensusObserverMessage, publisher::ConsensusPublisher,
     },
     counters, monitor,
     network::{IncomingCommitRequest, NetworkSender},
@@ -24,6 +23,7 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use aptos_bounded_executor::BoundedExecutor;
+use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{
     common::Author, pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
 };
@@ -135,8 +135,10 @@ pub struct BufferManager {
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
     order_vote_enabled: bool,
-    // Publisher for downstream observers.
-    publisher: Option<Publisher>,
+
+    // Consensus publisher for downstream observers.
+    consensus_observer_config: ConsensusObserverConfig,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
 }
 
 impl BufferManager {
@@ -162,7 +164,8 @@ impl BufferManager {
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
         order_vote_enabled: bool,
-        publisher: Option<Publisher>,
+        consensus_observer_config: ConsensusObserverConfig,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -209,11 +212,19 @@ impl BufferManager {
             reset_flag,
             bounded_executor: executor,
             order_vote_enabled,
-            publisher,
+
+            consensus_observer_config,
+            consensus_publisher,
         }
     }
 
-    fn do_reliable_broadcast(&self, message: CommitMessage) -> DropGuard {
+    fn do_reliable_broadcast(&self, message: CommitMessage) -> Option<DropGuard> {
+        // If consensus observer is enabled, we don't need to broadcast
+        if self.consensus_observer_config.observer_enabled {
+            return None;
+        }
+
+        // Otherwise, broadcast the message and return the drop guard
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let task = self.reliable_broadcast.broadcast(
             message,
@@ -224,7 +235,7 @@ impl BufferManager {
             ),
         );
         tokio::spawn(Abortable::new(task, abort_registration));
-        DropGuard::new(abort_handle)
+        Some(DropGuard::new(abort_handle))
     }
 
     fn create_new_request<Request>(&self, req: Request) -> CountedRequest<Request> {
@@ -265,11 +276,12 @@ impl BufferManager {
             ordered_blocks: ordered_blocks.clone(),
             lifetime_guard: self.create_new_request(()),
         });
-        if let Some(publisher) = &self.publisher {
-            publisher.publish(ObserverMessage::OrderedBlock(ObserverBlock {
-                blocks: ordered_blocks.clone().into_iter().map(Arc::new).collect(),
-                ordered_proof: ordered_proof.clone(),
-            }));
+        if let Some(consensus_publisher) = &self.consensus_publisher {
+            let message = ConsensusObserverMessage::new_ordered_block_message(
+                ordered_blocks.clone().into_iter().map(Arc::new).collect(),
+                ordered_proof.clone(),
+            );
+            consensus_publisher.publish_message(message);
         }
         self.execution_schedule_phase_tx
             .send(request)
@@ -372,8 +384,7 @@ impl BufferManager {
                     let commit_decision = CommitMessage::Decision(CommitDecision::new(
                         aggregated_item.commit_proof.clone(),
                     ));
-                    self.commit_proof_rb_handle
-                        .replace(self.do_reliable_broadcast(commit_decision));
+                    self.commit_proof_rb_handle = self.do_reliable_broadcast(commit_decision);
                 }
                 let commit_proof = aggregated_item.commit_proof.clone();
                 if commit_proof.ledger_info().ends_epoch() {
@@ -381,10 +392,11 @@ impl BufferManager {
                     // this persisting request will result in BlockNotFound
                     self.reset().await;
                 }
-                if let Some(publisher) = &self.publisher {
-                    publisher.publish(ObserverMessage::CommitDecision(CommitDecision::new(
-                        commit_proof.clone(),
-                    )));
+                if let Some(consensus_publisher) = &self.consensus_publisher {
+                    let message = ConsensusObserverMessage::new_commit_decision_message(
+                        CommitDecision::new(commit_proof.clone()),
+                    );
+                    consensus_publisher.publish_message(message);
                 }
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {
@@ -548,9 +560,9 @@ impl BufferManager {
                 let signed_item_mut = signed_item.unwrap_signed_mut();
                 let commit_vote = signed_item_mut.commit_vote.clone();
                 let commit_vote = CommitMessage::Vote(commit_vote);
-                signed_item_mut
-                    .rb_handle
-                    .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
+                signed_item_mut.rb_handle = self
+                    .do_reliable_broadcast(commit_vote)
+                    .map(|handle| (Instant::now(), handle));
                 self.buffer.set(&current_cursor, signed_item);
             } else {
                 self.buffer.set(&current_cursor, item);
@@ -676,9 +688,9 @@ impl BufferManager {
                 };
                 if re_broadcast {
                     let commit_vote = CommitMessage::Vote(signed_item.commit_vote.clone());
-                    signed_item
-                        .rb_handle
-                        .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
+                    signed_item.rb_handle = self
+                        .do_reliable_broadcast(commit_vote)
+                        .map(|handle| (Instant::now(), handle));
                     count += 1;
                 }
                 self.buffer.set(&cursor, item);

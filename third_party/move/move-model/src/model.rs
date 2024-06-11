@@ -1249,12 +1249,14 @@ impl GlobalEnv {
                 reported_ordering
             }
         });
-        for (diag, reported) in self
-            .diags
-            .borrow_mut()
-            .iter_mut()
-            .filter(|(d, reported)| !reported && filter(d))
-        {
+        for (diag, reported) in self.diags.borrow_mut().iter_mut().filter(|(d, reported)| {
+            !reported
+                && filter(d)
+                && (d.severity >= Severity::Error
+                    || d.labels
+                        .iter()
+                        .any(|label| self.file_id_is_primary_target.contains(&label.file_id)))
+        }) {
             if !*reported {
                 // Avoid showing the same message twice. This can happen e.g. because of
                 // duplication of expressions via schema inclusion.

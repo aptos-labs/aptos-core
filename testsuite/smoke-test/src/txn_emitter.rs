@@ -3,7 +3,7 @@
 
 use crate::{
     smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
-    test_utils::create_and_fund_account,
+    utils::create_and_fund_account,
 };
 use anyhow::ensure;
 use aptos_forge::{
