@@ -2,9 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::handlers::utils::size_prefixed_bcs_bytes;
+use crate::handlers::utils::THROUGHPUT_COUNTER;
+use aptos_metrics_core::IntCounterHelper;
 use aptos_storage_interface::{AptosDbError, Result as DbResult};
-use bytes::{Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use serde::Serialize;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -15,6 +16,7 @@ pub(super) struct BytesSender {
     /// the max pending bytes are more predictable.
     buffer: BytesMut,
     bytes_tx: tokio::sync::mpsc::Sender<BytesResult>,
+    endpoint: &'static str,
 }
 
 impl BytesSender {
@@ -24,12 +26,15 @@ impl BytesSender {
     #[cfg(test)]
     const TARGET_BATCH_SIZE: usize = 10;
 
-    pub fn new() -> (Self, tokio_stream::wrappers::ReceiverStream<BytesResult>) {
+    pub fn new(
+        endpoint: &'static str,
+    ) -> (Self, tokio_stream::wrappers::ReceiverStream<BytesResult>) {
         let (bytes_tx, bytes_rx) = tokio::sync::mpsc::channel(Self::MAX_BATCHES);
 
         let myself = Self {
             buffer: BytesMut::new(),
             bytes_tx,
+            endpoint,
         };
 
         let stream = tokio_stream::wrappers::ReceiverStream::new(bytes_rx);
@@ -51,11 +56,20 @@ impl BytesSender {
         &mut self,
         record: Record,
     ) -> DbResult<()> {
-        self.send_bytes(size_prefixed_bcs_bytes(&record)?)
+        let record_bytes = bcs::to_bytes(&record)?;
+        let size_bytes = (record_bytes.len() as u32).to_be_bytes();
+
+        let mut buf = BytesMut::with_capacity(size_bytes.len() + record_bytes.len());
+        buf.put_slice(&size_bytes);
+        buf.extend(record_bytes);
+
+        self.send_bytes(buf.freeze())
     }
 
     pub fn flush_buffer(&mut self) -> DbResult<()> {
         let bytes = self.buffer.split().freeze();
+        THROUGHPUT_COUNTER.inc_with_by(&[self.endpoint], bytes.len() as u64);
+
         self.send_res(Ok(bytes))
     }
 
