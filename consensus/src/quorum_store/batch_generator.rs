@@ -391,8 +391,6 @@ impl BatchGenerator {
         mut interval: Interval,
     ) {
         let start = Instant::now();
-        let mut last_pulled_num_txns = 0;
-        let mut last_pulled_max_txn = 0;
 
         let mut last_non_empty_pull = start;
         let back_pressure_decrease_duration =
@@ -401,9 +399,7 @@ impl BatchGenerator {
             Duration::from_millis(self.config.back_pressure.increase_duration_ms);
         let mut back_pressure_decrease_latest = start;
         let mut back_pressure_increase_latest = start;
-        let mut dynamic_pull_txn_per_s = (self.config.back_pressure.dynamic_min_txn_per_s
-            + self.config.back_pressure.dynamic_max_txn_per_s)
-            / 2;
+        let mut dynamic_pull_txn_per_s = self.config.back_pressure.dynamic_max_txn_per_s;
 
         loop {
             let _timer = counters::BATCH_GENERATOR_MAIN_LOOP.start_timer();
@@ -452,19 +448,14 @@ impl BatchGenerator {
                     ) as usize;
                     if (!self.back_pressure.proof_count
                         && since_last_non_empty_pull_ms >= self.config.batch_generation_min_non_empty_interval_ms)
-                        || since_last_non_empty_pull_ms == self.config.batch_generation_max_interval_ms
-                        || last_pulled_num_txns >= self.config.sender_max_batch_txns as u64
-                        || last_pulled_num_txns > (last_pulled_max_txn as f64 / 2.0) as u64 {
-
+                        || since_last_non_empty_pull_ms == self.config.batch_generation_max_interval_ms {
                         let dynamic_pull_max_txn = std::cmp::max(
                             (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
                         let pull_max_txn = std::cmp::min(
                             dynamic_pull_max_txn,
                             self.config.sender_max_total_txns as u64,
                         );
-                        last_pulled_max_txn = pull_max_txn;
                         let batches = self.handle_scheduled_pull(pull_max_txn).await;
-                        last_pulled_num_txns = batches.iter().map(|b| b.batch_info().num_txns()).sum();
                         if !batches.is_empty() {
                             last_non_empty_pull = tick_start;
 
