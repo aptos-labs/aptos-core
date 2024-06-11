@@ -80,6 +80,7 @@ async fn batch_update_gradually(
 ) -> Result<()> {
     // let mut swarm = ctx.swarm();
     for validator in validators_to_update {
+        info!("batch_update_gradually upgrade start: {}", validator);
         ctxa.ctx
             .lock()
             .await
@@ -87,6 +88,7 @@ async fn batch_update_gradually(
             .upgrade_validator(*validator, version)
             .await?;
         if wait_until_healthy {
+            info!("batch_update_gradually upgrade waiting: {}", validator);
             let deadline = Instant::now() + max_wait;
             ctxa.ctx
                 .lock()
@@ -96,10 +98,13 @@ async fn batch_update_gradually(
                 .unwrap()
                 .wait_until_healthy(deadline)
                 .await?;
+            info!("batch_update_gradually upgrade healthy: {}", validator);
         }
         if !delay.is_zero() {
+            info!("batch_update_gradually upgrade delay: {:?}", delay);
             tokio::time::sleep(delay).await;
         }
+        info!("batch_update_gradually upgrade done: {}", validator);
     }
 
     ctxa.ctx.lock().await.swarm().health_check().await?;

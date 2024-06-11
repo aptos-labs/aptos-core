@@ -66,6 +66,7 @@ async fn stat_gather_task(
 ) -> Result<Option<TxnStats>> {
     let mut upgrade_stats = vec![];
     while !done.load(Ordering::Relaxed) {
+        info!("stat_gather_task some traffic...");
         let upgrading_stats = emitter
             .clone()
             .emit_txn_for(
@@ -74,6 +75,7 @@ async fn stat_gather_task(
                 upgrade_traffic_chunk_duration,
             )
             .await?;
+        info!("stat_gather_task some stats: {}", &upgrading_stats);
         upgrade_stats.push(upgrading_stats);
     }
     let statsum = upgrade_stats.into_iter().reduce(|a, b| &a + &b);
@@ -139,10 +141,10 @@ fn upgrade_and_gather_stats(
     let emitter_ctx = ctxa.clone();
     let mut stats_result: Result<Option<TxnStats>> = Ok(None);
     let mut upgrade_result: Result<()> = Ok(());
-    // std::thread::scope(|scopev| {
     tokio_scoped::scope(|scopev| {
         // emit trafic and gather stats
         scopev.spawn(async {
+            info!("upgrade_and_gather_stats traffic thread start");
             let mut ctx_locker = emitter_ctx.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();
             let emit_job_request = ctx.emit_job.clone();
@@ -156,14 +158,8 @@ fn upgrade_and_gather_stats(
                     },
                 };
             let source_account = ctx.swarm().chain_info().root_account;
-            // let traffic_runtime = match traffic_emitter_runtime() {
-            //     Ok(x) => x,
-            //     Err(err) => {
-            //         stats_result = Err(err);
-            //         return;
-            //     }
-            // };
             let upgrade_traffic_chunk_duration = Duration::from_secs(15);
+            info!("upgrade_and_gather_stats traffic thread 1");
             stats_result = stat_gather_task(
                 emitter,
                 emit_job_request,
@@ -172,11 +168,11 @@ fn upgrade_and_gather_stats(
                 upgrade_done.clone(),
             )
             .await;
+            info!("upgrade_and_gather_stats traffic thread done");
         });
         // do upgrade
         scopev.spawn(async {
-            // let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-            // upgrade_result = runtime.block_on(batch_update_gradually(ctxa, validators_to_update, version, wait_until_healthy, delay, max_wait));
+            info!("upgrade_and_gather_stats upgrade thread start");
             upgrade_result = batch_update_gradually(
                 ctxa,
                 validators_to_update,
@@ -186,7 +182,9 @@ fn upgrade_and_gather_stats(
                 max_wait,
             )
             .await;
+            info!("upgrade_and_gather_stats upgrade thread 1");
             upgrade_done.store(true, Ordering::Relaxed);
+            info!("upgrade_and_gather_stats upgrade thread done");
         });
     });
 
