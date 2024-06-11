@@ -883,7 +883,7 @@ impl Loader {
     {
         for (addr, name) in ids.into_iter() {
             // TODO: Allow the check of special addresses to be customized.
-            if !addr.is_special() && visited.insert((addr, name), ()).is_some() {
+            if addr.is_special() || visited.insert((addr, name), ()).is_some() {
                 continue;
             }
 
