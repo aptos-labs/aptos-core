@@ -1323,7 +1323,7 @@ impl<'a> Resolver<'a> {
         let struct_ty = &struct_inst.definition_struct_type;
         ty_builder.create_struct_instantiation_ty_with_legacy_check(
             struct_ty,
-            struct_inst.instantiation.clone(),
+            &struct_inst.instantiation,
             ty_args,
         )
     }
@@ -1471,7 +1471,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => {
                 let field_inst = &module.field_instantiations[idx.0 as usize];
                 let struct_ty = &field_inst.definition_struct_type;
-                let ty_params = field_inst.instantiation.clone();
+                let ty_params = &field_inst.instantiation;
 
                 self.loader()
                     .ty_builder()
