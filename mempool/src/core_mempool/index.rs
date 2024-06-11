@@ -91,13 +91,13 @@ impl PartialOrd for OrderedQueueKey {
 
 impl Ord for OrderedQueueKey {
     fn cmp(&self, other: &OrderedQueueKey) -> Ordering {
-        if self.address == other.address {
-            return self
-                .sequence_number
-                .transaction_sequence_number
-                .cmp(&other.sequence_number.transaction_sequence_number)
-                .reverse();
-        }
+        // if self.address == other.address {
+        //     return self
+        //         .sequence_number
+        //         .transaction_sequence_number
+        //         .cmp(&other.sequence_number.transaction_sequence_number)
+        //         .reverse();
+        // }
         match self.gas_ranking_score.cmp(&other.gas_ranking_score) {
             Ordering::Equal => {},
             ordering => return ordering,
