@@ -178,6 +178,7 @@ impl BlockStore {
             vec![],                   /* compute_status */
             vec![],                   /* txn_infos */
             vec![],                   /* reconfig_events */
+            None,                     // block end info
         );
 
         let pipelined_root_block = PipelinedBlock::new(

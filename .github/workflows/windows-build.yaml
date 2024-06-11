@@ -5,19 +5,20 @@ on:
   workflow_dispatch:
   pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
-  push:
-    branches:
-      - main
+  schedule: 
+    # Run twice a day at 12PM PT and 8PM PT Monday through Friday
+    - cron: "0 19,3 * * 1-5"
+    # Run once a day at 12PM PT on Saturday and Sunday
+    - cron: "0 19 * * 6-7"
 
 jobs:
   windows-build:
-    runs-on: windows-latest-8-core
+    runs-on: windows-latest
     if: | # Only run on each PR once an appropriate event occurs
       (
         github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'push' ||
+        github.event_name == 'schedule' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-windows-tests') ||
-        github.event.pull_request.auto_merge != null
       )
     defaults:
       run:
@@ -34,8 +35,11 @@ jobs:
       - name: Run cargo cache
         uses: Swatinem/rust-cache@359a70e43a0bb8a13953b04a90f76428b4959bb6 # pin@v2.2.0
 
-      - name: Install the developer tools
-        run: PowerShell -ExecutionPolicy Bypass -File scripts/windows_dev_setup.ps1
+      - name: Set up WinGet
+        run: Set-Variable ProgressPreference SilentlyContinue ; PowerShell -ExecutionPolicy Bypass -File scripts/windows_dev_setup.ps1
+
+      - name: Install the Developer Tools
+        run: Set-Variable ProgressPreference SilentlyContinue ; PowerShell -ExecutionPolicy Bypass -File scripts/windows_dev_setup.ps1 -t
 
       # This is required for the openssl-sys crate to build.
       # See: https://github.com/sfackler/rust-openssl/issues/1542#issuecomment-1399358351
