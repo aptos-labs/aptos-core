@@ -10,7 +10,7 @@ use crate::{
     utils::iterators::ExpectContinuousVersions,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     transaction::{TransactionToCommit, Version},
@@ -66,7 +66,7 @@ impl WriteSetDb {
         start_version: Version,
         num_transactions: usize,
     ) -> Result<impl Iterator<Item = Result<WriteSet>> + '_> {
-        let mut iter = self.db.iter::<WriteSetSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<WriteSetSchema>()?;
         iter.seek(&start_version)?;
         iter.expect_continuous_versions(start_version, num_transactions)
     }
@@ -89,7 +89,7 @@ impl WriteSetDb {
             end_version
         );
 
-        let mut iter = self.db.iter::<WriteSetSchema>(Default::default())?;
+        let mut iter = self.db.iter::<WriteSetSchema>()?;
         iter.seek(&begin_version)?;
 
         let mut ret = Vec::with_capacity((end_version - begin_version) as usize);

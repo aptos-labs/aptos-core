@@ -7,16 +7,22 @@ use crate::{
     common::NUM_STATE_SHARDS,
     db_options::{gen_state_kv_cfds, state_kv_db_column_families},
     metrics::OTHER_TIMERS_SECONDS,
-    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        state_value::StateValueSchema,
+    },
     utils::truncation_helper::{get_state_kv_commit_progress, truncate_state_kv_db_shards},
 };
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_storage_interface::Result;
-use aptos_types::transaction::Version;
+use aptos_types::{
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::Version,
+};
 use arr_macro::arr;
 use std::{
     path::{Path, PathBuf},
@@ -268,5 +274,25 @@ impl StateKvDb {
             .as_ref()
             .join(STATE_KV_DB_FOLDER_NAME)
             .join("metadata")
+    }
+
+    pub(crate) fn get_state_value_with_version_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        let mut read_opts = ReadOptions::default();
+
+        // We want `None` if the state_key changes in iteration.
+        read_opts.set_prefix_same_as_start(true);
+
+        let mut iter = self
+            .db_shard(state_key.get_shard_id())
+            .iter_with_opts::<StateValueSchema>(read_opts)?;
+        iter.seek(&(state_key.clone(), version))?;
+        Ok(iter
+            .next()
+            .transpose()?
+            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
     }
 }
