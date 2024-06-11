@@ -70,8 +70,14 @@ env:
 permissions:
   contents: read
   id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+  pull-requests: write
 
 jobs:
+  workflow-telemetry-action:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect Workflow Telemetry
+        uses: catchpoint/workflow-telemetry-action@v2
   rust-all:
     runs-on: experimental-docker
     steps:
