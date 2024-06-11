@@ -33,7 +33,7 @@ use aptos_framework::{
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_gas_schedule::{
-    gas_feature_versions::RELEASE_V1_14, AptosGasParameters, TransactionGasParameters,
+    gas_feature_versions::RELEASE_V1_15, AptosGasParameters, TransactionGasParameters,
     VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
@@ -227,7 +227,7 @@ pub fn aptos_prod_ty_builder(
     gas_feature_version: u64,
     gas_params: &AptosGasParameters,
 ) -> TypeBuilder {
-    if features.is_limit_type_size_enabled() && gas_feature_version >= RELEASE_V1_14 {
+    if features.is_limit_type_size_enabled() && gas_feature_version >= RELEASE_V1_15 {
         let max_ty_size = gas_params.vm.txn.max_ty_size;
         let max_ty_depth = gas_params.vm.txn.max_ty_depth;
         TypeBuilder::with_limits(max_ty_size.into(), max_ty_depth.into())
