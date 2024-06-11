@@ -9,8 +9,8 @@ use crate::{
     block_storage::BlockReader,
     counters::{
         CHAIN_HEALTH_BACKOFF_TRIGGERED, PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED,
-        PROPOSER_DELAY_PROPOSAL, PROPOSER_PENDING_BLOCKS_COUNT,
-        PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
+        PROPOSER_BLOCK_SIZE_BYTES, PROPOSER_BLOCK_SIZE_TXNS, PROPOSER_DELAY_PROPOSAL,
+        PROPOSER_PENDING_BLOCKS_COUNT, PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
     payload_client::PayloadClient,
     util::time_service::TimeService,
@@ -334,6 +334,8 @@ impl ProposalGenerator {
             // Use non-backpressure reduced values for computing fill_fraction
             let max_fill_fraction = (max_pending_block_len as f32 / self.max_block_txns as f32)
                 .max(max_pending_block_bytes as f32 / self.max_block_bytes as f32);
+            PROPOSER_BLOCK_SIZE_TXNS.set(max_block_txns as i64);
+            PROPOSER_BLOCK_SIZE_BYTES.set(max_block_bytes as i64);
             PROPOSER_PENDING_BLOCKS_COUNT.set(pending_blocks.len() as i64);
             PROPOSER_PENDING_BLOCKS_FILL_FRACTION.set(max_fill_fraction as f64);
 
