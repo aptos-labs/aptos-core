@@ -890,7 +890,9 @@ impl Transaction {
                 txn.info,
                 txn.events,
             ),
-            StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
+            StateCheckpoint(_) | BlockEpilogue(_) => {
+                (TransactionType::StateCheckpoint, None, txn.info, vec![])
+            },
             ValidatorTransaction(_) => (TransactionType::Validator, None, txn.info, txn.events),
         };
 
