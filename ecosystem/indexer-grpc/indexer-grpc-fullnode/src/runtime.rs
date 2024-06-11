@@ -93,14 +93,14 @@ pub fn bootstrap(
         let router = match use_data_service_interface {
             false => {
                 let svc = FullnodeDataServer::new(server)
-                    .send_compressed(CompressionEncoding::Gzip)
+                    .send_compressed(CompressionEncoding::Zstd)
                     .accept_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Zstd);
                 tonic_server.add_service(svc)
             },
             true => {
                 let svc = RawDataServer::new(localnet_data_server)
-                    .send_compressed(CompressionEncoding::Gzip)
+                    .send_compressed(CompressionEncoding::Zstd)
                     .accept_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Zstd);
                 tonic_server.add_service(svc)

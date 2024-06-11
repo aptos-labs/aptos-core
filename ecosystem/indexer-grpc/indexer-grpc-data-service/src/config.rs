@@ -170,7 +170,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             Arc::new(in_memory_cache),
         )?;
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
-            .send_compressed(CompressionEncoding::Gzip)
+            .send_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Zstd);
         let svc_clone = svc.clone();
