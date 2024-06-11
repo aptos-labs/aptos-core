@@ -7,10 +7,10 @@ The scripts in this repository will not work without installing the dependencies
 To install, please run:
 
 ```
-./tools/install-deps.sh
+. ./tools/install-deps.sh
 ```
 
-## Run circuit unittests
+## Run sub-circuit unittests
 
 ```bash
 cargo test -p aptos-keyless-circuit
