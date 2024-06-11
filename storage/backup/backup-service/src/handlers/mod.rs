@@ -84,19 +84,26 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> BoxedFilter<(impl Rep
     let bh = backup_handler.clone();
     let epoch_ending_ledger_infos = warp::path!(u64 / u64)
         .map(move |start_epoch, end_epoch| {
-            // use async move block to group `bh` and the iterator into the same lifetime, since the
-            // latter references the former.
-            reply_with_async_channel_writer(
-                &bh,
-                EPOCH_ENDING_LEDGER_INFOS,
-                |bh, sender| async move {
-                    send_size_prefixed_bcs_bytes(
-                        bh.get_epoch_ending_ledger_info_iter(start_epoch, end_epoch),
-                        sender,
-                    )
-                    .await
-                },
-            )
+            let (mut sender, stream) = bytes_sender::BytesSender::new();
+
+            // spawn and forget, error will propagate through the stream
+            let bh = bh.clone();
+            let _join_handle = tokio::task::spawn_blocking(move || {
+                if let Err(err) = {
+                    for res in bh.get_epoch_ending_ledger_info_iter(start_epoch, end_epoch)? {
+                        let record = res?;
+                        let bytes = size_prefixed_bcs_bytes(&record)?;
+                        sender.send_bytes(bytes)?;
+                    }
+                    Ok(())
+                } {
+                    sender.abort::<AptosDbError>(err)
+                } else {
+                    sender.finish()
+                }
+            });
+
+            Box::new(warp::reply::Response::new(Body::wrap_stream(stream)))
         })
         .recover(handle_rejection);
 
