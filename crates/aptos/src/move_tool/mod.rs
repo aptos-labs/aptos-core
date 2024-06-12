@@ -88,7 +88,10 @@ pub enum MoveTool {
     Coverage(coverage::CoveragePackage),
     CreateObjectAndPublishPackage(CreateObjectAndPublishPackage),
     UpgradeObjectPackage(UpgradeObjectPackage),
+    Deploy(DeployObjectCode),
+    Upgrade(UpgradeCodeObject),
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
+    Transfer(TransferCodeObject),
     Disassemble(Disassemble),
     Decompile(Decompile),
     Document(DocumentPackage),
@@ -119,6 +122,9 @@ impl MoveTool {
                 tool.execute_serialized_success().await
             },
             MoveTool::UpgradeObjectPackage(tool) => tool.execute_serialized_success().await,
+            MoveTool::Deploy(tool) => tool.execute_serialized_success().await,
+            MoveTool::Upgrade(tool) => tool.execute_serialized_success().await,
+            MoveTool::Transfer(tool) => tool.execute_serialized_success().await,
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
@@ -916,20 +922,8 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         self.move_options
             .add_named_address(self.address_name, object_address.to_string());
 
-        let options = self
-            .included_artifacts_args
-            .included_artifacts
-            .build_options(
-                self.move_options.dev,
-                self.move_options.skip_fetch_latest_git_deps,
-                self.move_options.named_addresses(),
-                self.move_options.bytecode_version,
-                self.move_options.compiler_version,
-                self.move_options.language_version,
-                self.move_options.skip_attribute_checks,
-                self.move_options.check_test_code,
-            );
-        let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
+        let package =
+            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
         let message = format!(
             "Do you want to publish this package at object address {}",
             object_address
@@ -941,30 +935,15 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 .expect("Failed to serialize PackageMetadata"),
             package.extract_code(),
         );
-        let size = bcs::serialized_size(&payload)?;
-        println!("package size {} bytes", size);
 
-        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
-            return Err(CliError::UnexpectedError(format!(
-                "The package is larger than {} bytes ({} bytes)! To lower the size \
-                you may want to include less artifacts via `--included-artifacts`. \
-                You can also override this check with `--override-size-check",
-                MAX_PUBLISH_PACKAGE_SIZE, size
-            )));
-        }
-        let result = self
-            .txn_options
-            .submit_transaction(payload)
-            .await
-            .map(TransactionSummary::from);
-
-        if result.is_ok() {
-            println!(
-                "Code was successfully deployed to object address {}.",
-                object_address
-            );
-        }
-        result
+        submit_tx_and_check(
+            &self.txn_options,
+            payload,
+            &object_address.to_string(),
+            self.override_size_check_option.override_size_check,
+            "Code was successfully deployed to object address {}.",
+        )
+        .await
     }
 }
 
@@ -993,20 +972,8 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let options = self
-            .included_artifacts_args
-            .included_artifacts
-            .build_options(
-                self.move_options.dev,
-                self.move_options.skip_fetch_latest_git_deps,
-                self.move_options.named_addresses(),
-                self.move_options.bytecode_version,
-                self.move_options.compiler_version,
-                self.move_options.language_version,
-                self.move_options.skip_attribute_checks,
-                self.move_options.check_test_code,
-            );
-        let built_package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
+        let package =
+            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
         let url = self
             .txn_options
             .rest_options
@@ -1014,12 +981,12 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
 
         // Get the `PackageRegistry` at the given object address.
         let registry = CachedPackageRegistry::create(url, self.object_address, false).await?;
-        let package = registry
-            .get_package(built_package.name())
+        let package_info = registry
+            .get_package(package.name())
             .await
             .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
 
-        if package.upgrade_policy() == UpgradePolicy::immutable() {
+        if package_info.upgrade_policy() == UpgradePolicy::immutable() {
             return Err(CliError::CommandArgumentError(
                 "A package with upgrade policy `immutable` cannot be upgraded".to_owned(),
             ));
@@ -1027,42 +994,255 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
 
         let message = format!(
             "Do you want to upgrade the package '{}' at object address {}",
-            package.name(),
+            package_info.name(),
             self.object_address
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_upgrade(
-            bcs::to_bytes(&built_package.extract_metadata()?)
+            bcs::to_bytes(&package.extract_metadata()?)
                 .expect("Failed to serialize PackageMetadata"),
-            built_package.extract_code(),
+            package.extract_code(),
             self.object_address,
         );
-        let size = bcs::serialized_size(&payload)?;
-        println!("package size {} bytes", size);
 
-        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
-            return Err(CliError::UnexpectedError(format!(
-                "The package is larger than {} bytes ({} bytes)! To lower the size \
-                you may want to include less artifacts via `--included-artifacts`. \
-                You can also override this check with `--override-size-check",
-                MAX_PUBLISH_PACKAGE_SIZE, size
-            )));
-        }
-        let result = self
-            .txn_options
-            .submit_transaction(payload)
-            .await
-            .map(TransactionSummary::from);
-
-        if result.is_ok() {
-            println!(
-                "Code was successfully upgraded at object address {}.",
-                self.object_address
-            );
-        }
-        result
+        submit_tx_and_check(
+            &self.txn_options,
+            payload,
+            &self.object_address.to_string(),
+            self.override_size_check_option.override_size_check,
+            "Code was successfully upgraded at object address {}.",
+        )
+        .await
     }
+}
+
+/// Publishes the modules in a Move package to the Aptos blockchain, under an object.
+#[derive(Parser)]
+pub struct DeployObjectCode {
+    /// The named address for compiling and using in the contract
+    ///
+    /// This will take the derived account address for the object and put it in this location
+    #[clap(long)]
+    pub(crate) address_name: String,
+    #[clap(flatten)]
+    pub(crate) override_size_check_option: OverrideSizeCheckOption,
+    #[clap(flatten)]
+    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for DeployObjectCode {
+    fn command_name(&self) -> &'static str {
+        "Deploy"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let sender_address = self.txn_options.get_public_key_and_address()?.1;
+        let sequence_number = self.txn_options.sequence_number(sender_address).await? + 1;
+        let object_address = create_object_code_deployment_address(sender_address, sequence_number);
+
+        self.move_options
+            .add_named_address(self.address_name, object_address.to_string());
+
+        let package =
+            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let message = format!(
+            "Do you want to deploy this package at object address {}",
+            object_address
+        );
+        prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
+
+        let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_publish(
+            bcs::to_bytes(&package.extract_metadata()?)
+                .expect("Failed to serialize PackageMetadata"),
+            package.extract_code(),
+        );
+
+        submit_tx_and_check(
+            &self.txn_options,
+            payload,
+            &object_address.to_string(),
+            self.override_size_check_option.override_size_check,
+            "Code was successfully deployed to object address {}.",
+        )
+        .await
+    }
+}
+
+#[derive(Parser)]
+pub struct UpgradeCodeObject {
+    /// The named address for compiling and using in the contract
+    #[clap(long)]
+    pub(crate) address_name: String,
+    /// Address of the object the package was deployed to
+    ///
+    /// This must be an already deployed object containing the package
+    /// if the package is not already created, it will fail.
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) object_address: AccountAddress,
+    #[clap(flatten)]
+    pub(crate) override_size_check_option: OverrideSizeCheckOption,
+    #[clap(flatten)]
+    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for UpgradeCodeObject {
+    fn command_name(&self) -> &'static str {
+        "Upgrade"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        self.move_options
+            .add_named_address(self.address_name, self.object_address.to_string());
+
+        let package =
+            build_package_options(&self.move_options, &self.included_artifacts_args).unwrap();
+        let url = self
+            .txn_options
+            .rest_options
+            .url(&self.txn_options.profile_options)?;
+
+        // Get the `PackageRegistry` at the given code object address.
+        let registry = CachedPackageRegistry::create(url, self.object_address, false).await?;
+        let package_info = registry
+            .get_package(package.name())
+            .await
+            .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+
+        if package_info.upgrade_policy() == UpgradePolicy::immutable() {
+            return Err(CliError::CommandArgumentError(
+                "A code package with upgrade policy `immutable` cannot be upgraded".to_owned(),
+            ));
+        }
+
+        let message = format!(
+            "Do you want to upgrade the code package '{}' at object address {}",
+            package_info.name(),
+            self.object_address
+        );
+        prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
+
+        let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_upgrade(
+            bcs::to_bytes(&package.extract_metadata()?)
+                .expect("Failed to serialize PackageMetadata"),
+            package.extract_code(),
+            self.object_address,
+        );
+
+        submit_tx_and_check(
+            &self.txn_options,
+            payload,
+            &self.object_address.to_string(),
+            self.override_size_check_option.override_size_check,
+            "Code was successfully upgraded at object address {}.",
+        )
+        .await
+    }
+}
+
+#[derive(Parser)]
+pub struct TransferCodeObject {
+    /// Address of the object the package was deployed to
+    ///
+    /// This must be an already deployed object containing the package
+    /// if the package is not already created, it will fail.
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) object_address: AccountAddress,
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) to: AccountAddress,
+    #[clap(flatten)]
+    pub(crate) override_size_check_option: OverrideSizeCheckOption,
+    #[clap(flatten)]
+    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for TransferCodeObject {
+    fn command_name(&self) -> &'static str {
+        "Transfer"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let message = format!(
+            "Do you want to transfer ownership of the code package at object address {} to owner address {}?",
+            self.object_address,
+            self.to,
+        );
+        prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
+
+        let payload =
+            aptos_cached_packages::aptos_stdlib::object_transfer_call(self.object_address, self.to);
+
+        submit_tx_and_check(
+            &self.txn_options,
+            payload,
+            &self.object_address.to_string(),
+            self.override_size_check_option.override_size_check,
+            "Code ownership was successfully transferred to {}.",
+        )
+        .await
+    }
+}
+
+fn build_package_options(
+    move_options: &MovePackageDir,
+    included_artifacts_args: &IncludedArtifactsArgs,
+) -> anyhow::Result<BuiltPackage> {
+    let options = included_artifacts_args.included_artifacts.build_options(
+        move_options.dev,
+        move_options.skip_fetch_latest_git_deps,
+        move_options.named_addresses(),
+        move_options.bytecode_version,
+        move_options.compiler_version,
+        move_options.language_version,
+        move_options.skip_attribute_checks,
+        move_options.check_test_code,
+    );
+    BuiltPackage::build(move_options.get_package_path()?, options)
+}
+
+async fn submit_tx_and_check(
+    txn_options: &TransactionOptions,
+    payload: TransactionPayload,
+    object_address: &str,
+    override_size_check: bool,
+    success_message: &str,
+) -> CliTypedResult<TransactionSummary> {
+    let size = bcs::serialized_size(&payload)?;
+    println!("package size {} bytes", size);
+
+    if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+        return Err(CliError::UnexpectedError(format!(
+            "The package is larger than {} bytes ({} bytes)! To lower the size \
+            you may want to include fewer artifacts via `--included-artifacts`. \
+            You can also override this check with `--override-size-check",
+            MAX_PUBLISH_PACKAGE_SIZE, size
+        )));
+    }
+
+    let result = txn_options
+        .submit_transaction(payload)
+        .await
+        .map(TransactionSummary::from);
+
+    if result.is_ok() {
+        println!("{} {}", success_message, object_address);
+    }
+    result
 }
 
 /// Publishes the modules in a Move package to the Aptos blockchain under a resource account
