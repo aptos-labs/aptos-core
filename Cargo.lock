@@ -917,6 +917,7 @@ name = "aptos-consensus-notifications"
 version = "0.1.0"
 dependencies = [
  "aptos-crypto",
+ "aptos-logger",
  "aptos-runtimes",
  "aptos-types",
  "async-trait",

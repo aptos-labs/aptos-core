@@ -4,10 +4,10 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_logger::error;
 use aptos_types::{
     contract_event::ContractEvent, ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
-use aptos_logger::error;
 use async_trait::async_trait;
 use futures::{
     channel::{mpsc, oneshot},
