@@ -31,7 +31,7 @@ pub fn get_gas_config_from_storage(
     match GasScheduleV2::fetch_config(config_storage) {
         Some(gas_schedule) => {
             let feature_version = gas_schedule.feature_version;
-            let map = gas_schedule.to_btree_map();
+            let map = gas_schedule.into_btree_map();
             (
                 AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
                 feature_version,
@@ -39,7 +39,7 @@ pub fn get_gas_config_from_storage(
         },
         None => match GasSchedule::fetch_config(config_storage) {
             Some(gas_schedule) => {
-                let map = gas_schedule.to_btree_map();
+                let map = gas_schedule.into_btree_map();
                 (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
             },
             None => (Err("Neither gas schedule v2 nor v1 exists.".to_string()), 0),

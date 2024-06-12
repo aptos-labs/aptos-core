@@ -11,4 +11,5 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
-      - DefaultGas
+      - Gas:
+          new: current

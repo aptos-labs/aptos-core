@@ -3600,6 +3600,17 @@ Helper to check whether a feature flag is enabled.
 
 
 
+
+<a id="0x1_features_spec_sha_512_and_ripemd_160_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_sha_512_and_ripemd_160_enabled">spec_sha_512_and_ripemd_160_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_SHA_512_AND_RIPEMD_160_NATIVES">SHA_512_AND_RIPEMD_160_NATIVES</a>)
+}
+</code></pre>
+
+
+
 <a id="@Specification_1_is_enabled"></a>
 
 ### Function `is_enabled`
