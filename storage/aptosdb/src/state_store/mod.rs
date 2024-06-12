@@ -41,7 +41,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
-use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::{SmtAncestors, SparseMerkleTree};
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher,
@@ -146,18 +146,8 @@ impl DbReader for StateDb {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
-        let mut read_opts = ReadOptions::default();
-        // We want `None` if the state_key changes in iteration.
-        read_opts.set_prefix_same_as_start(true);
-        let mut iter = self
-            .state_kv_db
-            .db_shard(state_key.get_shard_id())
-            .iter::<StateValueSchema>(read_opts)?;
-        iter.seek(&(state_key.clone(), version))?;
-        Ok(iter
-            .next()
-            .transpose()?
-            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+        self.state_kv_db
+            .get_state_value_with_version_by_version(state_key, version)
     }
 
     /// Returns the proof of the given state key and version.
@@ -1076,9 +1066,7 @@ impl StateStore {
             .state_db
             .state_merkle_db
             .metadata_db()
-            .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
-            Default::default(),
-        )?;
+            .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>()?;
         iter.seek_to_first();
 
         let all_rows = iter.collect::<Result<Vec<_>>>()?;
@@ -1087,12 +1075,10 @@ impl StateStore {
             all_rows.into_iter().map(|(k, _v)| k).collect();
         if self.state_merkle_db.sharding_enabled() {
             for i in 0..NUM_STATE_SHARDS as u8 {
-                let mut iter = self
-                    .state_merkle_db
-                    .db_shard(i)
-                    .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
-                    Default::default(),
-                )?;
+                let mut iter =
+                    self.state_merkle_db
+                        .db_shard(i)
+                        .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>()?;
                 iter.seek_to_first();
 
                 let all_rows = iter.collect::<Result<Vec<_>>>()?;
