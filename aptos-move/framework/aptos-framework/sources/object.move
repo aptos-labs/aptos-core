@@ -49,7 +49,7 @@ module aptos_framework::object {
     /// Cannot reclaim objects that weren't burnt.
     const EOBJECT_NOT_BURNT: u64 = 8;
     /// Object is untransferable any operations that might result in a transfer are disallowed.
-    const ENOT_MOVABLE: u64 = 9;
+    const EOBJECT_NOT_TRANSFERRABLE: u64 = 9;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -354,7 +354,7 @@ module aptos_framework::object {
 
     /// Generates the TransferRef, which can be used to manage object transfers.
     public fun generate_transfer_ref(ref: &ConstructorRef): TransferRef {
-        assert!(!exists<Untransferable>(ref.self), error::permission_denied(ENOT_MOVABLE));
+        assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
         TransferRef { self: ref.self }
     }
 
@@ -458,7 +458,7 @@ module aptos_framework::object {
 
     /// Enable direct transfer.
     public fun enable_ungated_transfer(ref: &TransferRef) acquires ObjectCore {
-        assert!(!exists<Untransferable>(ref.self), error::permission_denied(ENOT_MOVABLE));
+        assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
         let object = borrow_global_mut<ObjectCore>(ref.self);
         object.allow_ungated_transfer = true;
     }
@@ -466,7 +466,7 @@ module aptos_framework::object {
     /// Create a LinearTransferRef for a one-time transfer. This requires that the owner at the
     /// time of generation is the owner at the time of transferring.
     public fun generate_linear_transfer_ref(ref: &TransferRef): LinearTransferRef acquires ObjectCore {
-        assert!(!exists<Untransferable>(ref.self), error::permission_denied(ENOT_MOVABLE));
+        assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
         let owner = owner(Object<ObjectCore> { inner: ref.self });
         LinearTransferRef {
             self: ref.self,
@@ -476,7 +476,7 @@ module aptos_framework::object {
 
     /// Transfer to the destination address using a LinearTransferRef.
     public fun transfer_with_ref(ref: LinearTransferRef, to: address) acquires ObjectCore, TombStone {
-        assert!(!exists<Untransferable>(ref.self), error::permission_denied(ENOT_MOVABLE));
+        assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
 
         // Undo soft burn if present as we don't want the original owner to be able to reclaim by calling unburn later.
         if (exists<TombStone>(ref.self)) {

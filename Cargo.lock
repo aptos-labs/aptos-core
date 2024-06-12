@@ -2326,6 +2326,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-keyless-circuit"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-keyless-common",
+ "aptos-logger",
+ "ark-bn254",
+ "ark-ff",
+ "base64 0.13.1",
+ "hex",
+ "itertools 0.12.1",
+ "num-bigint 0.3.3",
+ "num-modular",
+ "num-traits",
+ "rand 0.7.3",
+ "rand_chacha 0.3.1",
+ "rsa 0.9.6",
+ "serde_json",
+ "sha2 0.9.9",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-keyless-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-types",
+ "ark-bn254",
+ "ark-ff",
+ "base64 0.13.1",
+ "hex",
+ "num-bigint 0.3.3",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
 name = "aptos-keyless-pepper-common"
 version = "0.1.0"
 dependencies = [
@@ -7116,6 +7158,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dyn-clone"
+version = "1.0.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d6ef0072f8a535281e4876be788938b528e9a1d43900b82c2569af7da799125"
+
+[[package]]
 name = "e2e-move-tests"
 version = "0.1.0"
 dependencies = [
@@ -8106,13 +8154,15 @@ dependencies = [
 
 [[package]]
 name = "gcp-bigquery-client"
-version = "0.13.0"
+version = "0.16.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09ab5966c98f6d4e71e247cda6a6d8497bc8a1df3a4ba9ee548087842cffc21d"
+checksum = "fb67dedb3fce3a6d25829158e40b22c5e9aa107fdbae0f2fef564931c9161a6a"
 dependencies = [
  "async-stream",
+ "async-trait",
+ "dyn-clone",
  "hyper",
- "hyper-rustls 0.23.2",
+ "hyper-rustls 0.24.2",
  "log",
  "reqwest",
  "serde",
@@ -8905,7 +8955,9 @@ dependencies = [
  "futures-util",
  "http",
  "hyper",
+ "log",
  "rustls 0.21.10",
+ "rustls-native-certs 0.6.3",
  "tokio",
  "tokio-rustls 0.24.1",
 ]
@@ -9173,9 +9225,9 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.17.7"
+version = "0.17.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb28741c9db9a713d93deb3bb9515c20788cef5815265bee4980e87bde7e0f25"
+checksum = "763a5a8f45087d6bcea4222e7b72c291a054edf80e4ef6efd2a4979878c7bea3"
 dependencies = [
  "console",
  "instant",
@@ -11475,6 +11527,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-modular"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17bb261bf36fa7d83f4c294f834e91256769097b3cb505d44831e0a179ac647f"
+dependencies = [
+ "num-bigint 0.4.4",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "num-rational"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13584,6 +13647,7 @@ dependencies = [
  "pkcs1 0.7.5",
  "pkcs8 0.10.2",
  "rand_core 0.6.4",
+ "sha2 0.10.8",
  "signature 2.2.0",
  "spki 0.7.3",
  "subtle",
@@ -13779,15 +13843,6 @@ name = "rustls-pemfile"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5eebeaeb360c87bfb72e84abdb3447159c0eaececf1bef2aecd65a8be949d1c9"
-dependencies = [
- "base64 0.13.1",
-]
-
-[[package]]
-name = "rustls-pemfile"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ee86d63972a7c661d1536fefe8c3c8407321c3df668891286de28abcd087360"
 dependencies = [
  "base64 0.13.1",
 ]
@@ -14039,7 +14094,7 @@ version = "0.39.0"
 source = "git+https://github.com/banool/self_update.git?rev=8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b#8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b"
 dependencies = [
  "hyper",
- "indicatif 0.17.7",
+ "indicatif 0.17.8",
  "log",
  "quick-xml 0.23.1",
  "regex",
@@ -16926,22 +16981,22 @@ checksum = "1367295b8f788d371ce2dbc842c7b709c73ee1364d30351dd300ec2203b12377"
 
 [[package]]
 name = "yup-oauth2"
-version = "7.0.1"
+version = "8.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98748970d2ddf05253e6525810d989740334aa7509457864048a829902db76f3"
+checksum = "b61da40aeb0907a65f7fb5c1de83c5a224d6a9ebb83bf918588a2bb744d636b8"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.13.1",
+ "base64 0.21.6",
  "futures",
  "http",
  "hyper",
- "hyper-rustls 0.23.2",
- "itertools 0.10.5",
+ "hyper-rustls 0.24.2",
+ "itertools 0.12.1",
  "log",
  "percent-encoding",
- "rustls 0.20.9",
- "rustls-pemfile 0.3.0",
+ "rustls 0.22.2",
+ "rustls-pemfile 1.0.4",
  "seahash",
  "serde",
  "serde_json",

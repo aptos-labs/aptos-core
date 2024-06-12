@@ -21,8 +21,10 @@ pub enum AptosDbError {
     /// Other non-classified error.
     #[error("AptosDB Other Error: {0}")]
     Other(String),
+    #[error("AptosDB RocksDb Error: {0}")]
+    RocksDbIncompleteResult(String),
     #[error("AptosDB RocksDB Error: {0}")]
-    RocksDbError(String),
+    OtherRocksDbError(String),
     #[error("AptosDB bcs Error: {0}")]
     BcsError(String),
     #[error("AptosDB IO Error: {0}")]
