@@ -15,8 +15,8 @@ on:
       CHAIN_NAME:
         required: false
         type: choice
-        options: [testnet, mainnet, all]
-        default: all
+        options: [testnet, mainnet, all, detect]
+        default: detect
         description: The chain name to test. If not specified, it will test both testnet and mainnet.
   pull_request:
     paths:
@@ -27,7 +27,6 @@ on:
   push:
     branches:
       - aptos-release-v* # the aptos release branches
-      - aptos-node-v*
 
 # cancel redundant builds
 concurrency:
@@ -38,18 +37,42 @@ concurrency:
 jobs:
   determine-test-metadata:
     runs-on: ubuntu-latest
+    outputs:
+      CHAIN_NAME: ${{ steps.determine-test-target.outputs.CHAIN_NAME }}
     steps:
       # checkout the repo first, so check-aptos-core can use it and cancel the workflow if necessary
       - uses: actions/checkout@v3
       - uses: ./.github/actions/check-aptos-core
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
+      - name: Determine target based on cadence
+        id: determine-test-target
+        run: |
+          set -ex
+
+          CHAIN_NAME="${{ inputs.CHAIN_NAME}}"
+
+          if [[ "$CHAIN_NAME" == "detect" ]] || [[ -z "$CHAIN_NAME" ]]; then
+            BRANCH_NAME="${{ github.ref_name }}"
+            if [[ "$BRANCH_NAME" == aptos-release* ]]; then
+              # On release branches run all
+              CHAIN_NAME=all
+            else
+              # For anything else just run mainnet
+              CHAIN_NAME=mainnet
+            fi
+          fi
+
+          echo "CHAIN_NAME=$CHAIN_NAME" >> $GITHUB_OUTPUT
 
   replay-testnet:
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all')
+      github.event_name == 'workflow_dispatch' && (
+        needs.determine-test-metadata.outputs.CHAIN_NAME == 'testnet' ||
+        needs.determine-test-metadata.outputs.CHAIN_NAME == 'all'
+      )
     needs: determine-test-metadata
     uses: ./.github/workflows/workflow-run-replay-verify.yaml
     secrets: inherit
@@ -69,7 +92,10 @@ jobs:
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'mainnet' || inputs.CHAIN_NAME == 'all' )
+      github.event_name == 'workflow_dispatch' && (
+        needs.determine-test-metadata.outputs.CHAIN_NAME == 'mainnet' ||
+        needs.determine-test-metadata.outputs.CHAIN_NAME == 'all'
+      )
     needs: determine-test-metadata
     uses: ./.github/workflows/workflow-run-replay-verify.yaml
     secrets: inherit
