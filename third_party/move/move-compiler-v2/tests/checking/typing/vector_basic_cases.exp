@@ -7,7 +7,7 @@ module 0x42::Test {
         [Number(0), Number(1), Number(2)];
         [Number(0), Number(1), Number(2)];
         [Number(0), Number(1), Number(2)];
-        Vector<address>(0x0, 0x1);
+        [Address(Numerical(0000000000000000000000000000000000000000000000000000000000000000)), Address(Numerical(0000000000000000000000000000000000000000000000000000000000000001))];
         Vector<Test::X>(pack Test::X(false), pack Test::X(false));
         Vector<vector<address>>(Vector<address>(), Vector<address>());
         Vector<vector<vector<address>>>(Vector<vector<address>>(Vector<address>(), Vector<address>()), Vector<vector<address>>());
@@ -21,7 +21,7 @@ module 0x42::Test {
         [Number(0)];
         [Number(0)];
         [Number(0)];
-        Vector<address>(0x0);
+        [Address(Numerical(0000000000000000000000000000000000000000000000000000000000000000))];
         Vector<Test::X>(pack Test::X(false));
         Vector<vector<address>>(Vector<address>());
         Vector<vector<vector<address>>>(Vector<vector<address>>(Vector<address>()));
