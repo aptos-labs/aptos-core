@@ -518,6 +518,14 @@ pub static MISSED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static FOUND_BATCHES_LOCALLY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_found_batches_locally_count",
+        "Count of the found batches locally."
+    )
+    .unwrap()
+});
+
 /// Count of the timeout batches at the sender side.
 pub static TIMEOUT_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
@@ -559,6 +567,14 @@ pub static SENT_BATCH_REQUEST_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_sent_batch_request_count",
         "Count of the number of batch request sent to other nodes."
+    )
+    .unwrap()
+});
+
+pub static SENT_INDIVIDUAL_BATCH_REQUEST_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_sent_individual_batch_request_count",
+        "Count of the number of individual batch request sent to other nodes."
     )
     .unwrap()
 });

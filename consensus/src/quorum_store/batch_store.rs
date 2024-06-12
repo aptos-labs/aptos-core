@@ -428,6 +428,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
         let batch_requester = self.batch_requester.clone();
         tokio::spawn(async move {
             if let Ok(mut value) = batch_store.get_batch_from_local(proof.digest()) {
+                counters::FOUND_BATCHES_LOCALLY_COUNT.inc();
                 if tx
                     .send(Ok(value.take_payload().expect("Must have payload")))
                     .is_err()

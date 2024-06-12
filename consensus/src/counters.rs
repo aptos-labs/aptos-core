@@ -1118,3 +1118,52 @@ pub static RAND_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_payload_manager_request_transactions_duration",
+        "Histogram of the time it takes to request transactions from the payload manager.",
+        [
+            0.005, 0.010, 0.015, 0.020, 0.025, 0.030, 0.035, 0.040, 0.045, 0.050, 0.055, 0.060,
+            0.065, 0.070, 0.075, 0.080, 0.085, 0.090, 0.095, 0.100, 0.110, 0.120, 0.130, 0.140,
+            0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.225, 0.250
+        ]
+        .to_vec()
+    )
+    .unwrap()
+});
+
+pub static PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_PROOF_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_payload_manager_request_transactions_proof_count",
+        "Count of the number of times a proof is requested for transactions."
+    )
+    .unwrap()
+});
+
+pub static PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_PROOF_COUNT_PURPOSE_1: Lazy<IntCounter> =
+    Lazy::new(|| {
+        register_int_counter!(
+            "aptos_consensus_payload_manager_request_transactions_proof_count_purpose_1",
+            "Count of the number of times a proof is requested for transactions for purpose 1."
+        )
+        .unwrap()
+    });
+
+pub static PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_PROOF_COUNT_PURPOSE_2: Lazy<IntCounter> =
+    Lazy::new(|| {
+        register_int_counter!(
+            "aptos_consensus_payload_manager_request_transactions_proof_count_purpose_2",
+            "Count of the number of times a proof is requested for transactions for purpose 2."
+        )
+        .unwrap()
+    });
+
+pub static PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_PROOF_COUNT_PURPOSE_3: Lazy<IntCounter> =
+    Lazy::new(|| {
+        register_int_counter!(
+            "aptos_consensus_payload_manager_request_transactions_proof_count_purpose_3",
+            "Count of the number of times a proof is requested for transactions for purpose 3."
+        )
+        .unwrap()
+    });

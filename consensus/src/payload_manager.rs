@@ -58,11 +58,25 @@ impl PayloadManager {
         proofs: Vec<ProofOfStore>,
         block_timestamp: u64,
         batch_reader: Arc<dyn BatchReader>,
+        purpose: u64,
     ) -> Vec<(
         HashValue,
         oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
     )> {
         let mut receivers = Vec::new();
+        counters::PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_PROOF_COUNT.inc_by(proofs.len() as u64);
+        if purpose == 1 {
+            counters::PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_PROOF_COUNT_PURPOSE_1
+                .inc_by(proofs.len() as u64);
+        } else if purpose == 2 {
+            counters::PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_PROOF_COUNT_PURPOSE_2
+                .inc_by(proofs.len() as u64);
+        } else if purpose == 3 {
+            counters::PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_PROOF_COUNT_PURPOSE_3
+                .inc_by(proofs.len() as u64);
+        }
+
+        let start_time = std::time::Instant::now();
         for pos in proofs {
             trace!(
                 "QSE: requesting pos {:?}, digest {}, time = {}",
@@ -76,6 +90,8 @@ impl PayloadManager {
                 debug!("QSE: skipped expired pos {}", pos.digest());
             }
         }
+        counters::PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_DURATION
+            .observe(start_time.elapsed().as_secs_f64());
         receivers
     }
 
@@ -141,6 +157,7 @@ impl PayloadManager {
                     proof_with_status.proofs.clone(),
                     timestamp,
                     batch_reader.clone(),
+                    1,
                 );
                 proof_with_status
                     .status
@@ -257,6 +274,7 @@ impl PayloadManager {
                                     proof_with_data.proofs.clone(),
                                     block.timestamp_usecs(),
                                     batch_reader.clone(),
+                                    2,
                                 );
                                 // Could not get all data so requested again
                                 proof_with_data
@@ -273,6 +291,7 @@ impl PayloadManager {
                                     proof_with_data.proofs.clone(),
                                     block.timestamp_usecs(),
                                     batch_reader.clone(),
+                                    3,
                                 );
                                 // Could not get all data so requested again
                                 proof_with_data
