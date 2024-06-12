@@ -144,7 +144,7 @@ if [ ! -z "$CHECK" ]; then
 fi
 
 CARGO_OP_PARAMS="--locked --profile $MOVE_PR_PROFILE"
-CARGO_NEXTEST_PARAMS="--locked --profile $MOVE_PR_PROFILE"
+CARGO_NEXTEST_PARAMS="--locked --cargo-profile $MOVE_PR_PROFILE"
 
 # Artifact generation needs to be run before testing as tests may depend on its result
 if [ ! -z "$GEN_ARTIFACTS" ]; then
@@ -168,7 +168,7 @@ if [ ! -z "$TEST" ]; then
     # It is important to run all tests from one cargo command to keep cargo features
     # stable.
     cd $BASE
-    cargo nextest run $CARGO_NEXTEST_PARAMS --no-fail-fast \
+    cargo nextest run $CARGO_NEXTEST_PARAMS \
      $MOVE_CRATES
   )
 fi
@@ -177,7 +177,7 @@ if [ ! -z "$INTEGRATION_TEST" ]; then
   echo "*************** [move-pr] Running integration tests"
   (
     cd $BASE
-    MOVE_COMPILER_V2=false cargo nextest run $CARGO_NEXTEST_PARAMS --no-fail-fast \
+    MOVE_COMPILER_V2=false cargo nextest run $CARGO_NEXTEST_PARAMS \
        $MOVE_CRATES $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi
@@ -192,7 +192,7 @@ if [ ! -z "$COMPILER_V2_TEST" ]; then
     # rebuild will be triggered via feature unification.
     MOVE_COMPILER_V2=false cargo build $CARGO_OP_PARAMS \
      $MOVE_CRATES_V2_ENV_DEPENDENT
-    MOVE_COMPILER_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS --no-fail-fast \
+    MOVE_COMPILER_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS \
      $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi
