@@ -14,8 +14,7 @@ use aptos_crypto::{
 };
 use aptos_framework::{ReleaseBundle, ReleasePackage};
 use aptos_gas_schedule::{
-    AptosGasParameters, InitialGasSchedule, MiscGasParameters, NativeGasParameters,
-    ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
+    AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
@@ -130,9 +129,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     }
     let data_cache = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        Ok(&AptosGasParameters::zeros()),
         ChainId::test().id(),
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
@@ -248,9 +246,8 @@ pub fn encode_genesis_change_set(
     }
     let data_cache = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        Ok(&AptosGasParameters::zeros()),
         ChainId::test().id(),
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
@@ -1086,9 +1083,8 @@ pub fn test_genesis_module_publishing() {
     let data_cache = state_view.as_move_resolver();
 
     let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        Ok(&AptosGasParameters::zeros()),
         ChainId::test().id(),
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
