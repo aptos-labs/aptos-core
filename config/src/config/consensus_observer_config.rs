@@ -52,13 +52,19 @@ impl ConsensusObserverConfig {
 
 impl ConfigOptimizer for ConsensusObserverConfig {
     fn optimize(
-        _node_config: &mut NodeConfig,
+        node_config: &mut NodeConfig,
         _local_config_yaml: &Value,
-        _node_type: NodeType,
+        node_type: NodeType,
         _chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
-        // TODO: use me to enable consensus observer for
-        // validators and VFNs in controlled environments.
+        if node_type.is_validator() {
+            node_config.consensus_observer.publisher_enabled = true;
+            return Ok(true);
+        } else if node_type.is_validator_fullnode() {
+            node_config.consensus_observer.observer_enabled = true;
+            return Ok(true);
+        }
+
         Ok(false)
     }
 }
