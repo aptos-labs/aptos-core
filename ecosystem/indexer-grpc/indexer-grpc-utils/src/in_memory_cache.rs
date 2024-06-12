@@ -18,7 +18,7 @@ const IN_MEMORY_CACHE_GC_INTERVAL_MS: u64 = 100;
 // Max cache entry TTL: 30 seconds.
 // const MAX_IN_MEMORY_CACHE_ENTRY_TTL: u64 = 30;
 // Warm-up cache entries. Pre-fetch the cache entries to warm up the cache.
-pub const WARM_UP_CACHE_ENTRIES: u64 = 20_000;
+pub const WARM_UP_CACHE_ENTRIES: u64 = 10_000;
 pub const MAX_REDIS_FETCH_BATCH_SIZE: usize = 500;
 
 /// Configuration for when we want to explicitly declare how large the cache should be.
