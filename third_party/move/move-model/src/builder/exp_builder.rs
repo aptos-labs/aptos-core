@@ -31,14 +31,17 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{self, Ability, AbilitySet};
 use move_compiler::{
-    expansion::ast as EA,
+    expansion::ast::{self as EA, SequenceItem},
     hlir::ast as HA,
     naming::ast as NA,
-    parser::{ast as PA, ast::CallKind},
+    parser::ast::{self as PA, CallKind},
     shared::{Identifier, Name},
 };
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
-use move_ir_types::location::{sp, Spanned};
+use move_ir_types::{
+    location::{sp, Spanned},
+    sp,
+};
 use num::{BigInt, FromPrimitive, Zero};
 use std::{
     collections::{BTreeMap, BTreeSet, LinkedList},
@@ -1169,10 +1172,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 if is_wildcard(resource) {
                     ResourceSpecifier::DeclaredInModule(module_id)
                 } else {
-                    let mident = sp(specifier.loc, EA::ModuleIdent_ {
-                        address: *address,
-                        module: *module,
-                    });
+                    let mident = sp(
+                        specifier.loc,
+                        EA::ModuleIdent_ {
+                            address: *address,
+                            module: *module,
+                        },
+                    );
                     let maccess = sp(
                         specifier.loc,
                         EA::ModuleAccess_::ModuleAccess(mident, *resource, None),
@@ -1858,11 +1864,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(&rt, &loc);
                 if self.mode == ExpTranslationMode::Impl {
                     // Remember information about this spec block for deferred checking.
-                    self.placeholder_map
-                        .insert(id, ExpPlaceholder::SpecBlockInfo {
+                    self.placeholder_map.insert(
+                        id,
+                        ExpPlaceholder::SpecBlockInfo {
                             spec_id: *spec_id,
                             locals: self.get_locals(),
-                        });
+                        },
+                    );
                 }
                 ExpData::Call(id, Operation::NoOp, vec![])
             },
@@ -2945,7 +2953,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         context: &ErrorMessageContext,
     ) -> ExpData {
         let items = seq.iter().collect_vec();
-        let seq_exp = self.translate_seq_recursively(loc, &items, expected_type, context);
+        let seq_exp = self.translate_seq_recursively(loc, &items, expected_type, context, false);
         if seq_exp.is_directly_borrowable() {
             // Avoid unwrapping a borrowable item, in case context is a `Borrow`.
             let node_id = self.new_node_id_with_type_loc(expected_type, loc);
@@ -2966,6 +2974,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         items: &[&EA::SequenceItem],
         expected_type: &Type,
         context: &ErrorMessageContext,
+        last_elt_type_was_void: bool,
     ) -> ExpData {
         if items.is_empty() {
             self.require_impl_language(loc);
@@ -3015,7 +3024,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         self.check_type(loc, expected_type, &Type::unit(), context);
                         self.new_unit_exp(loc)
                     } else {
-                        self.translate_seq_recursively(loc, &items[1..], expected_type, context)
+                        self.translate_seq_recursively(
+                            loc,
+                            &items[1..],
+                            expected_type,
+                            context,
+                            false,
+                        )
                     };
                     // Return result
                     self.exit_scope();
@@ -3024,7 +3039,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 Seq(_) if items.len() > 1 => {
                     self.translate_seq_items(loc, items, expected_type, context)
                 },
-                Seq(exp) => self.translate_exp_in_context(exp, expected_type, context),
+                Seq(exp) => {
+                    if last_elt_type_was_void {
+                        if let sp!(loc, EA::Exp_::Unit { trailing: true }) = exp {
+                            let msg = "A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.";
+                            let loc = self.to_loc(loc);
+                            self.env().diag(Severity::Warning, &loc, msg);
+                        }
+                    }
+                    self.translate_exp_in_context(exp, expected_type, context)
+                },
             }
         }
     }
@@ -3040,8 +3064,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.require_impl_language(loc);
         let mut exps = vec![];
         let mut k = 0;
+        let mut last_item_type_was_void = false;
         while k < items.len() - 1 {
             use EA::SequenceItem_::*;
+            last_item_type_was_void = false;
             if let Seq(exp) = &items[k].value {
                 // There is an item after this one, so the value can be dropped. The default
                 // type of the expression is `()`.
@@ -3060,6 +3086,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         Some(ConstraintContext::inferred()),
                     )
                     .expect("success on fresh var");
+                    last_item_type_was_void = true;
+                } else if item_type.is_unit() {
+                    last_item_type_was_void = true;
                 }
                 if let ExpData::Sequence(_, mut es) = exp {
                     exps.append(&mut es);
@@ -3071,7 +3100,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
             k += 1;
         }
-        let rest = self.translate_seq_recursively(loc, &items[k..], expected_type, context);
+        let rest = self.translate_seq_recursively(
+            loc,
+            &items[k..],
+            expected_type,
+            context,
+            last_item_type_was_void,
+        );
         exps.push(rest.into_exp());
         let id = self.new_node_id_with_type_loc(expected_type, loc);
         ExpData::Sequence(id, exps)
@@ -3169,9 +3204,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             );
             let global_id = self.new_node_id_with_type_loc(&ghost_mem_ty, loc);
             self.set_node_instantiation(global_id, vec![ghost_mem_ty]);
-            let global_access = ExpData::Call(global_id, Operation::Global(None), vec![
-                zero_addr.into_exp()
-            ]);
+            let global_access = ExpData::Call(
+                global_id,
+                Operation::Global(None),
+                vec![zero_addr.into_exp()],
+            );
             let select_id = self.new_node_id_with_type_loc(&ty, loc);
             self.set_node_instantiation(select_id, instantiation);
             return ExpData::Call(
@@ -3563,11 +3600,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     Operation::Select(mid, sid, FieldId::new(field_name))
                 } else {
                     // Create a placeholder for later resolution.
-                    self.placeholder_map
-                        .insert(id, ExpPlaceholder::FieldSelectInfo {
+                    self.placeholder_map.insert(
+                        id,
+                        ExpPlaceholder::FieldSelectInfo {
                             struct_ty: ty,
                             field_name,
-                        });
+                        },
+                    );
                     Operation::NoOp
                 };
                 ExpData::Call(id, oper, vec![exp.into_exp()])
@@ -4068,13 +4107,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             None,
         );
         let id = self.new_node_id_with_type_loc(expected_type, loc);
-        self.placeholder_map
-            .insert(id, ExpPlaceholder::ReceiverCallInfo {
+        self.placeholder_map.insert(
+            id,
+            ExpPlaceholder::ReceiverCallInfo {
                 name,
                 generics: generics.map(|g| g.1.clone()),
                 arg_types,
                 result_type: expected_type.clone(),
-            });
+            },
+        );
         ExpData::Call(id, Operation::NoOp, args)
     }
 

@@ -1,3 +1,59 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
+  ┌─ tests/checking/liveness/trailing_semi.move:3:15
+  │
+3 │         return;
+  │               ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
+  ┌─ tests/checking/liveness/trailing_semi.move:9:16
+  │
+9 │         abort 0;
+  │                ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
+   ┌─ tests/checking/liveness/trailing_semi.move:15:19
+   │
+15 │         { return };
+   │                   ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
+   ┌─ tests/checking/liveness/trailing_semi.move:21:20
+   │
+21 │         { abort 0 };
+   │                    ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
+   ┌─ tests/checking/liveness/trailing_semi.move:29:19
+   │
+29 │             return;
+   │                   ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
+   ┌─ tests/checking/liveness/trailing_semi.move:43:14
+   │
+43 │             };
+   │              ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
+   ┌─ tests/checking/liveness/trailing_semi.move:52:24
+   │
+52 │                 abort 0;
+   │                        ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
+   ┌─ tests/checking/liveness/trailing_semi.move:54:23
+   │
+54 │                 return;
+   │                       ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
+   ┌─ tests/checking/liveness/trailing_semi.move:55:14
+   │
+55 │             };
+   │              ^
+
 // -- Model dump before bytecode pipeline
 module <SELF>_0 {
     private fun main() {
