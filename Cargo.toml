@@ -762,7 +762,6 @@ tonic = { version = "0.11.0", features = [
     "tls-roots",
     "transport",
     "prost",
-    "gzip",
     "codegen",
     "zstd",
 ] }
