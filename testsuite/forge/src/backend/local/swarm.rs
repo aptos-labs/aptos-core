@@ -368,7 +368,7 @@ impl LocalSwarm {
         )?;
 
         let version = self.versions.get(version).unwrap();
-        let mut fullnode = LocalNode::new(
+        let fullnode = LocalNode::new(
             version.to_owned(),
             fullnode_config.name,
             index,
@@ -398,7 +398,7 @@ impl LocalSwarm {
         )?;
 
         let version = self.versions.get(version).unwrap();
-        let mut fullnode = LocalNode::new(
+        let fullnode = LocalNode::new(
             version.to_owned(),
             fullnode_config.name,
             index,
@@ -478,7 +478,7 @@ impl Drop for LocalSwarm {
 
 #[async_trait::async_trait]
 impl Swarm for LocalSwarm {
-    async fn health_check(&mut self) -> Result<()> {
+    async fn health_check(&self) -> Result<()> {
         Ok(())
     }
 
@@ -579,7 +579,7 @@ impl Swarm for LocalSwarm {
     }
 
     fn remove_full_node(&mut self, id: PeerId) -> Result<()> {
-        if let Some(mut fullnode) = self.fullnodes.remove(&id) {
+        if let Some(fullnode) = self.fullnodes.remove(&id) {
             fullnode.stop();
         }
 

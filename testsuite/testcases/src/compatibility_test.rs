@@ -145,19 +145,23 @@ fn upgrade_and_gather_stats(
         // emit trafic and gather stats
         scopev.spawn(async {
             info!("upgrade_and_gather_stats traffic thread start");
-            let mut ctx_locker = emitter_ctx.ctx.lock().await;
-            let ctx = ctx_locker.deref_mut();
-            let emit_job_request = ctx.emit_job.clone();
-            let rng = SeedableRng::from_rng(ctx.core().rng()).unwrap();
-            let (emitter, emit_job_request) =
-                match create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng) {
-                    Ok(parts) => parts,
-                    Err(err) => {
-                        stats_result = Err(err);
-                        return;
-                    },
-                };
-            let source_account = ctx.swarm().chain_info().root_account;
+            let (emitter, emit_job_request, source_account) = {
+                let mut ctx_locker = emitter_ctx.ctx.lock().await;
+                let ctx = ctx_locker.deref_mut();
+                let emit_job_request = ctx.emit_job.clone();
+                let rng = SeedableRng::from_rng(ctx.core().rng()).unwrap();
+                let (emitter, emit_job_request) =
+                    match create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng) {
+                        Ok(parts) => parts,
+                        Err(err) => {
+                            stats_result = Err(err);
+                            return;
+                        },
+                    };
+                let source_account = ctx.swarm().chain_info().root_account;
+                (emitter, emit_job_request, source_account)
+                // release lock on network context
+            };
             let upgrade_traffic_chunk_duration = Duration::from_secs(15);
             info!("upgrade_and_gather_stats traffic thread 1");
             stats_result = stat_gather_task(

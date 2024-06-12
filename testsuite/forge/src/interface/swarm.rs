@@ -23,7 +23,7 @@ use tokio::runtime::Runtime;
 pub trait Swarm: Sync + Send {
     /// Performs a health check on the entire swarm, ensuring all Nodes are Live and that no forks
     /// have occurred
-    async fn health_check(&mut self) -> Result<()>;
+    async fn health_check(&self) -> Result<()>;
 
     /// Returns an Iterator of references to all the Validators in the Swarm
     fn validators<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn Validator> + 'a>;

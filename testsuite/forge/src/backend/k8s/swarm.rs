@@ -42,6 +42,7 @@ use std::{
     env, str,
     sync::Arc,
 };
+use std::sync::atomic::AtomicU32;
 // use std::sync::Mutex;
 use tokio::{runtime::Runtime, time::Duration};
 
@@ -180,7 +181,7 @@ impl K8sSwarm {
             self.get_kube_client(),
             Some(self.kube_namespace.clone()),
         ));
-        let (peer_id, mut k8snode) = install_public_fullnode(
+        let (peer_id, k8snode) = install_public_fullnode(
             stateful_set_api,
             configmap_api,
             persistent_volume_claim_api,
@@ -203,7 +204,7 @@ impl K8sSwarm {
 
 #[async_trait::async_trait]
 impl Swarm for K8sSwarm {
-    async fn health_check(&mut self) -> Result<()> {
+    async fn health_check(&self) -> Result<()> {
         let nodes = self.validators.values().collect();
         let unhealthy_nodes = nodes_healthcheck(nodes).await.unwrap();
         if !unhealthy_nodes.is_empty() {
@@ -572,7 +573,7 @@ fn get_k8s_node_from_stateful_set(
         peer_id: PeerId::random(),
         index,
         service_name,
-        rest_api_port,
+        rest_api_port: AtomicU32::new(rest_api_port),
         version: Version::new(0, image_tag),
         namespace: namespace.to_string(),
         haproxy_enabled: enable_haproxy,
