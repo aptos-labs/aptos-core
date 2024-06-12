@@ -101,6 +101,8 @@ impl ConsensusNotificationSender for ConsensusNotifier {
             return Ok(());
         }
 
+        error!("ConsensusNotificationSender: Before notification to state sync");
+
         // Construct a oneshot channel to receive a state sync response
         let (callback, callback_receiver) = oneshot::channel();
         let commit_notification =

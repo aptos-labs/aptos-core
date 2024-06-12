@@ -105,6 +105,7 @@ impl ExecutionProxy {
         let notifier = state_sync_notifier.clone();
         handle.spawn(async move {
             while let Some((callback, txns, subscribable_events)) = rx.next().await {
+                error!("Before Transaction commit notification to state sync");
                 if let Err(e) = monitor!(
                     "notify_state_sync",
                     notifier.notify_new_commit(txns, subscribable_events).await
