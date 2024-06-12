@@ -11,7 +11,7 @@ use aptos_types::{
 use std::{
     collections::VecDeque,
     sync::{
-        mpsc::{Receiver, Sender},
+        mpsc::{Receiver, Sender, SyncSender},
         Arc,
     },
 };
@@ -20,7 +20,8 @@ pub fn state_snapshot_iter(
     state_store: Arc<StateStore>,
     version: Version,
 ) -> impl Iterator<Item = DbResult<(StateKey, StateValue)>> + Send {
-    let (result_tx, result_rx) = std::sync::mpsc::channel();
+    // Channel must be bounded, otherwis memory usage can grow unbounded if the consuming side is slow.
+    let (result_tx, result_rx) = std::sync::mpsc::sync_channel(0);
 
     // spawn and forget, error propagates through channel
     let _scheduler = std::thread::spawn(move || scheduler_thread(state_store, version, result_tx));
@@ -31,7 +32,7 @@ pub fn state_snapshot_iter(
 fn scheduler_thread(
     store: Arc<StateStore>,
     version: Version,
-    result_tx: Sender<DbResult<(StateKey, StateValue)>>,
+    result_tx: SyncSender<DbResult<(StateKey, StateValue)>>,
 ) {
     if let Err(err) = scheduler_thread_inner(store, version, &result_tx) {
         result_tx.send(Err(err)).ok();
@@ -41,7 +42,7 @@ fn scheduler_thread(
 fn scheduler_thread_inner(
     store: Arc<StateStore>,
     version: Version,
-    result_tx: &Sender<DbResult<(StateKey, StateValue)>>,
+    result_tx: &SyncSender<DbResult<(StateKey, StateValue)>>,
 ) -> DbResult<()> {
     const CONCURRENCY: usize = 4;
     const CHUNK_SIZE: usize = 100_000;
@@ -79,7 +80,7 @@ fn scheduler_thread_inner(
 
 fn try_passthrough(
     upstream: Receiver<DbResult<(StateKey, StateValue)>>,
-    downstream: &Sender<DbResult<(StateKey, StateValue)>>,
+    downstream: &SyncSender<DbResult<(StateKey, StateValue)>>,
 ) -> DbResult<()> {
     while let Ok(res) = upstream.recv() {
         let record = res?;
