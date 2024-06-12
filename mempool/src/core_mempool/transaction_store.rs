@@ -18,7 +18,7 @@ use crate::{
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::MempoolConfig;
-use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
+use aptos_consensus_types::common::TransactionSummary;
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Level};
 use aptos_types::{
@@ -28,7 +28,7 @@ use aptos_types::{
 };
 use std::{
     cmp::max,
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     mem::size_of,
     ops::Bound,
     time::{Duration, Instant, SystemTime},
@@ -201,12 +201,8 @@ impl TransactionStore {
 
     pub(crate) fn total_num_transactions_excluding(
         &self,
-        excluded_transactions: &BTreeMap<TransactionSummary, TransactionInProgress>,
+        excluded_transactions: &[TransactionSummary],
     ) -> u64 {
-        let excluded_transactions = excluded_transactions
-            .iter()
-            .map(|(txn_summary, _)| txn_summary)
-            .collect::<HashSet<_>>();
         self.transactions
             .values()
             .map(|txns| {

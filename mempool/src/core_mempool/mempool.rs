@@ -315,9 +315,13 @@ impl Mempool {
         counters::MEMPOOL_TOTAL_NUM_TXNS.observe(self.transactions.total_num_transactions() as f64);
         counters::MEMPOOL_REQUESTED_TXNS_IN_GET_BATCH.observe(max_txns as f64);
         counters::MEMPOOL_REQUESTED_BYTES_IN_GET_BATCH.observe(max_bytes as f64);
-        let mempool_total_txns_excluding_progressing = self
-            .transactions
-            .total_num_transactions_excluding(&exclude_transactions);
+        let mempool_total_txns_excluding_progressing =
+            self.transactions.total_num_transactions_excluding(
+                &exclude_transactions
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<TransactionSummary>>(),
+            );
         counters::MEMPOOL_TXNS_EXCLUDING_PROGRESING
             .observe(mempool_total_txns_excluding_progressing as f64);
         let start_time = Instant::now();
@@ -532,22 +536,38 @@ impl Mempool {
             },
         );
 
-        let mut actual_remaining_txns = 0;
-        for txn in self.transactions.iter_queue() {
-            let txn_ptr = TxnPointer::from(txn);
-            if exclude_transactions.contains_key(&txn_ptr) {
-                continue;
-            }
-            if block.iter().any(|t| {
-                t.sender() == txn_ptr.sender && t.sequence_number() == txn_ptr.sequence_number
-            }) {
-                continue;
-            }
-            actual_remaining_txns += 1;
+        // let mut actual_remaining_txns = 0;
+        // for txn in self.transactions.iter_queue() {
+        //     let txn_ptr = TxnPointer::from(txn);
+        //     if exclude_transactions.contains_key(&txn_ptr) {
+        //         continue;
+        //     }
+        //     if block.iter().any(|t| {
+        //         t.sender() == txn_ptr.sender && t.sequence_number() == txn_ptr.sequence_number
+        //     }) {
+        //         continue;
+        //     }
+        //     actual_remaining_txns += 1;
+        // }
+
+        let mut total_exclude_transactions: Vec<TransactionSummary> = exclude_transactions
+            .keys()
+            .cloned()
+            .collect::<Vec<TransactionSummary>>();
+        for txn in block.iter() {
+            let txn_ptr = TransactionSummary {
+                sender: txn.sender(),
+                hash: txn.committed_hash(),
+                sequence_number: txn.sequence_number(),
+            };
+            total_exclude_transactions.push(txn_ptr);
         }
+        let actual_remaining_txns = self
+            .transactions
+            .total_num_transactions_excluding(&total_exclude_transactions);
         counters::MEMPOOL_ACTUAL_REMAINING_TXNS.observe(actual_remaining_txns as f64);
         counters::MEMPOOL_ACTUAL_REMAINING_TXNS_SAME_AS_SKIPPED.observe(
-            if actual_remaining_txns == skipped.len() {
+            if actual_remaining_txns == (skipped.len() as u64) {
                 1.0
             } else {
                 0.0
