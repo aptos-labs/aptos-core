@@ -96,6 +96,16 @@ spec std::features {
         ensures [abstract] result == spec_module_event_enabled();
     }
 
+    spec fun spec_abort_if_multisig_payload_mismatch_enabled(): bool {
+        spec_is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
+    }
+
+    spec abort_if_multisig_payload_mismatch_enabled {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_abort_if_multisig_payload_mismatch_enabled();
+    }
+
     spec on_new_epoch(framework: &signer) {
         requires @std == signer::address_of(framework);
         let features_pending = global<PendingFeatures>(@std).features;
