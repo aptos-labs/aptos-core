@@ -260,11 +260,20 @@ where
             let current_loc = context.tokens.start_loc();
             let loc = make_loc(context.tokens.file_hash(), current_loc, current_loc);
             let loc2 = make_loc(context.tokens.file_hash(), start_loc, start_loc);
-            return Err(Box::new(diag!(
-                Syntax::UnexpectedToken,
-                (loc, format!("Expected '{}'", end_token)),
-                (loc2, format!("To match this '{}'", start_token)),
-            )));
+            let missing_comma = parse_list_item(context).is_ok();
+            if missing_comma {
+                return Err(Box::new(diag!(
+                    Syntax::UnexpectedToken,
+                    (loc, format!("Expected either ',' or '{}'", end_token)),
+                    (loc2, format!("To match this '{}'", start_token)),
+                )));
+            } else {
+                return Err(Box::new(diag!(
+                    Syntax::UnexpectedToken,
+                    (loc, format!("Expected '{}'", end_token)),
+                    (loc2, format!("To match this '{}'", start_token)),
+                )));
+            }
         }
         adjust_token(context.tokens, end_token);
         if match_token(context.tokens, end_token)? {

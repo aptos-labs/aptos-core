@@ -1,0 +1,9 @@
+error[E01002]: unexpected token
+  ┌─ tests/move_check/parser/missing_comma.move:4:5
+  │
+2 │   struct Bad {
+  │              - To match this '{'
+3 │     num: u8
+4 │     num2: u8
+  │     ^ Expected either ',' or '}'
+
