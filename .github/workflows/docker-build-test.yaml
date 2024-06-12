@@ -286,7 +286,7 @@ jobs:
       # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
       # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
       # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
-      FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
+      FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.BRANCH_HASH }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
 
   # Run e2e compat test against testnet branch. This is a PR required job.
@@ -315,7 +315,7 @@ jobs:
       IMAGE_TAG: a68e71c05caebf01504d4499110f3fba213fb53d #aptos-node-v1.14.0
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
-      FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
+      FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.BRANCH_HASH }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
 
   # Run forge framework upgradability test. This is a PR required job.
@@ -343,7 +343,7 @@ jobs:
       IMAGE_TAG: a68e71c05caebf01504d4499110f3fba213fb53d #aptos-node-v1.14.0
       FORGE_RUNNER_DURATION_SECS: 3600
       COMMENT_HEADER: forge-framework-upgrade
-      FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
+      FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.BRANCH_HASH }}
       SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') && (needs.test-target-determinator.outputs.run_framework_upgrade_test == 'false') }}
 
   forge-consensus-only-perf-test:
@@ -365,7 +365,7 @@ jobs:
       IMAGE_TAG: consensus_only_perf_test_${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: consensus-only-realistic-env-max-tps
-      FORGE_NAMESPACE: forge-consensus-only-realistic-env-max-tps-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
+      FORGE_NAMESPACE: forge-consensus-only-realistic-env-max-tps-${{ needs.determine-docker-build-metadata.outputs.BRANCH_HASH }}
 
   # Run forge multiregion test. This test uses the multiregion forge cluster that deploys pods in three GCP regions.
   forge-multiregion-test:
@@ -387,5 +387,5 @@ jobs:
       IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-multiregion-test
-      FORGE_NAMESPACE: forge-multiregion-test-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
+      FORGE_NAMESPACE: forge-multiregion-test-${{ needs.determine-docker-build-metadata.outputs.BRANCH_HASH }}
       FORGE_CLUSTER_NAME: forge-multiregion
