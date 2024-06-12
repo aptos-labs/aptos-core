@@ -1,0 +1,57 @@
+// -- Model dump before bytecode pipeline
+module <SELF>_0 {
+    private fun main() {
+        return Tuple();
+        Tuple()
+    }
+} // end <SELF>_0
+module <SELF>_1 {
+    private fun main() {
+        Abort(0);
+        Tuple()
+    }
+} // end <SELF>_1
+module <SELF>_2 {
+    private fun main() {
+        return Tuple();
+        Tuple()
+    }
+} // end <SELF>_2
+module <SELF>_3 {
+    private fun main() {
+        Abort(0);
+        Tuple()
+    }
+} // end <SELF>_3
+module <SELF>_4 {
+    private fun main(cond: bool) {
+        if cond {
+          return Tuple();
+          Tuple()
+        } else {
+          Tuple()
+        }
+    }
+} // end <SELF>_4
+module <SELF>_5 {
+    private fun main(cond: bool) {
+        if cond {
+          return Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end <SELF>_5
+module <SELF>_6 {
+    private fun main(cond: bool) {
+        if cond {
+          Abort(0);
+          Tuple()
+        } else {
+          return Tuple();
+          Tuple()
+        };
+        Tuple()
+    }
+} // end <SELF>_6

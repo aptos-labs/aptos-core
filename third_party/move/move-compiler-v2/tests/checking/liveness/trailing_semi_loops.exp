@@ -1,0 +1,139 @@
+
+Diagnostics:
+warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/checking/liveness/trailing_semi_loops.move:27:17
+   │
+27 │             let x: u64 = if (true) break else break;
+   │                 ^
+
+// -- Model dump before bytecode pipeline
+module <SELF>_0 {
+    private fun main() {
+        loop {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end <SELF>_0
+module <SELF>_1 {
+    private fun main() {
+        loop {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end <SELF>_1
+module <SELF>_2 {
+    private fun main(cond: bool) {
+        loop {
+          if cond {
+            return Tuple();
+            Tuple()
+          } else {
+            Abort(0);
+            Tuple()
+          };
+          Tuple()
+        }
+    }
+} // end <SELF>_2
+module <SELF>_3 {
+    private fun main() {
+        loop {
+          0;
+          Tuple()
+        };
+        Tuple()
+    }
+} // end <SELF>_3
+module <SELF>_4 {
+    private fun main() {
+        loop {
+          {
+            let x: u64 = if true {
+              break
+            } else {
+              break
+            };
+            Tuple()
+          }
+        }
+    }
+} // end <SELF>_4
+module <SELF>_5 {
+    private fun main() {
+        loop {
+          break;
+          Tuple()
+        }
+    }
+} // end <SELF>_5
+module <SELF>_6 {
+    private fun main(cond: bool) {
+        loop {
+          if cond {
+            break;
+            Tuple()
+          } else {
+            Tuple()
+          }
+        }
+    }
+} // end <SELF>_6
+module <SELF>_7 {
+    private fun main(cond: bool) {
+        loop {
+          if cond {
+            continue
+          } else {
+            break
+          };
+          Tuple()
+        }
+    }
+} // end <SELF>_7
+module <SELF>_8 {
+    private fun main(cond: bool) {
+        loop {
+          if cond {
+            Abort(0)
+          } else {
+            return Tuple()
+          };
+          Tuple()
+        }
+    }
+} // end <SELF>_8
+module <SELF>_9 {
+    private fun main(cond: bool) {
+        {
+          let x: u64;
+          loop {
+            if cond {
+              x: u64 = 1;
+              break
+            } else {
+              x: u64 = 2;
+              continue
+            };
+            Tuple()
+          };
+          x;
+          Tuple()
+        }
+    }
+} // end <SELF>_9
+module <SELF>_10 {
+    private fun main(cond: bool) {
+        loop {
+          if cond {
+            break;
+            Tuple()
+          } else {
+            continue;
+            Tuple()
+          };
+          Tuple()
+        }
+    }
+} // end <SELF>_10
