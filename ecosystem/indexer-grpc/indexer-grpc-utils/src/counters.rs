@@ -5,7 +5,7 @@ use crate::{constants::IndexerGrpcRequestMetadata, timestamp_to_iso, timestamp_t
 use aptos_metrics_core::{register_gauge_vec, register_int_gauge_vec, GaugeVec, IntGaugeVec};
 use aptos_protos::util::timestamp::Timestamp;
 use once_cell::sync::Lazy;
-use prometheus::{register_int_counter_vec, IntCounterVec};
+use prometheus::{register_int_counter_vec, IntCounterVec, IntGauge, register_int_gauge};
 
 pub enum IndexerGrpcStep {
     // [Data Service] New request received.
@@ -206,6 +206,30 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
         "indexer_grpc_transaction_unix_timestamp",
         "Transaction timestamp in unixtime",
         &["service_type", "step", "message"]
+    )
+    .unwrap()
+});
+
+pub static IN_MEMORY_CACHE_LATEST_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "indexer_grpc_in_memory_cache_latest_version",
+        "Latest version in in-memory cache",
+    )
+    .unwrap()
+});
+
+pub static IN_MEMORY_CURRENT_CACHE_ENTRY_COUNT: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "in_memory_cache_current_total_entry_count",
+        "Current total entry count in in-memory cache",
+    )
+    .unwrap()
+});
+
+pub static REDIS_START_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "indexer_grpc_file_store_redis_start_version",
+        "Start version of the transactions that are being stored in redis"
     )
     .unwrap()
 });

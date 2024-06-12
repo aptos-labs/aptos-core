@@ -8,6 +8,7 @@ use crate::{
 use anyhow::{ensure, Context};
 use aptos_protos::transaction::v1::Transaction;
 use redis::{AsyncCommands, RedisResult};
+use crate::counters::REDIS_START_VERSION;
 
 // Configurations for cache.
 // Cache entries that are present.
@@ -281,6 +282,14 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             // eviction policy, which is probabilistic-based and may evict the
             // cache that is still needed.
             if version >= CACHE_SIZE_EVICTION_LOWER_BOUND {
+                // we only put metric data once for the last version
+                if version == end_version {
+                    REDIS_START_VERSION
+                        .set(version as i64);
+                    tracing::debug!(
+                        start_version = version,
+                        "Evicting cache entries and setting start version.");
+                }
                 let key = CacheEntry::build_key(
                     version - CACHE_SIZE_EVICTION_LOWER_BOUND,
                     self.storage_format,

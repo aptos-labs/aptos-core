@@ -1,11 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{
-    BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT,
-    LATEST_PROCESSED_VERSION_PER_PROCESSOR, PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR,
-    PROCESSED_VERSIONS_COUNT_PER_PROCESSOR, SHORT_CONNECTION_COUNT,
-};
+use crate::metrics::{BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT, GRPC_STREAM_DATA_BYTES_PER_SOURCE, GRPC_STREAM_RESPONSE_CHANNEL_SIZE, LATEST_PROCESSED_VERSION_PER_PROCESSOR, PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR, PROCESSED_VERSIONS_COUNT_PER_PROCESSOR, SHORT_CONNECTION_COUNT};
 use anyhow::{Context, Result};
 use aptos_indexer_grpc_utils::{
     cache_operator::{CacheBatchGetStatus, CacheCoverageStatus, CacheOperator},
@@ -238,6 +234,10 @@ async fn get_data_with_tasks(
             Some(in_memory_transactions.len() as i64),
             Some(&request_metadata),
         );
+
+        GRPC_STREAM_DATA_BYTES_PER_SOURCE
+            .with_label_values(&[request_metadata.request_connection_id.as_str(), &"in_memory"])
+            .set(in_memory_transactions.len() as f64);
         return DataFetchSubTaskResult::BatchSuccess(chunk_transactions(
             in_memory_transactions,
             MESSAGE_SIZE_LIMIT,
@@ -703,6 +703,7 @@ async fn data_fetch(
         .batch_get_encoded_proto_data(starting_version)
         .await;
 
+    let connection_id = request_metadata.request_connection_id.clone();
     match batch_get_result {
         // Data is not ready yet in the cache.
         Ok(CacheBatchGetStatus::NotReady) => Ok(TransactionsDataStatus::AheadOfCache),
@@ -744,13 +745,22 @@ async fn data_fetch(
                 Some(num_of_transactions as i64),
                 Some(&request_metadata),
             );
-
+            GRPC_STREAM_DATA_BYTES_PER_SOURCE
+                .with_label_values(&[connection_id.as_str(), &"redis"])
+                .set(size_in_bytes as f64);
             Ok(TransactionsDataStatus::Success(transactions))
         },
         Ok(CacheBatchGetStatus::EvictedFromCache) => {
             let transactions =
                 data_fetch_from_filestore(starting_version, file_store_operator, request_metadata)
                     .await?;
+            let size_in_bytes = transactions
+                .iter()
+                .map(|t| t.encoded_len())
+                .sum::<usize>();
+            GRPC_STREAM_DATA_BYTES_PER_SOURCE
+                .with_label_values(&[connection_id.as_str(), &"redis"])
+                .set(size_in_bytes as f64);
             Ok(TransactionsDataStatus::Success(transactions))
         },
         Err(e) => Err(e),
@@ -901,6 +911,14 @@ async fn channel_send_multiple_with_timeout(
             .as_ref()
             .unwrap();
 
+        let channel_size = tx.capacity();
+        GRPC_STREAM_RESPONSE_CHANNEL_SIZE
+            .with_label_values(&[&start_version.to_string(), &request_metadata.request_connection_id])
+            .set(channel_size as i64);
+        tracing::debug!(
+            current_channel_size = channel_size,
+            connection_id = &request_metadata.request_connection_id,
+            "Channel size before sending.");
         tx.send_timeout(
             Result::<TransactionsResponse, Status>::Ok(resp_item.clone()),
             RESPONSE_CHANNEL_SEND_TIMEOUT,

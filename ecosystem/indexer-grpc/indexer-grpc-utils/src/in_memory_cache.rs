@@ -11,6 +11,7 @@ use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use crate::counters::{IN_MEMORY_CACHE_LATEST_VERSION, IN_MEMORY_CURRENT_CACHE_ENTRY_COUNT};
 
 // Internal lookup retry interval for in-memory cache.
 const IN_MEMORY_CACHE_LOOKUP_RETRY_INTERVAL_MS: u64 = 10;
@@ -244,8 +245,11 @@ fn spawn_update_task<C>(
                 .unwrap()
                 .context("Latest version doesn't exist in Redis")
                 .unwrap();
-            let in_cache_latest_version = { cache_metadata.read().await.latest_version };
-            if current_latest_version == in_cache_latest_version {
+            let (in_memory_cache_first_version, in_memory_cache_latest_version) = {
+                let cm = cache_metadata.read().await;
+                (cm.first_version, cm.latest_version)
+            };
+            if current_latest_version == in_memory_cache_latest_version {
                 tokio::time::sleep(std::time::Duration::from_millis(
                     IN_MEMORY_CACHE_LOOKUP_RETRY_INTERVAL_MS,
                 ))
@@ -254,16 +258,16 @@ fn spawn_update_task<C>(
             }
             let end_version = std::cmp::min(
                 current_latest_version,
-                in_cache_latest_version + 10 * MAX_REDIS_FETCH_BATCH_SIZE as u64,
+                in_memory_cache_latest_version + 10 * MAX_REDIS_FETCH_BATCH_SIZE as u64,
             );
-            let versions_to_fetch = (in_cache_latest_version..end_version).collect();
+            let versions_to_fetch = (in_memory_cache_latest_version..end_version).collect();
             let transactions = batch_get_transactions(&mut conn, versions_to_fetch, storage_format)
                 .await
                 .unwrap();
             // Ensure that transactions are ordered by version.
             let mut newly_added_bytes = 0;
             for (ind, transaction) in transactions.iter().enumerate() {
-                if transaction.version != in_cache_latest_version + ind as u64 {
+                if transaction.version != in_memory_cache_latest_version + ind as u64 {
                     panic!("Transactions are not ordered by version");
                 }
                 newly_added_bytes += transaction.encoded_len() as u64;
@@ -271,6 +275,17 @@ fn spawn_update_task<C>(
             for transaction in transactions {
                 cache.insert(transaction.version, Arc::new(transaction));
             }
+            tracing::debug!(
+                in_memory_cache_first_version = in_memory_cache_first_version,
+                in_memory_cache_end_version = end_version,
+                key_value_pairs_count = cache.len(),
+                total_capacity = cache.capacity(),
+                "In-memory cache is updated"
+                );
+            IN_MEMORY_CURRENT_CACHE_ENTRY_COUNT
+                .set(cache.len() as i64);
+            IN_MEMORY_CACHE_LATEST_VERSION
+                .set(end_version as i64);
             let mut current_cache_metadata = { *cache_metadata.read().await };
             current_cache_metadata.latest_version = end_version;
             current_cache_metadata.total_size_in_bytes += newly_added_bytes;
@@ -321,6 +336,12 @@ fn spawn_cleanup_task(
             }
             current_cache_metadata.total_size_in_bytes -= actual_bytes_removed;
             *cache_metadata.write().await = current_cache_metadata;
+            tracing::debug!(
+                first_version = current_cache_metadata.first_version - 1,
+                cur_kv_pair_count = cache.len(),
+                total_capacity = cache.capacity(),
+                "In-memory cache is cleaned up"
+            );
         }
     });
 }
