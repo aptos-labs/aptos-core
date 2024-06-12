@@ -355,7 +355,6 @@ proptest! {
             let actual_values = db
                 .get_backup_handler()
                 .get_account_iter(i as Version)
-                .unwrap()
                 .collect::<Result<Vec<_>>>()
                 .unwrap();
             let mut expected_values: Vec<_> = kvs[..=i]
@@ -532,7 +531,6 @@ proptest! {
             let snapshot = db
                 .get_backup_handler()
                 .get_account_iter(last_version)
-                .unwrap()
                 .collect::<Result<Vec<_>>>()
                 .unwrap();
             let (items, bytes) = snapshot.iter().fold((0, 0), |(items, bytes), (k, v)| {

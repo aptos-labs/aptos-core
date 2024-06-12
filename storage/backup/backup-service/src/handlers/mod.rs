@@ -47,7 +47,7 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> BoxedFilter<(impl Rep
     let state_snapshot = warp::path!(Version)
         .map(move |version| {
             reply_with_bytes_sender(&bh, STATE_SNAPSHOT, move |bh, sender| {
-                bh.get_account_iter(version)?
+                bh.get_account_iter(version)
                     .try_for_each(|record_res| sender.send_size_prefixed_bcs_bytes(record_res?))
             })
         })
