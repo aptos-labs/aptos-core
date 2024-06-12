@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: ambiguous usage of local `x` since it is still being borrowed
+  ┌─ tests/reference-safety/bug_13488_err.move:9:9
+  │
+9 │         *z = x;
+  │         ^^^^^^ ambiguous usage here, try an explicit annotation, e.g. 'move x' or 'copy x'
+
+error: ambiguous usage of local `x` since it is still being borrowed
+   ┌─ tests/reference-safety/bug_13488_err.move:16:18
+   │
+16 │         let _v = vector[x];
+   │                  ^^^^^^ ambiguous usage here, try an explicit annotation, e.g. 'move x' or 'copy x'
