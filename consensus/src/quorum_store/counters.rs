@@ -45,7 +45,7 @@ const QUORUM_STORE_LATENCY_BUCKETS: &[f64] = &[
 
 // Histogram buckets that expand DEFAULT_BUCKETS with more granularity between 0-150 ms
 const QUORUM_STORE_SMALL_LATENCY_BUCKETS: &[f64] = &[
-    0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.04, 0.05, 0.06, 0.70, 0.08, 0.09, 0.1, 0.11, 0.12,
+    0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12,
     0.13, 0.14, 0.15, 0.2,
 ];
 
