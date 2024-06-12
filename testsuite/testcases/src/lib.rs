@@ -61,7 +61,7 @@ async fn batch_update(
     let deadline = Instant::now() + Duration::from_secs(60);
     for validator in validators_to_update {
         ctx.swarm()
-            .validator_mut(*validator)
+            .validator(*validator)
             .unwrap()
             .wait_until_healthy(deadline)
             .await?;
@@ -94,7 +94,7 @@ async fn batch_update_gradually(
                 .lock()
                 .await
                 .swarm()
-                .validator_mut(*validator)
+                .validator(*validator)
                 .unwrap()
                 .wait_until_healthy(deadline)
                 .await?;

@@ -63,9 +63,9 @@ pub trait Node: Send + Sync {
 
     async fn get_identity(&self) -> Result<String>;
 
-    async fn set_identity(&mut self, k8s_secret_name: String) -> Result<()>;
+    async fn set_identity(&self, k8s_secret_name: String) -> Result<()>;
     /// Clears this Node's Storage. This stops the node as well
-    async fn clear_storage(&mut self) -> Result<()>;
+    async fn clear_storage(&self) -> Result<()>;
 
     async fn health_check(&self) -> Result<(), HealthCheckError>;
 

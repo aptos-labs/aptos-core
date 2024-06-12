@@ -2673,7 +2673,7 @@ impl NetworkTest for RestartValidator {
     async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         let mut ctx_locker = ctx.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
-        let node = ctx.swarm().validators_mut().next().unwrap();
+        let node = ctx.swarm().validators().next().unwrap();
         node.health_check().await.expect("node health check failed");
         node.stop().await.unwrap();
         println!("Restarting node {}", node.peer_id());

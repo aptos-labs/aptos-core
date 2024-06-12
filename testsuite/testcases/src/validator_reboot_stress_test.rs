@@ -41,7 +41,7 @@ impl NetworkLoadTest for ValidatorRebootStressTest {
                     .collect()
             };
             for adr in &addresses {
-                let validator_to_reboot = swarm.validator_mut(*adr).unwrap();
+                let validator_to_reboot = swarm.validator(*adr).unwrap();
                 validator_to_reboot.stop().await?;
             }
             if self.down_time_secs > 0.0 {
@@ -49,7 +49,7 @@ impl NetworkLoadTest for ValidatorRebootStressTest {
             }
 
             for adr in &addresses {
-                let validator_to_reboot = swarm.validator_mut(*adr).unwrap();
+                let validator_to_reboot = swarm.validator(*adr).unwrap();
                 validator_to_reboot.start().await?;
             }
 

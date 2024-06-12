@@ -31,7 +31,7 @@ impl NetworkTest for PartialNodesDown {
         let mut down_nodes = all_validators.clone();
         let up_nodes = down_nodes.split_off(all_validators.len() / 10);
         for n in &down_nodes {
-            let node = ctx.swarm().validator_mut(*n).unwrap();
+            let node = ctx.swarm().validator(*n).unwrap();
             println!("Node {} is going to stop", node.name());
             runtime.block_on(node.stop())?;
         }
@@ -42,7 +42,7 @@ impl NetworkTest for PartialNodesDown {
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat);
         for n in &down_nodes {
-            let node = ctx.swarm().validator_mut(*n).unwrap();
+            let node = ctx.swarm().validator(*n).unwrap();
             println!("Node {} is going to restart", node.name());
             runtime.block_on(node.start())?;
         }

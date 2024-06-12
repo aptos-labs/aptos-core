@@ -38,7 +38,7 @@ impl NetworkLoadTest for FullNodeRebootStressTest {
             let fullnode_to_reboot = {
                 let mut rng = thread_rng();
                 swarm
-                    .full_node_mut(*all_fullnodes.choose(&mut rng).unwrap())
+                    .full_node(*all_fullnodes.choose(&mut rng).unwrap())
                     .unwrap()
             };
             fullnode_to_reboot.stop().await?;

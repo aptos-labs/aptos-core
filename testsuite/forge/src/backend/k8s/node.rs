@@ -165,7 +165,7 @@ impl Node for K8sNode {
             .expect("Invalid URL.")
     }
 
-    async fn clear_storage(&mut self) -> Result<()> {
+    async fn clear_storage(&self) -> Result<()> {
         // Remove all storage files
         let ledger_db_path = format!("{}/db/{}", APTOS_DATA_DIR, LEDGER_DB_NAME);
         let state_db_path = format!("{}/db/{}", APTOS_DATA_DIR, STATE_MERKLE_DB_NAME);
@@ -261,7 +261,7 @@ impl Node for K8sNode {
         stateful_set::get_identity(self.stateful_set_name(), self.namespace()).await
     }
 
-    async fn set_identity(&mut self, k8s_secret_name: String) -> Result<()> {
+    async fn set_identity(&self, k8s_secret_name: String) -> Result<()> {
         stateful_set::set_identity(
             self.stateful_set_name(),
             self.namespace(),

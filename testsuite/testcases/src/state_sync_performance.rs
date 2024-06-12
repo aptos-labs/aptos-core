@@ -251,26 +251,26 @@ fn stop_and_reset_nodes(
     // Stop and reset all fullnodes
     info!("Deleting all fullnode data!");
     for fullnode_id in fullnodes_to_reset {
-        let fullnode = ctx.swarm().full_node_mut(*fullnode_id).unwrap();
+        let fullnode = ctx.swarm().full_node(*fullnode_id).unwrap();
         runtime.block_on(async { fullnode.clear_storage().await })?;
     }
 
     // Stop and reset all validators
     info!("Deleting all validator data!");
     for valdiator_id in validators_to_reset {
-        let validator = ctx.swarm().validator_mut(*valdiator_id).unwrap();
+        let validator = ctx.swarm().validator(*valdiator_id).unwrap();
         runtime.block_on(async { validator.clear_storage().await })?;
     }
 
     // Restart the fullnodes so they start syncing from a fresh state
     for fullnode_id in fullnodes_to_reset {
-        let fullnode = ctx.swarm().full_node_mut(*fullnode_id).unwrap();
+        let fullnode = ctx.swarm().full_node(*fullnode_id).unwrap();
         runtime.block_on(async { fullnode.start().await })?;
     }
 
     // Restart the validators so they start syncing from a fresh state
     for valdiator_id in validators_to_reset {
-        let validator = ctx.swarm().validator_mut(*valdiator_id).unwrap();
+        let validator = ctx.swarm().validator(*valdiator_id).unwrap();
         runtime.block_on(async { validator.start().await })?;
     }
 

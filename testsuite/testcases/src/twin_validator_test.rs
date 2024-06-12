@@ -42,7 +42,7 @@ impl NetworkTest for TwinValidatorTest {
                     let main_id: AccountAddress = all_validators_ids[i];
                     let twin_id = all_validators_ids[i + validator_count - twin_count];
                     ctx.swarm()
-                        .validator_mut(twin_id)
+                        .validator(twin_id)
                         .unwrap()
                         .clear_storage()
                         .await
@@ -51,25 +51,25 @@ impl NetworkTest for TwinValidatorTest {
                         ))?;
                     let main_identity = ctx
                         .swarm()
-                        .validator_mut(main_id)
+                        .validator(main_id)
                         .unwrap()
                         .get_identity()
                         .await
                         .context(format!("Error while getting identity for {main_id}"))?;
                     ctx.swarm()
-                        .validator_mut(twin_id)
+                        .validator(twin_id)
                         .unwrap()
                         .set_identity(main_identity)
                         .await
                         .context(format!("Error while setting identity for {twin_id}"))?;
                     ctx.swarm()
-                        .validator_mut(twin_id)
+                        .validator(twin_id)
                         .unwrap()
                         .start()
                         .await
                         .context(format!("Error while starting {twin_id}"))?;
                     ctx.swarm()
-                        .validator_mut(twin_id)
+                        .validator(twin_id)
                         .unwrap()
                         .wait_until_healthy(Instant::now() + Duration::from_secs(300))
                         .await

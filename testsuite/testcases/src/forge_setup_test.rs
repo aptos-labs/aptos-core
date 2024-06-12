@@ -39,7 +39,7 @@ impl NetworkTest for ForgeSetupTest {
         let fullnode_id = all_fullnodes.iter().choose(&mut rng).unwrap();
 
         info!("Pick one fullnode to stop and wipe");
-        let fullnode = swarm.full_node_mut(*fullnode_id).unwrap();
+        let fullnode = swarm.full_node(*fullnode_id).unwrap();
         runtime.block_on(fullnode.clear_storage())?;
         runtime.block_on(fullnode.start())?;
 

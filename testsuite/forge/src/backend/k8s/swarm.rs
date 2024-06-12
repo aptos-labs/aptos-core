@@ -224,24 +224,8 @@ impl Swarm for K8sSwarm {
         Box::new(validators.into_iter())
     }
 
-    fn validators_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn Validator> + 'a> {
-        let mut validators: Vec<_> = self
-            .validators
-            .values_mut()
-            .map(|v| v as &'a mut dyn Validator)
-            .collect();
-        validators.sort_by_key(|v| v.index());
-        Box::new(validators.into_iter())
-    }
-
     fn validator(&self, id: PeerId) -> Option<&dyn Validator> {
         self.validators.get(&id).map(|v| v as &dyn Validator)
-    }
-
-    fn validator_mut(&mut self, id: PeerId) -> Option<&mut dyn Validator> {
-        self.validators
-            .get_mut(&id)
-            .map(|v| v as &mut dyn Validator)
     }
 
     /// TODO: this should really be a method on Node rather than Swarm
@@ -284,22 +268,8 @@ impl Swarm for K8sSwarm {
         Box::new(full_nodes.into_iter())
     }
 
-    fn full_nodes_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn FullNode> + 'a> {
-        let mut full_nodes: Vec<_> = self
-            .fullnodes
-            .values_mut()
-            .map(|n| n as &'a mut dyn FullNode)
-            .collect();
-        full_nodes.sort_by_key(|n| n.index());
-        Box::new(full_nodes.into_iter())
-    }
-
     fn full_node(&self, id: PeerId) -> Option<&dyn FullNode> {
         self.fullnodes.get(&id).map(|v| v as &dyn FullNode)
-    }
-
-    fn full_node_mut(&mut self, id: PeerId) -> Option<&mut dyn FullNode> {
-        self.fullnodes.get_mut(&id).map(|v| v as &mut dyn FullNode)
     }
 
     fn add_validator(&mut self, _version: &Version, _template: NodeConfig) -> Result<PeerId> {

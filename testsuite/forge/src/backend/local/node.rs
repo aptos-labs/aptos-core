@@ -299,11 +299,11 @@ impl Node for LocalNode {
         todo!()
     }
 
-    async fn set_identity(&mut self, _k8s_secret_name: String) -> Result<()> {
+    async fn set_identity(&self, _k8s_secret_name: String) -> Result<()> {
         todo!()
     }
 
-    async fn clear_storage(&mut self) -> Result<()> {
+    async fn clear_storage(&self) -> Result<()> {
         // Remove all storage files (i.e., blockchain data, consensus data and state sync data)
         let node_config = self.config();
         let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
