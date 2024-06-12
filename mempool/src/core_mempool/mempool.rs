@@ -532,27 +532,27 @@ impl Mempool {
             },
         );
 
-        let mut actual_remaining_txns = 0;
-        for txn in self.transactions.iter_queue() {
-            let txn_ptr = TxnPointer::from(txn);
-            if exclude_transactions.contains_key(&txn_ptr) {
-                continue;
-            }
-            if block.iter().any(|t| {
-                t.sender() == txn_ptr.sender && t.sequence_number() == txn_ptr.sequence_number
-            }) {
-                continue;
-            }
-            actual_remaining_txns += 1;
-        }
-        counters::MEMPOOL_ACTUAL_REMAINING_TXNS.observe(actual_remaining_txns as f64);
-        counters::MEMPOOL_ACTUAL_REMAINING_TXNS_SAME_AS_SKIPPED.observe(
-            if actual_remaining_txns == skipped.len() {
-                1.0
-            } else {
-                0.0
-            },
-        );
+        // let mut actual_remaining_txns = 0;
+        // for txn in self.transactions.iter_queue() {
+        //     let txn_ptr = TxnPointer::from(txn);
+        //     if exclude_transactions.contains_key(&txn_ptr) {
+        //         continue;
+        //     }
+        //     if block.iter().any(|t| {
+        //         t.sender() == txn_ptr.sender && t.sequence_number() == txn_ptr.sequence_number
+        //     }) {
+        //         continue;
+        //     }
+        //     actual_remaining_txns += 1;
+        // }
+        // counters::MEMPOOL_ACTUAL_REMAINING_TXNS.observe(actual_remaining_txns as f64);
+        // counters::MEMPOOL_ACTUAL_REMAINING_TXNS_SAME_AS_SKIPPED.observe(
+        //     if actual_remaining_txns == skipped.len() {
+        //         1.0
+        //     } else {
+        //         0.0
+        //     },
+        // );
 
         counters::MEMPOOL_UNFILLED_TXNS_IN_GET_BATCH
             .observe((max_txns.saturating_sub(block.len() as u64)) as f64);
