@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: cannot return nothing from a function with result type `u8`
+  ┌─ tests/checking/liveness/return_typing.move:7:19
+  │
+7 │         return(42);
+  │                   ^
+
+error: cannot return nothing from a function with result type `u8`
+   ┌─ tests/checking/liveness/return_typing.move:11:18
+   │
+11 │         return 42;
+   │                  ^
