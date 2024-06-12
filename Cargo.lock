@@ -2101,27 +2101,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-indexer-grpc-integration-tests"
+name = "aptos-indexer-grpc-integration-test-transaction-generator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-config",
- "aptos-indexer-grpc-cache-worker",
- "aptos-indexer-grpc-file-store",
  "aptos-indexer-grpc-server-framework",
- "aptos-indexer-grpc-utils",
- "aptos-logger",
- "aptos-transaction-emitter-lib",
- "aptos-transaction-generator-lib",
- "aptos-types",
- "once_cell",
- "redis",
- "regex",
+ "aptos-protos 1.3.0",
+ "clap 4.4.14",
  "reqwest",
- "tempfile",
+ "serde",
+ "serde_json",
+ "serde_yaml 0.8.26",
  "tokio",
+ "toml 0.7.8",
+ "tonic 0.11.0",
  "tracing",
- "url",
+ "which",
 ]
 
 [[package]]
