@@ -20,7 +20,7 @@ CompiledPackageInfo {
         dev_mode: true,
         test_mode: false,
         override_std: Some(
-            "devnet",
+            Devnet,
         ),
         generate_docs: false,
         generate_abis: false,
