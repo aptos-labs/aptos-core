@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    backup::state_snapshot_iter::state_snapshot_iter,
     ledger_db::LedgerDb,
     metrics::{
         BACKUP_EPOCH_ENDING_EPOCH, BACKUP_STATE_SNAPSHOT_LEAF_IDX, BACKUP_STATE_SNAPSHOT_VERSION,
@@ -123,17 +124,14 @@ impl BackupHandler {
     pub fn get_account_iter(
         &self,
         version: Version,
-    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync>> {
-        let iterator = self
-            .state_store
-            .get_state_key_and_value_iter(version, HashValue::zero())?
+    ) -> impl Iterator<Item = Result<(StateKey, StateValue)>> + Send {
+        state_snapshot_iter(self.state_store.clone(), version)
             .enumerate()
             .map(move |(idx, res)| {
                 BACKUP_STATE_SNAPSHOT_VERSION.set(version as i64);
                 BACKUP_STATE_SNAPSHOT_LEAF_IDX.set(idx as i64);
                 res
-            });
-        Ok(Box::new(iterator))
+            })
     }
 
     /// Gets the proof that proves a range of accounts.
