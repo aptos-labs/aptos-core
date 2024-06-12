@@ -296,6 +296,34 @@ pub static MEMPOOL_REQUESTED_BYTES_IN_GET_BATCH: Lazy<Histogram> = Lazy::new(|| 
     .unwrap()
 });
 
+pub static MEMPOOL_TRANSACTIONS_WALKED: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_transactions_walked",
+        "Number of txns walked in mempool",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_NON_EXCLUDED_TRANSACTIONS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_non_excluded_transactions",
+        "Number of txns in mempool after excluding duplicates and gas upgrades",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_DIFFERENCE_BETWEEN_TWO_EXCLUDED_CALCULATIONS: Lazy<Histogram> =
+    Lazy::new(|| {
+        register_histogram!(
+            "aptos_mempool_difference_between_two_excluded_calculations",
+            "Difference between two calculations of txns to exclude",
+            TRANSACTION_COUNT_BUCKETS.to_vec()
+        )
+        .unwrap()
+    });
+
 pub static MEMPOOL_UNFILLED_TXNS_IN_GET_BATCH: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_mempool_unfilled_txns_in_get_batch",
@@ -314,9 +342,44 @@ pub static MEMPOOL_UNFILLED_BYTES_IN_GET_BATCH: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static MEMPOOL_TOTAL_TXNS_MINUS_EXLUDED_SKIPPED_INCLUDED: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_total_txns_minus_excluded_skipped_included",
+        "Number of txns in mempool after excluding duplicates and gas upgrades and skipping txns",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_ACTUAL_REMAINING_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_mempool_actual_remaining_txns",
+        "Number of txns remaining in mempool after get batch response is sent",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_ACTUAL_REMAINING_TXNS_SAME_AS_SKIPPED: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_actual_remaining_txns_same_as_skipped",
+        "Number of txns remaining in mempool after get batch response is sent",
+        [0.5].to_vec()
+    )
+    .unwrap()
+});
+
 pub static MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_mempool_remaining_txns_after_get_batch",
+        "Number of txns remaining in mempool after get batch response is sent",
+    )
+    .unwrap()
+});
+
+pub static MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH_SECOND_WAY: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_mempool_remaining_txns_after_get_batch_second_way",
         "Number of txns remaining in mempool after get batch response is sent",
     )
     .unwrap()
