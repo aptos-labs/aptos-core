@@ -32,7 +32,10 @@ use aptos_framework::{
 };
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
-use aptos_gas_schedule::{AptosGasParameters, TransactionGasParameters, VMGasParameters};
+use aptos_gas_schedule::{
+    gas_feature_versions::RELEASE_V1_15, AptosGasParameters, TransactionGasParameters,
+    VMGasParameters,
+};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
@@ -99,7 +102,10 @@ use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
 };
-use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
+use move_vm_types::{
+    gas::{GasMeter, UnmeteredGasMeter},
+    loaded_data::runtime_types::TypeBuilder,
+};
 use num_cpus;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
@@ -215,6 +221,32 @@ fn is_approved_gov_script(
     }
 }
 
+// TODO(George): move to config file when it is moved from types crate.
+pub fn aptos_prod_ty_builder(
+    features: &Features,
+    gas_feature_version: u64,
+    gas_params: &AptosGasParameters,
+) -> TypeBuilder {
+    if features.is_limit_type_size_enabled() && gas_feature_version >= RELEASE_V1_15 {
+        let max_ty_size = gas_params.vm.txn.max_ty_size;
+        let max_ty_depth = gas_params.vm.txn.max_ty_depth;
+        TypeBuilder::with_limits(max_ty_size.into(), max_ty_depth.into())
+    } else {
+        aptos_default_ty_builder(features)
+    }
+}
+
+pub fn aptos_default_ty_builder(features: &Features) -> TypeBuilder {
+    if features.is_limit_type_size_enabled() {
+        // Type builder to use when:
+        //   1. Type size gas parameters are not yet in gas schedule (before V14).
+        //   2. No gas parameters are found on-chain.
+        TypeBuilder::with_limits(128, 20)
+    } else {
+        TypeBuilder::Legacy
+    }
+}
+
 pub struct AptosVM {
     is_simulation: bool,
     move_vm: MoveVmExt,
@@ -235,13 +267,8 @@ impl AptosVM {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
         let features = Features::fetch_config(resolver).unwrap_or_default();
         let randomness_config = RandomnessConfig::fetch(resolver);
-        let (
-            gas_params,
-            storage_gas_params,
-            native_gas_params,
-            misc_gas_params,
-            gas_feature_version,
-        ) = get_gas_parameters(&features, resolver);
+        let (gas_params, storage_gas_params, gas_feature_version) =
+            get_gas_parameters(&features, resolver);
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
         let chain_id = ChainId::fetch_config(resolver).unwrap_or_else(ChainId::test);
@@ -265,9 +292,8 @@ impl AptosVM {
             && features.is_aggregator_v2_delayed_fields_enabled();
 
         let move_vm = MoveVmExt::new(
-            native_gas_params,
-            misc_gas_params,
             gas_feature_version,
+            gas_params.as_ref(),
             chain_id.id(),
             features,
             timed_features.clone(),
