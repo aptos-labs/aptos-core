@@ -77,7 +77,7 @@ impl Cmd {
                             read_opts.set_prefix_same_as_start(true);
                             let mut iter = state_kv_db
                                 .db_shard(key.get_shard_id())
-                                .iter::<StateValueSchema>(read_opts)
+                                .iter_with_opts::<StateValueSchema>(read_opts)
                                 .unwrap();
                             iter.seek(&(key.clone(), key_version)).unwrap();
                             let (value_version, value) = iter
