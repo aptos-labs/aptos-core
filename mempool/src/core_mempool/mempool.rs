@@ -327,22 +327,22 @@ impl Mempool {
         let gas_end_time = start_time.elapsed();
         info!("MempoolGetBatchRequest");
 
-        let mut txn_walked_first_time = 0usize;
-        let mut non_excluded_txns = 0usize;
-        for txn in self.transactions.iter_queue() {
-            txn_walked_first_time += 1;
-            let txn_ptr = TxnPointer::from(txn);
+        // let mut txn_walked_first_time = 0usize;
+        // let mut non_excluded_txns = 0usize;
+        // for txn in self.transactions.iter_queue() {
+        //     txn_walked_first_time += 1;
+        //     let txn_ptr = TxnPointer::from(txn);
 
-            // TODO: removed gas upgraded logic. double check if it's needed
-            if exclude_transactions.contains_key(&txn_ptr) {
-                continue;
-            }
-            non_excluded_txns += 1;
-        }
-        counters::MEMPOOL_TRANSACTIONS_WALKED.observe(txn_walked_first_time as f64);
-        counters::MEMPOOL_NON_EXCLUDED_TRANSACTIONS.observe(non_excluded_txns as f64);
-        counters::MEMPOOL_DIFFERENCE_BETWEEN_TWO_EXCLUDED_CALCULATIONS
-            .observe((mempool_total_txns_excluding_progressing - non_excluded_txns as u64) as f64);
+        //     // TODO: removed gas upgraded logic. double check if it's needed
+        //     if exclude_transactions.contains_key(&txn_ptr) {
+        //         continue;
+        //     }
+        //     non_excluded_txns += 1;
+        // }
+        // counters::MEMPOOL_TRANSACTIONS_WALKED.observe(txn_walked_first_time as f64);
+        // counters::MEMPOOL_NON_EXCLUDED_TRANSACTIONS.observe(non_excluded_txns as f64);
+        // counters::MEMPOOL_DIFFERENCE_BETWEEN_TWO_EXCLUDED_CALCULATIONS
+        //     .observe((mempool_total_txns_excluding_progressing - non_excluded_txns as u64) as f64);
 
         let mut result = vec![];
         // Helper DS. Helps to mitigate scenarios where account submits several transactions
@@ -500,13 +500,13 @@ impl Mempool {
                 0
             },
         );
-        counters::MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH_SECOND_WAY.set(
-            if non_excluded_txns > block.len() {
-                (non_excluded_txns - block.len()) as i64
-            } else {
-                0
-            },
-        );
+        // counters::MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH_SECOND_WAY.set(
+        //     if non_excluded_txns > block.len() {
+        //         (non_excluded_txns - block.len()) as i64
+        //     } else {
+        //         0
+        //     },
+        // );
         counters::MEMPOOL_BLOCK_BIGGER_THAN_MEMPOOL.observe(
             if block.len() as u64 > mempool_total_txns_excluding_progressing {
                 1.0
@@ -532,27 +532,27 @@ impl Mempool {
             },
         );
 
-        // let mut actual_remaining_txns = 0;
-        // for txn in self.transactions.iter_queue() {
-        //     let txn_ptr = TxnPointer::from(txn);
-        //     if exclude_transactions.contains_key(&txn_ptr) {
-        //         continue;
-        //     }
-        //     if block.iter().any(|t| {
-        //         t.sender() == txn_ptr.sender && t.sequence_number() == txn_ptr.sequence_number
-        //     }) {
-        //         continue;
-        //     }
-        //     actual_remaining_txns += 1;
-        // }
-        // counters::MEMPOOL_ACTUAL_REMAINING_TXNS.observe(actual_remaining_txns as f64);
-        // counters::MEMPOOL_ACTUAL_REMAINING_TXNS_SAME_AS_SKIPPED.observe(
-        //     if actual_remaining_txns == skipped.len() {
-        //         1.0
-        //     } else {
-        //         0.0
-        //     },
-        // );
+        let mut actual_remaining_txns = 0;
+        for txn in self.transactions.iter_queue() {
+            let txn_ptr = TxnPointer::from(txn);
+            if exclude_transactions.contains_key(&txn_ptr) {
+                continue;
+            }
+            if block.iter().any(|t| {
+                t.sender() == txn_ptr.sender && t.sequence_number() == txn_ptr.sequence_number
+            }) {
+                continue;
+            }
+            actual_remaining_txns += 1;
+        }
+        counters::MEMPOOL_ACTUAL_REMAINING_TXNS.observe(actual_remaining_txns as f64);
+        counters::MEMPOOL_ACTUAL_REMAINING_TXNS_SAME_AS_SKIPPED.observe(
+            if actual_remaining_txns == skipped.len() {
+                1.0
+            } else {
+                0.0
+            },
+        );
 
         counters::MEMPOOL_UNFILLED_TXNS_IN_GET_BATCH
             .observe((max_txns.saturating_sub(block.len() as u64)) as f64);
