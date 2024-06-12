@@ -518,12 +518,38 @@ impl Mempool {
                 0.0
             },
         );
+        if self.transactions.total_num_transactions()
+            != (block.len() + skipped.len() + exclude_transactions.len()) as u64
+        {
+            info!("Total_num_transactions = {}, block len = {}, skipped len = {},  excluded transactions = {}, difference = {}", 
+                self.transactions.total_num_transactions(), block.len(), skipped.len(), exclude_transactions.len(),
+                (self.transactions.total_num_transactions() as i64 - (block.len()  + skipped.len() + exclude_transactions.len()) as i64)
+            );
+        }
         counters::MEMPOOL_DIFFERENCE_BETWEEN_TWO_EXCLUDED_CALCULATIONS.observe(
-            (self.transactions.total_num_transactions()
-                - block.len() as u64
-                - skipped.len() as u64
-                - exclude_transactions.len() as u64) as f64,
+            if self.transactions.total_num_transactions()
+                > block.len() as u64 + skipped.len() as u64 + exclude_transactions.len() as u64
+            {
+                (self.transactions.total_num_transactions()
+                    - block.len() as u64
+                    - skipped.len() as u64
+                    - exclude_transactions.len() as u64) as f64
+            } else {
+                0.0
+            },
         );
+
+        counters::MEMPOOL_DIFFERENCE_BETWEEN_TWO_EXCLUDED_CALCULATIONS_NEGATIVE.observe(
+            if block.len() as u64 + skipped.len() as u64 + exclude_transactions.len() as u64
+                > self.transactions.total_num_transactions()
+            {
+                (block.len() as u64 + skipped.len() as u64 + exclude_transactions.len() as u64
+                    - self.transactions.total_num_transactions()) as f64
+            } else {
+                0.0
+            },
+        );
+
         counters::MEMPOOL_BLOCK_AND_SKIPPED
             .set(((block.len() as u64) + (skipped.len() as u64)) as i64);
         counters::MEMPOOL_BLOCK_AND_SKIPPED_BIGGER_THAN_MEMPOOL.observe(

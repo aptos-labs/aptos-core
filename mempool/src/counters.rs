@@ -324,6 +324,16 @@ pub static MEMPOOL_DIFFERENCE_BETWEEN_TWO_EXCLUDED_CALCULATIONS: Lazy<Histogram>
         .unwrap()
     });
 
+pub static MEMPOOL_DIFFERENCE_BETWEEN_TWO_EXCLUDED_CALCULATIONS_NEGATIVE: Lazy<Histogram> =
+    Lazy::new(|| {
+        register_histogram!(
+            "aptos_mempool_difference_between_two_excluded_calculations_negative",
+            "Difference between two calculations of txns to exclude",
+            TRANSACTION_COUNT_BUCKETS.to_vec()
+        )
+        .unwrap()
+    });
+
 pub static MEMPOOL_UNFILLED_TXNS_IN_GET_BATCH: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_mempool_unfilled_txns_in_get_batch",
