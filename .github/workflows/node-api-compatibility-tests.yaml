@@ -43,7 +43,7 @@ jobs:
   # if there are any changes that would affect it within the PR / commit. If
   # everything is checked in, run tests, build the SDK, and upload it to npmjs.
   node-api-compatibility-tests:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker]
     permissions:
       contents: read
       id-token: write

@@ -30,7 +30,7 @@ jobs:
   run-tests-local-testnet:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker]
     env:
       # spin up the local testnet using the latest devnet image
       VALIDATOR_IMAGE_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}/validator
