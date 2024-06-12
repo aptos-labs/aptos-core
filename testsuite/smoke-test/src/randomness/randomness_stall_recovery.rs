@@ -1,20 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{randomness::get_on_chain_resource, smoke_test_environment::SwarmBuilder};
+use crate::{
+    genesis::enable_sync_only_mode, randomness::get_on_chain_resource,
+    smoke_test_environment::SwarmBuilder,
+};
 use aptos::common::types::GasOptions;
 use aptos_config::config::{OverrideNodeConfig, PersistableConfig};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_rest_client::Client;
 use aptos_types::{on_chain_config::OnChainRandomnessConfig, randomness::PerBlockRandomness};
-use futures::future::join_all;
 use std::{
     ops::Add,
     sync::Arc,
     time::{Duration, Instant},
 };
-use crate::genesis::enable_sync_only_mode;
 
 /// Chain recovery using a local config from randomness stall should work.
 /// See `randomness_config_seqnum.move` for more details.
@@ -73,7 +73,8 @@ async fn randomness_stall_recovery() {
             .randomness_override_seq_num = 1;
         validator_override_config
             .override_config_mut()
-            .consensus.sync_only = false;
+            .consensus
+            .sync_only = false;
         info!("Updating validator {} config.", idx);
         validator_override_config.save_config(config_path).unwrap();
         info!("Restarting validator {}.", idx);
