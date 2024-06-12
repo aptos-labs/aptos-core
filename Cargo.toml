@@ -758,7 +758,7 @@ tokio-stream = { version = "0.1.14", features = ["fs"] }
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"
-tonic = { features = [
+tonic = { version = "0.11.0", features = [
     "tls-roots",
     "transport",
     "prost",
@@ -861,5 +861,5 @@ debug = true
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
-tonic = { git  = "https://github.com/aptos-labs/tonic", rev = "888e8eb004eb0566a07f36634bb1f946f5981ebb" }
+tonic = { git = "https://github.com/aptos-labs/tonic.git", rev = "888e8eb004eb0566a07f36634bb1f946f5981ebb" }
 #tonic = { path = "/Users/max/aptos/tonic/tonic" }

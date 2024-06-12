@@ -15667,6 +15667,7 @@ dependencies = [
 [[package]]
 name = "tonic"
 version = "0.11.0"
+source = "git+https://github.com/aptos-labs/tonic.git?rev=888e8eb004eb0566a07f36634bb1f946f5981ebb#888e8eb004eb0566a07f36634bb1f946f5981ebb"
 dependencies = [
  "async-stream",
  "async-trait",
