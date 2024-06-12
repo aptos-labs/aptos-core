@@ -328,7 +328,7 @@ module stablecoin::usdk {
     // Check that the account is not denylisted by checking the frozen flag on the primary store
     fun assert_not_denylisted(account: address) {
         let metadata = metadata();
-        // CANNOT call into pfs::store_exists in our withdraw/deposit hooks as it creates possibility of a circular dependency. 
+        // CANNOT call into pfs::store_exists in our withdraw/deposit hooks as it creates possibility of a circular dependency.
         // Instead, we will call the inlined version of the function.
         if (primary_fungible_store::primary_store_exists_inlined(account, metadata)) {
             assert!(!fungible_asset::is_frozen(primary_fungible_store::primary_store_inlined(account, metadata)), EDENYLISTED);
