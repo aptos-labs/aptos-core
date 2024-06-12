@@ -119,18 +119,26 @@ impl BackupHandler {
         Ok((accumulator_proof, ledger_info))
     }
 
-    /// Gets an iterator which can yield all accounts in the state tree.
-    pub fn get_account_iter(
+    /// Gets the number of items in a state snapshot.
+    pub fn get_state_item_count(&self, version: Version) -> Result<usize> {
+        self.state_store.get_value_count(version)
+    }
+
+    /// Iterate through items in a state snapshot
+    pub fn get_state_item_iter(
         &self,
         version: Version,
-    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync>> {
+        start_idx: usize,
+        limit: usize,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send> {
         let iterator = self
             .state_store
-            .get_state_key_and_value_iter(version, HashValue::zero())?
+            .get_state_key_and_value_iter(version, start_idx)?
+            .take(limit)
             .enumerate()
             .map(move |(idx, res)| {
                 BACKUP_STATE_SNAPSHOT_VERSION.set(version as i64);
-                BACKUP_STATE_SNAPSHOT_LEAF_IDX.set(idx as i64);
+                BACKUP_STATE_SNAPSHOT_LEAF_IDX.set((start_idx + idx) as i64);
                 res
             });
         Ok(Box::new(iterator))
