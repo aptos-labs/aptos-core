@@ -7,6 +7,7 @@
 use aptos_types::{
     contract_event::ContractEvent, ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
+use aptos_logger::error;
 use async_trait::async_trait;
 use futures::{
     channel::{mpsc, oneshot},
@@ -121,6 +122,7 @@ impl ConsensusNotificationSender for ConsensusNotifier {
                 error
             )));
         }
+        error!("ConsensusNotificationSender: Transaction commit notification to state sync");
 
         // Handle any responses or a timeout
         if let Ok(response) =
