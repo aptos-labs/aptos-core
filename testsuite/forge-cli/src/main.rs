@@ -1424,7 +1424,8 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 15000 })
-                .init_gas_price_multiplier(20),
+                .init_gas_price_multiplier(20)
+                .txn_expiration_time_secs(5 * 60),
             inner_success_criteria: SuccessCriteria::new(7500),
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
