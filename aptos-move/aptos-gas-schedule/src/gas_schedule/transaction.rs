@@ -262,12 +262,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             max_ty_size: NumTypeNodes,
             { RELEASE_V1_15.. => "max_ty_size" },
-            256,
+            128,
         ],
         [
             max_ty_depth: NumTypeNodes,
             { RELEASE_V1_15.. => "max_ty_depth" },
-            128
+            20,
         ]
     ]
 );

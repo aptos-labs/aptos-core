@@ -241,7 +241,7 @@ pub fn aptos_default_ty_builder(features: &Features) -> TypeBuilder {
         // Type builder to use when:
         //   1. Type size gas parameters are not yet in gas schedule (before V14).
         //   2. No gas parameters are found on-chain.
-        TypeBuilder::with_limits(256, 128)
+        TypeBuilder::with_limits(128, 20)
     } else {
         TypeBuilder::Legacy
     }
