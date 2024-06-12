@@ -43,7 +43,7 @@ fn scheduler_thread_inner(
     version: Version,
     result_tx: &Sender<DbResult<(StateKey, StateValue)>>,
 ) -> DbResult<()> {
-    const CONCURRENCY: usize = 2;
+    const CONCURRENCY: usize = 4;
     const CHUNK_SIZE: usize = 100_000;
 
     let pool = THREAD_MANAGER.get_background_pool();
