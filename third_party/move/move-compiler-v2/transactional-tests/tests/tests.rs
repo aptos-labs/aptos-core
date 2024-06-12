@@ -56,7 +56,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         ],
         language_version: LanguageVersion::V2_0,
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/"],
+        exclude: &["/operator_eval/", "/no-optimize-only/"],
     },
     TestConfig {
         name: "no-optimize-only",
@@ -79,7 +79,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         ],
         language_version: LanguageVersion::V2_0,
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/"],
+        exclude: &["/operator_eval/", "/no-optimize-only/"],
     },
     TestConfig {
         name: "operator-eval-lang-1",
@@ -109,6 +109,7 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/print_bytecode.move",
     // The output of the tests could be different depending on the language version
     "/operator_eval/",
+    "/no-optimize-only/",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {
