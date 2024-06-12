@@ -2326,6 +2326,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-keyless-circuit"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-keyless-common",
+ "aptos-logger",
+ "ark-bn254",
+ "ark-ff",
+ "base64 0.13.1",
+ "hex",
+ "itertools 0.12.1",
+ "num-bigint 0.3.3",
+ "num-modular",
+ "num-traits",
+ "rand 0.7.3",
+ "rand_chacha 0.3.1",
+ "rsa 0.9.6",
+ "serde_json",
+ "sha2 0.9.9",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-keyless-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-types",
+ "ark-bn254",
+ "ark-ff",
+ "base64 0.13.1",
+ "hex",
+ "num-bigint 0.3.3",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
 name = "aptos-keyless-pepper-common"
 version = "0.1.0"
 dependencies = [
@@ -11485,6 +11527,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-modular"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17bb261bf36fa7d83f4c294f834e91256769097b3cb505d44831e0a179ac647f"
+dependencies = [
+ "num-bigint 0.4.4",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "num-rational"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13594,6 +13647,7 @@ dependencies = [
  "pkcs1 0.7.5",
  "pkcs8 0.10.2",
  "rand_core 0.6.4",
+ "sha2 0.10.8",
  "signature 2.2.0",
  "spki 0.7.3",
  "subtle",
