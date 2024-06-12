@@ -335,6 +335,7 @@ impl BatchGenerator {
             self.txns_in_progress_sorted.len()
         );
 
+        let pull_start_time = Instant::now();
         let mut pulled_txns = self
             .mempool_proxy
             .pull_internal(
@@ -344,6 +345,7 @@ impl BatchGenerator {
             )
             .await
             .unwrap_or_default();
+        counters::MEMPOOL_PULL_DURATION.observe_duration(pull_start_time.elapsed());
 
         trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
 
@@ -466,7 +468,10 @@ impl BatchGenerator {
                             self.config.sender_max_total_txns as u64,
                         );
                         last_pulled_max_txn = pull_max_txn;
+                        let pull_start_time = Instant::now();
                         let batches = self.handle_scheduled_pull(pull_max_txn).await;
+                        counters::MEMPOOL_PULL_AND_CREATE_BATCHES_DURATION.observe_duration(pull_start_time.elapsed());
+
                         last_pulled_num_txns = batches.iter().map(|b| b.batch_info().num_txns()).sum();
                         if !batches.is_empty() {
                             last_non_empty_pull = tick_start;

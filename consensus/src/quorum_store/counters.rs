@@ -43,6 +43,12 @@ const QUORUM_STORE_LATENCY_BUCKETS: &[f64] = &[
     0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 5.0, 10.0,
 ];
 
+// Histogram buckets that expand DEFAULT_BUCKETS with more granularity between 0-150 ms
+const QUORUM_STORE_SMALL_LATENCY_BUCKETS: &[f64] = &[
+    0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.04, 0.05, 0.06, 0.70, 0.08, 0.09, 0.1, 0.11, 0.12,
+    0.13, 0.14, 0.15, 0.2,
+];
+
 /// Counter for tracking latency of quorum store processing requests from consensus
 /// A 'fail' result means the quorum store's callback response to consensus failed.
 static QUORUM_STORE_SERVICE_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
@@ -699,7 +705,27 @@ pub static BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
         register_histogram!(
             "quorum_store_batch_creation_duration",
             "Histogram of the time durations for batch creation.",
-            QUORUM_STORE_LATENCY_BUCKETS.to_vec()
+            QUORUM_STORE_SMALL_LATENCY_BUCKETS.to_vec()
+        )
+        .unwrap(),
+    )
+});
+
+pub static MEMPOOL_PULL_AND_CREATE_BATCHES_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "mempool_pull_and_create_batches_duration",
+            "Histogram of the time durations for pulling from mempool and creating batches.",
+        )
+        .unwrap(),
+    )
+});
+
+pub static MEMPOOL_PULL_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "mempool_pull_duration",
+            "Histogram of the time durations for pulling from mempool",
         )
         .unwrap(),
     )
@@ -720,7 +746,6 @@ pub static EMPTY_BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(||
         register_histogram!(
             "quorum_store_empty_batch_creation_duration",
             "Histogram of the time durations for empty batch creation.",
-            QUORUM_STORE_LATENCY_BUCKETS.to_vec()
         )
         .unwrap(),
     )
