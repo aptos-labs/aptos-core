@@ -5,6 +5,9 @@
 
 # A script to check whether a local commit related to Move is ready for a PR.
 
+# Note that if tests aren't running for you try `cargo update` and maybe
+# `cargo install cargo-nextest`.
+
 set -e
 
 MOVE_PR_PROFILE="${MOVE_PR_PROFILE:-ci}"
