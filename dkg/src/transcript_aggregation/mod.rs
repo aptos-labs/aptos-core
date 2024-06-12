@@ -85,17 +85,13 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
             metadata.author == sender,
             "[DKG] adding peer transcript failed with node author mismatch"
         );
-        let transcript = bcs::from_bytes(transcript_bytes.as_slice()).map_err(|e| {
-            anyhow!("[DKG] adding peer transcript failed with trx deserialization error: {e}")
-        })?;
+
+        let transcript = verify_main::<S>(&self.dkg_pub_params, transcript_bytes)?;
+
         let mut trx_aggregator = self.trx_aggregator.lock();
         if trx_aggregator.contributors.contains(&metadata.author) {
             return Ok(None);
         }
-
-        S::verify_transcript(&self.dkg_pub_params, &transcript).map_err(|e| {
-            anyhow!("[DKG] adding peer transcript failed with trx verification failure: {e}")
-        })?;
 
         // All checks passed. Aggregating.
         let is_self = self.my_addr == sender;
@@ -148,6 +144,17 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
         );
         Ok(maybe_aggregated)
     }
+}
+
+pub fn verify_main<DKG: DKGTrait>(pub_params: &DKG::PublicParams, transcript_bytes: Vec<u8>) -> anyhow::Result<DKG::Transcript> {
+    let transcript = bcs::from_bytes(transcript_bytes.as_slice()).map_err(|e| {
+        anyhow!("[DKG] adding peer transcript failed with trx deserialization error: {e}")
+    })?;
+    DKG::verify_transcript(pub_params, &transcript).map_err(|e| {
+        anyhow!("[DKG] adding peer transcript failed with trx verification failure: {e}")
+    })?;
+
+    Ok(transcript)
 }
 
 #[cfg(test)]

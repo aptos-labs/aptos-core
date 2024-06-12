@@ -315,7 +315,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
 
 
 
-        let (public_params, my_transcript) = setup_deal::<DKG>(self.my_addr, self.my_index.clone(), self.dealer_sk.clone(), dkg_session_metadata)?;
+        let (public_params, my_transcript) = setup_deal_main::<DKG>(self.my_addr, self.my_index.clone(), self.dealer_sk.clone(), dkg_session_metadata)?;
 
 
 
@@ -454,7 +454,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     }
 }
 
-pub fn setup_deal<DKG: DKGTrait>(
+pub fn setup_deal_main<DKG: DKGTrait>(
     my_addr: AccountAddress,
     my_index: usize,
     my_sk: Arc<DKG::DealerPrivateKey>,
