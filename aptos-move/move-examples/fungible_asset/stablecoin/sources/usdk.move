@@ -93,8 +93,6 @@ module stablecoin::usdk {
         object::address_to_object(usdk_address())
     }
 
-
-
     /// Called as part of deployment to initialize the stablecoin.
     /// Note: The signer has to be the account where the module is published.
     /// Create a stablecoin token (a new Fungible Asset)
