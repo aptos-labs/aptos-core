@@ -7,7 +7,7 @@
 
 set -e
 
-MOVE_PR_PROFILE=ci
+MOVE_PR_PROFILE="${MOVE_PR_PROFILE:-ci}"
 
 BASE=$(git rev-parse --show-toplevel)
 
@@ -85,52 +85,52 @@ ARTIFACT_CRATE_PATHS="\
 
 # This is a partial list of Move crates, to keep this script fast.
 # May be extended as needed but should be kept minimal.
-MOVE_CRATES="\
-  -p move-stackless-bytecode\
-  -p move-stdlib\
-  -p move-bytecode-verifier\
-  -p move-binary-format\
-  -p move-compiler\
-  -p move-compiler-v2\
-  -p move-compiler-v2-transactional-tests\
-  -p move-prover-boogie-backend\
-  -p move-prover\
-  -p move-transactional-test-runner\
-  -p move-vm-runtime\
-  -p move-vm-types\
+MOVE_CRATES="
+  -p move-stackless-bytecode
+  -p move-stdlib
+  -p move-bytecode-verifier
+  -p move-binary-format
+  -p move-compiler
+  -p move-compiler-v2
+  -p move-compiler-v2-transactional-tests
+  -p move-prover-boogie-backend
+  -p move-prover
+  -p move-transactional-test-runner
+  -p move-vm-runtime
+  -p move-vm-types
 "
 
 # This is a list of crates for integration testing which depends on the
 # MOVE_COMPILER_V2 env var.
-MOVE_CRATES_V2_ENV_DEPENDENT="\
-  -p aptos-transactional-test-harness \
-  -p bytecode-verifier-transactional-tests \
-  -p move-async-vm \
-  -p move-cli \
-  -p move-model \
-  -p move-package \
-  -p move-prover-bytecode-pipeline \
-  -p move-stackless-bytecode \
-  -p move-to-yul \
-  -p move-transactional-test-runner \
-  -p move-unit-test \
-  -p move-vm-transactional-tests \
-  -p aptos-move-stdlib\
-  -p move-abigen\
-  -p move-docgen\
-  -p move-stdlib\
-  -p move-table-extension\
-  -p move-vm-integration-tests\
-  -p aptos-move-examples\
-  -p e2e-move-tests\
-  -p aptos-framework\
+MOVE_CRATES_V2_ENV_DEPENDENT="
+  -p aptos-transactional-test-harness
+  -p bytecode-verifier-transactional-tests
+  -p move-async-vm
+  -p move-cli
+  -p move-model
+  -p move-package
+  -p move-prover-bytecode-pipeline
+  -p move-stackless-bytecode
+  -p move-to-yul
+  -p move-transactional-test-runner
+  -p move-unit-test
+  -p move-vm-transactional-tests
+  -p aptos-move-stdlib
+  -p move-abigen
+  -p move-docgen
+  -p move-stdlib
+  -p move-table-extension
+  -p move-vm-integration-tests
+  -p aptos-move-examples
+  -p e2e-move-tests
+  -p aptos-framework
 "
 
 # Crates which do depend on compiler env but currently
 # do not maintain separate v2 baseline files. Those
 # are listed here for documentation and later fixing.
-MOVE_CRATES_V2_ENV_DEPENDENT_FAILURES="\
-  -p aptos-api\
+MOVE_CRATES_V2_ENV_DEPENDENT_FAILURES="
+  -p aptos-api
 "
 
 if [ ! -z "$CHECK" ]; then
@@ -143,23 +143,24 @@ if [ ! -z "$CHECK" ]; then
   )
 fi
 
+CARGO_OP_PARAMS="--locked --profile $MOVE_PR_PROFILE"
+CARGO_NEXTEST_PARAMS="--locked --profile $MOVE_PR_PROFILE"
+
 # Artifact generation needs to be run before testing as tests may depend on its result
 if [ ! -z "$GEN_ARTIFACTS" ]; then
   for dir in $ARTIFACT_CRATE_PATHS; do
     echo "*************** [move-pr] Generating artifacts for crate $dir"
     (
       cd $MOVE_BASE/$dir
-      cargo run --profile $MOVE_PR_PROFILE
+      cargo run $CARGO_OP_PARAMS
     )
   done
   # Add hoc treatment
   (
     cd $BASE
-    cargo build --profile $MOVE_PR_PROFILE -p aptos-cached-packages
+    cargo build $CARGO_OP_PARAMS -p aptos-cached-packages
   )
 fi
-
-
 
 if [ ! -z "$TEST" ]; then
   echo "*************** [move-pr] Running tests"
@@ -167,7 +168,7 @@ if [ ! -z "$TEST" ]; then
     # It is important to run all tests from one cargo command to keep cargo features
     # stable.
     cd $BASE
-    cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
+    cargo nextest run $CARGO_NEXTEST_PARAMS --no-fail-fast \
      $MOVE_CRATES
   )
 fi
@@ -176,7 +177,7 @@ if [ ! -z "$INTEGRATION_TEST" ]; then
   echo "*************** [move-pr] Running integration tests"
   (
     cd $BASE
-    MOVE_COMPILER_V2=false cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
+    MOVE_COMPILER_V2=false cargo nextest run $CARGO_NEXTEST_PARAMS --no-fail-fast \
        $MOVE_CRATES $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi
@@ -189,9 +190,9 @@ if [ ! -z "$COMPILER_V2_TEST" ]; then
     # to avoid regenerating incompatible markdown docs. We really need to
     # first build and then test the exact same package set, otherwise
     # rebuild will be triggered via feature unification.
-    MOVE_COMPILER_V2=false cargo build --profile $MOVE_PR_PROFILE \
+    MOVE_COMPILER_V2=false cargo build $CARGO_OP_PARAMS \
      $MOVE_CRATES_V2_ENV_DEPENDENT
-    MOVE_COMPILER_V2=true cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
+    MOVE_COMPILER_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS --no-fail-fast \
      $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi
