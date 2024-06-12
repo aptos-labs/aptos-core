@@ -14,6 +14,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use crate::genesis::enable_sync_only_mode;
 
 /// Chain recovery using a local config from randomness stall should work.
 /// See `randomness_config_seqnum.move` for more details.
@@ -48,23 +49,10 @@ async fn randomness_stall_recovery() {
         .await
         .expect("Epoch 2 taking too long to arrive!");
 
-    info!("Inject RandManager fault to every node.");
-    let validator_clients: Vec<Client> =
-        swarm.validators().map(|node| node.rest_client()).collect();
-    let tasks = validator_clients
-        .iter()
-        .map(|client| {
-            client.set_failpoint(
-                "rand_manager::process_ready_blocks".to_string(),
-                "return".to_string(),
-            )
-        })
-        .collect::<Vec<_>>();
-    let aptos_results = join_all(tasks).await;
-    debug!("aptos_results={:?}", aptos_results);
-
-    // Bake the fault injection...
-    tokio::time::sleep(Duration::from_secs(10)).await;
+    info!("Halting the chain by putting every validator into sync_only mode.");
+    for validator in swarm.validators_mut() {
+        enable_sync_only_mode(4, validator).await;
+    }
 
     info!("Chain should have halted.");
     let liveness_check_result = swarm
@@ -73,6 +61,7 @@ async fn randomness_stall_recovery() {
     info!("liveness_check_result={:?}", liveness_check_result);
     assert!(liveness_check_result.is_err());
 
+    info!("Hot-fixing all validators.");
     for (idx, validator) in swarm.validators_mut().enumerate() {
         info!("Stopping validator {}.", idx);
         validator.stop();
@@ -82,6 +71,9 @@ async fn randomness_stall_recovery() {
         validator_override_config
             .override_config_mut()
             .randomness_override_seq_num = 1;
+        validator_override_config
+            .override_config_mut()
+            .consensus.sync_only = false;
         info!("Updating validator {} config.", idx);
         validator_override_config.save_config(config_path).unwrap();
         info!("Restarting validator {}.", idx);
