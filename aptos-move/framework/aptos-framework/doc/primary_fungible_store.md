@@ -290,6 +290,7 @@ Return whether the given account's primary store exists.
 ## Function `primary_store_address_inlined`
 
 Get the address of the primary store for the given account.
+Use instead of the corresponding view functions for dispatchable hooks to avoid circular dependencies of modules.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address_inlined">primary_store_address_inlined</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
@@ -316,6 +317,7 @@ Get the address of the primary store for the given account.
 ## Function `primary_store_inlined`
 
 Get the primary store object for the given account.
+Use instead of the corresponding view functions for dispatchable hooks to avoid circular dependencies of modules.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_inlined">primary_store_inlined</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;
@@ -329,7 +331,7 @@ Get the primary store object for the given account.
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_inlined">primary_store_inlined</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): Object&lt;FungibleStore&gt; {
     <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address_inlined">primary_store_address_inlined</a>(owner, metadata);
-    <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;FungibleStore&gt;(store)
+    <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>(store)
 }
 </code></pre>
 
@@ -342,6 +344,7 @@ Get the primary store object for the given account.
 ## Function `primary_store_exists_inlined`
 
 Return whether the given account's primary store exists.
+Use instead of the corresponding view functions for dispatchable hooks to avoid circular dependencies of modules.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists_inlined">primary_store_exists_inlined</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
