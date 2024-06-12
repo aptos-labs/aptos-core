@@ -60,6 +60,13 @@ pub mod victoria_metrics_api {
             }
         }
 
+        pub fn is_selfhosted_vm_client(&self) -> bool {
+            self.base_url
+                .host_str()
+                .unwrap_or_default()
+                .contains("aptos-all.vm")
+        }
+
         pub async fn post_prometheus_metrics(
             &self,
             raw_metrics_body: Bytes,
