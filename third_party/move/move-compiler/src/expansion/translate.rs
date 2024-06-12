@@ -645,7 +645,7 @@ fn script_(context: &mut Context, package_name: Option<Symbol>, pscript: P::Scri
     check_valid_module_member_name(context, ModuleMemberKind::Function, pfunction.name.0);
     let (function_name, function) = function_(context, pfunction);
     match &function.visibility {
-        E::Visibility::Public(loc) | E::Visibility::Friend(loc) => {
+        E::Visibility::Public(loc) | E::Visibility::Package(loc) | E::Visibility::Friend(loc) => {
             let msg = format!(
                 "Invalid '{}' visibility modifier. \
                 Script functions are not callable from other Move functions.",
@@ -1890,6 +1890,7 @@ fn visibility(pvisibility: P::Visibility) -> E::Visibility {
     match pvisibility {
         P::Visibility::Public(loc) => E::Visibility::Public(loc),
         P::Visibility::Script(loc) => E::Visibility::Public(loc),
+        P::Visibility::Package(loc) => E::Visibility::Package(loc),
         P::Visibility::Friend(loc) => E::Visibility::Friend(loc),
         P::Visibility::Internal => E::Visibility::Internal,
     }

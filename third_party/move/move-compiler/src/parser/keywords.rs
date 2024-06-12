@@ -22,6 +22,7 @@ pub const KEYWORDS: &[&str] = &[
     "module",
     "move",
     "native",
+    "package",
     "public",
     "return",
     "script",
