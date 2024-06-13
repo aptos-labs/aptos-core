@@ -8,6 +8,8 @@ use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use std::convert::TryInto;
 use tokio::io::{AsyncRead, AsyncReadExt};
+use aptos_metrics_core::TimerHelper;
+use crate::metrics::backup::BACKUP_TIMER;
 
 #[async_trait]
 pub trait ReadRecordBytes {
@@ -42,6 +44,7 @@ impl<R: AsyncRead + Send + Unpin> ReadRecordBytes for R {
     }
 
     async fn read_record_bytes(&mut self) -> Result<Option<Bytes>> {
+        let _timer = BACKUP_TIMER.timer_with(&["read_record_bytes"]);
         // read record size
         let mut size_buf = BytesMut::with_capacity(4);
         self.read_full_buf_or_none(&mut size_buf).await?;

@@ -328,11 +328,13 @@ async fn send_records_inner(
     chunk_size: usize,
     sender: &Sender<Result<Bytes>>,
 ) -> Result<()> {
+    let _timer = BACKUP_TIMER.timer_with(&["state_snapshot_record_stream_all"]);
     let mut input = client
         .get_state_snapshot_chunk(version, start_idx, chunk_size)
         .await?;
     let mut count = 0;
     while let Some(record_bytes) = input.read_record_bytes().await? {
+        let _timer = BACKUP_TIMER.timer_with(&["state_snapshot_record_stream_send_bytes"]);
         count += 1;
         sender.send(Ok(record_bytes)).await?;
     }
