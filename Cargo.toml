@@ -861,5 +861,5 @@ debug = true
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
-tonic = { git = "https://github.com/aptos-labs/tonic.git", rev = "888e8eb004eb0566a07f36634bb1f946f5981ebb" }
+tonic = { git = "https://github.com/aptos-labs/tonic.git", rev = "be08ac2064f3ac91f15f2d7162e0f6a80493970c" }
 #tonic = { path = "/Users/max/aptos/tonic/tonic" }

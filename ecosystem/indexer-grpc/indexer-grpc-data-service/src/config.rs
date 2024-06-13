@@ -139,7 +139,6 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to build reflection service: {}", e))?
             .send_compressed(CompressionEncoding::Zstd)
-            .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Gzip);
 
@@ -181,7 +180,6 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         )?;
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Zstd)
-            .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Gzip);
         let svc_clone = svc.clone();
