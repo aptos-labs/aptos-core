@@ -2168,24 +2168,34 @@ impl<'a> PatDisplay<'a> {
                     "".to_string()
                 };
                 let struct_env = self.env.get_struct(struct_qfid.to_qualified_id());
-                let field_names = struct_env.get_fields().map(|f| f.get_name());
+                let field_names = struct_env
+                    .get_fields_optional_variant(*variant)
+                    .map(|f| f.get_name());
                 let pool = self.env.symbol_pool();
-                let args_str = pattern_vec
-                    .iter()
-                    .zip(field_names)
-                    .map(|(pat, sym)| {
-                        let field_name = pool.string(sym);
-                        let pattern_str = pat.display_cont(self).set_show_type(false).to_string();
-                        if &pattern_str != field_name.as_ref() {
-                            format!("{}: {}", field_name.as_ref(), pattern_str)
-                        } else {
-                            pattern_str
-                        }
-                    })
-                    .join(", ");
+                let args_str = if variant.is_some() && pattern_vec.is_empty() {
+                    "".to_string()
+                } else {
+                    format!(
+                        "{{ {} }}",
+                        pattern_vec
+                            .iter()
+                            .zip(field_names)
+                            .map(|(pat, sym)| {
+                                let field_name = pool.string(sym);
+                                let pattern_str =
+                                    pat.display_cont(self).set_show_type(false).to_string();
+                                if &pattern_str != field_name.as_ref() {
+                                    format!("{}: {}", field_name.as_ref(), pattern_str)
+                                } else {
+                                    pattern_str
+                                }
+                            })
+                            .join(", ")
+                    )
+                };
                 write!(
                     f,
-                    "{}{}{}{{ {} }}",
+                    "{}{}{}{}",
                     struct_env.get_full_name_str(),
                     optional_variant_suffix(pool, variant),
                     inst_str,

@@ -24,10 +24,10 @@ module 0x815::m {
           m::Color::RGB{ red, green, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
           }
-          m::Color::Red{  } => {
+          m::Color::Red => {
             true
           }
-          m::Color::Blue{  } => {
+          m::Color::Blue => {
             false
           }
         }
@@ -38,10 +38,10 @@ module 0x815::m {
           m::Color::RGB{ red, green, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
           }
-          m::Color::Red{  } => {
+          m::Color::Red => {
             true
           }
-          m::Color::Blue{  } => {
+          m::Color::Blue => {
             false
           }
         }
@@ -52,10 +52,10 @@ module 0x815::m {
           m::Color::RGB{ red: r, green: g, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(r, g), blue), 0)
           }
-          m::Color::Red{  } => {
+          m::Color::Red => {
             true
           }
-          m::Color::Blue{  } => {
+          m::Color::Blue => {
             false
           }
         }
@@ -66,10 +66,10 @@ module 0x815::m {
           m::Color::RGB{ red, green, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
           }
-          m::Color::Red{  } => {
+          m::Color::Red => {
             true
           }
-          m::Color::Blue{  } => {
+          m::Color::Blue => {
             false
           }
         }
@@ -80,10 +80,10 @@ module 0x815::m {
           m::Color::RGB{ red, green, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
           }
-          m::Color::Red{  } => {
+          m::Color::Red => {
             true
           }
-          m::Color::Blue{  } => {
+          m::Color::Blue => {
             false
           }
         }
@@ -94,10 +94,10 @@ module 0x815::m {
           m::Color::RGB{ red, green, blue } => {
             Gt<u64>(Add<u64>(Add<u64>(red, green), blue), 0)
           }
-          m::Color::Red{  } => {
+          m::Color::Red => {
             true
           }
-          m::Color::Blue{  } => {
+          m::Color::Blue => {
             false
           }
         }
@@ -142,10 +142,10 @@ module 0x815::m {
           let x: u64 = 1;
           {
             let r: &u64 = match (Borrow(Mutable)(self)) {
-              m::Color::Red{  } => {
+              m::Color::Red => {
                 Borrow(Immutable)(x)
               }
-              m::Color::Blue{  } => {
+              m::Color::Blue => {
                 Freeze(false)(Borrow(Mutable)(x))
               }
               _: &mut m::Color => {
@@ -179,10 +179,10 @@ module 0x815::m {
           m::Color::RGB{ red, green, blue } => {
             And(Neq<u64>(red, green), Neq<u64>(green, blue))
           }
-          m::Color::Red{  } => {
+          m::Color::Red => {
             true
           }
-          m::Color::Blue{  } => {
+          m::Color::Blue => {
             false
           }
         }
