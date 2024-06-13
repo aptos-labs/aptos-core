@@ -444,7 +444,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 extra_args,
             ) => {
                 let syntax = syntax.unwrap_or_else(|| self.default_syntax());
-                let (data, named_addr_opt, module, warnings_opt) =
+                let (data, named_addr_opt, module, _warnings_opt) =
                     self.compile_module(syntax, data, start_line, command_lines_stop)?;
                 self.register_temp_filename(&data);
                 let printed = if print_bytecode {
@@ -477,7 +477,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                             .add_and_generate_interface_file(module);
                     },
                 };
-                Ok(merge_output(warnings_opt, output))
+                Ok(merge_output(None, output))
             },
             TaskCommand::Run(
                 RunCommand {
