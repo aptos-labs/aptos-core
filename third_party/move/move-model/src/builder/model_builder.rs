@@ -475,6 +475,7 @@ impl<'env> ModelBuilder<'env> {
         self.const_table.insert(name, entry);
     }
 
+    /// Adds friend declarations for package visibility.
     pub fn add_friend_decl_for_package_visibility(&mut self) {
         let target_modules = self
             .env
