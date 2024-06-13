@@ -2,11 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{metrics::backup::THROUGHPUT_COUNTER, utils::error_notes::ErrorNotes};
+use crate::{
+    metrics::backup::{BACKUP_TIMER, THROUGHPUT_COUNTER},
+    utils::error_notes::ErrorNotes,
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_db::backup::backup_handler::DbState;
-use aptos_metrics_core::IntCounterHelper;
+use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use aptos_types::transaction::Version;
 use clap::Parser;
 use futures::TryStreamExt;
@@ -51,6 +54,8 @@ impl BackupServiceClient {
     }
 
     async fn get(&self, endpoint: &'static str, params: &str) -> Result<impl AsyncRead> {
+        let _timer = BACKUP_TIMER.timer_with(&[&format!("backup_service_client_get_{endpoint}")]);
+
         let url = if params.is_empty() {
             format!("{}/{}", self.address, endpoint)
         } else {
@@ -97,8 +102,26 @@ impl BackupServiceClient {
             .await
     }
 
-    pub async fn get_state_snapshot(&self, version: Version) -> Result<impl AsyncRead> {
-        self.get("state_snapshot", &format!("{}", version)).await
+    pub async fn get_state_item_count(&self, version: Version) -> Result<usize> {
+        let mut buf = Vec::new();
+        self.get("state_item_count", &format!("{}", version))
+            .await?
+            .read_to_end(&mut buf)
+            .await?;
+        Ok(bcs::from_bytes::<u64>(&buf)? as usize)
+    }
+
+    pub async fn get_state_snapshot_chunk(
+        &self,
+        version: Version,
+        start_idx: usize,
+        limit: usize,
+    ) -> Result<impl AsyncRead> {
+        self.get(
+            "state_snapshot_chunk",
+            &format!("{}/{}/{}", version, start_idx, limit),
+        )
+        .await
     }
 
     pub async fn get_state_root_proof(&self, version: Version) -> Result<Vec<u8>> {
