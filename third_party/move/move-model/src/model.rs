@@ -1769,6 +1769,7 @@ impl GlobalEnv {
         name: Symbol,
         loc: Loc,
         visibility: Visibility,
+        from_package_visibility: bool,
         type_params: Vec<TypeParameter>,
         params: Vec<Parameter>,
         result_type: Type,
@@ -1782,6 +1783,7 @@ impl GlobalEnv {
             def_idx: None,
             handle_idx: None,
             visibility,
+            has_package_visibility: from_package_visibility,
             is_native: false,
             kind: FunctionKind::Regular,
             attributes: vec![],
@@ -1909,6 +1911,10 @@ impl GlobalEnv {
             env: self,
             data: module_data,
         }
+    }
+
+    pub(crate) fn get_module_data_mut(&mut self, id: ModuleId) -> &mut ModuleData {
+        &mut self.module_data[id.0 as usize]
     }
 
     /// Gets a struct by qualified id.
@@ -2737,6 +2743,24 @@ impl<'env> ModuleEnv<'env> {
     /// Returns the set of modules this one declares as friends.
     pub fn get_friend_modules(&self) -> BTreeSet<ModuleId> {
         self.data.friend_modules.clone()
+    }
+
+    /// Returns the set of modules whose public(package) functions are called in the current module.
+    pub fn get_friend_deps(&self) -> BTreeSet<ModuleId> {
+        let mut deps = BTreeSet::new();
+        for fun_env in self.get_functions() {
+            let called_funs = fun_env.get_called_functions().expect("called functions");
+            for fun in called_funs {
+                let mod_id = fun.module_id;
+                let mod_env = self.env.get_module(mod_id);
+                if mod_env.is_target() && mod_env.get_function(fun.id).has_package_visibility() {
+                    deps.insert(mod_id);
+                }
+            }
+            let called_funs = fun_env.data.def.as_ref().map(|e| e.called_funs()).unwrap_or_default();
+            deps.extend(called_funs.iter().map(|mid| mid.module_id));
+        }
+        deps
     }
 
     /// Returns true if the given module is a transitive dependency of this one. The
@@ -3823,6 +3847,8 @@ pub struct FunctionData {
     /// Visibility of this function (private, friend, or public)
     pub(crate) visibility: Visibility,
 
+    pub(crate) has_package_visibility: bool,
+
     /// Whether this is a native function
     pub(crate) is_native: bool,
 
@@ -4188,6 +4214,11 @@ impl<'env> FunctionEnv<'env> {
     /// Return true if this function is a friend function
     pub fn is_friend(&self) -> bool {
         self.visibility() == Visibility::Friend
+    }
+
+    /// Return true iff this function is has package visibility
+    pub fn has_package_visibility(&self) -> bool {
+        self.data.has_package_visibility
     }
 
     /// Returns true if invariants are declared disabled in body of function

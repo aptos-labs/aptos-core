@@ -44,7 +44,7 @@ use move_binary_format::{
 use move_bytecode_source_map::source_map::SourceMap;
 use move_compiler::{
     compiled_unit::{FunctionInfo, SpecInfo},
-    expansion::ast as EA,
+    expansion::ast::{self as EA},
     parser::ast as PA,
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
@@ -68,6 +68,11 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     pub use_decls: Vec<UseDecl>,
     /// Translated friend declarations.
     pub friend_decls: Vec<FriendDecl>,
+    /// Location of a friend visibility in the current module
+    pub friend_fun_loc: Option<move_ir_types::location::Loc>,
+    /// Locations of package visibilities in the current module
+    pub package_fun_loc: Option<move_ir_types::location::Loc>,
+    pub package_funs: BTreeSet<FunId>,
     /// Translated specification functions.
     pub spec_funs: Vec<SpecFunDecl>,
     /// During the definition analysis, the index into `spec_funs` we are currently
@@ -145,6 +150,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             module_id,
             module_name,
             use_decls: vec![],
+            friend_fun_loc: None,
+            package_fun_loc: None,
+            package_funs: BTreeSet::new(),
             friend_decls: vec![],
             spec_funs: vec![],
             inline_spec_builder: Spec::default(),
@@ -432,6 +440,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for (name, fun_def) in module_def.functions.key_cloned_iter() {
             self.decl_ana_fun(&name, fun_def);
         }
+        // we have collected all package and friend visibilities in the current module
+        self.check_visibility_compatibility();
         for (name, const_def) in module_def.constants.key_cloned_iter() {
             self.decl_ana_const(&name, const_def);
         }
@@ -442,7 +452,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             self.decl_ana_use_decl(use_decl)
         }
         for (friend_mod_id, friend) in module_def.friends.key_cloned_iter() {
-            self.decl_ana_friend_decl(&friend_mod_id, friend);
+            self.decl_ana_friend_decl(&friend_mod_id, &friend.loc);
         }
     }
 
@@ -506,6 +516,23 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             )
         }
         let fun_id = FunId::new(qsym.symbol);
+        let visibility = match def.visibility {
+            EA::Visibility::Public(_) => Visibility::Public,
+            EA::Visibility::Friend(loc) => {
+                if self.friend_fun_loc.is_none() {
+                    self.friend_fun_loc = Some(loc);
+                }
+                Visibility::Friend
+            },
+            EA::Visibility::Internal => Visibility::Private,
+            EA::Visibility::Package(loc) => {
+                if self.package_fun_loc.is_none() {
+                    self.package_fun_loc = Some(loc);
+                }
+                self.package_funs.insert(fun_id);
+                Visibility::Friend
+            },
+        };
         let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
         et.set_translate_move_fun();
@@ -528,11 +555,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             FunctionKind::Inline
         } else {
             FunctionKind::Regular
-        };
-        let visibility = match def.visibility {
-            EA::Visibility::Public(_) => Visibility::Public,
-            EA::Visibility::Friend(_) => Visibility::Friend,
-            EA::Visibility::Internal => Visibility::Private,
         };
         let is_native = matches!(def.body.value, EA::FunctionBody_::Native);
         let def_loc = et.to_loc(&def.loc);
@@ -620,7 +642,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         });
     }
 
-    fn decl_ana_friend_decl(&mut self, friend_mod_id: &EA::ModuleIdent, friend: &EA::Friend) {
+    fn decl_ana_friend_decl(&mut self, friend_mod_id: &EA::ModuleIdent, friend_loc: &move_ir_types::location::Loc) {
         // Get various information about the declared friend module.
         let addr = self.parent.resolve_address(
             &self.parent.to_loc(&friend_mod_id.loc),
@@ -630,7 +652,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             .symbol_pool()
             .make(friend_mod_id.value.module.0.value.as_str());
         let module_name = ModuleName::from_address_bytes_and_name(addr, name);
-        let loc = self.parent.to_loc(&friend.loc);
+        let loc = self.parent.to_loc(friend_loc);
         // Add a corresponding friend declaration.
         self.friend_decls.push(FriendDecl {
             loc,
@@ -1836,6 +1858,37 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
         et
     }
+
+    /// Checks if both package and friend visibility are used in the same module
+    fn check_visibility_compatibility(&self) {
+        if let Some(friend_vis_loc) = &self.friend_fun_loc {
+            let friend_vis_loc = self.parent.to_loc(friend_vis_loc);
+            if let Some(package_vis_loc) = &self.package_fun_loc {
+                let package_vis_loc = self.parent.to_loc(package_vis_loc);
+                self.parent.env.diag_with_labels(
+                    Severity::Error,
+                    &friend_vis_loc,
+                    "Cannot use both package and friend visibility in the same module",
+                    vec![
+                        (package_vis_loc, "package visibility declared here".to_string()),
+                        (friend_vis_loc.clone(), "friend visibility declared here".to_string()),
+                    ],
+                );
+            }
+        }
+    }
+
+    // fn translate_package_visibilities(&mut self, module_ids: &BTreeSet<ModuleIdent>) {
+    //     if let Some(loc) = self.package_fun_loc.clone() {
+    //         if let Some(mod_id) = self.module_ident.clone() {
+    //             for friend_mod_id in module_ids.iter() {
+    //                 if &mod_id != friend_mod_id {
+    //                     self.decl_ana_friend_decl(friend_mod_id, &loc)
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 /// ## Condition Definition Analysis
@@ -3230,6 +3283,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     // TODO: model friend visibility properly
                     unimplemented!("Friend visibility not supported yet")
                 },
+                PA::Visibility::Package(..) => {
+                    // TODO: model package visibility properly
+                    unimplemented!("Package visibility not supported yet")
+                }
             }
         }
         let rex = Regex::new(&format!(
@@ -3473,6 +3530,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let def = self.fun_defs.remove(&name.symbol);
             let called_funs = Some(def.as_ref().map(|e| e.called_funs()).unwrap_or_default());
             let access_specifiers = self.fun_access_specifiers.remove(&name.symbol);
+            let fun_id = FunId::new(name.symbol);
             let data = FunctionData {
                 name: name.symbol,
                 loc: entry.loc.clone(),
@@ -3480,6 +3538,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 def_idx: None,
                 handle_idx: None,
                 visibility: entry.visibility,
+                has_package_visibility: self.package_funs.contains(&fun_id),
                 is_native: entry.is_native,
                 kind: entry.kind,
                 attributes: entry.attributes.clone(),
@@ -3493,7 +3552,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 calling_funs: RefCell::default(),
                 transitive_closure_of_called_funs: RefCell::default(),
             };
-            function_data.insert(FunId::new(name.symbol), data);
+            function_data.insert(fun_id, data);
         }
 
         let mut named_constants: BTreeMap<NamedConstantId, NamedConstantData> = Default::default();

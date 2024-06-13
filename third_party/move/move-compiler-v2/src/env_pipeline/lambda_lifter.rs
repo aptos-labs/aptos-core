@@ -112,6 +112,7 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
                 fun_id.symbol(),
                 loc,
                 Visibility::Private,
+                false,
                 type_params,
                 params,
                 result_type,
