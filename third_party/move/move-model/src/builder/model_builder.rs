@@ -476,6 +476,7 @@ impl<'env> ModelBuilder<'env> {
     }
 
     /// Adds friend declarations for package visibility.
+    /// This should only be called when all modules are loaded.
     pub fn add_friend_decl_for_package_visibility(&mut self) {
         let target_modules = self
             .env
