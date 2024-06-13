@@ -40,16 +40,16 @@ struct TestCacheMetadata {
     pointers: Arc<Mutex<TestCacheMetadataPointers>>,
 }
 
-struct TestCache {
+struct TestCache<C: SizedCache<NotATransaction> + 'static> {
     metadata: Arc<TestCacheMetadata>,
-    cache: Arc<SyncMutexCache<NotATransaction>>,
+    cache: Arc<C>,
     insert_notify: Arc<Notify>,
     _cancellation_token_drop_guard: tokio_util::sync::DropGuard,
 }
 
-impl TestCache {
+impl<C: SizedCache<NotATransaction> + 'static> TestCache<C> {
     fn with_capacity(
-        capacity: usize,
+        c: C,
         eviction_trigger_size_in_bytes: usize,
         target_size_in_bytes: usize,
     ) -> Self {
@@ -59,14 +59,14 @@ impl TestCache {
             metadata: Arc::new(TestCacheMetadata {
                 eviction_trigger_size_in_bytes,
                 target_size_in_bytes,
-                capacity,
+                capacity: c.capacity(),
                 pointers: Arc::new(Mutex::new(TestCacheMetadataPointers {
                     tail: None,
                     head: None,
                     watermark: None,
                 })),
             }),
-            cache: Arc::new(SyncMutexCache::with_capacity(capacity)),
+            cache: Arc::new(c),
             insert_notify: Arc::new(Notify::new()),
             _cancellation_token_drop_guard: cancellation_token.clone().drop_guard(),
         };
@@ -109,7 +109,7 @@ impl TestCache {
     }
 }
 
-impl Cache<usize, NotATransaction> for TestCache {
+impl<C: SizedCache<NotATransaction> + 'static> Cache<usize, NotATransaction> for TestCache<C> {
     fn get(&self, key: &usize) -> Option<NotATransaction> {
         self.cache.get(key).and_then(|entry| {
             if entry.key == *key {
@@ -184,7 +184,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
     async fn test_insert_out_of_order() {
-        let cache = TestCache::with_capacity(10, 150, 100);
+        let c = SyncMutexCache::with_capacity(10);
+        let cache = TestCache::with_capacity(c, 150, 100);
         let key = 100;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
@@ -236,7 +237,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
     async fn test_array_wrap_around() {
-        let cache = TestCache::with_capacity(10, 150, 100);
+        let c = SyncMutexCache::with_capacity(10);
+        let cache = TestCache::with_capacity(c, 150, 100);
         let key = 7;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
@@ -288,7 +290,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
     async fn test_eviction_on_size_limit() {
-        let cache = TestCache::with_capacity(10, 56, 48);
+        let c = SyncMutexCache::with_capacity(10);
+        let cache = TestCache::with_capacity(c, 56, 48);
 
         // Insert initial items
         for i in 0..6 {
@@ -342,7 +345,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
     async fn test_eviction_out_of_order_inserts() {
-        let cache = TestCache::with_capacity(20, 88, 80);
+        let c = SyncMutexCache::with_capacity(20);
+        let cache = TestCache::with_capacity(c, 88, 80);
 
         // Insert items out of order
         let keys = [0, 5, 1, 3, 7, 2, 6, 4, 9, 8];
@@ -399,7 +403,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
     async fn test_eviction_with_array_wrap_around() {
-        let cache = TestCache::with_capacity(10, 48, 40);
+        let c = SyncMutexCache::with_capacity(10);
+        let cache = TestCache::with_capacity(c, 48, 40);
 
         // Insert items to fill the cache
         for i in 5..10 {

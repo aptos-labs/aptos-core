@@ -90,4 +90,8 @@ where
     fn total_size(&self) -> usize {
         self.size.load(Ordering::Relaxed)
     }
+
+    fn capacity(&self) -> usize {
+        self.capacity
+    }
 }
