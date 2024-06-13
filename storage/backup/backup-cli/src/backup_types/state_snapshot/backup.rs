@@ -24,10 +24,11 @@ use aptos_types::{
 };
 use bytes::{BufMut, Bytes, BytesMut};
 use clap::Parser;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStream, TryStreamExt};
 use once_cell::sync::Lazy;
 use std::{convert::TryInto, str::FromStr, sync::Arc, time::Instant};
-use tokio::io::{AsyncRead, AsyncWriteExt};
+use tokio::{io::AsyncWriteExt, sync::mpsc::Sender};
+use tokio_stream::wrappers::ReceiverStream;
 
 #[derive(Parser)]
 pub struct StateSnapshotBackupOpt {
@@ -46,8 +47,8 @@ struct Chunk {
     last_idx: usize,
 }
 
-struct ChunkerState<R> {
-    state_snapshot_file: Option<R>,
+struct ChunkerState<RecordStream> {
+    record_stream: Option<RecordStream>,
     buf: BytesMut,
     chunk_first_key: HashValue,
     prev_record_len: usize,
@@ -56,10 +57,13 @@ struct ChunkerState<R> {
     max_chunk_size: usize,
 }
 
-impl<R: AsyncRead + Send + Unpin> ChunkerState<R> {
-    async fn new(mut state_snapshot_file: R, max_chunk_size: usize) -> Result<Self> {
-        let first_record = state_snapshot_file
-            .read_record_bytes()
+impl<RecordStream> ChunkerState<RecordStream>
+where
+    RecordStream: TryStream<Ok = Bytes, Error = anyhow::Error> + Unpin,
+{
+    async fn new(mut record_stream: RecordStream, max_chunk_size: usize) -> Result<Self> {
+        let first_record = record_stream
+            .try_next()
             .await?
             .ok_or_else(|| anyhow!("State is empty."))?;
 
@@ -71,7 +75,7 @@ impl<R: AsyncRead + Send + Unpin> ChunkerState<R> {
         buf.extend(first_record);
 
         Ok(Self {
-            state_snapshot_file: Some(state_snapshot_file),
+            record_stream: Some(record_stream),
             buf,
             chunk_first_key,
             prev_record_len,
@@ -85,11 +89,11 @@ impl<R: AsyncRead + Send + Unpin> ChunkerState<R> {
         let _timer = BACKUP_TIMER.timer_with(&["state_snapshot_next_full_chunk"]);
 
         let input = self
-            .state_snapshot_file
+            .record_stream
             .as_mut()
             .expect("get_next_full_chunk after EOF.");
 
-        while let Some(record_bytes) = input.read_record_bytes().await? {
+        while let Some(record_bytes) = input.try_next().await? {
             let _timer = BACKUP_TIMER.timer_with(&["state_snapshot_process_records"]);
 
             // If buf + current_record exceeds max_chunk_size, dump current buf to a new chunk
@@ -122,20 +126,19 @@ impl<R: AsyncRead + Send + Unpin> ChunkerState<R> {
 
             // Return the full chunk if found
             if let Some(chunk) = chunk_cut_opt {
-                // FIXME(aldenhu): add logging, maybe not here
                 return Ok(Some(chunk));
             }
         }
 
         // Input file ended, full chunk not found.
         // The call site will call get_last_chunk which consume ChunkerState
-        let _ = self.state_snapshot_file.take();
+        let _ = self.record_stream.take();
         Ok(None)
     }
 
     async fn last_chunk(self) -> Result<Chunk> {
         let Self {
-            state_snapshot_file,
+            record_stream: state_snapshot_file,
             buf,
             chunk_first_key,
             prev_record_len,
@@ -171,10 +174,13 @@ struct Chunker<R> {
     state: Option<ChunkerState<R>>,
 }
 
-impl<R: AsyncRead + Send + Unpin> Chunker<R> {
-    async fn new(state_snapshot_file: R, max_chunk_size: usize) -> Result<Self> {
+impl<RecordStream> Chunker<RecordStream>
+where
+    RecordStream: TryStream<Ok = Bytes, Error = anyhow::Error> + Unpin,
+{
+    async fn new(record_stream: RecordStream, max_chunk_size: usize) -> Result<Self> {
         Ok(Self {
-            state: Some(ChunkerState::new(state_snapshot_file, max_chunk_size).await?),
+            state: Some(ChunkerState::new(record_stream, max_chunk_size).await?),
         })
     }
 
@@ -232,8 +238,8 @@ impl StateSnapshotBackupController {
             .create_backup_with_random_suffix(&self.backup_name())
             .await?;
 
-        let state_snapshot_file = self.client.get_state_snapshot(self.version()).await?;
-        let chunker = Chunker::new(state_snapshot_file, self.max_chunk_size).await?;
+        let record_stream = Box::pin(self.record_stream().await?);
+        let chunker = Chunker::new(record_stream, self.max_chunk_size).await?;
 
         let start = Instant::now();
         let chunk_stream = futures::stream::try_unfold(chunker, |mut chunker| async {
@@ -244,7 +250,7 @@ impl StateSnapshotBackupController {
             chunk_stream.map_ok(|chunk| self.write_chunk(&backup_handle, chunk));
 
         let chunks: Vec<_> = chunk_manifest_fut_stream
-            .try_buffered_x(8, 4) // 4 concurrently, at most 8 results in buffer.
+            .try_buffered_x(4, 2) // 4 concurrently, at most 8 results in buffer.
             .map_ok(|chunk_manifest| {
                 let last_idx = chunk_manifest.last_idx;
                 info!(
@@ -260,6 +266,83 @@ impl StateSnapshotBackupController {
 
         self.write_manifest(&backup_handle, chunks).await
     }
+
+    async fn record_stream(
+        &self,
+    ) -> Result<impl TryStream<Ok = Bytes, Error = anyhow::Error, Item = Result<Bytes>>> {
+        const CHUNK_SIZE: usize = if cfg!(test) { 100_000 } else { 2 };
+
+        let count = self.client.get_state_item_count(self.version()).await?;
+        let version = self.version();
+        let client = self.client.clone();
+
+        let chunks_stream = futures::stream::unfold(0, move |start_idx| async move {
+            if start_idx >= count {
+                return None;
+            }
+
+            let next_start_idx = start_idx + CHUNK_SIZE;
+            let chunk_size = CHUNK_SIZE.min(count - start_idx);
+
+            Some(((start_idx, chunk_size), next_start_idx))
+        })
+        .map(Result::<_>::Ok);
+
+        let record_stream_stream = chunks_stream.map_ok(move |(start_idx, chunk_size)| {
+            let client = client.clone();
+            async move {
+                let (tx, rx) = tokio::sync::mpsc::channel(chunk_size);
+                // spawn and forget, propagate error through channel
+                let _join_handle = tokio::spawn(send_records(
+                    client.clone(),
+                    version,
+                    start_idx,
+                    chunk_size,
+                    tx,
+                ));
+
+                Ok(ReceiverStream::new(rx))
+            }
+        });
+
+        Ok(record_stream_stream.try_buffered_x(4, 2).try_flatten())
+    }
+}
+
+async fn send_records(
+    client: Arc<BackupServiceClient>,
+    version: Version,
+    start_idx: usize,
+    chunk_size: usize,
+    sender: Sender<Result<Bytes>>,
+) {
+    if let Err(err) = send_records_inner(client, version, start_idx, chunk_size, &sender).await {
+        let _ = sender.send(Err(err)).await;
+    }
+}
+
+async fn send_records_inner(
+    client: Arc<BackupServiceClient>,
+    version: Version,
+    start_idx: usize,
+    chunk_size: usize,
+    sender: &Sender<Result<Bytes>>,
+) -> Result<()> {
+    let mut input = client
+        .get_state_snapshot_chunk(version, start_idx, chunk_size)
+        .await?;
+    let mut count = 0;
+    while let Some(record_bytes) = input.read_record_bytes().await? {
+        count += 1;
+        sender.send(Ok(record_bytes)).await?;
+    }
+    ensure!(
+        count == chunk_size,
+        "expecting {} records, got {}",
+        chunk_size,
+        count
+    );
+    Ok(())
 }
 
 impl StateSnapshotBackupController {

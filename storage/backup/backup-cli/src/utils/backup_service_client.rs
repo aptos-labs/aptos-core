@@ -97,8 +97,26 @@ impl BackupServiceClient {
             .await
     }
 
-    pub async fn get_state_snapshot(&self, version: Version) -> Result<impl AsyncRead> {
-        self.get("state_snapshot", &format!("{}", version)).await
+    pub async fn get_state_item_count(&self, version: Version) -> Result<usize> {
+        let mut buf = Vec::new();
+        self.get("state_item_count", &format!("{}", version))
+            .await?
+            .read_to_end(&mut buf)
+            .await?;
+        Ok(bcs::from_bytes::<u64>(&buf)? as usize)
+    }
+
+    pub async fn get_state_snapshot_chunk(
+        &self,
+        version: Version,
+        start_idx: usize,
+        limit: usize,
+    ) -> Result<impl AsyncRead> {
+        self.get(
+            "state_snapshot_chunk",
+            &format!("{}/{}/{}", version, start_idx, limit),
+        )
+        .await
     }
 
     pub async fn get_state_root_proof(&self, version: Version) -> Result<Vec<u8>> {
