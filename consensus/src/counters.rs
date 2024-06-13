@@ -301,10 +301,13 @@ pub static CONSENSUS_PROPOSAL_PENDING_ROUNDS: Lazy<Histogram> = Lazy::new(|| {
 });
 
 /// duration pending when creating proposal
-pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<Histogram> = Lazy::new(|| {
-    register_avg_counter(
-        "aptos_consensus_proposal_pending_duration",
-        "duration pending when creating proposal",
+pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_proposal_pending_duration",
+            "duration pending when creating proposal",
+        )
+        .unwrap(),
     )
 });
 
