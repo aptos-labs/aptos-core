@@ -3286,9 +3286,11 @@ dependencies = [
  "move-core-types",
  "move-model",
  "once_cell",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
+ "sha3 0.9.1",
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "tokio",
@@ -7194,6 +7196,7 @@ dependencies = [
  "rand 0.7.3",
  "rstest",
  "serde",
+ "sha3 0.9.1",
  "test-case",
 ]
 

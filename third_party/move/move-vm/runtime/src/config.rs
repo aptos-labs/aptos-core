@@ -6,6 +6,7 @@ use move_binary_format::{
     file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
 };
 use move_bytecode_verifier::VerifierConfig;
+use move_vm_types::loaded_data::runtime_types::TypeBuilder;
 use serde::Serialize;
 
 pub const DEFAULT_MAX_VALUE_NEST_DEPTH: u64 = 128;
@@ -19,13 +20,13 @@ pub struct VMConfig {
     // execution to ensure that type safety cannot be violated at runtime.
     pub paranoid_type_checks: bool,
     pub check_invariant_in_swap_loc: bool,
-    pub type_size_limit: bool,
     /// Maximum value nest depth for structs
     pub max_value_nest_depth: Option<u64>,
     pub type_max_cost: u64,
     pub type_base_cost: u64,
     pub type_byte_cost: u64,
     pub aggregator_v2_type_tagging: bool,
+    pub ty_builder: TypeBuilder,
 }
 
 impl Default for VMConfig {
@@ -35,12 +36,12 @@ impl Default for VMConfig {
             deserializer_config: DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX),
             paranoid_type_checks: false,
             check_invariant_in_swap_loc: true,
-            type_size_limit: false,
             max_value_nest_depth: Some(DEFAULT_MAX_VALUE_NEST_DEPTH),
             type_max_cost: 0,
             type_base_cost: 0,
             type_byte_cost: 0,
             aggregator_v2_type_tagging: false,
+            ty_builder: TypeBuilder::Legacy,
         }
     }
 }
