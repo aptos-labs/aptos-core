@@ -486,6 +486,9 @@ impl<'env> ModelBuilder<'env> {
             let cur_mod_env = self.env.get_module(cur_mod);
             let cur_mod_name = cur_mod_env.get_name().clone();
             for need_to_be_friend_with in cur_mod_env.get_friend_deps() {
+                if need_to_be_friend_with == cur_mod {
+                    continue;
+                }
                 let need_to_be_friend_with = self.env.get_module_data_mut(need_to_be_friend_with);
                 let already_friended = need_to_be_friend_with.friend_decls.iter().any(|friend_decl| {
                     &friend_decl.module_name == &cur_mod_name
