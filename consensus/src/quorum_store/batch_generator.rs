@@ -473,6 +473,8 @@ impl BatchGenerator {
                         counters::MEMPOOL_PULL_AND_CREATE_BATCHES_DURATION.observe_duration(pull_start_time.elapsed());
 
                         last_pulled_num_txns = batches.iter().map(|b| b.batch_info().num_txns()).sum();
+                        counters::LAST_PULLED_NUM_TXNS.observe(last_pulled_num_txns as f64);
+                        
                         if !batches.is_empty() {
                             last_non_empty_pull = tick_start;
 

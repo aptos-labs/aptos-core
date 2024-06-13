@@ -705,7 +705,6 @@ pub static BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
         register_histogram!(
             "quorum_store_batch_creation_duration",
             "Histogram of the time durations for batch creation.",
-            QUORUM_STORE_SMALL_LATENCY_BUCKETS.to_vec()
         )
         .unwrap(),
     )
@@ -731,14 +730,25 @@ pub static MEMPOOL_PULL_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
     )
 });
 
-pub static QS_SINCE_LAST_NON_EMPTY_PULL_TIME: Lazy<Histogram> = Lazy::new(|| {
+pub static QS_SINCE_LAST_NON_EMPTY_PULL_TIME: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_since_last_non_empty_pull_ms",
+            "Histogram of the time since last non-empty pull time",
+        )
+        .unwrap()
+    )
+});
+
+pub static LAST_PULLED_NUM_TXNS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
-        "quorum_store_since_last_non_empty_pull_ms",
-        "Histogram of the time since last non-empty pull time",
-        QUORUM_STORE_LATENCY_BUCKETS.to_vec()
+        "aptos_mempool_last_pulled_num_txns",
+        "Number of txns pulled in last get block request",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
     )
     .unwrap()
 });
+
 
 /// Histogram of the time durations for empty batch creation.
 pub static EMPTY_BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
