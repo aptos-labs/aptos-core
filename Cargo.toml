@@ -466,7 +466,7 @@ debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
-diesel = "2.1.1"
+diesel = "=2.1.1"
 diesel-async = { version = "0.4", features = ["postgres", "tokio"] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
