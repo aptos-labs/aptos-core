@@ -3,18 +3,16 @@
 
 use crate::compression_util::{CacheEntry, StorageFormat};
 use anyhow::Context;
+use aptos_in_memory_cache::{caches::fifo::FIFOCache, Cache, OrderedCache};
 use aptos_protos::transaction::v1::Transaction;
-use dashmap::DashMap;
 use itertools::Itertools;
 use prost::Message;
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 // Internal lookup retry interval for in-memory cache.
 const IN_MEMORY_CACHE_LOOKUP_RETRY_INTERVAL_MS: u64 = 10;
-const IN_MEMORY_CACHE_GC_INTERVAL_MS: u64 = 100;
 // Max cache entry TTL: 30 seconds.
 // const MAX_IN_MEMORY_CACHE_ENTRY_TTL: u64 = 30;
 // Warm-up cache entries. Pre-fetch the cache entries to warm up the cache.
@@ -77,18 +75,10 @@ impl InMemoryCacheConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct CacheMetadata {
-    total_size_in_bytes: u64,
-    latest_version: u64,
-    first_version: u64,
-}
-
 /// InMemoryCache is a simple in-memory cache that stores the protobuf Transaction.
 pub struct InMemoryCache {
     /// Cache maps the cache key to the deserialized Transaction.
-    cache: Arc<DashMap<u64, Arc<Transaction>>>,
-    cache_metadata: Arc<RwLock<CacheMetadata>>,
+    cache: Arc<FIFOCache<u64, Arc<Transaction>>>,
     _cancellation_token_drop_guard: tokio_util::sync::DropGuard,
 }
 
@@ -101,42 +91,33 @@ impl InMemoryCache {
     where
         C: redis::aio::ConnectionLike + Send + Sync + Clone + 'static,
     {
-        let cache = Arc::new(DashMap::new());
-        let (in_memory_first_version, in_memory_latest_version, total_size_in_bytes) =
-            warm_up_the_cache(conn.clone(), cache.clone(), storage_format).await?;
-        tracing::info!(
-            "In-memory cache is warmed up to version {}",
-            in_memory_latest_version
-        );
         let cancellation_token = tokio_util::sync::CancellationToken::new();
-        let cache_metadata = Arc::new(RwLock::new(CacheMetadata {
-            first_version: in_memory_first_version,
-            total_size_in_bytes,
-            latest_version: in_memory_latest_version,
-        }));
+        let cache = Arc::new(FIFOCache::new(
+            cache_config.size_config.cache_target_size_bytes,
+            cache_config.size_config.cache_eviction_trigger_size_bytes,
+            |txn_version, _| Some(txn_version + 1),
+        ));
+
+        warm_up_the_cache(conn.clone(), cache.clone(), storage_format).await?;
+
         spawn_update_task(
             conn,
             cache.clone(),
-            cache_metadata.clone(),
             storage_format,
-            cancellation_token.clone(),
-        );
-        spawn_cleanup_task(
-            cache_config.size_config.clone(),
-            cache.clone(),
-            cache_metadata.clone(),
             cancellation_token.clone(),
         );
         tracing::info!("In-memory cache is created");
         Ok(Self {
-            cache,
-            cache_metadata,
+            cache: cache.clone(),
             _cancellation_token_drop_guard: cancellation_token.drop_guard(),
         })
     }
 
-    pub async fn latest_version(&self) -> u64 {
-        self.cache_metadata.read().await.latest_version
+    pub fn latest_version(&self) -> u64 {
+        if let Some(key) = self.cache.last_key() {
+            return key + 1;
+        }
+        0
     }
 
     // This returns the transaction if it exists in the cache.
@@ -145,7 +126,7 @@ impl InMemoryCache {
     pub async fn get_transactions(&self, starting_version: u64) -> Vec<Transaction> {
         let start_time = std::time::Instant::now();
         let (versions_to_fetch, in_memory_latest_version) = loop {
-            let latest_version = self.latest_version().await;
+            let latest_version = self.latest_version();
             if starting_version >= latest_version {
                 tokio::time::sleep(std::time::Duration::from_millis(
                     IN_MEMORY_CACHE_LOOKUP_RETRY_INTERVAL_MS,
@@ -195,13 +176,14 @@ impl InMemoryCache {
 }
 
 /// Warm up the cache with the latest transactions.
-async fn warm_up_the_cache<C>(
+async fn warm_up_the_cache<C, Ca>(
     conn: C,
-    cache: Arc<DashMap<u64, Arc<Transaction>>>,
+    cache: Arc<Ca>,
     storage_format: StorageFormat,
 ) -> anyhow::Result<(u64, u64, u64)>
 where
     C: redis::aio::ConnectionLike + Send + Sync + Clone + 'static,
+    Ca: OrderedCache<u64, Arc<Transaction>> + 'static,
 {
     let mut conn = conn.clone();
     let latest_version = get_config_by_key(&mut conn, "latest_version")
@@ -222,14 +204,14 @@ where
     Ok((first_version, latest_version, total_size_in_bytes))
 }
 
-fn spawn_update_task<C>(
+fn spawn_update_task<C, Ca>(
     conn: C,
-    cache: Arc<DashMap<u64, Arc<Transaction>>>,
-    cache_metadata: Arc<RwLock<CacheMetadata>>,
+    cache: Arc<Ca>,
     storage_format: StorageFormat,
     cancellation_token: tokio_util::sync::CancellationToken,
 ) where
     C: redis::aio::ConnectionLike + Send + Sync + Clone + 'static,
+    Ca: OrderedCache<u64, Arc<Transaction>> + 'static,
 {
     tokio::spawn(async move {
         let mut conn = conn.clone();
@@ -244,7 +226,8 @@ fn spawn_update_task<C>(
                 .unwrap()
                 .context("Latest version doesn't exist in Redis")
                 .unwrap();
-            let in_cache_latest_version = { cache_metadata.read().await.latest_version };
+
+            let in_cache_latest_version = { cache.last_key().expect("Cache is warmed up") } + 1;
             if current_latest_version == in_cache_latest_version {
                 tokio::time::sleep(std::time::Duration::from_millis(
                     IN_MEMORY_CACHE_LOOKUP_RETRY_INTERVAL_MS,
@@ -261,66 +244,14 @@ fn spawn_update_task<C>(
                 .await
                 .unwrap();
             // Ensure that transactions are ordered by version.
-            let mut newly_added_bytes = 0;
             for (ind, transaction) in transactions.iter().enumerate() {
                 if transaction.version != in_cache_latest_version + ind as u64 {
                     panic!("Transactions are not ordered by version");
                 }
-                newly_added_bytes += transaction.encoded_len() as u64;
             }
             for transaction in transactions {
                 cache.insert(transaction.version, Arc::new(transaction));
             }
-            let mut current_cache_metadata = { *cache_metadata.read().await };
-            current_cache_metadata.latest_version = end_version;
-            current_cache_metadata.total_size_in_bytes += newly_added_bytes;
-            // Get the data available.
-            {
-                *cache_metadata.write().await = current_cache_metadata;
-            }
-        }
-    });
-}
-
-fn spawn_cleanup_task(
-    cache_size_config: InMemoryCacheSizeConfig,
-    cache: Arc<DashMap<u64, Arc<Transaction>>>,
-    cache_metadata: Arc<RwLock<CacheMetadata>>,
-    cancellation_token: tokio_util::sync::CancellationToken,
-) {
-    tokio::spawn(async move {
-        loop {
-            if cancellation_token.is_cancelled() {
-                tracing::info!("In-memory cache cleanup task is cancelled.");
-                return;
-            }
-            let mut current_cache_metadata = { *cache_metadata.read().await };
-            let should_evict = current_cache_metadata
-                .total_size_in_bytes
-                .saturating_sub(cache_size_config.cache_eviction_trigger_size_bytes)
-                > 0;
-            if !should_evict {
-                tokio::time::sleep(std::time::Duration::from_millis(
-                    IN_MEMORY_CACHE_GC_INTERVAL_MS,
-                ))
-                .await;
-                continue;
-            }
-            let mut actual_bytes_removed = 0;
-            let mut bytes_to_remove = current_cache_metadata
-                .total_size_in_bytes
-                .saturating_sub(cache_size_config.cache_target_size_bytes);
-            while bytes_to_remove > 0 {
-                let key_to_remove = current_cache_metadata.first_version;
-                let (_k, v) = cache
-                    .remove(&key_to_remove)
-                    .expect("Failed to remove the key");
-                bytes_to_remove = bytes_to_remove.saturating_sub(v.encoded_len() as u64);
-                actual_bytes_removed += v.encoded_len() as u64;
-                current_cache_metadata.first_version += 1;
-            }
-            current_cache_metadata.total_size_in_bytes -= actual_bytes_removed;
-            *cache_metadata.write().await = current_cache_metadata;
         }
     });
 }
@@ -437,7 +368,7 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(in_memory_cache.latest_version().await, 0);
+        assert_eq!(in_memory_cache.latest_version(), 0);
     }
 
     #[tokio::test]
@@ -465,7 +396,8 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(in_memory_cache.latest_version().await, 1);
+        tokio::time::sleep(std::time::Duration::from_nanos(1)).await;
+        assert_eq!(in_memory_cache.latest_version(), 1);
         let txns = in_memory_cache.get_transactions(0).await;
         assert_eq!(txns.len(), 1);
         assert_eq!(txns[0].version, 0);
@@ -510,7 +442,7 @@ mod tests {
         .await
         .unwrap();
         tokio::time::sleep(std::time::Duration::from_millis(1)).await;
-        assert_eq!(in_memory_cache.latest_version().await, 2);
+        assert_eq!(in_memory_cache.latest_version(), 2);
         let txns = in_memory_cache.get_transactions(1).await;
         assert_eq!(txns.len(), 1);
         assert_eq!(txns[0].version, 1);

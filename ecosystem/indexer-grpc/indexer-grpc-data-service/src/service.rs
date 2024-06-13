@@ -148,11 +148,7 @@ impl RawData for RawDataServerWrapper {
         let current_version = match &request.starting_version {
             Some(version) => *version,
             // Live mode if starting version isn't specified
-            None => self
-                .in_memory_cache
-                .latest_version()
-                .await
-                .saturating_sub(1),
+            None => self.in_memory_cache.latest_version().saturating_sub(1),
         };
 
         let file_store_operator: Box<dyn FileStoreOperator> = self.file_store_config.create();
