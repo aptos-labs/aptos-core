@@ -122,7 +122,7 @@ where
             .await
     }
 
-    fn to_bytes(&self, peers: Vec<Author>, message: M) -> anyhow::Result<HashMap<Author, Bytes>> {
+    fn to_bytes_by_protocol(&self, peers: Vec<Author>, message: M) -> anyhow::Result<HashMap<Author, Bytes>> {
         let message: TestMessage = message.try_into()?;
         let raw_message: Bytes = message.0.into();
         Ok(peers

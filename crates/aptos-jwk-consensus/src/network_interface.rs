@@ -49,7 +49,7 @@ impl<NetworkClient: NetworkClientInterface<JWKConsensusMsg>>
             .await
     }
 
-    pub fn to_bytes(
+    pub fn to_bytes_by_protocol(
         &self,
         peers: Vec<PeerId>,
         message: JWKConsensusMsg,
@@ -60,7 +60,7 @@ impl<NetworkClient: NetworkClientInterface<JWKConsensusMsg>>
             .collect();
         Ok(self
             .network_client
-            .to_bytes(peer_network_ids, message)?
+            .to_bytes_by_protocol(peer_network_ids, message)?
             .into_iter()
             .map(|(peer_network_id, bytes)| (peer_network_id.peer_id(), bytes))
             .collect())

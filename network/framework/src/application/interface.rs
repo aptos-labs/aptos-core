@@ -74,7 +74,7 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
         _peer: PeerNetworkId,
     ) -> Result<Message, Error>;
 
-    fn to_bytes(
+    fn to_bytes_by_protocol(
         &self,
         _peers: Vec<PeerNetworkId>,
         _message: Message,
@@ -262,7 +262,7 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
             .await?)
     }
 
-    fn to_bytes<'a>(
+    fn to_bytes_by_protocol(
         &self,
         peers: Vec<PeerNetworkId>,
         message: Message,

@@ -47,7 +47,7 @@ impl<NetworkClient: NetworkClientInterface<DKGMessage>> DKGNetworkClient<Network
             .await
     }
 
-    pub fn to_bytes(
+    pub fn to_bytes_by_protocol(
         &self,
         peers: Vec<PeerId>,
         message: DKGMessage,
@@ -58,7 +58,7 @@ impl<NetworkClient: NetworkClientInterface<DKGMessage>> DKGNetworkClient<Network
             .collect();
         Ok(self
             .network_client
-            .to_bytes(peer_network_ids, message)?
+            .to_bytes_by_protocol(peer_network_ids, message)?
             .into_iter()
             .map(|(peer_network_id, bytes)| (peer_network_id.peer_id(), bytes))
             .collect())

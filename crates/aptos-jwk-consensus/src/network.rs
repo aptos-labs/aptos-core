@@ -88,12 +88,12 @@ impl RBNetworkSender<JWKConsensusMsg> for NetworkSender {
         }
     }
 
-    fn to_bytes(
+    fn to_bytes_by_protocol(
         &self,
         peers: Vec<Author>,
         message: JWKConsensusMsg,
     ) -> Result<HashMap<Author, bytes::Bytes>, anyhow::Error> {
-        self.jwk_network_client.to_bytes(peers, message)
+        self.jwk_network_client.to_bytes_by_protocol(peers, message)
     }
 }
 

@@ -66,7 +66,7 @@ impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockNetworkSender {
         Ok(DAGRpcResult(Ok(DAGMessage::TestAck(TestAck(Vec::new())))))
     }
 
-    fn to_bytes(
+    fn to_bytes_by_protocol(
         &self,
         peers: Vec<Author>,
         _message: DAGMessage,

@@ -620,9 +620,14 @@ impl<Req: TConsensusMsg + RBMessage + 'static, Res: TConsensusMsg + RBMessage + 
         tokio::task::spawn_blocking(|| TConsensusMsg::from_network_message(response_msg)).await?
     }
 
-    fn to_bytes(&self, peers: Vec<Author>, message: Req) -> anyhow::Result<HashMap<Author, Bytes>> {
+    fn to_bytes_by_protocol(
+        &self,
+        peers: Vec<Author>,
+        message: Req,
+    ) -> anyhow::Result<HashMap<Author, Bytes>> {
         let consensus_msg = message.into_network_message();
-        self.consensus_network_client.to_bytes(peers, consensus_msg)
+        self.consensus_network_client
+            .to_bytes_by_protocol(peers, consensus_msg)
     }
 }
 

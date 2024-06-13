@@ -56,7 +56,7 @@ impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockDAGNetworkSender {
         unimplemented!()
     }
 
-    fn to_bytes(
+    fn to_bytes_by_protocol(
         &self,
         peers: Vec<Author>,
         message: DAGMessage,

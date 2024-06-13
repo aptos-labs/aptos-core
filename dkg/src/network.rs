@@ -101,12 +101,12 @@ impl RBNetworkSender<DKGMessage> for NetworkSender {
         self.send_rpc_to_self(message, timeout).await
     }
 
-    fn to_bytes(
+    fn to_bytes_by_protocol(
         &self,
         peers: Vec<AccountAddress>,
         message: DKGMessage,
     ) -> anyhow::Result<HashMap<AccountAddress, Bytes>> {
-        self.dkg_network_client.to_bytes(peers, message)
+        self.dkg_network_client.to_bytes_by_protocol(peers, message)
     }
 }
 

@@ -26,7 +26,12 @@ pub trait RBNetworkSender<Req: RBMessage, Res: RBMessage = Req>: Send + Sync {
 
     async fn send_rb_rpc_to_self(&self, message: Req, timeout: Duration) -> anyhow::Result<Res>;
 
-    fn to_bytes(&self, peers: Vec<Author>, message: Req) -> anyhow::Result<HashMap<Author, Bytes>>;
+    /// Serializes the given message into bytes using each peers' preferred protocol.
+    fn to_bytes_by_protocol(
+        &self,
+        peers: Vec<Author>,
+        message: Req,
+    ) -> anyhow::Result<HashMap<Author, Bytes>>;
 }
 
 pub trait BroadcastStatus<Req: RBMessage, Res: RBMessage = Req>: Send + Sync + Clone {
@@ -116,8 +121,10 @@ where
             let sender = network_sender.clone();
             let message_clone = message.clone();
             let protocols = Arc::new(
-                tokio::task::spawn_blocking(move || sender.to_bytes(peers, message_clone))
-                    .await??,
+                tokio::task::spawn_blocking(move || {
+                    sender.to_bytes_by_protocol(peers, message_clone)
+                })
+                .await??,
             );
 
             let send_message = |receiver, sleep_duration: Option<Duration>| {
