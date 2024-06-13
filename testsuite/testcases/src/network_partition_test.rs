@@ -24,6 +24,8 @@ impl Test for NetworkPartitionTest {
 impl NetworkLoadTest for NetworkPartitionTest {
     async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<LoadDestination> {
         ctx.swarm
+            .write()
+            .await
             .inject_chaos(SwarmChaos::Partition(SwarmNetworkPartition {
                 partition_percentage: PARTITION_PERCENTAGE,
             }))
@@ -38,6 +40,8 @@ impl NetworkLoadTest for NetworkPartitionTest {
         // Just send the load to last validator which is not included in the partition
         Ok(LoadDestination::Peers(vec![ctx
             .swarm
+            .read()
+            .await
             .validators()
             .last()
             .map(|v| v.peer_id())
@@ -46,6 +50,8 @@ impl NetworkLoadTest for NetworkPartitionTest {
 
     async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {
         ctx.swarm
+            .write()
+            .await
             .remove_chaos(SwarmChaos::Partition(SwarmNetworkPartition {
                 partition_percentage: PARTITION_PERCENTAGE,
             }))

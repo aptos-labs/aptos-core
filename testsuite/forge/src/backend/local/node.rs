@@ -117,7 +117,11 @@ impl LocalNode {
 
     pub fn start(&self) -> Result<()> {
         let mut process_locker = self.process.lock().unwrap();
-        ensure!(process_locker.is_none(), "node {} already running", self.name);
+        ensure!(
+            process_locker.is_none(),
+            "node {} already running",
+            self.name
+        );
 
         // Ensure log file exists
         let log_file = OpenOptions::new()

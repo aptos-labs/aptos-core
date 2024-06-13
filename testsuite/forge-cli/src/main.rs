@@ -2673,7 +2673,8 @@ impl NetworkTest for RestartValidator {
     async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
         let mut ctx_locker = ctx.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
-        let node = ctx.swarm().validators().next().unwrap();
+        let swarm = ctx.swarm.read().await;
+        let node = swarm.validators().next().unwrap();
         node.health_check().await.expect("node health check failed");
         node.stop().await.unwrap();
         println!("Restarting node {}", node.peer_id());
@@ -2700,7 +2701,9 @@ impl NetworkTest for EmitTransaction {
         let ctx = ctx_locker.deref_mut();
         let duration = Duration::from_secs(10);
         let all_validators = ctx
-            .swarm()
+            .swarm
+            .read()
+            .await
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
@@ -2764,14 +2767,17 @@ async fn gather_metrics_one(ctx: &NetworkContext<'_>) {
     let now = chrono::prelude::Utc::now()
         .format("%Y%m%d_%H%M%S")
         .to_string();
-    for val in ctx.swarm.validators() {
-        let mut url = val.inspection_service_endpoint();
-        let valname = val.peer_id().to_string();
-        url.set_path("metrics");
-        let fname = format!("{}.{}.metrics", now, valname);
-        let outpath: PathBuf = outdir.join(fname);
-        let th = handle.spawn(gather_metrics_to_file(url, outpath));
-        gets.push(th);
+    {
+        let swarm = ctx.swarm.read().await;
+        for val in swarm.validators() {
+            let mut url = val.inspection_service_endpoint();
+            let valname = val.peer_id().to_string();
+            url.set_path("metrics");
+            let fname = format!("{}.{}.metrics", now, valname);
+            let outpath: PathBuf = outdir.join(fname);
+            let th = handle.spawn(gather_metrics_to_file(url, outpath));
+            gets.push(th);
+        }
     }
     // join all the join handles
     while !gets.is_empty() {

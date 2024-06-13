@@ -560,7 +560,7 @@ impl Swarm for LocalSwarm {
         Box::new(self.versions.keys().cloned())
     }
 
-    fn chain_info(&mut self) -> ChainInfo {
+    fn chain_info(&self) -> ChainInfo {
         let rest_api_url = self
             .validators()
             .next()

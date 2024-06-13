@@ -89,7 +89,7 @@ async fn get_patched_jwks(rest_client: &Client) -> PatchedJWKs {
 /// Patch the JWK with governance proposal and see it is effective.
 #[tokio::test]
 async fn jwk_patching() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
         .await;

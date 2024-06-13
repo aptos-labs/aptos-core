@@ -242,7 +242,7 @@ async fn test_network() {
 
 #[tokio::test]
 async fn test_account_balance() {
-    let (mut swarm, cli, _faucet, rosetta_client) = setup_simple_test(3).await;
+    let (swarm, cli, _faucet, rosetta_client) = setup_simple_test(3).await;
 
     let account_1 = cli.account_id(0);
     let account_2 = cli.account_id(1);
@@ -587,7 +587,7 @@ async fn wait_for_rosetta_block(node_clients: &NodeClients<'_>, block_height: u6
 
 #[tokio::test]
 async fn test_transfer() {
-    let (mut swarm, cli, _faucet, rosetta_client) = setup_simple_test(1).await;
+    let (swarm, cli, _faucet, rosetta_client) = setup_simple_test(1).await;
     let chain_id = swarm.chain_id();
     let client = swarm.aptos_public_info().client().clone();
     let sender = cli.account_id(0);
@@ -2494,7 +2494,7 @@ async fn withdraw_undelegated_stake_and_wait(
 async fn test_delegation_pool_operations() {
     const NUM_TXNS_PER_PAGE: u16 = 2;
 
-    let (mut swarm, cli, _, rosetta_client) = setup_test(
+    let (swarm, cli, _, rosetta_client) = setup_test(
         2,
         Arc::new(|_, config, _| config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE),
     )

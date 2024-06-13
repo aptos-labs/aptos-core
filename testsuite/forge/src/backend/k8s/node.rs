@@ -20,10 +20,10 @@ use std::{
     fmt::{Debug, Formatter},
     process::{Command, Stdio},
     str::FromStr,
+    sync::atomic::{AtomicU32, Ordering},
     thread,
     time::{Duration, Instant},
 };
-use std::sync::atomic::{AtomicU32, Ordering};
 
 const APTOS_DATA_DIR: &str = "/opt/aptos/data";
 

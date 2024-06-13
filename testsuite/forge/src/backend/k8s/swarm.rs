@@ -40,9 +40,8 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
     env, str,
-    sync::Arc,
+    sync::{atomic::AtomicU32, Arc},
 };
-use std::sync::atomic::AtomicU32;
 // use std::sync::Mutex;
 use tokio::{runtime::Runtime, time::Duration};
 
@@ -310,7 +309,7 @@ impl Swarm for K8sSwarm {
         Box::new(self.versions.keys().cloned())
     }
 
-    fn chain_info(&mut self) -> ChainInfo {
+    fn chain_info(&self) -> ChainInfo {
         let rest_api_url = self.get_rest_api_url(0);
         let inspection_service_url = self.get_inspection_service_url(0);
         ChainInfo::new(

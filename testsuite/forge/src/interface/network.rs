@@ -55,7 +55,7 @@ impl<'t> NetworkContextSynchronizer<'t> {
 
 pub struct NetworkContext<'t> {
     core: CoreContext,
-    pub swarm: &'t mut dyn Swarm,
+    pub swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     pub report: &'t mut TestReport,
     pub global_duration: Duration,
     pub emit_job: EmitJobRequest,
@@ -66,7 +66,7 @@ pub struct NetworkContext<'t> {
 impl<'t> NetworkContext<'t> {
     pub fn new(
         core: CoreContext,
-        swarm: &'t mut dyn Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         report: &'t mut TestReport,
         global_duration: Duration,
         emit_job: EmitJobRequest,
@@ -83,9 +83,9 @@ impl<'t> NetworkContext<'t> {
         }
     }
 
-    pub fn swarm(&mut self) -> &mut dyn Swarm {
-        self.swarm
-    }
+    // pub fn swarm(&mut self) -> &mut dyn Swarm {
+    //     self.swarm
+    // }
 
     pub fn core(&mut self) -> &mut CoreContext {
         &mut self.core
@@ -103,7 +103,7 @@ impl<'t> NetworkContext<'t> {
     ) -> Result<()> {
         SuccessCriteriaChecker::check_for_success(
             &self.success_criteria,
-            self.swarm,
+            self.swarm.clone(),
             self.report,
             stats,
             window,

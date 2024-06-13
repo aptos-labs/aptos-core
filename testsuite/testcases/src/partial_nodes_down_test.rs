@@ -24,14 +24,17 @@ impl NetworkTest for PartialNodesDown {
         let runtime = Runtime::new()?;
         let duration = Duration::from_secs(120);
         let all_validators = ctx
-            .swarm()
+            .swarm
+            .read()
+            .await
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
         let mut down_nodes = all_validators.clone();
         let up_nodes = down_nodes.split_off(all_validators.len() / 10);
         for n in &down_nodes {
-            let node = ctx.swarm().validator(*n).unwrap();
+            let swarm = ctx.swarm.read().await;
+            let node = swarm.validator(*n).unwrap();
             println!("Node {} is going to stop", node.name());
             runtime.block_on(node.stop())?;
         }
@@ -42,7 +45,8 @@ impl NetworkTest for PartialNodesDown {
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat);
         for n in &down_nodes {
-            let node = ctx.swarm().validator(*n).unwrap();
+            let swarm = ctx.swarm.read().await;
+            let node = swarm.validator(*n).unwrap();
             println!("Node {} is going to restart", node.name());
             runtime.block_on(node.start())?;
         }

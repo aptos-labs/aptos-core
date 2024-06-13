@@ -67,7 +67,7 @@ pub trait Swarm: Sync + Send {
     fn versions<'a>(&'a self) -> Box<dyn Iterator<Item = Version> + 'a>;
 
     /// Construct a ChainInfo from this Swarm
-    fn chain_info(&mut self) -> ChainInfo;
+    fn chain_info(&self) -> ChainInfo;
 
     fn logs_location(&mut self) -> String;
 
@@ -95,7 +95,7 @@ pub trait Swarm: Sync + Send {
         timeout: Option<i64>,
     ) -> Result<Vec<Sample>>;
 
-    fn aptos_public_info(&mut self) -> AptosPublicInfo {
+    fn aptos_public_info(&self) -> AptosPublicInfo {
         self.chain_info().into_aptos_public_info()
     }
 

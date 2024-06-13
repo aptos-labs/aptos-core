@@ -32,7 +32,7 @@ async fn test_indexer() {
         )
         .unwrap();
 
-    let fullnode = swarm.full_node_mut(fullnode_peer_id).unwrap();
+    let fullnode = swarm.full_node(fullnode_peer_id).unwrap();
     fullnode
         .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await

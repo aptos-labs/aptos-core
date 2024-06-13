@@ -150,15 +150,21 @@ fn upgrade_and_gather_stats(
                 let ctx = ctx_locker.deref_mut();
                 let emit_job_request = ctx.emit_job.clone();
                 let rng = SeedableRng::from_rng(ctx.core().rng()).unwrap();
-                let (emitter, emit_job_request) =
-                    match create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng) {
-                        Ok(parts) => parts,
-                        Err(err) => {
-                            stats_result = Err(err);
-                            return;
-                        },
-                    };
-                let source_account = ctx.swarm().chain_info().root_account;
+                let (emitter, emit_job_request) = match create_emitter_and_request(
+                    ctx.swarm.clone(),
+                    emit_job_request,
+                    nodes,
+                    rng,
+                )
+                .await
+                {
+                    Ok(parts) => parts,
+                    Err(err) => {
+                        stats_result = Err(err);
+                        return;
+                    },
+                };
+                let source_account = ctx.swarm.read().await.chain_info().root_account;
                 (emitter, emit_job_request, source_account)
                 // release lock on network context
             };
@@ -207,7 +213,15 @@ impl NetworkTest for SimpleValidatorUpgrade {
 
         // Get the different versions we're testing with
         let (old_version, new_version) = {
-            let mut versions = ctxa.ctx.lock().await.swarm().versions().collect::<Vec<_>>();
+            let mut versions = ctxa
+                .ctx
+                .lock()
+                .await
+                .swarm
+                .read()
+                .await
+                .versions()
+                .collect::<Vec<_>>();
             versions.sort();
             if versions.len() != 2 {
                 bail!("exactly two different versions needed to run compat test");
@@ -224,14 +238,26 @@ impl NetworkTest for SimpleValidatorUpgrade {
         ctxa.report_text(msg).await;
 
         // Split the swarm into 2 parts
-        if ctxa.ctx.lock().await.swarm().validators().count() < 4 {
+        if ctxa
+            .ctx
+            .lock()
+            .await
+            .swarm
+            .read()
+            .await
+            .validators()
+            .count()
+            < 4
+        {
             bail!("compat test requires >= 4 validators");
         }
         let all_validators = ctxa
             .ctx
             .lock()
             .await
-            .swarm()
+            .swarm
+            .read()
+            .await
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
@@ -331,7 +357,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
                 &txn_stat_half,
             );
 
-            ctx.swarm().fork_check(epoch_duration)?;
+            ctx.swarm.read().await.fork_check(epoch_duration)?;
 
             // Update the second batch
             let msg = format!("4. upgrading second batch to new version: {}", new_version);
@@ -369,7 +395,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
             let msg = "5. check swarm health".to_string();
             info!("{}", msg);
             ctx.report.report_text(msg);
-            ctx.swarm().fork_check(epoch_duration)?;
+            ctx.swarm.read().await.fork_check(epoch_duration)?;
             ctx.report.report_text(format!(
                 "Compatibility test for {} ==> {} passed",
                 old_version, new_version

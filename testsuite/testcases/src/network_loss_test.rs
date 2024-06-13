@@ -24,6 +24,8 @@ impl Test for NetworkLossTest {
 impl NetworkLoadTest for NetworkLossTest {
     async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<LoadDestination> {
         ctx.swarm
+            .write()
+            .await
             .inject_chaos(SwarmChaos::Loss(SwarmNetworkLoss {
                 loss_percentage: LOSS_PERCENTAGE,
                 correlation_percentage: CORRELATION_PERCENTAGE,
@@ -41,6 +43,8 @@ impl NetworkLoadTest for NetworkLossTest {
 
     async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {
         ctx.swarm
+            .write()
+            .await
             .remove_chaos(SwarmChaos::Loss(SwarmNetworkLoss {
                 loss_percentage: LOSS_PERCENTAGE,
                 correlation_percentage: CORRELATION_PERCENTAGE,

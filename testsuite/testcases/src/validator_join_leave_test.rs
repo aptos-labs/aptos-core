@@ -13,7 +13,7 @@ use aptos_logger::info;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey};
 use async_trait::async_trait;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 const MAX_NODE_LAG_SECS: u64 = 360;
 
@@ -33,13 +33,13 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
 
     async fn test(
         &self,
-        swarm: &mut dyn Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         _report: &mut TestReport,
         duration: Duration,
     ) -> Result<()> {
         // Verify we have at least 7 validators (i.e., 3f+1, where f is 2)
         // so we can lose 2 validators but still make progress.
-        let num_validators = swarm.validators().count();
+        let num_validators = { swarm.read().await.validators().count() };
         if num_validators < 7 {
             return Err(anyhow::format_err!(
                 "ValidatorSet leaving and rejoining test require at least 7 validators! Given: {:?}.",
@@ -49,10 +49,15 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
 
         let faucet_endpoint: reqwest::Url = "http://localhost:8081".parse().unwrap();
         // Connect the operator tool to the node's JSON RPC API
-        let rest_client = swarm.validators().next().unwrap().rest_client();
-        let transaction_factory = swarm.chain_info().transaction_factory();
+        let transaction_factory = { swarm.read().await.chain_info().transaction_factory() };
 
-        let rest_api_endpoint = swarm.validators().next().unwrap().rest_api_endpoint();
+        let (rest_client, rest_api_endpoint) = {
+            let swarm = swarm.read().await;
+            let first_validator = swarm.validators().next().unwrap();
+            let rest_client = first_validator.rest_client();
+            let rest_api_endpoint = first_validator.rest_api_endpoint();
+            (rest_client, rest_api_endpoint)
+        };
         let mut cli = CliTestFramework::new(
             rest_api_endpoint,
             faucet_endpoint,
@@ -60,7 +65,7 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
         )
         .await;
 
-        let mut public_info = swarm.chain_info().into_aptos_public_info();
+        let mut public_info = { swarm.read().await.chain_info().into_aptos_public_info() };
 
         let mut validator_cli_indices = Vec::new();
 
@@ -109,9 +114,13 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
 
         // Wait for all nodes to synchronize and stabilize.
         info!("Waiting for the validators to be synchronized.");
-        swarm
-            .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
-            .await?;
+        {
+            swarm
+                .read()
+                .await
+                .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
+                .await?;
+        }
 
         // Wait for 1/3 of the test duration.
         tokio::time::sleep(duration / 3).await;
@@ -123,12 +132,12 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
                 .await
                 .unwrap();
 
-            let root_account = swarm.chain_info().root_account();
+            let root_account = swarm.read().await.chain_info().root_account();
             reconfig(&rest_client, &transaction_factory, root_account).await;
         }
 
         {
-            let root_account = swarm.chain_info().root_account();
+            let root_account = swarm.read().await.chain_info().root_account();
             reconfig(&rest_client, &transaction_factory, root_account).await;
         }
 
@@ -140,18 +149,20 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
         for operator_index in validator_cli_indices.iter().rev().take(num_validators / 3) {
             cli.join_validator_set(*operator_index, None).await.unwrap();
 
-            let root_account = swarm.chain_info().root_account();
+            let root_account = swarm.read().await.chain_info().root_account();
             reconfig(&rest_client, &transaction_factory, root_account).await;
         }
 
         {
-            let root_account = swarm.chain_info().root_account();
+            let root_account = swarm.read().await.chain_info().root_account();
             reconfig(&rest_client, &transaction_factory, root_account).await;
         }
 
         // Wait for all nodes to synchronize and stabilize.
         info!("Waiting for the validators to be synchronized.");
         swarm
+            .read()
+            .await
             .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
             .await?;
 

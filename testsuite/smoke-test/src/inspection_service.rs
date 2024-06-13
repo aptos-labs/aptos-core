@@ -6,7 +6,7 @@ use aptos_forge::Swarm;
 
 #[tokio::test]
 async fn test_inspection_service_connection() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let swarm = new_local_swarm_with_aptos(1).await;
     let info = swarm.aptos_public_info();
     // Ping the inspection service index page and verify we get a successful response
     let resp = reqwest::get(info.inspection_service_url().to_owned())

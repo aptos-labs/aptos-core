@@ -14,7 +14,6 @@ use aptos_logger::info;
 use async_trait::async_trait;
 use rand::SeedableRng;
 use std::{fmt::Debug, ops::DerefMut, time::Duration};
-use tokio::runtime::Runtime;
 
 // add larger warmup, as when we are exceeding the max load,
 // it takes more time to fill mempool.
@@ -230,26 +229,28 @@ impl NetworkTest for LoadVsPerfBenchmark {
 
         let mut ctx_locker = ctx.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
-        let rt = Runtime::new().unwrap();
 
         let mut continous_job = if let Some(continuous_traffic) = &self.continuous_traffic {
-            let nodes_to_send_load_to =
-                LoadDestination::FullnodesOtherwiseValidators.get_destination_nodes(ctx.swarm());
+            let nodes_to_send_load_to = LoadDestination::FullnodesOtherwiseValidators
+                .get_destination_nodes(ctx.swarm.clone())
+                .await;
             let rng = SeedableRng::from_rng(ctx.core().rng())?;
             let (mut emitter, emit_job_request) = create_emitter_and_request(
-                ctx.swarm(),
+                ctx.swarm.clone(),
                 continuous_traffic.traffic.clone(),
                 &nodes_to_send_load_to,
                 rng,
             )
+            .await
             .context("create emitter")?;
 
-            let job = rt
-                .block_on(emitter.start_job(
-                    ctx.swarm().chain_info().root_account,
+            let job = emitter
+                .start_job(
+                    ctx.swarm.read().await.chain_info().root_account,
                     emit_job_request,
                     1 + 2 * self.workloads.len(),
-                ))
+                )
+                .await
                 .context("start emitter job")?;
             Some(job)
         } else {
@@ -301,26 +302,29 @@ impl NetworkTest for LoadVsPerfBenchmark {
             ctx.report.report_text(line);
         }
 
-        let continuous_results = continous_job.map(|job| {
-            let stats_by_phase = rt.block_on(job.stop_job());
+        let continuous_results = match continous_job {
+            Some(job) => {
+                let stats_by_phase = job.stop_job().await;
 
-            let mut result = vec![];
-            for (phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
-                if phase % 2 != 0 {
-                    result.push((
-                        format!("continuous with traffic {}", phase / 2),
-                        phase_stats,
-                    ));
+                let mut result = vec![];
+                for (phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
+                    if phase % 2 != 0 {
+                        result.push((
+                            format!("continuous with traffic {}", phase / 2),
+                            phase_stats,
+                        ));
+                    }
                 }
-            }
 
-            let table = to_table_continuous("continuous traffic".to_string(), &result);
-            for line in table {
-                ctx.report.report_text(line);
-            }
+                let table = to_table_continuous("continuous traffic".to_string(), &result);
+                for line in table {
+                    ctx.report.report_text(line);
+                }
 
-            result
-        });
+                Some(result)
+            },
+            None => None,
+        };
 
         for (index, result) in results.iter().enumerate() {
             // always take last phase for success criteria

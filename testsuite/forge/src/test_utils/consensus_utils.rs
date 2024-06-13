@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{wait_for_all_nodes_to_catchup_to_version, Swarm, SwarmExt};
+use crate::{wait_for_all_nodes_to_catchup_to_version, AptosPublicInfo};
 use anyhow::{bail, Context, Result};
 use aptos_config::config::DEFAULT_MAX_PAGE_SIZE;
 use aptos_rest_client::Client as RestClient;
@@ -53,14 +53,16 @@ async fn get_node_state(validator_client: &RestClient) -> NodeState {
 /// I.e. if part is shorter than how long it takes for empty block to be
 /// generated, we can make sure one block gets created on every part.
 pub async fn test_consensus_fault_tolerance(
-    swarm: &mut dyn Swarm,
+    // swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+    validator_clients: Vec<(String, RestClient)>,
+    public_info: AptosPublicInfo,
     cycles: usize,
     cycle_duration_s: f32,
     parts_in_cycle: usize,
-    mut failure_injection: Box<dyn FailureInjection>,
+    mut failure_injection: Box<dyn FailureInjection + Send>,
     // (cycle, executed_epochs, executed_rounds, executed_transactions, current_state, previous_state)
     mut check_cycle: Box<
-        dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> Result<()>,
+        dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> Result<()> + Send,
     >,
     new_epoch_on_cycle: bool,
     // Instead of failing on first check, we check the full run,
@@ -68,7 +70,9 @@ pub async fn test_consensus_fault_tolerance(
     // Can allow us to better see if state would've gotten resolved by itself, etc.
     raise_check_error_at_the_end: bool,
 ) -> Result<()> {
-    let validator_clients = swarm.get_validator_clients_with_names();
+    // let validator_clients = {
+    //     swarm.read().await.get_validator_clients_with_names()
+    // };
 
     async fn get_all_states(validator_clients: &[(String, RestClient)]) -> Vec<NodeState> {
         join_all(
@@ -145,7 +149,8 @@ pub async fn test_consensus_fault_tolerance(
         }
 
         if new_epoch_on_cycle {
-            swarm.aptos_public_info().reconfig().await;
+            // swarm.read().await.aptos_public_info().reconfig().await;
+            public_info.reconfig().await;
         }
     }
 
@@ -240,7 +245,7 @@ impl FailureInjection for NoFailureInjection {
     async fn clear(&mut self, _: &[(String, RestClient)]) {}
 }
 
-pub fn no_failure_injection() -> Box<dyn FailureInjection> {
+pub fn no_failure_injection() -> Box<dyn FailureInjection + Send> {
     Box::new(NoFailureInjection {})
 }
 

@@ -10,67 +10,68 @@ use aptos_logger::info;
 use aptos_types::PeerId;
 use async_trait::async_trait;
 use rand::Rng;
-use tokio::runtime::Runtime;
+use std::sync::Arc;
 
-fn add_execution_delay(swarm: &mut dyn Swarm, config: &ExecutionDelayConfig) -> anyhow::Result<()> {
-    let runtime = Runtime::new().unwrap();
-    let validators = swarm.get_validator_clients_with_names();
+async fn add_execution_delay(
+    swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+    config: &ExecutionDelayConfig,
+) -> anyhow::Result<()> {
+    let validators = { swarm.read().await.get_validator_clients_with_names() };
 
-    runtime.block_on(async {
-        let mut rng = rand::thread_rng();
-        for (name, validator) in validators {
-            let sleep_percentage = if rng.gen_bool(config.inject_delay_node_fraction) {
+    for (name, validator) in validators {
+        let sleep_percentage = {
+            let mut rng = rand::thread_rng();
+            if rng.gen_bool(config.inject_delay_node_fraction) {
                 rng.gen_range(1_u32, config.inject_delay_max_transaction_percentage)
             } else {
                 0
-            };
-            info!(
-                "Validator {} adding {}% of transactions with {}ms execution delay",
-                name, sleep_percentage, config.inject_delay_per_transaction_ms
-            );
-            validator
-                .set_failpoint(
-                    "aptos_vm::execution::user_transaction".to_string(),
-                    format!(
-                        "{}%delay({})",
-                        sleep_percentage, config.inject_delay_per_transaction_ms
-                    ),
+            }
+        };
+        info!(
+            "Validator {} adding {}% of transactions with {}ms execution delay",
+            name, sleep_percentage, config.inject_delay_per_transaction_ms
+        );
+        validator
+            .set_failpoint(
+                "aptos_vm::execution::user_transaction".to_string(),
+                format!(
+                    "{}%delay({})",
+                    sleep_percentage, config.inject_delay_per_transaction_ms
+                ),
+            )
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "set_failpoint to add execution delay on {} failed, {:?}",
+                    name,
+                    e
                 )
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "set_failpoint to add execution delay on {} failed, {:?}",
-                        name,
-                        e
-                    )
-                })?;
-        }
-        Ok(())
-    })
+            })?;
+    }
+    Ok(())
 }
 
-fn remove_execution_delay(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-    let runtime = Runtime::new().unwrap();
-    let validators = swarm.get_validator_clients_with_names();
+async fn remove_execution_delay(
+    swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+) -> anyhow::Result<()> {
+    let validators = { swarm.read().await.get_validator_clients_with_names() };
 
-    runtime.block_on(async {
-        for (name, validator) in validators {
-            validator
-                .set_failpoint(
-                    "aptos_vm::execution::block_metadata".to_string(),
-                    "off".to_string(),
+    for (name, validator) in validators {
+        validator
+            .set_failpoint(
+                "aptos_vm::execution::block_metadata".to_string(),
+                "off".to_string(),
+            )
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "set_failpoint to remove execution delay on {} failed, {:?}",
+                    name,
+                    e
                 )
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "set_failpoint to remove execution delay on {} failed, {:?}",
-                        name,
-                        e
-                    )
-                })?;
-        }
-        Ok(())
-    })
+            })?;
+    }
+    Ok(())
 }
 
 /// Config for adding variable processing overhead/delay into
@@ -95,12 +96,12 @@ pub struct ExecutionDelayTest {
 #[async_trait]
 impl NetworkLoadTest for ExecutionDelayTest {
     async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<LoadDestination> {
-        add_execution_delay(ctx.swarm(), &self.add_execution_delay)?;
+        add_execution_delay(ctx.swarm.clone(), &self.add_execution_delay).await?;
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
     async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {
-        remove_execution_delay(ctx.swarm())
+        remove_execution_delay(ctx.swarm.clone()).await
     }
 }
 
@@ -129,8 +130,7 @@ pub struct NetworkUnreliabilityTest {
 #[async_trait]
 impl NetworkLoadTest for NetworkUnreliabilityTest {
     async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<LoadDestination> {
-        let swarm = ctx.swarm();
-        let validators = swarm.get_validator_clients_with_names();
+        let validators = { ctx.swarm.read().await.get_validator_clients_with_names() };
 
         for (name, validator) in validators {
             let drop_percentage = {
@@ -168,7 +168,7 @@ impl NetworkLoadTest for NetworkUnreliabilityTest {
     }
 
     async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {
-        let validators = ctx.swarm().get_validator_clients_with_names();
+        let validators = { ctx.swarm.read().await.get_validator_clients_with_names() };
 
         for (name, validator) in validators {
             validator
@@ -227,8 +227,16 @@ impl CpuChaosTest {
     /// Creates a new SwarmCpuStress to be injected via chaos. Note:
     /// CPU chaos is only done for the validators in the swarm (and
     /// not the fullnodes).
-    fn create_cpu_chaos(&self, swarm: &mut dyn Swarm) -> SwarmCpuStress {
-        let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+    async fn create_cpu_chaos(
+        &self,
+        swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+    ) -> SwarmCpuStress {
+        let all_validators = swarm
+            .read()
+            .await
+            .validators()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>();
         let cpu_chaos_config = self.cpu_chaos_config.clone();
         create_swarm_cpu_stress(all_validators, Some(cpu_chaos_config))
     }
@@ -283,9 +291,11 @@ pub fn create_swarm_cpu_stress(
 #[async_trait]
 impl NetworkLoadTest for CpuChaosTest {
     async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<LoadDestination> {
-        let swarm_cpu_stress = self.create_cpu_chaos(ctx.swarm());
+        let swarm_cpu_stress = self.create_cpu_chaos(ctx.swarm.clone()).await;
 
         ctx.swarm
+            .write()
+            .await
             .inject_chaos(SwarmChaos::CpuStress(swarm_cpu_stress))
             .await?;
 
@@ -293,9 +303,11 @@ impl NetworkLoadTest for CpuChaosTest {
     }
 
     async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {
-        let swarm_cpu_stress = self.create_cpu_chaos(ctx.swarm());
+        let swarm_cpu_stress = self.create_cpu_chaos(ctx.swarm.clone()).await;
 
         ctx.swarm
+            .write()
+            .await
             .remove_chaos(SwarmChaos::CpuStress(swarm_cpu_stress))
             .await
     }

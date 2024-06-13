@@ -12,7 +12,7 @@ use aptos_types::{
     on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
 };
 use async_trait::async_trait;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 const MAX_NODE_LAG_SECS: u64 = 360;
 
@@ -28,14 +28,18 @@ impl Test for QuorumStoreOnChainEnableTest {
 impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
     async fn test(
         &self,
-        swarm: &mut dyn aptos_forge::Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn aptos_forge::Swarm>>>,
         _report: &mut aptos_forge::TestReport,
         duration: std::time::Duration,
     ) -> anyhow::Result<()> {
         let faucet_endpoint: reqwest::Url = "http://localhost:8081".parse().unwrap();
-        let rest_client = swarm.validators().next().unwrap().rest_client();
-
-        let rest_api_endpoint = swarm.validators().next().unwrap().rest_api_endpoint();
+        let (rest_client, rest_api_endpoint) = {
+            let swarm = swarm.read().await;
+            let first_validator = swarm.validators().next().unwrap();
+            let rest_client = first_validator.rest_client();
+            let rest_api_endpoint = first_validator.rest_api_endpoint();
+            (rest_client, rest_api_endpoint)
+        };
         let mut cli = CliTestFramework::new(
             rest_api_endpoint,
             faucet_endpoint,
@@ -46,7 +50,7 @@ impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
         tokio::time::sleep(duration / 2).await;
 
         let root_cli_index = {
-            let root_account = swarm.chain_info().root_account();
+            let root_account = swarm.read().await.chain_info().root_account();
             cli.add_account_with_address_to_cli(
                 root_account.private_key().clone(),
                 root_account.address(),
@@ -97,6 +101,8 @@ impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
         // Wait for all nodes to synchronize and stabilize.
         info!("Waiting for the validators to be synchronized.");
         swarm
+            .read()
+            .await
             .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
             .await?;
 

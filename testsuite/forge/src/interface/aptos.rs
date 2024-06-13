@@ -301,7 +301,7 @@ impl AptosPublicInfo {
         Ok(account)
     }
 
-    pub async fn reconfig(&mut self) -> State {
+    pub async fn reconfig(&self) -> State {
         // dedupe with smoke-test::test_utils::reconfig
         reconfig(
             &self.rest_client,

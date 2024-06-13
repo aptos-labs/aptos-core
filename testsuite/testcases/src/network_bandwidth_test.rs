@@ -29,6 +29,8 @@ impl Test for NetworkBandwidthTest {
 impl NetworkLoadTest for NetworkBandwidthTest {
     async fn setup<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<LoadDestination> {
         ctx.swarm
+            .write()
+            .await
             .inject_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
                 group_network_bandwidths: vec![GroupNetworkBandwidth {
                     name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
@@ -51,6 +53,8 @@ impl NetworkLoadTest for NetworkBandwidthTest {
 
     async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {
         ctx.swarm
+            .write()
+            .await
             .remove_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
                 group_network_bandwidths: vec![GroupNetworkBandwidth {
                     name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),

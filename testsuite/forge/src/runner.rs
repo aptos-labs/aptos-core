@@ -586,10 +586,12 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 summary.handle_result(test.name().to_owned(), result)?;
             }
 
+            let logs_location = swarm.logs_location();
+            let swarm = Arc::new(tokio::sync::RwLock::new(swarm));
             for test in self.filter_tests(&self.tests.network_tests) {
                 let network_ctx = NetworkContext::new(
                     CoreContext::from_rng(&mut rng),
-                    &mut *swarm,
+                    swarm.clone(),
                     &mut report,
                     self.global_duration,
                     self.tests.emit_job_request.clone(),
@@ -614,7 +616,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             io::stderr().flush()?;
             if !summary.success() {
                 println!();
-                println!("Swarm logs can be found here: {}", swarm.logs_location());
+                println!("Swarm logs can be found here: {}", logs_location);
             }
         }
 

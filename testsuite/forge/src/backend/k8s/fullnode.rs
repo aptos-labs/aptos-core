@@ -35,9 +35,8 @@ use std::{
     env,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     path::PathBuf,
-    sync::Arc,
+    sync::{atomic::AtomicU32, Arc},
 };
-use std::sync::atomic::AtomicU32;
 use tempfile::TempDir;
 
 // these are constants given by the aptos-node helm chart

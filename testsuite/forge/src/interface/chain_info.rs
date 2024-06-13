@@ -35,7 +35,7 @@ impl ChainInfo {
         }
     }
 
-    pub fn root_account(&mut self) -> Arc<LocalAccount> {
+    pub fn root_account(&self) -> Arc<LocalAccount> {
         self.root_account.clone()
     }
 
