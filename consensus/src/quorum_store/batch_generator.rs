@@ -366,6 +366,9 @@ impl BatchGenerator {
         let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;
         let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
+        for batch in batches.iter() {
+            error!("QS: created batch w. id {}", batch.batch_id(),);
+        }
         self.last_end_batch_time = Instant::now();
         counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
 

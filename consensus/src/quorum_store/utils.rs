@@ -247,6 +247,10 @@ impl ProofQueue {
             counters::inc_rejected_pos_count(counters::POS_EXPIRED_LABEL);
             return;
         }
+        error!(
+            "Pushing proof of store with batch id {}",
+            proof.info().batch_id()
+        );
         let batch_key = BatchKey::from_info(proof.info());
         if self.batch_to_proof.get(&batch_key).is_some() {
             counters::inc_rejected_pos_count(counters::POS_DUPLICATE_LABEL);
@@ -311,6 +315,10 @@ impl ProofQueue {
                     {
                         cur_bytes += batch.num_bytes();
                         cur_txns += batch.num_txns();
+                        error!(
+                            "Pulling proof of store for consensus with batch id {}",
+                            proof.info().batch_id()
+                        );
                         if cur_bytes > max_bytes || cur_txns > max_txns {
                             // Exceeded the limit for requested bytes or number of transactions.
                             full = true;

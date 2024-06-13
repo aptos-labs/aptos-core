@@ -203,6 +203,11 @@ impl ProofCoordinator {
             digest = signed_batch_info.digest(),
             batch_id = signed_batch_info.batch_id().id,
         );
+
+        error!(
+            "PoQS initialized for batch: {}",
+            signed_batch_info.batch_id().id
+        );
         Ok(())
     }
 
@@ -339,7 +344,7 @@ impl ProofCoordinator {
                                 match self.add_signature(signed_batch_info, &validator_verifier) {
                                     Ok(result) => {
                                         if let Some(proof) = result {
-                                            debug!(
+                                            error!(
                                                 LogSchema::new(LogEvent::ProofOfStoreReady),
                                                 digest = digest,
                                                 batch_id = batch_id.id,
