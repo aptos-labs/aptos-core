@@ -68,9 +68,9 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     pub use_decls: Vec<UseDecl>,
     /// Translated friend declarations.
     pub friend_decls: Vec<FriendDecl>,
-    /// Location of a friend visibility in the current module
+    /// Location of a friend visibility modifier in the current module
     pub friend_fun_loc: Option<move_ir_types::location::Loc>,
-    /// Locations of package visibilities in the current module
+    /// Location of a package visibility modifier in the current module
     pub package_fun_loc: Option<move_ir_types::location::Loc>,
     /// Set of functions with package visibility in the current module
     pub package_funs: BTreeSet<FunId>,
