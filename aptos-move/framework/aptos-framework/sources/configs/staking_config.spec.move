@@ -164,6 +164,13 @@ spec aptos_framework::staking_config {
             result_1 <= MAX_REWARDS_RATE && result_2 <= MAX_U64;
     }
 
+    spec min_rewards_rate(): (u64, u64) {
+        include StakingRewardsConfigRequirement;
+        ensures (features::spec_periodical_reward_rate_decrease_enabled() &&
+            (global<StakingRewardsConfig>(@aptos_framework).rewards_rate.value as u64) != 0) ==>
+            result_1 <= MAX_REWARDS_RATE && result_2 <= MAX_U64;
+    }
+
     spec calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 {
         pragma verify_duration_estimate = 120;
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);

@@ -140,6 +140,88 @@ module aptos_framework::staking_config {
         get_reward_rate(borrow_global<StakingConfig>(@aptos_framework))
     }
 
+    #[view]
+    /// Return the minimum and maximum amounts that a validator may stake as a tuple (minimum, maximum).
+    public fun required_stake(): (u64, u64) acquires StakingConfig {
+        get_required_stake(borrow_global<StakingConfig>(@aptos_framework))
+    }
+
+    #[view]
+    /// Return the recurring lockup cycle for each validator.
+    public fun recurring_lockup_duration_secs(): u64 acquires StakingConfig {
+        get_recurring_lockup_duration(borrow_global<StakingConfig>(@aptos_framework))
+    }
+
+    #[view]
+    /// Return whether validators are allowed to leave or join after genesis.
+    public fun allow_validator_set_change(): bool acquires StakingConfig {
+        get_allow_validator_set_change(borrow_global<StakingConfig>(@aptos_framework))
+    }
+
+    #[view]
+    /// Return the percent of total voting power allowed to join the validator set this epoch.
+    public fun voting_power_increase_limit(): u64 acquires StakingConfig {
+        get_voting_power_increase_limit(borrow_global<StakingConfig>(@aptos_framework))
+    }
+
+    #[view]
+    /// Return the minimum reward rate of this epoch as a tuple (numerator, denominator).
+    public fun min_rewards_rate(): (u64, u64) acquires StakingRewardsConfig {
+        if (features::periodical_reward_rate_decrease_enabled()) {
+            let epoch_min_rewards_rate = borrow_global<StakingRewardsConfig>(@aptos_framework).min_rewards_rate;
+            if (fixed_point64::is_zero(epoch_min_rewards_rate)) {
+                (0u64, 1u64)
+            } else {
+                // Maximize denominator for higher precision.
+                // Restriction: nominator <= MAX_REWARDS_RATE && denominator <= MAX_U64
+                let denominator = fixed_point64::divide_u128((MAX_REWARDS_RATE as u128), epoch_min_rewards_rate);
+                if (denominator > MAX_U64) {
+                    denominator = MAX_U64
+                };
+                let nominator = (fixed_point64::multiply_u128(denominator, epoch_min_rewards_rate) as u64);
+                (nominator, (denominator as u64))
+            }
+        } else {
+            (0u64, 1u64)
+        }
+    }
+
+    #[view]
+    /// Return the reward rate period start in seconds of this epoch.
+    public fun rewards_rate_period_start_in_secs(): (u64) acquires StakingRewardsConfig {
+        if (features::periodical_reward_rate_decrease_enabled()) {
+            borrow_global<StakingRewardsConfig>(@aptos_framework).rewards_rate_period_in_secs
+        } else {
+            0u64
+        }
+    }
+
+    #[view]
+    /// Return the reward rate period start in seconds of the last epoch.
+    public fun last_rewards_rate_period_start_in_seconds(): (u64) acquires StakingRewardsConfig {
+        if (features::periodical_reward_rate_decrease_enabled()) {
+            borrow_global<StakingRewardsConfig>(@aptos_framework).last_rewards_rate_period_start_in_secs
+        } else {
+            0u64
+        }
+    }
+
+    #[view]
+    /// Return the rewards rate decrease rate of this epoch as a tuple (numerator, denominator).
+    public fun rewards_rate_decrease_rate(): (u64, u64) acquires StakingRewardsConfig {
+        if (features::periodical_reward_rate_decrease_enabled()) {
+            let epoch_rewards_rate_decrease_rate = borrow_global<StakingRewardsConfig>(@aptos_framework).rewards_rate_decrease_rate;
+            if (fixed_point64::is_zero(epoch_rewards_rate_decrease_rate)) {
+                (0u64, 1u64)
+            } else {
+                let nominator = (fixed_point64::multiply_u128((BPS_DENOMINATOR as u128), epoch_rewards_rate_decrease_rate) as u64);
+                (nominator, BPS_DENOMINATOR)
+            }
+        } else {
+            (0u64, 1u64)
+        }
+    }
+
     /// Initialize rewards configurations.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun initialize_rewards(
@@ -216,60 +298,6 @@ module aptos_framework::staking_config {
     /// Return the joining limit %.
     public fun get_voting_power_increase_limit(config: &StakingConfig): u64 {
         config.voting_power_increase_limit
-    }
-
-    /// Return the minimum reward rate of this epoch.
-    public fun get_min_rewards_rate(): (u64, u64) acquires StakingRewardsConfig {
-        if (features::periodical_reward_rate_decrease_enabled()) {
-            let epoch_min_rewards_rate = borrow_global<StakingRewardsConfig>(@aptos_framework).min_rewards_rate;
-            if (fixed_point64::is_zero(epoch_min_rewards_rate)) {
-                (0u64, 1u64)
-            } else {
-                // Maximize denominator for higher precision.
-                // Restriction: nominator <= MAX_REWARDS_RATE && denominator <= MAX_U64
-                let denominator = fixed_point64::divide_u128((MAX_REWARDS_RATE as u128), epoch_min_rewards_rate);
-                if (denominator > MAX_U64) {
-                    denominator = MAX_U64
-                };
-                let nominator = (fixed_point64::multiply_u128(denominator, epoch_min_rewards_rate) as u64);
-                (nominator, (denominator as u64))
-            }
-        } else {
-            (0u64, 1u64)
-        }
-    }
-
-    /// Return the reward rate period start in seconds of this epoch.
-    public fun get_rewards_rate_period_start_in_secs(): (u64) acquires StakingRewardsConfig {
-        if (features::periodical_reward_rate_decrease_enabled()) {
-            borrow_global<StakingRewardsConfig>(@aptos_framework).rewards_rate_period_in_secs
-        } else {
-            0u64
-        }
-    }
-
-    /// Return the reward rate period start in seconds of the last epoch.
-    public fun get_last_rewards_rate_period_start_in_seconds(): (u64) acquires StakingRewardsConfig {
-        if (features::periodical_reward_rate_decrease_enabled()) {
-            borrow_global<StakingRewardsConfig>(@aptos_framework).last_rewards_rate_period_start_in_secs
-        } else {
-            0u64
-        }
-    }
-
-    /// Return the rewards rate decrease rate of this epoch.
-    public fun get_rewards_rate_decrease_rate(): (u64, u64) acquires StakingRewardsConfig {
-        if (features::periodical_reward_rate_decrease_enabled()) {
-            let epoch_rewards_rate_decrease_rate = borrow_global<StakingRewardsConfig>(@aptos_framework).rewards_rate_decrease_rate;
-            if (fixed_point64::is_zero(epoch_rewards_rate_decrease_rate)) {
-                (0u64, 1u64)
-            } else {
-                let nominator = (fixed_point64::multiply_u128((BPS_DENOMINATOR as u128), epoch_rewards_rate_decrease_rate) as u64);
-                (nominator, BPS_DENOMINATOR)
-            }
-        } else {
-            (0u64, 1u64)
-        }
     }
 
     /// Calculate and save the latest rewards rate.
