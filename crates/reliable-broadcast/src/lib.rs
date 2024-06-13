@@ -113,7 +113,7 @@ where
             .map(|author| (author, self.backoff_policy.clone()))
             .collect();
         let executor = self.executor.clone();
-        let self_author = self.self_author.clone();
+        let self_author = self.self_author;
         async move {
             let message: Req = message.into();
 

@@ -147,6 +147,7 @@ impl RBNetworkSender<CommitMessage> for NetworkSender {
         message: CommitMessage,
     ) -> Result<HashMap<Author, bytes::Bytes>, anyhow::Error> {
         let msg = ConsensusMsg::CommitMessage(Box::new(message));
-        self.consensus_network_client.to_bytes_by_protocol(peers, msg)
+        self.consensus_network_client
+            .to_bytes_by_protocol(peers, msg)
     }
 }

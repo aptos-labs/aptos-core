@@ -153,7 +153,7 @@ fn setup(
 
     let validators: Vec<_> = signers.iter().map(|s| s.author()).collect();
     let rb = Arc::new(ReliableBroadcast::new(
-        validators[0].clone(),
+        validators[0],
         validators,
         network_sender.clone(),
         ExponentialBackoff::from_millis(10),

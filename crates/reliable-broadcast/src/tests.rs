@@ -122,7 +122,11 @@ where
             .await
     }
 
-    fn to_bytes_by_protocol(&self, peers: Vec<Author>, message: M) -> anyhow::Result<HashMap<Author, Bytes>> {
+    fn to_bytes_by_protocol(
+        &self,
+        peers: Vec<Author>,
+        message: M,
+    ) -> anyhow::Result<HashMap<Author, Bytes>> {
         let message: TestMessage = message.try_into()?;
         let raw_message: Bytes = message.0.into();
         Ok(peers
@@ -136,7 +140,7 @@ where
 async fn test_reliable_broadcast() {
     let (_, validator_verifier) = random_validator_verifier(5, None, false);
     let validators = validator_verifier.get_ordered_account_addresses();
-    let self_author = validators[0].clone();
+    let self_author = validators[0];
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestRBSender::<TestRBMessage>::new(self_author, failures));
     let rb = ReliableBroadcast::new(
@@ -161,7 +165,7 @@ async fn test_reliable_broadcast() {
 async fn test_chaining_reliable_broadcast() {
     let (_, validator_verifier) = random_validator_verifier(5, None, false);
     let validators = validator_verifier.get_ordered_account_addresses();
-    let self_author = validators[0].clone();
+    let self_author = validators[0];
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestRBSender::<TestRBMessage>::new(self_author, failures));
     let rb = Arc::new(ReliableBroadcast::new(
@@ -197,7 +201,7 @@ async fn test_chaining_reliable_broadcast() {
 async fn test_abort_reliable_broadcast() {
     let (_, validator_verifier) = random_validator_verifier(5, None, false);
     let validators = validator_verifier.get_ordered_account_addresses();
-    let self_author = validators[0].clone();
+    let self_author = validators[0];
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestRBSender::<TestRBMessage>::new(self_author, failures));
     let rb = Arc::new(ReliableBroadcast::new(

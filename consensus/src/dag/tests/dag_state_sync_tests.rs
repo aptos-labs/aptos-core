@@ -50,16 +50,16 @@ impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockDAGNetworkSender {
 
     async fn send_rb_rpc_to_self(
         &self,
-        message: DAGMessage,
-        timeout: Duration,
+        _message: DAGMessage,
+        _timeout: Duration,
     ) -> anyhow::Result<DAGRpcResult> {
         unimplemented!()
     }
 
     fn to_bytes_by_protocol(
         &self,
-        peers: Vec<Author>,
-        message: DAGMessage,
+        _peers: Vec<Author>,
+        _message: DAGMessage,
     ) -> anyhow::Result<HashMap<Author, Bytes>> {
         unimplemented!()
     }
