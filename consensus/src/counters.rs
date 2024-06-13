@@ -1071,7 +1071,7 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlo
         NUM_INPUT_TXNS_PER_BLOCK
             .observe(block.block().payload().map_or(0, |payload| payload.len()) as f64);
         NUM_BYTES_PER_BLOCK
-            .observe(block.block().payload().map_or(0, |payload| payload.len()) as f64);
+            .observe(block.block().payload().map_or(0, |payload| payload.size()) as f64);
         COMMITTED_BLOCKS_COUNT.inc();
         LAST_COMMITTED_ROUND.set(block.round() as i64);
         LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
