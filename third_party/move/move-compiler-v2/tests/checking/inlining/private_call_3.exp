@@ -1,5 +1,19 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+    ┌─ tests/checking/inlining/private_call_3.move:117:42
+    │
+117 │     assert!(o::friend_accessible() == 42, 1);
+    │                                             ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+    ┌─ tests/checking/inlining/private_call_3.move:123:52
+    │
+123 │     assert!(o_nonfriend::friend_accessible() == 42, 1);
+    │                                                       ^
+
+
+Diagnostics:
 error: inline function `0x42::m::friend_accessible` cannot be called from inline function `0x42::o_nonfriend::foo` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
    ┌─ tests/checking/inlining/private_call_3.move:12:31
    │

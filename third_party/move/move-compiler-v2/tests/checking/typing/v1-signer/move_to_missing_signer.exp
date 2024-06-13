@@ -11,3 +11,9 @@ error: the function takes 2 arguments but 1 were provided
    │
 14 │         () = move_to<R<bool>>(R<bool> { f: false });
    │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/v1-signer/move_to_missing_signer.move:14:52
+   │
+14 │         () = move_to<R<bool>>(R<bool> { f: false });
+   │                                                    ^

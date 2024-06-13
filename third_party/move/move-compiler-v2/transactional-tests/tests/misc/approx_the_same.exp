@@ -1,3 +1,30 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-24:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:7:20
++   │
++ 7 │             y = tmp;
++   │                    ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:13:32
++    │
++ 13 │                 mult = mult * n;
++    │                                ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:16:22
++    │
++ 16 │             n = n * n; // previous bug: alive in same instr but not after
++    │                      ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:18:39
++    │
++ 18 │         assert!((x - y) * mult < x, 0);
++    │                                       ^
++ 
++ 
++ 

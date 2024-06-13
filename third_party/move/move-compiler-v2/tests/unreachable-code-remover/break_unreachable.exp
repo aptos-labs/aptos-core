@@ -1,3 +1,23 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/unreachable-code-remover/break_unreachable.move:8:26
+  │
+8 │                 i = i + 1; // unreachable
+  │                          ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/unreachable-code-remover/break_unreachable.move:11:26
+   │
+11 │                 i = i + 1; // unreachable
+   │                          ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/unreachable-code-remover/break_unreachable.move:13:22
+   │
+13 │             i = i + 1; // unreachable
+   │                      ^
+
 ============ initial bytecode ================
 
 [variant baseline]

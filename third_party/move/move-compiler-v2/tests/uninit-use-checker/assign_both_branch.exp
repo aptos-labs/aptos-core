@@ -1,3 +1,17 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/uninit-use-checker/assign_both_branch.move:5:18
+  │
+5 │             x = 1;
+  │                  ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/uninit-use-checker/assign_both_branch.move:7:18
+  │
+7 │             x = 2;
+  │                  ^
+
 ============ initial bytecode ================
 
 [variant baseline]

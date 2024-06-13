@@ -1,5 +1,31 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/ability-check/inferred_copy.move:16:16
+   │
+16 │         some(r);
+   │                ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/ability-check/inferred_copy.move:21:20
+   │
+21 │         some2(r, r);
+   │                    ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/ability-check/inferred_copy.move:28:16
+   │
+28 │         some(y);
+   │                ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/ability-check/inferred_copy.move:35:16
+   │
+35 │         some(y);
+   │                ^
+
+
+Diagnostics:
 error: cannot move local `r` since it is still in use
    ┌─ tests/ability-check/inferred_copy.move:33:17
    │

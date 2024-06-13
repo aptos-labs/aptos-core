@@ -35,3 +35,9 @@ error: expected `u64` but found a value of type `u8`
   │
 9 │         assert!(true || false, 0u8);
   │                                ^^^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/typing/other_builtins_invalid.move:9:36
+  │
+9 │         assert!(true || false, 0u8);
+  │                                    ^

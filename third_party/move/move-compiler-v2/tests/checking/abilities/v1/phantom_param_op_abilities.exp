@@ -1,3 +1,23 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/abilities/v1/phantom_param_op_abilities.move:11:50
+   │
+11 │         *ref = HasDrop<NoAbilities, u64> { a: 1 };
+   │                                                  ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/abilities/v1/phantom_param_op_abilities.move:16:47
+   │
+16 │         _ = HasDrop<NoAbilities, u64> { a: 1 };
+   │                                               ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/abilities/v1/phantom_param_op_abilities.move:30:48
+   │
+30 │         move_to<HasKey<NoAbilities, u64>>(s, x);
+   │                                                ^
+
 // -- Model dump before bytecode pipeline
 module 0x42::M {
     struct HasCopy {

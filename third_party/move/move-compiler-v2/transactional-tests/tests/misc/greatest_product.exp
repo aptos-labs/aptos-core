@@ -1,3 +1,24 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-41:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:25:38
++    │
++ 25 │                 max_product = product;
++    │                                      ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:27:22
++    │
++ 27 │             i = i + 1;
++    │                      ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:32:52
++    │
++ 32 │         assert!(find_greatest_product() == 3969, 0);
++    │                                                    ^
++ 
++ 
++ 

@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/copy-propagation/branch_1.move:6:18
+  │
+6 │             a = 0; // kills copy `a := p`
+  │                  ^
+
 ============ initial bytecode ================
 
 [variant baseline]

@@ -1,5 +1,13 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/acquires-checker/globals.move:6:28
+  │
+6 │         move_to(s, R{f: 1});
+  │                            ^
+
+
+Diagnostics:
 error: missing acquires annotation for `R`
    ┌─ tests/acquires-checker/globals.move:13:9
    │

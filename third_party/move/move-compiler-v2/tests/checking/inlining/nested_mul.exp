@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/inlining/nested_mul.move:11:20
+   │
+11 │     assert!(a == 1, 0);
+   │                       ^
+
 // -- Model dump before bytecode pipeline
 module 0x42::mathtest {
     public inline fun mul_div(a: u64,b: u64,c: u64): u64 {

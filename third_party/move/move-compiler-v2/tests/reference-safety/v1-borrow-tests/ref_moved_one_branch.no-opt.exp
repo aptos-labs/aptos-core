@@ -1,2 +1,16 @@
 
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/reference-safety/v1-borrow-tests/ref_moved_one_branch.move:6:37
+  │
+6 │             foo(&mut (move s).value);
+  │                                     ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/reference-safety/v1-borrow-tests/ref_moved_one_branch.move:11:20
+   │
+11 │         *x = *x + 1;
+   │                    ^
+
+
 ============ bytecode verification succeeded ========

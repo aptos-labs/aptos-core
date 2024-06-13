@@ -1,2 +1,16 @@
 
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/reference-safety/v1-tests/release_cycle.move:7:23
+  │
+7 │             y = copy x;
+  │                       ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/reference-safety/v1-tests/release_cycle.move:10:23
+   │
+10 │             x = copy y;
+   │                       ^
+
+
 ============ bytecode verification succeeded ========

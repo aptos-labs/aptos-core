@@ -1,3 +1,17 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/variable-coalescing/consume_3.move:7:19
+  │
+7 │         consume(a);
+  │                   ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/variable-coalescing/consume_3.move:19:20
+   │
+19 │         consume_(a);
+   │                    ^
+
 ============ initial bytecode ================
 
 [variant baseline]

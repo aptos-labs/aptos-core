@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/simplifier/constant_folding_addresses.move:6:55
+  │
+6 │         assert!(vector::length(&addresses) == 1845, 1);
+  │                                                       ^
+
 // -- Model dump before bytecode pipeline
 module 0xcafe::Addresses {
     use std::vector;

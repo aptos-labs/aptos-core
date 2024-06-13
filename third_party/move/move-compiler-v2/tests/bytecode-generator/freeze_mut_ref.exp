@@ -1,3 +1,29 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/bytecode-generator/freeze_mut_ref.move:58:34
+   │
+58 │         (x, y) = (&mut 0, &mut 0);
+   │                                  ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/bytecode-generator/freeze_mut_ref.move:69:34
+   │
+69 │         *({*f = 0; z = y; g}) = 2;
+   │                                  ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/bytecode-generator/freeze_mut_ref.move:74:44
+   │
+74 │         if (cond) x = copy s else x = other;
+   │                                            ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/bytecode-generator/freeze_mut_ref.move:79:36
+   │
+79 │         _x = if (cond) s else other;
+   │                                    ^
+
 // -- Model dump before bytecode pipeline
 module 0x42::freeze_mut_ref {
     use std::vector;

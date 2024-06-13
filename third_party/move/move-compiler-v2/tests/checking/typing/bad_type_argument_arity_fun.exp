@@ -17,3 +17,9 @@ error: expected 1 type argument but 2 were provided
    │
 14 │         let r = foo<&mut u64, bool>(&mut 0);
    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/bad_type_argument_arity_fun.move:15:15
+   │
+15 │         *r = 1;
+   │               ^

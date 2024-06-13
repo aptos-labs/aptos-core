@@ -17,3 +17,9 @@ error: duplicate assignment to `f`
   │
 8 │         (f, R{f}, f) = (0, R { f: 0 }, 0);
   │                   ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/typing/assign_duplicate_assigning.move:8:42
+  │
+8 │         (f, R{f}, f) = (0, R { f: 0 }, 0);
+  │                                          ^

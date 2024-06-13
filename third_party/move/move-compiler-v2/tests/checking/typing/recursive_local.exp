@@ -5,3 +5,9 @@ error: unable to infer type due to cyclic type constraints (try annotating the t
   │
 5 │         x = (x, 0);
   │         ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/typing/recursive_local.move:5:19
+  │
+5 │         x = (x, 0);
+  │                   ^

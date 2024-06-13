@@ -1,102 +1,147 @@
-processed 17 tasks
-
-task 1 'run'. lines 17-23:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: script,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 2 'run'. lines 25-31:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: script,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 4 'run'. lines 48-54:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: script,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 5 'run'. lines 56-62:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: script,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 7 'run'. lines 79-85:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: script,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 10 'run'. lines 112-119:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: script,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 11 'run'. lines 121-126:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: script,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 12 'run'. lines 128-134:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: script,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 14 'run'. lines 152-158:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: script,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 15 'run'. lines 160-166:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: script,
-    indices: redacted,
-    offsets: redacted,
-}
-
-task 16 'run'. lines 168-174:
-Error: Script execution failed with VMError: {
-    major_status: ARITHMETIC_ERROR,
-    sub_status: None,
-    location: script,
-    indices: redacted,
-    offsets: redacted,
-}
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 17 tasks
+= 
++ task 0 'run'. lines 1-15:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:11:57
++    │
++ 11 │     assert!(5u32 + 4294967290u32 == 4294967295u32, 1202);
++    │                                                         ^
++ 
++ 
++ 
+= task 1 'run'. lines 17-23:
+= Error: Script execution failed with VMError: {
+=     major_status: ARITHMETIC_ERROR,
+=     sub_status: None,
+=     location: script,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
+= task 2 'run'. lines 25-31:
+= Error: Script execution failed with VMError: {
+=     major_status: ARITHMETIC_ERROR,
+=     sub_status: None,
+=     location: script,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
++ task 3 'run'. lines 33-46:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE3:42:46
++    │
++ 42 │     assert!(5u32 - 1u32 - 4u32 == 0u32, 2201);
++    │                                              ^
++ 
++ 
++ 
+= task 4 'run'. lines 48-54:
+= Error: Script execution failed with VMError: {
+=     major_status: ARITHMETIC_ERROR,
+=     sub_status: None,
+=     location: script,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
+= task 5 'run'. lines 56-62:
+= Error: Script execution failed with VMError: {
+=     major_status: ARITHMETIC_ERROR,
+=     sub_status: None,
+=     location: script,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
++ task 6 'run'. lines 65-77:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE6:73:57
++    │
++ 73 │     assert!(2147483647u32 * 2u32 == 4294967294u32, 3200);
++    │                                                         ^
++ 
++ 
++ 
+= task 7 'run'. lines 79-85:
+= Error: Script execution failed with VMError: {
+=     major_status: ARITHMETIC_ERROR,
+=     sub_status: None,
+=     location: script,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
++ task 9 'run'. lines 97-110:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++     ┌─ TEMPFILE9:106:57
++     │
++ 106 │     assert!(4294967295u32 / 4294967294u32 == 1u32, 4201);
++     │                                                         ^
++ 
++ 
++ 
+= task 10 'run'. lines 112-119:
+= Error: Script execution failed with VMError: {
+=     major_status: ARITHMETIC_ERROR,
+=     sub_status: None,
+=     location: script,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
+= task 11 'run'. lines 121-126:
+= Error: Script execution failed with VMError: {
+=     major_status: ARITHMETIC_ERROR,
+=     sub_status: None,
+=     location: script,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
+= task 12 'run'. lines 128-134:
+= Error: Script execution failed with VMError: {
+=     major_status: ARITHMETIC_ERROR,
+=     sub_status: None,
+=     location: script,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
++ task 13 'run'. lines 137-150:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++     ┌─ TEMPFILE13:146:57
++     │
++ 146 │     assert!(4294967294u32 % 4294967294u32 == 0u32, 5201);
++     │                                                         ^
++ 
++ 
++ 
+= task 14 'run'. lines 152-158:
+= Error: Script execution failed with VMError: {
+=     major_status: ARITHMETIC_ERROR,
+=     sub_status: None,
+=     location: script,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
+= task 15 'run'. lines 160-166:
+= Error: Script execution failed with VMError: {
+=     major_status: ARITHMETIC_ERROR,
+=     sub_status: None,
+=     location: script,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
+= task 16 'run'. lines 168-174:
+= Error: Script execution failed with VMError: {
+=     major_status: ARITHMETIC_ERROR,
+=     sub_status: None,
+=     location: script,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 

@@ -77,3 +77,9 @@ error: expected expression with no value but found `X`
    │
 19 │         (*&mut s_mut.x: ());
    │                ^^^^^^^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/derefrence_invalid.move:19:28
+   │
+19 │         (*&mut s_mut.x: ());
+   │                            ^

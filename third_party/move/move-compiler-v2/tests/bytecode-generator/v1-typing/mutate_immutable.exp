@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/bytecode-generator/v1-typing/mutate_immutable.move:10:19
+   │
+10 │         *x_ref = 0;
+   │                   ^
+
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {

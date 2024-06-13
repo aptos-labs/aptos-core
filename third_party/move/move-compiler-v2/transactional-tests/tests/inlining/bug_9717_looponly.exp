@@ -1,3 +1,96 @@
-processed 5 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 5 tasks
+= 
++ task 0 'publish'. lines 1-130:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:12:22
++    │
++ 12 │             i = i + 1;
++    │                      ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:24:22
++    │
++ 24 │             i = i + 1;
++    │                      ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:34:22
++    │
++ 34 │             i = i + 1;
++    │                      ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:47:22
++    │
++ 47 │             i = i + 1;
++    │                      ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:63:14
++    │
++ 63 │             };
++    │              ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:72:33
++    │
++ 72 │         guess_flips_break(flips);
++    │                                 ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:77:33
++    │
++ 77 │         guess_flips_abort(flips);
++    │                                 ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:82:35
++    │
++ 82 │         guess_flips_nocheck(flips);
++    │                                   ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:87:36
++    │
++ 87 │         guess_flips_continue(flips);
++    │                                    ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:92:34
++    │
++ 92 │         guess_flips_break2(flips);
++    │                                  ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:97:33
++    │
++ 97 │         guess_flips_break(flips);
++    │                                 ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++     ┌─ TEMPFILE:101:33
++     │
++ 101 │         guess_flips_abort(flips);
++     │                                 ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++     ┌─ TEMPFILE:105:35
++     │
++ 105 │         guess_flips_nocheck(flips);
++     │                                   ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++     ┌─ TEMPFILE:109:36
++     │
++ 109 │         guess_flips_continue(flips);
++     │                                    ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++     ┌─ TEMPFILE:113:34
++     │
++ 113 │         guess_flips_break2(flips);
++     │                                  ^
++ 
++ 
++ 

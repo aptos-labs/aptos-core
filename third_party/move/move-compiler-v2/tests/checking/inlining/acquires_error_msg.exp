@@ -1,3 +1,17 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/inlining/acquires_error_msg.move:7:17
+  │
+7 │         modify(); // expect error message here
+  │                 ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/inlining/acquires_error_msg.move:11:51
+   │
+11 │         borrow_global_mut<Test>(@0xcafe).value = 2;
+   │                                                   ^
+
 // -- Model dump before bytecode pipeline
 module 0x42::test {
     struct Test {

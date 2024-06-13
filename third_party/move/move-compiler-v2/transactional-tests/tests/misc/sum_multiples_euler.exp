@@ -1,3 +1,24 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-19:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:8:30
++   │
++ 8 │                 sum = sum + i;
++   │                              ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:10:22
++    │
++ 10 │             i = i + 1;
++    │                      ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:16:57
++    │
++ 16 │         assert!(sum_multiples_3_or_5(1000) == 233168, 1);
++    │                                                         ^
++ 
++ 
++ 

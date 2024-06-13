@@ -1,3 +1,23 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/subtype_args.move:14:18
+   │
+14 │         imm(&S{});
+   │                  ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/subtype_args.move:20:32
+   │
+20 │         imm_imm(&mut 0, &mut 0);
+   │                                ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/subtype_args.move:25:22
+   │
+25 │         f(&0, &mut 0);
+   │                      ^
+
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {

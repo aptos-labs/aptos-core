@@ -1,3 +1,30 @@
-processed 3 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 3 tasks
+= 
++ task 0 'run'. lines 1-48:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:43:158
++    │
++ 43 │     assert!(115792089237316195423570985008687907853269984665640564039457584007913129639u256 & 3141524387653489576893u256 == 2366182237060668637861u256, 1302);
++    │                                                                                                                                                              ^
++ 
++ 
++ 
++ task 1 'run'. lines 51-99:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE1:93:211
++    │
++ 93 │     assert!(115792089237316195423570985008687907853269984665640564039457584007913129639u256 | 3141524387653489576893u256 == 115792089237316195423570985008687907853269984665640564814799734600734068671u256, 1302);
++    │                                                                                                                                                                                                                   ^
++ 
++ 
++ 
++ task 2 'run'. lines 102-156:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++     ┌─ TEMPFILE2:150:44
++     │
++ 150 │     assert!(13u256 ^ 1u256 == 12u256, 3402);
++     │                                            ^
++ 
++ 
++ 

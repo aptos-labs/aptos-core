@@ -1,3 +1,17 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/typing/derefrence_reference.move:8:20
+  │
+8 │         R{} = *&b.r;
+  │                    ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/derefrence_reference.move:15:24
+   │
+15 │         R{} = *&mut b.r;
+   │                        ^
+
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct B {

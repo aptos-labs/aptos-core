@@ -1,5 +1,19 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/unused/private_call_3.move:94:42
+   │
+94 │     assert!(o::friend_accessible() == 42, 1);
+   │                                             ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+    ┌─ tests/checking/unused/private_call_3.move:100:52
+    │
+100 │     assert!(o_nonfriend::friend_accessible() == 42, 1);
+    │                                                       ^
+
+
+Diagnostics:
 warning: Function `0x42::m::inaccessible` is unused: it has no current callers and is private to its module.
   ┌─ tests/checking/unused/private_call_3.move:8:16
   │

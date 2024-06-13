@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/typing/seq_ignores_value.move:5:11
+  │
+5 │         ();
+  │           ^
+
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {

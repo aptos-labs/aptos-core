@@ -1,3 +1,21 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-11:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:6:21
++   │
++ 6 │             a = @0x2;
++   │                     ^
++ 
++ 
++ 
++ task 1 'run'. lines 13-19:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE1:17:56
++    │
++ 17 │         assert!(reassign_cond(@0x1, false) == @0x1, 42);
++    │                                                        ^
++ 
++ 
++ 

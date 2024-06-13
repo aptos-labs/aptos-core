@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/bytecode-generator/fields.move:30:19
+   │
+30 │         x.g.h = 42;
+   │                   ^
+
 // -- Model dump before bytecode pipeline
 module 0x42::fields {
     struct T {

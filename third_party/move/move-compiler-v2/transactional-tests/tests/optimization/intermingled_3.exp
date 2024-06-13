@@ -1,3 +1,12 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-14:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:11:32
++    │
++ 11 │         assert!(test() == 2, 6);
++    │                                ^
++ 
++ 
++ 

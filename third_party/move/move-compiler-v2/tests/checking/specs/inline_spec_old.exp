@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/specs/inline_spec_old.move:5:10
+  │
+5 │         };
+  │          ^
+
 // -- Model dump before bytecode pipeline
 module 0x42::m {
     public fun foo(vec: &mut vector<bool>) {

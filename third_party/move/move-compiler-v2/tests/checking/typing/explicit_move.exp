@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/explicit_move.move:11:26
+   │
+11 │         R{} = (move r: R);
+   │                          ^
+
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {

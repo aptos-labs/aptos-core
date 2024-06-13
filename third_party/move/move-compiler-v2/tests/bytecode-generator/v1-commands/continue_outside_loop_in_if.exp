@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/bytecode-generator/v1-commands/continue_outside_loop_in_if.move:3:23
+  │
+3 │     if (true) continue;
+  │                       ^
+
 // -- Model dump before bytecode pipeline
 module <SELF>_0 {
     private fun main() {

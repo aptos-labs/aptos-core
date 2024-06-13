@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/specs/move_function_in_spec_ok.move:21:10
+   │
+21 │         };
+   │          ^
+
 // -- Model dump before bytecode pipeline
 module 0x42::move_function_in_spec {
     struct TypeInfo {

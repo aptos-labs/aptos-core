@@ -1,4 +1,12 @@
 
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/file-format-generator/fields.move:26:19
+   │
+26 │         x.g.h = 42;
+   │                   ^
+
+
 ============ disassembled file-format ==================
 // Move bytecode v7
 module 42.fields {

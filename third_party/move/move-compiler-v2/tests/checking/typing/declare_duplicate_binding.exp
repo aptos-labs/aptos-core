@@ -23,3 +23,9 @@ error: duplicate declaration of `f`
   │              -        ^
   │              │
   │              previous declaration of `f`
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/typing/declare_duplicate_binding.move:8:14
+  │
+8 │         f = 0;
+  │              ^

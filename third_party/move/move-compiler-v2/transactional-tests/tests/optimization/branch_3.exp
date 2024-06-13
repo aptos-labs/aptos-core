@@ -1,3 +1,24 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-18:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:6:18
++   │
++ 6 │             a = p;
++   │                  ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:8:18
++   │
++ 8 │             a = p;
++   │                  ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:14:39
++    │
++ 14 │         assert!(foo(false, 5) == 5, 2);
++    │                                       ^
++ 
++ 
++ 

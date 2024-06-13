@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/uninit-use-checker/if_assigns_no_else_unfoldable.move:5:25
+  │
+5 │     assert!(x == 42, 42);
+  │                         ^
+
 ============ initial bytecode ================
 
 [variant baseline]

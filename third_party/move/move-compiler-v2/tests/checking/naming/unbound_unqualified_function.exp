@@ -17,3 +17,9 @@ error: no function named `bar` found
   │
 5 │         *bar() = 0;
   │          ^^^^^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/naming/unbound_unqualified_function.move:5:19
+  │
+5 │         *bar() = 0;
+  │                   ^
