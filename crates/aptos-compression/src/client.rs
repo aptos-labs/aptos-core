@@ -7,6 +7,7 @@
 #[derive(Clone, Copy, Debug)]
 pub enum CompressionClient {
     Consensus,
+    ConsensusObserver,
     DKG,
     JWKConsensus,
     Mempool,
@@ -18,6 +19,7 @@ impl CompressionClient {
     pub fn get_label(&self) -> &'static str {
         match self {
             Self::Consensus => "consensus",
+            Self::ConsensusObserver => "consensus_observer",
             Self::DKG => "dkg",
             Self::JWKConsensus => "jwk_consensus",
             Self::Mempool => "mempool",

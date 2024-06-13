@@ -6,7 +6,7 @@ use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::{
-    consensus_observer::network::ObserverMessage, network_interface::ConsensusMsg,
+    consensus_observer::publisher::ConsensusPublisher, network_interface::ConsensusMsg,
     persistent_liveness_storage::StorageWriteProxy, quorum_store::quorum_store_db::QuorumStoreDB,
 };
 use aptos_consensus_notifications::ConsensusNotifier;
@@ -18,10 +18,7 @@ use aptos_indexer_grpc_table_info::runtime::bootstrap as bootstrap_indexer_table
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::{
-    interface::{NetworkClient, NetworkClientInterface},
-    storage::PeersAndMetadata,
-};
+use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
 use aptos_network_benchmark::{run_netbench_service, NetbenchMessage};
 use aptos_peer_monitoring_service_server::{
     network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
@@ -118,7 +115,7 @@ pub fn start_consensus_runtime(
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
     vtxn_pool: VTxnPoolState,
-    observer_network_client: Option<NetworkClient<ObserverMessage>>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
 
@@ -134,7 +131,7 @@ pub fn start_consensus_runtime(
         db_rw,
         reconfig_subscription,
         vtxn_pool,
-        observer_network_client,
+        consensus_publisher,
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
 

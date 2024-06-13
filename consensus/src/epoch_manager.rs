@@ -8,7 +8,7 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockStore,
     },
-    consensus_observer::{network::ObserverMessage, publisher::Publisher},
+    consensus_observer::publisher::ConsensusPublisher,
     counters,
     dag::{DagBootstrapper, DagCommitSigner, StorageAdapter},
     error::{error_kind, DbError},
@@ -175,7 +175,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     payload_manager: Arc<PayloadManager>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
     proof_cache: ProofCache,
-    observer_network: Option<NetworkClient<ObserverMessage>>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
 }
 
@@ -196,7 +196,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         aptos_time_service: aptos_time_service::TimeService,
         vtxn_pool: VTxnPoolState,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
-        observer_network: Option<NetworkClient<ObserverMessage>>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -244,7 +244,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .initial_capacity(1_000)
                 .time_to_live(Duration::from_secs(20))
                 .build(),
-            observer_network,
+            consensus_publisher,
             pending_blocks: Arc::new(Mutex::new(PendingBlocks::new())),
         }
     }
@@ -710,8 +710,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ))
         };
 
-        let (payload_manager, quorum_store_msg_tx) = quorum_store_builder
-            .init_payload_manager(self.observer_network.clone().map(Publisher::new));
+        let (payload_manager, quorum_store_msg_tx) =
+            quorum_store_builder.init_payload_manager(self.consensus_publisher.clone());
         self.quorum_store_msg_tx = quorum_store_msg_tx;
         self.payload_manager = payload_manager.clone();
 

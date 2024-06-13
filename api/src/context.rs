@@ -41,7 +41,9 @@ use aptos_types::{
         state_value::StateValue,
         TStateView,
     },
-    transaction::{SignedTransaction, TransactionWithProof, Version},
+    transaction::{
+        block_epilogue::BlockEndInfo, SignedTransaction, Transaction, TransactionWithProof, Version,
+    },
 };
 use futures::{channel::oneshot, SinkExt};
 use mini_moka::sync::Cache;
@@ -892,29 +894,37 @@ impl Context {
         start_version: Version,
         limit: u64,
         ledger_version: Version,
-    ) -> Result<Vec<(u64, u64)>> {
+    ) -> Result<(Vec<(u64, u64)>, Vec<BlockEndInfo>)> {
         if start_version > ledger_version || limit == 0 {
-            return Ok(vec![]);
+            return Ok((vec![], vec![]));
         }
 
-        // This is just an estimation, so we cna just skip over errors
+        // This is just an estimation, so we can just skip over errors
         let limit = std::cmp::min(limit, ledger_version - start_version + 1);
         let txns = self.db.get_transaction_iterator(start_version, limit)?;
         let infos = self
             .db
             .get_transaction_info_iterator(start_version, limit)?;
-        let gas_prices: Vec<_> = txns
-            .zip(infos)
-            .filter_map(|(txn, info)| {
-                txn.as_ref()
-                    .ok()
-                    .and_then(|t| t.try_as_signed_user_txn())
-                    .map(|t| (t.gas_unit_price(), info))
-            })
-            .filter_map(|(unit_price, info)| info.as_ref().ok().map(|i| (unit_price, i.gas_used())))
-            .collect();
 
-        Ok(gas_prices)
+        let mut gas_prices = Vec::new();
+        let mut block_end_infos = Vec::new();
+        for (txn, info) in txns.zip(infos) {
+            match txn.as_ref() {
+                Ok(Transaction::UserTransaction(txn)) => {
+                    if let Ok(info) = info.as_ref() {
+                        gas_prices.push((txn.gas_unit_price(), info.gas_used()));
+                    }
+                },
+                Ok(Transaction::BlockEpilogue(txn)) => {
+                    if let Some(block_end_info) = txn.try_as_block_end_info() {
+                        block_end_infos.push(block_end_info.clone());
+                    }
+                },
+                _ => {},
+            }
+        }
+
+        Ok((gas_prices, block_end_infos))
     }
 
     pub fn estimate_gas_price<E: InternalError>(
@@ -1009,20 +1019,17 @@ impl Context {
                 last - first,
                 ledger_info.ledger_version.0,
             ) {
-                Ok(prices_and_used) => {
+                Ok((prices_and_used, block_end_infos)) => {
                     let is_full_block = if prices_and_used.len() >= config.full_block_txns {
                         true
-                    } else if let Some(full_block_gas_used) =
+                    } else if !block_end_infos.is_empty() {
+                        assert_eq!(1, block_end_infos.len());
+                        block_end_infos.first().unwrap().limit_reached()
+                    } else if let Some(block_gas_limit) =
                         block_config.block_gas_limit_type.block_gas_limit()
                     {
-                        // be pessimistic for conflicts, as such information is not onchain
                         let gas_used = prices_and_used.iter().map(|(_, used)| *used).sum::<u64>();
-                        let max_conflict_multiplier = block_config
-                            .block_gas_limit_type
-                            .conflict_penalty_window()
-                            .unwrap_or(1)
-                            as u64;
-                        gas_used * max_conflict_multiplier >= full_block_gas_used
+                        gas_used >= block_gas_limit
                     } else {
                         false
                     };
@@ -1173,14 +1180,14 @@ impl Context {
             let gas_schedule_params =
                 match GasScheduleV2::fetch_config(&state_view).and_then(|gas_schedule| {
                     let feature_version = gas_schedule.feature_version;
-                    let gas_schedule = gas_schedule.to_btree_map();
+                    let gas_schedule = gas_schedule.into_btree_map();
                     AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
                         .ok()
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
                     None => GasSchedule::fetch_config(&state_view)
                         .and_then(|gas_schedule| {
-                            let gas_schedule = gas_schedule.to_btree_map();
+                            let gas_schedule = gas_schedule.into_btree_map();
                             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0).ok()
                         })
                         .ok_or_else(|| {

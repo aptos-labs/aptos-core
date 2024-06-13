@@ -59,13 +59,10 @@ mod upgrade;
 mod smoke_test_environment;
 
 #[cfg(test)]
-mod test_utils;
+mod utils;
 
 #[cfg(test)]
 mod validator_txns;
 
 #[cfg(test)]
 mod workspace_builder;
-
-#[cfg(test)]
-pub(crate) mod utils;

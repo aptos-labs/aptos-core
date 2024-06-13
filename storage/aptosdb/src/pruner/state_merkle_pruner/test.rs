@@ -17,7 +17,7 @@ use crate::{
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::HashValue;
-use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -275,7 +275,7 @@ fn test_state_store_pruner_partial_version() {
         aptos_db
             .state_merkle_db()
             .metadata_db()
-            .iter::<StaleNodeIndexSchema>(ReadOptions::default())
+            .iter::<StaleNodeIndexSchema>()
             .unwrap()
             .count(),
         0
@@ -287,7 +287,7 @@ fn test_state_store_pruner_partial_version() {
                 aptos_db
                     .state_merkle_db()
                     .db_shard(i)
-                    .iter::<StaleNodeIndexSchema>(ReadOptions::default())
+                    .iter::<StaleNodeIndexSchema>()
                     .unwrap()
                     .count(),
                 0

@@ -19,6 +19,7 @@ use aptos_types::{
         state_value::{PersistedStateValueMetadata, StateValueMetadata},
     },
     transaction,
+    transaction::block_epilogue::BlockEpiloguePayload,
     validator_txn::ValidatorTransaction,
     write_set,
 };
@@ -97,10 +98,12 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
     tracer.trace_type::<ValidatorTransaction>(&samples)?;
     tracer.trace_type::<BlockMetadataExt>(&samples)?;
+    tracer.trace_type::<BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
+    tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AccountAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::TransactionAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
