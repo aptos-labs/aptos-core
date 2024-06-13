@@ -2746,7 +2746,7 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns the set of modules whose public(package) functions are called in the current module.
-    pub fn get_friend_deps(&self) -> BTreeSet<ModuleId> {
+    pub fn needs_be_friend_with(&self) -> BTreeSet<ModuleId> {
         let mut deps = BTreeSet::new();
         for fun_env in self.get_functions() {
             let called_funs = fun_env.get_called_functions().expect("called functions");
