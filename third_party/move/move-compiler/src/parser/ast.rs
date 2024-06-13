@@ -953,16 +953,17 @@ impl BinOp_ {
 
 impl Visibility {
     pub const FRIEND: &'static str = "public(friend)";
-    pub const PACKAGE: &'static str = "public(package)";
     pub const INTERNAL: &'static str = "";
+    pub const PACKAGE: &'static str = "public(package)";
     pub const PUBLIC: &'static str = "public";
     pub const SCRIPT: &'static str = "public(script)";
 
     pub fn loc(&self) -> Option<Loc> {
         match self {
-            Visibility::Public(loc) | Visibility::Script(loc) | Visibility::Friend(loc) | Visibility::Package(loc) => {
-                Some(*loc)
-            },
+            Visibility::Public(loc)
+            | Visibility::Script(loc)
+            | Visibility::Friend(loc)
+            | Visibility::Package(loc) => Some(*loc),
             Visibility::Internal => None,
         }
     }

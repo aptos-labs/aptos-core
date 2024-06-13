@@ -643,7 +643,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         });
     }
 
-    fn decl_ana_friend_decl(&mut self, friend_mod_id: &EA::ModuleIdent, friend_loc: &move_ir_types::location::Loc) {
+    fn decl_ana_friend_decl(
+        &mut self,
+        friend_mod_id: &EA::ModuleIdent,
+        friend_loc: &move_ir_types::location::Loc,
+    ) {
         // Get various information about the declared friend module.
         let addr = self.parent.resolve_address(
             &self.parent.to_loc(&friend_mod_id.loc),
@@ -1871,8 +1875,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     &friend_vis_loc,
                     "Cannot use both package and friend visibility in the same module",
                     vec![
-                        (package_vis_loc, "package visibility declared here".to_string()),
-                        (friend_vis_loc.clone(), "friend visibility declared here".to_string()),
+                        (
+                            package_vis_loc,
+                            "package visibility declared here".to_string(),
+                        ),
+                        (
+                            friend_vis_loc.clone(),
+                            "friend visibility declared here".to_string(),
+                        ),
                     ],
                 );
             }
@@ -3275,7 +3285,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 PA::Visibility::Package(..) => {
                     // TODO: model package visibility properly
                     unimplemented!("Package visibility not supported yet")
-                }
+                },
             }
         }
         let rex = Regex::new(&format!(
