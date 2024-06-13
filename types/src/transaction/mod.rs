@@ -52,7 +52,7 @@ pub mod signature_verified_transaction;
 pub mod user_transaction_context;
 pub mod webauthn;
 
-pub use self::block_epilogue::BlockEpiloguePayload;
+pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
