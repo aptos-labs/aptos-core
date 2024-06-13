@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: friend modules of `0x42::A` must have the same address, but the declared friend module `0x43::B` has a different address
+  ┌─ tests/visibility-checker/package_visibility_diff_addr.move:1:1
+  │
+1 │ ╭ module 0x42::A {
+2 │ │     fun foo() {}
+3 │ │     public(package) fun bar() {}
+4 │ │ }
+  │ ╰─^
