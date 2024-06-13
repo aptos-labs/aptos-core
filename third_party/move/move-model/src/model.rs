@@ -2757,8 +2757,6 @@ impl<'env> ModuleEnv<'env> {
                     deps.insert(mod_id);
                 }
             }
-            let called_funs = fun_env.data.def.as_ref().map(|e| e.called_funs()).unwrap_or_default();
-            deps.extend(called_funs.iter().map(|mid| mid.module_id));
         }
         deps
     }

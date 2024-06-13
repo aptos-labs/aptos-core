@@ -72,6 +72,7 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     pub friend_fun_loc: Option<move_ir_types::location::Loc>,
     /// Locations of package visibilities in the current module
     pub package_fun_loc: Option<move_ir_types::location::Loc>,
+    /// Set of functions with package visibility in the current module
     pub package_funs: BTreeSet<FunId>,
     /// Translated specification functions.
     pub spec_funs: Vec<SpecFunDecl>,
