@@ -320,7 +320,7 @@ impl CodeGenerator for ElseExpr {
 impl CodeGenerator for BinaryOperation {
     fn emit_code_lines(&self) -> Vec<String> {
         vec![format!(
-            "{} {} {}",
+            "({} {} {})",
             self.lhs.inline(),
             self.op.emit_code(),
             self.rhs.inline()
