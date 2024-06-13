@@ -733,7 +733,9 @@ impl Visibility {
 
     pub fn loc(&self) -> Option<Loc> {
         match self {
-            Visibility::Public(loc) | Visibility::Friend(loc) | Visibility::Package(loc) => Some(*loc),
+            Visibility::Public(loc) | Visibility::Friend(loc) | Visibility::Package(loc) => {
+                Some(*loc)
+            },
             Visibility::Internal => None,
         }
     }
