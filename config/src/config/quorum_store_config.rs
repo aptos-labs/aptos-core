@@ -35,13 +35,13 @@ impl Default for QuorumStoreBackPressureConfig {
             // Roughly, target TPS * commit latency seconds * duplication factor of a transaction in batches.
             backlog_txn_limit_count: 12_000,
             // QS will create batches at the max rate until this number is reached
-            backlog_per_validator_batch_limit_count: 20,
+            backlog_per_validator_batch_limit_count: 4,
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
             increase_fraction: 1.5,
             dynamic_min_txn_per_s: 160,
-            dynamic_max_txn_per_s: 12000,
+            dynamic_max_txn_per_s: 4000,
         }
     }
 }

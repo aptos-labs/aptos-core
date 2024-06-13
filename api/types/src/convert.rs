@@ -4,8 +4,8 @@
 
 use crate::{
     transaction::{
-        DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
-        MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
+        BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem,
+        DeletedTableData, MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
         UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
@@ -32,8 +32,8 @@ use aptos_types::{
         StateView,
     },
     transaction::{
-        EntryFunction, ExecutionStatus, Multisig, RawTransaction, Script, SignedTransaction,
-        TransactionAuxiliaryData,
+        BlockEndInfo, BlockEpiloguePayload, EntryFunction, ExecutionStatus, Multisig,
+        RawTransaction, Script, SignedTransaction, TransactionAuxiliaryData,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -200,11 +200,33 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             BlockMetadata(txn) => (&txn, info, events).into(),
             BlockMetadataExt(txn) => (&txn, info, events).into(),
-            // TODO [fix] Create separate transaction type for API
-            StateCheckpoint(_) | BlockEpilogue { .. } => {
+            StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),
+                })
+            },
+            BlockEpilogue(block_epilogue_payload) => {
+                Transaction::BlockEpilogueTransaction(BlockEpilogueTransaction {
+                    info,
+                    timestamp: timestamp.into(),
+                    block_end_info: match block_epilogue_payload {
+                        BlockEpiloguePayload::V0 {
+                            block_end_info:
+                                BlockEndInfo::V0 {
+                                    block_gas_limit_reached,
+                                    block_output_limit_reached,
+                                    block_effective_block_gas_units,
+                                    block_approx_output_size,
+                                },
+                            ..
+                        } => Some(crate::transaction::BlockEndInfo {
+                            block_gas_limit_reached,
+                            block_output_limit_reached,
+                            block_effective_block_gas_units,
+                            block_approx_output_size,
+                        }),
+                    },
                 })
             },
             ValidatorTransaction(_txn) => (info, events, timestamp).into(),

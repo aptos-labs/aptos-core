@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId};
+use crate::{
+    aptos_vm::{aptos_default_ty_builder, aptos_prod_ty_builder},
+    move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId},
+};
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext,
     code::NativeCodeContext,
@@ -13,7 +16,7 @@ use aptos_framework::natives::{
     transaction_context::NativeTransactionContext,
 };
 use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{AptosGasParameters, MiscGasParameters, NativeGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
 use aptos_types::{
@@ -34,9 +37,8 @@ pub struct MoveVmExt {
 
 impl MoveVmExt {
     fn new_impl<F>(
-        native_gas_params: NativeGasParameters,
-        misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
+        gas_params: Result<&AptosGasParameters, &String>,
         chain_id: u8,
         features: Features,
         timed_features: TimedFeatures,
@@ -47,10 +49,33 @@ impl MoveVmExt {
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
     {
+        // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
+        //            This only happens in a edge case that is probably related to write set transactions or genesis,
+        //            which logically speaking, shouldn't be handled by the VM at all.
+        //            We should clean up the logic here once we get that refactored.
+        let (native_gas_params, misc_gas_params, ty_builder) = match gas_params {
+            Ok(gas_params) => {
+                let ty_builder = aptos_prod_ty_builder(&features, gas_feature_version, gas_params);
+                (
+                    gas_params.natives.clone(),
+                    gas_params.vm.misc.clone(),
+                    ty_builder,
+                )
+            },
+            Err(_) => {
+                let ty_builder = aptos_default_ty_builder(&features);
+                (
+                    NativeGasParameters::zeros(),
+                    MiscGasParameters::zeros(),
+                    ty_builder,
+                )
+            },
+        };
+
         let mut builder = SafeNativeBuilder::new(
             gas_feature_version,
-            native_gas_params.clone(),
-            misc_gas_params.clone(),
+            native_gas_params,
+            misc_gas_params,
             timed_features.clone(),
             features.clone(),
         );
@@ -63,6 +88,7 @@ impl MoveVmExt {
             &features,
             &timed_features,
             aggregator_v2_type_tagging,
+            ty_builder,
             paranoid_type_checks,
         );
 
@@ -74,9 +100,8 @@ impl MoveVmExt {
     }
 
     pub fn new(
-        native_gas_params: NativeGasParameters,
-        misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
+        gas_params: Result<&AptosGasParameters, &String>,
         chain_id: u8,
         features: Features,
         timed_features: TimedFeatures,
@@ -84,9 +109,8 @@ impl MoveVmExt {
         aggregator_v2_type_tagging: bool,
     ) -> VMResult<Self> {
         Self::new_impl::<fn(DynamicExpression)>(
-            native_gas_params,
-            misc_gas_params,
             gas_feature_version,
+            gas_params,
             chain_id,
             features,
             timed_features,
@@ -97,9 +121,8 @@ impl MoveVmExt {
     }
 
     pub fn new_with_gas_hook<F>(
-        native_gas_params: NativeGasParameters,
-        misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
+        gas_params: Result<&AptosGasParameters, &String>,
         chain_id: u8,
         features: Features,
         timed_features: TimedFeatures,
@@ -111,9 +134,8 @@ impl MoveVmExt {
         F: Fn(DynamicExpression) + Send + Sync + 'static,
     {
         Self::new_impl(
-            native_gas_params,
-            misc_gas_params,
             gas_feature_version,
+            gas_params,
             chain_id,
             features,
             timed_features,

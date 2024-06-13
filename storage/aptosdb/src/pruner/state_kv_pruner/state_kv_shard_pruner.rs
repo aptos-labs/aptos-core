@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use aptos_logger::info;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
@@ -50,9 +50,7 @@ impl StateKvShardPruner {
     ) -> Result<()> {
         let batch = SchemaBatch::new();
 
-        let mut iter = self
-            .db_shard
-            .iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
+        let mut iter = self.db_shard.iter::<StaleStateValueIndexSchema>()?;
         iter.seek(&current_progress)?;
         for item in iter {
             let (index, _) = item?;
