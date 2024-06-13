@@ -250,7 +250,7 @@ impl StateSnapshotBackupController {
             chunk_stream.map_ok(|chunk| self.write_chunk(&backup_handle, chunk));
 
         let chunks: Vec<_> = chunk_manifest_fut_stream
-            .try_buffered_x(4, 2) // 4 concurrently, at most 8 results in buffer.
+            .try_buffered_x(8, 4) // 4 concurrently, at most 8 results in buffer.
             .map_ok(|chunk_manifest| {
                 let last_idx = chunk_manifest.last_idx;
                 info!(
