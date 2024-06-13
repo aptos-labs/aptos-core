@@ -486,7 +486,7 @@ impl<'env> ModelBuilder<'env> {
         for cur_mod in target_modules {
             let cur_mod_env = self.env.get_module(cur_mod);
             let cur_mod_name = cur_mod_env.get_name().clone();
-            for need_to_be_friend_with in cur_mod_env.get_friend_deps() {
+            for need_to_be_friend_with in cur_mod_env.needs_be_friend_with() {
                 if need_to_be_friend_with == cur_mod {
                     continue;
                 }
