@@ -567,19 +567,14 @@ impl SignedTransaction {
         fee_payer_address: AccountAddress,
         fee_payer_signer: AccountAuthenticator,
     ) -> Self {
-        SignedTransaction {
-            raw_txn,
-            authenticator: TransactionAuthenticator::fee_payer(
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-                fee_payer_address,
-                fee_payer_signer,
-            ),
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
+        let authenticator = TransactionAuthenticator::fee_payer(
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+            fee_payer_address,
+            fee_payer_signer,
+        );
+        Self::new_signed_transaction(raw_txn, authenticator)
     }
 
     pub fn new_multisig(
@@ -588,13 +583,7 @@ impl SignedTransaction {
         signature: MultiEd25519Signature,
     ) -> SignedTransaction {
         let authenticator = TransactionAuthenticator::multi_ed25519(public_key, signature);
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
+        Self::new_signed_transaction(raw_txn, authenticator)
     }
 
     pub fn new_multi_agent(
@@ -603,17 +592,12 @@ impl SignedTransaction {
         secondary_signer_addresses: Vec<AccountAddress>,
         secondary_signers: Vec<AccountAuthenticator>,
     ) -> Self {
-        SignedTransaction {
-            raw_txn,
-            authenticator: TransactionAuthenticator::multi_agent(
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-            ),
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
+        let authenticator = TransactionAuthenticator::multi_agent(
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+        );
+        Self::new_signed_transaction(raw_txn, authenticator)
     }
 
     pub fn new_secp256k1_ecdsa(
@@ -621,19 +605,11 @@ impl SignedTransaction {
         public_key: secp256k1_ecdsa::PublicKey,
         signature: secp256k1_ecdsa::Signature,
     ) -> SignedTransaction {
-        let authenticator = TransactionAuthenticator::single_sender(
-            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-                AnyPublicKey::secp256k1_ecdsa(public_key),
-                AnySignature::secp256k1_ecdsa(signature),
-            )),
-        );
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::secp256k1_ecdsa(public_key),
+            AnySignature::secp256k1_ecdsa(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
     }
 
     pub fn new_keyless(
@@ -641,45 +617,21 @@ impl SignedTransaction {
         public_key: KeylessPublicKey,
         signature: KeylessSignature,
     ) -> SignedTransaction {
-        let authenticator = TransactionAuthenticator::single_sender(
-            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-                AnyPublicKey::keyless(public_key),
-                AnySignature::keyless(signature),
-            )),
-        );
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::keyless(public_key),
+            AnySignature::keyless(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
     }
 
     pub fn new_single_sender(
         raw_txn: RawTransaction,
         authenticator: AccountAuthenticator,
     ) -> SignedTransaction {
-        SignedTransaction {
+        Self::new_signed_transaction(
             raw_txn,
-            authenticator: TransactionAuthenticator::single_sender(authenticator),
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
-    }
-
-    pub fn new_with_authenticator(
-        raw_txn: RawTransaction,
-        authenticator: TransactionAuthenticator,
-    ) -> Self {
-        Self {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
+            TransactionAuthenticator::single_sender(authenticator),
+        )
     }
 
     pub fn authenticator(&self) -> TransactionAuthenticator {
