@@ -48,8 +48,6 @@ move-compiler/tests/move_check/liveness/{
   explicit_last_copy.move,
   loop_weirdness.move,
   move_in_infinite_loop_branched.move,
-  trailing_semi.move,
-  trailing_semi_loops.move,
 }
 move-compiler/tests/move_check/locals/{
   use_after_move_if.move,

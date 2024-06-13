@@ -217,8 +217,12 @@ move-compiler/tests/move_check/translated_ir_tests/move/generics/instantiation_l
 move-compiler/tests/move_check/translated_ir_tests/move/generics/instantiation_loops/recursive_struct.exp   move-compiler-v2/tests/cyclic-instantiation-checker/v1-tests/recursive_struct.exp
 move-compiler/tests/move_check/translated_ir_tests/move/generics/instantiation_loops/recursive_two_args_swapping_type_con.exp   move-compiler-v2/tests/cyclic-instantiation-checker/v1-tests/recursive_two_args_swapping_type_con.exp
 move-compiler/tests/move_check/translated_ir_tests/move/generics/instantiation_loops/two_loops.exp   move-compiler-v2/tests/cyclic-instantiation-checker/v1-tests/two_loops.exp
+move-compiler/tests/move_check/liveness/abort_typing.exp   move-compiler-v2/tests/checking/liveness/abort_typing.exp
 move-compiler/tests/move_check/liveness/mut_inline.exp   move-compiler-v2/tests/live-var/mut_inline.exp
 move-compiler/tests/move_check/liveness/mut_ref.exp   move-compiler-v2/tests/live-var/mut_ref.exp
+move-compiler/tests/move_check/liveness/return_typing.exp   move-compiler-v2/tests/checking/liveness/return_typing.exp
+move-compiler/tests/move_check/liveness/trailing_semi.exp   move-compiler-v2/tests/checking/liveness/trailing_semi.exp
+move-compiler/tests/move_check/liveness/trailing_semi_loops.exp   move-compiler-v2/tests/checking/liveness/trailing_semi_loops.exp
 move-compiler/tests/move_check/liveness/unused_assignment.exp   move-compiler-v2/tests/unused-assignment/v1-liveness/unused_assignment.exp
 move-compiler/tests/move_check/locals/assign_partial_resource.exp   move-compiler-v2/tests/unused-assignment/v1-locals/assign_partial_resource.exp
 move-compiler/tests/move_check/locals/assign_resource.exp   move-compiler-v2/tests/unused-assignment/v1-locals/assign_resource.exp
