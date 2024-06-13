@@ -461,7 +461,7 @@ impl BatchGenerator {
 
                         let dynamic_pull_max_txn = std::cmp::max(
                             (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
-                        counters::QS_SINCE_LAST_NON_EMPTY_PULL_TIME.observe((since_last_non_empty_pull_ms as f64)/ 1000.0);
+                        counters::QS_SINCE_LAST_NON_EMPTY_PULL_TIME.observe_duration(Duration::from_millis(since_last_non_empty_pull_ms as u64));
                         counters::QS_DYNAMIC_MAX_PULL_TXNS.observe(dynamic_pull_max_txn as f64);
                         let pull_max_txn = std::cmp::min(
                             dynamic_pull_max_txn,
