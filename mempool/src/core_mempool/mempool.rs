@@ -660,6 +660,7 @@ impl Mempool {
                 while skipped.contains(&skipped_txn) {
                     inserted.insert(skipped_txn);
                     result.push(skipped_txn);
+                    skipped.remove(&skipped_txn);
                     if (result.len() as u64) == max_txns {
                         break 'main;
                     }
@@ -669,6 +670,7 @@ impl Mempool {
                 skipped.insert((txn.address, tx_seq));
             }
         }
+        counters::MEMPOOL_SKIPPED_TXNS.set(skipped.len() as i64);
         let result_size = result.len();
         let result_end_time = start_time.elapsed();
         let result_time = result_end_time.saturating_sub(gas_end_time);
@@ -737,6 +739,31 @@ impl Mempool {
         if !return_non_full && !full_bytes && (block.len() as u64) < max_txns {
             block.clear();
         }
+
+        let mut total_exclude_transactions: Vec<TransactionSummary> = exclude_transactions
+            .keys()
+            .cloned()
+            .collect::<Vec<TransactionSummary>>();
+        for txn in block.iter() {
+            let txn_ptr = TransactionSummary {
+                sender: txn.sender(),
+                hash: txn.committed_hash(),
+                sequence_number: txn.sequence_number(),
+            };
+            total_exclude_transactions.push(txn_ptr);
+        }
+
+        let actual_remaining_txns = self
+            .transactions
+            .total_num_transactions_excluding(&total_exclude_transactions);
+        counters::MEMPOOL_ACTUAL_REMAINING_TXNS.observe(actual_remaining_txns as f64);
+        counters::MEMPOOL_ACTUAL_REMAINING_TXNS_SAME_AS_SKIPPED.observe(
+            if actual_remaining_txns == (skipped.len() as u64) {
+                1.0
+            } else {
+                0.0
+            },
+        );
 
         counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
         counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);
