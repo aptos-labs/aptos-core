@@ -25,11 +25,13 @@ mod mock_state_computer;
 mod mock_storage;
 
 use crate::{
-    payload_manager::PayloadManager, pipeline::execution_client::DummyExecutionClient,
+    block_storage::pending_blocks::PendingBlocks, payload_manager::PayloadManager,
+    pipeline::execution_client::DummyExecutionClient,
     util::mock_time_service::SimulatedTimeService,
 };
 use aptos_consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
+use aptos_infallible::Mutex;
 use aptos_types::{
     block_info::BlockInfo,
     chain_id::ChainId,
@@ -89,6 +91,8 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         Arc::new(SimulatedTimeService::new()),
         10,
         Arc::from(PayloadManager::DirectMempool),
+        false,
+        Arc::new(Mutex::new(PendingBlocks::new())),
     ))
 }
 
@@ -150,7 +154,7 @@ impl TreeInserter {
                 parent_qc,
                 parent.timestamp_usecs() + 1,
                 round,
-                Payload::empty(false),
+                Payload::empty(false, true),
                 vec![],
             ))
             .await
@@ -201,7 +205,11 @@ pub fn placeholder_ledger_info() -> LedgerInfo {
 }
 
 pub fn placeholder_sync_info() -> SyncInfo {
-    SyncInfo::new(certificate_for_genesis(), certificate_for_genesis(), None)
+    SyncInfo::new(
+        certificate_for_genesis(),
+        certificate_for_genesis().into_wrapped_ledger_info(),
+        None,
+    )
 }
 
 fn nocapture() -> bool {

@@ -14,3 +14,17 @@ retries = 3
 status-level = "skip"
 failure-output = "immediate-final"
 junit = { path = "junit.xml" }
+
+[profile.default.slow-timeout]
+period = "600s"
+terminate-after = 1
+
+[profile.smoke-test]
+# like profile.ci
+status-level = "skip"
+failure-output = "immediate-final"
+fail-fast = true
+# different than ci
+test-threads = 6
+retries = 3
+slow-timeout = { period = "1800s", terminate-after = 1 }

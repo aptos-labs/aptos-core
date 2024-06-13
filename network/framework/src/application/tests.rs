@@ -390,8 +390,13 @@ fn test_peers_and_metadata_caching() {
     );
 
     // Update the peer metadata for peer 1
-    let peer_monitoring_metadata =
-        PeerMonitoringMetadata::new(Some(1010101.0), None, None, Some("Internal string".into()));
+    let peer_monitoring_metadata = PeerMonitoringMetadata::new(
+        Some(1010101.0),
+        None,
+        None,
+        None,
+        Some("Internal string".into()),
+    );
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata.clone())
         .unwrap();
@@ -846,7 +851,7 @@ fn check_registered_networks(
 
 /// Verifies that all returned peers are correct
 fn check_all_peers(peers_and_metadata: &Arc<PeersAndMetadata>, expected_peers: Vec<PeerNetworkId>) {
-    let all_peers = peers_and_metadata.get_all_peers().unwrap();
+    let all_peers = peers_and_metadata.get_all_peers();
     compare_vectors_ignore_order(all_peers, expected_peers);
 }
 

@@ -9,11 +9,9 @@ use aptos_aggregator::{
     delta_change_set::DeltaOp,
     resolver::{AggregatorV1Resolver, DelayedFieldResolver},
 };
-use aptos_types::{
-    delayed_fields::PanicError,
-    state_store::{state_key::StateKey, state_value::StateValueMetadata},
-};
+use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata};
 use better_any::{Tid, TidAble};
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::MoveTypeLayout;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
@@ -79,7 +77,7 @@ impl<'a> NativeAggregatorContext<'a> {
 
     /// Returns all changes made within this context (i.e. by a single
     /// transaction).
-    pub fn into_change_set(self) -> Result<AggregatorChangeSet, PanicError> {
+    pub fn into_change_set(self) -> PartialVMResult<AggregatorChangeSet> {
         let NativeAggregatorContext {
             aggregator_v1_data,
             delayed_field_data,
@@ -126,7 +124,7 @@ impl<'a> NativeAggregatorContext<'a> {
             delayed_field_changes,
             // is_empty check covers both whether delayed fields are enabled or not, as well as whether there
             // are any changes that would require computing reads needing exchange.
-            // TODO[agg_v2](optimize) we only later compute the the write set, so cannot pass the correct skip values here.
+            // TODO[agg_v2](optimize) we only later compute the write set, so cannot pass the correct skip values here.
             reads_needing_exchange: if delayed_write_set_ids.is_empty() {
                 BTreeMap::new()
             } else {

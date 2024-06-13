@@ -34,14 +34,14 @@ pub mod message_queues;
 #[cfg(test)]
 mod message_queues_test;
 
-/// An [`mpsc::Sender`](futures::channel::mpsc::Sender) with an [`IntGauge`]
+/// An [`mpsc::Sender`] with an [`IntGauge`]
 /// counting the number of currently queued items.
 pub struct Sender<T> {
     inner: mpsc::Sender<T>,
     gauge: IntGauge,
 }
 
-/// An [`mpsc::Receiver`](futures::channel::mpsc::Receiver) with an [`IntGauge`]
+/// An [`mpsc::Receiver`] with an [`IntGauge`]
 /// counting the number of currently queued items.
 pub struct Receiver<T> {
     inner: mpsc::Receiver<T>,
@@ -157,7 +157,7 @@ pub struct UnboundedSender<T> {
     gauge: IntGauge,
 }
 
-/// An [`mpsc::UnboundedReceiver`](futures::channel::mpsc::UnboundedReceiver) with an [`IntGauge`]
+/// An [`mpsc::UnboundedReceiver`] with an [`IntGauge`]
 /// counting the number of currently queued items.
 pub struct UnboundedReceiver<T> {
     inner: mpsc::UnboundedReceiver<T>,

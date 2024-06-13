@@ -12,13 +12,6 @@ inputs:
 runs:
   using: composite
   steps:
-    # Install node and pnpm.
-    - uses: actions/setup-node@v3
-      with:
-        node-version-file: .node-version
-        registry-url: "https://registry.npmjs.org"
-    - uses: pnpm/action-setup@v2
-
     # Find a docker image to use for the testnet.
     - uses: ./.github/actions/get-latest-docker-image-tag
       id: get-docker-image-tag
@@ -42,18 +35,18 @@ runs:
       shell: bash
       working-directory: ./ecosystem/typescript/sdk
 
+    # Run a local testnet. This installs node and pnpm too.
+    - uses: aptos-labs/actions/run-local-testnet@main
+      with:
+        PNPM_VERSION: 8.15.6
+        DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+        CLI_GIT_REF: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
+
     # Run package install. If install fails, it probably means the updated lockfile was
     # not included in the commit.
     - run: pnpm install --frozen-lockfile
       shell: bash
       working-directory: ./ecosystem/typescript/sdk
-
-    # Run a local testnet.
-    - uses: ./.github/actions/run-local-testnet
-      with:
-        IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
-        GCP_DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
-        WITH_INDEXER_API: "true"
 
     # Run the non indexer TS SDK tests.
     - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
@@ -67,7 +60,6 @@ runs:
         max_attempts: 3
         timeout_minutes: 25
         command: cd ./ecosystem/typescript/sdk && pnpm run test:ci
-
 
     # Run the indexer TS SDK tests.
     - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2

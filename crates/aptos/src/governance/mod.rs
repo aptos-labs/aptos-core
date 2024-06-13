@@ -18,7 +18,7 @@ use crate::{
     move_tool::{FrameworkPackageArgs, IncludedArtifacts},
     CliCommand, CliResult,
 };
-use aptos_api_types::ViewRequest;
+use aptos_api_types::ViewFunction;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::HashValue;
 use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
@@ -38,7 +38,10 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use clap::Parser;
-use move_core_types::transaction_argument::TransactionArgument;
+use move_core_types::{
+    ident_str, language_storage::ModuleId, parser::parse_type_tag,
+    transaction_argument::TransactionArgument,
+};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -605,14 +608,15 @@ impl SubmitVote {
         let is_proposal_closed = self
             .args
             .txn_options
-            .view(ViewRequest {
-                function: "0x1::voting::is_voting_closed".parse().unwrap(),
-                type_arguments: vec!["0x1::governance_proposal::GovernanceProposal"
-                    .parse()
-                    .unwrap()],
-                arguments: vec![
-                    serde_json::Value::String("0x1".to_string()),
-                    serde_json::Value::String(proposal_id.to_string()),
+            .view(ViewFunction {
+                module: ModuleId::new(AccountAddress::ONE, ident_str!("voting").to_owned()),
+                function: ident_str!("is_voting_closed").to_owned(),
+                ty_args: vec![
+                    parse_type_tag("0x1::governance_proposal::GovernanceProposal").unwrap(),
+                ],
+                args: vec![
+                    bcs::to_bytes(&AccountAddress::ONE).unwrap(),
+                    bcs::to_bytes(&proposal_id).unwrap(),
                 ],
             })
             .await?[0]
@@ -630,14 +634,16 @@ impl SubmitVote {
             let remaining_voting_power = self
                 .args
                 .txn_options
-                .view(ViewRequest {
-                    function: "0x1::aptos_governance::get_remaining_voting_power"
-                        .parse()
-                        .unwrap(),
-                    type_arguments: vec![],
-                    arguments: vec![
-                        serde_json::Value::String(pool_address.to_string()),
-                        serde_json::Value::String(proposal_id.to_string()),
+                .view(ViewFunction {
+                    module: ModuleId::new(
+                        AccountAddress::ONE,
+                        ident_str!("aptos_governance").to_owned(),
+                    ),
+                    function: ident_str!("get_remaining_voting_power").to_owned(),
+                    ty_args: vec![],
+                    args: vec![
+                        bcs::to_bytes(&pool_address).unwrap(),
+                        bcs::to_bytes(&proposal_id).unwrap(),
                     ],
                 })
                 .await?[0]
@@ -995,8 +1001,10 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             move_options.dev,
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
+            move_options.override_std,
             move_options.bytecode_version,
             move_options.compiler_version,
+            move_options.language_version,
             move_options.skip_attribute_checks,
             move_options.check_test_code,
         );

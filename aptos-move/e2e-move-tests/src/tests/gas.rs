@@ -14,9 +14,53 @@ use crate::{
 use aptos_cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
 use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_gas_profiling::TransactionGasLog;
-use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
+use aptos_types::{
+    account_address::{default_stake_pool_address, AccountAddress},
+    account_config::CORE_CODE_ADDRESS,
+    transaction::{EntryFunction, TransactionPayload},
+};
 use aptos_vm::AptosVM;
+use move_core_types::{identifier::Identifier, language_storage::ModuleId};
+use sha3::{Digest, Sha3_512};
 use std::path::Path;
+
+#[test]
+fn test_modify_gas_schedule_check_hash() {
+    let mut harness = MoveHarness::new();
+
+    let mut gas_schedule = harness.get_gas_schedule();
+    let old_hash = Sha3_512::digest(&bcs::to_bytes(&gas_schedule).unwrap()).to_vec();
+
+    const MAGIC: u64 = 42424242;
+
+    let (_, val) = gas_schedule
+        .entries
+        .iter_mut()
+        .find(|(name, _)| name == "instr.nop")
+        .unwrap();
+    assert_ne!(*val, MAGIC);
+    *val = MAGIC;
+
+    harness.executor.exec(
+        "gas_schedule",
+        "set_for_next_epoch_check_hash",
+        vec![],
+        vec![
+            bcs::to_bytes(&CORE_CODE_ADDRESS).unwrap(),
+            bcs::to_bytes(&old_hash).unwrap(),
+            bcs::to_bytes(&bcs::to_bytes(&gas_schedule).unwrap()).unwrap(),
+        ],
+    );
+
+    harness
+        .executor
+        .exec("reconfiguration_with_dkg", "finish", vec![], vec![
+            bcs::to_bytes(&CORE_CODE_ADDRESS).unwrap(),
+        ]);
+
+    let (_, gas_params) = harness.get_gas_params();
+    assert_eq!(gas_params.vm.instr.nop, MAGIC.into());
+}
 
 fn save_profiling_results(name: &str, log: &TransactionGasLog) {
     let path = Path::new("gas-profiling").join(name);
@@ -331,6 +375,66 @@ fn test_gas() {
         "UpgradeLarge",
         publisher,
         &test_dir_path("code_publishing.data/pack_large_upgrade"),
+    );
+    publish(
+        &mut harness,
+        "PublishDependencyChain-1",
+        publisher,
+        &test_dir_path("dependencies.data/p1"),
+    );
+    publish(
+        &mut harness,
+        "PublishDependencyChain-2",
+        publisher,
+        &test_dir_path("dependencies.data/p2"),
+    );
+    publish(
+        &mut harness,
+        "PublishDependencyChain-3",
+        publisher,
+        &test_dir_path("dependencies.data/p3"),
+    );
+    run(
+        &mut harness,
+        "UseDependencyChain-1",
+        publisher,
+        TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::from_hex_literal("0xcafe").unwrap(),
+                Identifier::new("m1").unwrap(),
+            ),
+            Identifier::new("run").unwrap(),
+            vec![],
+            vec![],
+        )),
+    );
+    run(
+        &mut harness,
+        "UseDependencyChain-2",
+        publisher,
+        TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::from_hex_literal("0xcafe").unwrap(),
+                Identifier::new("m2").unwrap(),
+            ),
+            Identifier::new("run").unwrap(),
+            vec![],
+            vec![],
+        )),
+    );
+    run(
+        &mut harness,
+        "UseDependencyChain-3",
+        publisher,
+        TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::from_hex_literal("0xcafe").unwrap(),
+                Identifier::new("m3").unwrap(),
+            ),
+            Identifier::new("run").unwrap(),
+            vec![],
+            vec![],
+        )),
     );
 }
 

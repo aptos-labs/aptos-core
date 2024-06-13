@@ -876,7 +876,9 @@ impl CliTestFramework {
         PublishPackage {
             move_options: self.move_options(account_strs),
             txn_options: self.transaction_options(index, gas_options),
-            override_size_check_option: OverrideSizeCheckOption { value: false },
+            override_size_check_option: OverrideSizeCheckOption {
+                override_size_check: false,
+            },
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },
@@ -898,6 +900,7 @@ impl CliTestFramework {
             package,
             output_dir: Some(output_dir),
             print_metadata: false,
+            bytecode: true,
         }
         .execute()
         .await
@@ -956,6 +959,25 @@ impl CliTestFramework {
         .await
     }
 
+    pub async fn run_script_with_gas_options(
+        &self,
+        index: usize,
+        script_contents: &str,
+        gas_options: Option<GasOptions>,
+    ) -> CliTypedResult<TransactionSummary> {
+        self.run_script_with_framework_package_and_gas_options(
+            index,
+            script_contents,
+            FrameworkPackageArgs {
+                framework_git_rev: None,
+                framework_local_dir: Some(Self::aptos_framework_dir()),
+                skip_fetch_latest_git_deps: false,
+            },
+            gas_options,
+        )
+        .await
+    }
+
     /// Runs the given script contents using the aptos_framework from aptos-core git repository.
     pub async fn run_script_with_default_framework(
         &self,
@@ -977,6 +999,22 @@ impl CliTestFramework {
         script_contents: &str,
         framework_package_args: FrameworkPackageArgs,
     ) -> CliTypedResult<TransactionSummary> {
+        self.run_script_with_framework_package_and_gas_options(
+            index,
+            script_contents,
+            framework_package_args,
+            None,
+        )
+        .await
+    }
+
+    pub async fn run_script_with_framework_package_and_gas_options(
+        &self,
+        index: usize,
+        script_contents: &str,
+        framework_package_args: FrameworkPackageArgs,
+        gas_options: Option<GasOptions>,
+    ) -> CliTypedResult<TransactionSummary> {
         // Make a temporary directory for compilation
         let temp_dir = TempDir::new().map_err(|err| {
             CliError::UnexpectedError(format!("Failed to create temporary directory {}", err))
@@ -991,7 +1029,7 @@ impl CliTestFramework {
         .unwrap();
 
         RunScript {
-            txn_options: self.transaction_options(index, None),
+            txn_options: self.transaction_options(index, gas_options),
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(source_path),
                 compiled_script_path: None,
@@ -1052,9 +1090,11 @@ impl CliTestFramework {
             package_dir: Some(self.move_dir()),
             output_dir: None,
             named_addresses: Self::named_addresses(account_strs),
+            override_std: None,
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
             compiler_version: None,
+            language_version: None,
             skip_attribute_checks: false,
             check_test_code: false,
         }

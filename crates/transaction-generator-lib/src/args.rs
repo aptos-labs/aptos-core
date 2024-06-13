@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{publishing::module_simple::LoopType, EntryPoints, TransactionType};
+use crate::{
+    publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind,
+    WorkflowProgress,
+};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +22,7 @@ pub enum TransactionTypeArg {
     PublishPackage,
     // Simple EntryPoints
     NoOp,
+    NoOpFeePayer,
     NoOp2Signers,
     NoOp5Signers,
     AccountResource32B,
@@ -31,6 +35,7 @@ pub enum TransactionTypeArg {
     ModifyGlobalResourceAggV2,
     ModifyGlobalFlagAggV2,
     ModifyGlobalBoundedAggV2,
+    ModifyGlobalMilestoneAggV2,
     // Complex EntryPoints
     CreateObjects10,
     CreateObjects10WithPayload10k,
@@ -48,7 +53,13 @@ pub enum TransactionTypeArg {
     TokenV1NFTMintAndTransferParallel,
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
+    // register if not registered already
+    CoinInitAndMint,
+    FungibleAssetMint,
     TokenV2AmbassadorMint,
+    TokenV2AmbassadorMintAndBurn1M,
+    LiquidityPoolSwap,
+    LiquidityPoolSwapStable,
     VectorPictureCreate30k,
     VectorPicture30k,
     VectorPictureRead30k,
@@ -56,19 +67,22 @@ pub enum TransactionTypeArg {
     VectorPicture40,
     VectorPictureRead40,
     SmartTablePicture30KWith200Change,
-    SmartTablePicture1MWith1KChange,
-    SmartTablePicture1BWith1KChange,
+    SmartTablePicture1MWith256Change,
+    SmartTablePicture1BWith256Change,
+    SmartTablePicture1MWith1KChangeExceedsLimit,
+    DeserializeU256,
 }
 
 impl TransactionTypeArg {
     pub fn materialize_default(&self) -> TransactionType {
-        self.materialize(1, false)
+        self.materialize(1, false, WorkflowProgress::when_done_default())
     }
 
     pub fn materialize(
         &self,
         module_working_set_size: usize,
         sender_use_account_pool: bool,
+        workflow_progress_type: WorkflowProgress,
     ) -> TransactionType {
         match self {
             TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
@@ -143,8 +157,20 @@ impl TransactionTypeArg {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
+            TransactionTypeArg::ModifyGlobalMilestoneAggV2 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::IncGlobalMilestoneAggV2 {
+                    milestone_every: 1000,
+                },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
             TransactionTypeArg::NoOp => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::Nop,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::NoOpFeePayer => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::NopFeePayer,
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -312,8 +338,37 @@ impl TransactionTypeArg {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
+            TransactionTypeArg::CoinInitAndMint => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::CoinInitAndMint,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::FungibleAssetMint => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::FungibleAssetMint,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
             TransactionTypeArg::TokenV2AmbassadorMint => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::TokenV2AmbassadorMint,
+                entry_point: EntryPoints::TokenV2AmbassadorMint { numbered: true },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::TokenV2AmbassadorMintAndBurn1M => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::CreateMintBurn {
+                    count: 10000,
+                    creation_balance: 200000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::LiquidityPoolSwap => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::LiquidityPoolSwap { is_stable: false },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::LiquidityPoolSwapStable => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::LiquidityPoolSwap { is_stable: true },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -357,7 +412,27 @@ impl TransactionTypeArg {
                     use_account_pool: sender_use_account_pool,
                 }
             },
-            TransactionTypeArg::SmartTablePicture1MWith1KChange => {
+            TransactionTypeArg::SmartTablePicture1MWith256Change => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::SmartTablePicture {
+                        length: 1024 * 1024,
+                        num_points_per_txn: 256,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::SmartTablePicture1BWith256Change => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::SmartTablePicture {
+                        length: 1024 * 1024 * 1024,
+                        num_points_per_txn: 256,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::SmartTablePicture1MWith1KChangeExceedsLimit => {
                 TransactionType::CallCustomModules {
                     entry_point: EntryPoints::SmartTablePicture {
                         length: 1024 * 1024,
@@ -367,15 +442,10 @@ impl TransactionTypeArg {
                     use_account_pool: sender_use_account_pool,
                 }
             },
-            TransactionTypeArg::SmartTablePicture1BWith1KChange => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::SmartTablePicture {
-                        length: 1024 * 1024 * 1024,
-                        num_points_per_txn: 1024,
-                    },
-                    num_modules: module_working_set_size,
-                    use_account_pool: sender_use_account_pool,
-                }
+            TransactionTypeArg::DeserializeU256 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::DeserializeU256,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
             },
         }
     }
@@ -386,10 +456,17 @@ impl TransactionTypeArg {
         transaction_phases: &[usize],
         module_working_set_size: usize,
         sender_use_account_pool: bool,
+        workflow_progress_type: WorkflowProgress,
     ) -> Vec<Vec<(TransactionType, usize)>> {
         let arg_transaction_types = transaction_types
             .iter()
-            .map(|t| t.materialize(module_working_set_size, sender_use_account_pool))
+            .map(|t| {
+                t.materialize(
+                    module_working_set_size,
+                    sender_use_account_pool,
+                    workflow_progress_type,
+                )
+            })
             .collect::<Vec<_>>();
 
         let arg_transaction_weights = if transaction_weights.is_empty() {

@@ -1,5 +1,11 @@
 
 Diagnostics:
+error: Expected a single type, but found a tuple type
+  ┌─ tests/checking/typing/exp_list_nested.move:6:13
+  │
+6 │         (0, (S{}, R{}))
+  │             ^^^^^^^^^^
+
 error: the function returns 3 arguments but 2 were provided
   ┌─ tests/checking/typing/exp_list_nested.move:6:9
   │

@@ -3,7 +3,7 @@
 
 use crate::{
     convert::convert_transaction,
-    counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
+    counters::UNABLE_TO_FETCH_TRANSACTION,
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
 };
 use aptos_api::context::Context;
@@ -23,7 +23,6 @@ use aptos_protos::{
     },
     util::timestamp::Timestamp,
 };
-use aptos_vm::data_cache::AsMoveResolver;
 use itertools::Itertools;
 use serde::Serialize;
 use std::{sync::Arc, time::Duration};
@@ -340,9 +339,8 @@ impl IndexerStreamCoordinator {
 
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
         let state_view = context.latest_state_view().unwrap();
-        let resolver = state_view.as_move_resolver();
         let converter =
-            resolver.as_converter(context.db.clone(), context.table_info_reader.clone());
+            state_view.as_converter(context.db.clone(), context.table_info_reader.clone());
 
         // Enrich data with block metadata
         let (_, _, block_event) = context
@@ -406,6 +404,10 @@ impl IndexerStreamCoordinator {
                             sct.info.block_height = Some(block_height_bcs);
                             sct.info.epoch = Some(epoch_bcs);
                         },
+                        APITransaction::BlockEpilogueTransaction(ref mut bet) => {
+                            bet.info.block_height = Some(block_height_bcs);
+                            bet.info.epoch = Some(epoch_bcs);
+                        },
                         APITransaction::ValidatorTransaction(ref mut vt) => {
                             vt.info.block_height = Some(block_height_bcs);
                             vt.info.epoch = Some(epoch_bcs);
@@ -449,7 +451,6 @@ impl IndexerStreamCoordinator {
             "[Indexer Fullnode] Successfully converted transactions",
         );
 
-        FETCHED_TRANSACTION.inc();
         transactions
     }
 

@@ -260,13 +260,8 @@ module guild::guild {
         smart_vector::contains(whitelist, &guild_master)
     }
 
-    #[test(fx = @std, admin = @guild, guild_master = @0x456, user = @0x789)]
-    public fun test_guild(fx: signer, admin: &signer, guild_master: &signer, user: address) acquires GuildToken, MemberToken, Config, Config {
-        use std::features;
-
-        let feature = features::get_auids();
-        features::change_feature_flags(&fx, vector[feature], vector[]);
-
+    #[test(admin = @guild, guild_master = @0x456, user = @0x789)]
+    public fun test_guild(admin: &signer, guild_master: &signer, user: address) acquires GuildToken, MemberToken, Config, Config {
         // This test assumes that the creator's address is equal to @token_objects.
         assert!(signer::address_of(admin) == @guild, 0);
 

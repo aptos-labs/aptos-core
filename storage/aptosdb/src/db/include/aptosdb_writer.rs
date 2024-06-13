@@ -227,7 +227,7 @@ impl AptosDB {
             .current_version
             .map(|version| version + 1)
             .unwrap_or(0);
-        let num_transactions_in_db = self.get_latest_version().map_or(0, |v| v + 1);
+        let num_transactions_in_db = self.get_synced_version().map_or(0, |v| v + 1);
         ensure!(num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
             "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
             first_version,
@@ -362,7 +362,7 @@ impl AptosDB {
             skip_index_and_usage,
             txns_to_commit
                 .iter()
-                .rposition(|txn| txn.is_state_checkpoint()),
+                .rposition(|txn| txn.has_state_checkpoint_hash()),
         )?;
 
         // Write block index if event index is skipped.

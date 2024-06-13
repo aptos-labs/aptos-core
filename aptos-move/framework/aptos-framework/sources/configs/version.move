@@ -2,6 +2,7 @@
 module aptos_framework::version {
     use std::error;
     use std::signer;
+    use aptos_framework::chain_status;
     use aptos_framework::config_buffer;
 
     use aptos_framework::reconfiguration;
@@ -39,6 +40,7 @@ module aptos_framework::version {
     /// TODO: update all the tests that reference this function, then disable this function.
     public entry fun set_version(account: &signer, major: u64) acquires Version {
         assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
+        chain_status::assert_genesis();
 
         let old_major = borrow_global<Version>(@aptos_framework).major;
         assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
@@ -52,11 +54,9 @@ module aptos_framework::version {
 
     /// Used in on-chain governances to update the major version for the next epoch.
     /// Example usage:
-    /// ```
-    /// aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);
-    /// aptos_framework::aptos_governance::reconfigure(&framework_signer);
-    /// ```
-    public fun set_for_next_epoch(account: &signer, major: u64) acquires Version {
+    /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
+    /// - `aptos_framework::aptos_governance::reconfigure(&framework_signer);`
+    public entry fun set_for_next_epoch(account: &signer, major: u64) acquires Version {
         assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
         let old_major = borrow_global<Version>(@aptos_framework).major;
         assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
@@ -64,9 +64,15 @@ module aptos_framework::version {
     }
 
     /// Only used in reconfigurations to apply the pending `Version`, if there is any.
-    public(friend) fun on_new_epoch() acquires Version {
+    public(friend) fun on_new_epoch(framework: &signer) acquires Version {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<Version>()) {
-            *borrow_global_mut<Version>(@aptos_framework) = config_buffer::extract<Version>();
+            let new_value = config_buffer::extract<Version>();
+            if (exists<Version>(@aptos_framework)) {
+                *borrow_global_mut<Version>(@aptos_framework) = new_value;
+            } else {
+                move_to(framework, new_value);
+            }
         }
     }
 

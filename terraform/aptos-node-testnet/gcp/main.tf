@@ -44,8 +44,10 @@ module "validator" {
   validator_name = "aptos-node"
 
   # K8s config
-  k8s_api_sources         = var.k8s_api_sources
-  cluster_ipv4_cidr_block = var.cluster_ipv4_cidr_block
+  k8s_api_sources                     = var.k8s_api_sources
+  cluster_ipv4_cidr_block             = var.cluster_ipv4_cidr_block
+  router_nat_ip_allocate_option       = var.router_nat_ip_allocate_option
+  enable_endpoint_independent_mapping = var.enable_endpoint_independent_mapping
 
   # autoscaling
   gke_enable_node_autoprovisioning     = var.gke_enable_node_autoprovisioning
@@ -58,7 +60,7 @@ module "validator" {
   workspace_name_override = var.workspace_name_override
   # if forge enabled, standardize the helm release name for ease of operations
   helm_release_name_override = var.enable_forge ? "aptos-node" : ""
-  helm_values                = var.aptos_node_helm_values
+  helm_values                = local.merged_helm_values
   num_validators             = var.num_validators
   num_fullnode_groups        = var.num_fullnode_groups
 
@@ -88,8 +90,17 @@ locals {
   chain_id = var.enable_forge ? 4 : var.chain_id
 
   aptos_node_helm_prefix = var.enable_forge ? "aptos-node" : "${module.validator.helm_release_name}-aptos-node"
-}
 
+  default_helm_values = {
+    cluster_name            = module.validator.gke_cluster_name
+    genesis_blob_upload_url = var.enable_forge ? "${google_cloudfunctions2_function.signed-url[0].service_config[0].uri}?cluster_name=${module.validator.gke_cluster_name}&era=${var.era}" : ""
+  }
+
+  merged_helm_values = merge(
+    local.default_helm_values,
+    var.aptos_node_helm_values
+  )
+}
 resource "helm_release" "genesis" {
   count       = var.enable_genesis ? 1 : 0
   name        = "genesis"
@@ -117,6 +128,8 @@ resource "helm_release" "genesis" {
           # internet facing network addresses for the fullnodes
           enable_onchain_discovery = var.zone_name != ""
         }
+        genesis_blob_upload_url = var.enable_forge ? "${google_cloudfunctions2_function.signed-url[0].service_config[0].uri}?cluster_name=${module.validator.gke_cluster_name}&era=${var.era}" : ""
+        cluster_name            = module.validator.gke_cluster_name
       }
     }),
     jsonencode(var.genesis_helm_values)

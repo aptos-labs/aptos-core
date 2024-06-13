@@ -1,3 +1,4 @@
+{{- if $.Values.backup.enable }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -18,7 +19,7 @@ metadata:
     app.kubernetes.io/name: backup
 spec:
   serviceName: {{ include "backup.fullname" . }}-backup
-  replicas: {{ int .Values.backup.enable }}
+  replicas: 1
   podManagementPolicy: Parallel
   selector:
     matchLabels:
@@ -30,7 +31,9 @@ spec:
         {{- include "backup.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: backup
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+        {{- if $.Values.metrics.destination }}
+        aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
+        {{- end}}
     spec:
       terminationGracePeriodSeconds: 0
       containers:
@@ -89,6 +92,8 @@ spec:
         runAsUser: 6180
         runAsGroup: 6180
         fsGroup: 6180
+        seccompProfile:
+          type: RuntimeDefault
       {{- with .nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -113,3 +118,4 @@ spec:
       imagePullSecrets:
       - name: {{.Values.imagePullSecret}}
       {{- end }}
+{{- end }}

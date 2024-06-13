@@ -20,6 +20,7 @@ pub struct LogSchema {
 
 #[derive(Serialize)]
 pub enum LogEvent {
+    BroadcastOrderVote,
     CommitViaBlock,
     CommitViaSync,
     IncrementalProofExpired,
@@ -28,6 +29,7 @@ pub enum LogEvent {
     NewRound,
     ProofOfStoreInit,
     ProofOfStoreReady,
+    ProofOfStoreCommit,
     Propose,
     ReceiveBatchRetrieval,
     ReceiveBlockRetrieval,
@@ -38,6 +40,7 @@ pub enum LogEvent {
     ReceiveProposal,
     ReceiveSyncInfo,
     ReceiveVote,
+    ReceiveOrderVote,
     RetrieveBlock,
     StateSync,
     Timeout,
@@ -51,6 +54,9 @@ pub enum LogEvent {
     ReceiveAugData,
     BroadcastCertifiedAugData,
     ReceiveCertifiedAugData,
+    // randomness fast path
+    BroadcastRandShareFastPath,
+    ReceiveRandShareFastPath,
 }
 
 impl LogSchema {

@@ -9,7 +9,6 @@ use crate::{
     storage::StorageReader,
     tests::{mock, utils},
 };
-use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::{
     config::{AptosDataClientConfig, StorageServiceConfig},
     network_id::PeerNetworkId,
@@ -66,7 +65,6 @@ async fn test_peers_with_ready_optimistic_fetches() {
     let storage_reader = StorageReader::new(storage_service_config, Arc::new(db_reader));
 
     // Create test data with an empty storage server summary
-    let bounded_executor = BoundedExecutor::new(100, Handle::current());
     let cached_storage_server_summary =
         Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
     let lru_response_cache = Cache::new(0);
@@ -82,7 +80,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
     // Verify that there are no peers with ready optimistic fetches
     let peers_with_ready_optimistic_fetches =
         optimistic_fetch::get_peers_with_ready_optimistic_fetches(
-            bounded_executor.clone(),
+            Handle::current(),
             storage_service_config,
             cached_storage_server_summary.clone(),
             optimistic_fetches.clone(),
@@ -103,7 +101,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
     // Verify that optimistic fetch 1 is ready
     let peers_with_ready_optimistic_fetches =
         optimistic_fetch::get_peers_with_ready_optimistic_fetches(
-            bounded_executor.clone(),
+            Handle::current(),
             storage_service_config,
             cached_storage_server_summary.clone(),
             optimistic_fetches.clone(),
@@ -130,7 +128,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
     // Verify that optimistic fetch 2 is not returned because it was invalid
     let peers_with_ready_optimistic_fetches =
         optimistic_fetch::get_peers_with_ready_optimistic_fetches(
-            bounded_executor,
+            Handle::current(),
             storage_service_config,
             cached_storage_server_summary,
             optimistic_fetches,
@@ -172,7 +170,6 @@ async fn test_peers_with_ready_optimistic_fetches_update() {
     let storage_reader = StorageReader::new(storage_service_config, Arc::new(db_reader));
 
     // Create test data with an empty storage server summary
-    let bounded_executor = BoundedExecutor::new(100, Handle::current());
     let cached_storage_server_summary =
         Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
     let lru_response_cache = Cache::new(0);
@@ -196,7 +193,7 @@ async fn test_peers_with_ready_optimistic_fetches_update() {
     // Verify that optimistic fetch 1 is ready
     let peers_with_ready_optimistic_fetches =
         optimistic_fetch::get_peers_with_ready_optimistic_fetches(
-            bounded_executor.clone(),
+            Handle::current(),
             storage_service_config,
             cached_storage_server_summary.clone(),
             optimistic_fetches.clone(),
@@ -223,7 +220,7 @@ async fn test_peers_with_ready_optimistic_fetches_update() {
 
     // Handle the ready optimistic fetches
     optimistic_fetch::handle_ready_optimistic_fetches(
-        bounded_executor.clone(),
+        Handle::current(),
         cached_storage_server_summary.clone(),
         storage_service_config,
         optimistic_fetches.clone(),
@@ -250,7 +247,7 @@ async fn test_peers_with_ready_optimistic_fetches_update() {
     // Verify that optimistic fetch 1 is ready (again!)
     let peers_with_ready_optimistic_fetches =
         optimistic_fetch::get_peers_with_ready_optimistic_fetches(
-            bounded_executor.clone(),
+            Handle::current(),
             storage_service_config,
             cached_storage_server_summary.clone(),
             optimistic_fetches.clone(),
@@ -283,7 +280,6 @@ async fn test_remove_expired_optimistic_fetches() {
     let time_service = TimeService::mock();
 
     // Create the test components
-    let bounded_executor = BoundedExecutor::new(100, Handle::current());
     let cached_storage_server_summary =
         Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
     let lru_response_cache = Cache::new(0);
@@ -317,7 +313,7 @@ async fn test_remove_expired_optimistic_fetches() {
     // Remove the expired optimistic fetches and verify none were removed
     let peers_with_ready_optimistic_fetches =
         optimistic_fetch::get_peers_with_ready_optimistic_fetches(
-            bounded_executor.clone(),
+            Handle::current(),
             storage_service_config,
             cached_storage_server_summary.clone(),
             optimistic_fetches.clone(),
@@ -351,7 +347,7 @@ async fn test_remove_expired_optimistic_fetches() {
     // Remove the expired optimistic fetches and verify the first batch was removed
     let peers_with_ready_optimistic_fetches =
         optimistic_fetch::get_peers_with_ready_optimistic_fetches(
-            bounded_executor.clone(),
+            Handle::current(),
             storage_service_config,
             cached_storage_server_summary.clone(),
             optimistic_fetches.clone(),
@@ -372,7 +368,7 @@ async fn test_remove_expired_optimistic_fetches() {
     // Remove the expired optimistic fetches and verify the second batch was removed
     let peers_with_ready_optimistic_fetches =
         optimistic_fetch::get_peers_with_ready_optimistic_fetches(
-            bounded_executor,
+            Handle::current(),
             storage_service_config,
             cached_storage_server_summary.clone(),
             optimistic_fetches.clone(),

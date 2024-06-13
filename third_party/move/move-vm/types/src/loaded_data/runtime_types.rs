@@ -7,15 +7,19 @@
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
+        Ability, AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
     },
 };
+#[cfg(test)]
+use move_core_types::account_address::AccountAddress;
 use move_core_types::{
-    gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
-    vm_status::StatusCode,
+    identifier::Identifier,
+    language_storage::{ModuleId, StructTag, TypeTag},
+    vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
+use serde::Serialize;
 use smallbitvec::SmallBitVec;
 use smallvec::{smallvec, SmallVec};
 use std::{
@@ -24,10 +28,9 @@ use std::{
     collections::{btree_map, BTreeMap},
     fmt,
     fmt::Debug,
+    sync::Arc,
 };
 use triomphe::Arc as TriompheArc;
-
-pub const TYPE_DEPTH_MAX: usize = 256;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 /// A formula describing the value depth of a type, using (the depths of) the type parameters as inputs.
@@ -125,18 +128,18 @@ impl DepthFormula {
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct StructType {
     pub idx: StructNameIndex,
-    pub fields: Vec<Type>,
+    pub field_tys: Vec<Type>,
     pub field_names: Vec<Identifier>,
-    pub phantom_ty_args_mask: SmallBitVec,
+    pub phantom_ty_params_mask: SmallBitVec,
     pub abilities: AbilitySet,
-    pub type_parameters: Vec<StructTypeParameter>,
+    pub ty_params: Vec<StructTypeParameter>,
     pub name: Identifier,
     pub module: ModuleId,
 }
 
 impl StructType {
-    pub fn type_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
-        self.type_parameters.iter().map(|param| &param.constraints)
+    pub fn ty_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
+        self.ty_params.iter().map(|param| &param.constraints)
     }
 
     // Check if the local struct handle is compatible with the defined struct type.
@@ -148,9 +151,9 @@ impl StructType {
             );
         }
 
-        if self.phantom_ty_args_mask.len() != struct_handle.type_parameters.len()
+        if self.phantom_ty_params_mask.len() != struct_handle.type_parameters.len()
             || !self
-                .phantom_ty_args_mask
+                .phantom_ty_params_mask
                 .iter()
                 .zip(struct_handle.type_parameters.iter())
                 .all(|(defined_is_phantom, local_type_parameter)| {
@@ -165,6 +168,20 @@ impl StructType {
         }
 
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn for_test() -> StructType {
+        Self {
+            idx: StructNameIndex(0),
+            field_tys: vec![],
+            field_names: vec![],
+            phantom_ty_params_mask: SmallBitVec::new(),
+            abilities: AbilitySet::EMPTY,
+            ty_params: vec![],
+            name: Identifier::new("Foo").unwrap(),
+            module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
+        }
     }
 }
 
@@ -282,183 +299,231 @@ impl AbilityInfo {
     }
 }
 
-impl Type {
-    #[allow(deprecated)]
-    const LEGACY_BASE_MEMORY_SIZE: AbstractMemorySize = AbstractMemorySize::new(1);
-
-    fn clone_impl(&self, depth: usize) -> PartialVMResult<Type> {
-        self.apply_subst(|idx, _| Ok(Type::TyParam(idx)), depth)
-    }
-
-    fn apply_subst<F>(&self, subst: F, depth: usize) -> PartialVMResult<Type>
-    where
-        F: Fn(u16, usize) -> PartialVMResult<Type> + Copy,
-    {
-        if depth > TYPE_DEPTH_MAX {
-            return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
-        }
-        let res = match self {
-            Type::TyParam(idx) => subst(*idx, depth)?,
-            Type::Bool => Type::Bool,
-            Type::U8 => Type::U8,
-            Type::U16 => Type::U16,
-            Type::U32 => Type::U32,
-            Type::U64 => Type::U64,
-            Type::U128 => Type::U128,
-            Type::U256 => Type::U256,
-            Type::Address => Type::Address,
-            Type::Signer => Type::Signer,
-            Type::Vector(ty) => Type::Vector(TriompheArc::new(ty.apply_subst(subst, depth + 1)?)),
-            Type::Reference(ty) => Type::Reference(Box::new(ty.apply_subst(subst, depth + 1)?)),
-            Type::MutableReference(ty) => {
-                Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
-            },
-            Type::Struct { idx, ability } => Type::Struct {
-                idx: *idx,
-                ability: ability.clone(),
-            },
-            Type::StructInstantiation {
-                idx,
-                ty_args: instantiation,
-                ability,
-            } => {
-                let mut inst = vec![];
-                for ty in instantiation.iter() {
-                    inst.push(ty.apply_subst(subst, depth + 1)?)
-                }
-                Type::StructInstantiation {
-                    idx: *idx,
-                    ty_args: TriompheArc::new(inst),
-                    ability: ability.clone(),
-                }
-            },
-        };
-        Ok(res)
-    }
-
-    pub fn subst(&self, ty_args: &[Type]) -> PartialVMResult<Type> {
-        self.apply_subst(
-            |idx, depth| match ty_args.get(idx as usize) {
-                Some(ty) => ty.clone_impl(depth),
-                None => Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!(
-                            "type substitution failed: index out of bounds -- len {} got {}",
-                            ty_args.len(),
-                            idx
-                        )),
-                ),
-            },
-            1,
+macro_rules! paranoid_failure {
+    ($msg:ident) => {
+        Err(
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message($msg)
+                .with_sub_status(EPARANOID_FAILURE),
         )
-    }
+    };
+}
 
-    /// Returns the abstract memory size the data structure occupies.
-    ///
-    /// This kept only for legacy reasons.
-    /// New applications should not use this.
-    pub fn size(&self) -> AbstractMemorySize {
-        use Type::*;
-
-        match self {
-            TyParam(_) | Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => {
-                Self::LEGACY_BASE_MEMORY_SIZE
-            },
-            Reference(ty) | MutableReference(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
-            Vector(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
-            Struct { .. } => Self::LEGACY_BASE_MEMORY_SIZE,
-            StructInstantiation { ty_args: tys, .. } => tys
-                .iter()
-                .fold(Self::LEGACY_BASE_MEMORY_SIZE, |acc, ty| acc + ty.size()),
+impl Type {
+    pub fn verify_ty_arg_abilities<'a, I>(
+        ty_param_abilities: I,
+        ty_args: &[Self],
+    ) -> PartialVMResult<()>
+    where
+        I: IntoIterator<Item = &'a AbilitySet>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let ty_param_abilities = ty_param_abilities.into_iter();
+        if ty_param_abilities.len() != ty_args.len() {
+            return Err(PartialVMError::new(
+                StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
+            ));
         }
-    }
-
-    pub fn from_const_signature(constant_signature: &SignatureToken) -> PartialVMResult<Self> {
-        use SignatureToken as S;
-        use Type as L;
-
-        Ok(match constant_signature {
-            S::Bool => L::Bool,
-            S::U8 => L::U8,
-            S::U16 => L::U16,
-            S::U32 => L::U32,
-            S::U64 => L::U64,
-            S::U128 => L::U128,
-            S::U256 => L::U256,
-            S::Address => L::Address,
-            S::Vector(inner) => L::Vector(TriompheArc::new(Self::from_const_signature(inner)?)),
-            // Not yet supported
-            S::Struct(_) | S::StructInstantiation(_, _) => {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("Unable to load const type signature".to_string()),
-                )
-            },
-            // Not allowed/Not meaningful
-            S::TypeParameter(_) | S::Reference(_) | S::MutableReference(_) | S::Signer => {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("Unable to load const type signature".to_string()),
-                )
-            },
-        })
-    }
-
-    pub fn check_vec_ref(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
-        match self {
-            Type::MutableReference(inner) => match &**inner {
-                Type::Vector(inner) => {
-                    inner.check_eq(inner_ty)?;
-                    Ok(inner.as_ref().clone())
-                },
-                _ => Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("VecMutBorrow expects a vector reference".to_string())
-                        .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
-                ),
-            },
-            Type::Reference(inner) if !is_mut => match &**inner {
-                Type::Vector(inner) => {
-                    inner.check_eq(inner_ty)?;
-                    Ok(inner.as_ref().clone())
-                },
-                _ => Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("VecMutBorrow expects a vector reference".to_string())
-                        .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
-                ),
-            },
-            _ => Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("VecMutBorrow expects a vector reference".to_string())
-                    .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
-            ),
-        }
-    }
-
-    pub fn check_eq(&self, other: &Self) -> PartialVMResult<()> {
-        if self != other {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!(
-                        "Type mismatch: expected {:?}, got {:?}",
-                        self, other
-                    ))
-                    .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
-            );
+        for (ty, expected_ability_set) in ty_args.iter().zip(ty_param_abilities) {
+            if !expected_ability_set.is_subset(ty.abilities()?) {
+                return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED));
+            }
         }
         Ok(())
     }
 
-    pub fn check_ref_eq(&self, expected_inner: &Self) -> PartialVMResult<()> {
+    pub fn paranoid_check_is_bool_ty(&self) -> PartialVMResult<()> {
+        if !matches!(self, Self::Bool) {
+            let msg = format!("Expected boolean type, got {}", self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    pub fn paranoid_check_is_u64_ty(&self) -> PartialVMResult<()> {
+        if !matches!(self, Self::U64) {
+            let msg = format!("Expected U64 type, got {}", self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    pub fn paranoid_check_is_address_ty(&self) -> PartialVMResult<()> {
+        if !matches!(self, Self::Address) {
+            let msg = format!("Expected address type, got {}", self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    pub fn paranoid_check_is_signer_ref_ty(&self) -> PartialVMResult<()> {
+        if let Self::Reference(inner_ty) = self {
+            if matches!(inner_ty.as_ref(), Self::Signer) {
+                return Ok(());
+            }
+        }
+        let msg = format!("Expected address type, got {}", self);
+        paranoid_failure!(msg)
+    }
+
+    pub fn paranoid_check_has_ability(&self, ability: Ability) -> PartialVMResult<()> {
+        if !self.abilities()?.has_ability(ability) {
+            let msg = format!("Type {} does not have expected ability {}", self, ability);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    pub fn paranoid_check_abilities(&self, expected_abilities: AbilitySet) -> PartialVMResult<()> {
+        let abilities = self.abilities()?;
+        if !expected_abilities.is_subset(abilities) {
+            let msg = format!(
+                "Type {} has unexpected ability: expected {}, got {}",
+                self, expected_abilities, abilities
+            );
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    pub fn paranoid_check_eq(&self, expected_ty: &Self) -> PartialVMResult<()> {
+        if self != expected_ty {
+            let msg = format!("Expected type {}, got {}", expected_ty, self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    pub fn paranoid_check_is_vec_ty(&self, expected_elem_ty: &Self) -> PartialVMResult<()> {
+        if let Self::Vector(elem_ty) = self {
+            return elem_ty.paranoid_check_eq(expected_elem_ty);
+        }
+
+        let msg = format!("Expected vector type, got {}", self);
+        paranoid_failure!(msg)
+    }
+
+    pub fn paranoid_check_is_vec_ref_ty(
+        &self,
+        expected_elem_ty: &Self,
+        is_mut: bool,
+    ) -> PartialVMResult<()> {
+        if let Self::MutableReference(inner_ty) = self {
+            if let Self::Vector(elem_ty) = inner_ty.as_ref() {
+                elem_ty.paranoid_check_eq(expected_elem_ty)?;
+                return Ok(());
+            }
+        }
+
+        if let Self::Reference(inner_ty) = self {
+            if !is_mut {
+                if let Self::Vector(elem_ty) = inner_ty.as_ref() {
+                    elem_ty.paranoid_check_eq(expected_elem_ty)?;
+                    return Ok(());
+                }
+            }
+        }
+
+        let msg = format!(
+            "Expected a (mutable: {}) vector reference, got {}",
+            is_mut, self
+        );
+        paranoid_failure!(msg)
+    }
+
+    /// Returns an error if the type is not a (mutable) vector reference. Otherwise, returns
+    /// a (mutable) reference to its element type.
+    pub fn paranoid_check_and_get_vec_elem_ref_ty(
+        &self,
+        expected_elem_ty: &Self,
+        is_mut: bool,
+    ) -> PartialVMResult<Self> {
+        self.paranoid_check_is_vec_ref_ty(expected_elem_ty, is_mut)?;
+        let elem_ty = Box::new(self.get_vec_ref_elem_ty());
+
+        // SAFETY: This type construction satisfies all constraints on size/depth because the parent
+        //         vector reference type has been safely constructed.
+        Ok(if is_mut {
+            Type::MutableReference(elem_ty)
+        } else {
+            Type::Reference(elem_ty)
+        })
+    }
+
+    /// Returns an error if the type is not a (mutable) vector reference. Otherwise, returns
+    /// its element type.
+    pub fn paranoid_check_and_get_vec_elem_ty(
+        &self,
+        expected_elem_ty: &Self,
+        is_mut: bool,
+    ) -> PartialVMResult<Self> {
+        self.paranoid_check_is_vec_ref_ty(expected_elem_ty, is_mut)?;
+        Ok(self.get_vec_ref_elem_ty())
+    }
+
+    fn get_vec_ref_elem_ty(&self) -> Self {
         match self {
-            Type::MutableReference(inner) | Type::Reference(inner) => {
-                inner.check_eq(expected_inner)
+            Self::Reference(inner_ty) | Self::MutableReference(inner_ty) => match inner_ty.as_ref()
+            {
+                Self::Vector(elem_ty) => elem_ty.as_ref().clone(),
+                _ => unreachable!("The inner type must be a vector"),
             },
-            _ => Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("VecMutBorrow expects a vector reference".to_string()),
-            ),
+            _ => unreachable!("The top-level type must be a reference"),
+        }
+    }
+
+    #[inline]
+    pub fn paranoid_freeze_ref_ty(self) -> PartialVMResult<Type> {
+        match self {
+            Type::MutableReference(ty) => Ok(Type::Reference(ty)),
+            _ => {
+                let msg = format!("Expected a mutable reference to freeze, got {}", self);
+                paranoid_failure!(msg)
+            },
+        }
+    }
+
+    #[inline]
+    pub fn paranoid_read_ref(self) -> PartialVMResult<Type> {
+        match self {
+            Type::Reference(inner_ty) | Type::MutableReference(inner_ty) => {
+                inner_ty.paranoid_check_has_ability(Ability::Copy)?;
+                Ok(inner_ty.as_ref().clone())
+            },
+            _ => {
+                let msg = format!("Expected a reference to read, got {}", self);
+                paranoid_failure!(msg)
+            },
+        }
+    }
+
+    #[inline]
+    pub fn paranoid_write_ref(&self, val_ty: &Type) -> PartialVMResult<()> {
+        if let Type::MutableReference(inner_ty) = self {
+            if inner_ty.as_ref() == val_ty {
+                return inner_ty.paranoid_check_has_ability(Ability::Drop);
+            }
+        }
+
+        let msg = format!("Cannot write type {} to type {}", val_ty, self);
+        paranoid_failure!(msg)
+    }
+
+    pub fn paranoid_check_ref_eq(
+        &self,
+        expected_inner_ty: &Self,
+        is_mut: bool,
+    ) -> PartialVMResult<()> {
+        match self {
+            Type::MutableReference(inner_ty) => inner_ty.paranoid_check_eq(expected_inner_ty),
+            Type::Reference(inner_ty) if !is_mut => inner_ty.paranoid_check_eq(expected_inner_ty),
+            _ => {
+                let msg = format!(
+                    "Expected a (mutable: {}) reference type, got {}",
+                    is_mut, self
+                );
+                paranoid_failure!(msg)
+            },
         }
     }
 
@@ -624,11 +689,642 @@ impl fmt::Display for Type {
     }
 }
 
+/// Controls creation of runtime types, i.e., methods offered by this struct
+/// should be the only way to construct any type.
+#[derive(Clone, Serialize)]
+pub enum TypeBuilder {
+    // Legacy configurations only limits type depth during type substitution. Will
+    // be removed in the nearest future when the new one stabilizes. The enum can
+    // be converted into the struct at that point.
+    Legacy,
+    WithLimits {
+        // Maximum number of nodes a fully-instantiated type has.
+        max_ty_size: u64,
+        // Maximum depth (in terms of number of nodes) a fully-instantiated type has.
+        max_ty_depth: u64,
+    },
+}
+
+impl TypeBuilder {
+    pub const LEGACY_MAX_TYPE_INSTANTIATION_NODES: u64 = 128;
+    const LEGACY_TYPE_DEPTH_MAX: u64 = 256;
+
+    pub fn is_legacy(&self) -> bool {
+        matches!(self, Self::Legacy)
+    }
+
+    pub fn with_limits(max_ty_size: u64, max_ty_depth: u64) -> Self {
+        Self::WithLimits {
+            max_ty_size,
+            max_ty_depth,
+        }
+    }
+
+    pub fn legacy() -> Self {
+        Self::Legacy
+    }
+
+    #[inline]
+    pub fn create_bool_ty(&self) -> Type {
+        Type::Bool
+    }
+
+    #[inline]
+    pub fn create_u8_ty(&self) -> Type {
+        Type::U8
+    }
+
+    #[inline]
+    pub fn create_u16_ty(&self) -> Type {
+        Type::U16
+    }
+
+    #[inline]
+    pub fn create_u32_ty(&self) -> Type {
+        Type::U32
+    }
+
+    #[inline]
+    pub fn create_u64_ty(&self) -> Type {
+        Type::U64
+    }
+
+    #[inline]
+    pub fn create_u128_ty(&self) -> Type {
+        Type::U128
+    }
+
+    #[inline]
+    pub fn create_u256_ty(&self) -> Type {
+        Type::U256
+    }
+
+    /// Creates a (possibly mutable) reference type from the given inner type.
+    /// Returns an error if the type size or depth are too large.
+    #[inline]
+    pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
+        if self.is_legacy() {
+            let inner_ty = Box::new(inner_ty.clone());
+            Ok(if is_mut {
+                Type::MutableReference(inner_ty)
+            } else {
+                Type::Reference(inner_ty)
+            })
+        } else {
+            let mut count = 1;
+            let check = |c: &mut u64, d: u64| self.check(c, d);
+            let inner_ty = self
+                .clone_impl(inner_ty, &mut count, 2, check)
+                .map_err(|e| {
+                    e.append_message_with_separator(
+                        '.',
+                        format!(
+                            "Failed to create a (mutable: {}) reference type with inner type {}",
+                            is_mut, inner_ty
+                        ),
+                    )
+                })?;
+            let inner_ty = Box::new(inner_ty);
+            Ok(if is_mut {
+                Type::MutableReference(inner_ty)
+            } else {
+                Type::Reference(inner_ty)
+            })
+        }
+    }
+
+    /// Creates a vector type with the given element type, returning an error
+    /// if the type size or depth are too large.
+    #[inline]
+    pub fn create_vec_ty(&self, elem_ty: &Type) -> PartialVMResult<Type> {
+        if self.is_legacy() {
+            Ok(Type::Vector(TriompheArc::new(elem_ty.clone())))
+        } else {
+            let mut count = 1;
+            let check = |c: &mut u64, d: u64| self.check(c, d);
+            let elem_ty = self
+                .clone_impl(elem_ty, &mut count, 2, check)
+                .map_err(|e| {
+                    e.append_message_with_separator(
+                        '.',
+                        format!(
+                            "Failed to create a vector type with element type {}",
+                            elem_ty
+                        ),
+                    )
+                })?;
+            Ok(Type::Vector(TriompheArc::new(elem_ty)))
+        }
+    }
+
+    #[inline]
+    pub fn create_struct_ty(&self, idx: StructNameIndex, ability: AbilityInfo) -> Type {
+        Type::Struct { idx, ability }
+    }
+
+    /// Creates a fully-instantiated struct type, performing the type substitution.
+    /// Returns an error if the type size or depth are too large.
+    #[inline]
+    pub fn create_struct_instantiation_ty(
+        &self,
+        struct_ty: &StructType,
+        ty_params: &[Type],
+        ty_args: &[Type],
+    ) -> PartialVMResult<Type> {
+        if self.is_legacy() {
+            Ok(Type::StructInstantiation {
+                idx: struct_ty.idx,
+                ty_args: triomphe::Arc::new(
+                    ty_params
+                        .iter()
+                        .map(|ty| self.create_ty_with_subst(ty, ty_args))
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                ability: AbilityInfo::generic_struct(
+                    struct_ty.abilities,
+                    struct_ty.phantom_ty_params_mask.clone(),
+                ),
+            })
+        } else {
+            // We cannot call substitution API directly because we have to take into
+            // account struct type itself. We simply shift count and depth by 1 and
+            // call inner APIs, to save extra cloning.
+            let mut count = 1;
+            let check = |c: &mut u64, d: u64| self.check(c, d);
+
+            let ty_args = ty_params
+                .iter()
+                .map(|ty| {
+                    // Note that depth is 2 because we accounted for the parent struct type.
+                    self.subst_impl(ty, ty_args, &mut count, 2, check)
+                        .map_err(|e| {
+                            e.append_message_with_separator(
+                                '.',
+                                format!(
+                                    "Failed to instantiate a type {} with type arguments {:?}",
+                                    ty, ty_args
+                                ),
+                            )
+                        })
+                })
+                .collect::<PartialVMResult<Vec<_>>>()?;
+
+            Ok(Type::StructInstantiation {
+                idx: struct_ty.idx,
+                ty_args: triomphe::Arc::new(ty_args),
+                ability: AbilityInfo::generic_struct(
+                    struct_ty.abilities,
+                    struct_ty.phantom_ty_params_mask.clone(),
+                ),
+            })
+        }
+    }
+
+    // This has to be a separate method because there are two different legacy instantiation
+    // constructions, where one uses the legacy checks and the other does not.
+    pub fn create_struct_instantiation_ty_with_legacy_check(
+        &self,
+        struct_ty: &StructType,
+        ty_params: &[Type],
+        ty_args: &[Type],
+    ) -> PartialVMResult<Type> {
+        if self.is_legacy() {
+            Ok(Type::StructInstantiation {
+                idx: struct_ty.idx,
+                ty_args: triomphe::Arc::new(
+                    ty_params
+                        .iter()
+                        .map(|ty| self.create_ty_with_subst_with_legacy_check(ty, ty_args))
+                        .collect::<PartialVMResult<_>>()?,
+                ),
+                ability: AbilityInfo::generic_struct(
+                    struct_ty.abilities,
+                    struct_ty.phantom_ty_params_mask.clone(),
+                ),
+            })
+        } else {
+            self.create_struct_instantiation_ty(struct_ty, ty_params, ty_args)
+        }
+    }
+
+    /// Creates a type for a Move constant. Note that constant types can be
+    /// more restrictive and therefore have their own creation API.
+    pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
+        let mut count = 0;
+        self.create_constant_ty_impl(const_tok, &mut count, 1)
+            .map_err(|e| {
+                if self.is_legacy() {
+                    e
+                } else {
+                    e.append_message_with_separator(
+                        '.',
+                        format!(
+                            "Failed to construct a type for constant token {:?}",
+                            const_tok
+                        ),
+                    )
+                }
+            })
+    }
+
+    /// Creates a fully-instantiated type from its storage representation.
+    pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> VMResult<Type>
+    where
+        F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
+    {
+        let mut count = 0;
+        self.create_ty_impl(ty_tag, &mut resolver, &mut count, 1)
+    }
+
+    /// Clones the given type, at the same time instantiating all its type parameters.
+    pub fn create_ty_with_subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
+        let mut count = 0;
+
+        let check = |c: &mut u64, d: u64| {
+            if self.is_legacy() {
+                self.legacy_check_in_subst(c, d)
+            } else {
+                self.check(c, d)
+            }
+        };
+
+        self.subst_impl(ty, ty_args, &mut count, 1, check)
+    }
+
+    // This has to be a separate method because legacy type construction used both:
+    //  1) depth check only,
+    //  2) no checks
+    // in different places. When legacy implementation is removed, this function can
+    // be removed in favour of "normal" type substitution.
+    pub fn create_ty_with_subst_with_legacy_check(
+        &self,
+        ty: &Type,
+        ty_args: &[Type],
+    ) -> PartialVMResult<Type> {
+        if self.is_legacy() {
+            match ty {
+                Type::MutableReference(_) | Type::Reference(_) | Type::Vector(_) => {
+                    if legacy_count_type_nodes(ty) > Self::LEGACY_MAX_TYPE_INSTANTIATION_NODES {
+                        return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+                    }
+                },
+                Type::StructInstantiation {
+                    ty_args: struct_inst,
+                    ..
+                } => {
+                    let mut sum_nodes = 1u64;
+                    for ty in ty_args.iter().chain(struct_inst.iter()) {
+                        sum_nodes = sum_nodes.saturating_add(legacy_count_type_nodes(ty));
+                        if sum_nodes > Self::LEGACY_MAX_TYPE_INSTANTIATION_NODES {
+                            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+                        }
+                    }
+                },
+                Type::Address
+                | Type::Bool
+                | Type::Signer
+                | Type::Struct { .. }
+                | Type::TyParam(_)
+                | Type::U8
+                | Type::U16
+                | Type::U32
+                | Type::U64
+                | Type::U128
+                | Type::U256 => (),
+            };
+        }
+        self.create_ty_with_subst(ty, ty_args)
+    }
+
+    fn legacy_check_in_subst(&self, _count: &mut u64, depth: u64) -> PartialVMResult<()> {
+        if depth > Self::LEGACY_TYPE_DEPTH_MAX {
+            return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
+        }
+        Ok(())
+    }
+
+    fn check(&self, count: &mut u64, depth: u64) -> PartialVMResult<()> {
+        match self {
+            Self::WithLimits {
+                max_ty_size,
+                max_ty_depth,
+            } => {
+                if *count >= *max_ty_size {
+                    return Err(
+                        PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
+                            "Type size is larger than maximum {}",
+                            *max_ty_size
+                        )),
+                    );
+                }
+                if depth > *max_ty_depth {
+                    return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED)
+                        .with_message(format!(
+                            "Type depth is larger than maximum {}",
+                            *max_ty_depth
+                        )));
+                }
+            },
+
+            // No checks in legacy implementation. Depth check for substitution
+            // is handled separately.
+            Self::Legacy => {},
+        }
+        Ok(())
+    }
+
+    fn create_constant_ty_impl(
+        &self,
+        const_tok: &SignatureToken,
+        count: &mut u64,
+        depth: u64,
+    ) -> PartialVMResult<Type> {
+        use SignatureToken as S;
+        use Type::*;
+
+        self.check(count, depth)?;
+        *count += 1;
+        Ok(match const_tok {
+            S::Bool => Bool,
+            S::U8 => U8,
+            S::U16 => U16,
+            S::U32 => U32,
+            S::U64 => U64,
+            S::U128 => U128,
+            S::U256 => U256,
+            S::Address => Address,
+            S::Vector(elem_tok) => {
+                let elem_ty = self.create_constant_ty_impl(elem_tok, count, depth + 1)?;
+                Vector(TriompheArc::new(elem_ty))
+            },
+
+            S::Struct(_) | S::StructInstantiation(_, _) => {
+                let msg = if self.is_legacy() {
+                    "Unable to load const type signature".to_string()
+                } else {
+                    "Struct constants are not supported".to_string()
+                };
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(msg),
+                );
+            },
+
+            tok => {
+                let msg = if self.is_legacy() {
+                    "Unable to load const type signature".to_string()
+                } else {
+                    format!(
+                        "{:?} is not allowed or is not a meaningful token for a constant",
+                        tok
+                    )
+                };
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(msg),
+                );
+            },
+        })
+    }
+
+    fn subst_impl<G>(
+        &self,
+        ty: &Type,
+        ty_args: &[Type],
+        count: &mut u64,
+        depth: u64,
+        check: G,
+    ) -> PartialVMResult<Type>
+    where
+        G: Fn(&mut u64, u64) -> PartialVMResult<()> + Copy,
+    {
+        Self::apply_subst(
+            ty,
+            |idx, c, d| match ty_args.get(idx as usize) {
+                Some(ty) => self.clone_impl(ty, c, d, check),
+                None => {
+                    let msg = if self.is_legacy() {
+                        format!(
+                            "type substitution failed: index out of bounds -- len {} got {}",
+                            ty_args.len(),
+                            idx
+                        )
+                    } else {
+                        format!(
+                            "Type substitution failed: index {} is out of bounds for {} type arguments",
+                            idx,
+                            ty_args.len()
+                        )
+                    };
+                    Err(
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message(msg),
+                    )
+                },
+            },
+            count,
+            depth,
+            check,
+        )
+    }
+
+    fn clone_impl<G>(
+        &self,
+        ty: &Type,
+        count: &mut u64,
+        depth: u64,
+        check: G,
+    ) -> PartialVMResult<Type>
+    where
+        G: Fn(&mut u64, u64) -> PartialVMResult<()> + Copy,
+    {
+        Self::apply_subst(
+            ty,
+            |idx, _, _| {
+                // The type cannot contain type parameters anymore (it also does not make
+                // sense to have them!), and so it is the caller's responsibility to ensure
+                // type substitution has been performed.
+                Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
+                        "There is an unresolved type parameter (index: {}) when cloning type {}",
+                        idx, ty
+                    )),
+                )
+            },
+            count,
+            depth,
+            check,
+        )
+    }
+
+    fn apply_subst<F, G>(
+        ty: &Type,
+        subst: F,
+        count: &mut u64,
+        depth: u64,
+        check: G,
+    ) -> PartialVMResult<Type>
+    where
+        F: Fn(u16, &mut u64, u64) -> PartialVMResult<Type> + Copy,
+        G: Fn(&mut u64, u64) -> PartialVMResult<()> + Copy,
+    {
+        use Type::*;
+
+        check(count, depth)?;
+        *count += 1;
+        Ok(match ty {
+            TyParam(idx) => {
+                // To avoid double-counting, revert counting the type parameter.
+                *count -= 1;
+                subst(*idx, count, depth)?
+            },
+
+            Bool => Bool,
+            U8 => U8,
+            U16 => U16,
+            U32 => U32,
+            U64 => U64,
+            U128 => U128,
+            U256 => U256,
+            Address => Address,
+            Signer => Signer,
+            Vector(elem_ty) => {
+                let elem_ty = Self::apply_subst(elem_ty, subst, count, depth + 1, check)?;
+                Vector(TriompheArc::new(elem_ty))
+            },
+            Reference(inner_ty) => {
+                let inner_ty = Self::apply_subst(inner_ty, subst, count, depth + 1, check)?;
+                Reference(Box::new(inner_ty))
+            },
+            MutableReference(inner_ty) => {
+                let inner_ty = Self::apply_subst(inner_ty, subst, count, depth + 1, check)?;
+                MutableReference(Box::new(inner_ty))
+            },
+            Struct { idx, ability } => Struct {
+                idx: *idx,
+                ability: ability.clone(),
+            },
+            StructInstantiation {
+                idx,
+                ty_args: non_instantiated_tys,
+                ability,
+            } => {
+                let mut instantiated_tys = vec![];
+                for ty in non_instantiated_tys.iter() {
+                    let ty = Self::apply_subst(ty, subst, count, depth + 1, check)?;
+                    instantiated_tys.push(ty);
+                }
+                StructInstantiation {
+                    idx: *idx,
+                    ty_args: TriompheArc::new(instantiated_tys),
+                    ability: ability.clone(),
+                }
+            },
+        })
+    }
+
+    fn create_ty_impl<F>(
+        &self,
+        ty_tag: &TypeTag,
+        resolver: &mut F,
+        count: &mut u64,
+        depth: u64,
+    ) -> VMResult<Type>
+    where
+        F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
+    {
+        use Type::*;
+        use TypeTag as T;
+
+        self.check(count, depth)
+            .map_err(|e| e.finish(Location::Undefined))?;
+        *count += 1;
+        Ok(match ty_tag {
+            T::Bool => Bool,
+            T::U8 => U8,
+            T::U16 => U16,
+            T::U32 => U32,
+            T::U64 => U64,
+            T::U128 => U128,
+            T::U256 => U256,
+            T::Address => Address,
+            T::Signer => Signer,
+            T::Vector(elem_ty_tag) => {
+                let elem_ty = self.create_ty_impl(elem_ty_tag, resolver, count, depth + 1)?;
+                Vector(triomphe::Arc::new(elem_ty))
+            },
+            T::Struct(struct_tag) => {
+                let struct_ty = resolver(struct_tag.as_ref())?;
+
+                if struct_ty.ty_params.is_empty() && struct_tag.type_args.is_empty() {
+                    Struct {
+                        idx: struct_ty.idx,
+                        ability: AbilityInfo::struct_(struct_ty.abilities),
+                    }
+                } else {
+                    let mut ty_args = vec![];
+                    for ty_arg in &struct_tag.type_args {
+                        let ty_arg = self.create_ty_impl(ty_arg, resolver, count, depth + 1)?;
+                        ty_args.push(ty_arg);
+                    }
+                    Type::verify_ty_arg_abilities(struct_ty.ty_param_constraints(), &ty_args)
+                        .map_err(|e| e.finish(Location::Undefined))?;
+                    StructInstantiation {
+                        idx: struct_ty.idx,
+                        ty_args: triomphe::Arc::new(ty_args),
+                        ability: AbilityInfo::generic_struct(
+                            struct_ty.abilities,
+                            struct_ty.phantom_ty_params_mask.clone(),
+                        ),
+                    }
+                }
+            },
+        })
+    }
+
+    #[cfg(test)]
+    fn num_nodes_in_subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<usize> {
+        let mut count = 0;
+
+        let check = |c: &mut u64, d: u64| self.check(c, d);
+        self.subst_impl(ty, ty_args, &mut count, 1, check)?;
+        Ok(count as usize)
+    }
+}
+
+pub fn legacy_count_type_nodes(ty: &Type) -> u64 {
+    let mut todo = vec![ty];
+    let mut result = 0;
+    while let Some(ty) = todo.pop() {
+        match ty {
+            Type::Vector(ty) => {
+                result += 1;
+                todo.push(ty);
+            },
+            Type::Reference(ty) | Type::MutableReference(ty) => {
+                result += 1;
+                todo.push(ty);
+            },
+            Type::StructInstantiation { ty_args, .. } => {
+                result += 1;
+                todo.extend(ty_args.iter())
+            },
+            _ => {
+                result += 1;
+            },
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod unit_tests {
     use super::*;
+    use claims::{assert_err, assert_matches, assert_ok};
+    use move_binary_format::file_format::StructHandleIndex;
 
-    fn struct_inst_for_test(ty_args: Vec<Type>) -> Type {
+    fn struct_instantiation_ty_for_test(ty_args: Vec<Type>) -> Type {
         Type::StructInstantiation {
             idx: StructNameIndex(0),
             ability: AbilityInfo::struct_(AbilitySet::EMPTY),
@@ -636,11 +1332,30 @@ mod unit_tests {
         }
     }
 
-    fn struct_for_test() -> Type {
+    fn struct_ty_for_test() -> Type {
         Type::Struct {
             idx: StructNameIndex(0),
             ability: AbilityInfo::struct_(AbilitySet::EMPTY),
         }
+    }
+
+    fn nested_vec_for_test(ty_depth: u64) -> (Type, SignatureToken, TypeTag) {
+        use SignatureToken as S;
+        use Type::*;
+        use TypeTag as T;
+
+        let mut ty = U8;
+        let mut tok = S::U8;
+        let mut tag = T::U8;
+
+        let mut depth = 1;
+        while depth < ty_depth {
+            ty = Vector(TriompheArc::new(ty.clone()));
+            tok = S::Vector(Box::new(tok.clone()));
+            tag = T::Vector(Box::new(tag.clone()));
+            depth += 1;
+        }
+        (ty, tok, tag)
     }
 
     #[test]
@@ -653,10 +1368,14 @@ mod unit_tests {
             (Vector(TriompheArc::new(Vector(TriompheArc::new(U8)))), 3),
             (Reference(Box::new(Bool)), 2),
             (TyParam(0), 1),
-            (struct_for_test(), 1),
-            (struct_inst_for_test(vec![U8, U8]), 3),
+            (struct_ty_for_test(), 1),
+            (struct_instantiation_ty_for_test(vec![U8, U8]), 3),
             (
-                struct_inst_for_test(vec![U8, struct_inst_for_test(vec![Bool, Bool, Bool]), U8]),
+                struct_instantiation_ty_for_test(vec![
+                    U8,
+                    struct_instantiation_ty_for_test(vec![Bool, Bool, Bool]),
+                    U8,
+                ]),
                 7,
             ),
         ];
@@ -670,17 +1389,18 @@ mod unit_tests {
     fn test_num_nodes_in_subst() {
         use Type::*;
 
+        let ty_builder = TypeBuilder::with_limits(11, 5);
         let cases: Vec<(Type, Vec<Type>, usize)> = vec![
             (TyParam(0), vec![Bool], 1),
             (TyParam(0), vec![Vector(TriompheArc::new(Bool))], 2),
             (Bool, vec![], 1),
             (
-                struct_inst_for_test(vec![TyParam(0), TyParam(0)]),
+                struct_instantiation_ty_for_test(vec![TyParam(0), TyParam(0)]),
                 vec![Vector(TriompheArc::new(Bool))],
                 5,
             ),
             (
-                struct_inst_for_test(vec![TyParam(0), TyParam(1)]),
+                struct_instantiation_ty_for_test(vec![TyParam(0), TyParam(1)]),
                 vec![
                     Vector(TriompheArc::new(Bool)),
                     Vector(TriompheArc::new(Vector(TriompheArc::new(Bool)))),
@@ -689,8 +1409,444 @@ mod unit_tests {
             ),
         ];
 
-        for (ty, ty_args, expected) in cases {
-            assert_eq!(ty.num_nodes_in_subst(&ty_args).unwrap(), expected);
+        for (ty, ty_args, expected_num_nodes) in cases {
+            let num_nodes = assert_ok!(ty_builder.num_nodes_in_subst(&ty, &ty_args));
+            assert_eq!(num_nodes, expected_num_nodes);
+            assert_eq!(ty.num_nodes_in_subst(&ty_args).unwrap(), expected_num_nodes);
         }
+    }
+
+    #[test]
+    fn test_substitution_large_depth() {
+        use Type::*;
+
+        let ty_builder = TypeBuilder::with_limits(11, 5);
+
+        let ty = Vector(TriompheArc::new(Vector(TriompheArc::new(TyParam(0)))));
+        let ty_arg = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
+        assert_ok!(ty_builder.create_ty_with_subst(&ty, &[ty_arg.clone()]));
+
+        let ty_arg = Vector(TriompheArc::new(ty_arg));
+        let err = assert_err!(ty_builder.create_ty_with_subst(&ty, &[ty_arg]));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+    }
+
+    #[test]
+    fn test_substitution_large_count() {
+        use Type::*;
+
+        let ty_builder = TypeBuilder::with_limits(11, 5);
+
+        let ty_params: Vec<Type> = (0..5).map(TyParam).collect();
+        let ty = struct_instantiation_ty_for_test(ty_params);
+
+        // Each type argument contributes 2 nodes, so in total the count is 11.
+        let ty_args: Vec<Type> = (0..5).map(|_| Vector(TriompheArc::new(Bool))).collect();
+        let num_nodes = assert_ok!(ty_builder.num_nodes_in_subst(&ty, &ty_args));
+        assert_eq!(num_nodes, 11);
+
+        let ty_args: Vec<Type> = (0..5)
+            .map(|i| {
+                if i == 4 {
+                    // 3 nodes, to increase the total count to 12.
+                    struct_instantiation_ty_for_test(vec![U64, struct_ty_for_test()])
+                } else {
+                    Vector(TriompheArc::new(Bool))
+                }
+            })
+            .collect();
+        let err = assert_err!(ty_builder.create_ty_with_subst(&ty, &ty_args));
+        assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+    }
+
+    #[test]
+    fn test_create_primitive_tys() {
+        use Type::*;
+
+        // Limits are irrelevant here.
+        let ty_builder = TypeBuilder::with_limits(1, 1);
+        let legacy_ty_builder = TypeBuilder::legacy();
+
+        assert_eq!(ty_builder.create_u8_ty(), U8);
+        assert_eq!(legacy_ty_builder.create_u8_ty(), U8);
+
+        assert_eq!(ty_builder.create_u16_ty(), U16);
+        assert_eq!(legacy_ty_builder.create_u16_ty(), U16);
+
+        assert_eq!(ty_builder.create_u32_ty(), U32);
+        assert_eq!(legacy_ty_builder.create_u32_ty(), U32);
+
+        assert_eq!(ty_builder.create_u64_ty(), U64);
+        assert_eq!(legacy_ty_builder.create_u64_ty(), U64);
+
+        assert_eq!(ty_builder.create_u128_ty(), U128);
+        assert_eq!(legacy_ty_builder.create_u128_ty(), U128);
+
+        assert_eq!(ty_builder.create_u256_ty(), U256);
+        assert_eq!(legacy_ty_builder.create_u256_ty(), U256);
+
+        assert_eq!(ty_builder.create_bool_ty(), Bool);
+        assert_eq!(legacy_ty_builder.create_bool_ty(), Bool);
+    }
+
+    #[test]
+    fn test_create_struct_ty() {
+        let idx = StructNameIndex(0);
+        let ability_info = AbilityInfo::struct_(AbilitySet::EMPTY);
+
+        // Limits are not relevant here.
+        let struct_ty = TypeBuilder::with_limits(1, 1).create_struct_ty(idx, ability_info.clone());
+        let legacy_struct_ty = TypeBuilder::legacy().create_struct_ty(idx, ability_info);
+
+        assert_eq!(&struct_ty, &legacy_struct_ty);
+        assert_matches!(struct_ty, Type::Struct { .. });
+    }
+
+    #[test]
+    fn test_create_struct_instantiation_ty() {
+        use Type::*;
+
+        let struct_ty = StructType::for_test();
+        let ty_params = [TyParam(0), Bool, TyParam(1)];
+
+        // Should succeed, type size limit is 5, and we have 5 nodes.
+        let ty_builder = TypeBuilder::with_limits(5, 100);
+        let ty_args = [Bool, Vector(TriompheArc::new(Bool))];
+        let ty =
+            assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
+        let legacy_ty =
+            assert_ok!(TypeBuilder::legacy()
+                .create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
+        assert_eq!(ty, legacy_ty);
+
+        // Should fail, we have size of 6 now.
+        let ty_args = [
+            Vector(TriompheArc::new(Bool)),
+            Vector(TriompheArc::new(Bool)),
+        ];
+        let err = assert_err!(
+            ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args)
+        );
+        assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+
+        // Should succeed, type depth limit is 4, and we have 4 nodes (3 in type parameter + struct).
+        let nested_vec = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
+        let ty_args = vec![Bool, nested_vec.clone()];
+        let ty_builder = TypeBuilder::with_limits(100, 4);
+        let ty =
+            assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
+        let legacy_ty =
+            assert_ok!(TypeBuilder::legacy()
+                .create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
+        assert_eq!(ty, legacy_ty);
+
+        // Should fail, we have depth of 5 now.
+        let ty_params = vec![Bool, Vector(TriompheArc::new(nested_vec))];
+        let err = assert_err!(
+            ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args)
+        );
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+    }
+
+    #[test]
+    fn test_create_vec_ty() {
+        let max_ty_depth = 5;
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
+        let legacy_ty_builder = TypeBuilder::legacy();
+
+        // Make sure the new type builder creates vector types in the same way as the legacy once.
+        let mut depth = 1;
+        let mut ty = Type::Bool;
+        while depth < max_ty_depth {
+            let legacy_ty = assert_ok!(legacy_ty_builder.create_vec_ty(&ty));
+            ty = assert_ok!(ty_builder.create_vec_ty(&ty));
+
+            assert_eq!(&ty, &legacy_ty);
+            assert_matches!(ty, Type::Vector(_));
+            depth += 1;
+        }
+        assert_eq!(depth, max_ty_depth);
+
+        // New type builder fails on exceeding the depth, but not the legacy one.
+        let err = assert_err!(ty_builder.create_vec_ty(&ty));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+        let legacy_ty = assert_ok!(legacy_ty_builder.create_vec_ty(&ty));
+        assert_matches!(legacy_ty, Type::Vector(_));
+
+        // The checks are always ordered: first number of nodes, then depth. Using
+        // a type builder with smaller than depth size limit must return a different
+        // error code.
+        let max_ty_size = 5;
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
+        let err = assert_err!(ty_builder.create_vec_ty(&ty));
+        assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+    }
+
+    #[test]
+    fn test_create_ref_ty() {
+        let max_ty_depth = 5;
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
+        let legacy_ty_builder = TypeBuilder::legacy();
+
+        let mut depth = 1;
+        let mut ty = Type::Bool;
+        while depth < max_ty_depth {
+            let legacy_ty = assert_ok!(legacy_ty_builder.create_ref_ty(&ty, false));
+            ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
+
+            assert_eq!(&ty, &legacy_ty);
+            assert_matches!(ty, Type::Reference(_));
+            depth += 1;
+        }
+        assert_eq!(depth, max_ty_depth);
+
+        let err = assert_err!(ty_builder.create_ref_ty(&ty, false));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+        let legacy_ty = assert_ok!(legacy_ty_builder.create_ref_ty(&ty, false));
+        assert_matches!(legacy_ty, Type::Reference(_));
+
+        let max_ty_size = 5;
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
+        let err = assert_err!(ty_builder.create_ref_ty(&ty, false));
+        assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+    }
+
+    #[test]
+    fn test_create_mut_ref_ty() {
+        let max_ty_depth = 5;
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
+        let legacy_ty_builder = TypeBuilder::legacy();
+
+        let mut depth = 1;
+        let mut ty = Type::Bool;
+        while depth < max_ty_depth {
+            let legacy_ty = assert_ok!(legacy_ty_builder.create_ref_ty(&ty, true));
+            ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
+
+            assert_eq!(&ty, &legacy_ty);
+            assert_matches!(ty, Type::MutableReference(_));
+            depth += 1;
+        }
+        assert_eq!(depth, max_ty_depth);
+
+        let err = assert_err!(ty_builder.create_ref_ty(&ty, true));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+        let legacy_ty = assert_ok!(legacy_ty_builder.create_ref_ty(&ty, true));
+        assert_matches!(legacy_ty, Type::MutableReference(_));
+
+        let max_ty_size = 5;
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
+        let err = assert_err!(ty_builder.create_ref_ty(&ty, true));
+        assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+    }
+
+    #[test]
+    fn test_create_constant_ty() {
+        use SignatureToken as S;
+        use Type::*;
+
+        let max_ty_depth = 5;
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
+        let legacy_ty_builder = TypeBuilder::legacy();
+
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U8)), U8);
+        assert_eq!(assert_ok!(legacy_ty_builder.create_constant_ty(&S::U8)), U8);
+
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U16)), U16);
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U16)),
+            U16
+        );
+
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U32)), U32);
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U32)),
+            U32
+        );
+
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U64)), U64);
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U64)),
+            U64
+        );
+
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U128)), U128);
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U128)),
+            U128
+        );
+
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U256)), U256);
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::U256)),
+            U256
+        );
+
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::Bool)), Bool);
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::Bool)),
+            Bool
+        );
+
+        assert_eq!(
+            assert_ok!(ty_builder.create_constant_ty(&S::Address)),
+            Address
+        );
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&S::Address)),
+            Address
+        );
+
+        // Vectors are special, because we limit their depth (and size).
+        // Here, we test the boundary cases.
+
+        for depth in [max_ty_depth - 1, max_ty_depth] {
+            let (expected_ty, vec_tok, _) = nested_vec_for_test(depth);
+            let ty = assert_ok!(ty_builder.create_constant_ty(&vec_tok));
+            let legacy_ty = assert_ok!(legacy_ty_builder.create_constant_ty(&vec_tok));
+            assert_eq!(&ty, &legacy_ty);
+            assert_eq!(&ty, &expected_ty);
+        }
+
+        let (expected_legacy_ty, vec_tok, _) = nested_vec_for_test(max_ty_depth + 1);
+        let err = assert_err!(ty_builder.create_constant_ty(&vec_tok));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_constant_ty(&vec_tok)),
+            expected_legacy_ty
+        );
+
+        let max_ty_size = 5;
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
+
+        for size in [max_ty_size - 1, max_ty_size] {
+            let (expected_ty, vec_tok, _) = nested_vec_for_test(size);
+            let ty = assert_ok!(ty_builder.create_constant_ty(&vec_tok));
+            let legacy_ty = assert_ok!(legacy_ty_builder.create_constant_ty(&vec_tok));
+            assert_eq!(&ty, &legacy_ty);
+            assert_eq!(&ty, &expected_ty);
+        }
+
+        let (_, vec_tok, _) = nested_vec_for_test(max_ty_size + 1);
+        let err = assert_err!(ty_builder.create_constant_ty(&vec_tok));
+        assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+
+        // The following tokens cannot be constants:
+
+        let struct_tok = S::Struct(StructHandleIndex::new(0));
+        assert_err!(ty_builder.create_constant_ty(&struct_tok));
+        assert_err!(legacy_ty_builder.create_constant_ty(&struct_tok));
+
+        let struct_instantiation_tok = S::StructInstantiation(StructHandleIndex::new(0), vec![]);
+        assert_err!(ty_builder.create_constant_ty(&struct_instantiation_tok));
+        assert_err!(legacy_ty_builder.create_constant_ty(&struct_instantiation_tok));
+
+        assert_err!(ty_builder.create_constant_ty(&S::Signer));
+        assert_err!(legacy_ty_builder.create_constant_ty(&S::Signer));
+
+        let ref_tok = S::Reference(Box::new(S::U8));
+        assert_err!(ty_builder.create_constant_ty(&ref_tok));
+        assert_err!(legacy_ty_builder.create_constant_ty(&ref_tok));
+
+        let mut_ref_tok = S::Reference(Box::new(S::U8));
+        assert_err!(ty_builder.create_constant_ty(&mut_ref_tok));
+        assert_err!(legacy_ty_builder.create_constant_ty(&mut_ref_tok));
+
+        let ty_param_tok = S::TypeParameter(0);
+        assert_err!(ty_builder.create_constant_ty(&ty_param_tok));
+        assert_err!(legacy_ty_builder.create_constant_ty(&ty_param_tok));
+    }
+
+    #[test]
+    fn test_create_ty() {
+        use Type::*;
+        use TypeTag as T;
+
+        let max_ty_size = 11;
+        let max_ty_depth = 5;
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, max_ty_depth);
+        let legacy_ty_builder = TypeBuilder::legacy();
+
+        let no_op = |_: &StructTag| unreachable!("Should not be called");
+
+        // Primitive types.
+
+        assert_eq!(assert_ok!(ty_builder.create_ty(&T::U8, no_op)), U8);
+        assert_eq!(assert_ok!(legacy_ty_builder.create_ty(&T::U8, no_op)), U8);
+
+        assert_eq!(assert_ok!(ty_builder.create_ty(&T::U16, no_op)), U16);
+        assert_eq!(assert_ok!(legacy_ty_builder.create_ty(&T::U16, no_op)), U16);
+
+        assert_eq!(assert_ok!(ty_builder.create_ty(&T::U32, no_op)), U32);
+        assert_eq!(assert_ok!(legacy_ty_builder.create_ty(&T::U32, no_op)), U32);
+
+        assert_eq!(assert_ok!(ty_builder.create_ty(&T::U64, no_op)), U64);
+        assert_eq!(assert_ok!(legacy_ty_builder.create_ty(&T::U64, no_op)), U64);
+
+        assert_eq!(assert_ok!(ty_builder.create_ty(&T::U128, no_op)), U128);
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::U128, no_op)),
+            U128
+        );
+
+        assert_eq!(assert_ok!(ty_builder.create_ty(&T::U256, no_op)), U256);
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::U256, no_op)),
+            U256
+        );
+
+        assert_eq!(assert_ok!(ty_builder.create_ty(&T::Bool, no_op)), Bool);
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::Bool, no_op)),
+            Bool
+        );
+
+        assert_eq!(
+            assert_ok!(ty_builder.create_ty(&T::Address, no_op)),
+            Address
+        );
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::Address, no_op)),
+            Address
+        );
+
+        assert_eq!(assert_ok!(ty_builder.create_ty(&T::Signer, no_op)), Signer);
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_ty(&T::Signer, no_op)),
+            Signer
+        );
+
+        // Vectors.
+
+        for depth in [max_ty_depth - 1, max_ty_depth] {
+            let (expected_ty, _, vec_tag) = nested_vec_for_test(depth);
+            let ty = assert_ok!(ty_builder.create_ty(&vec_tag, no_op));
+            let legacy_ty = assert_ok!(legacy_ty_builder.create_ty(&vec_tag, no_op));
+            assert_eq!(&ty, &legacy_ty);
+            assert_eq!(&ty, &expected_ty);
+        }
+
+        let (expected_legacy_ty, _, vec_tag) = nested_vec_for_test(max_ty_depth + 1);
+        let err = assert_err!(ty_builder.create_ty(&vec_tag, no_op));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+        assert_eq!(
+            assert_ok!(legacy_ty_builder.create_ty(&vec_tag, no_op)),
+            expected_legacy_ty
+        );
+
+        let max_ty_size = 5;
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
+
+        for size in [max_ty_size - 1, max_ty_size] {
+            let (expected_ty, _, vec_tag) = nested_vec_for_test(size);
+            let ty = assert_ok!(ty_builder.create_ty(&vec_tag, no_op));
+            let legacy_ty = assert_ok!(legacy_ty_builder.create_ty(&vec_tag, no_op));
+            assert_eq!(&ty, &legacy_ty);
+            assert_eq!(&ty, &expected_ty);
+        }
+
+        let (_, _, vec_tag) = nested_vec_for_test(max_ty_size + 1);
+        let err = assert_err!(ty_builder.create_ty(&vec_tag, no_op));
+        assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
 }

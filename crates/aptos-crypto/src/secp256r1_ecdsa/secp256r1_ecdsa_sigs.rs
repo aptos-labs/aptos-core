@@ -17,7 +17,8 @@ use serde::Serialize;
 use signature::Verifier;
 use std::{cmp::Ordering, fmt};
 
-/// A Secp256r1 ECDSA signature
+/// A secp256r1 ECDSA signature.
+/// NOTE: The max size on this struct is enforced in its `TryFrom<u8>` trait implementation.
 #[derive(DeserializeKey, Clone, SerializeKey)]
 #[key_name("Secp256r1EcdsaSignature")]
 pub struct Signature(pub(crate) p256::ecdsa::Signature);
@@ -64,14 +65,14 @@ impl Signature {
         if bytes.len() != SIGNATURE_LENGTH {
             return Err(CryptoMaterialError::WrongLengthError);
         }
-        if !Signature::check_s_lt_order_half(&bytes[32..]) {
+        if !Signature::check_s_le_order_half(&bytes[32..]) {
             return Err(CryptoMaterialError::CanonicalRepresentationError);
         }
         Ok(())
     }
 
-    /// Check if S < ORDER_HALF to capture invalid signatures.
-    fn check_s_lt_order_half(s: &[u8]) -> bool {
+    /// Check if S <= ORDER_HALF to capture invalid signatures.
+    fn check_s_le_order_half(s: &[u8]) -> bool {
         for i in 0..32 {
             match s[i].cmp(&ORDER_HALF[i]) {
                 Ordering::Less => return true,
@@ -79,8 +80,8 @@ impl Signature {
                 _ => {},
             }
         }
-        // At this stage S == ORDER_HALF which implies a non canonical S.
-        false
+        // At this stage S == ORDER_HALF , it is still considered a canonical value.
+        true
     }
 
     /// If the signature {R,S} does not have S < n/2 where n is the Ristretto255 order, return

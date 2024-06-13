@@ -35,8 +35,11 @@ use aptos_rosetta::{
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
-    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, chain_id::ChainId,
-    on_chain_config::GasScheduleV2, transaction::SignedTransaction,
+    account_address::AccountAddress,
+    account_config::CORE_CODE_ADDRESS,
+    chain_id::ChainId,
+    on_chain_config::{GasScheduleV2, OnChainRandomnessConfig},
+    transaction::SignedTransaction,
 };
 use serde_json::json;
 use std::{
@@ -79,6 +82,7 @@ async fn setup_test(
     let (swarm, cli, faucet) = SwarmBuilder::new_local(1)
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.epoch_duration_secs = EPOCH_DURATION_S;
+            genesis_config.randomness_config_override = Some(OnChainRandomnessConfig::Off);
         }))
         .with_init_config(config_fn)
         .with_aptos()
@@ -724,7 +728,7 @@ async fn test_block() {
         .into_inner();
     let feature_version = gas_schedule.feature_version;
     let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
-        &gas_schedule.to_btree_map(),
+        &gas_schedule.into_btree_map(),
         feature_version,
     )
     .unwrap();
@@ -1099,6 +1103,13 @@ async fn parse_block_transactions(
                 assert!(matches!(
                     actual_txn.transaction,
                     aptos_types::transaction::Transaction::StateCheckpoint(_)
+                ));
+                assert!(transaction.operations.is_empty());
+            },
+            TransactionType::BlockEpilogue => {
+                assert!(matches!(
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::BlockEpilogue(_)
                 ));
                 assert!(transaction.operations.is_empty());
             },

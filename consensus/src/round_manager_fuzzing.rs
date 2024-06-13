@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::BlockStore,
+    block_storage::{pending_blocks::PendingBlocks, BlockStore},
     liveness::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
@@ -39,7 +39,10 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::{Features, OnChainConsensusConfig, ValidatorSet, ValidatorTxnConfig},
+    on_chain_config::{
+        OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorSet,
+        ValidatorTxnConfig,
+    },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -88,6 +91,8 @@ fn build_empty_store(
         Arc::new(SimulatedTimeService::new()),
         10,
         Arc::from(PayloadManager::DirectMempool),
+        false,
+        Arc::new(Mutex::new(PendingBlocks::new())),
     ))
 }
 
@@ -179,11 +184,14 @@ fn create_node_for_fuzzing() -> RoundManager {
         Duration::ZERO,
         1,
         1024,
+        1,
+        1024,
         10,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
+        true,
     );
 
     //
@@ -210,8 +218,9 @@ fn create_node_for_fuzzing() -> RoundManager {
         OnChainConsensusConfig::default(),
         round_manager_tx,
         ConsensusConfig::default(),
-        Features::default(),
-        true,
+        OnChainRandomnessConfig::default_enabled(),
+        OnChainJWKConsensusConfig::default_enabled(),
+        None,
     )
 }
 

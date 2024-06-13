@@ -1,0 +1,34 @@
+
+Diagnostics:
+error: type `T` is missing required ability `key`
+  ┌─ tests/checking/abilities/missing_key.move:4:19
+  │
+4 │         move_from<T>(addr);
+  │                   ^
+  │
+  = required by instantiating type parameter `T:key` of function `move_from`
+
+error: type `Impotent` is missing required ability `store`
+   ┌─ tests/checking/abilities/missing_key.move:15:19
+   │
+15 │         move_from<S<Impotent>>(addr);
+   │                   ^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `S`
+   = required by instantiating type parameter `T:key` of function `move_from`
+
+error: type `Impotent` is missing required ability `key`
+   ┌─ tests/checking/abilities/missing_key.move:16:27
+   │
+16 │         borrow_global_mut<Impotent>(addr);
+   │                           ^^^^^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `borrow_global_mut`
+
+error: type `Impotent` is missing required ability `key` (type was inferred)
+   ┌─ tests/checking/abilities/missing_key.move:22:9
+   │
+22 │         move_to(signer, Impotent {})
+   │         ^^^^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_to`

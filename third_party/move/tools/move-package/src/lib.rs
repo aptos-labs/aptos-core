@@ -19,15 +19,16 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use clap::*;
-use move_command_line_common::env::read_bool_env_var;
 use move_compiler::{
     command_line::SKIP_ATTRIBUTE_CHECKS, shared::known_attributes::KnownAttribute,
 };
 use move_core_types::account_address::AccountAddress;
-use move_model::model;
-use once_cell::sync::Lazy;
+use move_model::{
+    metadata::{CompilerVersion, LanguageVersion},
+    model,
+};
 use serde::{Deserialize, Serialize};
-use source_package::layout::SourcePackageLayout;
+use source_package::{layout::SourcePackageLayout, std_lib::StdVersion};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -108,6 +109,10 @@ pub struct BuildConfig {
     #[clap(name = "test-mode", long = "test", global = true)]
     pub test_mode: bool,
 
+    /// Whether to override the standard library with the given version.
+    #[clap(long = "override-std", global = true, value_parser)]
+    pub override_std: Option<StdVersion>,
+
     /// Generate documentation for packages
     #[clap(name = "generate-docs", long = "doc", global = true)]
     pub generate_docs: bool,
@@ -166,25 +171,14 @@ pub struct CompilerConfig {
     pub skip_attribute_checks: bool,
 
     /// Compiler version to use
-    #[clap(long = "compiler-version", global = true)]
+    #[clap(long = "compiler-version", global = true,
+           value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
-}
 
-#[derive(ValueEnum, Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd)]
-pub enum CompilerVersion {
-    V1,
-    V2,
-}
-
-impl Default for CompilerVersion {
-    fn default() -> Self {
-        static MOVE_COMPILER_V2: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_COMPILER_V2"));
-        if *MOVE_COMPILER_V2 {
-            Self::V2
-        } else {
-            Self::V1
-        }
-    }
+    /// Language version to support
+    #[clap(long = "language-version", global = true,
+           value_parser = clap::value_parser!(LanguageVersion))]
+    pub language_version: Option<LanguageVersion>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
@@ -194,6 +188,10 @@ pub struct ModelConfig {
     /// If set, a string how targets are filtered. A target is included if its file name
     /// contains this string. This is similar as the `cargo test <string>` idiom.
     pub target_filter: Option<String>,
+    /// The compiler version used to build the model
+    pub compiler_version: CompilerVersion,
+    /// The language version used to build the model
+    pub language_version: LanguageVersion,
 }
 
 impl BuildConfig {

@@ -44,6 +44,11 @@ impl NumericalAddress {
         bytes: AccountAddress::ONE,
         format: NumberFormat::Hex,
     };
+    // bytes used for scripts, which don't have an address
+    pub const MAX_ADDRESS: Self = NumericalAddress {
+        bytes: AccountAddress::MAX_ADDRESS,
+        format: NumberFormat::Hex,
+    };
 
     pub const fn new(bytes: [u8; AccountAddress::LENGTH], format: NumberFormat) -> Self {
         Self {

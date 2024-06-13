@@ -3,7 +3,7 @@
 
 use crate::{
     aptos::move_test_helpers, smoke_test_environment::SwarmBuilder,
-    test_utils::check_create_mint_transfer, workspace_builder, workspace_builder::workspace_root,
+    utils::check_create_mint_transfer, workspace_builder, workspace_builder::workspace_root,
 };
 use aptos_crypto::ValidCryptoMaterialStringExt;
 use aptos_forge::Swarm;
@@ -14,7 +14,7 @@ use aptos_release_builder::{
         feature_flags::{FeatureFlag, Features},
         framework::FrameworkReleaseConfig,
         gas::generate_gas_upgrade_proposal,
-        ExecutionMode, Proposal, ProposalMetadata,
+        ExecutionMode, GasScheduleLocator, Proposal, ProposalMetadata,
     },
     ReleaseEntry,
 };
@@ -59,7 +59,7 @@ async fn test_upgrade_flow() {
     };
 
     let (_, update_gas_script) =
-        generate_gas_upgrade_proposal(&gas_schedule, true, "".to_owned().into_bytes())
+        generate_gas_upgrade_proposal(None, &gas_schedule, true, "".to_owned().into_bytes())
             .unwrap()
             .pop()
             .unwrap();
@@ -121,7 +121,10 @@ async fn test_upgrade_flow() {
                 execution_mode: ExecutionMode::RootSigner,
                 name: "gas".to_string(),
                 metadata: ProposalMetadata::default(),
-                update_sequence: vec![ReleaseEntry::DefaultGas],
+                update_sequence: vec![ReleaseEntry::Gas {
+                    old: None,
+                    new: GasScheduleLocator::Current,
+                }],
             },
             Proposal {
                 execution_mode: ExecutionMode::RootSigner,
@@ -143,6 +146,7 @@ async fn test_upgrade_flow() {
 
     config
         .generate_release_proposal_scripts(upgrade_scripts_folder.path())
+        .await
         .unwrap();
     let mut scripts = walkdir::WalkDir::new(upgrade_scripts_folder.path())
         .sort_by_file_name()

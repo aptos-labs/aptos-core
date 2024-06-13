@@ -20,7 +20,7 @@ echo "*************** [move-pr] Assuming move root at $MOVE_BASE"
 # Run only tests which would also be run on CI
 export ENV_TEST_ON_CI=1
 
-while getopts "htcgdia" opt; do
+while getopts "htcgdi2a" opt; do
   case $opt in
     h)
       cat <<EOF
@@ -31,6 +31,7 @@ Flags:
     -h   Print this help
     -t   Run tests
     -i   In addition to -t, run integration tests (Aptos framework and e2e tests)
+    -2   Run integration tests with the v2 compiler
     -c   Run xclippy and fmt +nightly
     -g   Run the git checks script (whitespace check). This works
          only for committed clients.
@@ -40,6 +41,8 @@ Flags:
     You can use the `MOVE_PR_PROFILE` environment variable to
     determine which cargo profile to use. (The default
     is `ci`, `debug` might be faster for build.)
+    You can also run those tests with `UB=1` to record new
+    baseline files where applicable.
 EOF
       exit 1
       ;;
@@ -48,6 +51,9 @@ EOF
       ;;
     i)
       INTEGRATION_TEST=1
+      ;;
+    2)
+      COMPILER_V2_TEST=1
       ;;
     c)
       CHECK=1
@@ -60,6 +66,7 @@ EOF
       ;;
     a)
       INTEGRATION_TEST=1
+      COMPILER_V2_TEST=1
       CHECK=1
       GEN_ARTIFACTS=1
       GIT_CHECKS=1
@@ -79,7 +86,6 @@ ARTIFACT_CRATE_PATHS="\
 # This is a partial list of Move crates, to keep this script fast.
 # May be extended as needed but should be kept minimal.
 MOVE_CRATES="\
-  -p move-model\
   -p move-stackless-bytecode\
   -p move-stdlib\
   -p move-bytecode-verifier\
@@ -88,42 +94,44 @@ MOVE_CRATES="\
   -p move-compiler-v2\
   -p move-compiler-v2-transactional-tests\
   -p move-prover-boogie-backend\
-  -p move-prover-bytecode-pipeline\
   -p move-prover\
-  -p move-docgen\
   -p move-transactional-test-runner\
   -p move-vm-runtime\
-  -p move-vm-transactional-tests\
   -p move-vm-types\
-  -p move-unit-test\
-  -p move-package\
 "
 
-INTEGRATION_TEST_CRATES="\
+# This is a list of crates for integration testing which depends on the
+# MOVE_COMPILER_V2 env var.
+MOVE_CRATES_V2_ENV_DEPENDENT="\
+  -p aptos-transactional-test-harness \
+  -p bytecode-verifier-transactional-tests \
+  -p move-async-vm \
+  -p move-cli \
+  -p move-model \
+  -p move-package \
+  -p move-prover-bytecode-pipeline \
+  -p move-stackless-bytecode \
+  -p move-to-yul \
+  -p move-transactional-test-runner \
+  -p move-unit-test \
+  -p move-vm-transactional-tests \
+  -p aptos-move-stdlib\
+  -p move-abigen\
+  -p move-docgen\
+  -p move-stdlib\
+  -p move-table-extension\
+  -p move-vm-integration-tests\
+  -p aptos-move-examples\
   -p e2e-move-tests\
   -p aptos-framework\
 "
 
-if [ ! -z "$TEST" ]; then
-  echo "*************** [move-pr] Running tests"
-  (
-    # It is important to run all tests from one cargo command to keep cargo features
-    # stable.
-    cd $BASE
-    cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
-     $MOVE_CRATES
-  )
-fi
-
-if [ ! -z "$INTEGRATION_TEST" ]; then
-  echo "*************** [move-pr] Running extended tests"
-  (
-    cd $BASE
-    cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
-     $MOVE_CRATES $INTEGRATION_TEST_CRATES
-  )
-fi
-
+# Crates which do depend on compiler env but currently
+# do not maintain separate v2 baseline files. Those
+# are listed here for documentation and later fixing.
+MOVE_CRATES_V2_ENV_DEPENDENT_FAILURES="\
+  -p aptos-api\
+"
 
 if [ ! -z "$CHECK" ]; then
   echo "*************** [move-pr] Running checks"
@@ -131,10 +139,11 @@ if [ ! -z "$CHECK" ]; then
     cd $BASE
     cargo xclippy
     cargo +nightly fmt
-    cargo sort --grouped --workspace 
+    cargo sort --grouped --workspace
   )
 fi
 
+# Artifact generation needs to be run before testing as tests may depend on its result
 if [ ! -z "$GEN_ARTIFACTS" ]; then
   for dir in $ARTIFACT_CRATE_PATHS; do
     echo "*************** [move-pr] Generating artifacts for crate $dir"
@@ -149,6 +158,44 @@ if [ ! -z "$GEN_ARTIFACTS" ]; then
     cargo build --profile $MOVE_PR_PROFILE -p aptos-cached-packages
   )
 fi
+
+
+
+if [ ! -z "$TEST" ]; then
+  echo "*************** [move-pr] Running tests"
+  (
+    # It is important to run all tests from one cargo command to keep cargo features
+    # stable.
+    cd $BASE
+    cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
+     $MOVE_CRATES
+  )
+fi
+
+if [ ! -z "$INTEGRATION_TEST" ]; then
+  echo "*************** [move-pr] Running integration tests"
+  (
+    cd $BASE
+    MOVE_COMPILER_V2=false cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
+       $MOVE_CRATES $MOVE_CRATES_V2_ENV_DEPENDENT
+  )
+fi
+
+if [ ! -z "$COMPILER_V2_TEST" ]; then
+  echo "*************** [move-pr] Running integration tests with compiler v2"
+  (
+    cd $BASE
+    # Need to ensure that aptos-cached-packages is build without the v2 flag,
+    # to avoid regenerating incompatible markdown docs. We really need to
+    # first build and then test the exact same package set, otherwise
+    # rebuild will be triggered via feature unification.
+    MOVE_COMPILER_V2=false cargo build --profile $MOVE_PR_PROFILE \
+     $MOVE_CRATES_V2_ENV_DEPENDENT
+    MOVE_COMPILER_V2=true cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
+     $MOVE_CRATES_V2_ENV_DEPENDENT
+  )
+fi
+
 
 if [ ! -z "$GIT_CHECKS" ]; then
    echo "*************** [move-pr] Running git checks"

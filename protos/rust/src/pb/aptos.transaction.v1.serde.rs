@@ -1,4 +1,5 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 // @generated
 impl serde::Serialize for AccountSignature {
@@ -836,6 +837,248 @@ impl<'de> serde::Deserialize<'de> for Block {
             }
         }
         deserializer.deserialize_struct("aptos.transaction.v1.Block", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for BlockEndInfo {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.block_gas_limit_reached {
+            len += 1;
+        }
+        if self.block_output_limit_reached {
+            len += 1;
+        }
+        if self.block_effective_block_gas_units != 0 {
+            len += 1;
+        }
+        if self.block_approx_output_size != 0 {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.BlockEndInfo", len)?;
+        if self.block_gas_limit_reached {
+            struct_ser.serialize_field("blockGasLimitReached", &self.block_gas_limit_reached)?;
+        }
+        if self.block_output_limit_reached {
+            struct_ser.serialize_field("blockOutputLimitReached", &self.block_output_limit_reached)?;
+        }
+        if self.block_effective_block_gas_units != 0 {
+            struct_ser.serialize_field("blockEffectiveBlockGasUnits", ToString::to_string(&self.block_effective_block_gas_units).as_str())?;
+        }
+        if self.block_approx_output_size != 0 {
+            struct_ser.serialize_field("blockApproxOutputSize", ToString::to_string(&self.block_approx_output_size).as_str())?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for BlockEndInfo {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "block_gas_limit_reached",
+            "blockGasLimitReached",
+            "block_output_limit_reached",
+            "blockOutputLimitReached",
+            "block_effective_block_gas_units",
+            "blockEffectiveBlockGasUnits",
+            "block_approx_output_size",
+            "blockApproxOutputSize",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            BlockGasLimitReached,
+            BlockOutputLimitReached,
+            BlockEffectiveBlockGasUnits,
+            BlockApproxOutputSize,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "blockGasLimitReached" | "block_gas_limit_reached" => Ok(GeneratedField::BlockGasLimitReached),
+                            "blockOutputLimitReached" | "block_output_limit_reached" => Ok(GeneratedField::BlockOutputLimitReached),
+                            "blockEffectiveBlockGasUnits" | "block_effective_block_gas_units" => Ok(GeneratedField::BlockEffectiveBlockGasUnits),
+                            "blockApproxOutputSize" | "block_approx_output_size" => Ok(GeneratedField::BlockApproxOutputSize),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = BlockEndInfo;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.BlockEndInfo")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<BlockEndInfo, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut block_gas_limit_reached__ = None;
+                let mut block_output_limit_reached__ = None;
+                let mut block_effective_block_gas_units__ = None;
+                let mut block_approx_output_size__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::BlockGasLimitReached => {
+                            if block_gas_limit_reached__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("blockGasLimitReached"));
+                            }
+                            block_gas_limit_reached__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::BlockOutputLimitReached => {
+                            if block_output_limit_reached__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("blockOutputLimitReached"));
+                            }
+                            block_output_limit_reached__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::BlockEffectiveBlockGasUnits => {
+                            if block_effective_block_gas_units__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("blockEffectiveBlockGasUnits"));
+                            }
+                            block_effective_block_gas_units__ =
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::BlockApproxOutputSize => {
+                            if block_approx_output_size__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("blockApproxOutputSize"));
+                            }
+                            block_approx_output_size__ =
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                    }
+                }
+                Ok(BlockEndInfo {
+                    block_gas_limit_reached: block_gas_limit_reached__.unwrap_or_default(),
+                    block_output_limit_reached: block_output_limit_reached__.unwrap_or_default(),
+                    block_effective_block_gas_units: block_effective_block_gas_units__.unwrap_or_default(),
+                    block_approx_output_size: block_approx_output_size__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.BlockEndInfo", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for BlockEpilogueTransaction {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.block_end_info.is_some() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.BlockEpilogueTransaction", len)?;
+        if let Some(v) = self.block_end_info.as_ref() {
+            struct_ser.serialize_field("blockEndInfo", v)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for BlockEpilogueTransaction {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "block_end_info",
+            "blockEndInfo",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            BlockEndInfo,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "blockEndInfo" | "block_end_info" => Ok(GeneratedField::BlockEndInfo),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = BlockEpilogueTransaction;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.BlockEpilogueTransaction")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<BlockEpilogueTransaction, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut block_end_info__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::BlockEndInfo => {
+                            if block_end_info__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("blockEndInfo"));
+                            }
+                            block_end_info__ = map.next_value()?;
+                        }
+                    }
+                }
+                Ok(BlockEpilogueTransaction {
+                    block_end_info: block_end_info__,
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.BlockEpilogueTransaction", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for BlockMetadataTransaction {
@@ -6458,6 +6701,9 @@ impl serde::Serialize for Transaction {
                 transaction::TxnData::Validator(v) => {
                     struct_ser.serialize_field("validator", v)?;
                 }
+                transaction::TxnData::BlockEpilogue(v) => {
+                    struct_ser.serialize_field("blockEpilogue", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -6486,6 +6732,8 @@ impl<'de> serde::Deserialize<'de> for Transaction {
             "stateCheckpoint",
             "user",
             "validator",
+            "block_epilogue",
+            "blockEpilogue",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -6502,6 +6750,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
             StateCheckpoint,
             User,
             Validator,
+            BlockEpilogue,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -6535,6 +6784,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             "stateCheckpoint" | "state_checkpoint" => Ok(GeneratedField::StateCheckpoint),
                             "user" => Ok(GeneratedField::User),
                             "validator" => Ok(GeneratedField::Validator),
+                            "blockEpilogue" | "block_epilogue" => Ok(GeneratedField::BlockEpilogue),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -6647,6 +6897,13 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             txn_data__ = map.next_value::<::std::option::Option<_>>()?.map(transaction::TxnData::Validator)
 ;
                         }
+                        GeneratedField::BlockEpilogue => {
+                            if txn_data__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("blockEpilogue"));
+                            }
+                            txn_data__ = map.next_value::<::std::option::Option<_>>()?.map(transaction::TxnData::BlockEpilogue)
+;
+                        }
                     }
                 }
                 Ok(Transaction {
@@ -6677,6 +6934,7 @@ impl serde::Serialize for transaction::TransactionType {
             Self::StateCheckpoint => "TRANSACTION_TYPE_STATE_CHECKPOINT",
             Self::User => "TRANSACTION_TYPE_USER",
             Self::Validator => "TRANSACTION_TYPE_VALIDATOR",
+            Self::BlockEpilogue => "TRANSACTION_TYPE_BLOCK_EPILOGUE",
         };
         serializer.serialize_str(variant)
     }
@@ -6694,6 +6952,7 @@ impl<'de> serde::Deserialize<'de> for transaction::TransactionType {
             "TRANSACTION_TYPE_STATE_CHECKPOINT",
             "TRANSACTION_TYPE_USER",
             "TRANSACTION_TYPE_VALIDATOR",
+            "TRANSACTION_TYPE_BLOCK_EPILOGUE",
         ];
 
         struct GeneratedVisitor;
@@ -6742,6 +7001,7 @@ impl<'de> serde::Deserialize<'de> for transaction::TransactionType {
                     "TRANSACTION_TYPE_STATE_CHECKPOINT" => Ok(transaction::TransactionType::StateCheckpoint),
                     "TRANSACTION_TYPE_USER" => Ok(transaction::TransactionType::User),
                     "TRANSACTION_TYPE_VALIDATOR" => Ok(transaction::TransactionType::Validator),
+                    "TRANSACTION_TYPE_BLOCK_EPILOGUE" => Ok(transaction::TransactionType::BlockEpilogue),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }

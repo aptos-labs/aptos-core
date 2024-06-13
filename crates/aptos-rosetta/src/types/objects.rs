@@ -33,7 +33,7 @@ use aptos_types::{
     event::EventKey,
     fee_statement::FeeStatement,
     stake_pool::{SetOperatorEvent, StakePool},
-    state_store::state_key::{StateKey, StateKeyInner},
+    state_store::state_key::{inner::StateKeyInner, StateKey},
     transaction::{EntryFunction, TransactionPayload},
     write_set::{WriteOp, WriteSet},
 };
@@ -856,6 +856,7 @@ pub enum TransactionType {
     BlockMetadataExt,
     StateCheckpoint,
     Validator,
+    BlockEpilogue,
 }
 
 impl Display for TransactionType {
@@ -868,6 +869,7 @@ impl Display for TransactionType {
             BlockMetadataExt => "BlockResourceExt",
             StateCheckpoint => "StateCheckpoint",
             Validator => "Validator",
+            BlockEpilogue => "BlockEpilogue",
         })
     }
 }
@@ -891,7 +893,8 @@ impl Transaction {
                 txn.events,
             ),
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
-            ValidatorTransaction(_) => todo!(),
+            ValidatorTransaction(_) => (TransactionType::Validator, None, txn.info, txn.events),
+            BlockEpilogue(_) => (TransactionType::BlockEpilogue, None, txn.info, vec![]),
         };
 
         // Operations must be sequential and operation index must always be in the same order
@@ -1231,7 +1234,7 @@ async fn parse_operations_from_write_set(
         struct_tag.address,
         struct_tag.module.as_str(),
         struct_tag.name.as_str(),
-        struct_tag.type_params.len(),
+        struct_tag.type_args.len(),
     ) {
         (AccountAddress::ONE, ACCOUNT_MODULE, ACCOUNT_RESOURCE, 0) => {
             parse_account_resource_changes(version, address, data, maybe_sender, operation_index)
@@ -1261,7 +1264,7 @@ async fn parse_operations_from_write_set(
                 .await
         },
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
-            if let Some(type_tag) = struct_tag.type_params.first() {
+            if let Some(type_tag) = struct_tag.type_args.first() {
                 // TODO: This will need to be updated to support more coins
                 if type_tag == &native_coin_tag() {
                     parse_coinstore_changes(

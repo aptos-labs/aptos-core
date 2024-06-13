@@ -17,10 +17,11 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_config::network_id::PeerNetworkId;
-use aptos_consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
+use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
+use aptos_mempool_notifications::CommittedTransaction;
 use aptos_metrics_core::HistogramTimer;
 use aptos_network::application::interface::NetworkClientInterface;
 use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
@@ -347,7 +348,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
         .with_label_values(&[counters::VM_VALIDATION_LABEL])
         .start_timer();
     let validation_results = transactions
-        .iter()
+        .par_iter()
         .map(|t| smp.validator.read().validate_transaction(t.0.clone()))
         .collect::<Vec<_>>();
     vm_validation_timer.stop_and_record();
@@ -474,7 +475,6 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
             max_txns,
             max_bytes,
             return_non_full,
-            include_gas_upgraded,
             exclude_transactions,
             callback,
         ) => {
@@ -503,13 +503,8 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
                     counters::GET_BLOCK_GET_BATCH_LABEL,
                     counters::REQUEST_SUCCESS_LABEL,
                 );
-                txns = mempool.get_batch(
-                    max_txns,
-                    max_bytes,
-                    return_non_full,
-                    include_gas_upgraded,
-                    exclude_transactions,
-                );
+                txns =
+                    mempool.get_batch(max_txns, max_bytes, return_non_full, exclude_transactions);
             }
 
             // mempool_service_transactions is logged inside get_batch
@@ -550,7 +545,7 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
 /// Remove transactions that are committed (or rejected) so that we can stop broadcasting them.
 pub(crate) fn process_committed_transactions(
     mempool: &Mutex<CoreMempool>,
-    transactions: Vec<TransactionSummary>,
+    transactions: Vec<CommittedTransaction>,
     block_timestamp_usecs: u64,
 ) {
     let mut pool = mempool.lock();

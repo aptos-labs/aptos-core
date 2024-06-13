@@ -13,18 +13,14 @@ public fun M::f($t0: M::R): (M::R, u64) {
 [variant baseline]
 public fun M::g($t0: &signer) {
      var $t1: M::R
-     var $t2: M::R
+     var $t2: u64
      var $t3: u64
-     var $t4: u64
-     var $t5: u64
-  0: $t3 := 1
-  1: $t2 := pack M::R($t3)
-  2: $t1 := infer($t2)
-  3: $t5 := 3
-  4: $t4 := infer($t5)
-  5: ($t1, $t4) := M::f($t1)
-  6: move_to<M::R>($t0, $t1)
-  7: return ()
+  0: $t2 := 1
+  1: $t1 := pack M::R($t2)
+  2: $t3 := 3
+  3: ($t1, $t3) := M::f($t1)
+  4: move_to<M::R>($t0, $t1)
+  5: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -45,26 +41,20 @@ public fun M::f($t0: M::R): (M::R, u64) {
 [variant baseline]
 public fun M::g($t0: &signer) {
      var $t1: M::R
-     var $t2: M::R
+     var $t2: u64
      var $t3: u64
-     var $t4: u64
-     var $t5: u64
      # live vars: $t0
-  0: $t3 := 1
-     # live vars: $t0, $t3
-  1: $t2 := pack M::R($t3)
+  0: $t2 := 1
      # live vars: $t0, $t2
-  2: $t1 := infer($t2)
+  1: $t1 := pack M::R($t2)
      # live vars: $t0, $t1
-  3: $t5 := 3
-     # live vars: $t0, $t1, $t5
-  4: $t4 := infer($t5)
+  2: $t3 := 3
      # live vars: $t0, $t1
-  5: ($t1, $t4) := M::f($t1)
+  3: ($t1, $t3) := M::f($t1)
      # live vars: $t0, $t1
-  6: move_to<M::R>($t0, $t1)
+  4: move_to<M::R>($t0, $t1)
      # live vars:
-  7: return ()
+  5: return ()
 }
 
 ============ after ReferenceSafetyProcessor: ================
@@ -97,58 +87,44 @@ public fun M::f($t0: M::R): (M::R, u64) {
 [variant baseline]
 public fun M::g($t0: &signer) {
      var $t1: M::R
-     var $t2: M::R
+     var $t2: u64
      var $t3: u64
-     var $t4: u64
-     var $t5: u64
      # live vars: $t0
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
      #
-  0: $t3 := 1
-     # live vars: $t0, $t3
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
-     #
-  1: $t2 := pack M::R($t3)
+  0: $t2 := 1
      # live vars: $t0, $t2
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
      #
-  2: $t1 := infer($t2)
+  1: $t1 := pack M::R($t2)
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
      #
-  3: $t5 := 3
-     # live vars: $t0, $t1, $t5
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
-     #
-  4: $t4 := infer($t5)
+  2: $t3 := 3
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
      #
-  5: ($t1, $t4) := M::f($t1)
+  3: ($t1, $t3) := M::f($t1)
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
      #
-  6: move_to<M::R>($t0, $t1)
+  4: move_to<M::R>($t0, $t1)
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  7: return ()
+  5: return ()
 }
 
 ============ after AbortAnalysisProcessor: ================
@@ -184,66 +160,50 @@ public fun M::f($t0: M::R): (M::R, u64) {
 [variant baseline]
 public fun M::g($t0: &signer) {
      var $t1: M::R
-     var $t2: M::R
+     var $t2: u64
      var $t3: u64
-     var $t4: u64
-     var $t5: u64
      # abort state: {returns,aborts}
      # live vars: $t0
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
      #
-  0: $t3 := 1
-     # abort state: {returns,aborts}
-     # live vars: $t0, $t3
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
-     #
-  1: $t2 := pack M::R($t3)
+  0: $t2 := 1
      # abort state: {returns,aborts}
      # live vars: $t0, $t2
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
      #
-  2: $t1 := infer($t2)
+  1: $t1 := pack M::R($t2)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
      #
-  3: $t5 := 3
-     # abort state: {returns,aborts}
-     # live vars: $t0, $t1, $t5
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
-     #
-  4: $t4 := infer($t5)
+  2: $t3 := 3
      # abort state: {returns,aborts}
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
      #
-  5: ($t1, $t4) := M::f($t1)
+  3: ($t1, $t3) := M::f($t1)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1
-     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # graph: {@1000000=external[borrow_imm -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
      #
-  6: move_to<M::R>($t0, $t1)
+  4: move_to<M::R>($t0, $t1)
      # abort state: {returns}
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  7: return ()
+  5: return ()
 }
 
 ============ after AbilityProcessor: ================
@@ -261,16 +221,12 @@ public fun M::f($t0: M::R): (M::R, u64) {
 [variant baseline]
 public fun M::g($t0: &signer) {
      var $t1: M::R
-     var $t2: M::R
+     var $t2: u64
      var $t3: u64
-     var $t4: u64
-     var $t5: u64
-  0: $t3 := 1
-  1: $t2 := pack M::R($t3)
-  2: $t1 := move($t2)
-  3: $t5 := 3
-  4: $t4 := move($t5)
-  5: ($t1, $t4) := M::f($t1)
-  6: move_to<M::R>($t0, $t1)
-  7: return ()
+  0: $t2 := 1
+  1: $t1 := pack M::R($t2)
+  2: $t3 := 3
+  3: ($t1, $t3) := M::f($t1)
+  4: move_to<M::R>($t0, $t1)
+  5: return ()
 }

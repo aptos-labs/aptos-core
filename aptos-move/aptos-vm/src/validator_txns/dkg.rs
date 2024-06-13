@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     aptos_vm::get_or_vm_startup_failure,
@@ -25,6 +26,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 
 #[derive(Debug)]
@@ -98,12 +100,13 @@ impl AptosVM {
 
         // All check passed, invoke VM to publish DKG result on chain.
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(resolver, session_id);
+        let mut session = self.new_session(resolver, session_id, None);
         let args = vec![
             MoveValue::Signer(AccountAddress::ONE),
             dkg_node.transcript_bytes.as_move_value(),
         ];
 
+        let module_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
                 &RECONFIGURATION_WITH_DKG_MODULE,
@@ -111,6 +114,7 @@ impl AptosVM {
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
+                &mut TraversalContext::new(&module_storage),
             )
             .map_err(|e| {
                 expect_only_successful_execution(e, FINISH_WITH_DKG_RESULT.as_str(), log_context)

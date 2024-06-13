@@ -12,6 +12,8 @@
 # FULLNODE_INTERNAL_HOST_SUFFIX: default fullnode-lb
 #
 
+set -x
+
 WORKSPACE=${WORKSPACE:-/tmp}
 USERNAME_PREFIX=${USERNAME_PREFIX:-aptos-node}
 VALIDATOR_INTERNAL_HOST_SUFFIX=${VALIDATOR_INTERNAL_HOST_SUFFIX:-validator-lb}
@@ -51,6 +53,11 @@ fi
 if [ "${FULLNODE_ENABLE_ONCHAIN_DISCOVERY}" = "true" ] && [ -z ${DOMAIN} ] \
   || [ "${VALIDATOR_ENABLE_ONCHAIN_DISCOVERY}" = "true" ] && [ -z ${DOMAIN} ]; then
   echo "If FULLNODE_ENABLE_ONCHAIN_DISCOVERY or VALIDATOR_ENABLE_ONCHAIN_DISCOVERY is set, DOMAIN must be set"
+  exit 1
+fi
+
+if [ -z ${CLUSTER_NAME} ]; then
+  echo "CLUSTER_NAME must be set"
   exit 1
 fi
 
@@ -129,13 +136,71 @@ kubectl get pvc -o name | grep /fn- | grep -v "e${ERA}-" | xargs -r kubectl dele
 # delete all genesis secrets except for those from this era
 kubectl get secret -o name | grep "genesis-e" | grep -v "e${ERA}-" | xargs -r kubectl delete
 
-# create genesis secrets for validators to startup
-for i in $(seq 0 $(($NUM_VALIDATORS - 1))); do
-  username="${USERNAME_PREFIX}-${i}"
-  user_dir="${WORKSPACE}/${username}"
-  kubectl create secret generic "${username}-genesis-e${ERA}" \
-    --from-file=genesis.blob=${WORKSPACE}/genesis.blob \
-    --from-file=waypoint.txt=${WORKSPACE}/waypoint.txt \
-    --from-file=validator-identity.yaml=${user_dir}/validator-identity.yaml \
-    --from-file=validator-full-node-identity.yaml=${user_dir}/validator-full-node-identity.yaml
-done
+upload_genesis_blob() {
+  if [ -z ${GENESIS_BLOB_UPLOAD_URL} ]; then
+    echo "Skipping genesis blob upload, GENESIS_BLOB_UPLOAD_URL is not set"
+    return 1
+  fi
+
+  local genesis_blob_path="${WORKSPACE}/genesis.blob"
+  local signed_url status_code
+  local genesis_blob_upload_url="${GENESIS_BLOB_UPLOAD_URL}"
+  genesis_blob_upload_url="$genesis_blob_upload_url&namespace=${NAMESPACE}&method=PUT"
+
+  # Set up a trap to remove the temporary file when the script exits
+  local temp_file="$(mktemp)"
+  trap 'rm -f "$temp_file"' EXIT
+
+  # Get the signed URL for uploading the genesis.blob
+  status_code=$(curl -s -o "$temp_file" -w "%{http_code}" "$genesis_blob_upload_url")
+
+  if [[ "${status_code:0:1}" != "2" ]]; then
+    echo "Failed to get signed URL, server responded with status code $status_code"
+    return 1
+  fi
+
+  set +x
+  signed_url=$(< "$temp_file")
+  set -x
+
+  # Upload the genesis.blob using the signed URL
+  status_code=$(curl -s -o "$temp_file" -w "%{http_code}" -X PUT -T "$genesis_blob_path" "$signed_url")
+
+  if [[ "${status_code:0:1}" != "2" ]]; then
+    echo "Upload failed, server responded with status code $status_code"
+    return 1
+  fi
+
+  echo "Upload successful"
+  return 0
+}
+
+create_secrets() {
+  local include_genesis_blob=$1
+
+  for i in $(seq 0 $((NUM_VALIDATORS - 1))); do
+    local username="${USERNAME_PREFIX}-${i}"
+    local user_dir="${WORKSPACE}/${username}"
+
+    local -a files_to_include=(
+      "--from-file=waypoint.txt=${WORKSPACE}/waypoint.txt"
+      "--from-file=validator-identity.yaml=${user_dir}/validator-identity.yaml"
+      "--from-file=validator-full-node-identity.yaml=${user_dir}/validator-full-node-identity.yaml"
+    )
+
+    if [[ "$include_genesis_blob" == "true" ]]; then
+      files_to_include+=("--from-file=genesis.blob=${WORKSPACE}/genesis.blob")
+    fi
+
+    kubectl create secret generic "${username}-genesis-e${ERA}" "${files_to_include[@]}"
+  done
+}
+
+# Include the genesis blob in the secrets if we can't upload it
+if upload_genesis_blob; then
+  echo "Genesis blob uploaded successfully"
+  create_secrets false
+else
+  echo "Genesis blob upload failed, including it in the secrets"
+  create_secrets true
+fi

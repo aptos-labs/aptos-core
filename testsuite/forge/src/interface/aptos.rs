@@ -3,6 +3,7 @@
 
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
+use anyhow::anyhow;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_logger::info;
 use aptos_rest_client::{Client as RestClient, PendingTransaction, State, Transaction};
@@ -267,6 +268,27 @@ impl<'t> AptosPublicInfo<'t> {
             })
     }
 
+    pub async fn account_exists(&self, address: AccountAddress) -> Result<()> {
+        self.rest_client
+            .get_account_resources(address)
+            .await
+            .is_ok()
+            .then_some(())
+            .ok_or_else(|| anyhow!("Account does not exist"))
+    }
+
+    pub async fn get_account_sequence_number(&mut self, address: AccountAddress) -> Result<u64> {
+        self.account_exists(address).await?;
+
+        Ok(self
+            .client()
+            .get_account_bcs(address)
+            .await
+            .unwrap()
+            .into_inner()
+            .sequence_number())
+    }
+
     pub fn random_account(&mut self) -> LocalAccount {
         LocalAccount::generate(&mut self.rng)
     }
@@ -311,20 +333,33 @@ pub async fn reconfig(
     let aptos_version = client.get_aptos_version().await.unwrap();
     let current = aptos_version.into_inner();
     let current_version = *current.major.inner();
-    let txn = root_account.sign_with_transaction_builder(
-        transaction_factory
-            .clone()
-            .payload(aptos_stdlib::version_set_version(current_version + 1)),
-    );
-    submit_and_wait_reconfig(client, txn).await
+    let txns = vec![
+        root_account.sign_with_transaction_builder(transaction_factory.clone().payload(
+            aptos_stdlib::version_set_for_next_epoch(current_version + 1),
+        )),
+        root_account.sign_with_transaction_builder(
+            transaction_factory
+                .clone()
+                .payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+        ),
+    ];
+
+    submit_and_wait_reconfig(client, txns).await
 }
 
-pub async fn submit_and_wait_reconfig(client: &RestClient, txn: SignedTransaction) -> State {
+pub async fn submit_and_wait_reconfig(
+    client: &RestClient,
+    mut txns: Vec<SignedTransaction>,
+) -> State {
     let state = client.get_ledger_information().await.unwrap().into_inner();
-    let result = client.submit_and_wait(&txn).await;
+    let last_txn = txns.pop().unwrap();
+    for txn in txns {
+        let _ = client.submit(&txn).await;
+    }
+    let result = client.submit_and_wait(&last_txn).await;
     if let Err(e) = result {
         let last_transactions = client
-            .get_account_transactions(txn.sender(), None, None)
+            .get_account_transactions(last_txn.sender(), None, None)
             .await
             .map(|result| {
                 result
@@ -345,8 +380,8 @@ pub async fn submit_and_wait_reconfig(client: &RestClient, txn: SignedTransactio
 
         panic!(
             "Couldn't execute {:?}, for account {:?}, error {:?}, last account transactions: {:?}",
-            txn,
-            txn.sender(),
+            last_txn,
+            last_txn.sender(),
             e,
             last_transactions.unwrap_or_default()
         )

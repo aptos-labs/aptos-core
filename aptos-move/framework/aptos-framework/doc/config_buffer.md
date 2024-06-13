@@ -23,7 +23,6 @@ NOTE: on-chain config <code>0x1::state::ValidatorSet</code> implemented its own 
 -  [Function `upsert`](#0x1_config_buffer_upsert)
 -  [Function `extract`](#0x1_config_buffer_extract)
 -  [Specification](#@Specification_1)
-    -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `does_exist`](#@Specification_1_does_exist)
     -  [Function `upsert`](#@Specification_1_upsert)
     -  [Function `extract`](#@Specification_1_extract)
@@ -33,6 +32,7 @@ NOTE: on-chain config <code>0x1::state::ValidatorSet</code> implemented its own 
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info">0x1::type_info</a>;
 </code></pre>
 
@@ -96,9 +96,12 @@ Config buffer operations failed with permission denied.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <b>move_to</b>(aptos_framework, <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a> {
-        configs: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_new">simple_map::new</a>(),
-    })
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>if</b> (!<b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework)) {
+        <b>move_to</b>(aptos_framework, <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a> {
+            configs: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_new">simple_map::new</a>(),
+        })
+    }
 }
 </code></pre>
 
@@ -208,22 +211,6 @@ Typically used in <code>X::on_new_epoch()</code> where X is an on-chaon config.
 
 
 
-<a id="@Specification_1_initialize"></a>
-
-### Function `initialize`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
-
-
-
-
-<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework));
-</code></pre>
-
-
-
 <a id="@Specification_1_does_exist"></a>
 
 ### Function `does_exist`
@@ -329,7 +316,6 @@ Typically used in <code>X::on_new_epoch()</code> where X is an on-chaon config.
 
 <pre><code><b>schema</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochAbortsIf">OnNewEpochAbortsIf</a>&lt;T&gt; {
     <b>let</b> type_name = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;();
-    <b>aborts_if</b> <a href="config_buffer.md#0x1_config_buffer_spec_fun_does_exist">spec_fun_does_exist</a>&lt;T&gt;(type_name) && !<b>exists</b>&lt;T&gt;(@aptos_framework);
     <b>let</b> configs = <b>global</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework);
     <b>include</b> <a href="config_buffer.md#0x1_config_buffer_spec_fun_does_exist">spec_fun_does_exist</a>&lt;T&gt;(type_name) ==&gt; <a href="../../aptos-stdlib/doc/any.md#0x1_any_UnpackAbortsIf">any::UnpackAbortsIf</a>&lt;T&gt; {
         x: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(configs.configs, type_name)
@@ -345,7 +331,6 @@ Typically used in <code>X::on_new_epoch()</code> where X is an on-chaon config.
 
 <pre><code><b>schema</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">OnNewEpochRequirement</a>&lt;T&gt; {
     <b>let</b> type_name = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;();
-    <b>requires</b> <a href="config_buffer.md#0x1_config_buffer_spec_fun_does_exist">spec_fun_does_exist</a>&lt;T&gt;(type_name) ==&gt; <b>exists</b>&lt;T&gt;(@aptos_framework);
     <b>let</b> configs = <b>global</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework);
     <b>include</b> <a href="config_buffer.md#0x1_config_buffer_spec_fun_does_exist">spec_fun_does_exist</a>&lt;T&gt;(type_name) ==&gt; <a href="../../aptos-stdlib/doc/any.md#0x1_any_UnpackRequirement">any::UnpackRequirement</a>&lt;T&gt; {
         x: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(configs.configs, type_name)

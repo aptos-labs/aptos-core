@@ -637,11 +637,18 @@ impl AuthenticationKey {
     }
 
     /// Construct a preimage from a transaction-derived AUID as (txn_hash || auid_scheme_id)
-    pub fn auid(txn_hash: Vec<u8>, auid_counter: u64) -> Self {
-        let mut hash_arg = Vec::new();
-        hash_arg.extend(txn_hash);
-        hash_arg.extend(auid_counter.to_le_bytes().to_vec());
-        Self::from_preimage(hash_arg, Scheme::DeriveAuid)
+    pub fn auid(mut txn_hash: Vec<u8>, auid_counter: u64) -> Self {
+        txn_hash.extend(auid_counter.to_le_bytes().to_vec());
+        Self::from_preimage(txn_hash, Scheme::DeriveAuid)
+    }
+
+    pub fn object_address_from_object(
+        source: &AccountAddress,
+        derive_from: &AccountAddress,
+    ) -> AuthenticationKey {
+        let mut bytes = source.to_vec();
+        bytes.append(&mut derive_from.to_vec());
+        Self::from_preimage(bytes, Scheme::DeriveObjectAddressFromObject)
     }
 
     /// Create an authentication key from an Ed25519 public key
@@ -991,6 +998,15 @@ impl AnySignature {
         Self::Keyless { signature }
     }
 
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Ed25519 { .. } => "Ed25519",
+            Self::Secp256k1Ecdsa { .. } => "Secp256k1Ecdsa",
+            Self::WebAuthn { .. } => "WebAuthn",
+            Self::Keyless { .. } => "Keyless",
+        }
+    }
+
     pub fn verify<T: Serialize + CryptoHash>(
         &self,
         public_key: &AnyPublicKey,
@@ -1164,12 +1180,20 @@ impl<'de> Deserialize<'de> for EphemeralPublicKey {
             #[derive(::serde::Deserialize)]
             #[serde(rename = "EphemeralPublicKey")]
             enum Value {
-                Ed25519 { public_key: Ed25519PublicKey },
+                Ed25519 {
+                    public_key: Ed25519PublicKey,
+                },
+                Secp256r1Ecdsa {
+                    public_key: secp256r1_ecdsa::PublicKey,
+                },
             }
 
             let value = Value::deserialize(deserializer)?;
             Ok(match value {
                 Value::Ed25519 { public_key } => EphemeralPublicKey::Ed25519 { public_key },
+                Value::Secp256r1Ecdsa { public_key } => {
+                    EphemeralPublicKey::Secp256r1Ecdsa { public_key }
+                },
             })
         }
     }

@@ -19,10 +19,15 @@ spec:
       labels:
         {{- include "aptos-fullnode.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: fullnode
+        {{- if $.Values.chain.name }}
+        chain_name: {{ $.Values.chain.name }}
+        {{- end}}
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: runtime/default
         prometheus.io/scrape: "true"
         prometheus.io/port: "9101"
+        {{- if $.Values.metrics.destination }}
+        aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
+        {{- end}}
     spec:
       terminationGracePeriodSeconds: 0
       initContainers:
@@ -188,6 +193,8 @@ spec:
         runAsUser: 6180
         runAsGroup: 6180
         fsGroup: 6180
+        seccompProfile:
+          type: RuntimeDefault
       volumes:
       - name: aptos-config
         configMap:

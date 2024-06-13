@@ -9,13 +9,16 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule,
 };
 use aptos_language_e2e_tests::{
-    account::{Account, AccountData},
+    account::{Account, AccountData, TransactionBuilder},
     executor::FakeExecutor,
 };
 use aptos_types::{
-    access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{AccountResource, CoinStoreResource, CORE_CODE_ADDRESS},
+    account_config::{
+        fungible_store::FungibleStoreResource, object::ObjectGroupResource, AccountResource,
+        CoinStoreResource, CORE_CODE_ADDRESS,
+    },
+    chain_id::ChainId,
     contract_event::ContractEvent,
     move_utils::MemberId,
     on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
@@ -24,8 +27,9 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
     },
     transaction::{
-        EntryFunction, Script, SignedTransaction, TransactionArgument, TransactionOutput,
-        TransactionPayload, TransactionStatus, ViewFunctionOutput,
+        EntryFunction, Multisig, MultisigTransactionPayload, Script, SignedTransaction,
+        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
+        ViewFunctionOutput,
     },
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
@@ -75,8 +79,8 @@ pub struct MoveHarness {
     /// The last counted transaction sequence number, by account address.
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 
-    default_gas_unit_price: u64,
-    max_gas_per_txn: u64,
+    pub default_gas_unit_price: u64,
+    pub max_gas_per_txn: u64,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -159,10 +163,14 @@ impl MoveHarness {
     /// Creates an account for the given static address. This address needs to be static so
     /// we can load regular Move code to there without need to rewrite code addresses.
     pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
+        self.new_account_with_balance_at(addr, 1_000_000_000_000_000)
+    }
+
+    pub fn new_account_with_balance_at(&mut self, addr: AccountAddress, balance: u64) -> Account {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
         // Mint the account 10M Aptos coins (with 8 decimals).
-        self.store_and_fund_account(&acc, 1_000_000_000_000_000, 10)
+        self.store_and_fund_account(&acc, balance, 10)
     }
 
     // Creates an account with a randomly generated address and key pair
@@ -186,11 +194,12 @@ impl MoveHarness {
 
     /// Runs a signed transaction. On success, applies the write set.
     pub fn run_raw(&mut self, txn: SignedTransaction) -> TransactionOutput {
-        let output = self.executor.execute_transaction(txn);
+        let mut output = self.executor.execute_transaction(txn);
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
             self.executor.append_events(output.events().to_vec());
         }
+        output.fill_error_status();
         output
     }
 
@@ -228,21 +237,22 @@ impl MoveHarness {
         &mut self,
         txn_block: Vec<SignedTransaction>,
     ) -> Vec<TransactionOutput> {
-        let result = assert_ok!(self.executor.execute_block(txn_block));
-        for output in &result {
+        let mut result = assert_ok!(self.executor.execute_block(txn_block));
+        for output in &mut result {
             if matches!(output.status(), TransactionStatus::Keep(_)) {
                 self.executor.apply_write_set(output.write_set());
             }
+            output.fill_error_status();
         }
         result
     }
 
-    /// Creates a transaction, based on provided payload.
-    pub fn create_transaction_payload(
+    /// Creates a transaction without signing it
+    pub fn create_transaction_without_sign(
         &mut self,
         account: &Account,
         payload: TransactionPayload,
-    ) -> SignedTransaction {
+    ) -> TransactionBuilder {
         let on_chain_seq_no = self.sequence_number(account.address());
         let seq_no_ref = self.txn_seq_no.get_mut(account.address()).unwrap();
         let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
@@ -253,6 +263,27 @@ impl MoveHarness {
             .max_gas_amount(self.max_gas_per_txn)
             .gas_unit_price(self.default_gas_unit_price)
             .payload(payload)
+    }
+
+    /// Creates a transaction, based on provided payload.
+    /// The chain_id is by default for test
+    pub fn create_transaction_payload(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> SignedTransaction {
+        self.create_transaction_without_sign(account, payload)
+            .sign()
+    }
+
+    /// Creates a transaction to be sent to mainnet
+    pub fn create_transaction_payload_mainnet(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> SignedTransaction {
+        self.create_transaction_without_sign(account, payload)
+            .chain_id(ChainId::mainnet())
             .sign()
     }
 
@@ -264,6 +295,17 @@ impl MoveHarness {
         payload: TransactionPayload,
     ) -> TransactionStatus {
         let txn = self.create_transaction_payload(account, payload);
+        self.run(txn)
+    }
+
+    /// Runs a transaction sent to mainnet
+    pub fn run_transaction_payload_mainnet(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> TransactionStatus {
+        let txn = self.create_transaction_payload_mainnet(account, payload);
+        assert!(self.chain_id_is_mainnet(&CORE_CODE_ADDRESS));
         self.run(txn)
     }
 
@@ -316,6 +358,22 @@ impl MoveHarness {
         )
     }
 
+    /// Create a multisig transaction.
+    pub fn create_multisig(
+        &mut self,
+        account: &Account,
+        multisig_address: AccountAddress,
+        transaction_payload: Option<MultisigTransactionPayload>,
+    ) -> SignedTransaction {
+        self.create_transaction_payload(
+            account,
+            TransactionPayload::Multisig(Multisig {
+                multisig_address,
+                transaction_payload,
+            }),
+        )
+    }
+
     pub fn create_script(
         &mut self,
         account: &Account,
@@ -338,6 +396,17 @@ impl MoveHarness {
         args: Vec<Vec<u8>>,
     ) -> TransactionStatus {
         let txn = self.create_entry_function(account, fun, ty_args, args);
+        self.run(txn)
+    }
+
+    /// Run the multisig transaction.
+    pub fn run_multisig(
+        &mut self,
+        account: &Account,
+        multisig_address: AccountAddress,
+        transaction_payload: Option<MultisigTransactionPayload>,
+    ) -> TransactionStatus {
+        let txn = self.create_multisig(account, multisig_address, transaction_payload);
         self.run(txn)
     }
 
@@ -440,7 +509,7 @@ impl MoveHarness {
         options: Option<BuildOptions>,
         patch_metadata: impl FnMut(&mut PackageMetadata),
     ) -> SignedTransaction {
-        let package = build_package(path.to_owned(), options.unwrap_or_default())
+        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         self.create_publish_built_package(account, &package, patch_metadata)
     }
@@ -649,9 +718,7 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<Vec<u8>> {
-        let path =
-            AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test");
-        self.read_state_value_bytes(&StateKey::access_path(path))
+        self.read_state_value_bytes(&StateKey::resource(addr, &struct_tag).unwrap())
     }
 
     /// Reads the resource data `T`.
@@ -673,10 +740,17 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<StateValueMetadata> {
-        self.read_state_value(&StateKey::access_path(
-            AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test"),
-        ))
-        .map(StateValue::into_metadata)
+        self.read_state_value(&StateKey::resource(addr, &struct_tag).unwrap())
+            .map(StateValue::into_metadata)
+    }
+
+    pub fn read_resource_group_metadata(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<StateValueMetadata> {
+        self.read_state_value(&StateKey::resource_group(addr, &struct_tag))
+            .map(StateValue::into_metadata)
     }
 
     pub fn read_resource_group(
@@ -684,8 +758,7 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
-        let path = AccessPath::resource_group_access_path(*addr, struct_tag);
-        self.read_state_value_bytes(&StateKey::access_path(path))
+        self.read_state_value_bytes(&StateKey::resource_group(addr, &struct_tag))
             .map(|data| bcs::from_bytes(&data).unwrap())
     }
 
@@ -710,8 +783,16 @@ impl MoveHarness {
 
     pub fn read_aptos_balance(&self, addr: &AccountAddress) -> u64 {
         self.read_resource::<CoinStoreResource>(addr, CoinStoreResource::struct_tag())
-            .unwrap()
-            .coin()
+            .map(|c| c.coin())
+            .unwrap_or(0)
+            + self
+                .read_resource_from_resource_group::<FungibleStoreResource>(
+                    &aptos_types::account_config::fungible_store::primary_store(addr),
+                    ObjectGroupResource::struct_tag(),
+                    FungibleStoreResource::struct_tag(),
+                )
+                .map(|c| c.balance())
+                .unwrap_or(0)
     }
 
     /// Write the resource data `T`.
@@ -722,8 +803,7 @@ impl MoveHarness {
         struct_tag: StructTag,
         data: &T,
     ) {
-        let path = AccessPath::resource_access_path(addr, struct_tag).expect("access path in test");
-        let state_key = StateKey::access_path(path);
+        let state_key = StateKey::resource(&addr, &struct_tag).unwrap();
         self.executor
             .write_state_value(state_key, bcs::to_bytes(data).unwrap());
     }
@@ -734,7 +814,7 @@ impl MoveHarness {
         let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         self.executor
-            .exec("features", "change_feature_flags", vec![], vec![
+            .exec("features", "change_feature_flags_internal", vec![], vec![
                 MoveValue::Signer(*acc.address())
                     .simple_serialize()
                     .unwrap(),
@@ -764,14 +844,19 @@ impl MoveHarness {
             entries,
         };
         let schedule_bytes = bcs::to_bytes(&gas_schedule).expect("bcs");
+        let core_signer_arg = MoveValue::Signer(AccountAddress::ONE)
+            .simple_serialize()
+            .unwrap();
         self.executor
-            .exec("gas_schedule", "set_gas_schedule", vec![], vec![
-                MoveValue::Signer(AccountAddress::ONE)
-                    .simple_serialize()
-                    .unwrap(),
+            .exec("gas_schedule", "set_for_next_epoch", vec![], vec![
+                core_signer_arg.clone(),
                 MoveValue::vector_u8(schedule_bytes)
                     .simple_serialize()
                     .unwrap(),
+            ]);
+        self.executor
+            .exec("aptos_governance", "force_end_epoch", vec![], vec![
+                core_signer_arg,
             ]);
     }
 
@@ -788,6 +873,12 @@ impl MoveHarness {
         self.read_resource::<AccountResource>(addr, AccountResource::struct_tag())
             .unwrap()
             .sequence_number()
+    }
+
+    fn chain_id_is_mainnet(&self, addr: &AccountAddress) -> bool {
+        self.read_resource::<ChainId>(addr, ChainId::struct_tag())
+            .unwrap()
+            .is_mainnet()
     }
 
     pub fn modify_gas_schedule_raw(&mut self, modify: impl FnOnce(&mut GasScheduleV2)) {
@@ -817,7 +908,7 @@ impl MoveHarness {
         let gas_schedule: GasScheduleV2 = self.get_gas_schedule();
         let feature_version = gas_schedule.feature_version;
         let params = AptosGasParameters::from_on_chain_gas_schedule(
-            &gas_schedule.to_btree_map(),
+            &gas_schedule.into_btree_map(),
             feature_version,
         )
         .unwrap();
@@ -847,7 +938,7 @@ impl MoveHarness {
         arguments: Vec<Vec<u8>>,
     ) -> ViewFunctionOutput {
         self.executor
-            .execute_view_function(fun.module_id, fun.member_id, type_args, arguments)
+            .execute_view_function(fun, type_args, arguments)
     }
 
     /// Splits transactions into blocks based on passed `block_split``, and
@@ -878,7 +969,11 @@ impl MoveHarness {
                 offset,
                 txns.len()
             );
-            let outputs = harness.run_block_get_output(txns);
+            let mut outputs = harness.run_block_get_output(txns);
+            let _ = outputs
+                .iter_mut()
+                .map(|t| t.fill_error_status())
+                .collect::<Vec<_>>();
             for (idx, (error, output)) in errors.into_iter().zip(outputs.iter()).enumerate() {
                 if error == SUCCESS {
                     assert_success!(
@@ -939,7 +1034,7 @@ impl MoveHarness {
 
 impl BlockSplit {
     pub fn arbitrary(len: usize) -> BoxedStrategy<BlockSplit> {
-        // skip last choice if lenght is not big enough for it.
+        // skip last choice if length is not big enough for it.
         (0..(if len > 1 { 3 } else { 2 }))
             .prop_flat_map(move |enum_type| {
                 // making running a test with a full block likely
@@ -1037,7 +1132,7 @@ macro_rules! assert_out_of_gas {
 #[macro_export]
 macro_rules! assert_abort {
     // identity needs to be before pattern (both with and without message),
-    // as if we pass variable - it matches the pattern arm, but value is not used, but overriden.
+    // as if we pass variable - it matches the pattern arm, but value is not used, but overridden.
     // Opposite order and test_asserts_variable_used / test_asserts_variable_used_with_message tests
     // would fail
     ($s:expr, $c:ident $(,)?) => {{
@@ -1087,7 +1182,7 @@ macro_rules! assert_abort {
 #[macro_export]
 macro_rules! assert_abort_ref {
     // identity needs to be before pattern (both with and without message),
-    // as if we pass variable - it matches the pattern arm, but value is not used, but overriden.
+    // as if we pass variable - it matches the pattern arm, but value is not used, but overridden.
     // Opposite order and test_asserts_variable_used / test_asserts_variable_used_with_message tests
     // would fail
     ($s:expr, $c:ident $(,)?) => {{

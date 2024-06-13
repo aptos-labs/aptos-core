@@ -10,6 +10,7 @@ CompiledPackageInfo {
     build_flags: BuildConfig {
         dev_mode: true,
         test_mode: false,
+        override_std: None,
         generate_docs: false,
         generate_abis: false,
         generate_move_model: false,
@@ -34,7 +35,10 @@ CompiledPackageInfo {
                 "verify_only",
             },
             skip_attribute_checks: false,
-            compiler_version: None,
+            compiler_version: Some(
+                V1,
+            ),
+            language_version: None,
         },
     },
 }

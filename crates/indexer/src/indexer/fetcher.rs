@@ -5,7 +5,6 @@ use crate::counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
 use aptos_api::Context;
 use aptos_api_types::{AsConverter, LedgerInfo, Transaction, TransactionOnChainData};
 use aptos_logger::prelude::*;
-use aptos_vm::data_cache::AsMoveResolver;
 use futures::{channel::mpsc, SinkExt};
 use std::{sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
@@ -243,8 +242,7 @@ async fn fetch_nexts(
     let mut block_height_bcs = aptos_api_types::U64::from(block_height);
 
     let state_view = context.latest_state_view().unwrap();
-    let resolver = state_view.as_move_resolver();
-    let converter = resolver.as_converter(context.db.clone(), context.table_info_reader.clone());
+    let converter = state_view.as_converter(context.db.clone(), context.table_info_reader.clone());
 
     let mut transactions = vec![];
     for (ind, raw_txn) in raw_txns.into_iter().enumerate() {
@@ -288,6 +286,10 @@ async fn fetch_nexts(
                     Transaction::StateCheckpointTransaction(ref mut sct) => {
                         sct.info.block_height = Some(block_height_bcs);
                         sct.info.epoch = Some(epoch_bcs);
+                    },
+                    Transaction::BlockEpilogueTransaction(ref mut bet) => {
+                        bet.info.block_height = Some(block_height_bcs);
+                        bet.info.epoch = Some(epoch_bcs);
                     },
                     Transaction::ValidatorTransaction(ref mut st) => {
                         st.info.block_height = Some(block_height_bcs);

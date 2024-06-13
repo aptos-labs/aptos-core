@@ -72,7 +72,14 @@ impl MoveVM {
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,
-            data_cache: TransactionDataCache::new(remote),
+            data_cache: TransactionDataCache::new(
+                self.runtime
+                    .loader()
+                    .vm_config()
+                    .deserializer_config
+                    .clone(),
+                remote,
+            ),
             module_store: ModuleStorageAdapter::new(self.runtime.module_storage()),
             native_extensions,
         }
@@ -87,7 +94,14 @@ impl MoveVM {
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,
-            data_cache: TransactionDataCache::new(remote),
+            data_cache: TransactionDataCache::new(
+                self.runtime
+                    .loader()
+                    .vm_config()
+                    .deserializer_config
+                    .clone(),
+                remote,
+            ),
             module_store: ModuleStorageAdapter::new(module_storage),
             native_extensions,
         }
@@ -103,7 +117,14 @@ impl MoveVM {
             .loader()
             .load_module(
                 module_id,
-                &TransactionDataCache::new(remote),
+                &mut TransactionDataCache::new(
+                    self.runtime
+                        .loader()
+                        .vm_config()
+                        .deserializer_config
+                        .clone(),
+                    remote,
+                ),
                 &ModuleStorageAdapter::new(self.runtime.module_storage()),
             )
             .map(|arc_module| arc_module.arc_module())

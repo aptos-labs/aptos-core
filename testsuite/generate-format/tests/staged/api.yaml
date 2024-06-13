@@ -112,6 +112,24 @@ AssertionSignature:
 BitVec:
   STRUCT:
     - inner: BYTES
+BlockEndInfo:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - block_gas_limit_reached: BOOL
+          - block_output_limit_reached: BOOL
+          - block_effective_block_gas_units: U64
+          - block_approx_output_size: U64
+BlockEpiloguePayload:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - block_id:
+              TYPENAME: HashValue
+          - block_end_info:
+              TYPENAME: BlockEndInfo
 BlockMetadata:
   STRUCT:
     - id:
@@ -237,6 +255,11 @@ EphemeralPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: Ed25519PublicKey
+    1:
+      Secp256r1Ecdsa:
+        STRUCT:
+          - public_key:
+              TYPENAME: Secp256r1EcdsaPublicKey
 EphemeralSignature:
   ENUM:
     0:
@@ -424,13 +447,6 @@ QuorumCertifiedUpdate:
         TYPENAME: AggregateSignature
 RandMetadata:
   STRUCT:
-    - metadata_to_sign:
-        TYPENAME: RandMetadataToSign
-    - block_id:
-        TYPENAME: HashValue
-    - timestamp: U64
-RandMetadataToSign:
-  STRUCT:
     - epoch: U64
     - round: U64
 Randomness:
@@ -553,6 +569,10 @@ Transaction:
       BlockMetadataExt:
         NEWTYPE:
           TYPENAME: BlockMetadataExt
+    6:
+      BlockEpilogue:
+        NEWTYPE:
+          TYPENAME: BlockEpiloguePayload
 TransactionArgument:
   ENUM:
     0:

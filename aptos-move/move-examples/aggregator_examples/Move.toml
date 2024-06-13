@@ -1,0 +1,10 @@
+[package]
+name = "Aggregator examples"
+version = "0.0.0"
+
+[addresses]
+aggregator_examples = "0xCAFE"
+
+[dependencies]
+AptosStdlib = { local = "../../framework/aptos-stdlib" }
+AptosFramework = { local = "../../framework/aptos-framework" }

@@ -4,12 +4,14 @@
 use aptos_gas_algebra::GasExpression;
 use aptos_gas_schedule::{
     gas_params::txn::{
-        STORAGE_IO_PER_STATE_BYTE_READ, STORAGE_IO_PER_STATE_BYTE_WRITE,
-        STORAGE_IO_PER_STATE_SLOT_READ, STORAGE_IO_PER_STATE_SLOT_WRITE,
+        STORAGE_IO_PER_EVENT_BYTE_WRITE, STORAGE_IO_PER_STATE_BYTE_READ,
+        STORAGE_IO_PER_STATE_BYTE_WRITE, STORAGE_IO_PER_STATE_SLOT_READ,
+        STORAGE_IO_PER_STATE_SLOT_WRITE, STORAGE_IO_PER_TRANSACTION_BYTE_WRITE,
     },
     AptosGasParameters, VMGasParameters,
 };
 use aptos_types::{
+    contract_event::ContractEvent,
     on_chain_config::{ConfigStorage, StorageGasSchedule},
     state_store::state_key::StateKey,
     write_set::WriteOpSize,
@@ -59,12 +61,7 @@ impl IoPricingV1 {
         let mut cost = self.write_data_per_op * NumArgs::new(1);
 
         if self.write_data_per_byte_in_key > 0.into() {
-            cost += self.write_data_per_byte_in_key
-                * NumBytes::new(
-                    key.encode()
-                        .expect("Should be able to serialize state key")
-                        .len() as u64,
-                );
+            cost += self.write_data_per_byte_in_key * NumBytes::new(key.encoded().len() as u64);
         }
 
         match op_size {
@@ -133,11 +130,7 @@ impl IoPricingV2 {
                 .checked_sub(self.free_write_bytes_quota)
                 .unwrap_or(NumBytes::zero())
         } else {
-            let key_size = NumBytes::new(
-                key.encode()
-                    .expect("Should be able to serialize state key")
-                    .len() as u64,
-            );
+            let key_size = NumBytes::new(key.encoded().len() as u64);
             key_size + value_size
         }
     }
@@ -291,6 +284,20 @@ impl IoPricing {
             V3(v3) => Either::Right(Either::Left(v3.calculate_read_gas(bytes_loaded))),
             V4(v4) => Either::Right(Either::Right(v4.calculate_read_gas(bytes_loaded))),
         }
+    }
+
+    pub fn io_gas_per_transaction(
+        &self,
+        txn_size: NumBytes,
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+        STORAGE_IO_PER_TRANSACTION_BYTE_WRITE * txn_size
+    }
+
+    pub fn io_gas_per_event(
+        &self,
+        event: &ContractEvent,
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+        STORAGE_IO_PER_EVENT_BYTE_WRITE * NumBytes::new(event.size() as u64)
     }
 
     /// If group write size is provided, then the StateKey is for a resource group and the

@@ -31,7 +31,7 @@ pub fn aggregator_v1_id_for_test(key: u128) -> AggregatorID {
 }
 
 pub fn aggregator_v1_state_key_for_test(key: u128) -> StateKey {
-    StateKey::raw(key.to_le_bytes().to_vec())
+    StateKey::raw(&key.to_le_bytes())
 }
 
 pub const FAKE_AGGREGATOR_VIEW_GEN_ID_START: u32 = 87654321;
@@ -148,7 +148,7 @@ impl TDelayedFieldView for FakeAggregatorView {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         unimplemented!();
     }
 }

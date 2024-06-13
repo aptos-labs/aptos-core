@@ -40,7 +40,7 @@ fn test_metadata_tracking() {
         harness
             .read_resource_metadata(&address2, coin_store.clone())
             .unwrap(),
-        StateValueMetadata::none(),
+        StateValueMetadata::none()
     );
 
     // Enable storage slot metadata tracking

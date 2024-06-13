@@ -10,60 +10,38 @@ publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.52"
-bytes = "1.4.0"
-clap = { version = "4.3.9", features = ["derive"] }
-codespan-reporting = "0.11.1"
-colored = "2.0.0"
-difference = "2.0.0"
-itertools = "0.10.0"
-once_cell = "1.7.2"
-reqwest = { version = "0.11.1", features = ["blocking", "json"] }
-serde = { version = "1.0.124", default-features = false }
-serde_json = "1.0"
-serde_yaml = "0.8.17"
-tempfile = "3.2.0"
-toml_edit =  { version = "0.14.3", features = ["easy"] }
-walkdir = "2.3.1"
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+codespan-reporting = { workspace = true }
+colored = { workspace = true }
+once_cell = { workspace = true }
+tempfile = { workspace = true }
 
-bcs = { workspace = true }
 move-binary-format = { path = "../../move-binary-format" }
-move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
-move-bytecode-utils = { path = "../move-bytecode-utils" }
-
-move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
 move-bytecode-viewer = { path = "../move-bytecode-viewer" }
 move-command-line-common = { path = "../../move-command-line-common" }
 move-compiler = { path = "../../move-compiler" }
+move-compiler-v2 = { path = "../../move-compiler-v2" }
 move-core-types = { path = "../../move-core/types" }
 move-coverage = { path = "../move-coverage" }
 move-disassembler = { path = "../move-disassembler" }
 move-docgen = { path = "../../move-prover/move-docgen" }
 move-errmapgen = { path = "../../move-prover/move-errmapgen" }
-move-ir-types = { path = "../../move-ir/types" }
 move-model = { path = "../../move-model" }
 move-package = { path = "../move-package" }
 move-prover = { path = "../../move-prover" }
-move-resource-viewer = { path = "../move-resource-viewer" }
 move-stdlib = { path = "../../move-stdlib" }
-move-symbol-pool = { path = "../../move-symbol-pool" }
-move-table-extension = { path = "../../extensions/move-table-extension", optional = true }
 move-unit-test = { path = "../move-unit-test" }
 move-vm-runtime = { path = "../../move-vm/runtime", features = ["debugging"] }
 move-vm-test-utils = { path = "../../move-vm/test-utils" }
-move-vm-types = { path = "../../move-vm/types" }
 
 [dev-dependencies]
-datatest-stable = "0.1.1"
-httpmock = "0.6.6"
+datatest-stable = { workspace = true }
+httpmock = { workspace = true }
 
 [[bin]]
 name = "move"
 path = "src/main.rs"
-
-[[test]]
-name = "sandbox_testsuite"
-harness = false
 
 [[test]]
 name = "move_unit_tests_move_vm_and_stackless_vm"
@@ -85,4 +63,4 @@ required-features = ["evm-backend"]
 
 [features]
 evm-backend = ["move-unit-test/evm-backend", "move-package/evm-backend"]
-table-extension = ["move-table-extension", "move-unit-test/table-extension"]
+table-extension = ["move-unit-test/table-extension"]

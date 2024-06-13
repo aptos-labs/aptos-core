@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{compat::Sha3_256, Uniform};
@@ -8,8 +9,8 @@ use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_types::{
     dkg::{DKGSessionState, DKGState, DKGTrait, DefaultDKG},
-    on_chain_config::OnChainConfig,
-    randomness::{PerBlockRandomness, RandMetadataToSign, WVUF},
+    on_chain_config::{OnChainConfig, OnChainConsensusConfig},
+    randomness::{PerBlockRandomness, RandMetadata, WVUF},
     validator_verifier::ValidatorConsensusInfo,
 };
 use digest::Digest;
@@ -27,6 +28,8 @@ mod e2e_correctness;
 mod enable_feature_0;
 mod enable_feature_1;
 mod enable_feature_2;
+mod entry_func_attrs;
+mod randomness_stall_recovery;
 mod validator_restart_during_dkg;
 
 #[allow(dead_code)]
@@ -243,7 +246,7 @@ async fn verify_randomness(
     );
 
     // Compare the outputs from 2 paths.
-    let rand_metadata = RandMetadataToSign {
+    let rand_metadata = RandMetadata {
         epoch: on_chain_block_randomness.epoch,
         round: on_chain_block_randomness.round,
     };
@@ -257,4 +260,61 @@ async fn verify_randomness(
         "randomness verification failed with final check failure"
     );
     Ok(())
+}
+
+fn script_to_enable_main_logic() -> String {
+    r#"
+script {
+    use aptos_framework::aptos_governance;
+    use aptos_framework::randomness_config;
+    use aptos_std::fixed_point64;
+
+    fun main(core_resources: &signer) {
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let config = randomness_config::new_v1(
+            fixed_point64::create_from_rational(1, 2),
+            fixed_point64::create_from_rational(2, 3)
+        );
+        randomness_config::set_for_next_epoch(&framework_signer, config);
+        aptos_governance::reconfigure(&framework_signer);
+    }
+}
+"#
+    .to_string()
+}
+
+fn script_to_disable_main_logic() -> String {
+    r#"
+script {
+    use aptos_framework::aptos_governance;
+    use aptos_framework::randomness_config;
+    fun main(core_resources: &signer) {
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let config = randomness_config::new_off();
+        randomness_config::set_for_next_epoch(&framework_signer, config);
+        aptos_governance::reconfigure(&framework_signer);
+    }
+}
+"#
+    .to_string()
+}
+
+fn script_to_update_consensus_config(config: &OnChainConsensusConfig) -> String {
+    let config_bytes = bcs::to_bytes(config).unwrap();
+    format!(
+        r#"
+script {{
+    use aptos_framework::aptos_governance;
+    use aptos_framework::consensus_config;
+
+    fun main(core_resources: &signer) {{
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let config_bytes = vector{:?};
+        consensus_config::set_for_next_epoch(&framework_signer, config_bytes);
+        aptos_governance::reconfigure(&framework_signer);
+    }}
+}}
+    "#,
+        config_bytes
+    )
 }

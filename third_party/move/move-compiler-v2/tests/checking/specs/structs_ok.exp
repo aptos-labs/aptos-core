@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::M {
     struct T {
         x: u64,
@@ -16,16 +16,13 @@ module 0x42::M {
         z: vector<u64>,
     }
     public fun f(r: M::R): M::T {
-        pack M::T(select M::S.x(select M::R.s(r)))
-    }
-    spec fun $f(r: M::R): M::T {
-        pack M::T(select M::S.x(select M::R.s(r)))
+        pack M::T(select M::S.x<M::S>(select M::R.s<M::R>(r)))
     }
     spec fun struct_access(s: M::S): u64 {
-        select M::S.x(s)
+        select M::S.x<M::S>(s)
     }
     spec fun nested_struct_access(r: M::R): bool {
-        select M::S.y(select M::R.s(r))
+        select M::S.y<M::S>(select M::R.s<M::R>(r))
     }
     spec fun struct_pack(x: u64,y: bool,z: vector<u64>): M::S {
         pack M::S(x, y, z)

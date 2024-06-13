@@ -6,6 +6,7 @@ use aptos_config::config::{
     BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_infallible::Mutex;
+use aptos_types::state_store::create_empty_sharded_state_updates;
 use std::default::Default;
 
 impl AptosDB {
@@ -89,5 +90,63 @@ impl AptosDB {
 
     pub(crate) fn state_merkle_db(&self) -> Arc<StateMerkleDb> {
         self.state_store.state_db.state_merkle_db.clone()
+    }
+}
+
+pub fn gather_state_updates_until_last_checkpoint(
+    first_version: Version,
+    latest_in_memory_state: &StateDelta,
+    txns_to_commit: &[TransactionToCommit],
+) -> Option<ShardedStateUpdates> {
+    if let Some(latest_checkpoint_version) = latest_in_memory_state.base_version {
+        if latest_checkpoint_version >= first_version {
+            let idx = (latest_checkpoint_version - first_version) as usize;
+            assert!(
+                    txns_to_commit[idx].has_state_checkpoint_hash(),
+                    "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
+                    latest_checkpoint_version,
+                    first_version + idx as u64
+                );
+            let mut sharded_state_updates = create_empty_sharded_state_updates();
+            sharded_state_updates.par_iter_mut().enumerate().for_each(
+                |(shard_id, state_updates_shard)| {
+                    txns_to_commit[..=idx].iter().for_each(|txn_to_commit| {
+                        state_updates_shard.extend(txn_to_commit.state_updates()[shard_id].clone());
+                    })
+                },
+            );
+            return Some(sharded_state_updates);
+        }
+    }
+
+    None
+}
+
+/// Test only methods for the DB
+impl AptosDB {
+    pub fn save_transactions_for_test(
+        &self,
+        txns_to_commit: &[TransactionToCommit],
+        first_version: Version,
+        base_state_version: Option<Version>,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        sync_commit: bool,
+        latest_in_memory_state: StateDelta,
+    ) -> Result<()> {
+        let state_updates_until_last_checkpoint = gather_state_updates_until_last_checkpoint(
+            first_version,
+            &latest_in_memory_state,
+            txns_to_commit,
+        );
+        self.save_transactions(
+            txns_to_commit,
+            first_version,
+            base_state_version,
+            ledger_info_with_sigs,
+            sync_commit,
+            latest_in_memory_state,
+            state_updates_until_last_checkpoint,
+            None,
+        )
     }
 }

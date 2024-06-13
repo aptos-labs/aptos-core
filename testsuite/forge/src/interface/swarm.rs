@@ -177,33 +177,37 @@ pub trait SwarmExt: Swarm {
         Ok(())
     }
 
+    // Checks if root_hashes are equal across all nodes at a given version
+    async fn are_root_hashes_equal_at_version(
+        clients: &[RestClient],
+        version: u64,
+    ) -> Result<bool> {
+        let root_hashes = try_join_all(
+            clients
+                .iter()
+                .map(|node| node.get_transaction_by_version(version))
+                .collect::<Vec<_>>(),
+        )
+        .await?
+        .into_iter()
+        .map(|r| {
+            r.into_inner()
+                .transaction_info()
+                .unwrap()
+                .accumulator_root_hash
+        })
+        .collect::<Vec<_>>();
+
+        Ok(root_hashes.windows(2).all(|w| w[0] == w[1]))
+    }
+
     /// Perform a safety check, ensuring that no forks have occurred in the network.
-    fn fork_check(&self) -> Result<()> {
-        // Checks if root_hashes are equal across all nodes at a given version
-        async fn are_root_hashes_equal_at_version(
-            clients: &[RestClient],
-            version: u64,
-        ) -> Result<bool> {
-            let root_hashes = try_join_all(
-                clients
-                    .iter()
-                    .map(|node| node.get_transaction_by_version(version))
-                    .collect::<Vec<_>>(),
-            )
-            .await?
-            .into_iter()
-            .map(|r| {
-                r.into_inner()
-                    .transaction_info()
-                    .unwrap()
-                    .accumulator_root_hash
-            })
-            .collect::<Vec<_>>();
-
-            Ok(root_hashes.windows(2).all(|w| w[0] == w[1]))
-        }
-
+    fn fork_check(&self, epoch_duration: Duration) -> Result<()> {
         let runtime = Runtime::new().unwrap();
+
+        // Lots of errors can actually occur after an epoch change so guarantee that we change epochs here
+        // This can wait for 2x epoch to at least force the caller to be explicit about the epoch duration
+        runtime.block_on(self.wait_for_all_nodes_to_change_epoch(epoch_duration * 2))?;
 
         let clients = self
             .validators()
@@ -232,7 +236,10 @@ pub trait SwarmExt: Swarm {
             .copied()
             .ok_or_else(|| anyhow!("Unable to query nodes for their latest version"))?;
 
-        if !runtime.block_on(are_root_hashes_equal_at_version(&clients, min_version))? {
+        if !runtime.block_on(Self::are_root_hashes_equal_at_version(
+            &clients,
+            min_version,
+        ))? {
             return Err(anyhow!("Fork check failed"));
         }
 
@@ -240,7 +247,10 @@ pub trait SwarmExt: Swarm {
             self.wait_for_all_nodes_to_catchup_to_version(max_version, Duration::from_secs(10)),
         )?;
 
-        if !runtime.block_on(are_root_hashes_equal_at_version(&clients, max_version))? {
+        if !runtime.block_on(Self::are_root_hashes_equal_at_version(
+            &clients,
+            max_version,
+        ))? {
             return Err(anyhow!("Fork check failed"));
         }
 
@@ -297,10 +307,23 @@ pub trait SwarmExt: Swarm {
     }
 
     async fn wait_for_all_nodes_to_catchup_to_next(&self, timeout: Duration) -> Result<()> {
+        self.wait_for_all_nodes_to_catchup_to_future(timeout, 1)
+            .await
+    }
+
+    async fn wait_for_all_nodes_to_catchup_to_future(
+        &self,
+        timeout: Duration,
+        versions_to_sync_past: u64,
+    ) -> Result<()> {
         let clients = self.get_all_nodes_clients_with_names();
         let highest_synced_version = get_highest_synced_version(&clients).await?;
-        wait_for_all_nodes_to_catchup_to_version(&clients, highest_synced_version + 1, timeout)
-            .await
+        wait_for_all_nodes_to_catchup_to_version(
+            &clients,
+            highest_synced_version + versions_to_sync_past,
+            timeout,
+        )
+        .await
     }
 
     fn get_validator_clients_with_names(&self) -> Vec<(String, RestClient)> {

@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::hash::HashValue;
-use aptos_types::{account_address::AccountAddress, transaction::Version};
+use aptos_types::{
+    account_address::AccountAddress, account_config::NewBlockEvent, transaction::Version,
+};
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
@@ -10,6 +12,30 @@ use std::ops::Deref;
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub enum BlockInfo {
     V0(BlockInfoV0),
+}
+
+impl BlockInfo {
+    pub fn from_new_block_event(version: Version, new_block_event: &NewBlockEvent) -> Self {
+        let NewBlockEvent {
+            hash,
+            epoch,
+            round,
+            height: _,
+            previous_block_votes_bitvec: _,
+            proposer,
+            failed_proposer_indices: _,
+            timestamp,
+        } = new_block_event;
+
+        Self::V0(BlockInfoV0 {
+            id: HashValue::from_slice(hash.as_slice()).unwrap(),
+            epoch: *epoch,
+            round: *round,
+            proposer: *proposer,
+            first_version: version,
+            timestamp_usecs: *timestamp,
+        })
+    }
 }
 
 impl Deref for BlockInfo {
@@ -35,24 +61,6 @@ pub struct BlockInfoV0 {
 }
 
 impl BlockInfoV0 {
-    pub fn new(
-        id: HashValue,
-        epoch: u64,
-        round: u64,
-        proposer: AccountAddress,
-        timestamp_usecs: u64,
-        first_version: Version,
-    ) -> Self {
-        Self {
-            id,
-            epoch,
-            round,
-            proposer,
-            timestamp_usecs,
-            first_version,
-        }
-    }
-
     pub fn id(&self) -> HashValue {
         self.id
     }

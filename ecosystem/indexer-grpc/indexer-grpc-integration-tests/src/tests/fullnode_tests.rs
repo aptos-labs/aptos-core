@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_cache_worker::IndexerGrpcCacheWorkerConfig;
@@ -75,7 +76,7 @@ async fn reset_redis() -> Result<()> {
     Ok(())
 }
 
-/// Fetch the mint key from the running local testnet and dump it into the path specified
+/// Fetch the mint key from the running localnet and dump it into the path specified
 async fn dump_mint_key_to_file(path: &PathBuf) -> Result<String> {
     let validator_containers =
         get_container_by_name_regex(Regex::new(r"validator-testnet.*validator.*")?)?;
@@ -99,7 +100,7 @@ async fn dump_mint_key_to_file(path: &PathBuf) -> Result<String> {
     Ok(mint_key_path_string)
 }
 
-/// Emit transactions to the local testnet to invoke certain indexer actions, such as writing
+/// Emit transactions to the localnet to invoke certain indexer actions, such as writing
 /// to filestore
 async fn emit_transactions_for_test() -> Result<()> {
     // dump the key to a tempfile

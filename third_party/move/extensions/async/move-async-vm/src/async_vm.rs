@@ -18,6 +18,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
+    module_traversal::*,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
@@ -198,6 +199,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
 
         // Execute the initializer.
         let gas_before = gas_status.remaining_gas();
+        let traversal_storage = TraversalStorage::new();
         let result = self
             .vm_session
             .execute_function_bypass_visibility(
@@ -206,6 +208,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 gas_status,
+                &mut TraversalContext::new(&traversal_storage),
             )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
@@ -294,9 +297,17 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
 
         // Execute the handler.
         let gas_before = gas_status.remaining_gas();
+        let traversal_storage = TraversalStorage::new();
         let result = self
             .vm_session
-            .execute_function_bypass_visibility(module_id, handler_id, vec![], args, gas_status)
+            .execute_function_bypass_visibility(
+                module_id,
+                handler_id,
+                vec![],
+                args,
+                gas_status,
+                &mut TraversalContext::new(&traversal_storage),
+            )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
 
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
@@ -340,7 +351,8 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         }
     }
 
-    fn to_bcs(&self, value: Value, tag: &TypeTag) -> PartialVMResult<Vec<u8>> {
+    #[allow(clippy::wrong_self_convention)]
+    fn to_bcs(&mut self, value: Value, tag: &TypeTag) -> PartialVMResult<Vec<u8>> {
         let type_layout = self
             .vm_session
             .get_type_layout(tag)
