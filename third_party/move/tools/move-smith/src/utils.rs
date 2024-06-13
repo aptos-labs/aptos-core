@@ -125,7 +125,7 @@ fn process_transactional_test_err(err: Box<dyn Error>) -> Result<(), Box<dyn Err
             return Ok(());
         }
     }
-    if msg.contains("error[E") {
+    if msg.contains("error[E") || msg.contains("error:") {
         Err(err)
     } else {
         Ok(())

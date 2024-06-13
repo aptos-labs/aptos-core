@@ -94,3 +94,23 @@ fn test_run_transactional_test() {
     let code = simple_compile_unit().emit_code();
     run_transactional_test(code).unwrap();
 }
+
+#[test]
+fn test_run_transactional_test_should_fail() {
+    let code = r#" //# publish
+module 0xCAFE::Module0 {
+    struct HasCopyDrop has copy, drop {}
+
+    struct C2<T1: drop, T2: copy> has copy, drop, store {}
+
+    fun m1<T1: copy+drop, T2: copy+drop>(x: T1) {
+        m2<C2<HasCopyDrop, T2>, HasCopyDrop>(C2{});
+    }
+    fun m2<T3: copy+drop, T4: copy+drop>(x: T3): T3 {
+        m1<T3, T4>(x);
+        x
+    }
+}"#;
+    let result = run_transactional_test(code.to_string());
+    assert!(result.is_err());
+}
