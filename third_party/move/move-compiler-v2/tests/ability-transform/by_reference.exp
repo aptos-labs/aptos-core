@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/ability-transform/by_reference.move:22:39
+   │
+22 │         assert!(BYTES == b"hello", 42);
+   │                                       ^
+
 ============ initial bytecode ================
 
 [variant baseline]

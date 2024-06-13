@@ -1,5 +1,19 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/inlining/non_lambda_arg.move:13:66
+   │
+13 │             incorrect_sort_recursive(arr, pi + 1, high, a_less_b);
+   │                                                                  ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/inlining/non_lambda_arg.move:14:10
+   │
+14 │         };
+   │          ^
+
+
+Diagnostics:
 error: Only inline functions may have function-typed parameters, but non-inline function `sort::incorrect_sort` has a function parameter:
   ┌─ tests/checking/inlining/non_lambda_arg.move:4:16
   │

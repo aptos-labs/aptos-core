@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/dummy_field.move:27:25
+   │
+27 │         move_to<T>(s, r);
+   │                         ^
+
 // -- Model dump before bytecode pipeline
 module 0x42::test {
     struct T {

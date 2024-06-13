@@ -1,5 +1,13 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_bad5.move:12:23
+   │
+12 │         T { v: _ } = t;
+   │                       ^
+
+
+Diagnostics:
 error: cannot mutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_bad5.move:9:22
    │

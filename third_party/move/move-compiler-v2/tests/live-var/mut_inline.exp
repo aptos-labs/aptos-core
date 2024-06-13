@@ -1,3 +1,23 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/live-var/mut_inline.move:13:22
+   │
+13 │             i = i + 1;
+   │                      ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/live-var/mut_inline.move:20:26
+   │
+20 │                 p = p + 1;
+   │                          ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/live-var/mut_inline.move:22:22
+   │
+22 │             i = i + 1;
+   │                      ^
+
 ============ initial bytecode ================
 
 [variant baseline]

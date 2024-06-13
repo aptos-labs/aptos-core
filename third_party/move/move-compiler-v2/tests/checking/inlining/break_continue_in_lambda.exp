@@ -1,5 +1,25 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/inlining/break_continue_in_lambda.move:7:12
+  │
+7 │         f();
+  │            ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/inlining/break_continue_in_lambda.move:29:9
+   │
+29 │         brk4();
+   │               ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/inlining/break_continue_in_lambda.move:42:38
+   │
+42 │         brk2(| | while (true) { continue });
+   │                                            ^
+
+
+Diagnostics:
 error: Break outside of a loop not currently supported in inline functions
   ┌─ tests/checking/inlining/break_continue_in_lambda.move:3:9
   │

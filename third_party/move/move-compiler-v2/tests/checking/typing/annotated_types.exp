@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/annotated_types.move:10:51
+   │
+10 │         (_, _, R{}) = ((0, S{}, R{}): (u64, S, R));
+   │                                                   ^
+
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {

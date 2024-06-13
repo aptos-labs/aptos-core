@@ -1,2 +1,10 @@
 
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/acquires-checker/v1-borrow-tests/factor_valid_1.move:13:18
+   │
+13 │         foo(g, h);
+   │                  ^
+
+
 ============ bytecode verification succeeded ========

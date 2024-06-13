@@ -1,3 +1,45 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-65:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:16:22
++    │
++ 16 │             i = i + 1;
++    │                      ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:28:26
++    │
++ 28 │                 j = j + 1;
++    │                          ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:30:22
++    │
++ 30 │             i = i + 1;
++    │                      ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:44:22
++    │
++ 44 │             i = i + 1;
++    │                      ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:57:43
++    │
++ 57 │         assert!(!array_equals(&x, &z), 31);
++    │                                           ^
++ 
++ 
++ 
++ task 1 'run'. lines 67-73:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE1:71:11
++    │
++ 71 │     main();
++    │           ^
++ 
++ 
++ 

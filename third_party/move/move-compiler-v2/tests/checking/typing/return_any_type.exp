@@ -1,3 +1,17 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/typing/return_any_type.move:9:23
+  │
+9 │         foo(return ());
+  │                       ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/return_any_type.move:14:20
+   │
+14 │         Coin {} = c;
+   │                    ^
+
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct Coin {

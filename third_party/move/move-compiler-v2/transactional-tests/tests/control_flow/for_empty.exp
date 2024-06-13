@@ -1,3 +1,26 @@
-processed 1 task
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 1 task
+= 
++ task 0 'run'. lines 1-10:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:6:22
++   │
++ 6 │             x = x + 1;
++   │                      ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:5:9
++   │  
++ 5 │ ╭         for (i in 10..4) {
++ 6 │ │             x = x + 1;
++ 7 │ │         };
++   │ ╰─────────^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:8:28
++   │
++ 8 │         assert!(x == 0, 42);
++   │                            ^
++ 
++ 
++ 

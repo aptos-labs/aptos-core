@@ -1,5 +1,13 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/simplifier-elimination/if_assigns_no_else.move:5:25
+  │
+5 │     assert!(x == 42, 42);
+  │                         ^
+
+
+Diagnostics:
 warning: If condition is always true, so else branch code eliminated as dead code
   ┌─ tests/simplifier-elimination/if_assigns_no_else.move:4:9
   │

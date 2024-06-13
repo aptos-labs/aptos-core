@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/no-simplifier/constant_folding_ristretto.move:6:71
+  │
+6 │         assert!(non_canonical_highbit == non_canonical_highbit_hex, 1);
+  │                                                                       ^
+
 // -- Model dump before bytecode pipeline
 module 0xcafe::Ristretto {
     public fun test() {

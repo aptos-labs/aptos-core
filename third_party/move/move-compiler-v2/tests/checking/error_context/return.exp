@@ -24,6 +24,12 @@ error: cannot return `bool` from a function which returns nothing
 17 │         if (c) return true;
    │                       ^^^^
 
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/error_context/return.move:17:27
+   │
+17 │         if (c) return true;
+   │                           ^
+
 error: cannot return nothing from a function with result type `bool`
    ┌─ tests/checking/error_context/return.move:20:26
    │

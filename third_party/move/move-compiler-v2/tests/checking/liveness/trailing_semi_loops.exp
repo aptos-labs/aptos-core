@@ -1,84 +1,18 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
-  ┌─ tests/checking/liveness/trailing_semi_loops.move:3:16
-  │
-3 │         loop ();
-  │                ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
   ┌─ tests/checking/liveness/trailing_semi_loops.move:9:26
   │
 9 │         { (loop (): ()) };
   │                          ^
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
-   ┌─ tests/checking/liveness/trailing_semi_loops.move:18:10
-   │
-18 │         };
-   │          ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
-   ┌─ tests/checking/liveness/trailing_semi_loops.move:35:18
-   │
-35 │             break;
-   │                  ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
-   ┌─ tests/checking/liveness/trailing_semi_loops.move:44:22
-   │
-44 │                 break;
-   │                      ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
-   ┌─ tests/checking/liveness/trailing_semi_loops.move:55:42
-   │
-55 │             if (cond) continue else break;
-   │                                          ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
-   ┌─ tests/checking/liveness/trailing_semi_loops.move:63:42
-   │
-63 │             if (cond) abort 0 else return;
-   │                                          ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
-   ┌─ tests/checking/liveness/trailing_semi_loops.move:78:14
-   │
-78 │             };
-   │              ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
-   ┌─ tests/checking/liveness/trailing_semi_loops.move:88:22
-   │
-88 │                 break;
-   │                      ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
-   ┌─ tests/checking/liveness/trailing_semi_loops.move:90:25
-   │
-90 │                 continue;
-   │                         ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
    ┌─ tests/checking/liveness/trailing_semi_loops.move:91:14
    │
 91 │             };
    │              ^
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
-    ┌─ tests/checking/liveness/trailing_semi_loops.move:100:23
-    │
-100 │                 return;
-    │                       ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
-    ┌─ tests/checking/liveness/trailing_semi_loops.move:102:24
-    │
-102 │                 abort 0;
-    │                        ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
     ┌─ tests/checking/liveness/trailing_semi_loops.move:103:14
     │
 103 │             };

@@ -1,5 +1,25 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_2.move:24:29
+   │
+24 │         acquires_t2(account);
+   │                             ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_2.move:28:65
+   │
+28 │         T1 { v: _ } = move_from<T1>(signer::address_of(account));
+   │                                                                 ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_2.move:32:65
+   │
+32 │         T2 { v: _ } = move_from<T2>(signer::address_of(account));
+   │                                                                 ^
+
+
+Diagnostics:
 error: function acquires global `A::T1` which is currently mutably borrowed
    ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_2.move:9:9
    │

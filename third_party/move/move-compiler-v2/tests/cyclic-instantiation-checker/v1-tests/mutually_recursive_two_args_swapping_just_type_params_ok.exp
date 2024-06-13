@@ -1,3 +1,17 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_two_args_swapping_just_type_params_ok.move:3:20
+  │
+3 │         g<T2, T1>();
+  │                    ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_two_args_swapping_just_type_params_ok.move:7:20
+  │
+7 │         f<T1, T2>();
+  │                    ^
+
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     private fun f<T1,T2>() {

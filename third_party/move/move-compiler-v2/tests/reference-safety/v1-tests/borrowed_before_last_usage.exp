@@ -1,2 +1,10 @@
 
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/reference-safety/v1-tests/borrowed_before_last_usage.move:6:24
+  │
+6 │     assert!(*r == y, 0);
+  │                        ^
+
+
 ============ bytecode verification succeeded ========

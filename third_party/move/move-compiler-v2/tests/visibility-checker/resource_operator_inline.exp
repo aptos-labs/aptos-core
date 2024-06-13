@@ -1,5 +1,19 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/visibility-checker/resource_operator_inline.move:55:39
+   │
+55 │         M::inline_move_to(&account, r);
+   │                                       ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/visibility-checker/resource_operator_inline.move:68:28
+   │
+68 │         M::inline_unpack(r);
+   │                            ^
+
+
+Diagnostics:
 error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
    ┌─ tests/visibility-checker/resource_operator_inline.move:45:9
    │

@@ -1,4 +1,18 @@
 
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/file-format-generator/loop.move:5:22
+  │
+5 │             x = x - 1;
+  │                      ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/file-format-generator/loop.move:16:22
+   │
+16 │             x = x - 1;
+   │                      ^
+
+
 ============ disassembled file-format ==================
 // Move bytecode v7
 module 42.loops {

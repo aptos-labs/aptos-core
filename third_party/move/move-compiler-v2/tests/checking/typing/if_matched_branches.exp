@@ -1,3 +1,17 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/typing/if_matched_branches.move:5:29
+  │
+5 │         if (cond) () else ();
+  │                             ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/if_matched_branches.move:18:76
+   │
+18 │         (_, _, _, R{}) = if (cond) (0, 0x0, &0, R{}) else (1, 0x1, &1, R{});
+   │                                                                            ^
+
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {

@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/variable-coalescing/bug_12068.move:8:28
+  │
+8 │         assert!(x == 1, 42);
+  │                            ^
+
 ============ initial bytecode ================
 
 [variant baseline]

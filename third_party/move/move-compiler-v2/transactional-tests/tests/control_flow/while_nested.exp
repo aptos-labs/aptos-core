@@ -1,3 +1,12 @@
-processed 1 task
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 1 task
+= 
++ task 0 'run'. lines 1-17:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:12:22
++    │
++ 12 │             z = z + 1;
++    │                      ^
++ 
++ 
++ 

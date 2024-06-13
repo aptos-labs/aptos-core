@@ -2953,7 +2953,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         context: &ErrorMessageContext,
     ) -> ExpData {
         let items = seq.iter().collect_vec();
-        let seq_exp = self.translate_seq_recursively(loc, &items, expected_type, context, false);
+        let seq_exp = self.translate_seq_recursively(loc, &items, expected_type, context, None);
         if seq_exp.is_directly_borrowable() {
             // Avoid unwrapping a borrowable item, in case context is a `Borrow`.
             let node_id = self.new_node_id_with_type_loc(expected_type, loc);
@@ -2974,7 +2974,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         items: &[&EA::SequenceItem],
         expected_type: &Type,
         context: &ErrorMessageContext,
-        last_elt_type_was_void: bool,
+        last_item_type: Option<Type>,
     ) -> ExpData {
         if items.is_empty() {
             self.require_impl_language(loc);
@@ -3029,7 +3029,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             &items[1..],
                             expected_type,
                             context,
-                            false,
+                            None,
                         )
                     };
                     // Return result
@@ -3040,11 +3040,27 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.translate_seq_items(loc, items, expected_type, context)
                 },
                 Seq(exp) => {
-                    if last_elt_type_was_void {
-                        if let sp!(loc, EA::Exp_::Unit { trailing: true }) = exp {
-                            let msg = "A trailing `;` in an expression block implicitly adds a `()` value after the semicolon, not needed here.";
-                            let loc = self.to_loc(loc);
-                            self.env().diag(Severity::Warning, &loc, msg);
+                    if let sp!(loc, EA::Exp_::Unit { trailing: true }) = exp {
+                        if let Some(item_type) = &last_item_type {
+                            let item_type = self.subs.specialize(item_type);
+                            let expected_type = self.subs.specialize(expected_type);
+                            if expected_type.is_unit()
+                                || self.subs.is_free_var_without_constraints(&expected_type)
+                            {
+                                // We need a Unit type out of here.
+                                if item_type.is_unit() {
+                                    let msg = "A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.";
+                                    let loc = self.to_loc(loc);
+                                    self.env().diag(Severity::Warning, &loc, msg);
+                                } else {
+                                    // Ok, we needed a `;` here, no warning
+                                }
+                            } else {
+                                // Context expects a different type.
+                                let msg = "A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, potentially causing surprising type conflicts.";
+                                let loc = self.to_loc(loc);
+                                self.env().diag(Severity::Warning, &loc, msg);
+                            }
                         }
                     }
                     self.translate_exp_in_context(exp, expected_type, context)
@@ -3064,10 +3080,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.require_impl_language(loc);
         let mut exps = vec![];
         let mut k = 0;
-        let mut last_item_type_was_void = false;
+        let mut last_item_type = None;
         while k < items.len() - 1 {
             use EA::SequenceItem_::*;
-            last_item_type_was_void = false;
             if let Seq(exp) = &items[k].value {
                 // There is an item after this one, so the value can be dropped. The default
                 // type of the expression is `()`.
@@ -3086,9 +3101,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         Some(ConstraintContext::inferred()),
                     )
                     .expect("success on fresh var");
-                    last_item_type_was_void = true;
-                } else if item_type.is_unit() {
-                    last_item_type_was_void = true;
+                    // Item type is unconstrained, use `Type::Error` as a marker.
+                    last_item_type = Some(Type::Error);
+                } else {
+                    last_item_type = Some(item_type);
                 }
                 if let ExpData::Sequence(_, mut es) = exp {
                     exps.append(&mut es);
@@ -3105,7 +3121,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             &items[k..],
             expected_type,
             context,
-            last_item_type_was_void,
+            last_item_type,
         );
         exps.push(rest.into_exp());
         let id = self.new_node_id_with_type_loc(expected_type, loc);

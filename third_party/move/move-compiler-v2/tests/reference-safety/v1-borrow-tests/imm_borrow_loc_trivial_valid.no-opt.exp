@@ -1,2 +1,10 @@
 
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_loc_trivial_valid.move:16:23
+   │
+16 │         X { f: _ } = x;
+   │                       ^
+
+
 ============ bytecode verification succeeded ========

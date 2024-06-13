@@ -1,3 +1,52 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-191:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:76:80
++    │
++ 76 │             assert!(vector::borrow(&xbool, i) == vector::borrow(&xbool2, i), i);
++    │                                                                                ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:75:9
++    │  
++ 75 │ ╭         for (i in 0..vector::length(&xbool)) {
++ 76 │ │             assert!(vector::borrow(&xbool, i) == vector::borrow(&xbool2, i), i);
++ 77 │ │         };
++    │ ╰─────────^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++     ┌─ TEMPFILE:159:39
++     │
++ 159 │             delta = 1000 + len2 - len1;
++     │                                       ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++     ┌─ TEMPFILE:161:39
++     │
++ 161 │             delta = 2000 + len1 - len2;
++     │                                       ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++     ┌─ TEMPFILE:165:78
++     │
++ 165 │             assert!(vector::borrow(&xnum, i) == vector::borrow(&xnum2, i), i);
++     │                                                                              ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++     ┌─ TEMPFILE:164:9
++     │  
++ 164 │ ╭         for (i in 0..vector::length(&xnum)) {
++ 165 │ │             assert!(vector::borrow(&xnum, i) == vector::borrow(&xnum2, i), i);
++ 166 │ │         };
++     │ ╰─────────^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++     ┌─ TEMPFILE:185:30
++     │
++ 185 │         assert!(y, 4000 + 42);
++     │                              ^
++ 
++ 
++ 

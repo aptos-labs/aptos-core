@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/ability-transform/foreach_mut_expanded.move:15:41
+   │
+15 │         assert!(v == vector[2, 3, 4], 0);
+   │                                         ^
+
 ============ initial bytecode ================
 
 [variant baseline]

@@ -1,6 +1,21 @@
 comparison between v1 and v2 failed:
 = processed 3 tasks
 = 
++ task 0 'publish'. lines 1-26:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:9:28
++   │
++ 9 │         self.x = self.x + 1;
++   │                            ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:16:29
++    │
++ 16 │         self.x = self.x + by;
++    │                             ^
++ 
++ 
++ 
 = task 1 'run'. lines 28-28:
 - return values: 9
 + return values: 6

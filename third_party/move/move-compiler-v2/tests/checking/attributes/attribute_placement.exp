@@ -78,6 +78,12 @@ warning: unknown attribute
 39 │     #[attr]
    │       ^^^^ Attribute name 'attr' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
 
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/attributes/attribute_placement.move:41:17
+   │
+41 │         M::foo();
+   │                 ^
+
 warning: unknown attribute
    ┌─ tests/checking/attributes/attribute_placement.move:44:7
    │

@@ -4,6 +4,18 @@ comparison between v1 and v2 failed:
 = task 0 'publish'. lines 1-46:
 - warning[W09003]: unused assignment
 -    ┌─ TEMPFILE:23:13
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:4:13
++   │
++ 4 │         f(x);
++   │             ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:8:13
++   │
++ 8 │         f(x);
++   │             ^
++ 
 + warning: Unused assignment to `x`. Consider removing or prefixing with an underscore: `_x`
 +    ┌─ TEMPFILE:23:17
 =    │

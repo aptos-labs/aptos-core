@@ -1,4 +1,12 @@
 
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/file-format-generator/with_spec.move:21:10
+   │
+21 │         };
+   │          ^
+
+
 ============ disassembled file-format ==================
 // Move bytecode v7
 module 42.m {

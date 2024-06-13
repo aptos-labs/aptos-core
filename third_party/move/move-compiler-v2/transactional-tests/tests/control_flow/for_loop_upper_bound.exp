@@ -1,6 +1,15 @@
-processed 2 tasks
-
-task 1 'run'. lines 16-16:
-return values: 1
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-14:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:9:9
++   │
++ 9 │         for (i in 0..foo(&mut x)) {};
++   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++ 
++ 
++ 
+= task 1 'run'. lines 16-16:
+= return values: 1
+= 

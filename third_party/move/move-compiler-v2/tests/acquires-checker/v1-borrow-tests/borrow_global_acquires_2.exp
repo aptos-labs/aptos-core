@@ -1,2 +1,22 @@
 
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_2.move:10:29
+   │
+10 │         acquires_t1(account);
+   │                             ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_2.move:16:29
+   │
+16 │         acquires_t2(account);
+   │                             ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_2.move:22:29
+   │
+22 │         acquires_t1(account);
+   │                             ^
+
+
 ============ bytecode verification succeeded ========

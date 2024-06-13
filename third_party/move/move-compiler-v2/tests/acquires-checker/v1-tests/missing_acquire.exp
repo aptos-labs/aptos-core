@@ -1,5 +1,13 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/acquires-checker/v1-tests/missing_acquire.move:11:32
+   │
+11 │         R1{} = move_from<R1>(a);
+   │                                ^
+
+
+Diagnostics:
 error: missing acquires annotation for `R1`
   ┌─ tests/acquires-checker/v1-tests/missing_acquire.move:5:9
   │

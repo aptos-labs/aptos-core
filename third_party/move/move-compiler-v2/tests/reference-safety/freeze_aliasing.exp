@@ -1,5 +1,25 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/reference-safety/freeze_aliasing.move:8:15
+  │
+8 │         *r = 4;
+  │               ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/reference-safety/freeze_aliasing.move:22:38
+   │
+22 │         *vector::borrow_mut(r, i) = 4;
+   │                                      ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/reference-safety/freeze_aliasing.move:31:58
+   │
+31 │         *vector::borrow_mut(r, *vector::borrow(r, 1)) = 4;
+   │                                                          ^
+
+
+Diagnostics:
 error: cannot freeze local `y`  since multiple mutable references exist
   ┌─ tests/reference-safety/freeze_aliasing.move:7:18
   │

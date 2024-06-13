@@ -1,10 +1,28 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/typing/lambda.move:8:22
+  │
+8 │             i = i + 1;
+  │                      ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/lambda.move:14:60
+   │
+14 │             accu = reducer(XVector::pop_back(&mut v), accu);
+   │                                                            ^
+
 error: `reduce` is a function and not a macro
    ┌─ tests/checking/typing/lambda.move:34:37
    │
 34 │         foreach(&v, |e| sum = sum + reduce!(*e, 0, |t, r| t + r));
    │                                     ^^^^^^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/lambda.move:34:66
+   │
+34 │         foreach(&v, |e| sum = sum + reduce!(*e, 0, |t, r| t + r));
+   │                                                                  ^
 
 error: expected `|(&T, u64)|_` but found a value of type `|&T|`
    ┌─ tests/checking/typing/lambda.move:40:13
@@ -12,17 +30,35 @@ error: expected `|(&T, u64)|_` but found a value of type `|&T|`
 40 │             action(XVector::borrow(v, i), i); // expected to have wrong argument count
    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/lambda.move:41:22
+   │
+41 │             i = i + 1;
+   │                      ^
+
 error: expected `|u64|_` but found a value of type `|&T|`
    ┌─ tests/checking/typing/lambda.move:48:13
    │
 48 │             action(i); // expected to have wrong argument type
    │             ^^^^^^^^^
 
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/lambda.move:49:22
+   │
+49 │             i = i + 1;
+   │                      ^
+
 error: cannot use `()` with an operator which expects a value of type `u64`
    ┌─ tests/checking/typing/lambda.move:56:21
    │
 56 │             i = i + action(XVector::borrow(v, i)); // expected to have wrong result type
    │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/checking/typing/lambda.move:56:50
+   │
+56 │             i = i + action(XVector::borrow(v, i)); // expected to have wrong result type
+   │                                                  ^
 
 error: cannot return `u64` from a function with result type `|integer|`
    ┌─ tests/checking/typing/lambda.move:61:9

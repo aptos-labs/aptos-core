@@ -1,3 +1,36 @@
-processed 4 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 4 tasks
+= 
++ task 0 'publish'. lines 1-41:
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++   ┌─ TEMPFILE:7:19
++   │
++ 7 │         consume(y);
++   │                   ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:12:19
++    │
++ 12 │         consume(x);
++    │                   ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:21:20
++    │
++ 21 │         consume_(y);
++    │                    ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:26:20
++    │
++ 26 │         consume_(x);
++    │                    ^
++ 
++ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
++    ┌─ TEMPFILE:32:17
++    │
++ 32 │         test4(y);
++    │                 ^
++ 
++ 
++ 

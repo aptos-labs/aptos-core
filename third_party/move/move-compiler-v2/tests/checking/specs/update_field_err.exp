@@ -1,5 +1,11 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/specs/update_field_err.move:8:16
+  │
+8 │         r.x = 1;
+  │                ^
+
 error: field `z` not declared in struct `R`
    ┌─ tests/checking/specs/update_field_err.move:16:9
    │

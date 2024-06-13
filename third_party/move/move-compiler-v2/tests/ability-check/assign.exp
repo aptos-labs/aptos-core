@@ -1,5 +1,25 @@
 
 Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/ability-check/assign.move:13:15
+   │
+13 │        *x = 42;
+   │               ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/ability-check/assign.move:17:41
+   │
+17 │         *s = S { f: 42, g: T { h: 42 } };
+   │                                         ^
+
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   ┌─ tests/ability-check/assign.move:26:16
+   │
+26 │         s.f = f;
+   │                ^
+
+
+Diagnostics:
 error: local `s` of type `assign::S` does not have the `drop` ability
    ┌─ tests/ability-check/assign.move:17:9
    │

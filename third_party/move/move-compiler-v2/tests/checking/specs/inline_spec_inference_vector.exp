@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ tests/checking/specs/inline_spec_inference_vector.move:9:49
+  │
+9 │         vector::push_back(&mut bit_field, false);
+  │                                                 ^
+
 // -- Model dump before bytecode pipeline
 module 0x42::bit_vector {
     use std::vector;

@@ -1,5 +1,14 @@
 processed 5 tasks
 
+task 0 'publish'. lines 1-21:
+warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  ┌─ TEMPFILE:5:41
+  │
+5 │         move_to(s, R<bool>{value: true});
+  │                                         ^
+
+
+
 task 2 'run'. lines 25-25:
 return values: true
 
