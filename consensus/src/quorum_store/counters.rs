@@ -43,6 +43,14 @@ const QUORUM_STORE_LATENCY_BUCKETS: &[f64] = &[
     0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 5.0, 10.0,
 ];
 
+static PROOF_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+    [
+        1.0, 3.0, 5.0, 7.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0, 40.0, 50.0, 60.0, 75.0, 100.0,
+        125.0, 150.0, 200.0, 250.0, 300.0, 500.0,
+    ]
+    .to_vec()
+});
+
 // Histogram buckets that expand DEFAULT_BUCKETS with more granularity between 0-150 ms
 const QUORUM_STORE_SMALL_LATENCY_BUCKETS: &[f64] = &[
     0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12,
@@ -76,6 +84,29 @@ pub static MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
         .unwrap(),
     )
 });
+
+
+pub static NUM_PROOFS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION: Lazy<Histogram> = Lazy::new(
+    || {
+        register_histogram!(
+        "quorum_store_num_proofs_left_in_proof_queue_after_proposal_generation",
+        "Histogram for the number of proofs left in the proof queue after block proposal generation.",
+        PROOF_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+    },
+);
+
+pub static NUM_TXNS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION: Lazy<Histogram> = Lazy::new(
+    || {
+        register_histogram!(
+        "quorum_store_num_txns_left_in_proof_queue_after_proposal_generation",
+        "Histogram for the number of transactions left in the proof queue after block proposal generation.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+    },
+);
 
 /// Duration of each run of the event loop.
 pub static PROOF_MANAGER_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
