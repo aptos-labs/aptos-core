@@ -3845,6 +3845,8 @@ pub struct FunctionData {
     /// Visibility of this function (private, friend, or public)
     pub(crate) visibility: Visibility,
 
+    /// Whether this function has package visibility before the transformation.
+    /// Invariant: when true, visibility is always friend.
     pub(crate) has_package_visibility: bool,
 
     /// Whether this is a native function
