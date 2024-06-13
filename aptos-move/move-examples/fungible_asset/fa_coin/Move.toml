@@ -2,6 +2,10 @@
 name = "Examples"
 version = "0.0.0"
 
+
+[dev-addresses]
+FACoin = "0xcafe"
+
 [addresses]
 aptos_framework = "0x1"
 FACoin = "_"
