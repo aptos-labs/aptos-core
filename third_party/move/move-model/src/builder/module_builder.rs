@@ -1878,18 +1878,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
         }
     }
-
-    // fn translate_package_visibilities(&mut self, module_ids: &BTreeSet<ModuleIdent>) {
-    //     if let Some(loc) = self.package_fun_loc.clone() {
-    //         if let Some(mod_id) = self.module_ident.clone() {
-    //             for friend_mod_id in module_ids.iter() {
-    //                 if &mod_id != friend_mod_id {
-    //                     self.decl_ana_friend_decl(friend_mod_id, &loc)
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 }
 
 /// ## Condition Definition Analysis
