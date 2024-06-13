@@ -28,6 +28,14 @@ static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     .unwrap()
 });
 
+static PROOF_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+    [
+        1.0, 3.0, 5.0, 7.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0, 40.0, 50.0, 60.0, 75.0, 100.0,
+        125.0, 150.0, 200.0, 250.0, 300.0, 500.0,
+    ]
+    .to_vec()
+});
+
 static BYTE_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
         /*start=*/ 500.0, /*factor=*/ 1.5, /*count=*/ 25,
@@ -232,6 +240,28 @@ pub static EXCLUDED_TXNS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     )
         .unwrap()
 });
+
+pub static NUM_PROOFS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION: Lazy<Histogram> = Lazy::new(
+    || {
+        register_histogram!(
+        "quorum_store_num_proofs_left_in_proof_queue_after_proposal_generation",
+        "Histogram for the number of proofs left in the proof queue after block proposal generation.",
+        PROOF_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+    },
+);
+
+pub static NUM_TXNS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION: Lazy<Histogram> = Lazy::new(
+    || {
+        register_histogram!(
+        "quorum_store_num_txns_left_in_proof_queue_after_proposal_generation",
+        "Histogram for the number of transactions left in the proof queue after block proposal generation.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+    },
+);
 
 pub static BATCH_IN_PROGRESS_COMMITTED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

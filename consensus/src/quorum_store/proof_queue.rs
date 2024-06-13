@@ -316,6 +316,30 @@ impl ProofQueue {
             counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
+
+            // Number of proofs remaining in proof queue after the pull
+            let mut num_proofs_remaining_after_pull = 0;
+            let mut num_txns_remaining_after_pull = 0;
+            let excluded_batch_keys = excluded_batches
+                .iter()
+                .map(BatchKey::from_info)
+                .collect::<HashSet<_>>();
+            for (batch_key, proof) in &self.batch_to_proof {
+                if proof.is_some()
+                    && !ret
+                        .iter()
+                        .any(|p| BatchKey::from_info(p.info()) == *batch_key)
+                    && !excluded_batch_keys.contains(batch_key)
+                {
+                    num_proofs_remaining_after_pull += 1;
+                    num_txns_remaining_after_pull += proof.as_ref().unwrap().0.num_txns();
+                }
+            }
+            counters::NUM_PROOFS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION
+                .observe(num_proofs_remaining_after_pull as f64);
+            counters::NUM_TXNS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION
+                .observe(num_txns_remaining_after_pull as f64);
+
             // Stable sort, so the order of proofs within an author will not change.
             ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
             (ret, !full)

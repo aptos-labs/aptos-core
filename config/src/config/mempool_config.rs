@@ -81,7 +81,7 @@ impl Default for MempoolConfig {
             enable_intelligent_peer_prioritization: true,
             shared_mempool_peer_update_interval_ms: 1_000,
             shared_mempool_priority_update_interval_secs: 600, // 10 minutes (frequent reprioritization is expensive)
-            shared_mempool_failover_delay_ms: 500,
+            shared_mempool_failover_delay_ms: 2000,
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
             broadcast_buckets: DEFAULT_BUCKETS.to_vec(),
