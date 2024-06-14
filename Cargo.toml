@@ -123,6 +123,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
+    "ecosystem/indexer-grpc/transaction-filter",
     "ecosystem/nft-metadata-crawler-parser",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
@@ -428,6 +429,7 @@ aptos-storage-service-notifications = { path = "state-sync/inter-component/stora
 aptos-storage-service-types = { path = "state-sync/storage-service/types" }
 aptos-storage-service-server = { path = "state-sync/storage-service/server" }
 aptos-system-utils = { path = "crates/aptos-system-utils" }
+aptos-transaction-filter = { path = "ecosystem/indexer-grpc/transaction-filter" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
 aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }
@@ -534,6 +536,7 @@ datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
 derivation-path = "0.2.0"
+derive_builder = "0.20.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
 diesel = "2.1"
@@ -614,7 +617,7 @@ libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
 log = "0.4.17"
 lru = "0.7.5"
-lz4 = "1.24.0"
+lz4 = "1.25.0"
 maplit = "1.0.2"
 merlin = "3"
 memory-stats = "1.0.0"
