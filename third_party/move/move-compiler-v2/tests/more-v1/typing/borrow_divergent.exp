@@ -1,0 +1,46 @@
+
+Diagnostics:
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+  ┌─ tests/more-v1/typing/borrow_divergent.move:4:13
+  │
+4 │            &break;
+  │             ^^^^^
+
+warning: Unnecessary trailing semicolon
+  ┌─ tests/more-v1/typing/borrow_divergent.move:4:18
+  │
+4 │            &break;
+  │            ------^
+  │            │     │
+  │            │     A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │            Any code after this expression will not be reached
+
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/more-v1/typing/borrow_divergent.move:11:12
+   │
+11 │         &{ return };
+   │            ^^^^^^
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/more-v1/typing/borrow_divergent.move:11:20
+   │
+11 │         &{ return };
+   │         -----------^
+   │         │          │
+   │         │          A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │         Any code after this expression will not be reached
+
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/more-v1/typing/borrow_divergent.move:18:21
+   │
+18 │         &(if (cond) return else return);
+   │                     ^^^^^^
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/more-v1/typing/borrow_divergent.move:18:40
+   │
+18 │         &(if (cond) return else return);
+   │         -------------------------------^
+   │         │                              │
+   │         │                              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │         Any code after this expression will not be reached

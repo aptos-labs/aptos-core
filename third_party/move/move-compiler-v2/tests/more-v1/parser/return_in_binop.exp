@@ -1,0 +1,13 @@
+
+Diagnostics:
+warning: Unnecessary trailing semicolon
+   ┌─ tests/more-v1/parser/return_in_binop.move:18:19
+   │
+18 │         return ^ 0;
+   │         ----------^
+   │         │         │
+   │         │         A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │         Any code after this expression will not be reached
+
+
+============ bytecode verification succeeded ========

@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: unnecessary acquires annotation
+  ┌─ tests/more-v1/expansion/access_specifier_not_supported.move:8:20
+  │
+8 │     fun f2() reads S {
+  │                    ^^
+
+error: unnecessary acquires annotation
+   ┌─ tests/more-v1/expansion/access_specifier_not_supported.move:11:21
+   │
+11 │     fun f3() writes S {
+   │                     ^^
+
+error: unnecessary acquires annotation
+   ┌─ tests/more-v1/expansion/access_specifier_not_supported.move:14:23
+   │
+14 │     fun f4() acquires S(*) {
+   │                       ^^^^
+
+error: unnecessary acquires annotation
+   ┌─ tests/more-v1/expansion/access_specifier_not_supported.move:20:23
+   │
+20 │     fun f6() acquires 0x42::m::R {
+   │                       ^^^^^^^^^^^

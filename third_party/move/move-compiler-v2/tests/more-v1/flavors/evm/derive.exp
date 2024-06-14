@@ -1,0 +1,31 @@
+
+Diagnostics:
+warning: unknown attribute
+  ┌─ tests/more-v1/flavors/evm/derive.move:1:3
+  │
+1 │ #[contract]
+  │   ^^^^^^^^ Attribute name 'contract' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+
+warning: unknown attribute
+  ┌─ tests/more-v1/flavors/evm/derive.move:4:7
+  │
+4 │     #[callable]
+  │       ^^^^^^^^ Attribute name 'callable' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.
+
+error: no function named `M::call_add` found
+  ┌─ tests/more-v1/flavors/evm/derive.move:8:9
+  │
+8 │         0x1::M::call_add(@1, x) + call_add(@2, x)
+  │         ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: no function named `call_add` found
+  ┌─ tests/more-v1/flavors/evm/derive.move:8:35
+  │
+8 │         0x1::M::call_add(@1, x) + call_add(@2, x)
+  │                                   ^^^^^^^^^^^^^^^
+
+warning: unknown attribute
+   ┌─ tests/more-v1/flavors/evm/derive.move:11:7
+   │
+11 │     #[callable]
+   │       ^^^^^^^^ Attribute name 'callable' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.

@@ -1,0 +1,47 @@
+
+Diagnostics:
+error: cannot copy local `x` which is still mutably borrowed
+   ┌─ tests/more-v1/liveness/dead_refs_branch_invalid.move:8:9
+   │
+ 4 │         let x_ref = &mut x;
+   │                     ------ previous mutable local borrow
+   ·
+ 8 │         _ = x;
+   │         ^^^^^ copied here
+ 9 │         _ = move x;
+10 │         *x_ref = 0;
+   │         ---------- conflicting reference `x_ref` used here
+
+error: cannot move local `x` which is still borrowed
+   ┌─ tests/more-v1/liveness/dead_refs_branch_invalid.move:9:13
+   │
+ 4 │         let x_ref = &mut x;
+   │                     ------ previous mutable local borrow
+   ·
+ 9 │         _ = move x;
+   │             ^^^^^^ moved here
+10 │         *x_ref = 0;
+   │         ---------- conflicting reference `x_ref` used here
+
+error: cannot copy local `x` which is still mutably borrowed
+   ┌─ tests/more-v1/liveness/dead_refs_branch_invalid.move:20:9
+   │
+15 │         let x_ref = &mut x;
+   │                     ------ previous mutable local borrow
+   ·
+20 │         _ = x;
+   │         ^^^^^ copied here
+21 │         _ = move x;
+22 │         _ = *x_ref;
+   │             ------ conflicting reference `x_ref` used here
+
+error: cannot move local `x` which is still borrowed
+   ┌─ tests/more-v1/liveness/dead_refs_branch_invalid.move:21:13
+   │
+15 │         let x_ref = &mut x;
+   │                     ------ previous mutable local borrow
+   ·
+21 │         _ = move x;
+   │             ^^^^^^ moved here
+22 │         _ = *x_ref;
+   │             ------ conflicting reference `x_ref` used here

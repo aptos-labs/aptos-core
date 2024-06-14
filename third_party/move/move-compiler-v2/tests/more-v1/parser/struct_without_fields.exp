@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/struct_without_fields.move:3:13
+  │
+3 │     struct S;
+  │             ^
+  │             │
+  │             Unexpected ';'
+  │             Expected '{'

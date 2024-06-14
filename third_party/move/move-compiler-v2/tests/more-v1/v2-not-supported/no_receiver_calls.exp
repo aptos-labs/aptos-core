@@ -1,0 +1,15 @@
+
+Diagnostics:
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/more-v1/v2-not-supported/no_receiver_calls.move:4:28
+  │
+4 │     fun receiver(self: &T, x: u64) { abort 1 }
+  │                            ^
+
+
+Diagnostics:
+error: local `t` of type `m::T` does not have the `drop` ability
+  ┌─ tests/more-v1/v2-not-supported/no_receiver_calls.move:8:18
+  │
+8 │         receiver(&t, 1)
+  │                  ^^ still borrowed but will be implicitly dropped later since it is no longer used

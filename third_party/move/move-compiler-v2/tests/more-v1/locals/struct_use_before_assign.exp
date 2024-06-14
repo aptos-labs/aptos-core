@@ -1,0 +1,81 @@
+
+Diagnostics:
+warning: Unused local variable `z`. Consider removing or prefixing with an underscore: `_z`
+  ┌─ tests/more-v1/locals/struct_use_before_assign.move:8:13
+  │
+8 │         let z = y;
+  │             ^
+
+warning: Unused local variable `q`. Consider removing or prefixing with an underscore: `_q`
+  ┌─ tests/more-v1/locals/struct_use_before_assign.move:9:13
+  │
+9 │         let q = x;
+  │             ^
+
+warning: Unused local variable `z`. Consider removing or prefixing with an underscore: `_z`
+   ┌─ tests/more-v1/locals/struct_use_before_assign.move:17:13
+   │
+17 │         let z = y;
+   │             ^
+
+warning: Unused local variable `q`. Consider removing or prefixing with an underscore: `_q`
+   ┌─ tests/more-v1/locals/struct_use_before_assign.move:18:13
+   │
+18 │         let q = x;
+   │             ^
+
+warning: Unused local variable `z`. Consider removing or prefixing with an underscore: `_z`
+   ┌─ tests/more-v1/locals/struct_use_before_assign.move:24:13
+   │
+24 │         let z = y;
+   │             ^
+
+warning: Unused local variable `q`. Consider removing or prefixing with an underscore: `_q`
+   ┌─ tests/more-v1/locals/struct_use_before_assign.move:25:13
+   │
+25 │         let q = x;
+   │             ^
+
+warning: Unused local variable `z`. Consider removing or prefixing with an underscore: `_z`
+   ┌─ tests/more-v1/locals/struct_use_before_assign.move:30:13
+   │
+30 │         let z = y;
+   │             ^
+
+warning: Unused local variable `q`. Consider removing or prefixing with an underscore: `_q`
+   ┌─ tests/more-v1/locals/struct_use_before_assign.move:31:13
+   │
+31 │         let q = x;
+   │             ^
+
+
+Diagnostics:
+error: use of unassigned local `g`
+  ┌─ tests/more-v1/locals/struct_use_before_assign.move:6:17
+  │
+6 │         let r = R { f: 3, g };
+  │                 ^^^^^^^^^^^^^
+
+error: use of unassigned local `y0`
+   ┌─ tests/more-v1/locals/struct_use_before_assign.move:15:17
+   │
+15 │         let r = R { f: x0, g: y0 };
+   │                 ^^^^^^^^^^^^^^^^^^
+
+error: use of unassigned local `r`
+   ┌─ tests/more-v1/locals/struct_use_before_assign.move:23:13
+   │
+23 │         let R { f: x, g: y } = r;
+   │             ^^^^^^^^^^^^^^^^
+
+error: use of unassigned local `y`
+   ┌─ tests/more-v1/locals/struct_use_before_assign.move:30:17
+   │
+30 │         let z = y;
+   │                 ^
+
+error: use of unassigned local `x`
+   ┌─ tests/more-v1/locals/struct_use_before_assign.move:31:17
+   │
+31 │         let q = x;
+   │                 ^

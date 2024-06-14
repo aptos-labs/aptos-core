@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/friend_decl_address_only.move:3:16
+  │
+3 │     friend 0x42;
+  │            ----^ Unexpected ';'
+  │            │
+  │            Expected '::' after an address in a module access chain

@@ -1,0 +1,10 @@
+
+Diagnostics:
+warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/more-v1/parser/address_too_long_decimal_exp.move:4:13
+  │
+4 │         let x = @3402823669209384634633746074317682114560282366920938463463374607431768211456;
+  │             ^
+
+
+============ bytecode verification succeeded ========

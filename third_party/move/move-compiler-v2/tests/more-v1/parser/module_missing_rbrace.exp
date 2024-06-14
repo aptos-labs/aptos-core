@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/module_missing_rbrace.move:4:1
+  │
+4 │
+  │ ^
+  │
+  │ Unexpected end-of-file
+  │ Expected a module member: 'spec', 'use', 'friend', 'const', 'fun', 'inline', or 'struct'

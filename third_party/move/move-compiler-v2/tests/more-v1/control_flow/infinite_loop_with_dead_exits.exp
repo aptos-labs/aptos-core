@@ -1,0 +1,13 @@
+
+Diagnostics:
+warning: Unnecessary trailing semicolon
+   ┌─ tests/more-v1/control_flow/infinite_loop_with_dead_exits.move:13:30
+   │
+13 │             if (return) break;
+   │             -----------------^
+   │             │                │
+   │             │                A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │             Any code after this expression will not be reached
+
+
+============ bytecode verification succeeded ========
