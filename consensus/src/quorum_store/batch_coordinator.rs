@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::proof_queue::ProofQueueCommand;
+use super::utils::ProofQueueCommand;
 use crate::{
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{

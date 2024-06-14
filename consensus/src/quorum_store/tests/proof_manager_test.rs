@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{
-    proof_manager::ProofManager, proof_queue::ProofQueue,
-    tests::batch_store_test::batch_store_for_test,
+    proof_manager::ProofManager, tests::batch_store_test::batch_store_for_test, utils::ProofQueue,
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},

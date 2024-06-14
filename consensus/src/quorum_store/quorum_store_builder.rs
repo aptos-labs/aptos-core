@@ -18,9 +18,9 @@ use crate::{
         network_listener::NetworkListener,
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
         proof_manager::{ProofManager, ProofManagerCommand},
-        proof_queue::{ProofQueue, ProofQueueCommand},
         quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
         types::{Batch, BatchResponse},
+        utils::{ProofQueue, ProofQueueCommand},
     },
     round_manager::VerifiedEvent,
 };

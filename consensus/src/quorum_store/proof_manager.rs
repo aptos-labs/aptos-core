@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::proof_queue::BatchSortKey;
 use crate::{
     monitor,
     quorum_store::{
-        batch_generator::BackPressure, batch_store::BatchStore, counters,
-        proof_queue::ProofQueueCommand,
+        batch_generator::BackPressure,
+        batch_store::BatchStore,
+        counters,
+        utils::{BatchSortKey, ProofQueueCommand},
     },
 };
 use aptos_consensus_types::{

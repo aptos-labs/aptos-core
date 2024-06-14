@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::proof_queue::ProofQueue;
+use crate::quorum_store::utils::ProofQueue;
 use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo, ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_types::{aggregate_signature::AggregateSignature, PeerId};
