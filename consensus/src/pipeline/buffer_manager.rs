@@ -196,6 +196,7 @@ impl BufferManager {
             signing_phase_rx,
 
             reliable_broadcast: ReliableBroadcast::new(
+                author,
                 epoch_state.verifier.get_ordered_account_addresses(),
                 commit_msg_tx.clone(),
                 rb_backoff_policy,
