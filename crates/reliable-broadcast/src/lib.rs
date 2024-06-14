@@ -143,16 +143,10 @@ where
                     }
                     let send_fut = if receiver == self_author {
                         network_sender.send_rb_rpc(receiver, message, rpc_timeout_duration)
+                    } else if let Some(raw_message) = protocols.get(&receiver).cloned() {
+                        network_sender.send_rb_rpc_raw(receiver, raw_message, rpc_timeout_duration)
                     } else {
-                        if let Some(raw_message) = protocols.get(&receiver).cloned() {
-                            network_sender.send_rb_rpc_raw(
-                                receiver,
-                                raw_message,
-                                rpc_timeout_duration,
-                            )
-                        } else {
-                            network_sender.send_rb_rpc(receiver, message, rpc_timeout_duration)
-                        }
+                        network_sender.send_rb_rpc(receiver, message, rpc_timeout_duration)
                     };
                     (receiver, send_fut.await)
                 }
