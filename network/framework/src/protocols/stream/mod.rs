@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::protocols::wire::messaging::v1::{MultiplexMessage, NetworkMessage};
+use crate::protocols::wire::messaging::v1::{
+    MultiplexMessage, MultiplexMessageAndMetadata, NetworkMessage, NetworkMessageAndMetadata,
+};
 use anyhow::{bail, ensure};
 use aptos_channels::Sender;
 use aptos_id_generator::{IdGenerator, U32IdGenerator};
@@ -151,14 +153,14 @@ pub struct OutboundStream {
     request_id_gen: U32IdGenerator,
     max_frame_size: usize,
     max_message_size: usize,
-    stream_tx: Sender<MultiplexMessage>,
+    stream_tx: Sender<MultiplexMessageAndMetadata>,
 }
 
 impl OutboundStream {
     pub fn new(
         max_frame_size: usize,
         max_message_size: usize,
-        stream_tx: Sender<MultiplexMessage>,
+        stream_tx: Sender<MultiplexMessageAndMetadata>,
     ) -> Self {
         // some buffer for headers
         let max_frame_size = max_frame_size - 64;
@@ -180,7 +182,11 @@ impl OutboundStream {
         message.data_len() > self.max_frame_size
     }
 
-    pub async fn stream_message(&mut self, mut message: NetworkMessage) -> anyhow::Result<()> {
+    pub async fn stream_message(
+        &mut self,
+        message_and_metadata: NetworkMessageAndMetadata,
+    ) -> anyhow::Result<()> {
+        let (mut message, latency_metadata) = message_and_metadata.into_parts();
         ensure!(
             message.data_len() <= self.max_message_size,
             "Message length {} exceed size limit {}",
@@ -213,24 +219,31 @@ impl OutboundStream {
             chunks.len() <= u8::MAX as usize,
             "Number of fragments overflowed"
         );
+
+        // Send the stream header first
         let header = StreamMessage::Header(StreamHeader {
             request_id,
             num_fragments: chunks.len() as u8,
             message,
         });
-        self.stream_tx
-            .send(MultiplexMessage::Stream(header))
-            .await?;
+        let header_and_metadata =
+            MultiplexMessageAndMetadata::new(MultiplexMessage::Stream(header), latency_metadata);
+        self.stream_tx.send(header_and_metadata).await?;
+
+        // Next, send the individual message fragments
         for (index, chunk) in chunks.enumerate() {
-            let message = StreamMessage::Fragment(StreamFragment {
+            let fragment = StreamMessage::Fragment(StreamFragment {
                 request_id,
                 fragment_id: index as u8 + 1,
                 raw_data: Vec::from(chunk),
             });
-            self.stream_tx
-                .send(MultiplexMessage::Stream(message))
-                .await?;
+            let fragment_and_metadata = MultiplexMessageAndMetadata::new(
+                MultiplexMessage::Stream(fragment),
+                latency_metadata,
+            );
+            self.stream_tx.send(fragment_and_metadata).await?;
         }
+
         Ok(())
     }
 }

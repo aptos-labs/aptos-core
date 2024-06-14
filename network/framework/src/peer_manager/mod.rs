@@ -508,8 +508,18 @@ where
         );
         self.sample_connected_peers();
         let (peer_id, protocol_id, peer_request) = match request {
-            PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                (peer_id, msg.protocol_id(), PeerRequest::SendDirectSend(msg))
+            PeerManagerRequest::SendDirectSend(peer_id, mut message_and_metadata) => {
+                // Set the peer dispatch time
+                message_and_metadata
+                    .get_latency_metadata()
+                    .set_peer_dispatch_time();
+
+                // Create and return the peer ID, protocol ID and peer request
+                (
+                    peer_id,
+                    message_and_metadata.get_message().protocol_id(),
+                    PeerRequest::SendDirectSend(message_and_metadata),
+                )
             },
             PeerManagerRequest::SendRpc(peer_id, req) => {
                 (peer_id, req.protocol_id(), PeerRequest::SendRpc(req))

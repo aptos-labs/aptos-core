@@ -235,7 +235,7 @@ impl MockNetwork {
             Some(PeerManagerRequest::SendRpc(peer_id, network_request)) => {
                 let peer_network_id = PeerNetworkId::new(network_id, peer_id);
                 let protocol_id = network_request.protocol_id;
-                let data = network_request.data;
+                let data = network_request.get_message_data().clone();
                 let res_tx = network_request.res_tx;
 
                 let message: StorageServiceMessage = bcs::from_bytes(data.as_ref()).unwrap();

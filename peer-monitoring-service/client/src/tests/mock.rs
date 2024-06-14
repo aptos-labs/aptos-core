@@ -135,7 +135,7 @@ impl MockMonitoringServer {
                 // Deconstruct the network request
                 let peer_network_id = PeerNetworkId::new(*network_id, peer_id);
                 let protocol_id = network_request.protocol_id;
-                let request_data = network_request.data;
+                let request_data = network_request.get_message_data().clone();
                 let response_sender = network_request.res_tx;
 
                 // Deserialize the network message

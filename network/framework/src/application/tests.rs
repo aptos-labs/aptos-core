@@ -1106,13 +1106,14 @@ async fn wait_for_network_event(
                     // Create and return the peer manager notification
                     let inbound_rpc_request = InboundRpcRequest {
                         protocol_id: outbound_rpc_request.protocol_id,
-                        data: outbound_rpc_request.data,
+                        data: outbound_rpc_request.get_message_data().clone(),
                         res_tx: oneshot::channel().0,
                     };
                     (outbound_rpc_request.protocol_id, PeerManagerNotification::RecvRpc(peer_id, inbound_rpc_request))
                 }
-                PeerManagerRequest::SendDirectSend(peer_id, message) => {
+                PeerManagerRequest::SendDirectSend(peer_id, message_and_metadata) => {
                     // Verify the request is correct
+                    let message = message_and_metadata.get_message().clone();
                     assert!(!is_rpc_request);
                     assert_eq!(peer_id, expected_peer_id);
                     assert_eq!(Some(message.protocol_id), expected_direct_send_protocol_id);
