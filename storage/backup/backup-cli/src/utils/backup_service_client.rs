@@ -6,7 +6,7 @@ use crate::{metrics::backup::THROUGHPUT_COUNTER, utils::error_notes::ErrorNotes}
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_db::backup::backup_handler::DbState;
-use aptos_metrics_core::IntCounterHelper;
+use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use aptos_types::transaction::Version;
 use clap::Parser;
 use futures::TryStreamExt;
@@ -16,6 +16,7 @@ use tokio::{
 };
 use tokio_io_timeout::TimeoutReader;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
+use crate::metrics::backup::BACKUP_TIMER;
 
 #[derive(Parser)]
 pub struct BackupServiceClientOpt {
@@ -51,6 +52,8 @@ impl BackupServiceClient {
     }
 
     async fn get(&self, endpoint: &'static str, params: &str) -> Result<impl AsyncRead> {
+        let _timer = BACKUP_TIMER.timer_with(&[&format!("backup_service_client_get_{endpoint}")]);
+
         let url = if params.is_empty() {
             format!("{}/{}", self.address, endpoint)
         } else {

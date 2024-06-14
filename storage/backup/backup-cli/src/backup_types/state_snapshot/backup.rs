@@ -305,7 +305,7 @@ impl StateSnapshotBackupController {
             }
         });
 
-        Ok(record_stream_stream.try_buffered_x(4, 2).try_flatten())
+        Ok(record_stream_stream.try_buffered(4).try_flatten())
     }
 }
 
@@ -333,7 +333,10 @@ async fn send_records_inner(
         .get_state_snapshot_chunk(version, start_idx, chunk_size)
         .await?;
     let mut count = 0;
-    while let Some(record_bytes) = input.read_record_bytes().await? {
+    while let Some(record_bytes) = {
+        let _timer = BACKUP_TIMER.timer_with(&["state_snapshot_read_record_bytes"]);
+        input.read_record_bytes().await?
+    } {
         let _timer = BACKUP_TIMER.timer_with(&["state_snapshot_record_stream_send_bytes"]);
         count += 1;
         sender.send(Ok(record_bytes)).await?;
