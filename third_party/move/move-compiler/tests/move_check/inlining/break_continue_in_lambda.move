@@ -38,6 +38,7 @@ module 0xc0ffee::m {
             i = i + 1;
             if (i == 5) {
                 brk2(| | break);
+                brk2(| | continue);
 		brk2(| | while (true) { break });
 		brk2(| | while (true) { continue });
             }
