@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_move_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
-use aptos::move_tool::chunked_publish::create_chunks;
 use aptos_framework::{
+    chunked_publish::{
+        chunk_package_and_create_payloads, PublishType, LARGE_PACKAGES_MODULE_ADDRESS,
+    },
     natives::{
         code::{PackageMetadata, PackageRegistry, UpgradePolicy},
         object_code_deployment::ManagingRefs,
@@ -13,19 +15,13 @@ use aptos_framework::{
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     object_address::create_object_code_deployment_address,
-    transaction::{
-        AbortInfo, EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus,
-    },
+    transaction::{AbortInfo, TransactionPayload, TransactionStatus},
 };
 use move_core_types::{
-    account_address::AccountAddress, ident_str, language_storage::ModuleId,
-    parser::parse_struct_tag, vm_status::StatusCode,
+    account_address::AccountAddress, parser::parse_struct_tag, vm_status::StatusCode,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, option::Option, path::Path};
-
-/// Maximum code & metadata chunk size to be included in a transaction
-const MAX_CHUNK_SIZE_IN_BYTES: usize = 60_000;
 
 /// Number of transactions needed for staging code chunks before publishing to accounts or objects
 /// This is used to derive object address for testing object code deployment feature
@@ -39,23 +35,17 @@ struct State {
 
 struct LargePackageTestContext {
     harness: MoveHarness,
-    admin_account: Account, // publish `large_packages.move` under this account
-    account: Account,       // publish the large package under this account
+    account: Account, // used for testing account code deployment for large packages
     object_address: AccountAddress, // used for testing object code deployment for large packages
-}
-
-enum ChunkedPackagePublishMode {
-    AccountDeployChunked,
-    ObjectDeployChunked,
-    ObjectUpgradeChunked,
 }
 
 impl LargePackageTestContext {
     /// Create a new test context with initialized accounts and published `large_packages.move` module.
     fn new() -> Self {
         let mut harness = MoveHarness::new();
-        let admin_account =
-            harness.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+        let admin_account = harness.new_account_at(
+            AccountAddress::from_hex_literal(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
+        );
         let account = harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
         let sequence_number = harness.sequence_number(account.address());
         let object_address = create_object_code_deployment_address(
@@ -66,7 +56,7 @@ impl LargePackageTestContext {
         // publish `large_packages.move` module
         let build_option = Self::get_named_addresses_build_options(vec![(
             String::from("large_packages"),
-            AccountAddress::from_hex_literal("0xbeef").unwrap(),
+            AccountAddress::from_hex_literal(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
         )]);
 
         let txn = harness.create_publish_package(
@@ -79,7 +69,6 @@ impl LargePackageTestContext {
 
         LargePackageTestContext {
             harness,
-            admin_account,
             account,
             object_address,
         }
@@ -104,243 +93,57 @@ impl LargePackageTestContext {
         account: &Account,
         path: &Path,
         patch_metadata: impl FnMut(&mut PackageMetadata),
-        chunked_package_publish_mode: ChunkedPackagePublishMode,
+        publish_type: PublishType,
     ) -> Vec<TransactionStatus> {
-        let deploy_address = match chunked_package_publish_mode {
-            ChunkedPackagePublishMode::AccountDeployChunked => {
-                AccountAddress::from_hex_literal("0xcafe").unwrap()
-            },
-            ChunkedPackagePublishMode::ObjectDeployChunked
-            | ChunkedPackagePublishMode::ObjectUpgradeChunked => self.object_address,
+        let deploy_address = match publish_type {
+            PublishType::AccountDeploy => AccountAddress::from_hex_literal("0xcafe").unwrap(),
+            PublishType::ObjectDeploy | PublishType::ObjectUpgrade => self.object_address,
         };
 
         let build_options = Self::get_named_addresses_build_options(vec![(
             String::from("large_package_example"),
             deploy_address,
         )]);
-        let transactions = self.create_publish_large_package_from_path(
-            account,
+        let payloads = self.create_publish_large_package_from_path(
             path,
             Some(build_options),
             patch_metadata,
-            chunked_package_publish_mode,
+            publish_type,
         );
-        transactions
+        payloads
             .into_iter()
-            .map(|txn| self.harness.run(txn))
+            .map(|payload| {
+                let signed_tx = self
+                    .harness
+                    .create_transaction_without_sign(account, payload)
+                    .sign();
+                self.harness.run(signed_tx)
+            })
             .collect()
     }
 
     /// Create transactions for publishing a large package.
     fn create_publish_large_package_from_path(
         &mut self,
-        account: &Account,
         path: &Path,
         options: Option<BuildOptions>,
-        patch_metadata: impl FnMut(&mut PackageMetadata),
-        chunked_package_publish_mode: ChunkedPackagePublishMode,
-    ) -> Vec<SignedTransaction> {
+        mut patch_metadata: impl FnMut(&mut PackageMetadata),
+        publish_type: PublishType,
+    ) -> Vec<TransactionPayload> {
         let package = BuiltPackage::build(path.to_owned(), options.unwrap())
             .expect("package build must succeed");
         let package_code = package.extract_code();
-        let metadata = package
+        let mut metadata = package
             .extract_metadata()
             .expect("extracting package metadata must succeed");
-        self.create_payloads_from_metadata_and_code(
-            account,
-            package_code,
-            metadata,
-            patch_metadata,
-            chunked_package_publish_mode,
-        )
-    }
-
-    /// Create payloads from metadata and code chunks for a large package.
-    fn create_payloads_from_metadata_and_code(
-        &mut self,
-        account: &Account,
-        package_code: Vec<Vec<u8>>,
-        mut metadata: PackageMetadata,
-        mut patch_metadata: impl FnMut(&mut PackageMetadata),
-        chunked_package_publish_mode: ChunkedPackagePublishMode,
-    ) -> Vec<SignedTransaction> {
         patch_metadata(&mut metadata);
-
-        // Chunk the metadata
-        let mut metadata_chunks =
-            create_chunks(bcs::to_bytes(&metadata).expect("Failed deserializing metadata"));
-
-        // Separate last chunk for special handling
-        let mut metadata_chunk = metadata_chunks.pop().unwrap_or_default();
-        let mut taken_size = metadata_chunk.len();
-
-        let mut transactions = metadata_chunks
-            .into_iter()
-            .map(|chunk| {
-                self.harness.create_transaction_payload(
-                    account,
-                    self.large_packages_stage_code_chunk(chunk, vec![], vec![]),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        let mut code_indices: Vec<u16> = vec![];
-        let mut code_chunks: Vec<Vec<u8>> = vec![];
-
-        for (idx, module_code) in package_code.into_iter().enumerate() {
-            let chunked_module = create_chunks(module_code);
-            for chunk in chunked_module {
-                if taken_size + chunk.len() > MAX_CHUNK_SIZE_IN_BYTES {
-                    // Create a payload and reset accumulators
-                    let transaction = self.harness.create_transaction_payload(
-                        account,
-                        self.large_packages_stage_code_chunk(
-                            metadata_chunk,
-                            code_indices.clone(),
-                            code_chunks.clone(),
-                        ),
-                    );
-                    transactions.push(transaction);
-
-                    metadata_chunk = vec![];
-                    code_indices.clear();
-                    code_chunks.clear();
-                    taken_size = 0;
-                }
-
-                code_indices.push(idx as u16);
-                taken_size += chunk.len();
-                code_chunks.push(chunk);
-            }
-        }
-
-        // Add the last payload (publishing transaction)
-        let transaction = match chunked_package_publish_mode {
-            ChunkedPackagePublishMode::AccountDeployChunked => {
-                self.harness.create_transaction_payload(
-                    account,
-                    self.large_packages_stage_code_chunk_and_publish_to_account(
-                        metadata_chunk,
-                        code_indices,
-                        code_chunks,
-                    ),
-                )
-            },
-            ChunkedPackagePublishMode::ObjectDeployChunked => {
-                self.harness.create_transaction_payload(
-                    account,
-                    self.large_packages_stage_code_chunk_and_publish_to_object(
-                        metadata_chunk,
-                        code_indices,
-                        code_chunks,
-                    ),
-                )
-            },
-            ChunkedPackagePublishMode::ObjectUpgradeChunked => {
-                self.harness.create_transaction_payload(
-                    account,
-                    self.large_packages_stage_code_chunk_and_upgrade_object_code(
-                        metadata_chunk,
-                        code_indices,
-                        code_chunks,
-                        Some(self.object_address),
-                    ),
-                )
-            },
-        };
-
-        transactions.push(transaction);
-        transactions
-    }
-
-    /// Create a transaction payload for staging or publishing the large package.
-    fn large_packages_stage_code_chunk(
-        &self,
-        metadata_chunk: Vec<u8>,
-        code_indices: Vec<u16>,
-        code_chunks: Vec<Vec<u8>>,
-    ) -> TransactionPayload {
-        TransactionPayload::EntryFunction(EntryFunction::new(
-            ModuleId::new(
-                self.admin_account.address().to_owned(),
-                ident_str!("large_packages").to_owned(),
-            ),
-            ident_str!("stage_code_chunk").to_owned(),
-            vec![],
-            vec![
-                bcs::to_bytes(&metadata_chunk).unwrap(),
-                bcs::to_bytes(&code_indices).unwrap(),
-                bcs::to_bytes(&code_chunks).unwrap(),
-            ],
-        ))
-    }
-
-    // Create a transaction payload for staging chunked data and finally publishing the package to an account.
-    fn large_packages_stage_code_chunk_and_publish_to_account(
-        &self,
-        metadata_chunk: Vec<u8>,
-        code_indices: Vec<u16>,
-        code_chunks: Vec<Vec<u8>>,
-    ) -> TransactionPayload {
-        TransactionPayload::EntryFunction(EntryFunction::new(
-            ModuleId::new(
-                self.admin_account.address().to_owned(),
-                ident_str!("large_packages").to_owned(),
-            ),
-            ident_str!("stage_code_chunk_and_publish_to_account").to_owned(),
-            vec![],
-            vec![
-                bcs::to_bytes(&metadata_chunk).unwrap(),
-                bcs::to_bytes(&code_indices).unwrap(),
-                bcs::to_bytes(&code_chunks).unwrap(),
-            ],
-        ))
-    }
-
-    // Create a transaction payload for staging chunked data and finally publishing the package to an object.
-    fn large_packages_stage_code_chunk_and_publish_to_object(
-        &self,
-        metadata_chunk: Vec<u8>,
-        code_indices: Vec<u16>,
-        code_chunks: Vec<Vec<u8>>,
-    ) -> TransactionPayload {
-        TransactionPayload::EntryFunction(EntryFunction::new(
-            ModuleId::new(
-                self.admin_account.address().to_owned(),
-                ident_str!("large_packages").to_owned(),
-            ),
-            ident_str!("stage_code_chunk_and_publish_to_object").to_owned(),
-            vec![],
-            vec![
-                bcs::to_bytes(&metadata_chunk).unwrap(),
-                bcs::to_bytes(&code_indices).unwrap(),
-                bcs::to_bytes(&code_chunks).unwrap(),
-            ],
-        ))
-    }
-
-    // Create a transaction payload for staging chunked data and finally upgrading the object package.
-    fn large_packages_stage_code_chunk_and_upgrade_object_code(
-        &self,
-        metadata_chunk: Vec<u8>,
-        code_indices: Vec<u16>,
-        code_chunks: Vec<Vec<u8>>,
-        code_object: Option<AccountAddress>,
-    ) -> TransactionPayload {
-        TransactionPayload::EntryFunction(EntryFunction::new(
-            ModuleId::new(
-                self.admin_account.address().to_owned(),
-                ident_str!("large_packages").to_owned(),
-            ),
-            ident_str!("stage_code_chunk_and_upgrade_object_code").to_owned(),
-            vec![],
-            vec![
-                bcs::to_bytes(&metadata_chunk).unwrap(),
-                bcs::to_bytes(&code_indices).unwrap(),
-                bcs::to_bytes(&code_chunks).unwrap(),
-                bcs::to_bytes(&code_object).unwrap(),
-            ],
-        ))
+        let metadata_serialized = bcs::to_bytes(&metadata).expect("Failed deserializing metadata");
+        chunk_package_and_create_payloads(
+            metadata_serialized,
+            package_code,
+            publish_type,
+            Some(self.object_address),
+        )
     }
 }
 
@@ -354,7 +157,7 @@ fn large_package_publishing_basic() {
         &acc,
         &common::test_dir_path("../../../move-examples/large_packages/large_package_example"),
         |_| {},
-        ChunkedPackagePublishMode::AccountDeployChunked,
+        PublishType::AccountDeploy,
     );
     for tx_status in tx_statuses.into_iter() {
         assert_success!(tx_status);
@@ -399,7 +202,7 @@ fn large_package_upgrade_success_compat() {
         &acc,
         &common::test_dir_path("../../../move-examples/large_packages/large_package_example"),
         |_| {},
-        ChunkedPackagePublishMode::AccountDeployChunked,
+        PublishType::AccountDeploy,
     );
     for tx_status in tx_statuses.into_iter() {
         assert_success!(tx_status);
@@ -410,7 +213,7 @@ fn large_package_upgrade_success_compat() {
         &acc,
         &common::test_dir_path("../../../move-examples/large_packages/large_package_example"), // upgrade with the same package
         |_| {},
-        ChunkedPackagePublishMode::AccountDeployChunked,
+        PublishType::AccountDeploy,
     );
     for tx_status in tx_statuses.into_iter() {
         assert_success!(tx_status);
@@ -427,7 +230,7 @@ fn large_package_upgrade_fail_compat() {
         &acc,
         &common::test_dir_path("../../../move-examples/large_packages/large_package_example"),
         |_| {},
-        ChunkedPackagePublishMode::AccountDeployChunked,
+        PublishType::AccountDeploy,
     );
     for tx_status in tx_statuses.into_iter() {
         assert_success!(tx_status);
@@ -439,7 +242,7 @@ fn large_package_upgrade_fail_compat() {
         &acc,
         &common::test_dir_path("large_package_publishing.data/large_pack_upgrade_incompat"),
         |_| {},
-        ChunkedPackagePublishMode::AccountDeployChunked,
+        PublishType::AccountDeploy,
     );
 
     let last_tx_status = tx_statuses.pop().unwrap(); // transaction for publishing
@@ -463,7 +266,7 @@ fn large_package_upgrade_fail_immutable() {
         &acc,
         &common::test_dir_path("../../../move-examples/large_packages/large_package_example"),
         |metadata| metadata.upgrade_policy = UpgradePolicy::immutable(),
-        ChunkedPackagePublishMode::AccountDeployChunked,
+        PublishType::AccountDeploy,
     );
 
     for tx_status in tx_statuses.into_iter() {
@@ -476,7 +279,7 @@ fn large_package_upgrade_fail_immutable() {
         &acc,
         &common::test_dir_path("../../../move-examples/large_packages/large_package_example"),
         |_| {},
-        ChunkedPackagePublishMode::AccountDeployChunked,
+        PublishType::AccountDeploy,
     );
     let last_tx_status = tx_statuses.pop().unwrap(); // transaction for publishing
     for tx_status in tx_statuses.into_iter() {
@@ -499,7 +302,7 @@ fn large_package_upgrade_fail_overlapping_module() {
         &acc,
         &common::test_dir_path("../../../move-examples/large_packages/large_package_example"),
         |_| {},
-        ChunkedPackagePublishMode::AccountDeployChunked,
+        PublishType::AccountDeploy,
     );
     for tx_status in tx_statuses.into_iter() {
         assert_success!(tx_status);
@@ -511,7 +314,7 @@ fn large_package_upgrade_fail_overlapping_module() {
         &acc,
         &common::test_dir_path("../../../move-examples/large_packages/large_package_example"),
         |metadata| metadata.name = "other_large_pack".to_string(),
-        ChunkedPackagePublishMode::AccountDeployChunked,
+        PublishType::AccountDeploy,
     );
 
     let last_tx_status = tx_statuses.pop().unwrap(); // transaction for publishing
@@ -536,7 +339,7 @@ fn large_package_object_code_deployment_basic() {
         &acc,
         &common::test_dir_path("../../../move-examples/large_packages/large_package_example"),
         |_| {},
-        ChunkedPackagePublishMode::ObjectDeployChunked,
+        PublishType::ObjectDeploy,
     );
     for tx_status in tx_statuses.into_iter() {
         assert_success!(tx_status);
@@ -596,7 +399,7 @@ fn large_package_object_code_deployment_upgrade_success_compat() {
         &acc,
         &common::test_dir_path("../../../move-examples/large_packages/large_package_example"),
         |_| {},
-        ChunkedPackagePublishMode::ObjectDeployChunked,
+        PublishType::ObjectDeploy,
     );
     for tx_status in tx_statuses.into_iter() {
         assert_success!(tx_status);
@@ -607,7 +410,7 @@ fn large_package_object_code_deployment_upgrade_success_compat() {
         &acc,
         &common::test_dir_path("../../../move-examples/large_packages/large_package_example"), // upgrade with the same package
         |_| {},
-        ChunkedPackagePublishMode::ObjectUpgradeChunked,
+        PublishType::ObjectUpgrade,
     );
     for tx_status in tx_statuses.into_iter() {
         assert_success!(tx_status);
