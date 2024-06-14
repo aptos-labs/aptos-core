@@ -199,7 +199,7 @@ pub enum ProofQueueCommand {
     AddProofs(Vec<ProofOfStore>, oneshot::Sender<(u64, u64)>),
     // Batch coordinator sends this command to add the received batches to the proof queue.
     // For each transaction, the proof queue stores the list of batches containing the transaction.
-    AddBatches(Vec<(BatchInfo, Vec<(PeerId, u64)>)>),
+    AddBatches(Vec<(BatchInfo, Vec<TransactionSummary>)>),
     // Proof manager sends this command to pull proofs from the proof queue to
     // include in the block proposal.
     PullProofs {
@@ -221,9 +221,9 @@ pub struct ProofQueue {
     author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
     // ProofOfStore and insertion_time. None if committed
     batch_to_proof: HashMap<BatchKey, Option<(ProofOfStore, Instant)>>,
-    // Map of txn_summary = (sender, sequence number) to all the batches that contain
+    // Map of txn_summary = (sender, sequence number, hash) to all the batches that contain
     // the transaction. This helps in counting the number of unique transactions in the pipeline.
-    txn_summary_to_batches: HashMap<(PeerId, u64), HashSet<BatchKey>>,
+    txn_summary_to_batches: HashMap<TransactionSummary, HashSet<BatchKey>>,
     // List of batches for which we received txn summaries from the batch coordinator
     batches_with_txn_summary: HashSet<BatchKey>,
     // Expiration index

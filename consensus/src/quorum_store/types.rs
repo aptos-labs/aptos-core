@@ -3,7 +3,7 @@
 
 use anyhow::ensure;
 use aptos_consensus_types::{
-    common::BatchPayload,
+    common::{BatchPayload, TransactionSummary},
     proof_of_store::{BatchId, BatchInfo},
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -172,11 +172,13 @@ impl Batch {
         self.payload.into_transactions()
     }
 
-    pub fn summary(&self) -> Vec<(PeerId, u64)> {
+    pub fn summary(&self) -> Vec<TransactionSummary> {
         self.payload
             .txns()
             .iter()
-            .map(|txn| (txn.sender(), txn.sequence_number()))
+            .map(|txn| {
+                TransactionSummary::new(txn.sender(), txn.sequence_number(), txn.committed_hash())
+            })
             .collect()
     }
 
