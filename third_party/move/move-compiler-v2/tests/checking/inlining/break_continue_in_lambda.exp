@@ -1,22 +1,49 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/checking/inlining/break_continue_in_lambda.move:7:12
+warning: Unnecessary trailing semicolon
+  ┌─ tests/checking/inlining/break_continue_in_lambda.move:3:14
   │
-7 │         f();
-  │            ^
+3 │         break;
+  │         -----^
+  │         │    │
+  │         │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │         Any code after this expression will not be reached
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/inlining/break_continue_in_lambda.move:29:9
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/inlining/break_continue_in_lambda.move:12:18
    │
-29 │         brk4();
-   │               ^
+12 │             break;
+   │             -----^
+   │             │    │
+   │             │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │             Any code after this expression will not be reached
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/inlining/break_continue_in_lambda.move:42:38
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/inlining/break_continue_in_lambda.move:18:21
    │
-42 │         brk2(| | while (true) { continue });
-   │                                            ^
+18 │             continue;
+   │             --------^
+   │             │       │
+   │             │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │             Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/inlining/break_continue_in_lambda.move:49:7
+   │
+49 │     break;
+   │     -----^
+   │     │    │
+   │     │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │     Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/inlining/break_continue_in_lambda.move:53:10
+   │
+53 │     continue;
+   │     --------^
+   │     │       │
+   │     │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │     Any code after this expression will not be reached
 
 
 Diagnostics:

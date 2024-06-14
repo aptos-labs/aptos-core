@@ -129,3 +129,12 @@ error: type `R` is missing required ability `drop`
    │
    = required by instantiating type parameter `T:drop` of struct `S`
    = required by instantiating type parameter `T:drop` of struct `S`
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/abilities/instantiate_signatures.move:45:40
+   │
+45 │         S<S<(u64, u64)>> { f: abort 0 };
+   │         -------------------------------^
+   │         │                              │
+   │         │                              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │         Any code after this expression will not be reached

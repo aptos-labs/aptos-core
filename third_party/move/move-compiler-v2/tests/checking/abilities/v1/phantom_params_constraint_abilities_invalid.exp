@@ -72,12 +72,6 @@ error: type `NoAbilities` is missing required abilities `copy + drop + store`
    = required by instantiating type parameter `T2` of struct `HasAbilities`
    = required by instantiating type parameter `T:copy + drop + store + key` of function `f1`
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:25:53
-   │
-25 │         f1<HasAbilities<NoAbilities, NoAbilities>>();
-   │                                                     ^
-
 error: type `NoAbilities` is missing required ability `drop`
    ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:30:13
    │
@@ -125,9 +119,3 @@ error: type `NoAbilities` is missing required ability `store`
    │
    = required by instantiating type parameter `T2` of struct `HasKey`
    = required by instantiating type parameter `T4:key` of function `f3`
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:34:14
-   │
-34 │           >();
-   │              ^

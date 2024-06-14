@@ -1,16 +1,13 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/unreachable-code-remover/conditional_loop_unreachable.move:7:26
+warning: Unnecessary trailing semicolon
+  ┌─ tests/unreachable-code-remover/conditional_loop_unreachable.move:9:22
   │
-7 │                 i = i + 1;
-  │                          ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unreachable-code-remover/conditional_loop_unreachable.move:12:22
-   │
-12 │             i = i + 1;
-   │                      ^
+9 │                 break;
+  │                 -----^
+  │                 │    │
+  │                 │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │                 Any code after this expression will not be reached
 
 ============ initial bytecode ================
 

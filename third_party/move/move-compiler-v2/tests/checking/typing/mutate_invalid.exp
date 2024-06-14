@@ -42,12 +42,6 @@ error: cannot assign `&mut bool` to left-hand side of type `&mut u64`
 12 │         *&mut baz().f = false;
    │          ^^^^^^^^^^^^
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/mutate_invalid.move:12:30
-   │
-12 │         *&mut baz().f = false;
-   │                              ^
-
 error: cannot assign `&mut X` to left-hand side of type `&mut S`
    ┌─ tests/checking/typing/mutate_invalid.move:17:10
    │
@@ -65,9 +59,3 @@ error: cannot assign `&mut ()` to left-hand side of type `&mut u64`
    │
 20 │         *&mut r.f = ();
    │          ^^^^^^^^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/mutate_invalid.move:20:23
-   │
-20 │         *&mut r.f = ();
-   │                       ^

@@ -1,17 +1,3 @@
-
-Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/checking/receiver/generic_calls.move:8:19
-  │
-8 │         self.x = y;
-  │                   ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/receiver/generic_calls.move:30:49
-   │
-30 │         s.receiver_needs_type_args::<u64, u8>(x);
-   │                                                 ^
-
 // -- Model dump before bytecode pipeline
 module 0x42::m {
     struct S {

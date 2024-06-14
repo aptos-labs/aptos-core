@@ -1,57 +1,12 @@
-comparison between v1 and v2 failed:
-= processed 4 tasks
-= 
-+ task 0 'run'. lines 1-12:
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+   ┌─ TEMPFILE:9:22
-+   │
-+ 9 │             j = j + 1;
-+   │                      ^
-+ 
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE:10:10
-+    │
-+ 10 │         };
-+    │          ^
-+ 
-+ 
-+ 
-+ task 1 'run'. lines 14-25:
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE1:22:22
-+    │
-+ 22 │             j = j + 1;
-+    │                      ^
-+ 
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE1:23:10
-+    │
-+ 23 │         };
-+    │          ^
-+ 
-+ 
-+ 
-+ task 2 'run'. lines 27-38:
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE2:35:22
-+    │
-+ 35 │             j = j + 1;
-+    │                      ^
-+ 
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE2:36:10
-+    │
-+ 36 │         };
-+    │          ^
-+ 
-+ 
-+ 
-= task 3 'run'. lines 40-53:
-= Error: Script execution failed with VMError: {
-=     major_status: ARITHMETIC_ERROR,
-=     sub_status: None,
-=     location: script,
-=     indices: redacted,
-=     offsets: redacted,
-= }
-= 
+processed 4 tasks
+
+task 3 'run'. lines 40-53:
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: redacted,
+    offsets: redacted,
+}
+
+==> Compiler v2 delivered same results!

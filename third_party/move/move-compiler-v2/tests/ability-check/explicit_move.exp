@@ -1,19 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/ability-check/explicit_move.move:13:16
-   │
-13 │         some(x);
-   │                ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/ability-check/explicit_move.move:20:16
-   │
-20 │         some(r);
-   │                ^
-
-
-Diagnostics:
 error: local `x` of type `m::R` does not have the `copy` ability
    ┌─ tests/ability-check/explicit_move.move:12:9
    │

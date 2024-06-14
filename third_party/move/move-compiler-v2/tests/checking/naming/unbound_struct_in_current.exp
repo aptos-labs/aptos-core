@@ -36,12 +36,6 @@ error: undeclared struct `M::S`
 13 │         Self::S {} = bar();
    │         ^^^^^^^
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/naming/unbound_struct_in_current.move:13:27
-   │
-13 │         Self::S {} = bar();
-   │                           ^
-
 error: undeclared struct `M::S`
    ┌─ tests/checking/naming/unbound_struct_in_current.move:17:13
    │

@@ -1,17 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/module_call.move:32:38
-   │
-32 │         (X::bing(false, @0x0, 0): ());
-   │                                      ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/module_call.move:39:35
-   │
-39 │         (bing(false, @0x0, 0): ());
-   │                                   ^
-
 error: the function takes 2 arguments but 1 were provided
    ┌─ tests/checking/typing/module_call.move:43:26
    │

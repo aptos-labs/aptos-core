@@ -1,18 +1,9 @@
-comparison between v1 and v2 failed:
-= processed 3 tasks
-= 
-+ task 0 'publish'. lines 1-13:
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+   ┌─ TEMPFILE:8:30
-+   │
-+ 8 │             count = count + 1;
-+   │                              ^
-+ 
-+ 
-+ 
-= task 1 'run'. lines 15-15:
-= return values: 44
-= 
-= task 2 'run'. lines 17-17:
-= return values: 6
-= 
+processed 3 tasks
+
+task 1 'run'. lines 15-15:
+return values: 44
+
+task 2 'run'. lines 17-17:
+return values: 6
+
+==> Compiler v2 delivered same results!

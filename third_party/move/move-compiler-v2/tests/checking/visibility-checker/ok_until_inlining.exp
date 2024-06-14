@@ -1,25 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/checking/visibility-checker/ok_until_inlining.move:3:15
-  │
-3 │         priv();
-  │               ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/checking/visibility-checker/ok_until_inlining.move:9:14
-  │
-9 │         foo(); // ok
-  │              ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/visibility-checker/ok_until_inlining.move:15:27
-   │
-15 │         0xc0ffee::m::foo(); // not ok
-   │                           ^
-
-
-Diagnostics:
 error: function `0xc0ffee::m::priv` cannot be called from function `0xc0ffee::n::test` because it is private to module `0xc0ffee::m`
    ┌─ tests/checking/visibility-checker/ok_until_inlining.move:6:9
    │

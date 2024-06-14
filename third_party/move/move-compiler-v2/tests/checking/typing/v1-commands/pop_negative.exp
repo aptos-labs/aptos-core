@@ -5,9 +5,3 @@ error: the left-hand side has 4 items but the right-hand side provided 3
   │
 7 │         (_, _, _, _) = three();
   │         ^^^^^^^^^^^^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/checking/typing/v1-commands/pop_negative.move:7:31
-  │
-7 │         (_, _, _, _) = three();
-  │                               ^

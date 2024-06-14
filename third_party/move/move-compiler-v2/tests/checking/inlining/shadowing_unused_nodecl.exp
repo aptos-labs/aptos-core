@@ -1,19 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/checking/inlining/shadowing_unused_nodecl.move:9:16
-  │
-9 │         f(x, q);
-  │                ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/inlining/shadowing_unused_nodecl.move:13:32
-   │
-13 │         quux(|a, b| f(a, b), z);
-   │                                ^
-
-
-Diagnostics:
 warning: Unused parameter `z`. Consider removing or prefixing with an underscore: `_z`
   ┌─ tests/checking/inlining/shadowing_unused_nodecl.move:6:42
   │

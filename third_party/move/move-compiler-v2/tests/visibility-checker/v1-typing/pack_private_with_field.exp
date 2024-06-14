@@ -1,13 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/visibility-checker/v1-typing/pack_private_with_field.move:25:22
-   │
-25 │   0x42::m::consume(s);
-   │                      ^
-
-
-Diagnostics:
 error: Invalid operation: pack of `m::S` can only be done within the defining module `0x42::m`
    ┌─ tests/visibility-checker/v1-typing/pack_private_with_field.move:18:5
    │

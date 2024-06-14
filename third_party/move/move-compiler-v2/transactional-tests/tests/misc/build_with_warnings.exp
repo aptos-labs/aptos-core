@@ -10,12 +10,6 @@ comparison between v1 and v2 failed:
 -   │                    ^ Unused parameter 'x'. Consider removing or prefixing with an underscore: '_x'
 +   │                    ^
 = 
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+   ┌─ TEMPFILE:7:32
-+   │
-+ 7 │         assert!(foo(3) == 2, 1);
-+   │                                ^
 = 
 = 
 = 
-+ 

@@ -10,9 +10,3 @@ error: type `R` is missing required ability `copy`
   │                  ^
   │
   = required by instantiating type parameter `T:copy` of struct `CupC`
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/ability-check/v1-typing/constraints_not_satisfied_type_arguments_internal_call.move:9:23
-  │
-9 │         box<CupC<R>>();
-  │                       ^

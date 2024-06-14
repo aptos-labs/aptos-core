@@ -1,13 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/inlining/private_call_2.move:25:35
-   │
-25 │         assert!(o::foo() == 42, 1);
-   │                                   ^
-
-
-Diagnostics:
 error: function `0x42::m::bar` cannot be called from function `0x42::n::test` because module `0x42::n` is not a `friend` of `0x42::m`
    ┌─ tests/checking/inlining/private_call_2.move:7:24
    │

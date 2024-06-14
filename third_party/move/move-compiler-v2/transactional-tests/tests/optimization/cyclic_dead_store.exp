@@ -1,30 +1,15 @@
-comparison between v1 and v2 failed:
-= processed 5 tasks
-= 
-+ task 0 'publish'. lines 1-22:
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+   ┌─ TEMPFILE:8:22
-+   │
-+ 8 │             i = i + 1;
-+   │                      ^
-+ 
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE:16:22
-+    │
-+ 16 │             i = i + 1;
-+    │                      ^
-+ 
-+ 
-+ 
-= task 1 'run'. lines 24-24:
-= return values: 55
-= 
-= task 2 'run'. lines 26-26:
-= return values: 66
-= 
-= task 3 'run'. lines 28-28:
-= return values: 55
-= 
-= task 4 'run'. lines 30-30:
-= return values: 55
-= 
+processed 5 tasks
+
+task 1 'run'. lines 24-24:
+return values: 55
+
+task 2 'run'. lines 26-26:
+return values: 66
+
+task 3 'run'. lines 28-28:
+return values: 55
+
+task 4 'run'. lines 30-30:
+return values: 55
+
+==> Compiler v2 delivered same results!

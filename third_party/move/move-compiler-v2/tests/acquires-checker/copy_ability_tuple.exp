@@ -1,13 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/acquires-checker/copy_ability_tuple.move:12:25
-   │
-12 │         move_to<R>(s, r);
-   │                         ^
-
-
-Diagnostics:
 error: unnecessary acquires annotation
   ┌─ tests/acquires-checker/copy_ability_tuple.move:8:39
   │

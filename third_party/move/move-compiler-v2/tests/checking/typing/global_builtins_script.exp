@@ -1,13 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/global_builtins_script.move:17:25
-   │
-17 │     move_to(&account, r);
-   │                         ^
-
-
-Diagnostics:
 error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
    ┌─ tests/checking/typing/global_builtins_script.move:14:5
    │

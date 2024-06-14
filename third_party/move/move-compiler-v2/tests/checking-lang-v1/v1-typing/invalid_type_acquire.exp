@@ -39,9 +39,3 @@ error: type `S` is missing required ability `key`
    │                                    ^
    │
    = required by instantiating type parameter `T:key` of function `move_from`
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking-lang-v1/v1-typing/invalid_type_acquire.move:58:35
-   │
-58 │         move_to<S>(account, any());
-   │                                   ^
