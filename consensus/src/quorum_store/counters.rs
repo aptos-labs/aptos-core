@@ -416,6 +416,14 @@ pub static PULLED_EMPTY_TXNS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static PULLED_TXNS_TOTAL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_pulled_txns_total_count",
+        "Total count of the pulled txns."
+    )
+    .unwrap()
+});
+
 /// Number of txns (equals max_count) for each time the pull for batches returns full.
 pub static BATCH_PULL_FULL_TXNS: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(

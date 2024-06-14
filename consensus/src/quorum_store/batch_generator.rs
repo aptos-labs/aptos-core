@@ -361,6 +361,7 @@ impl BatchGenerator {
         } else {
             counters::PULLED_TXNS_COUNT.inc();
             counters::PULLED_TXNS_NUM.observe(pulled_txns.len() as f64);
+            counters::PULLED_TXNS_TOTAL_COUNT.inc_by(pulled_txns.len() as f64);
             if pulled_txns.len() as u64 == max_count {
                 counters::BATCH_PULL_FULL_TXNS.observe(max_count as f64)
             }
