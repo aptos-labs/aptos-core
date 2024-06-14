@@ -1,0 +1,102 @@
+warning[W09001]: unused alias
+   ┌─ tests/move_check/v2-not-supported/index.move:10:19
+   │
+10 │         use 0x42::test;
+   │                   ^^^^ Unused 'use' of alias 'test'. Consider removing it
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:11:19
+   │
+11 │         assert!((&test::R[@0x1]).value == true, 0);
+   │                   ^^^^^^^^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:15:22
+   │
+15 │         let x = &mut 0x42::test::R[@0x1];
+   │                      ^^^^^^^^^^^^^^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:17:19
+   │
+17 │         assert!((&R[@0x1]).value == false, 1);
+   │                   ^^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+warning[W09001]: unused alias
+   ┌─ tests/move_check/v2-not-supported/index.move:38:19
+   │
+38 │         use 0x42::test;
+   │                   ^^^^ Unused 'use' of alias 'test'. Consider removing it
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:39:19
+   │
+39 │         assert!((&test::Y<X<bool>>[@0x1]).field.value == true, 0);
+   │                   ^^^^^^^^^^^^^^^^^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:44:22
+   │
+44 │         let y = &mut 0x42::test ::Y<X<bool>> [addr];
+   │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:46:19
+   │
+46 │         assert!((&Y<X<bool>>[addr]) .field.value == false, 1);
+   │                   ^^^^^^^^^^^^^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:54:17
+   │
+54 │         assert!(v[0].value == 2, 0);
+   │                 ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:71:19
+   │
+71 │         assert!((&v[0]).field.value == true, 0);
+   │                   ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:72:19
+   │
+72 │         assert!((&v[1]).field.value == false, 0);
+   │                   ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:89:19
+   │
+89 │         assert!((&v[0]).field.value == true, 0);
+   │                   ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:90:19
+   │
+90 │         assert!((&v[1]).field.value == false, 0);
+   │                   ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:91:15
+   │
+91 │         (&mut v[0]).field.value = false;
+   │               ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:92:15
+   │
+92 │         (&mut v[1]).field.value = true;
+   │               ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:93:19
+   │
+93 │         assert!((&v[0]).field.value == false, 0);
+   │                   ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
+error[E01010]: syntax item restricted to spec contexts
+   ┌─ tests/move_check/v2-not-supported/index.move:94:19
+   │
+94 │         assert!((&v[1]).field.value == true, 0);
+   │                   ^^^^ `_[_]` index operator in non-specification code only allowed in Move 2
+
