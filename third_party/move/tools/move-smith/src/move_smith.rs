@@ -30,7 +30,7 @@ use std::cell::RefCell;
 
 /// Keeps track of the generation state.
 pub struct MoveSmith {
-    config: Config,
+    pub config: Config,
 
     // The output code
     modules: Vec<RefCell<Module>>,

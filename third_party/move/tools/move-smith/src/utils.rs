@@ -4,7 +4,7 @@
 //! Utility functions for MoveSmith.
 // TODO: consider move compiler/vm glue code to a separate file
 
-use crate::{ast::CompileUnit, move_smith::MoveSmith};
+use crate::{ast::CompileUnit, config::Config, move_smith::MoveSmith};
 use arbitrary::{Result, Unstructured};
 use move_compiler::{
     shared::{known_attributes::KnownAttribute, Flags},
@@ -90,7 +90,7 @@ pub fn compile_modules(code: String) {
 }
 
 /// Runs the given Move code as a transactional test.
-pub fn run_transactional_test(code: String) -> Result<(), Box<dyn Error>> {
+pub fn run_transactional_test(code: String, config: Option<&Config>) -> Result<(), Box<dyn Error>> {
     let (file_path, dir) = create_tmp_move_file(code, None);
     let vm_test_config = TestRunConfig::ComparisonV1V2 {
         language_version: LanguageVersion::V2_0,
@@ -107,25 +107,30 @@ pub fn run_transactional_test(code: String) -> Result<(), Box<dyn Error>> {
     );
     dir.close().unwrap();
 
+    let ignores = match config {
+        Some(c) => c.known_error.clone(),
+        None => Vec::new(),
+    };
+
     match result {
         Ok(_) => Ok(()),
-        Err(e) => process_transactional_test_err(e),
+        Err(e) => process_transactional_test_err(&ignores, e),
     }
 }
 
-// TODO: Find a better place for this: config or in fuzz target
-const IGNORE_ERRORS: [&str; 1] = ["unbound module"];
-
 /// Filtering the error messages from the transactional test.
 /// Currently only treat `error[Exxxx]` as a real error to ignore warnings.
-fn process_transactional_test_err(err: Box<dyn Error>) -> Result<(), Box<dyn Error>> {
+fn process_transactional_test_err(
+    ignores: &[String],
+    err: Box<dyn Error>,
+) -> Result<(), Box<dyn Error>> {
     let msg = format!("{:}", err);
-    for ignore in IGNORE_ERRORS.iter() {
+    for ignore in ignores.iter() {
         if msg.contains(ignore) {
             return Ok(());
         }
     }
-    if msg.contains("error[E") || msg.contains("error:") {
+    if msg.contains("error[E") || msg.contains("error:") || msg.contains("bug") {
         Err(err)
     } else {
         Ok(())

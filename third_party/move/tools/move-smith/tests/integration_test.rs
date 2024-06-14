@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use arbitrary::Unstructured;
-use move_smith::{ast::*, codegen::*, move_smith::*, names::Identifier, types::*, utils::*};
+use move_smith::{
+    ast::*, codegen::*, config::*, move_smith::*, names::Identifier, types::*, utils::*,
+};
 use num_bigint::BigUint;
 use std::cell::RefCell;
 
@@ -93,7 +95,7 @@ fn test_generation_and_compile() {
 #[test]
 fn test_run_transactional_test() {
     let code = simple_compile_unit().emit_code();
-    run_transactional_test(code).unwrap();
+    run_transactional_test(code, Some(&Config::default())).unwrap();
 }
 
 #[test]
@@ -112,6 +114,6 @@ module 0xCAFE::Module0 {
         x
     }
 }"#;
-    let result = run_transactional_test(code.to_string());
+    let result = run_transactional_test(code.to_string(), Some(&Config::default()));
     assert!(result.is_err());
 }

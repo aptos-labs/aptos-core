@@ -7,6 +7,11 @@
 /// MoveSmith will randomly pick within [0..max_num_XXX] during generation.
 #[derive(Debug)]
 pub struct Config {
+    // The list of known errors to ignore
+    // This is aggresive: if the diff contains any of these strings,
+    // the report will be ignored
+    pub known_error: Vec<String>,
+
     /// The number of `//# run 0xCAFE::ModuleX::funX` to invoke
     pub num_runs_per_func: usize,
 
@@ -37,6 +42,11 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            known_error: vec![
+                "exceeded maximal local count".to_string(),
+                "MOVELOC_UNAVAILABLE_ERROR".to_string(),
+            ],
+
             num_runs_per_func: 10,
 
             max_num_modules: 3,
