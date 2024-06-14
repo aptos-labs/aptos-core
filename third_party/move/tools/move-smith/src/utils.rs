@@ -10,11 +10,15 @@ use move_compiler::{
     shared::{known_attributes::KnownAttribute, Flags},
     Compiler as MoveCompiler,
 };
-use move_compiler_v2::Experiment;
 use move_model::metadata::LanguageVersion;
 use move_transactional_test_runner::{vm_test_harness, vm_test_harness::TestRunConfig};
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::{error::Error, fs::File, io::Write, path::PathBuf};
+use std::{
+    error::Error,
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+};
 use tempfile::{tempdir, TempDir};
 
 /// Choose a random index based on the given probabilities.
@@ -90,40 +94,48 @@ pub fn compile_modules(code: String) {
 }
 
 /// Runs the given Move code as a transactional test.
-pub fn run_transactional_test(code: String, config: Option<&Config>) -> Result<(), Box<dyn Error>> {
+pub fn run_transactional_test(code: String, config: &Config) -> Result<(), Box<dyn Error>> {
     let (file_path, dir) = create_tmp_move_file(code, None);
+
+    let ignores = config.known_error.clone();
+
+    for (name, experiments) in config.experiment_combos.iter() {
+        let result = run_transactional_test_with_experiments(&file_path, experiments);
+
+        let processed_result = process_transactional_test_result(name, &ignores, result);
+        match &processed_result {
+            Ok(_) => {},
+            Err(_) => return processed_result,
+        };
+    }
+
+    dir.close().unwrap();
+    Ok(())
+}
+
+fn run_transactional_test_with_experiments(
+    file_path: &Path,
+    experiments: &[(String, bool)],
+) -> Result<(), Box<dyn Error>> {
     let vm_test_config = TestRunConfig::ComparisonV1V2 {
         language_version: LanguageVersion::V2_0,
-        v2_experiments: vec![
-            (Experiment::OPTIMIZE.to_string(), true),
-            (Experiment::AST_SIMPLIFY.to_string(), false),
-            (Experiment::ACQUIRES_CHECK.to_string(), false),
-        ],
-    };
-    let result = vm_test_harness::run_test_with_config_and_exp_suffix(
-        vm_test_config,
-        file_path.as_path(),
-        &None,
-    );
-    dir.close().unwrap();
-
-    let ignores = match config {
-        Some(c) => c.known_error.clone(),
-        None => Vec::new(),
+        v2_experiments: experiments.to_owned(),
     };
 
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => process_transactional_test_err(&ignores, e),
-    }
+    vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, file_path, &None)
 }
 
 /// Filtering the error messages from the transactional test.
 /// Currently only treat `error[Exxxx]` as a real error to ignore warnings.
-fn process_transactional_test_err(
+fn process_transactional_test_result(
+    name: &String,
     ignores: &[String],
-    err: Box<dyn Error>,
+    result: Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
+    if result.is_ok() {
+        return Ok(());
+    }
+    let err = result.unwrap_err();
     let msg = format!("{:}", err);
     for ignore in ignores.iter() {
         if msg.contains(ignore) {
@@ -131,7 +143,11 @@ fn process_transactional_test_err(
         }
     }
     if msg.contains("error[E") || msg.contains("error:") || msg.contains("bug") {
-        Err(err)
+        // Raise an error with the name of the experiment
+        Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("error with experiment: {:?}, {:?}", name, err),
+        )))
     } else {
         Ok(())
     }

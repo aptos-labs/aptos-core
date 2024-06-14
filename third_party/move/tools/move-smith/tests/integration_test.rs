@@ -95,7 +95,7 @@ fn test_generation_and_compile() {
 #[test]
 fn test_run_transactional_test() {
     let code = simple_compile_unit().emit_code();
-    run_transactional_test(code, Some(&Config::default())).unwrap();
+    run_transactional_test(code, &Config::default()).unwrap();
 }
 
 #[test]
@@ -114,6 +114,6 @@ module 0xCAFE::Module0 {
         x
     }
 }"#;
-    let result = run_transactional_test(code.to_string(), Some(&Config::default()));
+    let result = run_transactional_test(code.to_string(), &Config::default());
     assert!(result.is_err());
 }

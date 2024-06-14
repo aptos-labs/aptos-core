@@ -3,14 +3,17 @@
 
 //! Configuration for the MoveSmith fuzzer.
 
+use move_compiler_v2::Experiment;
+
 /// The configuration for the MoveSmith fuzzer.
 /// MoveSmith will randomly pick within [0..max_num_XXX] during generation.
-#[derive(Debug)]
 pub struct Config {
     // The list of known errors to ignore
     // This is aggresive: if the diff contains any of these strings,
     // the report will be ignored
     pub known_error: Vec<String>,
+
+    pub experiment_combos: Vec<(String, Vec<(String, bool)>)>,
 
     /// The number of `//# run 0xCAFE::ModuleX::funX` to invoke
     pub num_runs_per_func: usize,
@@ -45,6 +48,22 @@ impl Default for Config {
             known_error: vec![
                 "exceeded maximal local count".to_string(),
                 "MOVELOC_UNAVAILABLE_ERROR".to_string(),
+            ],
+
+            experiment_combos: vec![
+                ("optimize".to_string(), vec![
+                    (Experiment::OPTIMIZE.to_string(), true),
+                    (Experiment::ACQUIRES_CHECK.to_string(), false),
+                ]),
+                ("no-optimize".to_string(), vec![
+                    (Experiment::OPTIMIZE.to_string(), false),
+                    (Experiment::ACQUIRES_CHECK.to_string(), false),
+                ]),
+                ("optimize-no-simplify".to_string(), vec![
+                    (Experiment::OPTIMIZE.to_string(), true),
+                    (Experiment::AST_SIMPLIFY.to_string(), false),
+                    (Experiment::ACQUIRES_CHECK.to_string(), false),
+                ]),
             ],
 
             num_runs_per_func: 10,
