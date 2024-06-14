@@ -465,6 +465,17 @@ pub enum NameAccessChain_ {
     // (<Name>|<Num>)::<Name>::<Name>::<Name>
     Four(Spanned<(LeadingNameAccess, Name)>, Name, Name),
 }
+
+impl NameAccessChain_ {
+    pub fn name(&self) -> &Name {
+        match &self {
+            NameAccessChain_::One(x) => x,
+            NameAccessChain_::Two(_, x) => x,
+            NameAccessChain_::Three(_, x) => x,
+        }
+    }
+}
+
 pub type NameAccessChain = Spanned<NameAccessChain_>;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]

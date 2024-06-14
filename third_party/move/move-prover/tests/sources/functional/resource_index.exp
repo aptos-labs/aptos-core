@@ -1,0 +1,12 @@
+Move prover returns: exiting with model building errors
+error: undeclared `test::Y`
+   ┌─ tests/sources/functional/resource_index.move:15:20
+   │
+15 │             assert Y<X<bool>>[addr].field.value == false;
+   │                    ^
+
+error: expected `num` but found a value of type `address`
+   ┌─ tests/sources/functional/resource_index.move:15:20
+   │
+15 │             assert Y<X<bool>>[addr].field.value == false;
+   │                    ^^^^^^^^^^^^^^^^

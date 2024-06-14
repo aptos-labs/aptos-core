@@ -2491,13 +2491,112 @@ fn exps(context: &mut Context, pes: Vec<P::Exp>) -> Vec<E::Exp> {
     pes.into_iter().map(|pe| exp_(context, pe)).collect()
 }
 
+/// This function assumes `e` and `i` are from an index expression `e[i]` and generates
+/// the expression `& vector::borrow(&e, i)` or `&mut vector::borrow_mut(&e, i)` based on
+/// the `mutable` flag
+fn call_to_vector_borrow(
+    context: &mut Context,
+    loc: &Loc,
+    e: P::Exp,
+    i: P::Exp,
+    mutable: bool,
+) -> E::Exp {
+    use E::Exp_ as EE;
+    let std_address = Address::Numerical(None, Spanned {
+        loc: *loc,
+        value: NumericalAddress::STD_ADDRESS,
+    });
+    let module_name = ModuleName(Name::new(*loc, Symbol::from("vector")));
+    let ident = E::ModuleIdent_::new(std_address, module_name);
+    let borrow_fun = if mutable { "borrow_mut" } else { "borrow" };
+    let access = E::ModuleAccess::new(
+        *loc,
+        E::ModuleAccess_::ModuleAccess(sp(*loc, ident), Name::new(*loc, Symbol::from(borrow_fun))),
+    );
+    let vector_var = exp_(context, e.clone());
+    sp(
+        *loc,
+        EE::Call(
+            access,
+            CallKind::Regular,
+            None,
+            sp(*loc, vec![
+                sp(*loc, EE::Borrow(mutable, Box::new(vector_var))),
+                exp_(context, i),
+            ]),
+        ),
+    )
+}
+
+/// This function assumes `e` and `i` are from an index expression `e[i]` and generates
+/// the expression `borrow_global<e>(i)` or `borrow_global_mut<e>(i)` based on
+/// the `mutable` flag.
+/// Assumption:
+/// `e` must be a struct type
+fn call_to_borrow_global(
+    context: &mut Context,
+    loc: &Loc,
+    e: P::Type_,
+    i: P::Exp,
+    mutable: bool,
+) -> E::Exp {
+    use E::Exp_ as EE;
+    let borrow_global_fun = if mutable {
+        "borrow_global_mut"
+    } else {
+        "borrow_global"
+    };
+    let access = E::ModuleAccess::new(
+        *loc,
+        E::ModuleAccess_::Name(Name::new(*loc, Symbol::from(borrow_global_fun))),
+    );
+    let tys_opt = optional_types(context, Some(vec![sp(*loc, e)]));
+    sp(
+        *loc,
+        EE::Call(
+            access,
+            CallKind::Regular,
+            tys_opt,
+            sp(*loc, vec![exp_(context, i)]),
+        ),
+    )
+}
+
+fn is_valid_local_name(s: Symbol) -> bool {
+    s.starts_with('_') || s.starts_with(|c: char| c.is_ascii_lowercase())
+}
+
+fn is_struct_in_current_module(context: &Context, name: &Name) -> bool {
+    if let Some(m) = context.current_module {
+        if context.module_members.0.contains_key(&m.value) {
+            let vs = context.module_members.0.get(&m.value).unwrap();
+            return vs.1.iter().any(|(info_name, info)| {
+                info.kind == ModuleMemberKind::Struct && info_name == name
+            });
+        }
+    }
+    false
+}
+
+fn is_constant(context: &Context, name: &Name) -> bool {
+    for (_, members) in context.module_members.0.values() {
+        if members
+            .iter()
+            .any(|(info_name, info)| info.kind == ModuleMemberKind::Constant && info_name == name)
+        {
+            return true;
+        }
+    }
+    false
+}
+
 fn exp(context: &mut Context, pe: P::Exp) -> Box<E::Exp> {
     Box::new(exp_(context, pe))
 }
 
 fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
     use E::Exp_ as EE;
-    use P::Exp_ as PE;
+    use P::{Exp_ as PE, Type_ as PT};
     let e_ = match pe_ {
         PE::Unit => EE::Unit { trailing: false },
         PE::Value(pv) => match value(context, pv) {
@@ -2688,7 +2787,38 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 EE::BinopExp(exp(context, *pl), op, exp(context, *pr))
             }
         },
-        PE::Borrow(mut_, pr) => EE::Borrow(mut_, exp(context, *pr)),
+        PE::Borrow(mut_, pr) => {
+            if let PE::Index(ref e, ref i) = pr.value {
+                // handling `&_[_]` or `&mut _[_]`
+                if context.env.flags().v2() {
+                    if let PE::Name(sp!(_, ref ptn), _) = e.value {
+                        let name = ptn.name();
+                        if is_struct_in_current_module(context, name) {
+                            if let PE::Name(chain, types) = &e.value {
+                                let ty = PT::Apply(
+                                    Box::new(chain.clone()),
+                                    types.clone().unwrap_or(vec![]),
+                                );
+                                return call_to_borrow_global(context, &loc, ty, *i.clone(), mut_);
+                            }
+                        } else if !context.in_spec_context
+                            && (is_valid_local_name(name.value) || is_constant(context, name))
+                        {
+                            return call_to_vector_borrow(
+                                context,
+                                &loc,
+                                *e.clone(),
+                                *i.clone(),
+                                mut_,
+                            );
+                        }
+                    } else if !context.in_spec_context {
+                        return call_to_vector_borrow(context, &loc, *e.clone(), *i.clone(), mut_);
+                    }
+                }
+            }
+            EE::Borrow(mut_, exp(context, *pr))
+        },
         pdotted_ @ PE::Dot(_, _) => match exp_dotted(context, sp(loc, pdotted_)) {
             Some(edotted) => EE::ExpDotted(Box::new(edotted)),
             None => {
@@ -2698,13 +2828,61 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         },
         PE::Cast(e, ty) => EE::Cast(exp(context, *e), type_(context, ty)),
         PE::Index(e, i) => {
-            if context.in_spec_context {
-                EE::Index(exp(context, *e), exp(context, *i))
-            } else {
-                let msg = "`_[_]` index operator only allowed in specifications";
+            let mut err_msg =
+                "`_[_]` index operator in non-specification code only allowed in Move 2";
+            if context.env.flags().v2() {
+                // handling `_[_]` or `_[_]` (without `&` or `&mut`)
+                if let PE::Name(sp!(_, ref ptn), _) = e.value {
+                    let name = ptn.name();
+                    if is_struct_in_current_module(context, name) {
+                        if context.in_spec_context {
+                            if let PE::Name(chain, types) = &e.value {
+                                let ty = PT::Apply(
+                                    Box::new(chain.clone()),
+                                    types.clone().unwrap_or(vec![]),
+                                );
+                                return call_to_borrow_global(context, &loc, ty, *i.clone(), false);
+                            }
+                        } else {
+                            err_msg =
+                                "resource indexing using `_[_]` needs to be paired with `&` or `&mut`";
+                        }
+                    } else if is_valid_local_name(name.value) || is_constant(context, name) {
+                        let exp_ = if context.in_spec_context {
+                            EE::Index(exp(context, *e), exp(context, *i))
+                        } else {
+                            // v[i] without `&` or `&mut` is translated into
+                            // *(vector::borrow(&v, i))
+                            EE::Dereference(Box::new(sp(
+                                loc,
+                                call_to_vector_borrow(context, &loc, *e, *i, false).value,
+                            )))
+                        };
+                        return sp(loc, exp_);
+                    } else {
+                        err_msg = "index notation `_[_]` expects a resource or vector";
+                    }
+                } else {
+                    let exp_ = if context.in_spec_context {
+                        EE::Index(exp(context, *e), exp(context, *i))
+                    } else {
+                        EE::Dereference(Box::new(sp(
+                            loc,
+                            call_to_vector_borrow(context, &loc, *e, *i, false).value,
+                        )))
+                    };
+                    return sp(loc, exp_);
+                }
                 context
                     .env
-                    .add_diag(diag!(Syntax::SpecContextRestricted, (loc, msg)));
+                    .add_diag(diag!(Syntax::UnexpectedToken, (loc, err_msg)));
+                EE::UnresolvedError
+            } else if context.in_spec_context {
+                EE::Index(exp(context, *e), exp(context, *i))
+            } else {
+                context
+                    .env
+                    .add_diag(diag!(Syntax::SpecContextRestricted, (loc, err_msg)));
                 EE::UnresolvedError
             }
         },
@@ -3303,10 +3481,7 @@ fn check_valid_address_name_(
 }
 
 fn check_valid_local_name(context: &mut Context, v: &Var) {
-    fn is_valid(s: Symbol) -> bool {
-        s.starts_with('_') || s.starts_with(|c: char| c.is_ascii_lowercase())
-    }
-    if !is_valid(v.value()) {
+    if !is_valid_local_name(v.value()) {
         let msg = format!(
             "Invalid local variable name '{}'. Local variable names must start with 'a'..'z' (or \
              '_')",
@@ -3325,7 +3500,7 @@ struct ModuleMemberInfo {
     pub deprecation: Option<Loc>, // Some(loc) if member is deprecated at loc
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum ModuleMemberKind {
     Constant,
     Function,
