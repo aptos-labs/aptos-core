@@ -37,6 +37,8 @@ pub trait RBNetworkSender<Req: RBMessage, Res: RBMessage = Req>: Send + Sync {
         peers: Vec<Author>,
         message: Req,
     ) -> anyhow::Result<HashMap<Author, Bytes>>;
+
+    fn sort_peers_by_latency(&self, peers: &mut [Author]);
 }
 
 pub trait BroadcastStatus<Req: RBMessage, Res: RBMessage = Req>: Send + Sync + Clone {
@@ -155,6 +157,10 @@ where
 
             let mut rpc_futures = FuturesUnordered::new();
             let mut aggregate_futures = FuturesUnordered::new();
+
+            let mut receivers = receivers;
+            network_sender.sort_peers_by_latency(&mut receivers);
+
             for receiver in receivers {
                 rpc_futures.push(send_message(receiver, None));
             }

@@ -11,7 +11,7 @@ use crate::{
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_logger::{prelude::*, sample, sample::SampleRate};
-use aptos_types::network_address::NetworkAddress;
+use aptos_types::{network_address::NetworkAddress, PeerId};
 use async_trait::async_trait;
 use bytes::Bytes;
 use itertools::Itertools;
@@ -79,6 +79,8 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
         _peers: Vec<PeerNetworkId>,
         _message: Message,
     ) -> anyhow::Result<HashMap<PeerNetworkId, Bytes>>;
+
+    fn sort_peers_by_latency(&self, _network: NetworkId, _peers: &mut [PeerId]);
 }
 
 /// A network component that can be used by client applications (e.g., consensus,
@@ -278,6 +280,11 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         }
 
         Ok(bytes_per_peer)
+    }
+
+    fn sort_peers_by_latency(&self, network_id: NetworkId, peers: &mut [PeerId]) {
+        self.peers_and_metadata
+            .sort_peers_by_latency(network_id, peers)
     }
 }
 

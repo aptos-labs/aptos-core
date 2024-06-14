@@ -36,8 +36,8 @@ impl PrioritizedPeersComparator {
     /// Higher priority peers are greater than lower priority peers.
     fn compare_simple(
         &self,
-        peer_a: &(PeerNetworkId, Option<PeerMonitoringMetadata>),
-        peer_b: &(PeerNetworkId, Option<PeerMonitoringMetadata>),
+        peer_a: &(PeerNetworkId, Option<&PeerMonitoringMetadata>),
+        peer_b: &(PeerNetworkId, Option<&PeerMonitoringMetadata>),
     ) -> Ordering {
         // Deconstruct the peer tuples
         let (peer_network_id_a, _) = peer_a;
@@ -60,8 +60,8 @@ impl PrioritizedPeersComparator {
     /// Higher priority peers are greater than lower priority peers.
     fn compare_intelligent(
         &self,
-        peer_a: &(PeerNetworkId, Option<PeerMonitoringMetadata>),
-        peer_b: &(PeerNetworkId, Option<PeerMonitoringMetadata>),
+        peer_a: &(PeerNetworkId, Option<&PeerMonitoringMetadata>),
+        peer_b: &(PeerNetworkId, Option<&PeerMonitoringMetadata>),
     ) -> Ordering {
         // Deconstruct the peer tuples
         let (peer_network_id_a, monitoring_metadata_a) = peer_a;
@@ -191,7 +191,7 @@ impl PrioritizedPeersState {
     /// The peers are sorted in descending order (i.e., higher values are prioritized).
     fn sort_peers_by_priority(
         &self,
-        peers_and_metadata: &[(PeerNetworkId, Option<PeerMonitoringMetadata>)],
+        peers_and_metadata: &[(PeerNetworkId, Option<&PeerMonitoringMetadata>)],
     ) -> Vec<PeerNetworkId> {
         peers_and_metadata
             .iter()
@@ -211,7 +211,7 @@ impl PrioritizedPeersState {
     /// Updates the prioritized peers list
     pub fn update_prioritized_peers(
         &mut self,
-        peers_and_metadata: Vec<(PeerNetworkId, Option<PeerMonitoringMetadata>)>,
+        peers_and_metadata: Vec<(PeerNetworkId, Option<&PeerMonitoringMetadata>)>,
     ) {
         // Calculate the new set of prioritized peers
         let new_prioritized_peers = self.sort_peers_by_priority(&peers_and_metadata);
@@ -257,9 +257,9 @@ impl PrioritizedPeersState {
 /// Returns the distance from the validators for the
 /// given monitoring metadata (if one exists).
 fn get_distance_from_validators(
-    monitoring_metadata: &Option<PeerMonitoringMetadata>,
+    monitoring_metadata: &Option<&PeerMonitoringMetadata>,
 ) -> Option<u64> {
-    monitoring_metadata.as_ref().and_then(|metadata| {
+    monitoring_metadata.and_then(|metadata| {
         metadata
             .latest_network_info_response
             .as_ref()
@@ -269,10 +269,8 @@ fn get_distance_from_validators(
 
 /// Returns the ping latency for the given monitoring
 /// metadata (if one exists).
-fn get_peer_ping_latency(monitoring_metadata: &Option<PeerMonitoringMetadata>) -> Option<f64> {
-    monitoring_metadata
-        .as_ref()
-        .and_then(|metadata| metadata.average_ping_latency_secs)
+fn get_peer_ping_latency(monitoring_metadata: &Option<&PeerMonitoringMetadata>) -> Option<f64> {
+    monitoring_metadata.and_then(|metadata| metadata.average_ping_latency_secs)
 }
 
 /// Compares the network ID for the given pair of peers.
@@ -285,8 +283,8 @@ fn compare_network_id(network_id_a: &NetworkId, network_id_b: &NetworkId) -> Ord
 /// Compares the ping latency for the given pair of monitoring metadata.
 /// The peer with the lowest ping latency is prioritized.
 fn compare_ping_latency(
-    monitoring_metadata_a: &Option<PeerMonitoringMetadata>,
-    monitoring_metadata_b: &Option<PeerMonitoringMetadata>,
+    monitoring_metadata_a: &Option<&PeerMonitoringMetadata>,
+    monitoring_metadata_b: &Option<&PeerMonitoringMetadata>,
 ) -> Ordering {
     // Get the ping latency from the monitoring metadata
     let ping_latency_a = get_peer_ping_latency(monitoring_metadata_a);
@@ -313,8 +311,8 @@ fn compare_ping_latency(
 /// Compares the validator distance for the given pair of monitoring metadata.
 /// The peer with the lowest validator distance is prioritized.
 fn compare_validator_distance(
-    monitoring_metadata_a: &Option<PeerMonitoringMetadata>,
-    monitoring_metadata_b: &Option<PeerMonitoringMetadata>,
+    monitoring_metadata_a: &Option<&PeerMonitoringMetadata>,
+    monitoring_metadata_b: &Option<&PeerMonitoringMetadata>,
 ) -> Ordering {
     // Get the validator distance from the monitoring metadata
     let validator_distance_a = get_distance_from_validators(monitoring_metadata_a);
@@ -387,7 +385,10 @@ mod test {
         // Verify that the metadata is equal
         assert_eq!(
             Ordering::Equal,
-            compare_validator_distance(&Some(monitoring_metadata_1), &Some(monitoring_metadata_2))
+            compare_validator_distance(
+                &Some(&monitoring_metadata_1),
+                &Some(&monitoring_metadata_2)
+            )
         );
 
         // Create monitoring metadata with different distances
@@ -398,13 +399,16 @@ mod test {
         assert_eq!(
             Ordering::Greater,
             compare_validator_distance(
-                &Some(monitoring_metadata_1.clone()),
-                &Some(monitoring_metadata_2.clone())
+                &Some(&monitoring_metadata_1),
+                &Some(&monitoring_metadata_2)
             )
         );
         assert_eq!(
             Ordering::Less,
-            compare_validator_distance(&Some(monitoring_metadata_2), &Some(monitoring_metadata_1))
+            compare_validator_distance(
+                &Some(&monitoring_metadata_2),
+                &Some(&monitoring_metadata_1)
+            )
         );
 
         // Create monitoring metadata with and without distances
@@ -415,26 +419,26 @@ mod test {
         assert_eq!(
             Ordering::Greater,
             compare_validator_distance(
-                &Some(monitoring_metadata_1.clone()),
-                &Some(monitoring_metadata_2.clone())
+                &Some(&monitoring_metadata_1),
+                &Some(&monitoring_metadata_2)
             )
         );
         assert_eq!(
             Ordering::Less,
             compare_validator_distance(
-                &Some(monitoring_metadata_2.clone()),
-                &Some(monitoring_metadata_1.clone())
+                &Some(&monitoring_metadata_2),
+                &Some(&monitoring_metadata_1)
             )
         );
 
         // Compare monitoring metadata that is missing entirely
         assert_eq!(
             Ordering::Greater,
-            compare_validator_distance(&Some(monitoring_metadata_1.clone()), &None)
+            compare_validator_distance(&Some(&monitoring_metadata_1), &None)
         );
         assert_eq!(
             Ordering::Less,
-            compare_validator_distance(&None, &Some(monitoring_metadata_1))
+            compare_validator_distance(&None, &Some(&monitoring_metadata_1))
         );
     }
 
@@ -447,7 +451,7 @@ mod test {
         // Verify that the metadata is equal
         assert_eq!(
             Ordering::Equal,
-            compare_ping_latency(&Some(monitoring_metadata_1), &Some(monitoring_metadata_2))
+            compare_ping_latency(&Some(&monitoring_metadata_1), &Some(&monitoring_metadata_2))
         );
 
         // Create monitoring metadata with different ping latencies
@@ -457,14 +461,11 @@ mod test {
         // Verify that the metadata has different ordering
         assert_eq!(
             Ordering::Greater,
-            compare_ping_latency(
-                &Some(monitoring_metadata_1.clone()),
-                &Some(monitoring_metadata_2.clone())
-            )
+            compare_ping_latency(&Some(&monitoring_metadata_1), &Some(&monitoring_metadata_2))
         );
         assert_eq!(
             Ordering::Less,
-            compare_ping_latency(&Some(monitoring_metadata_2), &Some(monitoring_metadata_1))
+            compare_ping_latency(&Some(&monitoring_metadata_2), &Some(&monitoring_metadata_1))
         );
 
         // Create monitoring metadata with and without ping latencies
@@ -474,27 +475,21 @@ mod test {
         // Verify that the metadata with a ping latency has a higher ordering
         assert_eq!(
             Ordering::Greater,
-            compare_ping_latency(
-                &Some(monitoring_metadata_1.clone()),
-                &Some(monitoring_metadata_2.clone())
-            )
+            compare_ping_latency(&Some(&monitoring_metadata_1), &Some(&monitoring_metadata_2))
         );
         assert_eq!(
             Ordering::Less,
-            compare_ping_latency(
-                &Some(monitoring_metadata_2.clone()),
-                &Some(monitoring_metadata_1.clone())
-            )
+            compare_ping_latency(&Some(&monitoring_metadata_2), &Some(&monitoring_metadata_1))
         );
 
         // Compare monitoring metadata that is missing entirely
         assert_eq!(
             Ordering::Greater,
-            compare_ping_latency(&Some(monitoring_metadata_1.clone()), &None)
+            compare_ping_latency(&Some(&monitoring_metadata_1), &None)
         );
         assert_eq!(
             Ordering::Less,
-            compare_ping_latency(&None, &Some(monitoring_metadata_1))
+            compare_ping_latency(&None, &Some(&monitoring_metadata_1))
         );
     }
 
@@ -622,40 +617,29 @@ mod test {
         let public_peer = (create_public_peer(), None);
 
         // Verify that peers are prioritized by network ID first
-        let all_peers = vec![
-            vfn_peer.clone(),
-            public_peer.clone(),
-            validator_peer.clone(),
-        ];
+        let all_peers = vec![vfn_peer, public_peer, validator_peer];
         let prioritized_peers = prioritized_peers_state.sort_peers_by_priority(&all_peers);
         let expected_peers = vec![validator_peer.0, vfn_peer.0, public_peer.0];
         assert_eq!(prioritized_peers, expected_peers);
 
         // Create a list of peers with the same network ID, but different validator distances
-        let public_peer_1 = (
-            create_public_peer(),
-            Some(create_metadata_with_distance(Some(1))),
-        );
+        let peer_metadata_1 = create_metadata_with_distance(Some(1));
+        let public_peer_1 = (create_public_peer(), Some(&peer_metadata_1));
+
+        let peer_metadata_2 = create_metadata_with_distance(None);
         let public_peer_2 = (
             create_public_peer(),
-            Some(create_metadata_with_distance(None)), // No validator distance
-        );
-        let public_peer_3 = (
-            create_public_peer(),
-            Some(create_metadata_with_distance(Some(0))),
-        );
-        let public_peer_4 = (
-            create_public_peer(),
-            Some(create_metadata_with_distance(Some(2))),
+            Some(&peer_metadata_2), // No validator distance
         );
 
+        let peer_metadata_3 = create_metadata_with_distance(Some(0));
+        let public_peer_3 = (create_public_peer(), Some(&peer_metadata_3));
+
+        let peer_metadata_4 = create_metadata_with_distance(Some(2));
+        let public_peer_4 = (create_public_peer(), Some(&peer_metadata_4));
+
         // Verify that peers on the same network ID are prioritized by validator distance
-        let all_peers = vec![
-            public_peer_1.clone(),
-            public_peer_2.clone(),
-            public_peer_3.clone(),
-            public_peer_4.clone(),
-        ];
+        let all_peers = vec![public_peer_1, public_peer_2, public_peer_3, public_peer_4];
         let prioritized_peers = prioritized_peers_state.sort_peers_by_priority(&all_peers);
         let expected_peers = vec![
             public_peer_3.0,
@@ -666,30 +650,23 @@ mod test {
         assert_eq!(prioritized_peers, expected_peers);
 
         // Create a list of peers with the same network ID and validator distance, but different ping latencies
-        let public_peer_1 = (
-            create_public_peer(),
-            Some(create_metadata_with_distance_and_latency(1, 0.5)),
-        );
-        let public_peer_2 = (
-            create_public_peer(),
-            Some(create_metadata_with_distance_and_latency(1, 2.0)),
-        );
-        let public_peer_3 = (
-            create_public_peer(),
-            Some(create_metadata_with_distance_and_latency(1, 0.4)),
-        );
+        let peer_metadata_1 = create_metadata_with_distance_and_latency(1, 0.5);
+        let public_peer_1 = (create_public_peer(), Some(&peer_metadata_1));
+
+        let peer_metadata_2 = create_metadata_with_distance_and_latency(1, 2.0);
+        let public_peer_2 = (create_public_peer(), Some(&peer_metadata_2));
+
+        let peer_metadata_3 = create_metadata_with_distance_and_latency(1, 0.4);
+        let public_peer_3 = (create_public_peer(), Some(&peer_metadata_3));
+
+        let peer_metadata_4 = create_metadata_with_distance(Some(1));
         let public_peer_4 = (
             create_public_peer(),
-            Some(create_metadata_with_distance(Some(1))), // No ping latency
+            Some(&peer_metadata_4), // No ping latency
         );
 
         // Verify that peers on the same network ID and validator distance are prioritized by ping latency
-        let all_peers = vec![
-            public_peer_1.clone(),
-            public_peer_2.clone(),
-            public_peer_3.clone(),
-            public_peer_4.clone(),
-        ];
+        let all_peers = vec![public_peer_1, public_peer_2, public_peer_3, public_peer_4];
         let prioritized_peers = prioritized_peers_state.sort_peers_by_priority(&all_peers);
         let expected_peers = vec![
             public_peer_3.0,
@@ -719,11 +696,7 @@ mod test {
         let public_peer = (create_public_peer(), None);
 
         // Verify that peers are prioritized by network ID first
-        let all_peers = vec![
-            vfn_peer.clone(),
-            public_peer.clone(),
-            validator_peer.clone(),
-        ];
+        let all_peers = vec![vfn_peer, public_peer, validator_peer];
         let prioritized_peers = prioritized_peers_state.sort_peers_by_priority(&all_peers);
         let expected_peers = vec![validator_peer.0, vfn_peer.0, public_peer.0];
         assert_eq!(prioritized_peers, expected_peers);
@@ -760,30 +733,23 @@ mod test {
         assert!(prioritized_peers_state.last_peer_priority_update.is_none());
 
         // Create a list of peers with and without ping latencies
-        let public_peer_1 = (
-            create_public_peer(),
-            Some(create_metadata_with_distance_and_latency(1, 0.5)),
-        );
-        let public_peer_2 = (
-            create_public_peer(),
-            Some(create_metadata_with_distance_and_latency(1, 2.0)),
-        );
-        let public_peer_3 = (
-            create_public_peer(),
-            Some(create_metadata_with_distance_and_latency(1, 0.4)),
-        );
+        let peer_metadata_1 = create_metadata_with_distance_and_latency(1, 0.5);
+        let public_peer_1 = (create_public_peer(), Some(&peer_metadata_1));
+
+        let peer_metadata_2 = create_metadata_with_distance_and_latency(1, 2.0);
+        let public_peer_2 = (create_public_peer(), Some(&peer_metadata_2));
+
+        let peer_metadata_3 = create_metadata_with_distance_and_latency(1, 0.4);
+        let public_peer_3 = (create_public_peer(), Some(&peer_metadata_3));
+
+        let peer_metadata_4 = create_metadata_with_distance(Some(1));
         let public_peer_4 = (
             create_public_peer(),
-            Some(create_metadata_with_distance(Some(1))), // No ping latency
+            Some(&peer_metadata_4), // No ping latency
         );
 
         // Update the prioritized peers
-        let all_peers = vec![
-            public_peer_1.clone(),
-            public_peer_2.clone(),
-            public_peer_3.clone(),
-            public_peer_4.clone(),
-        ];
+        let all_peers = vec![public_peer_1, public_peer_2, public_peer_3, public_peer_4];
         prioritized_peers_state.update_prioritized_peers(all_peers);
 
         // Verify that the prioritized peers were updated correctly
@@ -810,11 +776,7 @@ mod test {
         time_service.advance_secs(100);
 
         // Update the prioritized peers for only peers with ping latencies
-        let all_peers = vec![
-            public_peer_1.clone(),
-            public_peer_2.clone(),
-            public_peer_3.clone(),
-        ];
+        let all_peers = vec![public_peer_1, public_peer_2, public_peer_3];
         prioritized_peers_state.update_prioritized_peers(all_peers);
 
         // Verify that the prioritized peers were updated correctly
@@ -852,11 +814,7 @@ mod test {
         let public_peer = (create_public_peer(), None);
 
         // Update the prioritized peers
-        let all_peers = vec![
-            validator_peer.clone(),
-            vfn_peer.clone(),
-            public_peer.clone(),
-        ];
+        let all_peers = vec![validator_peer, vfn_peer, public_peer];
         prioritized_peers_state.update_prioritized_peers(all_peers);
 
         // Verify that the prioritized peers were updated correctly
@@ -865,13 +823,15 @@ mod test {
         assert_eq!(prioritized_peers, expected_peers);
 
         // Create a list of peers with the same network ID but different metadata
-        let mut all_peers = vec![];
+        let mut all_metadata = Vec::new();
         for i in 0..100 {
-            all_peers.push((
-                create_public_peer(),
-                Some(create_metadata_with_distance_and_latency(i, i as f64)),
-            ));
+            let metadata = create_metadata_with_distance_and_latency(i, i as f64);
+            all_metadata.push(metadata);
         }
+        let all_peers: Vec<_> = all_metadata
+            .iter()
+            .map(|metadata| (create_public_peer(), Some(metadata)))
+            .collect();
 
         // Update the prioritized peers multiple times and verify that the order is consistent
         let prioritized_peers = prioritized_peers_state.sort_peers_by_priority(&all_peers);
