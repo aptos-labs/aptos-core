@@ -1,0 +1,25 @@
+
+Diagnostics:
+warning: unused alias
+  ┌─ tests/checking/typing/index_err.move:9:19
+  │
+9 │         use 0x42::test;
+  │                   ^^^^ Unused 'use' of alias 'test'. Consider removing it
+
+error: unexpected token
+   ┌─ tests/checking/typing/index_err.move:10:17
+   │
+10 │         assert!((test::R[@0x1]).value == true, 0);
+   │                 ^^^^^^^^^^^^^^^ resource indexing using `_[_]` needs to be paired with `&` or `&mut`
+
+error: unexpected token
+   ┌─ tests/checking/typing/index_err.move:14:9
+   │
+14 │         Test[@0x1];
+   │         ^^^^^^^^^^ index notation `_[_]` expects a resource or vector
+
+error: unexpected token
+   ┌─ tests/checking/typing/index_err.move:18:10
+   │
+18 │         &Test[@0x1];
+   │          ^^^^^^^^^^ index notation `_[_]` expects a resource or vector

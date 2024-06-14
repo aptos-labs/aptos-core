@@ -49,6 +49,10 @@ impl NumericalAddress {
         bytes: AccountAddress::MAX_ADDRESS,
         format: NumberFormat::Hex,
     };
+    pub const STD_ADDRESS: Self = NumericalAddress {
+        bytes: AccountAddress::ONE,
+        format: NumberFormat::Hex,
+    };
 
     pub const fn new(bytes: [u8; AccountAddress::LENGTH], format: NumberFormat) -> Self {
         Self {
