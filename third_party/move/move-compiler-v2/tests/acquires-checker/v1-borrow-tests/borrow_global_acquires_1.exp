@@ -1,16 +1,2 @@
 
-Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_1.move:7:29
-  │
-7 │         acquires_t1(account);
-  │                             ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_1.move:11:65
-   │
-11 │         T1 { v: _ } = move_from<T1>(signer::address_of(account));
-   │                                                                 ^
-
-
 ============ bytecode verification succeeded ========

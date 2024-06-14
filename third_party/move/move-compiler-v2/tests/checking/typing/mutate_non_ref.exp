@@ -47,9 +47,3 @@ error: cannot assign `&mut integer` to left-hand side of type `u64`
    │
 22 │         *x_ref.s.f = 0;
    │          ^^^^^^^^^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/mutate_non_ref.move:22:23
-   │
-22 │         *x_ref.s.f = 0;
-   │                       ^

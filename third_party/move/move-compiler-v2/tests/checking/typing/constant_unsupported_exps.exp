@@ -36,6 +36,15 @@ error: cannot use `signer` with an operator which expects a value of type `&sign
 30 │         move_to(s, R{});
    │                 ^
 
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/typing/constant_unsupported_exps.move:36:31
+   │
+36 │         loop { break; continue; };
+   │                       --------^
+   │                       │       │
+   │                       │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │                       Any code after this expression will not be reached
+
 error: cannot return `integer` from a function which returns nothing
    ┌─ tests/checking/typing/constant_unsupported_exps.move:39:16
    │

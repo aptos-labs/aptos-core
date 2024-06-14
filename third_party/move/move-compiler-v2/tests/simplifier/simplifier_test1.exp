@@ -1,11 +1,3 @@
-
-Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/simplifier/simplifier_test1.move:9:24
-  │
-9 │             t2 = t2 + x; // t2= 10, 19, 27, 34, 40, 45, 49, 52, 54, 55
-  │                        ^
-
 // -- Model dump before bytecode pipeline
 module 0x8675::M {
     public fun test(): u64 {

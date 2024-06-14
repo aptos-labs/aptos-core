@@ -1,13 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_3.move:27:29
-   │
-27 │         acquires_t2(account);
-   │                             ^
-
-
-Diagnostics:
 error: function acquires global `A::T1` which is currently mutably borrowed
    ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_3.move:9:9
    │

@@ -1,3 +1,14 @@
+
+Diagnostics:
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/typing/break_outside_loop.move:10:14
+   │
+10 │         break;
+   │         -----^
+   │         │    │
+   │         │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │         Any code after this expression will not be reached
+
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     private fun bar() {

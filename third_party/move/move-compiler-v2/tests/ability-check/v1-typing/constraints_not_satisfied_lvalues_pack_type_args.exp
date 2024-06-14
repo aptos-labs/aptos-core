@@ -11,8 +11,11 @@ error: type `R` is missing required ability `copy`
   │
   = required by instantiating type parameter `phantom T:copy` of struct `CupC`
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+warning: Unnecessary trailing semicolon
   ┌─ tests/ability-check/v1-typing/constraints_not_satisfied_lvalues_pack_type_args.move:9:32
   │
 9 │         B<CupC<R>> {} = abort 0;
-  │                                ^
+  │         -----------------------^
+  │         │                      │
+  │         │                      A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │         Any code after this expression will not be reached

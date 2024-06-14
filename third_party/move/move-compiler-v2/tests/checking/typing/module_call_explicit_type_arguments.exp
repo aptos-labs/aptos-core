@@ -1,17 +1,3 @@
-
-Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/checking/typing/module_call_explicit_type_arguments.move:9:28
-  │
-9 │         foo<u64, u64>(0, 0);
-  │                            ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/module_call_explicit_type_arguments.move:14:24
-   │
-14 │         foo<U, V>(u, v);
-   │                        ^
-
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     private fun foo<T,U>(_x: #0,_y: #1) {

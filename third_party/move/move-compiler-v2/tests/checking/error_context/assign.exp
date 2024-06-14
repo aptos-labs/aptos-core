@@ -12,23 +12,11 @@ error: cannot assign `S` to left-hand side of type `R`
 15 │         (S{x, y}, R{z, s}) = (r, s);
    │                   ^^^^^^^
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/error_context/assign.move:15:36
-   │
-15 │         (S{x, y}, R{z, s}) = (r, s);
-   │                                    ^
-
 error: the left-hand side has 2 items but the right-hand side provided 3
    ┌─ tests/checking/error_context/assign.move:20:9
    │
 20 │         (x, y) = (1, 2, 3);
    │         ^^^^^^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/error_context/assign.move:20:27
-   │
-20 │         (x, y) = (1, 2, 3);
-   │                           ^
 
 error: expected `bool` but found a value of type `u64`
    ┌─ tests/checking/error_context/assign.move:24:9
@@ -42,20 +30,8 @@ error: cannot assign `&mut u8` to left-hand side of type `&mut u64`
 25 │         *x = 1u8;
    │          ^
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/error_context/assign.move:25:17
-   │
-25 │         *x = 1u8;
-   │                 ^
-
 error: the left-hand side expected `&mut` but `&` was provided
    ┌─ tests/checking/error_context/assign.move:30:9
    │
 30 │         r = &s2;
    │         ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/error_context/assign.move:30:16
-   │
-30 │         r = &s2;
-   │                ^

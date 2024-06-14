@@ -1,19 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/visibility-checker/global_operator.move:15:29
-   │
-15 │         move_to(&account, r);
-   │                             ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/visibility-checker/global_operator.move:29:29
-   │
-29 │         move_to(&account, r);
-   │                             ^
-
-
-Diagnostics:
 error: Invalid operation: storage operation on type `M::R` can only be done within the defining module `0x42::M`
    ┌─ tests/visibility-checker/global_operator.move:10:9
    │

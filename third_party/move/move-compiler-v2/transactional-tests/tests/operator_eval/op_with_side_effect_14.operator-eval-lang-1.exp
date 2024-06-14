@@ -3,19 +3,7 @@ comparison between v1 and v2 failed:
 = 
 + task 0 'publish'. lines 1-26:
 + Error: compilation errors:
-+  warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+   ┌─ TEMPFILE:9:29
-+   │
-+ 9 │         self.x = self.x + by;
-+   │                             ^
-+ 
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE:12:29
-+    │
-+ 12 │         self.x = self.x + by;
-+    │                             ^
-+ 
-+ error: A sequence within an operand of binary operation `+` can obscure program logic and is not allowed by this compiler.
++  error: A sequence within an operand of binary operation `+` can obscure program logic and is not allowed by this compiler.
 +    ┌─ TEMPFILE:16:9
 +    │
 + 16 │         {inc_x(&mut s, 6); s.x} + {inc_x(&mut s, 47); s.x} + {inc_x(&mut s, 117); s.x}

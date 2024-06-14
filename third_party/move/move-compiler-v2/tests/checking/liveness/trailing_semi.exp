@@ -1,10 +1,93 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+warning: Unnecessary trailing semicolon
+  ┌─ tests/checking/liveness/trailing_semi.move:3:15
+  │
+3 │         return;
+  │         ------^
+  │         │     │
+  │         │     A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │         Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+  ┌─ tests/checking/liveness/trailing_semi.move:9:16
+  │
+9 │         abort 0;
+  │         -------^
+  │         │      │
+  │         │      A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │         Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi.move:15:19
+   │
+15 │         { return };
+   │           ------  ^
+   │           │       │
+   │           │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │           Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi.move:21:20
+   │
+21 │         { abort 0 };
+   │           -------  ^
+   │           │        │
+   │           │        A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │           Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi.move:29:19
+   │
+29 │             return;
+   │             ------^
+   │             │     │
+   │             │     A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │             Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi.move:43:14
+   │
+39 │ ╭             if (cond) {
+40 │ │                 return
+41 │ │             } else {
+42 │ │                 abort 0
+43 │ │             };
+   │ │              ^
+   │ │              │
+   │ │              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │ ╰─────────────' Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi.move:52:24
+   │
+52 │                 abort 0;
+   │                 -------^
+   │                 │      │
+   │                 │      A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │                 Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/checking/liveness/trailing_semi.move:54:23
+   │
+54 │                 return;
+   │                 ------^
+   │                 │     │
+   │                 │     A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │                 Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
    ┌─ tests/checking/liveness/trailing_semi.move:55:14
    │
-55 │             };
-   │              ^
+51 │ ╭             if (cond) {
+52 │ │                 abort 0;
+53 │ │             } else {
+54 │ │                 return;
+55 │ │             };
+   │ │              ^
+   │ │              │
+   │ │              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │ ╰─────────────' Any code after this expression will not be reached
 
 // -- Model dump before bytecode pipeline
 module <SELF>_0 {

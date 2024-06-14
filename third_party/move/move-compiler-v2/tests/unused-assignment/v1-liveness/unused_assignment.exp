@@ -1,37 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/unused-assignment/v1-liveness/unused_assignment.move:8:14
-  │
-8 │         x = 0;
-  │              ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/v1-liveness/unused_assignment.move:21:18
-   │
-21 │             x = 0;
-   │                  ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/v1-liveness/unused_assignment.move:28:18
-   │
-28 │             x = 1;
-   │                  ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/v1-liveness/unused_assignment.move:30:18
-   │
-30 │             x = 2;
-   │                  ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/v1-liveness/unused_assignment.move:41:18
-   │
-41 │             x = 1;
-   │                  ^
-
-
-Diagnostics:
 warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
   ┌─ tests/unused-assignment/v1-liveness/unused_assignment.move:3:13
   │

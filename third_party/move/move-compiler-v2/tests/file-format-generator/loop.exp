@@ -1,16 +1,22 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/file-format-generator/loop.move:5:22
-  │
-5 │             x = x - 1;
-  │                      ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/file-format-generator/loop.move:16:22
+warning: Unnecessary trailing semicolon
+   ┌─ tests/file-format-generator/loop.move:25:22
    │
-16 │             x = x - 1;
-   │                      ^
+25 │                 break;
+   │                 -----^
+   │                 │    │
+   │                 │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │                 Any code after this expression will not be reached
+
+warning: Unnecessary trailing semicolon
+   ┌─ tests/file-format-generator/loop.move:28:21
+   │
+28 │             continue;
+   │             --------^
+   │             │       │
+   │             │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │             Any code after this expression will not be reached
 
 
 ============ disassembled file-format ==================

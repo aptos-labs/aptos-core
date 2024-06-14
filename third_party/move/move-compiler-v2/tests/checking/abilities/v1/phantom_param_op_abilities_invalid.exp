@@ -1,17 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/abilities/v1/phantom_param_op_abilities_invalid.move:11:72
-   │
-11 │         *ref = HasDrop<NoAbilities, NoAbilities> { a: NoAbilities { } };
-   │                                                                        ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/abilities/v1/phantom_param_op_abilities_invalid.move:16:69
-   │
-16 │         _ = HasDrop<NoAbilities, NoAbilities> { a: NoAbilities { } };
-   │                                                                     ^
-
 error: type `NoAbilities` is missing required ability `store`
    ┌─ tests/checking/abilities/v1/phantom_param_op_abilities_invalid.move:30:17
    │
@@ -20,12 +8,6 @@ error: type `NoAbilities` is missing required ability `store`
    │
    = required by instantiating type parameter `T2` of struct `HasKey`
    = required by instantiating type parameter `T:key` of function `move_to`
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/abilities/v1/phantom_param_op_abilities_invalid.move:30:56
-   │
-30 │         move_to<HasKey<NoAbilities, NoAbilities>>(s, x);
-   │                                                        ^
 
 error: type `NoAbilities` is missing required ability `store`
    ┌─ tests/checking/abilities/v1/phantom_param_op_abilities_invalid.move:35:19

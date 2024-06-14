@@ -1,19 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/inlining/lambda_param.move:20:20
-   │
-20 │     assert!(a == 3, 0);
-   │                       ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/inlining/lambda_param.move:29:20
-   │
-29 │     assert!(b == 3, 0);
-   │                       ^
-
-
-Diagnostics:
 error: Currently, a function-typed parameter to an inline function must be a literal lambda expression
   ┌─ tests/checking/inlining/lambda_param.move:7:15
   │

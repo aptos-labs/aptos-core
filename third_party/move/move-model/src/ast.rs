@@ -573,6 +573,9 @@ pub enum ExpData {
     Temporary(NodeId, TempIndex),
     /// Represents a call to an operation. The `Operation` enum covers all builtin functions
     /// (including operators, constants, ...) as well as user functions.
+    ///
+    /// *** Note that if the `Operation` is `Or` or `And`, then operands may not all be evaluated,
+    /// so be careful.
     Call(NodeId, Operation, Vec<Exp>),
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
@@ -716,6 +719,106 @@ impl ExpData {
                 | ExpData::LoopCont(_, _)
                 | ExpData::Return(_, _)
         )
+    }
+
+    pub fn contains_free_break(&self) -> bool {
+        use ExpData::*;
+        match self {
+            LoopCont(_, false) => true,
+            Loop(..) => false,
+            Invalid(_)
+            | Value(..)
+            | LocalVar(..)
+            | Temporary(..)
+            | Quant(..)
+            | SpecBlock(..)
+            | LoopCont(_, true)
+            | Lambda(..) => false,
+            Call(_, op, exps) => match op {
+                Operation::Or | Operation::And => {
+                    for exp in exps {
+                        if exp.contains_free_break() {
+                            return true;
+                        } else if !exp.has_reachable_successor() {
+                            return false;
+                        }
+                    }
+                    false
+                },
+                Operation::Abort => false,
+                _ => exps.iter().any(|exp| exp.contains_free_break()),
+            },
+            Sequence(_, exps) => exps.iter().any(|exp| exp.contains_free_break()),
+            Invoke(_, exp, exps) => {
+                exp.contains_free_break() || exps.iter().any(|exp| exp.contains_free_break())
+            },
+            Block(_, _, None, exp) | Return(_, exp) | Assign(_, _, exp) => {
+                exp.contains_free_break()
+            },
+            Block(_, _, Some(exp1), exp2) | Mutate(_, exp1, exp2) => {
+                exp1.contains_free_break() || exp2.contains_free_break()
+            },
+            IfElse(_, exp1, exp2, exp3) => {
+                exp1.contains_free_break()
+                    || exp2.contains_free_break()
+                    || exp3.contains_free_break()
+            },
+            Match(_, exp1, match_arms) => {
+                exp1.contains_free_break()
+                    || match_arms.iter().any(|arm| {
+                        if let Some(cond_exp) = &arm.condition {
+                            cond_exp.contains_free_break() ||
+                                arm.body.contains_free_break()
+                        } else {
+                            arm.body.contains_free_break()
+                        }
+                    })
+            },
+        }
+    }
+
+    pub fn has_reachable_successor(&self) -> bool {
+        use ExpData::*;
+        match self {
+            Invalid(_) | Value(..) | LocalVar(..) | Temporary(..) | Lambda(..) | Quant(..)
+            | SpecBlock(..) => true,
+            Call(_, op, exps) => match op {
+                Operation::Or | Operation::And => exps
+                    .iter()
+                    .next()
+                    .map(|exp| exp.has_reachable_successor())
+                    .unwrap_or(true),
+                Operation::Abort => false,
+                _ => exps.iter().all(|exp| exp.has_reachable_successor()),
+            },
+            Invoke(_, exp, explist) => {
+                exp.has_reachable_successor()
+                    && explist.iter().all(|exp| exp.has_reachable_successor())
+            },
+            Block(_, _, None, exp) | Assign(_, _, exp) => exp.has_reachable_successor(),
+            Block(_, _, Some(exp1), exp2) | Mutate(_, exp1, exp2) => {
+                exp1.has_reachable_successor() && exp2.has_reachable_successor()
+            },
+            IfElse(_, exp1, exp2, exp3) => {
+                exp1.has_reachable_successor()
+                    && (exp2.has_reachable_successor() || exp3.has_reachable_successor())
+            },
+            Return(_, _exp) => false,
+            Sequence(_, exps) => exps.iter().all(|exp| exp.has_reachable_successor()),
+            LoopCont(_, _) => false,
+            Loop(_, exp) => exp.contains_free_break(),
+            Match(_, exp1, match_arms) => {
+                exp1.has_reachable_successor() &&
+                    match_arms.iter().any(|arm| {
+                        if let Some(cond_exp) = &arm.condition {
+                            cond_exp.has_reachable_successor() &&
+                                arm.body.has_reachable_successor()
+                        } else {
+                            arm.body.has_reachable_successor()
+                        }
+                    })
+            },
+        }
     }
 
     pub fn is_directly_borrowable(&self) -> bool {
@@ -1623,8 +1726,8 @@ pub enum Operation {
     Xor,
     Shl,
     Shr,
-    And,
-    Or,
+    And, // Short-cutting, not an op, really
+    Or,  // Short-cutting, not an op, really
     Eq,
     Neq,
     Lt,
@@ -1650,7 +1753,7 @@ pub enum Operation {
     MoveTo,
     MoveFrom,
     Freeze(/*explicit*/ bool),
-    Abort,
+    Abort, // alters control flow
     Vector,
 
     // Builtin functions (spec only)
@@ -2523,6 +2626,13 @@ impl Operation {
             // Operation with no effect
             NoOp => true,
         }
+    }
+
+    /// Checks whether an expression calling the operation is OK to remove from code.  This includes
+    /// side-effect-free expressions which are not related to Specs, Assertions, and won't generate
+    /// errors or warnings in stackless-bytecode passes.
+    pub fn has_reachable_successor(&self) -> bool {
+        !matches!(self, Operation::Abort)
     }
 
     /// Whether the operation allows to take reference parameters instead of values. This applies

@@ -11,9 +11,3 @@ error: cannot adapt `S` to annotated type `R`
   │
 7 │         let (S { g }, R { f }): (R, R);
   │              ^^^^^^^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/checking/typing/declare_wrong_type.move:9:14
-  │
-9 │         f = 0;
-  │              ^

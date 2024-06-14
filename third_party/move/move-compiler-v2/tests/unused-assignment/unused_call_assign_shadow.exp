@@ -1,19 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:14:22
-   │
-14 │             y = y + 1;
-   │                      ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:16:22
-   │
-16 │             y = y + 2;
-   │                      ^
-
-
-Diagnostics:
 warning: Unused parameter `a`. Consider removing or prefixing with an underscore: `_a`
   ┌─ tests/unused-assignment/unused_call_assign_shadow.move:2:13
   │

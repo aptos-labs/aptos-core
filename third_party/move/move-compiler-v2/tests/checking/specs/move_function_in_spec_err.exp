@@ -1,13 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/specs/move_function_in_spec_err.move:28:10
-   │
-28 │         };
-   │          ^
-
-
-Diagnostics:
 error: specification expression cannot call impure Move function `change`
    ┌─ tests/checking/specs/move_function_in_spec_err.move:25:20
    │

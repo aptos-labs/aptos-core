@@ -5,9 +5,3 @@ error: unable to infer instantiation of type `S<_>` (consider providing type arg
   │
 5 │         S{} = S{};
   │               ^^^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/checking/typing/uninferred_type_unpack_assign.move:5:18
-  │
-5 │         S{} = S{};
-  │                  ^

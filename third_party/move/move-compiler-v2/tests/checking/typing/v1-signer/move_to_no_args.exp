@@ -11,9 +11,3 @@ error: the function takes 2 arguments but 0 were provided
    │
 12 │         () = move_to<R<bool>>();
    │              ^^^^^^^^^^^^^^^^^^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/v1-signer/move_to_no_args.move:12:32
-   │
-12 │         () = move_to<R<bool>>();
-   │                                ^

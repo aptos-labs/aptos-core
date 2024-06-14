@@ -2,18 +2,6 @@ comparison between v1 and v2 failed:
 = processed 3 tasks
 = 
 + task 0 'publish'. lines 1-26:
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+   ┌─ TEMPFILE:9:29
-+   │
-+ 9 │         self.x = self.x + by;
-+   │                             ^
-+ 
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE:12:29
-+    │
-+ 12 │         self.x = self.x + by;
-+    │                             ^
-+ 
 + warning: Unused assignment to `by`. Consider removing or prefixing with an underscore: `_by`
 +    ┌─ TEMPFILE:11:16
 +    │

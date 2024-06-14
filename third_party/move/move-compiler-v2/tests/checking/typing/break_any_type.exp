@@ -1,10 +1,13 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/break_any_type.move:18:20
-   │
-18 │         Coin {} = c;
-   │                    ^
+warning: Unnecessary trailing semicolon
+  ┌─ tests/checking/typing/break_any_type.move:6:22
+  │
+6 │             0 + break;
+  │             ---------^
+  │             │        │
+  │             │        A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │             Any code after this expression will not be reached
 
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {

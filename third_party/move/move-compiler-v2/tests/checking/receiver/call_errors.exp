@@ -1,11 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/checking/receiver/call_errors.move:8:19
-  │
-8 │         self.x = y;
-  │                   ^
-
 error: undeclared receiver function `receiver_wrongly_spelled` for type `S<u64>`
    ┌─ tests/checking/receiver/call_errors.move:20:9
    │

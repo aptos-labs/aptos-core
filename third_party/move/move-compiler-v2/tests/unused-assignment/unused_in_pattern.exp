@@ -1,19 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/unused_in_pattern.move:15:17
-   │
-15 │         S { x, y } = s;
-   │                       ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/unused_in_pattern.move:28:26
-   │
-28 │         T { z: S { x, y } } = t;
-   │                                ^
-
-
-Diagnostics:
 warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
    ┌─ tests/unused-assignment/unused_in_pattern.move:20:11
    │

@@ -12,12 +12,6 @@ error: missing field `dummy_field`
 12 │         let r = R {};
    │                 ^^^^
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/dummy_field_err.move:13:25
-   │
-13 │         move_to<R>(s, r);
-   │                         ^
-
 error: field `dummy_field` not declared in `test::T`
    ┌─ tests/checking/typing/dummy_field_err.move:20:17
    │
@@ -41,12 +35,6 @@ error: missing field `dummy_field_1`
    │
 38 │         let r = G {};
    │                 ^^^^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/dummy_field_err.move:39:25
-   │
-39 │         move_to<G>(s, r);
-   │                         ^
 
 error: empty struct `test::A` cannot access the field `dummy_field`
    ┌─ tests/checking/typing/dummy_field_err.move:47:17

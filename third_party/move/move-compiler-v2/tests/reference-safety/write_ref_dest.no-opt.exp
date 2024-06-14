@@ -1,19 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/reference-safety/write_ref_dest.move:11:34
-   │
-11 │         assert!(y == vector[], 0);
-   │                                  ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/reference-safety/write_ref_dest.move:16:26
-   │
-16 │         (y, _) = (*&y, 1);
-   │                          ^
-
-
-Diagnostics:
 warning: Unused assignment to `y`. Consider removing or prefixing with an underscore: `_y`
    ┌─ tests/reference-safety/write_ref_dest.move:16:9
    │

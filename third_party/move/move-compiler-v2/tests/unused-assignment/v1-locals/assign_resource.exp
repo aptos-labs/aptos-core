@@ -1,43 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/unused-assignment/v1-locals/assign_resource.move:7:16
-  │
-7 │         R{} = r;
-  │                ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/v1-locals/assign_resource.move:12:28
-   │
-12 │         if (cond) { r = R{}; };
-   │                            ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/v1-locals/assign_resource.move:13:16
-   │
-13 │         R{} = r;
-   │                ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/v1-locals/assign_resource.move:18:36
-   │
-18 │         if (cond) {} else { r = R{}; };
-   │                                    ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/v1-locals/assign_resource.move:19:16
-   │
-19 │         R{} = r;
-   │                ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/v1-locals/assign_resource.move:25:16
-   │
-25 │         R{} = r;
-   │                ^
-
-
-Diagnostics:
 warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
   ┌─ tests/unused-assignment/v1-locals/assign_resource.move:5:17
   │

@@ -1,11 +1,3 @@
-
-Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/uninit-use-checker/assign_wrong_if_branch_no_else_unfoldable.move:5:26
-  │
-5 │     assert!(x == 100, 42);
-  │                          ^
-
 ============ initial bytecode ================
 
 [variant baseline]

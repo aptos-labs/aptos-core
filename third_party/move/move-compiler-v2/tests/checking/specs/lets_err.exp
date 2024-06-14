@@ -6,12 +6,6 @@ error: undeclared `one`
 6 │     let zero = one;
   │                ^^^
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/specs/lets_err.move:13:22
-   │
-13 │     *b = saved_a * *b;
-   │                      ^
-
 error: let bound `new_a` propagated via schema inclusion is referring to post state
    ┌─ tests/checking/specs/lets_err.move:22:5
    │

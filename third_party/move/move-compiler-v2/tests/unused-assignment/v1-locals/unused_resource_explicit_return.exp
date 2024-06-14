@@ -1,25 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/v1-locals/unused_resource_explicit_return.move:12:17
-   │
-12 │         R {} = r;
-   │                 ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/v1-locals/unused_resource_explicit_return.move:18:17
-   │
-18 │         R {} = r;
-   │                 ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/unused-assignment/v1-locals/unused_resource_explicit_return.move:24:17
-   │
-24 │         R {} = r;
-   │                 ^
-
-
-Diagnostics:
 warning: Unused local variable `r`. Consider removing or prefixing with an underscore: `_r`
   ┌─ tests/unused-assignment/v1-locals/unused_resource_explicit_return.move:5:13
   │

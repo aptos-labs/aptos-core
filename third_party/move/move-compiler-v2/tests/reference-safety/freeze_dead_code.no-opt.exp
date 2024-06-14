@@ -1,19 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/reference-safety/freeze_dead_code.move:9:20
-  │
-9 │         *n = *n + 1;
-  │                    ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/reference-safety/freeze_dead_code.move:19:20
-   │
-19 │         *m = *m + 1;
-   │                    ^
-
-
-Diagnostics:
 error: cannot freeze local `y`  since multiple mutable references exist
   ┌─ tests/reference-safety/freeze_dead_code.move:8:9
   │

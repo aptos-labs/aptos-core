@@ -1,10 +1,2 @@
 
-Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/ability-check/resources.move:11:39
-   │
-11 │         assert!(my_borrow().f == 1, 1);
-   │                                       ^
-
-
 ============ bytecode verification succeeded ========

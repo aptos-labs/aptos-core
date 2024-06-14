@@ -1,18 +1,4 @@
 
-Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/file-format-generator/unpack_generic_struct.move:38:21
-   │
-38 │             *v = key;
-   │                     ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/file-format-generator/unpack_generic_struct.move:39:11
-   │
-39 │         });
-   │           ^
-
-
 ============ disassembled file-format ==================
 // Move bytecode v7
 module 42.m {

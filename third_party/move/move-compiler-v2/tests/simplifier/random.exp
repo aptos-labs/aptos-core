@@ -1,31 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/simplifier/random.move:13:23
-   │
-13 │             x = x - *y;
-   │                       ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/simplifier/random.move:31:24
-   │
-31 │             t2 = t2 + x;
-   │                        ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/simplifier/random.move:44:18
-   │
-44 │             v = 3;
-   │                  ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/simplifier/random.move:46:18
-   │
-46 │             v = 2;
-   │                  ^
-
-
-Diagnostics:
 warning: Unused local variable `q`. Consider removing or prefixing with an underscore: `_q`
    ┌─ tests/simplifier/random.move:48:13
    │

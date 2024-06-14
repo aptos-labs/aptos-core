@@ -1,11 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  ┌─ tests/checking/typing/v1-commands/pop_weird.move:8:28
-  │
-8 │         (_, _, _) = three();
-  │                            ^
-
 error: the left-hand side has 2 items but the right-hand side provided 0
    ┌─ tests/checking/typing/v1-commands/pop_weird.move:13:9
    │
@@ -17,9 +11,3 @@ error: tuple type `()` is not allowed as a type argument
    │
 14 │         (_) = ();
    │         ^^^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/v1-commands/pop_weird.move:14:17
-   │
-14 │         (_) = ();
-   │                 ^

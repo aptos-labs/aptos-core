@@ -1,13 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/ability-check/v1-typing/implicit_deref_borrow_field_not_copyable.move:11:21
-   │
-11 │         R{} = bref.r;
-   │                     ^
-
-
-Diagnostics:
 error: value of type `M::R` does not have the `copy` ability
   ┌─ tests/ability-check/v1-typing/implicit_deref_borrow_field_not_copyable.move:8:15
   │

@@ -1,75 +1,21 @@
-comparison between v1 and v2 failed:
-= processed 8 tasks
-= 
-= task 0 'run'. lines 1-8:
-= Error: Script execution failed with VMError: {
-=     major_status: ARITHMETIC_ERROR,
-=     sub_status: None,
-=     location: script,
-=     indices: redacted,
-=     offsets: redacted,
-= }
-= 
-= task 1 'run'. lines 10-18:
-= Error: Script execution failed with VMError: {
-=     major_status: ARITHMETIC_ERROR,
-=     sub_status: None,
-=     location: script,
-=     indices: redacted,
-=     offsets: redacted,
-= }
-= 
-+ task 2 'run'. lines 19-27:
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE2:23:37
-+    │
-+ 23 │     assert!(0u8 >> 4u8 == 0u8, 1100);
-+    │                                     ^
-+ 
-+ 
-+ 
-+ task 3 'run'. lines 28-48:
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE3:41:195
-+    │
-+ 41 │     assert!(115792089237316195423570985008687907853269984665640564039457584007913129639935u256 >> 0u8 == 115792089237316195423570985008687907853269984665640564039457584007913129639935u256, 2105);
-+    │                                                                                                                                                                                                   ^
-+ 
-+ 
-+ 
-+ task 4 'run'. lines 49-70:
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE4:63:46
-+    │
-+ 63 │     assert!(1000u256 >> 1u8 == 500u256, 3105);
-+    │                                              ^
-+ 
-+ 
-+ 
-+ task 5 'run'. lines 71-85:
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE5:79:119
-+    │
-+ 79 │     assert!(11579208923731619542357098500868790785326998466564056403945758400791312963993u256 >> 255u8 == 0u256, 4005);
-+    │                                                                                                                       ^
-+ 
-+ 
-+ 
-+ task 6 'run'. lines 86-100:
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+    ┌─ TEMPFILE6:94:119
-+    │
-+ 94 │     assert!(7u256 << 254u8 == 86844066927987146567678238756515930889952488499230423029593188005934847229952u256, 5005);
-+    │                                                                                                                       ^
-+ 
-+ 
-+ 
-+ task 7 'run'. lines 101-131:
-+ warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-+     ┌─ TEMPFILE7:124:176
-+     │
-+ 124 │     assert!(1234536789093546757803786604381691994985672142341299639418u256 << 202u8 == 33658913632735705985908889087832028406806276615240336691180752852867975479296u256, 6504);
-+     │                                                                                                                                                                                ^
-+ 
-+ 
-+ 
+processed 8 tasks
+
+task 0 'run'. lines 1-8:
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: redacted,
+    offsets: redacted,
+}
+
+task 1 'run'. lines 10-18:
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: redacted,
+    offsets: redacted,
+}
+
+==> Compiler v2 delivered same results!

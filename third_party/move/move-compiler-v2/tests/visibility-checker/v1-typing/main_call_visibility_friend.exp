@@ -1,13 +1,5 @@
 
 Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/visibility-checker/v1-typing/main_call_visibility_friend.move:16:18
-   │
-16 │     0x2::X::baz();
-   │                  ^
-
-
-Diagnostics:
 error: function `0x2::X::foo` cannot be called from a script because it is not public
    ┌─ tests/visibility-checker/v1-typing/main_call_visibility_friend.move:3:24
    │

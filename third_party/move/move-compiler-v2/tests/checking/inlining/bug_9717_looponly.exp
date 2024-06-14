@@ -1,11 +1,3 @@
-
-Diagnostics:
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/inlining/bug_9717_looponly.move:16:14
-   │
-16 │             };
-   │              ^
-
 // -- Model dump before bytecode pipeline
 module 0xcafe::vectors {
     use std::vector;

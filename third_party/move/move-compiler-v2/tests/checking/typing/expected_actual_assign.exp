@@ -6,23 +6,11 @@ error: cannot assign `u8` to left-hand side of type `u64`
 13 │         x = 1u8;
    │         ^
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/expected_actual_assign.move:13:16
-   │
-13 │         x = 1u8;
-   │                ^
-
 error: cannot assign `vector<_>` to left-hand side of type `integer`
    ┌─ tests/checking/typing/expected_actual_assign.move:18:9
    │
 18 │         x = vector[];
    │         ^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/expected_actual_assign.move:18:21
-   │
-18 │         x = vector[];
-   │                     ^
 
 error: cannot assign `S` to left-hand side of type `R`
    ┌─ tests/checking/typing/expected_actual_assign.move:24:9
@@ -36,20 +24,8 @@ error: cannot assign `integer` to left-hand side of type `R`
 25 │         R{y} = 1;
    │         ^^^^
 
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/expected_actual_assign.move:25:17
-   │
-25 │         R{y} = 1;
-   │                 ^
-
 error: cannot assign `S` to left-hand side of type `R`
    ┌─ tests/checking/typing/expected_actual_assign.move:32:10
    │
 32 │         (R{y}, x) = (s, y);
    │          ^^^^
-
-warning: A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   ┌─ tests/checking/typing/expected_actual_assign.move:32:27
-   │
-32 │         (R{y}, x) = (s, y);
-   │                           ^
