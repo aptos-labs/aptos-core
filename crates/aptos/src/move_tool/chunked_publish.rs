@@ -18,43 +18,41 @@ use move_core_types::{account_address::AccountAddress, ident_str, language_stora
 pub(crate) const LARGE_PACKAGES_MODULE_ADDRESS: &str =
     "0xa29df848eebfe5d981f708c2a5b06d31af2be53bbd8ddc94c8523f4b903f7adb"; // mainnet and testnet
 
-/// These modes create a single transaction for publishing a package.
-pub(crate) enum PackagePublishMode {
+// pub(crate) enum PublishMode {
+//     Standard,
+//     Chunked,
+// }
+
+pub(crate) enum PublishType {
     AccountDeploy,
     ObjectDeploy,
     ObjectUpgrade,
 }
 
-/// These modes create multiple transactions for publishing a package.
-pub(crate) enum ChunkedPackagePublishMode {
-    AccountDeployChunked,
-    ObjectDeployChunked,
-    ObjectUpgradeChunked,
-}
-
+// For standard publish mode which submits a single transaction for publishing.
 pub(crate) fn create_package_publication_data_from_built_package(
     package: BuiltPackage,
-    package_publish_mode: PackagePublishMode,
+    publish_type: PublishType,
     object_address: Option<AccountAddress>,
 ) -> CliTypedResult<PackagePublicationData> {
     let compiled_units = package.extract_code();
     let metadata = package.extract_metadata()?;
     let metadata_serialized = bcs::to_bytes(&metadata).expect("PackageMetadata has BCS");
 
-    let payload = match package_publish_mode {
-        PackagePublishMode::AccountDeploy => {
+    let payload = match publish_type {
+        PublishType::AccountDeploy => {
             aptos_cached_packages::aptos_stdlib::code_publish_package_txn(
                 metadata_serialized.clone(),
                 compiled_units.clone(),
             )
         },
-        PackagePublishMode::ObjectDeploy => {
+        PublishType::ObjectDeploy => {
             aptos_cached_packages::aptos_stdlib::object_code_deployment_publish(
                 metadata_serialized.clone(),
                 compiled_units.clone(),
             )
         },
-        PackagePublishMode::ObjectUpgrade => {
+        PublishType::ObjectUpgrade => {
             aptos_cached_packages::aptos_stdlib::object_code_deployment_upgrade(
                 metadata_serialized.clone(),
                 compiled_units.clone(),
@@ -70,26 +68,26 @@ pub(crate) fn create_package_publication_data_from_built_package(
     })
 }
 
+// For chunked publish mode which submits multiple transactions for publishing.
 pub(crate) async fn create_chunked_publish_payloads_from_built_package(
     package: BuiltPackage,
-    chunked_package_publish_mode: ChunkedPackagePublishMode,
+    publish_type: PublishType,
     object_address: Option<AccountAddress>,
 ) -> CliTypedResult<ChunkedPublishPayloads> {
     let compiled_units = package.extract_code();
     let metadata = package.extract_metadata()?;
     let metadata_serialized = bcs::to_bytes(&metadata).expect("PackageMetadata has BCS");
 
-    let maybe_object_address =
-        if let ChunkedPackagePublishMode::ObjectUpgradeChunked = chunked_package_publish_mode {
-            object_address
-        } else {
-            None
-        };
+    let maybe_object_address = if let PublishType::ObjectUpgrade = publish_type {
+        object_address
+    } else {
+        None
+    };
 
     let payloads = chunk_package_and_create_payloads(
         metadata_serialized,
         compiled_units,
-        chunked_package_publish_mode,
+        publish_type,
         maybe_object_address,
     )
     .await;
@@ -100,7 +98,7 @@ pub(crate) async fn create_chunked_publish_payloads_from_built_package(
 async fn chunk_package_and_create_payloads(
     metadata: Vec<u8>,
     package_code: Vec<Vec<u8>>,
-    chunked_package_publish_mode: ChunkedPackagePublishMode,
+    publish_type: PublishType,
     object_address: Option<AccountAddress>,
 ) -> Vec<TransactionPayload> {
     // Chunk the metadata
@@ -142,29 +140,23 @@ async fn chunk_package_and_create_payloads(
     }
 
     // The final call includes staging the last metadata and code chunk, and then publishing or upgrading the package on-chain.
-    let payload = match chunked_package_publish_mode {
-        ChunkedPackagePublishMode::AccountDeployChunked => {
-            large_packages_stage_code_chunk_and_publish_to_account(
-                metadata_chunk,
-                code_indices,
-                code_chunks,
-            )
-        },
-        ChunkedPackagePublishMode::ObjectDeployChunked => {
-            large_packages_stage_code_chunk_and_publish_to_object(
-                metadata_chunk,
-                code_indices,
-                code_chunks,
-            )
-        },
-        ChunkedPackagePublishMode::ObjectUpgradeChunked => {
-            large_packages_stage_code_chunk_and_upgrade_object_code(
-                metadata_chunk,
-                code_indices,
-                code_chunks,
-                object_address,
-            )
-        },
+    let payload = match publish_type {
+        PublishType::AccountDeploy => large_packages_stage_code_chunk_and_publish_to_account(
+            metadata_chunk,
+            code_indices,
+            code_chunks,
+        ),
+        PublishType::ObjectDeploy => large_packages_stage_code_chunk_and_publish_to_object(
+            metadata_chunk,
+            code_indices,
+            code_chunks,
+        ),
+        PublishType::ObjectUpgrade => large_packages_stage_code_chunk_and_upgrade_object_code(
+            metadata_chunk,
+            code_indices,
+            code_chunks,
+            object_address,
+        ),
     };
     payloads.push(payload);
 

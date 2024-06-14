@@ -24,8 +24,8 @@ use crate::{
         chunked_publish::{
             create_chunked_publish_payloads_from_built_package,
             create_package_publication_data_from_built_package,
-            large_packages_cleanup_staging_area, submit_chunked_publish_transactions,
-            ChunkedPackagePublishMode, PackagePublishMode, LARGE_PACKAGES_MODULE_ADDRESS,
+            large_packages_cleanup_staging_area, submit_chunked_publish_transactions, PublishType,
+            LARGE_PACKAGES_MODULE_ADDRESS,
         },
         coverage::SummaryCoverage,
         fmt::Fmt,
@@ -791,7 +791,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
 
         let package_publication_data = create_package_publication_data_from_built_package(
             package,
-            PackagePublishMode::AccountDeploy,
+            PublishType::AccountDeploy,
             None,
         )?;
 
@@ -831,7 +831,7 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
 
         let chunked_publish_payloads = create_chunked_publish_payloads_from_built_package(
             package,
-            ChunkedPackagePublishMode::AccountDeployChunked,
+            PublishType::AccountDeploy,
             None,
         )
         .await?;
@@ -1099,7 +1099,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
             let mock_payloads = create_chunked_publish_payloads_from_built_package(
                 package,
-                ChunkedPackagePublishMode::AccountDeployChunked,
+                PublishType::AccountDeploy,
                 None,
             )
             .await?
@@ -1126,7 +1126,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         let result = if self.chunked_publish_option.chunked_publish {
             let payloads = create_chunked_publish_payloads_from_built_package(
                 package,
-                ChunkedPackagePublishMode::ObjectDeployChunked,
+                PublishType::ObjectDeploy,
                 None,
             )
             .await?
@@ -1144,7 +1144,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         } else {
             let package_publication_data = create_package_publication_data_from_built_package(
                 package,
-                PackagePublishMode::ObjectDeploy,
+                PublishType::ObjectDeploy,
                 Some(object_address),
             )?;
             let size = bcs::serialized_size(&package_publication_data.payload)?;
@@ -1236,7 +1236,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
         let result = if self.chunked_publish_option.chunked_publish {
             let payloads = create_chunked_publish_payloads_from_built_package(
                 built_package,
-                ChunkedPackagePublishMode::ObjectUpgradeChunked,
+                PublishType::ObjectUpgrade,
                 Some(self.object_address),
             )
             .await?
@@ -1253,7 +1253,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
         } else {
             let payload = create_package_publication_data_from_built_package(
                 built_package,
-                PackagePublishMode::ObjectUpgrade,
+                PublishType::ObjectUpgrade,
                 Some(self.object_address),
             )?
             .payload;

@@ -142,18 +142,6 @@ impl LargePackageTestContext {
     ) -> Vec<SignedTransaction> {
         let package = BuiltPackage::build(path.to_owned(), options.unwrap())
             .expect("package build must succeed");
-        // let package_arc = {
-        //     let mut cache = CACHED_BUILT_PACKAGES.lock().unwrap();
-        //     Arc::clone(
-        //         cache
-        //             .entry(path.to_owned())
-        //             .or_insert_with(|| Arc::new(build_package(path.to_owned(), options.unwrap()))),
-        //     )
-        // };
-        // let package_ref = package_arc
-        //     .as_ref()
-        //     .as_ref()
-        //     .expect("building package must succeed");
         let package_code = package.extract_code();
         let metadata = package
             .extract_metadata()
