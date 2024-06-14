@@ -617,11 +617,7 @@ mod test {
         let public_peer = (create_public_peer(), None);
 
         // Verify that peers are prioritized by network ID first
-        let all_peers = vec![
-            vfn_peer.clone(),
-            public_peer.clone(),
-            validator_peer.clone(),
-        ];
+        let all_peers = vec![vfn_peer, public_peer, validator_peer];
         let prioritized_peers = prioritized_peers_state.sort_peers_by_priority(&all_peers);
         let expected_peers = vec![validator_peer.0, vfn_peer.0, public_peer.0];
         assert_eq!(prioritized_peers, expected_peers);
@@ -643,12 +639,7 @@ mod test {
         let public_peer_4 = (create_public_peer(), Some(&peer_metadata_4));
 
         // Verify that peers on the same network ID are prioritized by validator distance
-        let all_peers = vec![
-            public_peer_1.clone(),
-            public_peer_2.clone(),
-            public_peer_3.clone(),
-            public_peer_4.clone(),
-        ];
+        let all_peers = vec![public_peer_1, public_peer_2, public_peer_3, public_peer_4];
         let prioritized_peers = prioritized_peers_state.sort_peers_by_priority(&all_peers);
         let expected_peers = vec![
             public_peer_3.0,
@@ -675,12 +666,7 @@ mod test {
         );
 
         // Verify that peers on the same network ID and validator distance are prioritized by ping latency
-        let all_peers = vec![
-            public_peer_1.clone(),
-            public_peer_2.clone(),
-            public_peer_3.clone(),
-            public_peer_4.clone(),
-        ];
+        let all_peers = vec![public_peer_1, public_peer_2, public_peer_3, public_peer_4];
         let prioritized_peers = prioritized_peers_state.sort_peers_by_priority(&all_peers);
         let expected_peers = vec![
             public_peer_3.0,
@@ -710,11 +696,7 @@ mod test {
         let public_peer = (create_public_peer(), None);
 
         // Verify that peers are prioritized by network ID first
-        let all_peers = vec![
-            vfn_peer.clone(),
-            public_peer.clone(),
-            validator_peer.clone(),
-        ];
+        let all_peers = vec![vfn_peer, public_peer, validator_peer];
         let prioritized_peers = prioritized_peers_state.sort_peers_by_priority(&all_peers);
         let expected_peers = vec![validator_peer.0, vfn_peer.0, public_peer.0];
         assert_eq!(prioritized_peers, expected_peers);
@@ -767,12 +749,7 @@ mod test {
         );
 
         // Update the prioritized peers
-        let all_peers = vec![
-            public_peer_1.clone(),
-            public_peer_2.clone(),
-            public_peer_3.clone(),
-            public_peer_4.clone(),
-        ];
+        let all_peers = vec![public_peer_1, public_peer_2, public_peer_3, public_peer_4];
         prioritized_peers_state.update_prioritized_peers(all_peers);
 
         // Verify that the prioritized peers were updated correctly
@@ -799,11 +776,7 @@ mod test {
         time_service.advance_secs(100);
 
         // Update the prioritized peers for only peers with ping latencies
-        let all_peers = vec![
-            public_peer_1.clone(),
-            public_peer_2.clone(),
-            public_peer_3.clone(),
-        ];
+        let all_peers = vec![public_peer_1, public_peer_2, public_peer_3];
         prioritized_peers_state.update_prioritized_peers(all_peers);
 
         // Verify that the prioritized peers were updated correctly
@@ -841,11 +814,7 @@ mod test {
         let public_peer = (create_public_peer(), None);
 
         // Update the prioritized peers
-        let all_peers = vec![
-            validator_peer.clone(),
-            vfn_peer.clone(),
-            public_peer.clone(),
-        ];
+        let all_peers = vec![validator_peer, vfn_peer, public_peer];
         prioritized_peers_state.update_prioritized_peers(all_peers);
 
         // Verify that the prioritized peers were updated correctly
