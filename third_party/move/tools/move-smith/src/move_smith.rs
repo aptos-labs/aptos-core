@@ -413,7 +413,9 @@ impl MoveSmith {
             parameters.push((name, typ));
         }
 
-        let return_type = match bool::arbitrary(u)? {
+        // More chance to have return type than not
+        // so that we can compare the the return value
+        let return_type = match u.int_in_range(0..=10)? > 2 {
             true => Some(self.get_random_type(u, parent_scope, true, true)?),
             false => None,
         };
