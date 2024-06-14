@@ -70,11 +70,7 @@ impl OnChainExecutionConfig {
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
         OnChainExecutionConfig::V4(ExecutionConfigV4 {
-            transaction_shuffler_type: TransactionShufflerType::Fairness {
-                sender_conflict_window_size: 32,
-                module_conflict_window_size: 1,
-                entry_fun_conflict_window_size: 2,
-            },
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         })
@@ -152,7 +148,7 @@ pub enum TransactionShufflerType {
     NoShuffling,
     DeprecatedSenderAwareV1(u32),
     SenderAwareV2(u32),
-    Fairness {
+    DeprecatedFairness {
         sender_conflict_window_size: u32,
         module_conflict_window_size: u32,
         entry_fun_conflict_window_size: u32,

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction_shuffler::fairness::TxnIdx;
+use crate::transaction_shuffler::deprecated_fairness::TxnIdx;
 
 pub struct SelectionTracker {
     selected_markers: Vec<bool>,
