@@ -748,7 +748,7 @@ pub static NUM_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Histogram for the number of txns per (committed) blocks.
+/// Histogram for the number of input txns in the committed blocks.
 pub static NUM_INPUT_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_consensus_num_input_txns_per_block",
@@ -758,6 +758,7 @@ pub static NUM_INPUT_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the number of bytes in the committed blocks.
 pub static NUM_BYTES_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_consensus_num_bytes_per_block",

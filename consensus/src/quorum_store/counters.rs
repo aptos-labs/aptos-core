@@ -101,38 +101,6 @@ pub static BATCH_GENERATOR_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
     )
 });
 
-pub static PROOFS_WITHOUT_BATCH_DATA: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "quorum_store_proofs_without_batch_data",
-        "Number of proofs received without batch data"
-    )
-    .unwrap()
-});
-
-pub static TXNS_WITH_DUPLICATE_BATCHES: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "quorum_store_txns_with_duplicate_batches",
-        "Number of transactions received with duplicate batches"
-    )
-    .unwrap()
-});
-
-pub static TXNS_IN_PROOF_QUEUE: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "quorum_store_txns_in_proof_queue",
-        "Number of transactions in the proof queue"
-    )
-    .unwrap()
-});
-
-pub static PROOFS_IN_PROOF_QUEUE: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "quorum_store_proofs_in_proof_queue",
-        "Number of proofs in the proof queue"
-    )
-    .unwrap()
-});
-
 //////////////////////
 // NEW QUORUM STORE
 //////////////////////
@@ -241,28 +209,6 @@ pub static EXCLUDED_TXNS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
         .unwrap()
 });
 
-pub static NUM_PROOFS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION: Lazy<Histogram> = Lazy::new(
-    || {
-        register_histogram!(
-        "quorum_store_num_proofs_left_in_proof_queue_after_proposal_generation",
-        "Histogram for the number of proofs left in the proof queue after block proposal generation.",
-        PROOF_COUNT_BUCKETS.clone(),
-    )
-    .unwrap()
-    },
-);
-
-pub static NUM_TXNS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION: Lazy<Histogram> = Lazy::new(
-    || {
-        register_histogram!(
-        "quorum_store_num_txns_left_in_proof_queue_after_proposal_generation",
-        "Histogram for the number of transactions left in the proof queue after block proposal generation.",
-        TRANSACTION_COUNT_BUCKETS.clone(),
-    )
-    .unwrap()
-    },
-);
-
 pub static BATCH_IN_PROGRESS_COMMITTED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_batch_in_progress_committed",
@@ -365,6 +311,64 @@ pub fn pos_to_commit(bucket: u64, secs: f64) {
         .with_label_values(&[bucket.to_string().as_str()])
         .observe(secs);
 }
+
+//////////////////////
+// Proof Queue
+//////////////////////
+
+pub static PROOFS_WITHOUT_BATCH_DATA: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "quorum_store_proofs_without_batch_data",
+        "Number of proofs received without batch data"
+    )
+    .unwrap()
+});
+
+pub static TXNS_WITH_DUPLICATE_BATCHES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "quorum_store_txns_with_duplicate_batches",
+        "Number of transactions received with duplicate batches"
+    )
+    .unwrap()
+});
+
+pub static TXNS_IN_PROOF_QUEUE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "quorum_store_txns_in_proof_queue",
+        "Number of transactions in the proof queue"
+    )
+    .unwrap()
+});
+
+pub static PROOFS_IN_PROOF_QUEUE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "quorum_store_proofs_in_proof_queue",
+        "Number of proofs in the proof queue"
+    )
+    .unwrap()
+});
+
+pub static NUM_PROOFS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION: Lazy<Histogram> = Lazy::new(
+    || {
+        register_histogram!(
+        "quorum_store_num_proofs_left_in_proof_queue_after_proposal_generation",
+        "Histogram for the number of proofs left in the proof queue after block proposal generation.",
+        PROOF_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+    },
+);
+
+pub static NUM_TXNS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION: Lazy<Histogram> = Lazy::new(
+    || {
+        register_histogram!(
+        "quorum_store_num_txns_left_in_proof_queue_after_proposal_generation",
+        "Histogram for the number of transactions left in the proof queue after block proposal generation.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+    },
+);
 
 /// Histogram for the number of total txns left after adding or cleaning batches.
 pub static NUM_TOTAL_TXNS_LEFT_ON_UPDATE: Lazy<Histogram> = Lazy::new(|| {
