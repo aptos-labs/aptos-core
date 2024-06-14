@@ -104,7 +104,7 @@ pub struct ProofQueue {
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
-    remaining_txns: u64,
+    remaining_txns_with_duplicates: u64,
     remaining_proofs: u64,
     remaining_local_txns: u64,
     remaining_local_proofs: u64,
@@ -120,7 +120,7 @@ impl ProofQueue {
             batches_with_txn_summary: HashSet::new(),
             expirations: TimeExpirations::new(),
             latest_block_timestamp: 0,
-            remaining_txns: 0,
+            remaining_txns_with_duplicates: 0,
             remaining_proofs: 0,
             remaining_local_txns: 0,
             remaining_local_proofs: 0,
@@ -129,7 +129,7 @@ impl ProofQueue {
 
     #[inline]
     fn inc_remaining(&mut self, author: &AccountAddress, num_txns: u64) {
-        self.remaining_txns += num_txns;
+        self.remaining_txns_with_duplicates += num_txns;
         self.remaining_proofs += 1;
         if *author == self.my_peer_id {
             self.remaining_local_txns += num_txns;
@@ -139,7 +139,7 @@ impl ProofQueue {
 
     #[inline]
     fn dec_remaining(&mut self, author: &AccountAddress, num_txns: u64) {
-        self.remaining_txns -= num_txns;
+        self.remaining_txns_with_duplicates -= num_txns;
         self.remaining_proofs -= 1;
         if *author == self.my_peer_id {
             self.remaining_local_txns -= num_txns;
@@ -147,7 +147,7 @@ impl ProofQueue {
         }
     }
 
-    fn remaining_txns(&self) -> u64 {
+    fn remaining_txns_without_duplicates(&self) -> u64 {
         // All the bath keys for which batch_to_proof is not None. This is the set of unexpired and uncommitted proofs.
         let unexpired_batch_keys = self
             .batch_to_proof
@@ -178,37 +178,6 @@ impl ProofQueue {
                 }
             })
             .sum::<u64>();
-
-        //count the number of transactions with more than one batches
-        counters::TXNS_WITH_DUPLICATE_BATCHES.set(
-            self.txn_summary_to_batches
-                .iter()
-                .filter(|(_, batches)| batches.len() > 1)
-                .count() as i64,
-        );
-
-        counters::TXNS_IN_PROOF_QUEUE.set(self.txn_summary_to_batches.len() as i64);
-
-        // count the number of batches with proofs but without txn summaries
-        counters::PROOFS_WITHOUT_BATCH_DATA.set(
-            self.batch_to_proof
-                .iter()
-                .map(|(batch_key, proof)| {
-                    if proof.is_some() && !self.batches_with_txn_summary.contains(batch_key) {
-                        1
-                    } else {
-                        0
-                    }
-                })
-                .sum::<i64>(),
-        );
-
-        counters::PROOFS_IN_PROOF_QUEUE.set(
-            self.batch_to_proof
-                .values()
-                .map(|proof| if proof.is_some() { 1 } else { 0 })
-                .sum::<i64>(),
-        );
 
         remaining_txns
     }
@@ -388,13 +357,43 @@ impl ProofQueue {
     }
 
     pub(crate) fn remaining_txns_and_proofs(&self) -> (u64, u64) {
-        counters::NUM_TOTAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_txns as f64);
+        counters::NUM_TOTAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_txns_with_duplicates as f64);
         counters::NUM_TOTAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_proofs as f64);
         counters::NUM_LOCAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_local_txns as f64);
         counters::NUM_LOCAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_local_proofs as f64);
-        let remaining_txns_without_duplicates = self.remaining_txns();
+        let remaining_txns_without_duplicates = self.remaining_txns_without_duplicates();
         counters::NUM_TOTAL_TXNS_LEFT_ON_UPDATE_WITHOUT_DUPLICATES
             .observe(remaining_txns_without_duplicates as f64);
+        //count the number of transactions with more than one batches
+        counters::TXNS_WITH_DUPLICATE_BATCHES.set(
+            self.txn_summary_to_batches
+                .iter()
+                .filter(|(_, batches)| batches.len() > 1)
+                .count() as i64,
+        );
+
+        counters::TXNS_IN_PROOF_QUEUE.set(self.txn_summary_to_batches.len() as i64);
+
+        // count the number of batches with proofs but without txn summaries
+        counters::PROOFS_WITHOUT_BATCH_DATA.set(
+            self.batch_to_proof
+                .iter()
+                .map(|(batch_key, proof)| {
+                    if proof.is_some() && !self.batches_with_txn_summary.contains(batch_key) {
+                        1
+                    } else {
+                        0
+                    }
+                })
+                .sum::<i64>(),
+        );
+
+        counters::PROOFS_IN_PROOF_QUEUE.set(
+            self.batch_to_proof
+                .values()
+                .map(|proof| if proof.is_some() { 1 } else { 0 })
+                .sum::<i64>(),
+        );
         (remaining_txns_without_duplicates, self.remaining_proofs)
     }
 
