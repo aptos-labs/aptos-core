@@ -4,7 +4,7 @@
 
 import type { HexEncodedBytes } from './HexEncodedBytes';
 
-export type Signature_string_HexEncodedBytes_ = ({
-    type: string;
-} & HexEncodedBytes);
+export type Ed25519 = {
+    value: HexEncodedBytes;
+};
 
