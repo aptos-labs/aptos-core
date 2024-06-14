@@ -10,6 +10,7 @@ pub mod fullnode_data_service;
 pub mod localnet_data_service;
 pub mod runtime;
 pub mod stream_coordinator;
+pub mod offending_transaction;
 
 #[derive(Clone, Debug)]
 pub struct ServiceContext {
