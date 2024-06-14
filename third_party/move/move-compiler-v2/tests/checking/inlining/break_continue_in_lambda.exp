@@ -28,18 +28,18 @@ warning: Unnecessary trailing semicolon
    │             Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
-   ┌─ tests/checking/inlining/break_continue_in_lambda.move:49:7
+   ┌─ tests/checking/inlining/break_continue_in_lambda.move:50:7
    │
-49 │     break;
+50 │     break;
    │     -----^
    │     │    │
    │     │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
    │     Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
-   ┌─ tests/checking/inlining/break_continue_in_lambda.move:53:10
+   ┌─ tests/checking/inlining/break_continue_in_lambda.move:54:10
    │
-53 │     continue;
+54 │     continue;
    │     --------^
    │     │       │
    │     │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
@@ -58,3 +58,9 @@ error: Break outside of a loop not supported in function-typed arguments (lambda
    │
 40 │                 brk2(| | break);
    │                          ^^^^^
+
+error: Continue outside of a loop not supported in function-typed arguments (lambda expressions)
+   ┌─ tests/checking/inlining/break_continue_in_lambda.move:41:26
+   │
+41 │                 brk2(| | continue);
+   │                          ^^^^^^^^
