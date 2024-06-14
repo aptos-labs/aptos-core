@@ -305,7 +305,7 @@ impl StateSnapshotBackupController {
             }
         });
 
-        Ok(record_stream_stream.try_buffered(4).try_flatten())
+        Ok(record_stream_stream.try_buffered_x(8, 4).try_flatten())
     }
 }
 
