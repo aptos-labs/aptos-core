@@ -149,6 +149,7 @@ move-compiler/tests/move_check/translated_ir_tests/move/commands/unpack_extra_bi
 move-compiler/tests/move_check/translated_ir_tests/move/commands/unpack_missing_binding.exp   move-compiler-v2/tests/checking/typing/v1-commands/unpack_missing_binding.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/unpack_wrong_type.exp   move-compiler-v2/tests/checking/typing/v1-commands/unpack_wrong_type.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/use_before_assign.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/use_before_assign.exp
+move-compiler/tests/move_check/control_flow/break_continue_outside_loop.exp   move-compiler-v2/tests/bytecode-generator/control_flow/break_continue_outside_loop.exp
 move-compiler/tests/move_check/control_flow/for_loop_empty_novar.exp   move-compiler-v2/tests/checking/control_flow/for_loop_empty_novar.exp
 move-compiler/tests/move_check/control_flow/for_type_mismatch.exp   move-compiler-v2/tests/checking/control_flow/for_type_mismatch.exp
 move-compiler/tests/move_check/control_flow/loop_after_loop.exp   move-compiler-v2/tests/checking/control_flow/loop_after_loop.exp

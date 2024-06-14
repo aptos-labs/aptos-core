@@ -74,6 +74,7 @@ move-compiler/transactional-tests/tests/control_flow/while_simple.exp   move-com
 move-compiler/transactional-tests/tests/dependencies/dependency_order.exp   move-compiler-v2/transactional-tests/tests/dependencies/dependency_order.exp
 move-compiler/transactional-tests/tests/dependencies/transitive_deps.exp   move-compiler-v2/transactional-tests/tests/dependencies/transitive_deps.exp
 move-compiler/transactional-tests/tests/evaluation_order/lazy_assert.exp   move-compiler-v2/transactional-tests/tests/evaluation_order/lazy_assert.exp
+move-compiler/transactional-tests/tests/evaluation_order/short_circuit_boolean.exp   move-compiler-v2/transactional-tests/tests/evaluation_order/short_circuit_boolean.exp
 move-compiler/transactional-tests/tests/evaluation_order/short_circuiting.exp   move-compiler-v2/transactional-tests/tests/evaluation_order/short_circuiting.exp
 move-compiler/transactional-tests/tests/evaluation_order/short_circuiting_invalid.exp   move-compiler-v2/transactional-tests/tests/evaluation_order/short_circuiting_invalid.exp
 move-compiler/transactional-tests/tests/evaluation_order/struct_arguments.exp   move-compiler-v2/transactional-tests/tests/evaluation_order/struct_arguments.exp
