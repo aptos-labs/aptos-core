@@ -39,7 +39,7 @@ struct MockDAGNetworkSender {}
 
 #[async_trait]
 impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockDAGNetworkSender {
-    async fn send_rb_rpc(
+    async fn send_rb_rpc_raw(
         &self,
         _receiver: Author,
         _message: Bytes,
@@ -48,8 +48,9 @@ impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockDAGNetworkSender {
         unimplemented!()
     }
 
-    async fn send_rb_rpc_to_self(
+    async fn send_rb_rpc(
         &self,
+        _receiver: Author,
         _message: DAGMessage,
         _timeout: Duration,
     ) -> anyhow::Result<DAGRpcResult> {

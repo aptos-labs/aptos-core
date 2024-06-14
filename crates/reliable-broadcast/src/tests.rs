@@ -66,7 +66,6 @@ where
 }
 
 struct TestRBSender<M> {
-    self_author: Author,
     failures: Mutex<HashMap<Author, u8>>,
     received: Mutex<HashMap<Author, TestMessage>>,
     _marker: PhantomData<M>,
@@ -76,9 +75,8 @@ impl<M> TestRBSender<M>
 where
     M: Send + Sync,
 {
-    fn new(self_author: Author, failures: HashMap<Author, u8>) -> Self {
+    fn new(failures: HashMap<Author, u8>) -> Self {
         Self {
-            self_author,
             failures: Mutex::new(failures),
             received: Mutex::new(HashMap::new()),
             _marker: PhantomData,
@@ -93,7 +91,7 @@ where
     TestAck: TryFrom<M> + Into<M>,
     TestMessage: TryFrom<M, Error = anyhow::Error> + Into<M>,
 {
-    async fn send_rb_rpc(
+    async fn send_rb_rpc_raw(
         &self,
         receiver: Author,
         raw_message: Bytes,
@@ -115,11 +113,15 @@ where
         Ok(TestAck(message.0).into())
     }
 
-    async fn send_rb_rpc_to_self(&self, message: M, timeout: Duration) -> anyhow::Result<M> {
+    async fn send_rb_rpc(
+        &self,
+        author: Author,
+        message: M,
+        timeout: Duration,
+    ) -> anyhow::Result<M> {
         let message: TestMessage = message.try_into()?;
         let raw_message: Bytes = message.0.into();
-        self.send_rb_rpc(self.self_author, raw_message, timeout)
-            .await
+        self.send_rb_rpc_raw(author, raw_message, timeout).await
     }
 
     fn to_bytes_by_protocol(
@@ -142,7 +144,7 @@ async fn test_reliable_broadcast() {
     let validators = validator_verifier.get_ordered_account_addresses();
     let self_author = validators[0];
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
-    let sender = Arc::new(TestRBSender::<TestRBMessage>::new(self_author, failures));
+    let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
     let rb = ReliableBroadcast::new(
         self_author,
         validators.clone(),
@@ -167,7 +169,7 @@ async fn test_chaining_reliable_broadcast() {
     let validators = validator_verifier.get_ordered_account_addresses();
     let self_author = validators[0];
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
-    let sender = Arc::new(TestRBSender::<TestRBMessage>::new(self_author, failures));
+    let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
     let rb = Arc::new(ReliableBroadcast::new(
         self_author,
         validators.clone(),
@@ -203,7 +205,7 @@ async fn test_abort_reliable_broadcast() {
     let validators = validator_verifier.get_ordered_account_addresses();
     let self_author = validators[0];
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
-    let sender = Arc::new(TestRBSender::<TestRBMessage>::new(self_author, failures));
+    let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
     let rb = Arc::new(ReliableBroadcast::new(
         self_author,
         validators.clone(),

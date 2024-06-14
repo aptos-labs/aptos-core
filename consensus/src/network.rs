@@ -597,7 +597,7 @@ impl TDAGNetworkSender for NetworkSender {
 impl<Req: TConsensusMsg + RBMessage + 'static, Res: TConsensusMsg + RBMessage + 'static>
     RBNetworkSender<Req, Res> for NetworkSender
 {
-    async fn send_rb_rpc(
+    async fn send_rb_rpc_raw(
         &self,
         receiver: Author,
         raw_message: Bytes,
@@ -611,12 +611,14 @@ impl<Req: TConsensusMsg + RBMessage + 'static, Res: TConsensusMsg + RBMessage + 
         tokio::task::spawn_blocking(|| TConsensusMsg::from_network_message(response_msg)).await?
     }
 
-    async fn send_rb_rpc_to_self(&self, message: Req, timeout: Duration) -> anyhow::Result<Res> {
+    async fn send_rb_rpc(
+        &self,
+        receiver: Author,
+        message: Req,
+        timeout: Duration,
+    ) -> anyhow::Result<Res> {
         let consensus_msg = message.into_network_message();
-        let response_msg = self
-            .send_rpc_to_self(consensus_msg, timeout)
-            .await
-            .map_err(|e| anyhow!("invalid rpc response: {}", e))?;
+        let response_msg = self.send_rpc(receiver, consensus_msg, timeout).await?;
         tokio::task::spawn_blocking(|| TConsensusMsg::from_network_message(response_msg)).await?
     }
 

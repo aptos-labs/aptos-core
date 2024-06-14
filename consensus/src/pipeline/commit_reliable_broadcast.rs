@@ -101,7 +101,7 @@ impl BroadcastStatus<CommitMessage> for Arc<AckState> {
 
 #[async_trait]
 impl RBNetworkSender<CommitMessage> for NetworkSender {
-    async fn send_rb_rpc(
+    async fn send_rb_rpc_raw(
         &self,
         receiver: Author,
         raw_message: Bytes,
@@ -122,15 +122,14 @@ impl RBNetworkSender<CommitMessage> for NetworkSender {
         Ok(response)
     }
 
-    async fn send_rb_rpc_to_self(
+    async fn send_rb_rpc(
         &self,
+        receiver: Author,
         message: CommitMessage,
         timeout: Duration,
     ) -> anyhow::Result<CommitMessage> {
-        let consensus_msg = ConsensusMsg::CommitMessage(Box::new(message));
-        let response_msg = self.send_rpc_to_self(consensus_msg, timeout).await?;
-
-        let response = match response_msg {
+        let req = ConsensusMsg::CommitMessage(Box::new(message));
+        let response = match self.send_rpc(receiver, req, timeout).await? {
             ConsensusMsg::CommitMessage(resp) if matches!(*resp, CommitMessage::Ack(_)) => *resp,
             ConsensusMsg::CommitMessage(resp) if matches!(*resp, CommitMessage::Nack) => {
                 bail!("Received nack, will retry")

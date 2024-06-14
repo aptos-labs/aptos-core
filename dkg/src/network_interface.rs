@@ -34,6 +34,18 @@ impl<NetworkClient: NetworkClientInterface<DKGMessage>> DKGNetworkClient<Network
         Self { network_client }
     }
 
+    pub async fn send_rpc(
+        &self,
+        peer: PeerId,
+        message: DKGMessage,
+        rpc_timeout: Duration,
+    ) -> Result<DKGMessage, Error> {
+        let peer_network_id = self.get_peer_network_id_for_peer(peer);
+        self.network_client
+            .send_to_peer_rpc(message, rpc_timeout, peer_network_id)
+            .await
+    }
+
     /// Send a RPC to the destination peer
     pub async fn send_rpc_raw(
         &self,

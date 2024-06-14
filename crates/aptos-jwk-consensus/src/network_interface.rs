@@ -37,6 +37,18 @@ impl<NetworkClient: NetworkClientInterface<JWKConsensusMsg>>
         Self { network_client }
     }
 
+    pub async fn send_rpc(
+        &self,
+        peer: PeerId,
+        message: JWKConsensusMsg,
+        rpc_timeout: Duration,
+    ) -> Result<JWKConsensusMsg, Error> {
+        let peer_network_id = self.get_peer_network_id_for_peer(peer);
+        self.network_client
+            .send_to_peer_rpc(message, rpc_timeout, peer_network_id)
+            .await
+    }
+
     pub async fn send_rpc_raw(
         &self,
         peer: PeerId,

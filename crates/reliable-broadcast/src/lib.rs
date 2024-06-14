@@ -17,14 +17,19 @@ pub trait RBMessage: Send + Sync + Clone {}
 
 #[async_trait]
 pub trait RBNetworkSender<Req: RBMessage, Res: RBMessage = Req>: Send + Sync {
-    async fn send_rb_rpc(
+    async fn send_rb_rpc_raw(
         &self,
         receiver: Author,
         message: Bytes,
         timeout: Duration,
     ) -> anyhow::Result<Res>;
 
-    async fn send_rb_rpc_to_self(&self, message: Req, timeout: Duration) -> anyhow::Result<Res>;
+    async fn send_rb_rpc(
+        &self,
+        receiver: Author,
+        message: Req,
+        timeout: Duration,
+    ) -> anyhow::Result<Res>;
 
     /// Serializes the given message into bytes using each peers' preferred protocol.
     fn to_bytes_by_protocol(
@@ -137,13 +142,17 @@ where
                         time_service.sleep(duration).await;
                     }
                     let send_fut = if receiver == self_author {
-                        network_sender.send_rb_rpc_to_self(message, rpc_timeout_duration)
+                        network_sender.send_rb_rpc(receiver, message, rpc_timeout_duration)
                     } else {
-                        network_sender.send_rb_rpc(
-                            receiver,
-                            protocols.get(&receiver).unwrap().clone(),
-                            rpc_timeout_duration,
-                        )
+                        if let Some(raw_message) = protocols.get(&receiver).cloned() {
+                            network_sender.send_rb_rpc_raw(
+                                receiver,
+                                raw_message,
+                                rpc_timeout_duration,
+                            )
+                        } else {
+                            network_sender.send_rb_rpc(receiver, message, rpc_timeout_duration)
+                        }
                     };
                     (receiver, send_fut.await)
                 }
