@@ -1642,6 +1642,9 @@ impl TransactionOptions {
 
         // Warn local user that clock is skewed behind the blockchain.
         // There will always be a little lag from real time to blockchain time
+        if state.timestamp_usecs < ACCEPTED_CLOCK_SKEW_US {
+            eprintln!("Blockchain clock ({}) is lower than acceptable clock skew ({}). Would underflow.", state.timestamp_usecs, ACCEPTED_CLOCK_SKEW_US );
+        }
         if now_usecs < state.timestamp_usecs - ACCEPTED_CLOCK_SKEW_US {
             eprintln!("Local clock is is skewed from blockchain clock.  Clock is more than {} seconds behind the blockchain {}", ACCEPTED_CLOCK_SKEW_US, state.timestamp_usecs / US_IN_SECS );
         }
