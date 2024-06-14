@@ -95,8 +95,8 @@ fn observe_operation_time(operation: &str, client: &CompressionClient, start_tim
 /// Updates the compression metrics for the given data sets
 pub fn update_compression_metrics(
     client: &CompressionClient,
-    raw_data: &Vec<u8>,
-    compressed_data: &Vec<u8>,
+    raw_data: &[u8],
+    compressed_data: &[u8],
 ) {
     update_operation_metrics(COMPRESS, client, raw_data, compressed_data);
 }
@@ -104,8 +104,8 @@ pub fn update_compression_metrics(
 /// Updates the decompression metrics for the given data sets
 pub fn update_decompression_metrics(
     client: &CompressionClient,
-    compressed_data: &Vec<u8>,
-    raw_data: &Vec<u8>,
+    compressed_data: &[u8],
+    raw_data: &[u8],
 ) {
     update_operation_metrics(DECOMPRESS, client, raw_data, compressed_data);
 }
@@ -115,8 +115,8 @@ pub fn update_decompression_metrics(
 fn update_operation_metrics(
     operation: &str,
     client: &CompressionClient,
-    raw_data: &Vec<u8>,
-    compressed_data: &Vec<u8>,
+    raw_data: &[u8],
+    compressed_data: &[u8],
 ) {
     increment_compression_byte_count(operation, RAW_BYTES, client, raw_data.len() as u64);
     increment_compression_byte_count(

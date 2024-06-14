@@ -978,7 +978,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     ///
     /// (Helper for check_pattern_args_types_need_freezeref)
     fn check_params_args_types_vectors_need_freezeref(
-        params_types: &Vec<Type>,
+        params_types: &[Type],
         args_types: &Vec<Type>,
     ) -> Option<Vec<bool>> {
         // element is Some(true) if a FreezeRef is needed, Some(false) if not, and None if types

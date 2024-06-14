@@ -511,7 +511,10 @@ mod test {
 
         // Set the prioritized peers
         let prioritized_peers = vec![validator_peer, vfn_peer, public_peer];
-        *prioritized_peers_state.prioritized_peers.write() = prioritized_peers.clone();
+        prioritized_peers_state
+            .prioritized_peers
+            .write()
+            .clone_from(&prioritized_peers);
 
         // Verify that the peer priorities are correct
         for (index, peer) in prioritized_peers.iter().enumerate() {

@@ -379,7 +379,7 @@ impl IndexerStreamCoordinator {
                 }
             }
             let size_info = Self::get_size_info(&raw_txn);
-            match converter
+            let res = converter
                 .try_into_onchain_transaction(timestamp, raw_txn)
                 .map(|mut txn| {
                     match txn {
@@ -414,7 +414,8 @@ impl IndexerStreamCoordinator {
                         },
                     };
                     txn
-                }) {
+                });
+            match res {
                 Ok(transaction) => transactions.push((transaction, size_info)),
                 Err(err) => {
                     UNABLE_TO_FETCH_TRANSACTION.inc();

@@ -11,7 +11,7 @@ use std::{
     fmt::{Debug, Formatter},
 };
 
-pub fn total_weight_lower_bound(validator_stakes: &Vec<u64>) -> usize {
+pub fn total_weight_lower_bound(validator_stakes: &[u64]) -> usize {
     // Each validator has at least 1 weight.
     validator_stakes.len()
 }
@@ -32,7 +32,7 @@ pub fn total_weight_lower_bound(validator_stakes: &Vec<u64>) -> usize {
 /// - when `r > 2/3`, `weight_sub_total >= 2*n + 8 - rounding_weight_loss_total >= 1.5*n + 8 + rounding_weight_gain_total > reconstruction_threshold`.
 
 pub fn total_weight_upper_bound(
-    validator_stakes: &Vec<u64>,
+    validator_stakes: &[u64],
     mut reconstruct_threshold_in_stake_ratio: U64F64,
     secrecy_threshold_in_stake_ratio: U64F64,
 ) -> usize {

@@ -29,6 +29,7 @@ use tokio_retry::strategy::FixedInterval;
 #[derive(Clone)]
 struct TestMessage(Vec<u8>);
 
+#[allow(unused)]
 #[derive(Clone)]
 struct TestAck(Vec<u8>);
 

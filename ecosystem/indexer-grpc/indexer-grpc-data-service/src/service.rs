@@ -597,14 +597,14 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
             // If this batch is fully contained within the previous batch, skip it
             if prev_start <= start_version && prev_end >= end_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE, &"full"])
+                    .with_label_values(&[SERVICE_TYPE, "full"])
                     .inc_by(end_version - start_version);
                 continue;
             }
             // If this batch overlaps with the previous batch, combine them
             if prev_end >= start_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE, &"partial"])
+                    .with_label_values(&[SERVICE_TYPE, "partial"])
                     .inc_by(prev_end - start_version + 1);
                 tracing::debug!(
                     batch_first_version = first_version,
@@ -622,7 +622,7 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
             // Otherwise there is a gap
             if prev_end + 1 != start_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE, &"gap"])
+                    .with_label_values(&[SERVICE_TYPE, "gap"])
                     .inc_by(prev_end - start_version + 1);
 
                 tracing::error!(

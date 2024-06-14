@@ -264,7 +264,7 @@ async fn fetch_nexts(
                 block_height_bcs = aptos_api_types::U64::from(block_height);
             }
         }
-        match converter
+        let res = converter
             .try_into_onchain_transaction(timestamp, raw_txn)
             .map(|mut txn| {
                 match txn {
@@ -297,7 +297,8 @@ async fn fetch_nexts(
                     },
                 };
                 txn
-            }) {
+            });
+        match res {
             Ok(transaction) => transactions.push(transaction),
             Err(err) => {
                 UNABLE_TO_FETCH_TRANSACTION.inc();

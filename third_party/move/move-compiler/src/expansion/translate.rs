@@ -83,7 +83,7 @@ impl<'env, 'map> Context<'env, 'map> {
 
     fn set_current_module(&mut self, module: Option<ModuleIdent>) {
         self.in_deprecated_code = match &module {
-            Some(m) => self.module_deprecation_attribute_locs.get(m).is_some(),
+            Some(m) => self.module_deprecation_attribute_locs.contains_key(m),
             None => false,
         };
         self.current_module = module;
@@ -527,8 +527,7 @@ fn module_(
     let current_module = sp(name_loc, ModuleIdent_::new(*context.cur_address(), name));
     if context
         .module_deprecation_attribute_locs
-        .get(&current_module)
-        .is_some()
+        .contains_key(&current_module)
     {
         context.in_deprecated_code = true;
     }
@@ -2208,6 +2207,7 @@ enum Access {
     Term,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 enum DeprecatedMemberKind {}
 

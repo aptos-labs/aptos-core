@@ -805,10 +805,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         // TODO: Do we still need this?
         let _private_key = match (extra_args.private_key, named_addr_opt) {
             (Some(private_key), _) => self.resolve_private_key(&private_key),
-            (None, Some(named_addr)) => match self
-                .private_key_mapping
-                .get(&named_addr.as_str().to_string())
-            {
+            (None, Some(named_addr)) => match self.private_key_mapping.get(named_addr.as_str()) {
                 Some(private_key) => private_key.clone(),
                 None => panic_missing_private_key_named("publish", named_addr.as_str()),
             },
