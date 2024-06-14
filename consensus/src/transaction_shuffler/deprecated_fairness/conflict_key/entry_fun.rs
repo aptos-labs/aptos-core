@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction_shuffler::fairness::conflict_key::ConflictKey;
+use crate::transaction_shuffler::deprecated_fairness::conflict_key::ConflictKey;
 use aptos_types::transaction::{SignedTransaction, TransactionPayload};
 use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 

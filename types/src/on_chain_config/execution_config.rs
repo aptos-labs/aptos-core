@@ -148,7 +148,7 @@ pub enum TransactionShufflerType {
     NoShuffling,
     DeprecatedSenderAwareV1(u32),
     SenderAwareV2(u32),
-    Fairness {
+    DeprecatedFairness {
         sender_conflict_window_size: u32,
         module_conflict_window_size: u32,
         entry_fun_conflict_window_size: u32,
