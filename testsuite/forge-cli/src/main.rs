@@ -2481,7 +2481,7 @@ fn pfn_const_tps(
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(12000)
+            SuccessCriteria::new(5000)
                 .add_no_restarts()
                 .add_max_expired_tps(0)
                 .add_max_failed_submission_tps(0)

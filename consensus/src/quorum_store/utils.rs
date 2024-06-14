@@ -224,8 +224,8 @@ pub struct ProofQueue {
     // Map of txn_summary = (sender, sequence number, hash) to all the batches that contain
     // the transaction. This helps in counting the number of unique transactions in the pipeline.
     txn_summary_to_batches: HashMap<TransactionSummary, HashSet<BatchKey>>,
-    // List of batches for which we received txn summaries from the batch coordinator
-    batches_with_txn_summary: HashSet<BatchKey>,
+    // List of transaction summaries for each batch
+    batch_to_txn_summaries: HashMap<BatchKey, Vec<TransactionSummary>>,
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
@@ -242,7 +242,7 @@ impl ProofQueue {
             author_to_batches: HashMap::new(),
             batch_to_proof: HashMap::new(),
             txn_summary_to_batches: HashMap::new(),
-            batches_with_txn_summary: HashSet::new(),
+            batch_to_txn_summaries: HashMap::new(),
             expirations: TimeExpirations::new(),
             latest_block_timestamp: 0,
             remaining_txns_with_duplicates: 0,
@@ -296,7 +296,7 @@ impl ProofQueue {
             .batch_to_proof
             .iter()
             .filter_map(|(batch_key, proof)| {
-                if proof.is_some() && !self.batches_with_txn_summary.contains(batch_key) {
+                if proof.is_some() && !self.batch_to_txn_summaries.contains_key(batch_key) {
                     Some(proof.as_ref().unwrap().0.num_txns())
                 } else {
                     None
@@ -353,8 +353,18 @@ impl ProofQueue {
         let mut ret = vec![];
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
+        let mut total_txns = 0;
         let mut excluded_txns = 0;
         let mut full = false;
+        let mut included_and_excluded_txns = HashSet::new();
+        for batch_info in excluded_batches {
+            let batch_key = BatchKey::from_info(batch_info);
+            if let Some(txn_summaries) = self.batch_to_txn_summaries.get(&batch_key) {
+                for txn_summary in txn_summaries {
+                    included_and_excluded_txns.insert(*txn_summary);
+                }
+            }
+        }
 
         let mut iters = vec![];
         for (_, batches) in self.author_to_batches.iter() {
@@ -373,8 +383,20 @@ impl ProofQueue {
                     } else if let Some(Some((proof, insertion_time))) =
                         self.batch_to_proof.get(&sort_key.batch_key)
                     {
+                        if let Some(txn_summaries) =
+                            self.batch_to_txn_summaries.get(&sort_key.batch_key)
+                        {
+                            for txn_summary in txn_summaries {
+                                if !included_and_excluded_txns.contains(txn_summary) {
+                                    included_and_excluded_txns.insert(*txn_summary);
+                                    cur_txns += 1;
+                                }
+                            }
+                        } else {
+                            cur_txns += batch.num_txns();
+                        }
                         cur_bytes += batch.num_bytes();
-                        cur_txns += batch.num_txns();
+                        total_txns += batch.num_txns();
                         if cur_bytes > max_bytes || cur_txns > max_txns {
                             // Exceeded the limit for requested bytes or number of transactions.
                             full = true;
@@ -407,6 +429,8 @@ impl ProofQueue {
 
         if full || return_non_full {
             counters::BLOCK_SIZE_WHEN_PULL.observe(cur_txns as f64);
+            counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(total_txns as f64);
+            counters::EXTRA_TXNS_WHEN_PULL.observe((total_txns - cur_txns) as f64);
             counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
@@ -468,7 +492,7 @@ impl ProofQueue {
                             batches.remove(&key.batch_key);
                             !batches.is_empty()
                         });
-                        self.batches_with_txn_summary.remove(&key.batch_key);
+                        self.batch_to_txn_summaries.remove(&key.batch_key);
                         self.dec_remaining(&batch.author(), batch.num_txns());
                     }
                     claims::assert_some!(self.batch_to_proof.remove(&key.batch_key));
@@ -504,7 +528,7 @@ impl ProofQueue {
             self.batch_to_proof
                 .iter()
                 .map(|(batch_key, proof)| {
-                    if proof.is_some() && !self.batches_with_txn_summary.contains(batch_key) {
+                    if proof.is_some() && !self.batch_to_txn_summaries.contains_key(batch_key) {
                         1
                     } else {
                         0
@@ -534,7 +558,7 @@ impl ProofQueue {
                 self.dec_remaining(&batch.author(), batch.num_txns());
             }
             self.batch_to_proof.insert(batch_key.clone(), None);
-            self.batches_with_txn_summary.remove(&batch_key);
+            self.batch_to_txn_summaries.remove(&batch_key);
             self.txn_summary_to_batches.retain(|_, batches| {
                 batches.remove(&batch_key);
                 !batches.is_empty()
@@ -582,13 +606,14 @@ impl ProofQueue {
                     ProofQueueCommand::AddBatches(batch_summaries) => {
                         for (batch_info, txn_summaries) in batch_summaries {
                             let batch_key = BatchKey::from_info(&batch_info);
+                            self.batch_to_txn_summaries
+                                .insert(batch_key.clone(), txn_summaries.clone());
                             for txn_summary in txn_summaries {
                                 self.txn_summary_to_batches
                                     .entry(txn_summary)
                                     .or_default()
                                     .insert(batch_key.clone());
                             }
-                            self.batches_with_txn_summary.insert(batch_key);
                         }
                     },
                 }
