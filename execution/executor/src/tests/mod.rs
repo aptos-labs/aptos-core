@@ -493,6 +493,7 @@ fn apply_transaction_by_writeset(
         state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
         sharded_state_cache,
         transaction_accumulator: _,
+        block_end_info: _,
     } = ledger_update_output;
 
     db.writer
@@ -710,6 +711,7 @@ fn run_transactions_naive(
             state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
             sharded_state_cache,
             transaction_accumulator: _,
+            block_end_info: _,
         } = ledger_update_output;
         db.writer
             .save_transactions(
@@ -781,7 +783,7 @@ proptest! {
 
             // get txn_infos from db
             let db = executor.db.reader.clone();
-            prop_assert_eq!(db.get_latest_version().unwrap(), ledger_version);
+            prop_assert_eq!(db.get_synced_version().unwrap(), ledger_version);
             let txn_list = db.get_transactions(1 /* start version */, ledger_version, ledger_version /* ledger version */, false /* fetch events */).unwrap();
             prop_assert_eq!(&block.inner_txns(), &txn_list.transactions[..num_input_txns as usize]);
             let txn_infos = txn_list.proof.transaction_infos;

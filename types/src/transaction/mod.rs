@@ -42,6 +42,7 @@ use std::{
 
 pub mod analyzed_transaction;
 pub mod authenticator;
+pub mod block_epilogue;
 mod block_output;
 mod change_set;
 mod module;
@@ -51,6 +52,7 @@ pub mod signature_verified_transaction;
 pub mod user_transaction_context;
 pub mod webauthn;
 
+pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
@@ -922,6 +924,17 @@ impl ExecutionStatus {
         matches!(self, ExecutionStatus::Success)
     }
 
+    // Used by simulation API for showing detail error message. Should not be used by production code.
+    pub fn convert_vm_status_for_simulation(vm_status: VMStatus) -> Self {
+        let mut show_error_flags = Features::default();
+        show_error_flags.disable(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH);
+        let (txn_status, _aux_data) =
+            TransactionStatus::from_vm_status(vm_status, true, &show_error_flags);
+        txn_status.status().unwrap_or_else(|discarded_code| {
+            ExecutionStatus::MiscellaneousError(Some(discarded_code))
+        })
+    }
+
     pub fn remove_error_detail(self) -> Self {
         match self {
             ExecutionStatus::MoveAbort {
@@ -1382,14 +1395,6 @@ impl TransactionInfo {
         ))
     }
 
-    pub fn inject_auxiliary_error_data(&mut self, auxiliary_data: TransactionAuxiliaryData) {
-        match self {
-            Self::V0(ref mut info) => {
-                info.inject_auxiliary_error_data(auxiliary_data);
-            },
-        }
-    }
-
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_placeholder(
         gas_used: u64,
@@ -1479,14 +1484,6 @@ impl TransactionInfoV0 {
         }
     }
 
-    pub fn inject_auxiliary_error_data(&mut self, auxiliary_data: TransactionAuxiliaryData) {
-        if let Some(detail) = auxiliary_data.get_detail_error_message() {
-            if let ExecutionStatus::MiscellaneousError(None) = &mut self.status {
-                self.status = ExecutionStatus::MiscellaneousError(Some(detail.status_code()))
-            }
-        }
-    }
-
     pub fn transaction_hash(&self) -> HashValue {
         self.transaction_hash
     }
@@ -1495,7 +1492,7 @@ impl TransactionInfoV0 {
         self.state_change_hash
     }
 
-    pub fn is_state_checkpoint(&self) -> bool {
+    pub fn has_state_checkpoint_hash(&self) -> bool {
         self.state_checkpoint_hash().is_some()
     }
 
@@ -1610,8 +1607,8 @@ impl TransactionToCommit {
         &self.transaction_info
     }
 
-    pub fn is_state_checkpoint(&self) -> bool {
-        self.transaction_info().is_state_checkpoint()
+    pub fn has_state_checkpoint_hash(&self) -> bool {
+        self.transaction_info().has_state_checkpoint_hash()
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -1998,6 +1995,12 @@ pub enum Transaction {
     /// Transaction to update the block metadata resource at the beginning of a block,
     /// when on-chain randomness is enabled.
     BlockMetadataExt(BlockMetadataExt),
+
+    /// Transaction to let the executor update the global state tree and record the root hash
+    /// in the TransactionInfo
+    /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
+    /// Replaces StateCheckpoint, with optionally having more data.
+    BlockEpilogue(BlockEpiloguePayload),
 }
 
 impl From<BlockMetadataExt> for Transaction {
@@ -2044,6 +2047,7 @@ impl Transaction {
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadata(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
+            Transaction::BlockEpilogue(_) => "block_epilogue",
             Transaction::ValidatorTransaction(_) => "validator_transaction",
             Transaction::BlockMetadataExt(_) => "block_metadata_ext",
         }
@@ -2052,6 +2056,17 @@ impl Transaction {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy() -> Self {
         Transaction::StateCheckpoint(HashValue::zero())
+    }
+
+    pub fn is_non_reconfig_block_ending(&self) -> bool {
+        match self {
+            Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_) => true,
+            Transaction::UserTransaction(_)
+            | Transaction::GenesisTransaction(_)
+            | Transaction::BlockMetadata(_)
+            | Transaction::BlockMetadataExt(_)
+            | Transaction::ValidatorTransaction(_) => false,
+        }
     }
 }
 

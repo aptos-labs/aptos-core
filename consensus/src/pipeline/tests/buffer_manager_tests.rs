@@ -26,7 +26,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkId;
+use aptos_config::{config::ConsensusObserverConfig, network_id::NetworkId};
 use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis, pipelined_block::PipelinedBlock,
     vote_proposal::VoteProposal,
@@ -156,6 +156,8 @@ pub fn prepare_buffer_manager(
             verifier: validators.clone(),
         }),
         bounded_executor,
+        false,
+        ConsensusObserverConfig::default(),
         None,
     );
 

@@ -170,7 +170,7 @@ pub trait DbReader: Send + Sync {
         fn get_transaction_auxiliary_data_by_version(
             &self,
             version: Version,
-        ) -> Result<TransactionAuxiliaryData>;
+        ) -> Result<Option<TransactionAuxiliaryData>>;
 
         /// See [AptosDB::get_first_txn_version].
         ///
@@ -286,8 +286,8 @@ pub trait DbReader: Send + Sync {
         /// Returns the latest ledger info, if any.
         fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
 
-        /// Returns the latest committed version, error on on non-bootstrapped/empty DB.
-        fn get_latest_version(&self) -> Result<Version>;
+        /// Returns the latest "synced" transaction version, potentially not "committed" yet.
+        fn get_synced_version(&self) -> Result<Version>;
 
         /// Returns the latest state checkpoint version if any.
         fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>>;
@@ -462,6 +462,13 @@ pub trait DbReader: Send + Sync {
         self.get_latest_ledger_info_option().and_then(|opt| {
             opt.ok_or_else(|| AptosDbError::Other("Latest LedgerInfo not found.".to_string()))
         })
+    }
+
+    /// Returns the latest committed version, error on on non-bootstrapped/empty DB.
+    /// N.b. different from `get_synced_version()`.
+    fn get_latest_ledger_info_version(&self) -> Result<Version> {
+        self.get_latest_ledger_info()
+            .map(|li| li.ledger_info().version())
     }
 
     /// Returns the latest version and committed block timestamp

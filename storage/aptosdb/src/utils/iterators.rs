@@ -131,7 +131,9 @@ impl<'a> PrefixedStateValueIterator<'a> {
         // keys starting with `aptos/abc`.
         read_opts.set_total_order_seek(true);
         let (kv_iter, index_iter) = if use_index {
-            let mut index_iter = db.metadata_db().iter::<StateValueIndexSchema>(read_opts)?;
+            let mut index_iter = db
+                .metadata_db()
+                .iter_with_opts::<StateValueIndexSchema>(read_opts)?;
             if let Some(first_key) = &first_key {
                 index_iter.seek(&(first_key.clone(), u64::MAX))?;
             } else {
@@ -139,7 +141,9 @@ impl<'a> PrefixedStateValueIterator<'a> {
             };
             (None, Some(index_iter))
         } else {
-            let mut kv_iter = db.metadata_db().iter::<StateValueSchema>(read_opts)?;
+            let mut kv_iter = db
+                .metadata_db()
+                .iter_with_opts::<StateValueSchema>(read_opts)?;
             if let Some(first_key) = &first_key {
                 kv_iter.seek(&(first_key.clone(), u64::MAX))?;
             } else {

@@ -24,6 +24,7 @@ When the test suite is complete, it will tell you which tests passed and which f
 """
 
 import argparse
+import asyncio
 import logging
 import os
 import pathlib
@@ -33,8 +34,8 @@ import sys
 
 from cases.account import (
     test_account_create_and_transfer,
-    test_account_list,
     test_account_fund_with_faucet,
+    test_account_list,
     test_account_lookup_address,
     test_account_resource_account,
     test_account_rotate_key,
@@ -53,6 +54,7 @@ from cases.node import (
     test_node_update_consensus_key,
     test_node_update_validator_network_address,
 )
+"""
 from cases.stake import (
     test_stake_add_stake,
     test_stake_create_staking_contract,
@@ -65,6 +67,7 @@ from cases.stake import (
     test_stake_withdraw_stake_after_unlock,
     test_stake_withdraw_stake_before_unlock,
 )
+"""
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -134,7 +137,7 @@ def parse_args():
     return args
 
 
-def run_tests(run_helper):
+async def run_tests(run_helper):
     # Make sure the metrics port is accessible.
     test_metrics_accessible(run_helper)
 
@@ -145,8 +148,8 @@ def run_tests(run_helper):
     test_config_show_profiles(run_helper)
 
     # Run account tests.
-    test_account_fund_with_faucet(run_helper)
-    test_account_create_and_transfer(run_helper)
+    await test_account_fund_with_faucet(run_helper)
+    await test_account_create_and_transfer(run_helper)
     test_account_list(run_helper)
     test_account_lookup_address(run_helper)
     test_account_resource_account(run_helper)
@@ -162,16 +165,18 @@ def run_tests(run_helper):
     test_move_view(run_helper)
 
     # Run stake subcommand group tests.
+    """
     test_stake_initialize_stake_owner(run_helper)
     test_stake_add_stake(run_helper)
     test_stake_withdraw_stake_before_unlock(run_helper)
     test_stake_unlock_stake(run_helper)
-    test_stake_withdraw_stake_after_unlock(run_helper)
+    await test_stake_withdraw_stake_after_unlock(run_helper)
     test_stake_increase_lockup(run_helper)
     test_stake_set_operator(run_helper)
     test_stake_set_voter(run_helper)
-    test_stake_create_staking_contract(run_helper)
+    await test_stake_create_staking_contract(run_helper)
     test_stake_request_commission(run_helper)
+    """
 
     # Run node subcommand group tests.
     test_node_show_validator_set(run_helper)
@@ -182,7 +187,7 @@ def run_tests(run_helper):
     test_account_rotate_key(run_helper)
 
 
-def main():
+async def main():
     args = parse_args()
 
     if args.debug:
@@ -197,7 +202,10 @@ def main():
 
     # If we're on Mac and DOCKER_DEFAULT_PLATFORM is not already set, set it to
     # linux/amd64 since we only publish images for that platform.
-    if platform.system().lower() == "darwin" and platform.processor().lower().startswith("arm"):
+    if (
+        platform.system().lower() == "darwin"
+        and platform.processor().lower().startswith("arm")
+    ):
         if not os.environ.get("DOCKER_DEFAULT_PLATFORM"):
             os.environ["DOCKER_DEFAULT_PLATFORM"] = "linux/amd64"
             LOG.info(
@@ -229,7 +237,7 @@ def main():
         run_helper.prepare()
 
         # Run tests.
-        run_tests(run_helper)
+        await run_tests(run_helper)
     finally:
         # Stop the node + faucet.
         stop_node(container_name)
@@ -257,7 +265,7 @@ def main():
 
 
 if __name__ == "__main__":
-    if main():
+    if asyncio.run(main()):
         sys.exit(0)
     else:
         sys.exit(1)

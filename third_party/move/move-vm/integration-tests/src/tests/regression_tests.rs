@@ -108,9 +108,8 @@ fn script_large_ty() {
 
     let mut storage = InMemoryStorage::new();
     let move_vm = MoveVM::new_with_config(vec![], VMConfig {
-        verifier: verifier_config,
+        verifier_config,
         paranoid_type_checks: true,
-        type_size_limit: true,
         ..Default::default()
     })
     .unwrap();

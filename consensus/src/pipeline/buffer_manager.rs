@@ -5,8 +5,7 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     consensus_observer::{
-        network::{ObserverMessage, OrderedBlock as ObserverBlock},
-        publisher::Publisher,
+        network_message::ConsensusObserverMessage, publisher::ConsensusPublisher,
     },
     counters, monitor,
     network::{IncomingCommitRequest, NetworkSender},
@@ -24,6 +23,7 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use aptos_bounded_executor::BoundedExecutor;
+use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{
     common::Author, pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
 };
@@ -118,6 +118,11 @@ pub struct BufferManager {
 
     block_rx: UnboundedReceiver<OrderedBlocks>,
     reset_rx: UnboundedReceiver<ResetRequest>,
+
+    // self channel to retry execution schedule phase
+    execution_schedule_retry_tx: UnboundedSender<()>,
+    execution_schedule_retry_rx: UnboundedReceiver<()>,
+
     stop: bool,
 
     epoch_state: Arc<EpochState>,
@@ -134,8 +139,11 @@ pub struct BufferManager {
     previous_commit_time: Instant,
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
-    // Publisher for downstream observers.
-    publisher: Option<Publisher>,
+    order_vote_enabled: bool,
+
+    // Consensus publisher for downstream observers.
+    consensus_observer_config: ConsensusObserverConfig,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
 }
 
 impl BufferManager {
@@ -160,13 +168,18 @@ impl BufferManager {
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
-        publisher: Option<Publisher>,
+        order_vote_enabled: bool,
+        consensus_observer_config: ConsensusObserverConfig,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
         let rb_backoff_policy = ExponentialBackoff::from_millis(2)
             .factor(50)
             .max_delay(Duration::from_secs(5));
+
+        let (tx, rx) = unbounded();
+
         Self {
             author,
 
@@ -198,6 +211,10 @@ impl BufferManager {
 
             block_rx,
             reset_rx,
+
+            execution_schedule_retry_tx: tx,
+            execution_schedule_retry_rx: rx,
+
             stop: false,
 
             epoch_state,
@@ -206,11 +223,20 @@ impl BufferManager {
             previous_commit_time: Instant::now(),
             reset_flag,
             bounded_executor: executor,
-            publisher,
+            order_vote_enabled,
+
+            consensus_observer_config,
+            consensus_publisher,
         }
     }
 
-    fn do_reliable_broadcast(&self, message: CommitMessage) -> DropGuard {
+    fn do_reliable_broadcast(&self, message: CommitMessage) -> Option<DropGuard> {
+        // If consensus observer is enabled, we don't need to broadcast
+        if self.consensus_observer_config.observer_enabled {
+            return None;
+        }
+
+        // Otherwise, broadcast the message and return the drop guard
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let task = self.reliable_broadcast.broadcast(
             message,
@@ -221,7 +247,7 @@ impl BufferManager {
             ),
         );
         tokio::spawn(Abortable::new(task, abort_registration));
-        DropGuard::new(abort_handle)
+        Some(DropGuard::new(abort_handle))
     }
 
     fn create_new_request<Request>(&self, req: Request) -> CountedRequest<Request> {
@@ -262,11 +288,12 @@ impl BufferManager {
             ordered_blocks: ordered_blocks.clone(),
             lifetime_guard: self.create_new_request(()),
         });
-        if let Some(publisher) = &self.publisher {
-            publisher.publish(ObserverMessage::OrderedBlock(ObserverBlock {
-                blocks: ordered_blocks.clone().into_iter().map(Arc::new).collect(),
-                ordered_proof: ordered_proof.clone(),
-            }));
+        if let Some(consensus_publisher) = &self.consensus_publisher {
+            let message = ConsensusObserverMessage::new_ordered_block_message(
+                ordered_blocks.clone().into_iter().map(Arc::new).collect(),
+                ordered_proof.clone(),
+            );
+            consensus_publisher.publish_message(message);
         }
         self.execution_schedule_phase_tx
             .send(request)
@@ -279,33 +306,27 @@ impl BufferManager {
 
     /// Set the execution root to the first not executed item (Ordered) and send execution request
     /// Set to None if not exist
-    async fn advance_execution_root(&mut self) {
+    /// Return Some(block_id) if the block needs to be scheduled for retry
+    fn advance_execution_root(&mut self) -> Option<HashValue> {
         let cursor = self.execution_root;
         self.execution_root = self
             .buffer
             .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
                 item.is_ordered()
             });
-        info!(
-            "Advance execution root from {:?} to {:?}",
-            cursor, self.execution_root
-        );
         if self.execution_root.is_some() && cursor == self.execution_root {
             // Schedule retry.
-            // NOTE: probably should schedule retry for all ordered blocks, but since execution error
-            // is not expected nor retryable in reality, I'd rather remove retrying or do it more
-            // properly than complicating it here.
-            let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
-            let request = self.create_new_request(ExecutionRequest {
-                ordered_blocks,
-                lifetime_guard: self.create_new_request(()),
-            });
-            let sender = self.execution_schedule_phase_tx.clone();
-            Self::spawn_retry_request(sender, request, Duration::from_millis(100));
+            self.execution_root
+        } else {
+            info!(
+                "Advance execution root from {:?} to {:?}",
+                cursor, self.execution_root
+            );
+            // Otherwise do nothing, because the execution wait phase is driven by the response of
+            // the execution schedule phase, which is in turn fed as soon as the ordered blocks
+            // come in.
+            None
         }
-        // Otherwise do nothing, because the execution wait phase is driven by the response of
-        // the execution schedule phase, which is in turn fed as soon as the ordered blocks
-        // come in.
     }
 
     /// Set the signing root to the first not signed item (Executed) and send execution request
@@ -370,10 +391,11 @@ impl BufferManager {
                     // this persisting request will result in BlockNotFound
                     self.reset().await;
                 }
-                if let Some(publisher) = &self.publisher {
-                    publisher.publish(ObserverMessage::CommitDecision(CommitDecision::new(
-                        commit_proof.clone(),
-                    )));
+                if let Some(consensus_publisher) = &self.consensus_publisher {
+                    let message = ConsensusObserverMessage::new_commit_decision_message(
+                        CommitDecision::new(commit_proof.clone()),
+                    );
+                    consensus_publisher.publish_message(message);
                 }
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {
@@ -442,6 +464,28 @@ impl BufferManager {
             .expect("Failed to send execution wait request.");
     }
 
+    async fn retry_schedule_phase(&mut self) {
+        let mut cursor = self.execution_root;
+        let mut count = 0;
+        while cursor.is_some() {
+            let ordered_blocks = self.buffer.get(&cursor).get_blocks().clone();
+            let request = self.create_new_request(ExecutionRequest {
+                ordered_blocks,
+                lifetime_guard: self.create_new_request(()),
+            });
+            count += 1;
+            self.execution_schedule_phase_tx
+                .send(request)
+                .await
+                .expect("Failed to send execution schedule request.");
+            cursor = self.buffer.get_next(&cursor);
+        }
+        info!(
+            "Reschedule {} execution requests from {:?}",
+            count, self.execution_root
+        );
+    }
+
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
     async fn process_execution_response(&mut self, response: ExecutionResponse) {
         let ExecutionResponse { block_id, inner } = response;
@@ -454,11 +498,15 @@ impl BufferManager {
         let executed_blocks = match inner {
             Ok(result) => result,
             Err(ExecutorError::CouldNotGetData) => {
-                warn!("Execution error - CouldNotGetData");
+                warn!("Execution error - CouldNotGetData {}", block_id);
+                return;
+            },
+            Err(ExecutorError::BlockNotFound(block_id)) => {
+                warn!("Execution error BlockNotFound {}", block_id);
                 return;
             },
             Err(e) => {
-                error!("Execution error {:?}", e);
+                error!("Execution error {:?} for {}", e, block_id);
                 return;
             },
         };
@@ -498,6 +546,7 @@ impl BufferManager {
             executed_blocks,
             &self.epoch_state.verifier,
             self.end_epoch_timestamp.get().cloned(),
+            self.order_vote_enabled,
         );
         let aggregated = new_item.is_aggregated();
         self.buffer.set(&current_cursor, new_item);
@@ -536,9 +585,9 @@ impl BufferManager {
                 let signed_item_mut = signed_item.unwrap_signed_mut();
                 let commit_vote = signed_item_mut.commit_vote.clone();
                 let commit_vote = CommitMessage::Vote(commit_vote);
-                signed_item_mut
-                    .rb_handle
-                    .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
+                signed_item_mut.rb_handle = self
+                    .do_reliable_broadcast(commit_vote)
+                    .map(|handle| (Instant::now(), handle));
                 self.buffer.set(&current_cursor, signed_item);
             } else {
                 self.buffer.set(&current_cursor, item);
@@ -664,9 +713,9 @@ impl BufferManager {
                 };
                 if re_broadcast {
                     let commit_vote = CommitMessage::Vote(signed_item.commit_vote.clone());
-                    signed_item
-                        .rb_handle
-                        .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
+                    signed_item.rb_handle = self
+                        .do_reliable_broadcast(commit_vote)
+                        .map(|handle| (Instant::now(), handle));
                     count += 1;
                 }
                 self.buffer.set(&cursor, item);
@@ -747,7 +796,7 @@ impl BufferManager {
                     monitor!("buffer_manager_process_ordered", {
                     self.process_ordered_blocks(blocks).await;
                     if self.execution_root.is_none() {
-                        self.advance_execution_root().await;
+                        self.advance_execution_root();
                     }});
                 },
                 reset_event = self.reset_rx.select_next_some() => {
@@ -760,11 +809,26 @@ impl BufferManager {
                 })},
                 response = self.execution_wait_phase_rx.select_next_some() => {
                     monitor!("buffer_manager_process_execution_wait_response", {
+                    let response_block_id = response.block_id;
                     self.process_execution_response(response).await;
-                    self.advance_execution_root().await;
+                    if let Some(block_id) = self.advance_execution_root() {
+                        // if the response is for the current execution root, retry the schedule phase
+                        if response_block_id == block_id {
+                            let mut tx = self.execution_schedule_retry_tx.clone();
+                            tokio::spawn(async move {
+                                tokio::time::sleep(Duration::from_millis(100)).await;
+                                // buffer manager can be dropped at the point of sending retry
+                                let _ = tx.send(()).await;
+                            });
+                        }
+                    }
                     if self.signing_root.is_none() {
                         self.advance_signing_root().await;
                     }});
+                },
+                _ = self.execution_schedule_retry_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_execution_schedule_retry",
+                    self.retry_schedule_phase().await);
                 },
                 response = self.signing_phase_rx.select_next_some() => {
                     monitor!("buffer_manager_process_signing_response", {
@@ -777,7 +841,7 @@ impl BufferManager {
                     if let Some(aggregated_block_id) = self.process_commit_message(rpc_request) {
                         self.advance_head(aggregated_block_id).await;
                         if self.execution_root.is_none() {
-                            self.advance_execution_root().await;
+                            self.advance_execution_root();
                         }
                         if self.signing_root.is_none() {
                             self.advance_signing_root().await;

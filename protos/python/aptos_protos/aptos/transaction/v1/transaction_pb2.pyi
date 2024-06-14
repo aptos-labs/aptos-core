@@ -90,6 +90,7 @@ class Transaction(_message.Message):
         "state_checkpoint",
         "user",
         "validator",
+        "block_epilogue",
         "size_info",
     ]
 
@@ -101,12 +102,14 @@ class Transaction(_message.Message):
         TRANSACTION_TYPE_STATE_CHECKPOINT: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_USER: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_VALIDATOR: _ClassVar[Transaction.TransactionType]
+        TRANSACTION_TYPE_BLOCK_EPILOGUE: _ClassVar[Transaction.TransactionType]
     TRANSACTION_TYPE_UNSPECIFIED: Transaction.TransactionType
     TRANSACTION_TYPE_GENESIS: Transaction.TransactionType
     TRANSACTION_TYPE_BLOCK_METADATA: Transaction.TransactionType
     TRANSACTION_TYPE_STATE_CHECKPOINT: Transaction.TransactionType
     TRANSACTION_TYPE_USER: Transaction.TransactionType
     TRANSACTION_TYPE_VALIDATOR: Transaction.TransactionType
+    TRANSACTION_TYPE_BLOCK_EPILOGUE: Transaction.TransactionType
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     VERSION_FIELD_NUMBER: _ClassVar[int]
     INFO_FIELD_NUMBER: _ClassVar[int]
@@ -118,6 +121,7 @@ class Transaction(_message.Message):
     STATE_CHECKPOINT_FIELD_NUMBER: _ClassVar[int]
     USER_FIELD_NUMBER: _ClassVar[int]
     VALIDATOR_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_EPILOGUE_FIELD_NUMBER: _ClassVar[int]
     SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
     timestamp: _timestamp_pb2.Timestamp
     version: int
@@ -130,6 +134,7 @@ class Transaction(_message.Message):
     state_checkpoint: StateCheckpointTransaction
     user: UserTransaction
     validator: ValidatorTransaction
+    block_epilogue: BlockEpilogueTransaction
     size_info: TransactionSizeInfo
     def __init__(
         self,
@@ -144,6 +149,7 @@ class Transaction(_message.Message):
         state_checkpoint: _Optional[_Union[StateCheckpointTransaction, _Mapping]] = ...,
         user: _Optional[_Union[UserTransaction, _Mapping]] = ...,
         validator: _Optional[_Union[ValidatorTransaction, _Mapping]] = ...,
+        block_epilogue: _Optional[_Union[BlockEpilogueTransaction, _Mapping]] = ...,
         size_info: _Optional[_Union[TransactionSizeInfo, _Mapping]] = ...,
     ) -> None: ...
 
@@ -197,6 +203,37 @@ class StateCheckpointTransaction(_message.Message):
 class ValidatorTransaction(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
+
+class BlockEpilogueTransaction(_message.Message):
+    __slots__ = ["block_end_info"]
+    BLOCK_END_INFO_FIELD_NUMBER: _ClassVar[int]
+    block_end_info: BlockEndInfo
+    def __init__(
+        self, block_end_info: _Optional[_Union[BlockEndInfo, _Mapping]] = ...
+    ) -> None: ...
+
+class BlockEndInfo(_message.Message):
+    __slots__ = [
+        "block_gas_limit_reached",
+        "block_output_limit_reached",
+        "block_effective_block_gas_units",
+        "block_approx_output_size",
+    ]
+    BLOCK_GAS_LIMIT_REACHED_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_OUTPUT_LIMIT_REACHED_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_EFFECTIVE_BLOCK_GAS_UNITS_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_APPROX_OUTPUT_SIZE_FIELD_NUMBER: _ClassVar[int]
+    block_gas_limit_reached: bool
+    block_output_limit_reached: bool
+    block_effective_block_gas_units: int
+    block_approx_output_size: int
+    def __init__(
+        self,
+        block_gas_limit_reached: bool = ...,
+        block_output_limit_reached: bool = ...,
+        block_effective_block_gas_units: _Optional[int] = ...,
+        block_approx_output_size: _Optional[int] = ...,
+    ) -> None: ...
 
 class UserTransaction(_message.Message):
     __slots__ = ["request", "events"]

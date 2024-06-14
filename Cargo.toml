@@ -102,6 +102,7 @@ members = [
     "crates/crash-handler",
     "crates/fallible",
     "crates/indexer",
+    "crates/jwk-utils",
     "crates/node-resource-metrics",
     "crates/num-variants",
     "crates/proxy",
@@ -134,6 +135,8 @@ members = [
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
     "experimental/storage/layered-map",
+    "keyless/circuit",
+    "keyless/common",
     "keyless/pepper/common",
     "keyless/pepper/example-client-rust",
     "keyless/pepper/service",
@@ -359,6 +362,7 @@ aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/aptos-inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
 aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
+aptos-jwk-utils = { path = "crates/jwk-utils" }
 aptos-keygen = { path = "crates/aptos-keygen" }
 aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-ledger = { path = "crates/aptos-ledger" }
@@ -391,6 +395,7 @@ aptos-package-builder = { path = "aptos-move/package-builder" }
 aptos-peer-monitoring-service-client = { path = "peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "peer-monitoring-service/server" }
 aptos-peer-monitoring-service-types = { path = "peer-monitoring-service/types" }
+aptos-keyless-common = { path = "keyless/common" }
 aptos-keyless-pepper-common = { path = "keyless/pepper/common" }
 aptos-keyless-pepper-service = { path = "keyless/pepper/service" }
 aptos-profiler = { path = "crates/aptos-profiler" }
@@ -566,7 +571,7 @@ futures-core = "0.3.29"
 futures-util = "0.3.29"
 fxhash = "0.2.1"
 getrandom = "0.2.2"
-gcp-bigquery-client = "0.13.0"
+gcp-bigquery-client = "0.16.8"
 get_if_addrs = "0.5.3"
 git2 = "0.16.1"
 glob = "0.3.0"
@@ -692,7 +697,7 @@ reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
-rocksdb = { version = "0.21.0", features = ["lz4"] }
+rocksdb = { version = "0.22.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default_features = false }
 rstest = "0.15.0"

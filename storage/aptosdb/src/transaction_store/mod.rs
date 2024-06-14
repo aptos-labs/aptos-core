@@ -8,7 +8,7 @@ use crate::{
     ledger_db::LedgerDb, schema::transaction_by_account::TransactionByAccountSchema,
     utils::iterators::AccountTransactionVersionIter,
 };
-use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     account_address::AccountAddress,
@@ -65,7 +65,7 @@ impl TransactionStore {
         let mut iter = self
             .ledger_db
             .transaction_db_raw()
-            .iter::<TransactionByAccountSchema>(ReadOptions::default())?;
+            .iter::<TransactionByAccountSchema>()?;
         iter.seek(&(address, min_seq_num))?;
         Ok(AccountTransactionVersionIter::new(
             iter,

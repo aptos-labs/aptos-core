@@ -42,6 +42,7 @@ use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
     TransactionType::{self, NonConflictingCoinTransfer},
 };
+use aptos_types::on_chain_config::Features;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use pipeline::PipelineConfig;
 use std::{
@@ -108,6 +109,7 @@ pub fn run_benchmark<V>(
     pruner_config: PrunerConfig,
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
+    init_features: Features,
 ) where
     V: TransactionBlockExecutor + 'static,
 {
@@ -116,13 +118,13 @@ pub fn run_benchmark<V>(
         checkpoint_dir.as_ref(),
         enable_storage_sharding,
     );
-
-    let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
+    let (mut config, genesis_key) =
+        aptos_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
-
     let (db, executor) = init_db_and_executor::<V>(&config);
+
     let mut root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let transaction_generators = transaction_mix.clone().map(|transaction_mix| {
         let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
@@ -163,7 +165,7 @@ pub fn run_benchmark<V>(
         ((0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>(), phase)
     });
 
-    let version = db.reader.get_latest_version().unwrap();
+    let version = db.reader.get_synced_version().unwrap();
 
     let (pipeline, block_sender) =
         Pipeline::new(executor, version, &pipeline_config, Some(num_blocks));
@@ -230,7 +232,7 @@ pub fn run_benchmark<V>(
         }
     );
 
-    let num_txns = db.reader.get_latest_version().unwrap() - version - num_blocks_created as u64;
+    let num_txns = db.reader.get_synced_version().unwrap() - version - num_blocks_created as u64;
     overall_measuring.print_end("Overall", num_txns);
 
     if verify_sequence_numbers {
@@ -254,7 +256,7 @@ fn init_workload<V>(
 where
     V: TransactionBlockExecutor + 'static,
 {
-    let version = db.reader.get_latest_version().unwrap();
+    let version = db.reader.get_synced_version().unwrap();
     let (pipeline, block_sender) = Pipeline::<V>::new(
         BlockExecutor::new(db.clone()),
         version,
@@ -300,6 +302,7 @@ pub fn add_accounts<V>(
     verify_sequence_numbers: bool,
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
+    init_features: Features,
 ) where
     V: TransactionBlockExecutor + 'static,
 {
@@ -319,6 +322,7 @@ pub fn add_accounts<V>(
         verify_sequence_numbers,
         enable_storage_sharding,
         pipeline_config,
+        init_features,
     );
 }
 
@@ -332,16 +336,18 @@ fn add_accounts_impl<V>(
     verify_sequence_numbers: bool,
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
+    init_features: Features,
 ) where
     V: TransactionBlockExecutor + 'static,
 {
-    let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
+    let (mut config, genesis_key) =
+        aptos_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = output_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
     let (db, executor) = init_db_and_executor::<V>(&config);
 
-    let start_version = db.reader.get_latest_version().unwrap();
+    let start_version = db.reader.get_latest_ledger_info_version().unwrap();
 
     let (pipeline, block_sender) = Pipeline::new(
         executor,
@@ -372,7 +378,7 @@ fn add_accounts_impl<V>(
     pipeline.join();
 
     let elapsed = start_time.elapsed().as_secs_f32();
-    let now_version = db.reader.get_latest_version().unwrap();
+    let now_version = db.reader.get_latest_ledger_info_version().unwrap();
     let delta_v = now_version - start_version;
     info!(
         "Overall TPS: create_db: account creation: {} txn/s",
@@ -707,6 +713,7 @@ mod tests {
     use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
     use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
+    use aptos_types::on_chain_config::Features;
     use aptos_vm::AptosVM;
 
     fn test_generic_benchmark<E>(
@@ -732,6 +739,7 @@ mod tests {
             verify_sequence_numbers,
             false,
             PipelineConfig::default(),
+            Features::default(),
         );
 
         println!("run_benchmark");
@@ -753,6 +761,7 @@ mod tests {
             NO_OP_STORAGE_PRUNER_CONFIG,
             false,
             PipelineConfig::default(),
+            Features::default(),
         );
     }
 
@@ -768,7 +777,7 @@ mod tests {
         AptosVM::set_processed_transactions_detailed_counters();
         NativeExecutor::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVM>(
-            Some(TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB),
+            Some(TransactionTypeArg::ModifyGlobalMilestoneAggV2),
             true,
         );
     }

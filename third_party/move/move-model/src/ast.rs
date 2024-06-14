@@ -510,6 +510,35 @@ pub enum AddressSpecifier {
     Call(QualifiedInstId<FunId>, Symbol),
 }
 
+impl ResourceSpecifier {
+    /// Checks whether this resource specifier matches the given struct. A function
+    /// instantiation is passed to instantiate the specifier in the calling context
+    /// of the function where it is declared for.
+    pub fn matches(
+        &self,
+        env: &GlobalEnv,
+        fun_inst: &[Type],
+        struct_id: &QualifiedInstId<StructId>,
+    ) -> bool {
+        use ResourceSpecifier::*;
+        let struct_env = env.get_struct(struct_id.to_qualified_id());
+        match self {
+            Any => true,
+            DeclaredAtAddress(addr) => struct_env.module_env.get_name().addr() == addr,
+            DeclaredInModule(mod_id) => struct_env.module_env.get_id() == *mod_id,
+            Resource(spec_struct_id) => {
+                // Since this resource specifier is declared for a specific function,
+                // need to instantiate it with the function instantiation.
+                let spec_struct_id = spec_struct_id.clone().instantiate(fun_inst);
+                struct_id.to_qualified_id() == spec_struct_id.to_qualified_id()
+                    // If the specified instance has no parameters, every type instance is
+                    // allowed, otherwise only the given one.
+                    && (spec_struct_id.inst.is_empty() || spec_struct_id.inst == struct_id.inst)
+            },
+        }
+    }
+}
+
 // =================================================================================================
 /// # Expressions
 

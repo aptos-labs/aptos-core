@@ -14146,6 +14146,91 @@
           }
         }
       },
+      "BlockEndInfo": {
+        "type": "object",
+        "required": [
+          "block_gas_limit_reached",
+          "block_output_limit_reached",
+          "block_effective_block_gas_units",
+          "block_approx_output_size"
+        ],
+        "properties": {
+          "block_gas_limit_reached": {
+            "type": "boolean"
+          },
+          "block_output_limit_reached": {
+            "type": "boolean"
+          },
+          "block_effective_block_gas_units": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "block_approx_output_size": {
+            "type": "integer",
+            "format": "uint64"
+          }
+        }
+      },
+      "BlockEpilogueTransaction": {
+        "type": "object",
+        "description": "A block epilogue transaction",
+        "required": [
+          "version",
+          "hash",
+          "state_change_hash",
+          "event_root_hash",
+          "gas_used",
+          "success",
+          "vm_status",
+          "accumulator_root_hash",
+          "changes",
+          "timestamp"
+        ],
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_change_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "event_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_checkpoint_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "gas_used": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the transaction was successful"
+          },
+          "vm_status": {
+            "type": "string",
+            "description": "The VM status of the transaction, can tell useful information in a failure"
+          },
+          "accumulator_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "changes": {
+            "type": "array",
+            "description": "Final state of resources changed by the transaction",
+            "items": {
+              "$ref": "#/components/schemas/WriteSetChange"
+            }
+          },
+          "timestamp": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "block_end_info": {
+            "$ref": "#/components/schemas/BlockEndInfo"
+          }
+        }
+      },
       "BlockMetadataTransaction": {
         "type": "object",
         "description": "A block metadata transaction\n\nThis signifies the beginning of a block, and contains information\nabout the specific block",
@@ -15560,6 +15645,9 @@
             "$ref": "#/components/schemas/Transaction_StateCheckpointTransaction"
           },
           {
+            "$ref": "#/components/schemas/Transaction_BlockEpilogueTransaction"
+          },
+          {
             "$ref": "#/components/schemas/Transaction_ValidatorTransaction"
           }
         ],
@@ -15571,6 +15659,7 @@
             "genesis_transaction": "#/components/schemas/Transaction_GenesisTransaction",
             "block_metadata_transaction": "#/components/schemas/Transaction_BlockMetadataTransaction",
             "state_checkpoint_transaction": "#/components/schemas/Transaction_StateCheckpointTransaction",
+            "block_epilogue_transaction": "#/components/schemas/Transaction_BlockEpilogueTransaction",
             "validator_transaction": "#/components/schemas/Transaction_ValidatorTransaction"
           }
         }
@@ -15801,6 +15890,25 @@
           },
           {
             "$ref": "#/components/schemas/MultiEd25519Signature"
+          }
+        ]
+      },
+      "Transaction_BlockEpilogueTransaction": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "block_epilogue_transaction"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/BlockEpilogueTransaction"
           }
         ]
       },

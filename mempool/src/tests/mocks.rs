@@ -21,7 +21,7 @@ use aptos_network::{
         interface::{NetworkClient, NetworkServiceEvents},
         storage::PeersAndMetadata,
     },
-    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
+    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
         wire::handshake::v1::ProtocolId::MempoolDirectSend,
@@ -121,11 +121,12 @@ impl MockSharedMempool {
         let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+        let (_, conn_notifs_rx) = conn_notifs_channel::new();
         let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );
-        let network_events = NetworkEvents::new(network_notifs_rx, None);
+        let network_events = NetworkEvents::new(network_notifs_rx, conn_notifs_rx, None);
         let (ac_client, client_events) = mpsc::channel(1_024);
         let (quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
         let (mempool_notifier, mempool_listener) =

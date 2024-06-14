@@ -908,7 +908,7 @@ impl MoveHarness {
         let gas_schedule: GasScheduleV2 = self.get_gas_schedule();
         let feature_version = gas_schedule.feature_version;
         let params = AptosGasParameters::from_on_chain_gas_schedule(
-            &gas_schedule.to_btree_map(),
+            &gas_schedule.into_btree_map(),
             feature_version,
         )
         .unwrap();

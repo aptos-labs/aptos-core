@@ -61,6 +61,7 @@ futures = { workspace = true }
 futures-channel = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
+lru = { workspace = true }
 maplit = { workspace = true }
 mini-moka = { workspace = true }
 mirai-annotations = { workspace = true }
@@ -80,6 +81,7 @@ strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
+tokio-stream = { workspace = true }
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }

@@ -12,7 +12,7 @@ use anyhow::Result;
 use aptos_consensus_types::proof_of_store::BatchId;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{Options, SchemaBatch, DB};
 use std::{collections::HashMap, path::Path, time::Instant};
 
 pub trait QuorumStoreStorage: Sync + Send {
@@ -73,7 +73,7 @@ impl QuorumStoreStorage for QuorumStoreDB {
     }
 
     fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>> {
-        let mut iter = self.db.iter::<BatchSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<BatchSchema>()?;
         iter.seek_to_first();
         iter.map(|res| res.map_err(Into::into))
             .collect::<Result<HashMap<HashValue, PersistedValue>>>()
@@ -100,7 +100,7 @@ impl QuorumStoreStorage for QuorumStoreDB {
     }
 
     fn clean_and_get_batch_id(&self, current_epoch: u64) -> Result<Option<BatchId>, DbError> {
-        let mut iter = self.db.iter::<BatchIdSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<BatchIdSchema>()?;
         iter.seek_to_first();
         let epoch_batch_id = iter
             .map(|res| res.map_err(Into::into))
