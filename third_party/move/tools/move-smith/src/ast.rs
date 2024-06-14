@@ -18,6 +18,7 @@ use std::cell::RefCell;
 pub struct CompileUnit {
     pub modules: Vec<Module>,
     pub scripts: Vec<Script>,
+    pub runs: Vec<Identifier>,
 }
 
 /// A Move module.

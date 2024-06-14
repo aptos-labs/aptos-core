@@ -7,6 +7,9 @@
 /// MoveSmith will randomly pick within [0..max_num_XXX] during generation.
 #[derive(Debug)]
 pub struct Config {
+    /// The number of `//# run 0xCAFE::ModuleX::funX` to invoke
+    pub num_runs_per_func: usize,
+
     pub max_num_modules: usize,
     pub max_num_functions_in_module: usize,
     pub max_num_structs_in_module: usize,
@@ -34,6 +37,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            num_runs_per_func: 10,
+
             max_num_modules: 3,
             max_num_functions_in_module: 5,
             max_num_structs_in_module: 5,

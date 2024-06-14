@@ -56,6 +56,7 @@ fn simple_compile_unit() -> CompileUnit {
     CompileUnit {
         modules: vec![simple_module()],
         scripts: vec![simple_script()],
+        runs: vec![],
     }
 }
 

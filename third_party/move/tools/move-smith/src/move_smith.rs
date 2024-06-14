@@ -35,6 +35,7 @@ pub struct MoveSmith {
     // The output code
     modules: Vec<RefCell<Module>>,
     script: Option<Script>,
+    runs: RefCell<Vec<Identifier>>,
 
     // Skeleton Information
     function_signatures: Vec<FunctionSignature>,
@@ -59,6 +60,7 @@ impl MoveSmith {
             config,
             modules: Vec::new(),
             script: None,
+            runs: RefCell::new(Vec::new()),
             function_signatures: Vec::new(),
             id_pool: RefCell::new(IdentifierPool::new()),
             type_pool: RefCell::new(TypePool::new()),
@@ -73,12 +75,14 @@ impl MoveSmith {
             .iter()
             .map(|m| m.borrow().clone())
             .collect::<Vec<Module>>();
+        let runs = self.runs.borrow().clone();
         CompileUnit {
             modules,
             scripts: match &self.script {
                 Some(s) => vec![s.clone()],
                 None => Vec::new(),
             },
+            runs,
         }
     }
 
@@ -98,12 +102,14 @@ impl MoveSmith {
             self.fill_module(u, m)?;
         }
 
-        self.script = Some(self.generate_script(u)?);
+        // Disable script generation for now since intermediate states are not compared
+        self.script = None;
 
         Ok(())
     }
 
     /// Generate a script that calls functions from the generated modules.
+    #[allow(dead_code)]
     fn generate_script(&self, u: &mut Unstructured) -> Result<Script> {
         let mut script = Script { main: Vec::new() };
 
@@ -160,12 +166,74 @@ impl MoveSmith {
             self.fill_struct(u, s, &scope)?;
         }
 
-        // Function bodies
+        // Generate function bodies and runners
+        let mut all_runners = Vec::new();
         for f in module.borrow().functions.iter() {
             self.fill_function(u, f)?;
+            all_runners.extend(self.generate_runners(u, f)?);
+        }
+
+        // Insert the runners to the module and add run tasks to the whole compile unit
+        // Each task is simply the flat name of the runner function
+        for r in all_runners.into_iter() {
+            let module_flat = self.id_pool.borrow().flatten_access(&module.borrow().name);
+            let run_flat = Identifier(format!("{}::{}", module_flat.0, r.signature.name.0));
+            self.runs.borrow_mut().push(run_flat);
+            module.borrow_mut().functions.push(RefCell::new(r));
         }
 
         Ok(())
+    }
+
+    /// Generate a runner function for a callee function.
+    /// The runner function does not have parameters so that
+    /// it can be easily called with `//# run`.
+    /// The runner function only contains one function call and have the same return type as the callee.
+    // TODO: this is hacky just to have a way for comparing return results, should be improved
+    fn generate_runners(
+        &self,
+        u: &mut Unstructured,
+        callee: &RefCell<Function>,
+    ) -> Result<Vec<Function>> {
+        let signature = callee.borrow().signature.clone();
+
+        let mut runners = Vec::new();
+        for i in 0..self.config.num_runs_per_func {
+            // Generate a call to the target function
+            let call = Expression::FunctionCall(self.generate_call_to_function(
+                u,
+                &ROOT_SCOPE,
+                &signature,
+                false,
+            )?);
+
+            // Generate a body with only one statement/return expr
+            let body = match signature.return_type.is_none() {
+                true => Block {
+                    stmts: vec![Statement::Expr(call)],
+                    return_expr: None,
+                },
+                false => Block {
+                    stmts: Vec::new(),
+                    return_expr: Some(call),
+                },
+            };
+
+            // Use a special name for the runner function
+            // These names are not properly stored in the id_pool so they
+            // should not be used elsewhere other than with `//# run`
+            let runner = Function {
+                signature: FunctionSignature {
+                    name: Identifier(format!("{}_runner_{}", signature.name.0, i)),
+                    parameters: Vec::new(),
+                    return_type: signature.return_type.clone(),
+                },
+                visibility: Visibility { public: true },
+                body: Some(body),
+            };
+            runners.push(runner);
+        }
+        Ok(runners)
     }
 
     // Generate a struct skeleton with name and random abilities.

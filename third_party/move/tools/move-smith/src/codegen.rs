@@ -76,6 +76,10 @@ impl CodeGenerator for CompileUnit {
             code.extend(s.emit_code_lines());
         }
 
+        for r in &self.runs {
+            code.push(format!("//# run {}\n", r.0));
+        }
+
         code
     }
 }
