@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{metrics::backup::THROUGHPUT_COUNTER, utils::error_notes::ErrorNotes};
+use crate::{
+    metrics::backup::{BACKUP_TIMER, THROUGHPUT_COUNTER},
+    utils::error_notes::ErrorNotes,
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_db::backup::backup_handler::DbState;
@@ -16,7 +19,6 @@ use tokio::{
 };
 use tokio_io_timeout::TimeoutReader;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use crate::metrics::backup::BACKUP_TIMER;
 
 #[derive(Parser)]
 pub struct BackupServiceClientOpt {

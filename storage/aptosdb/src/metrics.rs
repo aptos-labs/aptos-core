@@ -237,5 +237,5 @@ pub static BACKUP_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
         &["name"],
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
     )
-        .unwrap()
+    .unwrap()
 });

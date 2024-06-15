@@ -203,6 +203,7 @@ pub struct StateSnapshotBackupController {
     max_chunk_size: usize,
     client: Arc<BackupServiceClient>,
     storage: Arc<dyn BackupStorage>,
+    concurrent_data_requests: usize,
 }
 
 impl StateSnapshotBackupController {
@@ -218,6 +219,7 @@ impl StateSnapshotBackupController {
             max_chunk_size: global_opt.max_chunk_size,
             client,
             storage,
+            concurrent_data_requests: global_opt.concurrent_data_requests,
         }
     }
 
@@ -238,7 +240,7 @@ impl StateSnapshotBackupController {
             .create_backup_with_random_suffix(&self.backup_name())
             .await?;
 
-        let record_stream = Box::pin(self.record_stream().await?);
+        let record_stream = Box::pin(self.record_stream(self.concurrent_data_requests).await?);
         let chunker = Chunker::new(record_stream, self.max_chunk_size).await?;
 
         let start = Instant::now();
@@ -269,6 +271,7 @@ impl StateSnapshotBackupController {
 
     async fn record_stream(
         &self,
+        concurrency: usize,
     ) -> Result<impl TryStream<Ok = Bytes, Error = anyhow::Error, Item = Result<Bytes>>> {
         const CHUNK_SIZE: usize = if cfg!(test) { 100_000 } else { 2 };
 
@@ -305,7 +308,9 @@ impl StateSnapshotBackupController {
             }
         });
 
-        Ok(record_stream_stream.try_buffered_x(8, 4).try_flatten())
+        Ok(record_stream_stream
+            .try_buffered_x(concurrency * 2, concurrency)
+            .try_flatten())
     }
 }
 

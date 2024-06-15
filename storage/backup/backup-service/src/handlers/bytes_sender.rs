@@ -22,7 +22,7 @@ pub(super) struct BytesSender {
 impl BytesSender {
     const MAX_BATCHES: usize = 100;
     #[cfg(not(test))]
-    const TARGET_BATCH_SIZE: usize = 1024 * 1024;
+    const TARGET_BATCH_SIZE: usize = 1024 * 10;
     #[cfg(test)]
     const TARGET_BATCH_SIZE: usize = 10;
 
