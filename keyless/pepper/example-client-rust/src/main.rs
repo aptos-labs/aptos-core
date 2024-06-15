@@ -3,6 +3,7 @@
 
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_keyless_pepper_common::{
+    aud_db::AudDbEntry,
     jwt,
     vuf::{self, VUF},
     PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey, SignatureResponse,
@@ -12,6 +13,7 @@ use aptos_types::{
     transaction::authenticator::EphemeralPublicKey,
 };
 use ark_serialize::CanonicalDeserialize;
+use firestore::{path, paths, FirestoreDb, FirestoreDbOptions};
 use reqwest::StatusCode;
 use std::{fs, io::stdin};
 
@@ -196,4 +198,36 @@ async fn main() {
     vuf::bls12381_g1_bls::Bls12381G1Bls::verify(&vuf_pk, &pepper_input_bytes, &signature, &[])
         .unwrap();
     println!("Pepper verification succeeded!");
+
+    println!("Checking firestore records.");
+    let google_project_id = std::env::var("KEYLESS_PROJECT_ID").unwrap();
+    let database_id = std::env::var("DATABASE_ID").unwrap();
+    let options = FirestoreDbOptions {
+        google_project_id,
+        database_id,
+        max_retries: 1,
+        firebase_api_url: None,
+    };
+    let db = FirestoreDb::with_options(options).await.unwrap();
+    let docs: Vec<AudDbEntry> = db
+        .fluent()
+        .select()
+        .fields(paths!(AudDbEntry::{iss, aud, uid_key, uid_val, last_request_unix_ms}))
+        .from("accounts")
+        .filter(|q| {
+            q.for_all([
+                q.field(path!(AudDbEntry::iss)).eq(pepper_input.iss.clone()),
+                q.field(path!(AudDbEntry::aud)).eq(pepper_input.aud.clone()),
+                q.field(path!(AudDbEntry::uid_key))
+                    .eq(pepper_input.uid_key.clone()),
+                q.field(path!(AudDbEntry::uid_val))
+                    .eq(pepper_input.uid_val.clone()),
+            ])
+        })
+        .obj()
+        .query()
+        .await
+        .unwrap();
+    println!("docs={docs:?}");
+    assert_eq!(1, docs.len());
 }
