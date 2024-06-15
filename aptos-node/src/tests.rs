@@ -80,7 +80,7 @@ fn test_create_single_node_test_config() {
     .unwrap();
     let f = std::fs::OpenOptions::new()
         .write(true)
-        .truncate(true)
+        .create_new(true)
         .open(&config_override_path)
         .expect("Couldn't open file");
     serde_yaml::to_writer(f, &config_override).unwrap();
