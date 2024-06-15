@@ -11,6 +11,7 @@ use crate::{
             ConsensusObserverRequest, ConsensusObserverResponse, OrderedBlock,
         },
         publisher::ConsensusPublisher,
+        subscription,
         subscription::ConsensusObserverSubscription,
     },
     dag::DagCommitSigner,
@@ -162,14 +163,22 @@ impl ConsensusObserver {
         debug!(LogSchema::new(LogEntry::ConsensusObserver)
             .message("Checking consensus observer progress!"));
 
-        // If we have an active subscription, verify that the subscription is still healthy
-        if self.active_observer_subscription.is_some() {
+        // Get the peer ID of the currently active subscription
+        let active_subscription_peer = self
+            .active_observer_subscription
+            .as_ref()
+            .map(|subscription| subscription.get_peer_network_id());
+
+        // If we have an active subscription, verify that the subscription
+        // is still healthy. If not, the subscription will be terminated.
+        if active_subscription_peer.is_some() {
             self.check_active_subscription().await;
         }
 
-        // If we don't have an active subscription, select a peer to subscribe to
+        // If we no longer have an active subscription, select a new peer to subscribe to
         if self.active_observer_subscription.is_none() {
-            self.create_new_observer_subscription().await;
+            self.create_new_observer_subscription(active_subscription_peer)
+                .await;
         }
     }
 
@@ -245,83 +254,101 @@ impl ConsensusObserver {
         })
     }
 
-    /// Creates a new observer subscription by sending a subscription request to
-    /// an appropriate peer and waiting for the response.
-    async fn create_new_observer_subscription(&mut self) {
-        // TODO: make peer selection more intelligent. We're currently just assuming VFN support.
-
-        // Select a peer to subscribe to
-        let selected_peer =
-            if let Some(peers_and_metadata) = self.get_connected_peers_and_metadata() {
-                // Select the VFN peer (there should only be a single VFN connection)
-                let selected_peer = peers_and_metadata
-                    .iter()
-                    .find(|(peer_network_id, _)| peer_network_id.network_id().is_vfn_network())
-                    .map(|(peer_network_id, _)| *peer_network_id);
-
-                // Ensure a single peer was found
-                match selected_peer {
-                    Some(selected_peer) => selected_peer,
-                    None => {
-                        error!(LogSchema::new(LogEntry::ConsensusObserver)
-                            .message("Failed to find a VFN peer to subscribe to!"));
-                        return;
-                    },
-                }
-            } else {
-                return; // No connected peers were found
-            };
-
-        // Send a subscription request to the peer and wait for the response.
-        // Note: it is fine to block here because we assume only a single active subscription.
-        let subscription_request = ConsensusObserverRequest::Subscribe;
-        let response = self
-            .consensus_observer_client
-            .send_rpc_request_to_peer(
-                &selected_peer,
-                subscription_request,
-                self.consensus_observer_config.request_timeout_ms,
-            )
-            .await;
-
-        // Process the response and update the active subscription
-        match response {
-            Ok(ConsensusObserverResponse::SubscribeAck) => {
-                info!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Successfully subscribed to peer: {}!",
-                        selected_peer
-                    ))
-                );
-
-                // Update the active subscription
-                let subscription = ConsensusObserverSubscription::new(
-                    self.consensus_observer_config,
-                    self.db_reader.clone(),
-                    selected_peer,
-                    self.time_service.clone(),
-                );
-                self.active_observer_subscription = Some(subscription);
+    /// Creates a new observer subscription by sending subscription requests to
+    /// appropriate peers and waiting for a successful response. If `previous_subscription_peer`
+    /// is provided, it will be excluded from the selection process.
+    async fn create_new_observer_subscription(
+        &mut self,
+        previous_subscription_peer: Option<PeerNetworkId>,
+    ) {
+        // Get a set of sorted peers to service our subscription request
+        let sorted_peers = match self.sort_peers_for_subscription(previous_subscription_peer) {
+            Some(sorted_peers) => sorted_peers,
+            None => {
+                error!(LogSchema::new(LogEntry::ConsensusObserver)
+                    .message("Failed to sort peers for subscription requests!"));
+                return;
             },
-            Ok(response) => {
-                // We received an invalid response
-                warn!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Got unexpected response type: {:?}",
-                        response.get_label()
-                    ))
-                );
-            },
-            Err(error) => {
-                // We encountered an error while sending the request
-                error!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Failed to send subscription request to peer: {}! Error: {:?}",
-                        selected_peer, error
-                    ))
-                );
-            },
+        };
+
+        // Verify that we have potential peers
+        if sorted_peers.is_empty() {
+            warn!(LogSchema::new(LogEntry::ConsensusObserver)
+                .message("There are no peers to subscribe to!"));
+            return;
         }
+
+        // Go through the sorted peers and attempt to subscribe to a single peer.
+        // The first peer that responds successfully will be the selected peer.
+        for selected_peer in &sorted_peers {
+            info!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Attempting to subscribe to peer: {}!",
+                    selected_peer
+                ))
+            );
+
+            // Send a subscription request to the peer and wait for the response.
+            // Note: it is fine to block here because we assume only a single active subscription.
+            let subscription_request = ConsensusObserverRequest::Subscribe;
+            let response = self
+                .consensus_observer_client
+                .send_rpc_request_to_peer(
+                    selected_peer,
+                    subscription_request,
+                    self.consensus_observer_config.request_timeout_ms,
+                )
+                .await;
+
+            // Process the response and update the active subscription
+            match response {
+                Ok(ConsensusObserverResponse::SubscribeAck) => {
+                    info!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Successfully subscribed to peer: {}!",
+                            selected_peer
+                        ))
+                    );
+
+                    // Update the active subscription
+                    let subscription = ConsensusObserverSubscription::new(
+                        self.consensus_observer_config,
+                        self.db_reader.clone(),
+                        *selected_peer,
+                        self.time_service.clone(),
+                    );
+                    self.active_observer_subscription = Some(subscription);
+
+                    return; // Return after successfully subscribing
+                },
+                Ok(response) => {
+                    // We received an invalid response
+                    warn!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Got unexpected response type: {:?}",
+                            response.get_label()
+                        ))
+                    );
+                },
+                Err(error) => {
+                    // We encountered an error while sending the request
+                    error!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Failed to send subscription request to peer: {}! Error: {:?}",
+                            selected_peer, error
+                        ))
+                    );
+                },
+            }
+        }
+
+        // We failed to connect to any peers
+        warn!(
+            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                "Failed to subscribe to any peers! Num peers attempted: {:?}",
+                sorted_peers.len()
+            ))
+        );
     }
 
     /// Forwards the commit decision to the execution pipeline
@@ -679,6 +706,29 @@ impl ConsensusObserver {
             if let Some(commit_decision) = commit_decision {
                 self.forward_commit_decision(commit_decision.clone());
             }
+        }
+    }
+
+    /// Produces a list of sorted peers to service our subscription request. Peers
+    /// are prioritized by validator distance and latency. If `previous_subscription_peer`
+    /// is provided, it will be excluded from the selection process.
+    fn sort_peers_for_subscription(
+        &mut self,
+        previous_subscription_peer: Option<PeerNetworkId>,
+    ) -> Option<Vec<PeerNetworkId>> {
+        if let Some(mut peers_and_metadata) = self.get_connected_peers_and_metadata() {
+            // Remove the previous subscription peer (if provided)
+            if let Some(previous_subscription_peer) = previous_subscription_peer {
+                let _ = peers_and_metadata.remove(&previous_subscription_peer);
+            }
+
+            // Sort the peers by validator distance and latency
+            let sorted_peers = subscription::sort_peers_by_distance_and_latency(peers_and_metadata);
+
+            // Return the sorted peers
+            Some(sorted_peers)
+        } else {
+            None // No connected peers were found
         }
     }
 
