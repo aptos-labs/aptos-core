@@ -76,6 +76,12 @@ pub mod package_hooks;
 mod show;
 pub mod stored_package;
 
+const HELLO_BLOCKCHAIN_MOVE_TOML: &str =
+    include_str!("../../../../aptos-move/move-examples/hello_blockchain/Move.toml");
+const HELLO_BLOCKCHAIN_EXAMPLE: &str = include_str!(
+    "../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain.move"
+);
+
 /// Tool for Move smart contract related operations
 ///
 /// This tool lets you compile, test, and publish Move code, in addition
@@ -248,6 +254,11 @@ impl FrameworkPackageArgs {
     }
 }
 
+#[derive(ValueEnum, Clone, Copy, Debug)]
+pub enum Template {
+    HelloBlockchain,
+}
+
 /// Creates a new Move package at the given location
 ///
 /// This will create a directory for a Move package and a corresponding
@@ -276,6 +287,10 @@ pub struct InitPackage {
     )]
     pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
 
+    /// Template name for initialization
+    #[clap(long)]
+    pub(crate) template: Option<Template>,
+
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
 
@@ -297,12 +312,33 @@ impl CliCommand<()> for InitPackage {
             .map(|(key, value)| (key, value.account_address.into()))
             .collect();
 
+        // Initialize move directory
+        let package_dir_path = package_dir.as_path();
         self.framework_package_args.init_move_dir(
-            package_dir.as_path(),
+            package_dir_path,
             &self.name,
             addresses,
             self.prompt_options,
-        )
+        )?;
+
+        // Add in any template associated
+        match self.template {
+            Some(Template::HelloBlockchain) | None => {
+                // Setup the Hello blockchain template
+                write_to_file(
+                    package_dir_path.join("Move.toml").as_path(),
+                    "Move.toml",
+                    HELLO_BLOCKCHAIN_MOVE_TOML.as_bytes(),
+                )?;
+                write_to_file(
+                    package_dir_path
+                        .join("sources/hello_blockchain.move")
+                        .as_path(),
+                    "hello_blockchain.move",
+                    HELLO_BLOCKCHAIN_EXAMPLE.as_bytes(),
+                )
+            },
+        }
     }
 }
 
