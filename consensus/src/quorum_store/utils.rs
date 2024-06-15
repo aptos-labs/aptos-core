@@ -309,13 +309,15 @@ impl ProofQueue {
                     } else if let Some(Some((proof, insertion_time))) =
                         self.batch_to_proof.get(&sort_key.batch_key)
                     {
-                        cur_bytes += batch.num_bytes();
-                        cur_txns += batch.num_txns();
-                        if cur_bytes > max_bytes || cur_txns > max_txns {
+                        if cur_bytes + batch.num_bytes() > max_bytes
+                            || cur_txns + batch.num_txns() > max_txns
+                        {
                             // Exceeded the limit for requested bytes or number of transactions.
                             full = true;
                             return false;
                         }
+                        cur_bytes += batch.num_bytes();
+                        cur_txns += batch.num_txns();
                         let bucket = proof.gas_bucket_start();
                         ret.push(proof.clone());
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
