@@ -17,7 +17,7 @@ function error() {
 
 function cargo_fuzz() {
     # Nightly version control
-    NIGHTLY_VERSION="nightly-2024-01-01"
+    NIGHTLY_VERSION="nightly-2024-06-01"
     rustup install $NIGHTLY_VERSION
     if [ -z "$1" ]; then
         error "error using cargo()"
