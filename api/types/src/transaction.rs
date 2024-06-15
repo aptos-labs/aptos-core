@@ -18,7 +18,7 @@ use aptos_crypto::{
 use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
-    block_metadata_ext::BlockMetadataExt,
+    block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
     contract_event::{ContractEvent, EventWithVersion},
     keyless,
     transaction::{
@@ -179,6 +179,7 @@ pub enum Transaction {
     StateCheckpointTransaction(StateCheckpointTransaction),
     BlockEpilogueTransaction(BlockEpilogueTransaction),
     ValidatorTransaction(ValidatorTransaction),
+    BlockMetadataExtTransaction(BlockMetadataExtTransaction),
 }
 
 impl Transaction {
@@ -190,7 +191,8 @@ impl Transaction {
             Transaction::GenesisTransaction(_) => 0,
             Transaction::StateCheckpointTransaction(txn) => txn.timestamp.0,
             Transaction::BlockEpilogueTransaction(txn) => txn.timestamp.0,
-            Transaction::ValidatorTransaction(txn) => txn.timestamp.0,
+            Transaction::ValidatorTransaction(txn) => txn.timestamp().0,
+            Transaction::BlockMetadataExtTransaction(txn) => txn.timestamp().0,
         }
     }
 
@@ -202,7 +204,10 @@ impl Transaction {
             Transaction::GenesisTransaction(txn) => Some(txn.info.version.into()),
             Transaction::StateCheckpointTransaction(txn) => Some(txn.info.version.into()),
             Transaction::BlockEpilogueTransaction(txn) => Some(txn.info.version.into()),
-            Transaction::ValidatorTransaction(txn) => Some(txn.info.version.into()),
+            Transaction::ValidatorTransaction(txn) => Some(txn.transaction_info().version.into()),
+            Transaction::BlockMetadataExtTransaction(txn) => {
+                Some(txn.transaction_info().version.into())
+            },
         }
     }
 
@@ -214,7 +219,8 @@ impl Transaction {
             Transaction::GenesisTransaction(txn) => txn.info.success,
             Transaction::StateCheckpointTransaction(txn) => txn.info.success,
             Transaction::BlockEpilogueTransaction(txn) => txn.info.success,
-            Transaction::ValidatorTransaction(txn) => txn.info.success,
+            Transaction::ValidatorTransaction(txn) => txn.transaction_info().success,
+            Transaction::BlockMetadataExtTransaction(txn) => txn.transaction_info().success,
         }
     }
 
@@ -230,7 +236,10 @@ impl Transaction {
             Transaction::GenesisTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::StateCheckpointTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::BlockEpilogueTransaction(txn) => txn.info.vm_status.clone(),
-            Transaction::ValidatorTransaction(txn) => txn.info.vm_status.clone(),
+            Transaction::ValidatorTransaction(txn) => txn.transaction_info().vm_status.clone(),
+            Transaction::BlockMetadataExtTransaction(txn) => {
+                txn.transaction_info().vm_status.clone()
+            },
         }
     }
 
@@ -243,6 +252,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(_) => "state_checkpoint_transaction",
             Transaction::BlockEpilogueTransaction(_) => "block_epilogue_transaction",
             Transaction::ValidatorTransaction(_) => "validator_transaction",
+            Transaction::BlockMetadataExtTransaction(_) => "block_metadata_ext_transaction",
         }
     }
 
@@ -256,7 +266,8 @@ impl Transaction {
             Transaction::GenesisTransaction(txn) => &txn.info,
             Transaction::StateCheckpointTransaction(txn) => &txn.info,
             Transaction::BlockEpilogueTransaction(txn) => &txn.info,
-            Transaction::ValidatorTransaction(txn) => &txn.info,
+            Transaction::ValidatorTransaction(txn) => txn.transaction_info(),
+            Transaction::BlockMetadataExtTransaction(txn) => txn.transaction_info(),
         })
     }
 }
@@ -308,38 +319,6 @@ impl From<(TransactionInfo, WriteSetPayload, Vec<Event>)> for Transaction {
     }
 }
 
-impl From<(&BlockMetadata, TransactionInfo, Vec<Event>)> for Transaction {
-    fn from((txn, info, events): (&BlockMetadata, TransactionInfo, Vec<Event>)) -> Self {
-        Transaction::BlockMetadataTransaction(BlockMetadataTransaction {
-            info,
-            id: txn.id().into(),
-            epoch: txn.epoch().into(),
-            round: txn.round().into(),
-            events,
-            previous_block_votes_bitvec: txn.previous_block_votes_bitvec().clone(),
-            proposer: txn.proposer().into(),
-            failed_proposer_indices: txn.failed_proposer_indices().clone(),
-            timestamp: txn.timestamp_usecs().into(),
-        })
-    }
-}
-
-impl From<(&BlockMetadataExt, TransactionInfo, Vec<Event>)> for Transaction {
-    fn from((txn, info, events): (&BlockMetadataExt, TransactionInfo, Vec<Event>)) -> Self {
-        Transaction::BlockMetadataTransaction(BlockMetadataTransaction {
-            info,
-            id: txn.id().into(),
-            epoch: txn.epoch().into(),
-            round: txn.round().into(),
-            events,
-            previous_block_votes_bitvec: txn.previous_block_votes_bitvec().clone(),
-            proposer: txn.proposer().into(),
-            failed_proposer_indices: txn.failed_proposer_indices().clone(),
-            timestamp: txn.timestamp_usecs().into(),
-        })
-    }
-}
-
 impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
     fn from((txn, payload): (&SignedTransaction, TransactionPayload)) -> Self {
         Self {
@@ -354,15 +333,15 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
     }
 }
 
-impl From<(TransactionInfo, Vec<Event>, u64)> for Transaction {
-    fn from((info, events, timestamp): (TransactionInfo, Vec<Event>, u64)) -> Self {
-        Transaction::ValidatorTransaction(ValidatorTransaction {
-            info,
-            events,
-            timestamp: timestamp.into(),
-        })
-    }
-}
+// impl From<(TransactionInfo, Vec<Event>, u64)> for Transaction {
+//     fn from((info, events, timestamp): (TransactionInfo, Vec<Event>, u64)) -> Self {
+//         Transaction::ValidatorTransaction(ValidatorTransaction {
+//             info,
+//             events,
+//             timestamp: timestamp.into(),
+//         })
+//     }
+// }
 
 /// Information related to how a transaction affected the state of the blockchain
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
@@ -586,8 +565,163 @@ pub struct BlockMetadataTransaction {
     pub timestamp: U64,
 }
 
+impl BlockMetadataTransaction {
+    pub fn from_internal_repr(
+        internal: BlockMetadata,
+        info: TransactionInfo,
+        events: Vec<Event>,
+    ) -> Self {
+        Self {
+            info,
+            id: internal.id().into(),
+            epoch: internal.epoch().into(),
+            round: internal.round().into(),
+            events,
+            previous_block_votes_bitvec: internal.previous_block_votes_bitvec().clone(),
+            proposer: internal.proposer().into(),
+            failed_proposer_indices: internal.failed_proposer_indices().clone(),
+            timestamp: internal.timestamp_usecs().into(),
+        }
+    }
+}
+
+/// A block metadata transaction
+///
+/// This signifies the beginning of a block, and contains information
+/// about the specific block
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct ValidatorTransaction {
+pub struct BlockMetadataWithRandomnessTransaction {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub info: TransactionInfo,
+    pub id: HashValue,
+    pub epoch: U64,
+    pub round: U64,
+    /// The events emitted at the block creation
+    pub events: Vec<Event>,
+    /// Previous block votes
+    pub previous_block_votes_bitvec: Vec<u8>,
+    pub proposer: Address,
+    /// The indices of the proposers who failed to propose
+    pub failed_proposer_indices: Vec<u32>,
+    pub timestamp: U64,
+    pub randomness: Option<Vec<u8>>,
+}
+
+impl BlockMetadataWithRandomnessTransaction {
+    pub fn from_internal_repr(
+        internal: BlockMetadataWithRandomness,
+        info: TransactionInfo,
+        events: Vec<Event>,
+    ) -> Self {
+        Self {
+            info,
+            id: internal.id.into(),
+            epoch: internal.epoch.into(),
+            round: internal.round.into(),
+            events,
+            previous_block_votes_bitvec: internal.previous_block_votes_bitvec.clone(),
+            proposer: internal.proposer.into(),
+            failed_proposer_indices: internal.failed_proposer_indices.clone(),
+            timestamp: internal.timestamp_usecs.into(),
+            randomness: internal.randomness.map(|r| r.randomness().to_vec()),
+        }
+    }
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+pub enum BlockMetadataExtTransaction {
+    V0(BlockMetadataTransaction),
+    V1(BlockMetadataWithRandomnessTransaction),
+}
+
+impl BlockMetadataExtTransaction {
+    pub fn from_internal_repr(
+        internal: BlockMetadataExt,
+        info: TransactionInfo,
+        events: Vec<Event>,
+    ) -> Self {
+        match internal {
+            BlockMetadataExt::V0(v0) => Self::V0(BlockMetadataTransaction::from_internal_repr(
+                v0, info, events,
+            )),
+            BlockMetadataExt::V1(v1) => Self::V1(
+                BlockMetadataWithRandomnessTransaction::from_internal_repr(v1, info, events),
+            ),
+        }
+    }
+
+    pub fn transaction_info(&self) -> &TransactionInfo {
+        match self {
+            BlockMetadataExtTransaction::V0(t) => &t.info,
+            BlockMetadataExtTransaction::V1(t) => &t.info,
+        }
+    }
+
+    pub fn timestamp(&self) -> U64 {
+        match self {
+            BlockMetadataExtTransaction::V0(t) => t.timestamp,
+            BlockMetadataExtTransaction::V1(t) => t.timestamp,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+pub enum ValidatorTransaction {
+    ObservedJWKUpdate(JWKUpdateTransaction),
+    DKGResult(DKGResultTransaction),
+}
+
+impl ValidatorTransaction {
+    pub fn transaction_info(&self) -> &TransactionInfo {
+        match self {
+            ValidatorTransaction::ObservedJWKUpdate(t) => &t.info,
+            ValidatorTransaction::DKGResult(t) => &t.info,
+        }
+    }
+
+    pub fn timestamp(&self) -> U64 {
+        match self {
+            ValidatorTransaction::ObservedJWKUpdate(t) => t.timestamp,
+            ValidatorTransaction::DKGResult(t) => t.timestamp,
+        }
+    }
+
+    pub fn from_internal_repr(
+        internal: aptos_types::validator_txn::ValidatorTransaction,
+        info: TransactionInfo,
+        events: Vec<Event>,
+        timestamp: u64,
+    ) -> Self {
+        match internal {
+            aptos_types::validator_txn::ValidatorTransaction::DKGResult(_) => {
+                Self::DKGResult(DKGResultTransaction {
+                    info,
+                    events,
+                    timestamp: U64::from(timestamp),
+                })
+            },
+            aptos_types::validator_txn::ValidatorTransaction::ObservedJWKUpdate(_) => {
+                Self::ObservedJWKUpdate(JWKUpdateTransaction {
+                    info,
+                    events,
+                    timestamp: U64::from(timestamp),
+                })
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct JWKUpdateTransaction {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub info: TransactionInfo,
+    pub events: Vec<Event>,
+    pub timestamp: U64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct DKGResultTransaction {
     #[serde(flatten)]
     #[oai(flatten)]
     pub info: TransactionInfo,

@@ -4,15 +4,16 @@
 
 use crate::{
     transaction::{
-        BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem,
-        DeletedTableData, MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
-        UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
+        BlockEpilogueTransaction, BlockMetadataExtTransaction, DecodedTableData, DeleteModule,
+        DeleteResource, DeleteTableItem, DeletedTableData, MultisigPayload,
+        MultisigTransactionPayload, StateCheckpointTransaction, UserTransactionRequestInner,
+        ValidatorTransaction, WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
-    Address, Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event,
-    HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType,
-    MoveValue, PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet,
-    SubmitTransactionRequest, Transaction, TransactionInfo, TransactionOnChainData,
+    Address, BlockMetadataTransaction, Bytecode, DirectWriteSet, EntryFunctionId,
+    EntryFunctionPayload, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource,
+    MoveScriptBytecode, MoveType, MoveValue, PendingTransaction, ResourceGroup, ScriptPayload,
+    ScriptWriteSet, SubmitTransactionRequest, Transaction, TransactionInfo, TransactionOnChainData,
     TransactionPayload, UserTransactionRequest, VersionedEvent, WriteSet, WriteSetChange,
     WriteSetPayload,
 };
@@ -176,7 +177,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         timestamp: u64,
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
-        use aptos_types::transaction::Transaction::*;
         let aux_data = self
             .db
             .get_transaction_auxiliary_data_by_version(data.version)?;
@@ -189,23 +189,32 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         );
         let events = self.try_into_events(&data.events)?;
         Ok(match data.transaction {
-            UserTransaction(txn) => {
+            aptos_types::transaction::Transaction::UserTransaction(txn) => {
                 let payload = self.try_into_transaction_payload(txn.payload().clone())?;
                 (&txn, info, payload, events, timestamp).into()
             },
-            GenesisTransaction(write_set) => {
+            aptos_types::transaction::Transaction::GenesisTransaction(write_set) => {
                 let payload = self.try_into_write_set_payload(write_set)?;
                 (info, payload, events).into()
             },
-            BlockMetadata(txn) => (&txn, info, events).into(),
-            BlockMetadataExt(txn) => (&txn, info, events).into(),
-            StateCheckpoint(_) => {
+            aptos_types::transaction::Transaction::BlockMetadata(txn) => {
+                Transaction::BlockMetadataTransaction(BlockMetadataTransaction::from_internal_repr(
+                    txn, info, events,
+                ))
+                // (&txn, info, events).into()
+            },
+            aptos_types::transaction::Transaction::BlockMetadataExt(txn) => {
+                Transaction::BlockMetadataExtTransaction(
+                    BlockMetadataExtTransaction::from_internal_repr(txn, info, events),
+                )
+            },
+            aptos_types::transaction::Transaction::StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),
                 })
             },
-            BlockEpilogue(block_epilogue_payload) => {
+            aptos_types::transaction::Transaction::BlockEpilogue(block_epilogue_payload) => {
                 Transaction::BlockEpilogueTransaction(BlockEpilogueTransaction {
                     info,
                     timestamp: timestamp.into(),
@@ -228,7 +237,11 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     },
                 })
             },
-            ValidatorTransaction(_txn) => (info, events, timestamp).into(),
+            aptos_types::transaction::Transaction::ValidatorTransaction(txn) => {
+                Transaction::ValidatorTransaction(ValidatorTransaction::from_internal_repr(
+                    txn, info, events, timestamp,
+                ))
+            },
         })
     }
 
