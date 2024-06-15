@@ -352,7 +352,7 @@ impl ProofQueue {
     ) -> (Vec<ProofOfStore>, bool) {
         let mut ret = vec![];
         let mut cur_bytes = 0;
-        let mut cur_txns = 0;
+        let mut cur_txns: u64 = 0;
         let mut total_txns = 0;
         let mut excluded_txns = 0;
         let mut full = false;
@@ -383,25 +383,35 @@ impl ProofQueue {
                     } else if let Some(Some((proof, insertion_time))) =
                         self.batch_to_proof.get(&sort_key.batch_key)
                     {
-                        if let Some(txn_summaries) =
+                        let temp_txns = if let Some(txn_summaries) =
                             self.batch_to_txn_summaries.get(&sort_key.batch_key)
                         {
-                            for txn_summary in txn_summaries {
-                                if !included_and_excluded_txns.contains(txn_summary) {
-                                    included_and_excluded_txns.insert(*txn_summary);
-                                    cur_txns += 1;
-                                }
-                            }
+                            cur_txns
+                                + txn_summaries
+                                    .iter()
+                                    .filter(|txn_summary| {
+                                        !included_and_excluded_txns.contains(txn_summary)
+                                    })
+                                    .count() as u64
                         } else {
-                            cur_txns += batch.num_txns();
-                        }
-                        cur_bytes += batch.num_bytes();
-                        total_txns += batch.num_txns();
-                        if cur_bytes > max_bytes || cur_txns > max_txns {
+                            cur_txns + batch.num_txns()
+                        };
+                        if cur_bytes + batch.num_bytes() > max_bytes || temp_txns > max_txns {
                             // Exceeded the limit for requested bytes or number of transactions.
                             full = true;
                             return false;
                         }
+                        cur_bytes += batch.num_bytes();
+                        total_txns += batch.num_txns();
+                        cur_txns += self.batch_to_txn_summaries.get(&sort_key.batch_key).map_or(
+                            batch.num_txns(),
+                            |summaries| {
+                                summaries
+                                    .iter()
+                                    .filter(|summary| included_and_excluded_txns.insert(**summary))
+                                    .count() as u64
+                            },
+                        );
                         let bucket = proof.gas_bucket_start();
                         ret.push(proof.clone());
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
