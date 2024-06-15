@@ -29,6 +29,7 @@ module FACoin::fa_coin {
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Global state to pause the FA coin.
+    /// OPTIONAL
     struct State has key {
         paused: bool,
     }
@@ -66,6 +67,7 @@ module FACoin::fa_coin {
         // Override the deposit and withdraw functions which mean overriding transfer.
         // This ensures all transfer will call withdraw and deposit functions in this module 
         // and perform the necessary checks.
+        // This is OPTIONAL. It is an advanced feature and we don't NEED a global state to pause the FA coin.
         let deposit = function_info::new_function_info(
             admin,
             string::utf8(b"fa_coin"),
@@ -92,6 +94,7 @@ module FACoin::fa_coin {
     }
 
     /// Deposit function override to ensure that the account is not denylisted and the FA coin is not paused.
+    /// OPTIONAL
     public fun deposit<T: key>(
         store: Object<T>,
         fa: FungibleAsset,
@@ -102,6 +105,7 @@ module FACoin::fa_coin {
     }
 
     /// Withdraw function override to ensure that the account is not denylisted and the FA coin is not paused.
+    /// OPTIONAL
     public fun withdraw<T: key>(
         store: Object<T>,
         amount: u64,
@@ -165,6 +169,7 @@ module FACoin::fa_coin {
     }
 
     /// Assert that the FA coin is not paused.
+    /// OPTIONAL
     fun assert_not_paused() acquires State {
         let state = borrow_global<State>(object::create_object_address(&@FACoin, ASSET_SYMBOL));
         assert!(!state.paused, EPAUSED);
