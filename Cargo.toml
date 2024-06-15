@@ -495,7 +495,7 @@ cloud-storage = { version = "0.11.1", features = [
 ], default-features = false }
 codespan-reporting = "0.11.1"
 concurrent-queue = "2.2.0"
-console-subscriber = "0.1.8"
+console-subscriber = "0.3.0"
 const_format = "0.2.26"
 core_affinity = "0.8.1"
 coset = "0.3"
@@ -801,3 +801,4 @@ debug = true
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
+tonic = { git = "https://github.com/aptos-labs/tonic.git", rev = "0da1ba8b1751d6e19eb55be24cccf9ae933c666e" }
