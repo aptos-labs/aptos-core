@@ -179,8 +179,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         use aptos_types::transaction::Transaction::*;
         let aux_data = self
             .db
-            .get_transaction_auxiliary_data_by_version(data.version)
-            .ok();
+            .get_transaction_auxiliary_data_by_version(data.version)?;
         let info = self.into_transaction_info(
             data.version,
             &data.info,
@@ -569,7 +568,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             .signature
             .clone()
             .ok_or_else(|| format_err!("missing signature"))?;
-        Ok(SignedTransaction::new_with_authenticator(
+        Ok(SignedTransaction::new_signed_transaction(
             self.try_into_raw_transaction(txn, chain_id)?,
             signature.try_into()?,
         ))
@@ -580,7 +579,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         submit_transaction_request: SubmitTransactionRequest,
         chain_id: ChainId,
     ) -> Result<SignedTransaction> {
-        Ok(SignedTransaction::new_with_authenticator(
+        Ok(SignedTransaction::new_signed_transaction(
             self.try_into_raw_transaction_poem(
                 submit_transaction_request.user_transaction_request,
                 chain_id,

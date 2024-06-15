@@ -3310,6 +3310,8 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "async-trait",
+ "bytes",
+ "claims",
  "futures",
  "futures-channel",
  "tokio",
@@ -8559,9 +8561,9 @@ checksum = "92620684d99f750bae383ecb3be3748142d6095760afd5cbcf2261e9a279d780"
 
 [[package]]
 name = "h2"
-version = "0.3.24"
+version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb2c4422095b67ee78da96fbb51a4cc413b3b25883c7717ff7ca1ab31022c9c9"
+checksum = "81fe527a889e1532da5c525686d96d4c2e74cdd345badf8dfef9f6b39dd5f5e8"
 dependencies = [
  "bytes",
  "fnv",
@@ -9228,9 +9230,9 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.17.8"
+version = "0.17.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "763a5a8f45087d6bcea4222e7b72c291a054edf80e4ef6efd2a4979878c7bea3"
+checksum = "fb28741c9db9a713d93deb3bb9515c20788cef5815265bee4980e87bde7e0f25"
 dependencies = [
  "console",
  "instant",
@@ -14097,7 +14099,7 @@ version = "0.39.0"
 source = "git+https://github.com/banool/self_update.git?rev=8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b#8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b"
 dependencies = [
  "hyper",
- "indicatif 0.17.8",
+ "indicatif 0.17.7",
  "log",
  "quick-xml 0.23.1",
  "regex",
@@ -16631,9 +16633,9 @@ dependencies = [
 
 [[package]]
 name = "whoami"
-version = "1.5.1"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a44ab49fad634e88f55bf8f9bb3abd2f27d7204172a112c7c9987e01c1c94ea9"
+checksum = "0fec781d48b41f8163426ed18e8fc2864c12937df9ce54c88ede7bd47270893e"
 dependencies = [
  "redox_syscall 0.4.1",
  "wasite",

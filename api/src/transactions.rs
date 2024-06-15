@@ -1557,7 +1557,7 @@ fn override_gas_parameters(
     );
 
     // TODO: Check that signature is null, this would just be helpful for downstream use
-    SignedTransaction::new_with_authenticator(raw_txn, signed_txn.authenticator())
+    SignedTransaction::new_signed_transaction(raw_txn, signed_txn.authenticator())
 }
 
 enum GetByVersionResponse {
