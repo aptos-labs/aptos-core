@@ -2000,8 +2000,8 @@ impl Transaction {
             Transaction::BlockMetadata(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
             Transaction::BlockEpilogue(_) => "block_epilogue",
-            Transaction::ValidatorTransaction(_) => "validator_transaction",
-            Transaction::BlockMetadataExt(_) => "block_metadata_ext",
+            Transaction::ValidatorTransaction(vt) => vt.type_name(),
+            Transaction::BlockMetadataExt(bmet) => bmet.type_name(),
         }
     }
 

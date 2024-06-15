@@ -40,6 +40,11 @@ use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
+use aptos_types::aggregate_signature::AggregateSignature;
+use aptos_types::dkg::{DKGTranscript, DKGTranscriptMetadata};
+use aptos_types::jwks::{ProviderJWKs, QuorumCertifiedUpdate};
+use aptos_types::jwks::jwk::JWK;
+use aptos_types::jwks::unsupported::UnsupportedJWK;
 
 static DUMMY_GUID: Lazy<EventGuid> = Lazy::new(|| EventGuid {
     creation_number: U64::from(0u64),
@@ -251,8 +256,8 @@ impl Transaction {
             Transaction::BlockMetadataTransaction(_) => "block_metadata_transaction",
             Transaction::StateCheckpointTransaction(_) => "state_checkpoint_transaction",
             Transaction::BlockEpilogueTransaction(_) => "block_epilogue_transaction",
-            Transaction::ValidatorTransaction(_) => "validator_transaction",
-            Transaction::BlockMetadataExtTransaction(_) => "block_metadata_ext_transaction",
+            Transaction::ValidatorTransaction(vt) => vt.type_str(),
+            Transaction::BlockMetadataExtTransaction(bmet) => bmet.type_str(),
         }
     }
 
@@ -629,6 +634,8 @@ impl BlockMetadataWithRandomnessTransaction {
     }
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[serde(tag = "block_metadata_ext_transaction_type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "block_metadata_ext_transaction_type", rename_all = "snake_case")]
 pub enum BlockMetadataExtTransaction {
     V0(BlockMetadataTransaction),
     V1(BlockMetadataWithRandomnessTransaction),
@@ -650,10 +657,24 @@ impl BlockMetadataExtTransaction {
         }
     }
 
+    pub fn type_str(&self) -> &'static str {
+        match self {
+            BlockMetadataExtTransaction::V0(_) => "block_metadata_ext_transaction__v0",
+            BlockMetadataExtTransaction::V1(_) => "block_metadata_ext_transaction__v1",
+        }
+    }
+
     pub fn transaction_info(&self) -> &TransactionInfo {
         match self {
             BlockMetadataExtTransaction::V0(t) => &t.info,
             BlockMetadataExtTransaction::V1(t) => &t.info,
+        }
+    }
+
+    pub fn transaction_info_mut(&mut self) -> &mut TransactionInfo {
+        match self {
+            BlockMetadataExtTransaction::V0(t) => &mut t.info,
+            BlockMetadataExtTransaction::V1(t) => &mut t.info,
         }
     }
 
@@ -666,23 +687,39 @@ impl BlockMetadataExtTransaction {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[serde(tag = "validator_transaction_type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "validator_transaction_type", rename_all = "snake_case")]
 pub enum ValidatorTransaction {
-    ObservedJWKUpdate(JWKUpdateTransaction),
-    DKGResult(DKGResultTransaction),
+    ObservedJwkUpdate(JWKUpdateTransaction),
+    DkgResult(DKGResultTransaction),
 }
 
 impl ValidatorTransaction {
+    pub fn type_str(&self) -> &'static str {
+        match self {
+            ValidatorTransaction::ObservedJwkUpdate(_) => "validator_transaction__observed_jwk_update",
+            ValidatorTransaction::DkgResult(_) => "validator_transaction__dkg_result",
+        }
+    }
+
     pub fn transaction_info(&self) -> &TransactionInfo {
         match self {
-            ValidatorTransaction::ObservedJWKUpdate(t) => &t.info,
-            ValidatorTransaction::DKGResult(t) => &t.info,
+            ValidatorTransaction::ObservedJwkUpdate(t) => &t.info,
+            ValidatorTransaction::DkgResult(t) => &t.info,
+        }
+    }
+
+    pub fn transaction_info_mut(&mut self) -> &mut TransactionInfo {
+        match self {
+            ValidatorTransaction::ObservedJwkUpdate(t) => &mut t.info,
+            ValidatorTransaction::DkgResult(t) => &mut t.info,
         }
     }
 
     pub fn timestamp(&self) -> U64 {
         match self {
-            ValidatorTransaction::ObservedJWKUpdate(t) => t.timestamp,
-            ValidatorTransaction::DKGResult(t) => t.timestamp,
+            ValidatorTransaction::ObservedJwkUpdate(t) => t.timestamp,
+            ValidatorTransaction::DkgResult(t) => t.timestamp,
         }
     }
 
@@ -693,18 +730,20 @@ impl ValidatorTransaction {
         timestamp: u64,
     ) -> Self {
         match internal {
-            aptos_types::validator_txn::ValidatorTransaction::DKGResult(_) => {
-                Self::DKGResult(DKGResultTransaction {
+            aptos_types::validator_txn::ValidatorTransaction::DKGResult(dkg_transcript) => {
+                Self::DkgResult(DKGResultTransaction {
                     info,
                     events,
                     timestamp: U64::from(timestamp),
+                    dkg_transcript: ExportedDKGTranscript::from_internal_repr(dkg_transcript),
                 })
             },
-            aptos_types::validator_txn::ValidatorTransaction::ObservedJWKUpdate(_) => {
-                Self::ObservedJWKUpdate(JWKUpdateTransaction {
+            aptos_types::validator_txn::ValidatorTransaction::ObservedJWKUpdate(quorum_certified_update) => {
+                Self::ObservedJwkUpdate(JWKUpdateTransaction {
                     info,
                     events,
                     timestamp: U64::from(timestamp),
+                    quorum_certified_update: ExportedQuorumCertifiedUpdate::from_internal_repr(quorum_certified_update),
                 })
             },
         }
@@ -718,6 +757,61 @@ pub struct JWKUpdateTransaction {
     pub info: TransactionInfo,
     pub events: Vec<Event>,
     pub timestamp: U64,
+    pub quorum_certified_update: ExportedQuorumCertifiedUpdate,
+}
+
+/// A more API-friendly representation of the on-chain `aptos_types::jwks::QuorumCertifiedUpdate`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ExportedQuorumCertifiedUpdate {
+    pub update: ExportedProviderJWKs,
+    pub multi_sig: ExportedAggregateSignature,
+}
+
+impl ExportedQuorumCertifiedUpdate {
+    pub fn from_internal_repr(internal: QuorumCertifiedUpdate) -> Self {
+        let QuorumCertifiedUpdate { update, multi_sig } = internal;
+        Self {
+            update: ExportedProviderJWKs::from_internal_repr(update),
+            multi_sig: ExportedAggregateSignature::from_internal_repr(multi_sig),
+        }
+    }
+}
+
+/// A more API-friendly representation of the on-chain `aptos_types::aggregate_signature::AggregateSignature`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ExportedAggregateSignature {
+    signer_indices: Vec<usize>,
+    sig: Option<Vec<u8>>,
+}
+
+impl ExportedAggregateSignature {
+    pub fn from_internal_repr(internal: AggregateSignature) -> Self {
+        Self {
+            signer_indices: internal.get_signers_bitvec().iter_ones().collect(),
+            sig: internal.sig().as_ref().map(|s|s.to_bytes().to_vec()),
+        }
+    }
+}
+
+/// A more API-friendly representation of the on-chain `aptos_types::jwks::ProviderJWKs`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ExportedProviderJWKs {
+    pub issuer: String,
+    pub version: u64,
+    pub jwks: Vec<JWK>,
+}
+
+impl ExportedProviderJWKs {
+    pub fn from_internal_repr(internal: ProviderJWKs) -> Self {
+        let ProviderJWKs { issuer, version, jwks } = internal;
+        Self {
+            issuer: String::from_utf8(issuer).unwrap_or("non_utf8_issuer".to_string()),
+            version,
+            jwks: jwks.iter().map(|on_chain_jwk|{
+                JWK::try_from(on_chain_jwk).expect("conversion from on-chain representation to human-friendly representation should work")
+            }).collect(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
@@ -727,6 +821,27 @@ pub struct DKGResultTransaction {
     pub info: TransactionInfo,
     pub events: Vec<Event>,
     pub timestamp: U64,
+    pub dkg_transcript: ExportedDKGTranscript,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ExportedDKGTranscript {
+    epoch: U64,
+    author: Address,
+    #[serde(with = "serde_bytes")]
+    payload: Vec<u8>,
+}
+
+impl ExportedDKGTranscript {
+    pub fn from_internal_repr(internal: DKGTranscript) -> Self {
+        let DKGTranscript { metadata, transcript_bytes } = internal;
+        let DKGTranscriptMetadata { epoch, author } = metadata;
+        Self {
+            epoch: epoch.into(),
+            author: author.into(),
+            payload: transcript_bytes,
+        }
+    }
 }
 
 /// An event from a transaction

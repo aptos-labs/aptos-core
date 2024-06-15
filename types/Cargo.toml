@@ -61,6 +61,8 @@ serde_yaml = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
+poem-openapi = { workspace = true }
+poem-openapi-derive = { workspace = true }
 
 [dev-dependencies]
 ahash = { workspace = true }

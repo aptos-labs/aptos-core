@@ -14,6 +14,7 @@ use std::{
     cmp::Ordering,
     fmt::{Debug, Formatter},
 };
+use poem_openapi_derive::Union;
 
 /// Reflection of Move type `0x1::jwks::JWK`.
 /// When you load an on-chain config that contains some JWK(s), the JWK will be of this type.
@@ -47,7 +48,7 @@ impl From<RSA_JWK> for JWKMoveStruct {
 }
 
 /// The JWK type that can be converted from/to `JWKMoveStruct` but easier to use in rust.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 pub enum JWK {
     RSA(RSA_JWK),
     Unsupported(UnsupportedJWK),

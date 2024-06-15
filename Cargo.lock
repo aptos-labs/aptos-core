@@ -531,6 +531,7 @@ dependencies = [
  "poem-openapi",
  "poem-openapi-derive",
  "serde",
+ "serde_bytes",
  "serde_json",
 ]
 
@@ -4108,6 +4109,8 @@ dependencies = [
  "passkey-authenticator",
  "passkey-client",
  "passkey-types",
+ "poem-openapi",
+ "poem-openapi-derive",
  "proptest",
  "proptest-derive",
  "quick_cache",
