@@ -213,7 +213,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let id = module.self_id();
         let sender = *id.address();
         let verbose = extra_args.verbose;
-        match self.perform_session_action(
+
+        let result = self.perform_session_action(
             gas_budget,
             |session, gas_status| {
                 let compat = Compatibility::new(
@@ -230,7 +231,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 )
             },
             production_vm_config_with_paranoid_type_checks(),
-        ) {
+        );
+        match result {
             Ok(()) => Ok((None, module)),
             Err(vm_error) => Err(anyhow!(
                 "Unable to publish module '{}'. Got VMError: {}",

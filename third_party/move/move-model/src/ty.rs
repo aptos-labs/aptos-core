@@ -2939,9 +2939,7 @@ impl TypeUnificationError {
                 let fields = field_map
                     .iter()
                     .filter_map(|(n, ty)| {
-                        let Some(actual_ty) = actual_field_map.get(n) else {
-                            return None;
-                        };
+                        let actual_ty = actual_field_map.get(n)?;
                         if ty != actual_ty {
                             Some(format!(
                                 "field `{}` has type `{}` instead of `{}`",
@@ -3317,6 +3315,7 @@ impl<'a> TypeDisplay<'a> {
         }
     }
 
+    #[allow(clippy::assigning_clones)]
     fn struct_str(&self, mid: ModuleId, sid: StructId) -> String {
         let env = self.context.env;
         let mut str = if let Some(builder_table) = self.context.builder_struct_table {

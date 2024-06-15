@@ -317,7 +317,7 @@ fn test_commit_callback() {
 #[test]
 fn test_reset_sequence_number_on_failure() {
     let mut pool = setup_mempool().0;
-    let txns = vec![TestTransaction::new(1, 0, 1), TestTransaction::new(1, 1, 1)];
+    let txns = [TestTransaction::new(1, 0, 1), TestTransaction::new(1, 1, 1)];
     let hashes: Vec<_> = txns
         .iter()
         .cloned()
