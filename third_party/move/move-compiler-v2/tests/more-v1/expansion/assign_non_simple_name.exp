@@ -1,5 +1,11 @@
 
 Diagnostics:
+warning: unused alias
+  ┌─ tests/more-v1/expansion/assign_non_simple_name.move:6:15
+  │
+6 │     use 0x42::X;
+  │               ^ Unused 'use' of alias 'X'. Consider removing it
+
 error: syntax item restricted to spec contexts
    ┌─ tests/more-v1/expansion/assign_non_simple_name.move:16:9
    │

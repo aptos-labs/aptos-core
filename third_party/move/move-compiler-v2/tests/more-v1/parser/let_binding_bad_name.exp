@@ -7,4 +7,4 @@ error: unexpected token
   │             ^
   │             │
   │             Unexpected '{'
-  │             Expected a variable or struct name
+  │             Expected a variable or struct or variant name

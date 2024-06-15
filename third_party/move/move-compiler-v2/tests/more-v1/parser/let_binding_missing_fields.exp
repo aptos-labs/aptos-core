@@ -1,10 +1,7 @@
 
 Diagnostics:
-error: unexpected token
-  ┌─ tests/more-v1/parser/let_binding_missing_fields.move:6:26
+error: invalid 'module' declaration
+  ┌─ tests/more-v1/parser/let_binding_missing_fields.move:1:8
   │
-6 │         let Generic<u64> = g; // Test a type name with no field bindings
-  │                          ^
-  │                          │
-  │                          Unexpected '='
-  │                          Expected '{'
+1 │ module M {
+  │        ^ Invalid module declaration. The module does not have a specified address. Either declare it inside of an 'address <address> {' block or declare it with an address 'module <address>::M''

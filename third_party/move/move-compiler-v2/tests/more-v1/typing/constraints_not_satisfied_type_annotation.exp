@@ -10,12 +10,3 @@ error: type `R` is missing required ability `copy`
   │                               ^
   │
   = required by instantiating type parameter `T:copy` of struct `CupC`
-
-warning: Unnecessary trailing semicolon
-  ┌─ tests/more-v1/typing/constraints_not_satisfied_type_annotation.move:7:35
-  │
-7 │         ignore((abort 0: CupC<R>));
-  │         --------------------------^
-  │         │                         │
-  │         │                         A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-  │         Any code after this expression will not be reached

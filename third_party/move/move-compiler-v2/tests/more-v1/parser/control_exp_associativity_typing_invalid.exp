@@ -29,12 +29,3 @@ error: expected expression with no value but found `u64`
    │
 26 │         loop bar() + 2;
    │              ^^^^^^^^^
-
-warning: Unnecessary trailing semicolon
-   ┌─ tests/more-v1/parser/control_exp_associativity_typing_invalid.move:26:23
-   │
-26 │         loop bar() + 2;
-   │         --------------^
-   │         │             │
-   │         │             A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
-   │         Any code after this expression will not be reached

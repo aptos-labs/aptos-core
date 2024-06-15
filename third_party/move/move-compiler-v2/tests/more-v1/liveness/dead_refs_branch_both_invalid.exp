@@ -7,7 +7,7 @@ error: cannot copy local `x` which is still mutably borrowed
    │                     ------ previous mutable local borrow
    ·
 10 │         _ = x;
-   │         ^^^^^ copied here
+   │         ^ copied here
 11 │         _ = move x;
 12 │         *x_ref = 0;
    │         ---------- conflicting reference `x_ref` used here
@@ -30,7 +30,7 @@ error: cannot copy local `x` which is still mutably borrowed
    │                     ------ previous mutable local borrow
    ·
 23 │         _ = x;
-   │         ^^^^^ copied here
+   │         ^ copied here
 24 │         _ = move x;
 25 │         _ = *x_ref;
    │             ------ conflicting reference `x_ref` used here

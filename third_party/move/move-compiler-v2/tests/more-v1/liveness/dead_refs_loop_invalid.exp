@@ -7,9 +7,9 @@ error: cannot copy local `x` which is still mutably borrowed
   │                     ------ previous mutable local borrow
 5 │         while (cond) {
 6 │             _ = x;
-  │             ^^^^^ copied here
+  │             ^ copied here
 7 │             _ = x_ref;
-  │             --------- conflicting reference `x_ref` used here
+  │             - conflicting reference `x_ref` used here
 
 error: cannot copy local `x` which is still mutably borrowed
    ┌─ tests/more-v1/liveness/dead_refs_loop_invalid.move:16:12
@@ -18,9 +18,9 @@ error: cannot copy local `x` which is still mutably borrowed
    │                     ------ previous mutable local borrow
 14 │         loop {
 15 │            _ = x_ref;
-   │            --------- conflicting reference `x_ref` used here
+   │            - conflicting reference `x_ref` used here
 16 │            _ = x;
-   │            ^^^^^ copied here
+   │            ^ copied here
 
 error: cannot copy local `x` which is still mutably borrowed
    ┌─ tests/more-v1/liveness/dead_refs_loop_invalid.move:25:13
@@ -29,6 +29,6 @@ error: cannot copy local `x` which is still mutably borrowed
    │                     ------ previous mutable local borrow
 23 │         loop {
 24 │             if (cond) break else  { _ = x_ref; };
-   │                                     --------- conflicting reference `x_ref` used here
+   │                                     - conflicting reference `x_ref` used here
 25 │             _ = x;
-   │             ^^^^^ copied here
+   │             ^ copied here

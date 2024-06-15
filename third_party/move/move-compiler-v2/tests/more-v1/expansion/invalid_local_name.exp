@@ -6,18 +6,6 @@ error: invalid name
 4 │     fun t(No: u64) {
   │           ^^ Invalid local variable name 'No'. Local variable names must start with 'a'..'z' (or '_')
 
-error: invalid name
-  ┌─ tests/more-v1/expansion/invalid_local_name.move:9:13
-  │
-9 │         let No;
-  │             ^^ Invalid local variable name 'No'. Local variable names must start with 'a'..'z' (or '_')
-
-error: invalid name
-   ┌─ tests/more-v1/expansion/invalid_local_name.move:14:13
-   │
-14 │         let No = 100;
-   │             ^^ Invalid local variable name 'No'. Local variable names must start with 'a'..'z' (or '_')
-
 error: invalid use of reserved name
    ┌─ tests/more-v1/expansion/invalid_local_name.move:23:13
    │
