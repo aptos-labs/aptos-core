@@ -177,6 +177,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         timestamp: u64,
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
+        use aptos_types::transaction::Transaction::{
+            BlockEpilogue, BlockMetadata, BlockMetadataExt, GenesisTransaction, StateCheckpoint,
+            UserTransaction,
+        };
         let aux_data = self
             .db
             .get_transaction_auxiliary_data_by_version(data.version)?;
@@ -189,32 +193,30 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         );
         let events = self.try_into_events(&data.events)?;
         Ok(match data.transaction {
-            aptos_types::transaction::Transaction::UserTransaction(txn) => {
+            UserTransaction(txn) => {
                 let payload = self.try_into_transaction_payload(txn.payload().clone())?;
                 (&txn, info, payload, events, timestamp).into()
             },
-            aptos_types::transaction::Transaction::GenesisTransaction(write_set) => {
+            GenesisTransaction(write_set) => {
                 let payload = self.try_into_write_set_payload(write_set)?;
                 (info, payload, events).into()
             },
-            aptos_types::transaction::Transaction::BlockMetadata(txn) => {
+            BlockMetadata(txn) => {
                 Transaction::BlockMetadataTransaction(BlockMetadataTransaction::from_internal_repr(
                     txn, info, events,
                 ))
                 // (&txn, info, events).into()
             },
-            aptos_types::transaction::Transaction::BlockMetadataExt(txn) => {
-                Transaction::BlockMetadataExtTransaction(
-                    BlockMetadataExtTransaction::from_internal_repr(txn, info, events),
-                )
-            },
-            aptos_types::transaction::Transaction::StateCheckpoint(_) => {
+            BlockMetadataExt(txn) => Transaction::BlockMetadataExtTransaction(
+                BlockMetadataExtTransaction::from_internal_repr(txn, info, events),
+            ),
+            StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),
                 })
             },
-            aptos_types::transaction::Transaction::BlockEpilogue(block_epilogue_payload) => {
+            BlockEpilogue(block_epilogue_payload) => {
                 Transaction::BlockEpilogueTransaction(BlockEpilogueTransaction {
                     info,
                     timestamp: timestamp.into(),

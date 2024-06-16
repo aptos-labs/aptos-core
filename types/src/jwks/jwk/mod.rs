@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::match_result_ok)]
+
 use crate::{
     jwks::{rsa::RSA_JWK, unsupported::UnsupportedJWK},
     move_any::{Any as MoveAny, AsMoveAny},
@@ -9,12 +11,12 @@ use crate::{
 use anyhow::anyhow;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::value::{MoveStruct, MoveValue};
+use poem_openapi_derive::Union;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     fmt::{Debug, Formatter},
 };
-use poem_openapi_derive::Union;
 
 /// Reflection of Move type `0x1::jwks::JWK`.
 /// When you load an on-chain config that contains some JWK(s), the JWK will be of this type.

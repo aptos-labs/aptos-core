@@ -7,7 +7,9 @@ use crate::{
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
 };
 use aptos_api::context::Context;
-use aptos_api_types::{AsConverter, Transaction as APITransaction, Transaction, TransactionOnChainData};
+use aptos_api_types::{
+    AsConverter, Transaction as APITransaction, Transaction, TransactionOnChainData,
+};
 use aptos_indexer_grpc_utils::{
     chunk_transactions,
     constants::MESSAGE_SIZE_LIMIT,
@@ -417,7 +419,7 @@ impl IndexerStreamCoordinator {
                             let info = bmet.transaction_info_mut();
                             info.block_height = Some(block_height_bcs);
                             info.epoch = Some(epoch_bcs);
-                        }
+                        },
                     };
                     txn
                 }) {

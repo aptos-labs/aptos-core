@@ -17,9 +17,12 @@ use aptos_crypto::{
 };
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     block_metadata::BlockMetadata,
     block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
     contract_event::{ContractEvent, EventWithVersion},
+    dkg::{DKGTranscript, DKGTranscriptMetadata},
+    jwks::{jwk::JWK, ProviderJWKs, QuorumCertifiedUpdate},
     keyless,
     transaction::{
         authenticator::{
@@ -40,11 +43,6 @@ use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_types::dkg::{DKGTranscript, DKGTranscriptMetadata};
-use aptos_types::jwks::{ProviderJWKs, QuorumCertifiedUpdate};
-use aptos_types::jwks::jwk::JWK;
-use aptos_types::jwks::unsupported::UnsupportedJWK;
 
 static DUMMY_GUID: Lazy<EventGuid> = Lazy::new(|| EventGuid {
     creation_number: U64::from(0u64),
@@ -635,7 +633,11 @@ impl BlockMetadataWithRandomnessTransaction {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "block_metadata_ext_transaction_type", rename_all = "snake_case")]
-#[oai(one_of, discriminator_name = "block_metadata_ext_transaction_type", rename_all = "snake_case")]
+#[oai(
+    one_of,
+    discriminator_name = "block_metadata_ext_transaction_type",
+    rename_all = "snake_case"
+)]
 pub enum BlockMetadataExtTransaction {
     V0(BlockMetadataTransaction),
     V1(BlockMetadataWithRandomnessTransaction),
@@ -688,7 +690,11 @@ impl BlockMetadataExtTransaction {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "validator_transaction_type", rename_all = "snake_case")]
-#[oai(one_of, discriminator_name = "validator_transaction_type", rename_all = "snake_case")]
+#[oai(
+    one_of,
+    discriminator_name = "validator_transaction_type",
+    rename_all = "snake_case"
+)]
 pub enum ValidatorTransaction {
     ObservedJwkUpdate(JWKUpdateTransaction),
     DkgResult(DKGResultTransaction),
@@ -697,7 +703,9 @@ pub enum ValidatorTransaction {
 impl ValidatorTransaction {
     pub fn type_str(&self) -> &'static str {
         match self {
-            ValidatorTransaction::ObservedJwkUpdate(_) => "validator_transaction__observed_jwk_update",
+            ValidatorTransaction::ObservedJwkUpdate(_) => {
+                "validator_transaction__observed_jwk_update"
+            },
             ValidatorTransaction::DkgResult(_) => "validator_transaction__dkg_result",
         }
     }
@@ -738,14 +746,16 @@ impl ValidatorTransaction {
                     dkg_transcript: ExportedDKGTranscript::from_internal_repr(dkg_transcript),
                 })
             },
-            aptos_types::validator_txn::ValidatorTransaction::ObservedJWKUpdate(quorum_certified_update) => {
-                Self::ObservedJwkUpdate(JWKUpdateTransaction {
-                    info,
-                    events,
-                    timestamp: U64::from(timestamp),
-                    quorum_certified_update: ExportedQuorumCertifiedUpdate::from_internal_repr(quorum_certified_update),
-                })
-            },
+            aptos_types::validator_txn::ValidatorTransaction::ObservedJWKUpdate(
+                quorum_certified_update,
+            ) => Self::ObservedJwkUpdate(JWKUpdateTransaction {
+                info,
+                events,
+                timestamp: U64::from(timestamp),
+                quorum_certified_update: ExportedQuorumCertifiedUpdate::from_internal_repr(
+                    quorum_certified_update,
+                ),
+            }),
         }
     }
 }
@@ -788,7 +798,7 @@ impl ExportedAggregateSignature {
     pub fn from_internal_repr(internal: AggregateSignature) -> Self {
         Self {
             signer_indices: internal.get_signers_bitvec().iter_ones().collect(),
-            sig: internal.sig().as_ref().map(|s|s.to_bytes().to_vec()),
+            sig: internal.sig().as_ref().map(|s| s.to_bytes().to_vec()),
         }
     }
 }
@@ -803,7 +813,11 @@ pub struct ExportedProviderJWKs {
 
 impl ExportedProviderJWKs {
     pub fn from_internal_repr(internal: ProviderJWKs) -> Self {
-        let ProviderJWKs { issuer, version, jwks } = internal;
+        let ProviderJWKs {
+            issuer,
+            version,
+            jwks,
+        } = internal;
         Self {
             issuer: String::from_utf8(issuer).unwrap_or("non_utf8_issuer".to_string()),
             version,
@@ -828,13 +842,15 @@ pub struct DKGResultTransaction {
 pub struct ExportedDKGTranscript {
     epoch: U64,
     author: Address,
-    #[serde(with = "serde_bytes")]
     payload: Vec<u8>,
 }
 
 impl ExportedDKGTranscript {
     pub fn from_internal_repr(internal: DKGTranscript) -> Self {
-        let DKGTranscript { metadata, transcript_bytes } = internal;
+        let DKGTranscript {
+            metadata,
+            transcript_bytes,
+        } = internal;
         let DKGTranscriptMetadata { epoch, author } = metadata;
         Self {
             epoch: epoch.into(),

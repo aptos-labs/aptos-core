@@ -8,10 +8,10 @@ use base64::URL_SAFE_NO_PAD;
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use move_core_types::value::{MoveStruct, MoveValue};
 use once_cell::sync::Lazy;
+use poem_openapi_derive::Object;
 use ring::signature::RsaKeyPair;
 use rsa::{pkcs1::EncodeRsaPrivateKey, pkcs8::DecodePrivateKey};
 use serde::{Deserialize, Serialize};
-use poem_openapi_derive::Object;
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 /// See its doc in Move for more details.
 #[allow(non_camel_case_types)]

@@ -531,7 +531,6 @@ dependencies = [
  "poem-openapi",
  "poem-openapi-derive",
  "serde",
- "serde_bytes",
  "serde_json",
 ]
 

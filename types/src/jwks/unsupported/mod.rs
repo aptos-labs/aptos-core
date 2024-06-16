@@ -4,9 +4,9 @@
 use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use aptos_crypto::HashValue;
 use move_core_types::value::{MoveStruct, MoveValue};
+use poem_openapi_derive::Object;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
-use poem_openapi_derive::Object;
 
 /// Move type `0x1::jwks::UnsupportedJWK` in rust.
 /// See its doc in Move for more details.

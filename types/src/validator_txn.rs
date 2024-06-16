@@ -44,7 +44,9 @@ impl ValidatorTransaction {
     pub fn type_name(&self) -> &'static str {
         match self {
             ValidatorTransaction::DKGResult(_) => "validator_transaction__dkg_result",
-            ValidatorTransaction::ObservedJWKUpdate(_) => "validator_transaction__observed_jwk_update",
+            ValidatorTransaction::ObservedJWKUpdate(_) => {
+                "validator_transaction__observed_jwk_update"
+            },
         }
     }
 }

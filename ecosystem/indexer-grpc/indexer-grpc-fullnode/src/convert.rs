@@ -762,7 +762,7 @@ pub fn convert_transaction(
         },
         Transaction::BlockMetadataExtTransaction(_) => {
             todo!()
-        }
+        },
     };
 
     let txn_data = match &transaction {
@@ -834,7 +834,7 @@ pub fn convert_transaction(
         },
         Transaction::BlockMetadataExtTransaction(_) => {
             todo!()
-        }
+        },
     };
 
     transaction::Transaction {

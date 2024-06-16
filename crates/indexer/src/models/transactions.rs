@@ -238,7 +238,7 @@ impl Transaction {
             },
             APITransaction::ValidatorTransaction(validator_txn) => (
                 Self::from_transaction_info(
-                    &validator_txn.info,
+                    validator_txn.transaction_info(),
                     None,
                     transaction.type_str().to_string(),
                     0,
@@ -250,6 +250,9 @@ impl Transaction {
                 vec![],
                 vec![],
             ),
+            APITransaction::BlockMetadataExtTransaction(_block_metadata_ext_txn) => {
+                todo!()
+            },
         }
     }
 

@@ -292,8 +292,14 @@ async fn fetch_nexts(
                         bet.info.epoch = Some(epoch_bcs);
                     },
                     Transaction::ValidatorTransaction(ref mut st) => {
-                        st.info.block_height = Some(block_height_bcs);
-                        st.info.epoch = Some(epoch_bcs);
+                        let info = st.transaction_info_mut();
+                        info.block_height = Some(block_height_bcs);
+                        info.epoch = Some(epoch_bcs);
+                    },
+                    Transaction::BlockMetadataExtTransaction(ref mut bmet) => {
+                        let info = bmet.transaction_info_mut();
+                        info.block_height = Some(block_height_bcs);
+                        info.epoch = Some(epoch_bcs);
                     },
                 };
                 txn
