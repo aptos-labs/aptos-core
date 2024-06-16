@@ -336,16 +336,6 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
     }
 }
 
-// impl From<(TransactionInfo, Vec<Event>, u64)> for Transaction {
-//     fn from((info, events, timestamp): (TransactionInfo, Vec<Event>, u64)) -> Self {
-//         Transaction::ValidatorTransaction(ValidatorTransaction {
-//             info,
-//             events,
-//             timestamp: timestamp.into(),
-//         })
-//     }
-// }
-
 /// Information related to how a transaction affected the state of the blockchain
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct TransactionInfo {
