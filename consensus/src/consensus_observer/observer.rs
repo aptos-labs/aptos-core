@@ -229,6 +229,22 @@ impl ConsensusObserver {
                 }
             }
 
+            // Verify that the subscription peer is optimal
+            if let Some(peers_and_metadata) = self.get_connected_peers_and_metadata() {
+                if let Err(error) =
+                    active_subscription.check_subscription_peer_optimality(peers_and_metadata)
+                {
+                    // Log the error and terminate the subscription
+                    warn!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "The subscription peer is no longer optimal: {:?}",
+                            error
+                        ))
+                    );
+                    return;
+                }
+            }
+
             // The subscription seems healthy, we can keep it
             self.active_observer_subscription = Some(active_subscription);
         }
