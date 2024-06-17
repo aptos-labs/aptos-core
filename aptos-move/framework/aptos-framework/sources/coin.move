@@ -1,10 +1,10 @@
 /// This module provides the foundation for typesafe Coins.
 module aptos_framework::coin {
-    use std::string;
     use std::error;
     use std::features;
     use std::option::{Self, Option};
     use std::signer;
+    use std::string::{Self, String};
     use aptos_std::table::{Self, Table};
 
     use aptos_framework::account;
@@ -18,10 +18,8 @@ module aptos_framework::coin {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata, MintRef, TransferRef, BurnRef};
     use aptos_framework::object::{Self, Object, object_address};
     use aptos_framework::primary_fungible_store;
-    use aptos_std::type_info::{Self, TypeInfo};
+    use aptos_std::type_info::{Self, TypeInfo, type_name};
     use aptos_framework::create_signer;
-    #[test_only]
-    use std::string::String;
 
     friend aptos_framework::aptos_coin;
     friend aptos_framework::genesis;
@@ -155,10 +153,10 @@ module aptos_framework::coin {
 
     /// Information about a specific coin type. Stored on the creator of the coin's account.
     struct CoinInfo<phantom CoinType> has key {
-        name: string::String,
+        name: String,
         /// Symbol of the coin, usually a shorter version of the name.
         /// For example, Singapore Dollar is SGD.
-        symbol: string::String,
+        symbol: String,
         /// Number of decimals used to get its user representation.
         /// For example, if `decimals` equals `2`, a balance of `505` coins should
         /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
@@ -167,15 +165,41 @@ module aptos_framework::coin {
         supply: Option<OptionalAggregator>,
     }
 
-    /// Event emitted when some amount of a coin is deposited into an account.
-    struct DepositEvent has drop, store {
+
+    #[event]
+    /// Module event emitted when some amount of a coin is deposited into an account.
+    struct CoinDeposit has drop, store {
+        coin_type: String,
+        account: address,
         amount: u64,
     }
 
     #[event]
-    /// Module event emitted when some amount of a coin is deposited into an account.
+    /// Module event emitted when some amount of a coin is withdrawn from an account.
+    struct CoinWithdraw has drop, store {
+        coin_type: String,
+        account: address,
+        amount: u64,
+    }
+
+    // DEPRECATED, NEVER USED
+    #[deprecated]
+    #[event]
     struct Deposit<phantom CoinType> has drop, store {
         account: address,
+        amount: u64,
+    }
+
+    // DEPRECATED, NEVER USED
+    #[deprecated]
+    #[event]
+    struct Withdraw<phantom CoinType> has drop, store {
+        account: address,
+        amount: u64,
+    }
+
+    /// Event emitted when some amount of a coin is deposited into an account.
+    struct DepositEvent has drop, store {
         amount: u64,
     }
 
@@ -184,12 +208,6 @@ module aptos_framework::coin {
         amount: u64,
     }
 
-    #[event]
-    /// Module event emitted when some amount of a coin is withdrawn from an account.
-    struct Withdraw<phantom CoinType> has drop, store {
-        account: address,
-        amount: u64,
-    }
 
     #[event]
     /// Module event emitted when the event handles related to coin store is deleted.
@@ -879,7 +897,9 @@ module aptos_framework::coin {
                 error::permission_denied(EFROZEN),
             );
             if (std::features::module_event_migration_enabled()) {
-                event::emit(Deposit<CoinType> { account: account_addr, amount: coin.value });
+                event::emit(
+                    CoinDeposit { coin_type: type_name<CoinType>(), account: account_addr, amount: coin.value }
+                );
             };
             event::emit_event<DepositEvent>(
                 &mut coin_store.deposit_events,
@@ -1159,7 +1179,11 @@ module aptos_framework::coin {
                 error::permission_denied(EFROZEN),
             );
             if (std::features::module_event_migration_enabled()) {
-                event::emit(Withdraw<CoinType> { account: account_addr, amount: coin_amount_to_withdraw });
+                event::emit(
+                    CoinWithdraw {
+                        coin_type: type_name<CoinType>(), account: account_addr, amount: coin_amount_to_withdraw
+                    }
+                );
             };
             event::emit_event<WithdrawEvent>(
                 &mut coin_store.withdraw_events,

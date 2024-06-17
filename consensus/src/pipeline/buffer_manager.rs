@@ -384,15 +384,8 @@ impl BufferManager {
                 let aggregated_item = item.unwrap_aggregated();
                 let block = aggregated_item.executed_blocks.last().unwrap().block();
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
-                // TODO: As all the validators broadcast commit votes directly to all other validators,
-                // the proposer do not have to broadcast commit decision again. Remove this if block.
-                // if we're the proposer for the block, we're responsible to broadcast the commit decision.
-                if block.author() == Some(self.author) {
-                    let commit_decision = CommitMessage::Decision(CommitDecision::new(
-                        aggregated_item.commit_proof.clone(),
-                    ));
-                    self.commit_proof_rb_handle = self.do_reliable_broadcast(commit_decision);
-                }
+                // As all the validators broadcast commit votes directly to all other validators,
+                // the proposer do not have to broadcast commit decision again.
                 let commit_proof = aggregated_item.commit_proof.clone();
                 if commit_proof.ledger_info().ends_epoch() {
                     // the epoch ends, reset to avoid executing more blocks, execute after

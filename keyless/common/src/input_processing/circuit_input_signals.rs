@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Copyright © Aptos Foundation
-
 use super::config::CircuitPaddingConfig;
 use anyhow::{anyhow, bail, Result};
 use ark_bn254::Fr;
