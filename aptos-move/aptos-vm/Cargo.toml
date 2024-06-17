@@ -57,6 +57,7 @@ ouroboros = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
+execution-metrics = { path = "../../execution/execution-metrics" }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }

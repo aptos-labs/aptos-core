@@ -4146,6 +4146,7 @@ dependencies = [
  "claims",
  "crossbeam-channel",
  "derive_more",
+ "execution-metrics",
  "fail",
  "futures",
  "hex",
@@ -7536,6 +7537,14 @@ dependencies = [
  "evm-core",
  "primitive-types 0.10.1",
  "sha3 0.8.2",
+]
+
+[[package]]
+name = "execution-metrics"
+version = "0.1.0"
+dependencies = [
+ "aptos-metrics-core",
+ "once_cell",
 ]
 
 [[package]]

@@ -2,9 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::sync::{Arc, Condvar, Mutex};
+use once_cell::sync::OnceCell;
 use aptos_block_executor::transaction_provider::TxnProvider;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
+use execution_metrics::REMOTE_EXECUTOR_TIMER_V2;
+
+static SHARD_ID: OnceCell<usize> = OnceCell::new();
+
+pub fn static_set_shard_id(shard_id: usize) {
+    SHARD_ID.set(shard_id).unwrap();
+}
 
 pub struct StreamedTransactionsProvider {
     txns: Vec<Arc<SignatureVerifiedTransaction>>
@@ -66,10 +74,14 @@ impl BlockingTransactionsProvider {
 impl TxnProvider<SignatureVerifiedTransaction> for BlockingTransactionsProvider {
     fn get_txn(&self, idx: usize) -> Arc<SignatureVerifiedTransaction> {
         let (lock, cvar) = &self.txns[idx];
+        let timer = REMOTE_EXECUTOR_TIMER_V2
+            .with_label_values(&[&SHARD_ID.get().unwrap().to_string(), "get_state_value"])
+            .start_timer();
         let mut status = lock.lock().unwrap();
         while let CommandValue::Waiting = *status {
             status = cvar.wait(status).unwrap();
         }
+        drop(timer);
         match &*status {
             CommandValue::Ready(txn) => txn.clone(),
             CommandValue::Waiting => unreachable!(),

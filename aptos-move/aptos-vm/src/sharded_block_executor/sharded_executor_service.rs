@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 use aptos_block_executor::transaction_provider::TxnProvider;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::block_executor::config::BlockExecutorConfigFromOnchain;
-use crate::sharded_block_executor::streamed_transactions_provider::BlockingTransactionsProvider;
+use crate::sharded_block_executor::streamed_transactions_provider::{BlockingTransactionsProvider, static_set_shard_id};
 use crate::sharded_block_executor::StreamedExecutorShardCommand;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
@@ -253,6 +253,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     break;
                 },
             };
+            // Setting shard id for the transaction provider
+            static_set_shard_id(self.shard_id);
+
             cumulative_txns += num_txns_in_the_block;
             /*let blocking_transactions_provider_clone = blocking_transactions_provider.clone();
 
