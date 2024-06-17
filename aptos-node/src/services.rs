@@ -6,8 +6,8 @@ use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::{
-    network_interface::ConsensusMsg, persistent_liveness_storage::StorageWriteProxy,
-    quorum_store::quorum_store_db::QuorumStoreDB,
+    consensus_observer::publisher::ConsensusPublisher, network_interface::ConsensusMsg,
+    persistent_liveness_storage::StorageWriteProxy, quorum_store::quorum_store_db::QuorumStoreDB,
 };
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
@@ -108,15 +108,20 @@ pub fn bootstrap_api_and_indexer(
 
 /// Starts consensus and returns the runtime
 pub fn start_consensus_runtime(
-    node_config: &mut NodeConfig,
+    node_config: &NodeConfig,
     db_rw: DbReaderWriter,
     consensus_reconfig_subscription: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
     consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
     vtxn_pool: VTxnPoolState,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
+
+    let reconfig_subscription = consensus_reconfig_subscription
+        .expect("Consensus requires a reconfiguration subscription!");
+
     let consensus = aptos_consensus::consensus_provider::start_consensus(
         node_config,
         consensus_network_interfaces.network_client,
@@ -124,11 +129,12 @@ pub fn start_consensus_runtime(
         Arc::new(consensus_notifier),
         consensus_to_mempool_sender,
         db_rw,
-        consensus_reconfig_subscription
-            .expect("Consensus requires a reconfiguration subscription!"),
+        reconfig_subscription,
         vtxn_pool,
+        consensus_publisher,
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
+
     consensus
 }
 

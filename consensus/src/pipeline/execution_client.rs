@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    consensus_observer::publisher::ConsensusPublisher,
     counters,
     error::StateSyncError,
     network::{IncomingCommitRequest, IncomingRandGenRequest, NetworkSender},
@@ -27,7 +28,7 @@ use crate::{
 use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::ConsensusConfig;
+use aptos_config::config::{ConsensusConfig, ConsensusObserverConfig};
 use aptos_consensus_types::{
     common::{Author, Round},
     pipelined_block::PipelinedBlock,
@@ -147,6 +148,8 @@ pub struct ExecutionProxyClient {
     // channels to buffer manager
     handle: Arc<RwLock<BufferManagerHandle>>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+    consensus_observer_config: ConsensusObserverConfig,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
 }
 
 impl ExecutionProxyClient {
@@ -158,6 +161,8 @@ impl ExecutionProxyClient {
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         bounded_executor: BoundedExecutor,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+        consensus_observer_config: ConsensusObserverConfig,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
         Self {
             consensus_config,
@@ -168,6 +173,8 @@ impl ExecutionProxyClient {
             bounded_executor,
             handle: Arc::new(RwLock::new(BufferManagerHandle::new())),
             rand_storage,
+            consensus_observer_config,
+            consensus_publisher,
         }
     }
 
@@ -177,8 +184,11 @@ impl ExecutionProxyClient {
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
+        onchain_consensus_config: &OnChainConsensusConfig,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_ordered_round: Round,
+        consensus_observer_config: ConsensusObserverConfig,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -262,6 +272,9 @@ impl ExecutionProxyClient {
             reset_buffer_manager_rx,
             epoch_state,
             self.bounded_executor.clone(),
+            onchain_consensus_config.order_vote_enabled(),
+            consensus_observer_config,
+            consensus_publisher,
         );
 
         tokio::spawn(execution_schedule_phase.start());
@@ -292,8 +305,11 @@ impl TExecutionClient for ExecutionProxyClient {
             epoch_state.clone(),
             rand_config,
             fast_rand_config,
+            onchain_consensus_config,
             rand_msg_rx,
             highest_ordered_round,
+            self.consensus_observer_config,
+            self.consensus_publisher.clone(),
         );
 
         let transaction_shuffler =

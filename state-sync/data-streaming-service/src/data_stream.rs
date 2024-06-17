@@ -228,8 +228,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         }
 
         self.notifications_to_responses
-            .get(notification_id)
-            .is_some()
+            .contains_key(notification_id)
     }
 
     /// Notifies the Aptos data client of a bad client response

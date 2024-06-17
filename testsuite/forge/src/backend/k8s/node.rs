@@ -268,6 +268,10 @@ impl Node for K8sNode {
         )
         .await
     }
+
+    fn service_name(&self) -> Option<String> {
+        Some(self.service_name.clone())
+    }
 }
 
 impl Validator for K8sNode {}

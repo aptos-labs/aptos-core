@@ -4,7 +4,7 @@
 
 use anyhow::format_err;
 use aptos_crypto::HashValue;
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
@@ -23,6 +23,7 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 
 pub struct GenesisSession<'r, 'l>(SessionExt<'r, 'l>);
@@ -35,6 +36,7 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) {
+        let traversal_storage = TraversalStorage::new();
         self.0
             .execute_function_bypass_visibility(
                 &ModuleId::new(
@@ -45,6 +47,7 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
                 ty_args,
                 args,
                 &mut UnmeteredGasMeter,
+                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_or_else(|e| {
                 panic!(
@@ -59,12 +62,14 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
     pub fn exec_script(&mut self, sender: AccountAddress, script: &Script) {
         let mut temp = vec![sender.to_vec()];
         temp.extend(convert_txn_args(script.args()));
+        let traversal_storage = TraversalStorage::new();
         self.0
             .execute_script(
                 script.code().to_vec(),
                 script.ty_args().to_vec(),
                 temp,
                 &mut UnmeteredGasMeter,
+                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap()
     }
@@ -106,9 +111,8 @@ where
 {
     let resolver = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        Ok(&AptosGasParameters::zeros()),
         chain_id,
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
@@ -120,7 +124,7 @@ where
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
         let mut session =
-            GenesisSession(move_vm.new_session(&resolver, SessionId::genesis(genesis_id)));
+            GenesisSession(move_vm.new_session(&resolver, SessionId::genesis(genesis_id), None));
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();

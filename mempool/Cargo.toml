@@ -38,6 +38,7 @@ fail = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
 maplit = { workspace = true }
+num_cpus = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 rand = { workspace = true }

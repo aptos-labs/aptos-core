@@ -174,6 +174,24 @@ BlockData:
         TYPENAME: QuorumCert
     - block_type:
         TYPENAME: BlockType
+BlockEndInfo:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - block_gas_limit_reached: BOOL
+          - block_output_limit_reached: BOOL
+          - block_effective_block_gas_units: U64
+          - block_approx_output_size: U64
+BlockEpiloguePayload:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - block_id:
+              TYPENAME: HashValue
+          - block_end_info:
+              TYPENAME: BlockEndInfo
 BlockInfo:
   STRUCT:
     - epoch: U64
@@ -387,6 +405,10 @@ ConsensusMsg:
       BatchResponseV2:
         NEWTYPE:
           TYPENAME: BatchResponse
+    18:
+      OrderVoteMsg:
+        NEWTYPE:
+          TYPENAME: OrderVoteMsg
 ContractEvent:
   ENUM:
     0:
@@ -609,6 +631,20 @@ OpenIdSig:
         TYPENAME: Pepper
     - idc_aud_val:
         OPTION: STR
+OrderVote:
+  STRUCT:
+    - author:
+        TYPENAME: AccountAddress
+    - ledger_info:
+        TYPENAME: LedgerInfo
+    - signature:
+        TYPENAME: Signature
+OrderVoteMsg:
+  STRUCT:
+    - order_vote:
+        TYPENAME: OrderVote
+    - quorum_cert:
+        TYPENAME: QuorumCert
 PartialAuthenticatorAssertionResponse:
   STRUCT:
     - signature:
@@ -716,13 +752,6 @@ RandGenMessage:
     - epoch: U64
     - data: BYTES
 RandMetadata:
-  STRUCT:
-    - metadata_to_sign:
-        TYPENAME: RandMetadataToSign
-    - block_id:
-        TYPENAME: HashValue
-    - timestamp: U64
-RandMetadataToSign:
   STRUCT:
     - epoch: U64
     - round: U64
@@ -836,9 +865,9 @@ SyncInfo:
         TYPENAME: QuorumCert
     - highest_ordered_cert:
         OPTION:
-          TYPENAME: QuorumCert
+          TYPENAME: WrappedLedgerInfo
     - highest_commit_cert:
-        TYPENAME: QuorumCert
+        TYPENAME: WrappedLedgerInfo
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
@@ -871,6 +900,10 @@ Transaction:
       BlockMetadataExt:
         NEWTYPE:
           TYPENAME: BlockMetadataExt
+    6:
+      BlockEpilogue:
+        NEWTYPE:
+          TYPENAME: BlockEpiloguePayload
 TransactionArgument:
   ENUM:
     0:
@@ -1058,6 +1091,12 @@ VoteMsg:
         TYPENAME: Vote
     - sync_info:
         TYPENAME: SyncInfo
+WrappedLedgerInfo:
+  STRUCT:
+    - vote_data:
+        TYPENAME: VoteData
+    - signed_ledger_info:
+        TYPENAME: LedgerInfoWithSignatures
 WriteOp:
   ENUM:
     0:

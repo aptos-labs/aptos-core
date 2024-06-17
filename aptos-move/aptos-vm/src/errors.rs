@@ -48,6 +48,8 @@ const EMULTISIG_TRANSACTION_NOT_FOUND: u64 = 2006;
 const EMULTISIG_PAYLOAD_DOES_NOT_MATCH_HASH: u64 = 2008;
 // Multisig transaction has not received enough approvals to be executed.
 const EMULTISIG_NOT_ENOUGH_APPROVALS: u64 = 2009;
+// Provided target function does not match the payload stored in the on-chain transaction.
+const EPAYLOAD_DOES_NOT_MATCH: u64 = 2010;
 
 const INVALID_ARGUMENT: u8 = 0x1;
 const LIMIT_EXCEEDED: u8 = 0x2;
@@ -87,6 +89,9 @@ pub fn convert_prologue_error(
                 },
                 (INVALID_ARGUMENT, EMULTISIG_PAYLOAD_DOES_NOT_MATCH_HASH) => {
                     StatusCode::MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH_HASH
+                },
+                (INVALID_ARGUMENT, EPAYLOAD_DOES_NOT_MATCH) => {
+                    StatusCode::MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH
                 },
                 (category, reason) => {
                     let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",

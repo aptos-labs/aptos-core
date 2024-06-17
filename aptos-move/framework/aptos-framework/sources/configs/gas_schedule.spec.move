@@ -107,8 +107,27 @@ spec aptos_framework::gas_schedule {
         aborts_if exists<GasScheduleV2>(@aptos_framework) && new_gas_schedule.feature_version < cur_gas_schedule.feature_version;
     }
 
-    spec on_new_epoch() {
-        include config_buffer::OnNewEpochAbortsIf<GasScheduleV2>;
+    spec set_for_next_epoch_check_hash(aptos_framework: &signer, old_gas_schedule_hash: vector<u8>, new_gas_schedule_blob: vector<u8>) {
+        use aptos_std::aptos_hash;
+        use std::bcs;
+        use std::features;
+        use aptos_framework::util;
+
+        include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        include config_buffer::SetForNextEpochAbortsIf {
+            account: aptos_framework,
+            config: new_gas_schedule_blob
+        };
+        let new_gas_schedule = util::spec_from_bytes<GasScheduleV2>(new_gas_schedule_blob);
+        let cur_gas_schedule = global<GasScheduleV2>(@aptos_framework);
+        aborts_if exists<GasScheduleV2>(@aptos_framework) && new_gas_schedule.feature_version < cur_gas_schedule.feature_version;
+        aborts_if exists<GasScheduleV2>(@aptos_framework) && (!features::spec_sha_512_and_ripemd_160_enabled() || aptos_hash::spec_sha3_512_internal(bcs::serialize(cur_gas_schedule)) != old_gas_schedule_hash);
+    }
+
+    spec on_new_epoch(framework: &signer) {
+        requires @aptos_framework == std::signer::address_of(framework);
+        include config_buffer::OnNewEpochRequirement<GasScheduleV2>;
+        aborts_if false;
     }
 
     spec set_storage_gas_config(aptos_framework: &signer, config: storage_gas::StorageGasConfig) {

@@ -26,7 +26,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkId;
+use aptos_config::{config::ConsensusObserverConfig, network_id::NetworkId};
 use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis, pipelined_block::PipelinedBlock,
     vote_proposal::VoteProposal,
@@ -156,6 +156,9 @@ pub fn prepare_buffer_manager(
             verifier: validators.clone(),
         }),
         bounded_executor,
+        false,
+        ConsensusObserverConfig::default(),
+        None,
     );
 
     (
@@ -317,8 +320,9 @@ fn buffer_manager_happy_path_test() {
                 .ok();
         }
 
-        // commit decision will be sent too, so 3 * 2
-        for _ in 0..6 {
+        // Only commit votes are sent, so 3 commit votes are expected
+        // Commit decision is no longer broadcasted
+        for _ in 0..3 {
             if let Some(msg) = self_loop_rx.next().await {
                 loopback_commit_vote(msg, &msg_tx, &verifier).await;
             }

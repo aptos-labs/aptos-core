@@ -3,6 +3,7 @@
 
 use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
+    consensus_observer::publisher::ConsensusPublisher,
     error::error_kind,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
@@ -48,13 +49,16 @@ pub enum QuorumStoreBuilder {
 impl QuorumStoreBuilder {
     pub fn init_payload_manager(
         &mut self,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> (
         Arc<PayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => inner.init_payload_manager(),
-            QuorumStoreBuilder::QuorumStore(inner) => inner.init_payload_manager(),
+            QuorumStoreBuilder::QuorumStore(inner) => {
+                inner.init_payload_manager(consensus_publisher)
+            },
         }
     }
 
@@ -317,6 +321,7 @@ impl InnerBuilder {
                 self.author,
                 self.network_sender.clone(),
                 self.proof_manager_cmd_tx.clone(),
+                self.batch_generator_cmd_tx.clone(),
                 self.batch_store.clone().unwrap(),
                 self.config.receiver_max_batch_txns as u64,
                 self.config.receiver_max_batch_bytes as u64,
@@ -425,6 +430,7 @@ impl InnerBuilder {
 
     fn init_payload_manager(
         &mut self,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> (
         Arc<PayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
@@ -436,6 +442,7 @@ impl InnerBuilder {
                 batch_reader,
                 // TODO: remove after splitting out clean requests
                 self.coordinator_tx.clone(),
+                consensus_publisher,
             )),
             Some(self.quorum_store_msg_tx.clone()),
         )

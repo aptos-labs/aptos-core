@@ -137,7 +137,13 @@ impl WarmVmId {
     fn core_packages_id_bytes(resolver: &impl AptosMoveResolver) -> VMResult<Option<Bytes>> {
         let bytes = {
             let _timer = TIMER.timer_with(&["fetch_pkgreg"]);
-            resolver.fetch_config_bytes(&StateKey::on_chain_config::<PackageRegistry>())
+            resolver.fetch_config_bytes(&StateKey::on_chain_config::<PackageRegistry>().map_err(
+                |err| {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!("failed to create StateKey: {}", err))
+                        .finish(Location::Undefined)
+                },
+            )?)
         };
 
         let core_package_registry = {

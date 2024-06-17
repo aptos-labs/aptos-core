@@ -41,7 +41,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
-use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::{SmtAncestors, SparseMerkleTree};
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher,
@@ -54,8 +54,7 @@ use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
         create_empty_sharded_state_updates,
-        state_key::StateKey,
-        state_key_prefix::StateKeyPrefix,
+        state_key::{prefix::StateKeyPrefix, StateKey},
         state_storage_usage::StateStorageUsage,
         state_value::{StaleStateValueIndex, StateValue, StateValueChunkWithProof},
         ShardedStateUpdates, StateViewId,
@@ -147,18 +146,8 @@ impl DbReader for StateDb {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
-        let mut read_opts = ReadOptions::default();
-        // We want `None` if the state_key changes in iteration.
-        read_opts.set_prefix_same_as_start(true);
-        let mut iter = self
-            .state_kv_db
-            .db_shard(state_key.get_shard_id())
-            .iter::<StateValueSchema>(read_opts)?;
-        iter.seek(&(state_key.clone(), version))?;
-        Ok(iter
-            .next()
-            .transpose()?
-            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+        self.state_kv_db
+            .get_state_value_with_version_by_version(state_key, version)
     }
 
     /// Returns the proof of the given state key and version.
@@ -166,10 +155,11 @@ impl DbReader for StateDb {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         let (_, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(state_key, version)?;
+            .get_with_proof_ext(state_key, version, root_depth)?;
         Ok(proof)
     }
 
@@ -178,10 +168,11 @@ impl DbReader for StateDb {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         let (leaf_data, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(state_key, version)?;
+            .get_with_proof_ext(state_key, version, root_depth)?;
         Ok((
             match leaf_data {
                 Some((_, (key, version))) => Some(self.expect_value_by_version(&key, version)?),
@@ -244,9 +235,10 @@ impl DbReader for StateStore {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         self.deref()
-            .get_state_proof_by_version_ext(state_key, version)
+            .get_state_proof_by_version_ext(state_key, version, root_depth)
     }
 
     /// Get the state value with proof extension given the state key and version
@@ -254,9 +246,10 @@ impl DbReader for StateStore {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         self.deref()
-            .get_state_value_with_proof_by_version_ext(state_key, version)
+            .get_state_value_with_proof_by_version_ext(state_key, version, root_depth)
     }
 }
 
@@ -339,7 +332,7 @@ impl StateStore {
         crash_if_difference_is_too_large: bool,
     ) {
         let ledger_metadata_db = ledger_db.metadata_db();
-        if let Ok(overall_commit_progress) = ledger_metadata_db.get_latest_version() {
+        if let Ok(overall_commit_progress) = ledger_metadata_db.get_synced_version() {
             info!(
                 overall_commit_progress = overall_commit_progress,
                 "Start syncing databases..."
@@ -370,23 +363,23 @@ impl StateStore {
             truncate_ledger_db(ledger_db, overall_commit_progress)
                 .expect("Failed to truncate ledger db.");
 
-            if state_kv_commit_progress != overall_commit_progress {
-                info!(
-                    state_kv_commit_progress = state_kv_commit_progress,
-                    "Start state KV truncation..."
-                );
-                let difference = state_kv_commit_progress - overall_commit_progress;
-                if crash_if_difference_is_too_large {
-                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
-                }
-                truncate_state_kv_db(
-                    &state_kv_db,
-                    state_kv_commit_progress,
-                    overall_commit_progress,
-                    difference as usize,
-                )
-                .expect("Failed to truncate state K/V db.");
+            // State K/V commit progress isn't (can't be) written atomically with the data,
+            // because there are shards, so we have to attempt truncation anyway.
+            info!(
+                state_kv_commit_progress = state_kv_commit_progress,
+                "Start state KV truncation..."
+            );
+            let difference = state_kv_commit_progress - overall_commit_progress;
+            if crash_if_difference_is_too_large {
+                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
             }
+            truncate_state_kv_db(
+                &state_kv_db,
+                state_kv_commit_progress,
+                overall_commit_progress,
+                std::cmp::max(difference as usize, 1), /* batch_size */
+            )
+            .expect("Failed to truncate state K/V db.");
         } else {
             info!("No overall commit progress was found!");
         }
@@ -437,7 +430,7 @@ impl StateStore {
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
-            .get_latest_version()
+            .get_synced_version()
             .map_or(0, |v| v + 1);
 
         let latest_snapshot_version = state_db
@@ -520,7 +513,7 @@ impl StateStore {
                 .collect::<Result<Vec<_>>>()?
                 .into_iter()
                 .enumerate()
-                .filter(|(_idx, txn_info)| txn_info.is_state_checkpoint())
+                .filter(|(_idx, txn_info)| txn_info.has_state_checkpoint_hash())
                 .last()
                 .map(|(idx, _)| idx);
             latest_snapshot_state_view.prime_cache_by_write_set(&write_sets)?;
@@ -1073,9 +1066,7 @@ impl StateStore {
             .state_db
             .state_merkle_db
             .metadata_db()
-            .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
-            Default::default(),
-        )?;
+            .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>()?;
         iter.seek_to_first();
 
         let all_rows = iter.collect::<Result<Vec<_>>>()?;
@@ -1084,12 +1075,10 @@ impl StateStore {
             all_rows.into_iter().map(|(k, _v)| k).collect();
         if self.state_merkle_db.sharding_enabled() {
             for i in 0..NUM_STATE_SHARDS as u8 {
-                let mut iter = self
-                    .state_merkle_db
-                    .db_shard(i)
-                    .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
-                    Default::default(),
-                )?;
+                let mut iter =
+                    self.state_merkle_db
+                        .db_shard(i)
+                        .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>()?;
                 iter.seek_to_first();
 
                 let all_rows = iter.collect::<Result<Vec<_>>>()?;

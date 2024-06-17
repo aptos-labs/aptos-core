@@ -40,7 +40,7 @@ use std::{
 /// This trait provides an additional api for the Session to decide where the resolved modules should be stored.
 ///
 /// The default api will store the modules inside MoveVM structure but the caller can also choose to store it
-/// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the the caller, i.e: the
+/// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the caller, i.e: the
 /// adapter layer, to freely decide when to drop or persist the cache as well as determining its own eviction policy.
 pub trait ModuleStorage {
     fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module>;
@@ -72,11 +72,11 @@ impl ModuleStorage for ModuleCache {
     }
 
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>> {
-        self.0.read().get(module_id).map(Arc::clone)
+        self.0.read().get(module_id).cloned()
     }
 
     fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>> {
-        self.0.read().get(&(addr, name)).map(Arc::clone)
+        self.0.read().get(&(addr, name)).cloned()
     }
 }
 
@@ -153,10 +153,11 @@ impl ModuleStorageAdapter {
         func_name: &IdentStr,
         module_id: &ModuleId,
     ) -> PartialVMResult<Arc<Function>> {
-        match self.modules.fetch_module(module_id).and_then(|module| {
+        let may_be_func = self.modules.fetch_module(module_id).and_then(|module| {
             let idx = module.function_map.get(func_name)?;
-            module.function_defs.get(*idx).map(Arc::clone)
-        }) {
+            module.function_defs.get(*idx).cloned()
+        });
+        match may_be_func {
             Some(func) => Ok(func),
             None => Err(
                 PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
@@ -329,7 +330,7 @@ impl Module {
                 let definition_struct_type =
                     Arc::new(Self::make_struct_type(&module, struct_def, &struct_idxs)?);
                 structs.push(StructDef {
-                    field_count: definition_struct_type.fields.len() as u16,
+                    field_count: definition_struct_type.field_tys.len() as u16,
                     definition_struct_type,
                 });
                 let name =
@@ -492,7 +493,7 @@ impl Module {
         };
         let abilities = struct_handle.abilities;
         let name = module.identifier_at(struct_handle.name).to_owned();
-        let type_parameters = struct_handle.type_parameters.clone();
+        let ty_params = struct_handle.type_parameters.clone();
         let fields = match &struct_def.field_information {
             StructFieldInformation::Native => unreachable!("native structs have been removed"),
             StructFieldInformation::Declared(fields) => fields,
@@ -510,15 +511,15 @@ impl Module {
         }
 
         Ok(StructType {
-            fields: field_tys,
-            phantom_ty_args_mask: struct_handle
+            field_tys,
+            phantom_ty_params_mask: struct_handle
                 .type_parameters
                 .iter()
                 .map(|ty| ty.is_phantom)
                 .collect(),
             field_names,
             abilities,
-            type_parameters,
+            ty_params,
             idx: struct_name_table[struct_def.struct_handle.0 as usize],
             module: module.self_id(),
             name,

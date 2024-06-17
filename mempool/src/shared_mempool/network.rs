@@ -76,6 +76,11 @@ pub enum BroadcastError {
     TooManyPendingBroadcasts(PeerNetworkId),
 }
 
+pub enum BroadcastPeerPriority {
+    Primary,
+    Failover,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct MempoolNetworkInterface<NetworkClient> {
     network_client: NetworkClient,
@@ -299,15 +304,22 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
     /// Peers are prioritized when the local is a validator, or it's within the default failovers.
     /// One is added for the primary peer
-    fn check_peer_prioritized(&self, peer: PeerNetworkId) -> Result<(), BroadcastError> {
-        if !self.role.is_validator() {
-            let peer_priority = self.prioritized_peers_state.get_peer_priority(&peer);
-            if peer_priority > self.mempool_config.default_failovers {
-                return Err(BroadcastError::PeerNotPrioritized(peer, peer_priority));
-            }
+    fn check_peer_prioritized(
+        &self,
+        peer: PeerNetworkId,
+    ) -> Result<BroadcastPeerPriority, BroadcastError> {
+        if self.role.is_validator() {
+            return Ok(BroadcastPeerPriority::Primary);
         }
 
-        Ok(())
+        let peer_priority = self.prioritized_peers_state.get_peer_priority(&peer);
+        if peer_priority == 0 {
+            Ok(BroadcastPeerPriority::Primary)
+        } else if peer_priority <= self.mempool_config.default_failovers {
+            Ok(BroadcastPeerPriority::Failover)
+        } else {
+            Err(BroadcastError::PeerNotPrioritized(peer, peer_priority))
+        }
     }
 
     /// Determines the broadcast batch.  There are three types of batches:
@@ -327,7 +339,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             .ok_or(BroadcastError::PeerNotFound(peer))?;
 
         // If the peer isn't prioritized, lets not broadcast
-        self.check_peer_prioritized(peer)?;
+        let peer_priority = self.check_peer_prioritized(peer)?;
 
         // If backoff mode is on for this peer, only execute broadcasts that were scheduled as a backoff broadcast.
         // This is to ensure the backoff mode is actually honored (there is a chance a broadcast was scheduled
@@ -398,9 +410,19 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                 },
                 None => {
                     // Fresh broadcast
+                    let before = match peer_priority {
+                        BroadcastPeerPriority::Primary => None,
+                        BroadcastPeerPriority::Failover => Some(
+                            Instant::now()
+                                - Duration::from_millis(
+                                    self.mempool_config.shared_mempool_failover_delay_ms,
+                                ),
+                        ),
+                    };
                     let (txns, new_timeline_id) = mempool.read_timeline(
                         &state.timeline_id,
                         self.mempool_config.shared_mempool_batch_size,
+                        before,
                     );
                     (
                         MultiBatchId::from_timeline_ids(&state.timeline_id, &new_timeline_id),

@@ -1,7 +1,7 @@
 # **Please** keep this file ordered alphabetically by directory paths.
 
 # Owners for the `.github` directory and all its subdirectories.
-/.github/ @aptos-labs/prod-eng @aptos-labs/security
+/.github/ @aptos-labs/prod-eng
 
 # Owners for the `/api` directory and all its subdirectories.
 /api/ @banool @gregnazario @0xmaayan
@@ -79,18 +79,9 @@
 # Owners for the `/dashboards` directory and all its subdirectories.
 /dashboards/ @aptos-labs/prod-eng
 
-# Owners for the `/developer-docs-site` directory and all its subdirectories.
-/developer-docs-site/ @davidiw @gregnazario @banool
-
-# Owner for docs tutorials for the token_standard and related tutorials.
-/developer-docs-site/docs/tutorials @areshand @gregnazario
-
 # Owners for the `/docker` directory and all its subdirectories.
 /docker/ @aptos-labs/prod-eng
-
-# Owners for the `SDKs`.
-/ecosystem/python/sdk @davidiw @gregnazario @banool @0xmaayan
-/ecosystem/typescript/sdk @gregnazario @banool @0xmaayan
+/docker/builder/docker-bake-rust-all.hcl @aptos-labs/prod-eng @aptos-labs/security
 
 # Owners for execution and storage.
 /execution/ @msmouse @lightmark @grao1991
@@ -99,7 +90,7 @@
 /mempool/ @bchocho
 
 # Owners for the network and all its subdirectories.
-/network/ @gregnazario @joshlind @brianolson
+/network/ @joshlind @brianolson
 
 # Owners for the scripts
 /scripts/ @aptos-labs/prod-eng

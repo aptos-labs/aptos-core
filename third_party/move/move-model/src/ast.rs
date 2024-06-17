@@ -510,6 +510,35 @@ pub enum AddressSpecifier {
     Call(QualifiedInstId<FunId>, Symbol),
 }
 
+impl ResourceSpecifier {
+    /// Checks whether this resource specifier matches the given struct. A function
+    /// instantiation is passed to instantiate the specifier in the calling context
+    /// of the function where it is declared for.
+    pub fn matches(
+        &self,
+        env: &GlobalEnv,
+        fun_inst: &[Type],
+        struct_id: &QualifiedInstId<StructId>,
+    ) -> bool {
+        use ResourceSpecifier::*;
+        let struct_env = env.get_struct(struct_id.to_qualified_id());
+        match self {
+            Any => true,
+            DeclaredAtAddress(addr) => struct_env.module_env.get_name().addr() == addr,
+            DeclaredInModule(mod_id) => struct_env.module_env.get_id() == *mod_id,
+            Resource(spec_struct_id) => {
+                // Since this resource specifier is declared for a specific function,
+                // need to instantiate it with the function instantiation.
+                let spec_struct_id = spec_struct_id.clone().instantiate(fun_inst);
+                struct_id.to_qualified_id() == spec_struct_id.to_qualified_id()
+                    // If the specified instance has no parameters, every type instance is
+                    // allowed, otherwise only the given one.
+                    && (spec_struct_id.inst.is_empty() || spec_struct_id.inst == struct_id.inst)
+            },
+        }
+    }
+}
+
 // =================================================================================================
 /// # Expressions
 
@@ -855,6 +884,19 @@ impl ExpData {
         vars
     }
 
+    /// Returns the free local variables and the used parameters in this expression.
+    /// Requires that we pass `param_symbols`: an ordered list of all parameter symbols
+    /// in the function containing this expression.
+    pub fn free_vars_and_used_params(&self, param_symbols: &[Symbol]) -> BTreeSet<Symbol> {
+        let mut result = self
+            .used_temporaries()
+            .into_iter()
+            .map(|t| param_symbols[t])
+            .collect::<BTreeSet<_>>();
+        result.append(&mut self.free_vars());
+        result
+    }
+
     /// Returns the used memory of this expression.
     pub fn used_memory(
         &self,
@@ -924,7 +966,7 @@ impl ExpData {
         temps
     }
 
-    /// Returns the temporaries used in this spec block.
+    /// Returns the temporaries used in this expression.
     pub fn used_temporaries(&self) -> BTreeSet<TempIndex> {
         let mut temps = BTreeSet::new();
         let mut visitor = |e: &ExpData| {
@@ -1143,7 +1185,7 @@ impl ExpData {
     ///   then visits `else`.
     ///
     /// In every case, if `visitor` returns `false`, then the visit is stopped early; otherwise
-    /// the the visit will continue.
+    /// the visit will continue.
     pub fn visit_positions<F>(&self, visitor: &mut F)
     where
         F: FnMut(VisitorPosition, &ExpData) -> bool,
@@ -2332,15 +2374,16 @@ impl Operation {
         use Operation::*;
         matches!(
             self,
-            Tuple
-                | Index
-                | Slice
-                | Range
-                | Implies
-                | Iff
-                | Identical
-                | Add
-                | Sub
+            Tuple | Index | Slice | Range | Implies | Iff | Identical | Not | Cast | Len | Vector
+        ) || self.is_binop()
+    }
+
+    /// Determines whether this is a binary operator
+    pub fn is_binop(&self) -> bool {
+        use Operation::*;
+        matches!(
+            self,
+            Add | Sub
                 | Mul
                 | Mod
                 | Div
@@ -2357,10 +2400,6 @@ impl Operation {
                 | Gt
                 | Le
                 | Ge
-                | Not
-                | Cast
-                | Len
-                | Vector
         )
     }
 
@@ -2476,6 +2515,33 @@ impl Operation {
     /// currently to equality which can be used on `(T, T)`, `(T, &T)`, etc.
     pub fn allows_ref_param_for_value(&self) -> bool {
         matches!(self, Operation::Eq | Operation::Neq)
+    }
+
+    /// Get the string representation, if this is a binary operator.
+    /// Returns `None` for non-binary operators.
+    pub fn to_string_if_binop(&self) -> Option<&'static str> {
+        use Operation::*;
+        match self {
+            Add => Some("+"),
+            Sub => Some("-"),
+            Mul => Some("*"),
+            Mod => Some("%"),
+            Div => Some("/"),
+            BitOr => Some("|"),
+            BitAnd => Some("&"),
+            Xor => Some("^"),
+            Shl => Some("<<"),
+            Shr => Some(">>"),
+            And => Some("&&"),
+            Or => Some("||"),
+            Eq => Some("=="),
+            Neq => Some("!="),
+            Lt => Some("<"),
+            Gt => Some(">"),
+            Le => Some("<="),
+            Ge => Some(">="),
+            _ => None,
+        }
     }
 }
 
@@ -2669,10 +2735,14 @@ impl ModuleName {
         self.1
     }
 
+    pub fn pseudo_script_name_builder(base: &str, index: usize) -> String {
+        format!("{}_{}", base, index)
+    }
+
     /// Return the pseudo module name used for scripts, incorporating the `index`.
     /// Our compiler infrastructure uses `MAX_ADDRESS` for pseudo modules created from scripts.
     pub fn pseudo_script_name(pool: &SymbolPool, index: usize) -> ModuleName {
-        let name = pool.make(format!("{}_{}", SCRIPT_MODULE_NAME, index).as_str());
+        let name = pool.make(Self::pseudo_script_name_builder(SCRIPT_MODULE_NAME, index).as_str());
         ModuleName(Address::Numerical(AccountAddress::MAX_ADDRESS), name)
     }
 

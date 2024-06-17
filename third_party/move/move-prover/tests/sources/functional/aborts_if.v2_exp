@@ -95,7 +95,7 @@ error: function does not abort under this condition
     =     at tests/sources/functional/aborts_if.move:113: multi_abort5_incorrect
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if.move:114: multi_abort5_incorrect
-    =         x = <redacted>
+    =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:117: multi_abort5_incorrect
     =     at tests/sources/functional/aborts_if.move:119: multi_abort5_incorrect (spec)
 
@@ -115,7 +115,7 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/aborts_if.move:136: abort_at_2_or_3_total_incorrect
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if.move:137: abort_at_2_or_3_total_incorrect
-    =         x = <redacted>
+    =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:137: abort_at_2_or_3_total_incorrect
     =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:137: abort_at_2_or_3_total_incorrect
@@ -130,7 +130,7 @@ error: function does not abort under this condition
     =     at tests/sources/functional/aborts_if.move:145: abort_at_2_or_3_spec_incorrect
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if.move:146: abort_at_2_or_3_spec_incorrect
-    =         x = <redacted>
+    =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:146: abort_at_2_or_3_spec_incorrect
     =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:146: abort_at_2_or_3_spec_incorrect
@@ -152,7 +152,7 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/aborts_if.move:154: abort_at_2_or_3_strict_incorrect
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if.move:155: abort_at_2_or_3_strict_incorrect
-    =         x = <redacted>
+    =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:155: abort_at_2_or_3_strict_incorrect
     =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:155: abort_at_2_or_3_strict_incorrect

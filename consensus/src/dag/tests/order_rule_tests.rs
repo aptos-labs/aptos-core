@@ -238,7 +238,7 @@ fn test_order_rule_basic() {
     for node in nodes.iter().flatten().flatten() {
         order_rule.process_new_node(node.metadata());
     }
-    let expected_order = vec![
+    let expected_order = [
         // anchor (1, 0) has 1 votes, anchor (3, 1) has 2 votes and a path to (1, 0)
         vec![(1, 0)],
         // anchor (2, 1) has 3 votes

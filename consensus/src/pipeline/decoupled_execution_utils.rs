@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    consensus_observer::publisher::ConsensusPublisher,
     network::{IncomingCommitRequest, NetworkSender},
     pipeline::{
         buffer_manager::{create_channel, BufferManager, OrderedBlocks, ResetRequest},
@@ -16,6 +17,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel::Receiver;
+use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::common::Author;
 use aptos_types::{account_address::AccountAddress, epoch_state::EpochState};
 use futures::channel::mpsc::UnboundedReceiver;
@@ -36,6 +38,9 @@ pub fn prepare_phases_and_buffer_manager(
     sync_rx: UnboundedReceiver<ResetRequest>,
     epoch_state: Arc<EpochState>,
     bounded_executor: BoundedExecutor,
+    order_vote_enabled: bool,
+    consensus_observer_config: ConsensusObserverConfig,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
 ) -> (
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,
@@ -119,6 +124,9 @@ pub fn prepare_phases_and_buffer_manager(
             ongoing_tasks,
             reset_flag.clone(),
             bounded_executor,
+            order_vote_enabled,
+            consensus_observer_config,
+            consensus_publisher,
         ),
     )
 }

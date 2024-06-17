@@ -247,7 +247,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/reference-safety/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts.clone(),
+            // TODO(#13485): Need to turn off acquires check for now to test 2.0 access specifiers
+            options: opts.clone().set_experiment(Experiment::ACQUIRES_CHECK, false),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
@@ -269,7 +270,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             // Some reference tests create different errors since variable names are
             // known without optimizations, so we need to have a different exp file
             exp_suffix: Some("no-opt.exp"),
-            options: opts.clone().set_experiment(Experiment::OPTIMIZE, false),
+            options: opts.clone().set_experiment(Experiment::OPTIMIZE, false)
+                .set_experiment(Experiment::ACQUIRES_CHECK, false),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
@@ -558,8 +560,8 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     let path_str = path.display().to_string();
     let mut options = config.options.clone();
     options.warn_unused = path_str.contains("/unused/");
-    options.sources = extract_test_directives(path, "// dep:")?;
-    options.sources.push(path_str.clone());
+    options.sources_deps = extract_test_directives(path, "// dep:")?;
+    options.sources = vec![path_str.clone()];
     options.dependencies = if extract_test_directives(path, "// no-stdlib")?.is_empty() {
         vec![path_from_crate_root("../move-stdlib/sources")]
     } else {
@@ -678,7 +680,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 },
             );
             if *ok.borrow() && config.stop_after == StopAfter::FileFormat {
-                let units = run_file_format_gen(&env, &targets);
+                let units = run_file_format_gen(&mut env, &targets);
                 let out = &mut test_output.borrow_mut();
                 update_diags(ok.borrow_mut(), out, &env);
                 if *ok.borrow() {

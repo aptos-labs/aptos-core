@@ -169,7 +169,7 @@ fn test_account_not_exist_with_fee_payer_insufficient_gas() {
     let output = h.run_raw(transaction);
     assert!(transaction_status_eq(
         output.status(),
-        &TransactionStatus::Discard(StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS)
+        &TransactionStatus::Discard(StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS),
     ));
 
     let alice_after =
@@ -271,8 +271,8 @@ fn test_account_not_exist_out_of_gas_with_fee_payer() {
     let result = h.run_raw(transaction);
 
     assert_eq!(
-        result.status(),
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+        result.status().to_owned(),
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
             StatusCode::EXECUTION_LIMIT_REACHED
         ))),
     );
@@ -351,7 +351,7 @@ fn test_account_not_exist_with_fee_payer_without_create_account() {
     let output = h.run_raw(transaction);
     assert!(transaction_status_eq(
         output.status(),
-        &TransactionStatus::Discard(StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST)
+        &TransactionStatus::Discard(StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST),
     ));
 }
 
@@ -380,7 +380,7 @@ fn test_normal_tx_with_fee_payer_insufficient_funds() {
     let output = h.run_raw(transaction);
     assert!(transaction_status_eq(
         output.status(),
-        &TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE)
+        &TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE),
     ));
 }
 

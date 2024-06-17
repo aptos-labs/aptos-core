@@ -8,8 +8,8 @@ use crate::{
     },
     utils::iterators::ExpectContinuousVersions,
 };
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
-use aptos_storage_interface::{AptosDbError, Result};
+use aptos_schemadb::{SchemaBatch, DB};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::{TransactionAuxiliaryData, Version};
 use std::{path::Path, sync::Arc};
 
@@ -45,15 +45,8 @@ impl TransactionAuxiliaryDataDb {
     pub(crate) fn get_transaction_auxiliary_data(
         &self,
         version: Version,
-    ) -> Result<TransactionAuxiliaryData> {
-        self.db
-            .get::<TransactionAuxiliaryDataSchema>(&version)?
-            .ok_or_else(|| {
-                AptosDbError::NotFound(format!(
-                    "No Transaction Auxiliary Data at version {}",
-                    version
-                ))
-            })
+    ) -> Result<Option<TransactionAuxiliaryData>> {
+        self.db.get::<TransactionAuxiliaryDataSchema>(&version)
     }
 
     /// Returns an iterator that yields `num_transaction_infos` transaction infos starting from
@@ -63,9 +56,7 @@ impl TransactionAuxiliaryDataDb {
         start_version: Version,
         num_transaction_auxiliary_data: usize,
     ) -> Result<impl Iterator<Item = Result<TransactionAuxiliaryData>> + '_> {
-        let mut iter = self
-            .db
-            .iter::<TransactionAuxiliaryDataSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<TransactionAuxiliaryDataSchema>()?;
         iter.seek(&start_version)?;
         iter.expect_continuous_versions(start_version, num_transaction_auxiliary_data)
     }

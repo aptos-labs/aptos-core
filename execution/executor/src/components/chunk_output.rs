@@ -27,6 +27,8 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     transaction::{
+        authenticator::AccountAuthenticator,
+        block_epilogue::BlockEndInfo,
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
         BlockOutput, ExecutionStatus, Transaction, TransactionOutput, TransactionOutputProvider,
         TransactionStatus,
@@ -46,6 +48,8 @@ pub struct ChunkOutput {
     /// execution result is processed; as well as all the accounts touched during execution, together
     /// with their proofs.
     pub state_cache: StateCache,
+    /// Optional StateCheckpoint payload
+    pub block_end_info: Option<BlockEndInfo>,
 }
 
 impl ChunkOutput {
@@ -71,12 +75,12 @@ impl ChunkOutput {
     ) -> Result<Self> {
         let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
 
-        let transaction_outputs = block_output.into_inner();
-        // TODO add block_limit_info to ChunkOutput, to add it to StateCheckpoint
+        let (transaction_outputs, block_end_info) = block_output.into_inner();
         Ok(Self {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
+            block_end_info,
         })
     }
 
@@ -104,6 +108,7 @@ impl ChunkOutput {
                 .collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
+            block_end_info: None,
         })
     }
 
@@ -129,6 +134,7 @@ impl ChunkOutput {
             transactions,
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
+            block_end_info: None,
         })
     }
 
@@ -259,7 +265,9 @@ pub fn update_counters_for_processed_chunk<T, O>(
     for (txn, output) in transactions.iter().zip(transaction_outputs.iter()) {
         if detailed_counters {
             if let Ok(size) = bcs::serialized_size(output.get_transaction_output()) {
-                metrics::APTOS_PROCESSED_TXNS_OUTPUT_SIZE.observe(size as f64);
+                metrics::APTOS_PROCESSED_TXNS_OUTPUT_SIZE
+                    .with_label_values(&[process_type])
+                    .observe(size as f64);
             }
         }
 
@@ -324,6 +332,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
             Some(Transaction::BlockMetadata(_)) => "block_metadata",
             Some(Transaction::BlockMetadataExt(_)) => "block_metadata_ext",
             Some(Transaction::StateCheckpoint(_)) => "state_checkpoint",
+            Some(Transaction::BlockEpilogue(_)) => "block_epilogue",
             Some(Transaction::ValidatorTransaction(_)) => "validator_transaction",
             None => "unknown",
         };
@@ -345,6 +354,52 @@ pub fn update_counters_for_processed_chunk<T, O>(
         }
 
         if let Some(Transaction::UserTransaction(user_txn)) = txn.get_transaction() {
+            if detailed_counters {
+                let mut signature_count = 0;
+                let account_authenticators = user_txn.authenticator_ref().all_signers();
+                for account_authenticator in account_authenticators {
+                    match account_authenticator {
+                        AccountAuthenticator::Ed25519 { .. } => {
+                            signature_count += 1;
+                            metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                                .with_label_values(&[process_type, "Ed25519"])
+                                .inc();
+                        },
+                        AccountAuthenticator::MultiEd25519 { signature, .. } => {
+                            let count = signature.signatures().len();
+                            signature_count += count;
+                            metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                                .with_label_values(&[process_type, "Ed25519_in_MultiEd25519"])
+                                .inc_by(count as u64);
+                        },
+                        AccountAuthenticator::SingleKey { authenticator } => {
+                            signature_count += 1;
+                            metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                                .with_label_values(&[
+                                    process_type,
+                                    &format!("{}_in_SingleKey", authenticator.signature().name()),
+                                ])
+                                .inc();
+                        },
+                        AccountAuthenticator::MultiKey { authenticator } => {
+                            for (_, signature) in authenticator.signatures() {
+                                signature_count += 1;
+                                metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                                    .with_label_values(&[
+                                        process_type,
+                                        &format!("{}_in_MultiKey", signature.name()),
+                                    ])
+                                    .inc();
+                            }
+                        },
+                    };
+                }
+
+                metrics::APTOS_PROCESSED_TXNS_NUM_AUTHENTICATORS
+                    .with_label_values(&[process_type])
+                    .observe(signature_count as f64);
+            }
+
             match user_txn.payload() {
                 aptos_types::transaction::TransactionPayload::Script(_script) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE

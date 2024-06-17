@@ -150,15 +150,32 @@ impl KnownAttribute {
         self.kind == KnownAttributeKind::Event as u8
     }
 
-    pub fn randomness() -> Self {
+    pub fn randomness(claimed_gas: Option<u64>) -> Self {
         Self {
             kind: KnownAttributeKind::Randomness as u8,
-            args: vec![],
+            args: if let Some(amount) = claimed_gas {
+                vec![amount.to_string()]
+            } else {
+                vec![]
+            },
         }
     }
 
     pub fn is_randomness(&self) -> bool {
         self.kind == KnownAttributeKind::Randomness as u8
+    }
+
+    pub fn try_as_randomness_annotation(&self) -> Option<RandomnessAnnotation> {
+        if self.kind == KnownAttributeKind::Randomness as u8 {
+            if let Some(arg) = self.args.first() {
+                let max_gas = arg.parse::<u64>().ok();
+                Some(RandomnessAnnotation::new(max_gas))
+            } else {
+                Some(RandomnessAnnotation::default())
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -224,7 +241,10 @@ pub fn get_vm_metadata_v0(
 }
 
 /// Check if the metadata has unknown key/data types
-pub fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedError> {
+pub fn check_metadata_format(
+    module: &CompiledModule,
+    features: &Features,
+) -> Result<(), MalformedError> {
     let mut exist = false;
     let mut compilation_key_exist = false;
     for data in module.metadata.iter() {
@@ -241,7 +261,9 @@ pub fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedErr
                 bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value)
                     .map_err(|e| MalformedError::DeserializedError(data.key.clone(), e))?;
             }
-        } else if data.key == *COMPILATION_METADATA_KEY {
+        } else if features.is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE)
+            && data.key == *COMPILATION_METADATA_KEY
+        {
             if compilation_key_exist {
                 return Err(MalformedError::DuplicateKey);
             }
@@ -450,7 +472,7 @@ pub fn verify_module_metadata(
     }
 
     if features.are_resource_groups_enabled() {
-        check_metadata_format(module)?;
+        check_metadata_format(module, features)?;
     }
     let metadata = if let Some(metadata) = get_metadata_from_compiled_module(module) {
         metadata
@@ -655,5 +677,18 @@ fn check_budget(meter: usize) -> Result<(), MetaDataValidationError> {
         ))
     } else {
         Ok(())
+    }
+}
+
+/// The randomness consuming options specified by developers for their entry function.
+/// Examples: `#[randomness(max_gas = 99999)]`, `#[randomness]`.
+#[derive(Default)]
+pub struct RandomnessAnnotation {
+    pub max_gas: Option<u64>,
+}
+
+impl RandomnessAnnotation {
+    pub fn new(max_gas: Option<u64>) -> Self {
+        Self { max_gas }
     }
 }
