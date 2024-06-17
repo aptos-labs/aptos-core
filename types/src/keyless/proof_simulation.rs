@@ -16,6 +16,16 @@ use ark_relations::r1cs::Result as R1CSResult;
 use ark_ec::{AffineRepr,CurveGroup};
 use ark_ff::PrimeField;
 use std::ops::AddAssign;
+use ark_bn254::Bn254;
+use ark_circom::CircomConfig;
+use ark_circom::CircomBuilder;
+use std::fs::File;
+use std::collections::HashMap;
+use std::str::FromStr;
+use num_bigint::BigInt;
+use ark_ff::MontBackend;
+use ark_bn254::FrConfig;
+use crate::keyless::bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine};
 
 /// The SNARK of [[Groth16]](https://eprint.iacr.org/2016/260.pdf), where "proving" implements the
 /// simulation algorithm instead, using the trapdoor output by the modified setup algorithm also
@@ -148,15 +158,6 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> {
     }
 }
 
-use ark_circom::CircomConfig;
-use ark_circom::CircomBuilder;
-use std::fs::File;
-use std::collections::HashMap;
-use std::str::FromStr;
-use num_bigint::BigInt;
-use ark_ff::MontBackend;
-use ark_bn254::FrConfig;
-use crate::keyless::bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine};
 
 
 /// Generates a trapdoor proving and verifiying key pair intended for proof simulation, in addition to a vector of public inputs, from
@@ -194,7 +195,6 @@ fn generate_keys_and_inputs<E: Pairing>() {
     println!("generated vk: {:?}", vk.clone());
     println!("public inputs: {:?}", inputs);
 }*/
-
 
 /// Generates and verifies a simulated proof using a hardcoded simulation prover and verifier key
 /// pair and a hardcoded public input. These values were generated with the Keyless circuit at commit
@@ -252,8 +252,6 @@ where
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
 }
-
-use ark_bn254::Bn254;
 
 #[test]
 fn prove_and_verify() {
