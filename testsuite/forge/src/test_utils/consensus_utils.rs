@@ -103,14 +103,11 @@ pub async fn test_consensus_fault_tolerance(
 
         let cur = get_all_states(&validator_clients).await;
 
-        let epochs = cur.iter().map(|s| s.epoch).max().unwrap()
-            - previous.iter().map(|s| s.epoch).max().unwrap();
-        let rounds = cur
-            .iter()
-            .map(|s| s.round)
-            .max()
-            .unwrap()
-            .saturating_sub(previous.iter().map(|s| s.round).max().unwrap());
+        let (cur_epoch, cur_round) = cur.iter().map(|s| (s.epoch, s.round)).max().unwrap();
+        let (prev_epoch, prev_round) = previous.iter().map(|s| (s.epoch, s.round)).max().unwrap();
+        let epochs = cur_epoch.saturating_sub(prev_epoch);
+        let rounds = cur_round.saturating_sub(prev_round);
+
         let transactions = cur.iter().map(|s| s.version).max().unwrap()
             - previous.iter().map(|s| s.version).max().unwrap();
 

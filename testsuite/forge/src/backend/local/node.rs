@@ -126,7 +126,6 @@ impl LocalNode {
         // Ensure log file exists
         let log_file = OpenOptions::new()
             .create(true)
-            .write(true)
             .append(true)
             .open(self.log_path())?;
 

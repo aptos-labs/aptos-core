@@ -1,6 +1,6 @@
 [toolchain]
-channel = "1.75.0"
+channel = "1.78.0"
 
 # Note: we don't specify cargofmt in our toolchain because we rely on
 # the nightly version of cargofmt and verify formatting in CI/CD.
-components = [ "cargo", "clippy", "rustc", "rust-docs", "rust-std" ]
+components = ["cargo", "clippy", "rustc", "rust-docs", "rust-std"]

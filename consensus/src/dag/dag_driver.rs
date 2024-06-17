@@ -326,7 +326,9 @@ impl DagDriver {
             debug!(LogSchema::new(LogEvent::BroadcastNode), id = node.id());
 
             defer!( observe_round(timestamp, RoundStage::NodeBroadcasted); );
-            rb.broadcast(node, signature_builder).await
+            rb.broadcast(node, signature_builder)
+                .await
+                .expect("Broadcast cannot fail")
         };
         let certified_broadcast = async move {
             let Ok(certificate) = rx.await else {
@@ -346,7 +348,9 @@ impl DagDriver {
                 certified_node,
                 latest_ledger_info.get_latest_ledger_info(),
             );
-            rb2.broadcast(certified_node_msg, cert_ack_set).await
+            rb2.broadcast(certified_node_msg, cert_ack_set)
+                .await
+                .expect("Broadcast cannot fail until cancelled")
         };
         let core_task = join(node_broadcast, certified_broadcast);
         let author = self.author;

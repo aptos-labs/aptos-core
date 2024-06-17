@@ -161,7 +161,7 @@ impl CustomModulesDelegationGeneratorCreator {
         init_txn_factory: TransactionFactory,
         root_account: &dyn RootAccountHandle,
         txn_executor: &dyn ReliableTransactionSubmitter,
-        packages: &mut Vec<(Package, LocalAccount)>,
+        packages: &mut [(Package, LocalAccount)],
         workload: &mut dyn UserModuleTransactionGenerator,
     ) -> Arc<TransactionGeneratorWorker> {
         let mut rng = StdRng::from_entropy();

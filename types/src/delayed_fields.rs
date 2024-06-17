@@ -10,6 +10,7 @@ use move_vm_types::delayed_values::{
     error::code_invariant_error,
 };
 use once_cell::sync::Lazy;
+use std::fmt::Display;
 
 // Represents something that should never happen - i.e. a code invariant error,
 // which we would generally just panic, but since we are inside of the VM,
@@ -19,10 +20,10 @@ pub enum PanicError {
     CodeInvariantError(String),
 }
 
-impl ToString for PanicError {
-    fn to_string(&self) -> String {
+impl Display for PanicError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PanicError::CodeInvariantError(e) => e.clone(),
+            PanicError::CodeInvariantError(e) => write!(f, "{}", e),
         }
     }
 }

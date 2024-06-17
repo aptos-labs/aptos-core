@@ -36,7 +36,7 @@ impl DbReader for AptosDB {
     fn get_transaction_auxiliary_data_by_version(
         &self,
         version: Version,
-    ) -> Result<TransactionAuxiliaryData> {
+    ) -> Result<Option<TransactionAuxiliaryData>> {
         gauged_api("get_transaction_auxiliary_data_by_version", || {
             self.error_if_ledger_pruned("Transaction", version)?;
             self.ledger_db
@@ -256,7 +256,7 @@ impl DbReader for AptosDB {
                     let events = self.ledger_db.event_db().get_events_by_version(version)?;
                     let write_set = self.ledger_db.write_set_db().get_write_set(version)?;
                     let txn = self.ledger_db.transaction_db().get_transaction(version)?;
-                    let auxiliary_data = self.ledger_db.transaction_auxiliary_data_db().get_transaction_auxiliary_data(version).unwrap_or_default();
+                    let auxiliary_data = self.ledger_db.transaction_auxiliary_data_db().get_transaction_auxiliary_data(version)?.unwrap_or_default();
                     let txn_output = TransactionOutput::new(
                         write_set,
                         events,
@@ -546,7 +546,7 @@ impl DbReader for AptosDB {
             }
 
             let db = self.ledger_db.metadata_db_arc();
-            let mut iter = db.rev_iter::<BlockInfoSchema>(ReadOptions::default())?;
+            let mut iter = db.rev_iter::<BlockInfoSchema>()?;
             iter.seek_to_last();
 
             let mut events = Vec::with_capacity(num_events);

@@ -46,6 +46,8 @@ pub trait FiatShamirProtocol<T: Transcript> {
     /// Returns one or more scalars `r` useful for doing linear combinations (e.g., combining
     /// pairings in the SCRAPE multipairing check using coefficients $1, r, r^2, r^3, \ldots$
     fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<Scalar>;
+
+    #[allow(dead_code)]
     fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<Scalar>;
 }
 

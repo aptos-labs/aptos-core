@@ -728,7 +728,7 @@ async fn test_block() {
         .into_inner();
     let feature_version = gas_schedule.feature_version;
     let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
-        &gas_schedule.to_btree_map(),
+        &gas_schedule.into_btree_map(),
         feature_version,
     )
     .unwrap();
@@ -1103,6 +1103,13 @@ async fn parse_block_transactions(
                 assert!(matches!(
                     actual_txn.transaction,
                     aptos_types::transaction::Transaction::StateCheckpoint(_)
+                ));
+                assert!(transaction.operations.is_empty());
+            },
+            TransactionType::BlockEpilogue => {
+                assert!(matches!(
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::BlockEpilogue(_)
                 ));
                 assert!(transaction.operations.is_empty());
             },

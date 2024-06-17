@@ -264,7 +264,7 @@ async fn fetch_nexts(
                 block_height_bcs = aptos_api_types::U64::from(block_height);
             }
         }
-        match converter
+        let res = converter
             .try_into_onchain_transaction(timestamp, raw_txn)
             .map(|mut txn| {
                 match txn {
@@ -287,13 +287,18 @@ async fn fetch_nexts(
                         sct.info.block_height = Some(block_height_bcs);
                         sct.info.epoch = Some(epoch_bcs);
                     },
+                    Transaction::BlockEpilogueTransaction(ref mut bet) => {
+                        bet.info.block_height = Some(block_height_bcs);
+                        bet.info.epoch = Some(epoch_bcs);
+                    },
                     Transaction::ValidatorTransaction(ref mut st) => {
                         st.info.block_height = Some(block_height_bcs);
                         st.info.epoch = Some(epoch_bcs);
                     },
                 };
                 txn
-            }) {
+            });
+        match res {
             Ok(transaction) => transactions.push(transaction),
             Err(err) => {
                 UNABLE_TO_FETCH_TRANSACTION.inc();
