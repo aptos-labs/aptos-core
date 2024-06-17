@@ -29,8 +29,8 @@ pub mod validator_reboot_stress_test;
 use anyhow::Context;
 use aptos_forge::{
     prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown},
-    EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt, Result,
-    Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
+    EmitJob, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt,
+    Result, Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
 };
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
@@ -264,6 +264,7 @@ impl NetworkTest for dyn NetworkLoadTest {
                 WARMUP_DURATION_FRACTION,
                 COOLDOWN_DURATION_FRACTION,
                 rng,
+                None,
             )
             .await?;
 
@@ -337,6 +338,7 @@ impl dyn NetworkLoadTest + '_ {
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
         rng: StdRng,
+        mut synchronized_with_job: Option<&mut EmitJob>,
     ) -> Result<Vec<LoadTestPhaseStats>> {
         let destination = self.setup(ctx).await.context("setup NetworkLoadTest")?;
         let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm.clone()).await;
@@ -384,6 +386,10 @@ impl dyn NetworkLoadTest + '_ {
         job = job.periodic_stat_forward(warmup_duration, 60).await;
         info!("{}s warmup finished", warmup_duration.as_secs());
 
+        if let Some(job) = synchronized_with_job.as_mut() {
+            job.start_next_phase()
+        }
+
         let mut phase_timing = Vec::new();
         let mut phase_start_network_state = Vec::new();
         let test_start = Instant::now();
@@ -416,6 +422,9 @@ impl dyn NetworkLoadTest + '_ {
 
         phase_start_network_state.push(NetworkState::new(&clients).await);
         job.start_next_phase();
+        if let Some(job) = synchronized_with_job.as_mut() {
+            job.start_next_phase()
+        }
         let cooldown_start = Instant::now();
 
         let cooldown_used = cooldown_start.elapsed();
