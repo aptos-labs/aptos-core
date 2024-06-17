@@ -45,7 +45,7 @@ module bonding_curve_launchpad::test_bonding_curve_launchpad {
 
     //---------------------------Unit Tests---------------------------
     #[test(deployer = @bonding_curve_launchpad)]
-    #[expected_failure(abort_code = liquidity_pairs::ELIQUIDITY_PAIR_DOES_NOT_EXIST, location = liquidity_pairs)]
+    #[expected_failure(abort_code = 393218, location = aptos_framework::object)]
     public fun test_nonexistant_is_frozen(deployer: &signer) {
         account::create_account_for_test(@0x1);
         liquidity_pairs::initialize_for_test(deployer);
