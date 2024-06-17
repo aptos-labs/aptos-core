@@ -258,7 +258,7 @@ impl NodeSetup {
             playground.peer_protocols(),
         );
         let consensus_network_client = ConsensusNetworkClient::new(network_client);
-        let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
+        let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None, true);
         let author = signer.author();
 
         let twin_id = TwinId { id, author };

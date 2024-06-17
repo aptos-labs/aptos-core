@@ -103,6 +103,7 @@ impl MockClient {
                 peer_manager_notification_receiver,
                 connection_notification_receiver,
                 None,
+                true,
             );
             network_and_events.insert(network_id, network_events);
             peer_manager_notifiers.insert(network_id, peer_manager_notifier);
