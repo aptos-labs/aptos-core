@@ -16,7 +16,6 @@ use aptos_sdk::types::PeerId;
 use futures::future::{join_all, try_join_all};
 use prometheus_http_query::response::{PromqlResult, Sample};
 use std::time::{Duration, Instant};
-use tokio::runtime::Runtime;
 
 /// Trait used to represent a running network comprised of Validators and FullNodes
 #[async_trait::async_trait]
@@ -190,12 +189,11 @@ pub trait SwarmExt: Swarm {
     }
 
     /// Perform a safety check, ensuring that no forks have occurred in the network.
-    fn fork_check(&self, epoch_duration: Duration) -> Result<()> {
-        let runtime = Runtime::new().unwrap();
-
+    async fn fork_check(&self, epoch_duration: Duration) -> Result<()> {
         // Lots of errors can actually occur after an epoch change so guarantee that we change epochs here
         // This can wait for 2x epoch to at least force the caller to be explicit about the epoch duration
-        runtime.block_on(self.wait_for_all_nodes_to_change_epoch(epoch_duration * 2))?;
+        self.wait_for_all_nodes_to_change_epoch(epoch_duration * 2)
+            .await?;
 
         let clients = self
             .validators()
@@ -203,16 +201,16 @@ pub trait SwarmExt: Swarm {
             .chain(self.full_nodes().map(|node| node.rest_client()))
             .collect::<Vec<_>>();
 
-        let versions = runtime
-            .block_on(try_join_all(
-                clients
-                    .iter()
-                    .map(|node| node.get_ledger_information())
-                    .collect::<Vec<_>>(),
-            ))?
-            .into_iter()
-            .map(|resp| resp.into_inner().version)
-            .collect::<Vec<u64>>();
+        let versions = try_join_all(
+            clients
+                .iter()
+                .map(|node| node.get_ledger_information())
+                .collect::<Vec<_>>(),
+        )
+        .await?
+        .into_iter()
+        .map(|resp| resp.into_inner().version)
+        .collect::<Vec<u64>>();
         let min_version = versions
             .iter()
             .min()
@@ -224,21 +222,14 @@ pub trait SwarmExt: Swarm {
             .copied()
             .ok_or_else(|| anyhow!("Unable to query nodes for their latest version"))?;
 
-        if !runtime.block_on(Self::are_root_hashes_equal_at_version(
-            &clients,
-            min_version,
-        ))? {
+        if !Self::are_root_hashes_equal_at_version(&clients, min_version).await? {
             return Err(anyhow!("Fork check failed"));
         }
 
-        runtime.block_on(
-            self.wait_for_all_nodes_to_catchup_to_version(max_version, Duration::from_secs(10)),
-        )?;
+        self.wait_for_all_nodes_to_catchup_to_version(max_version, Duration::from_secs(10))
+            .await?;
 
-        if !runtime.block_on(Self::are_root_hashes_equal_at_version(
-            &clients,
-            max_version,
-        ))? {
+        if !Self::are_root_hashes_equal_at_version(&clients, max_version).await? {
             return Err(anyhow!("Fork check failed"));
         }
 

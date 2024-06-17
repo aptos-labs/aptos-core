@@ -79,7 +79,7 @@ impl NetworkTest for FrameworkUpgrade {
         );
 
         {
-            ctx.swarm.read().await.fork_check(epoch_duration)?;
+            ctx.swarm.read().await.fork_check(epoch_duration).await?;
         }
 
         // Apply the framework release bundle.
@@ -155,14 +155,14 @@ impl NetworkTest for FrameworkUpgrade {
         );
 
         {
-            ctx.swarm.read().await.fork_check(epoch_duration)?;
+            ctx.swarm.read().await.fork_check(epoch_duration).await?;
         }
 
         let msg = "5. check swarm health".to_string();
         info!("{}", msg);
         ctx.report.report_text(msg);
         {
-            ctx.swarm.read().await.fork_check(epoch_duration)?;
+            ctx.swarm.read().await.fork_check(epoch_duration).await?;
         }
         ctx.report.report_text(format!(
             "Compatibility test for {} ==> {} passed",
@@ -184,7 +184,7 @@ impl NetworkTest for FrameworkUpgrade {
         );
 
         {
-            ctx.swarm.read().await.fork_check(epoch_duration)?;
+            ctx.swarm.read().await.fork_check(epoch_duration).await?;
         }
 
         Ok(())

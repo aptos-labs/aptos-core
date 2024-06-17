@@ -357,7 +357,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
                 &txn_stat_half,
             );
 
-            ctx.swarm.read().await.fork_check(epoch_duration)?;
+            ctx.swarm.read().await.fork_check(epoch_duration).await?;
 
             // Update the second batch
             let msg = format!("4. upgrading second batch to new version: {}", new_version);
@@ -395,7 +395,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
             let msg = "5. check swarm health".to_string();
             info!("{}", msg);
             ctx.report.report_text(msg);
-            ctx.swarm.read().await.fork_check(epoch_duration)?;
+            ctx.swarm.read().await.fork_check(epoch_duration).await?;
             ctx.report.report_text(format!(
                 "Compatibility test for {} ==> {} passed",
                 old_version, new_version
