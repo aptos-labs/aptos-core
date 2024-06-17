@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Copyright © Aptos Foundation
-
 use crate::api::{EphemeralPublicKeyBlinder, PoseidonHash};
 use anyhow::{anyhow, Result};
 use aptos_types::{
