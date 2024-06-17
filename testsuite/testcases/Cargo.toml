@@ -26,6 +26,7 @@ aptos-runtimes = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
+async-trait = { workspace = true }
 bcs = { workspace = true }
 csv = { workspace = true }
 futures = { workspace = true }
@@ -35,7 +36,6 @@ rand = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
 tokio-scoped = { workspace = true }
-async-trait = { workspace = true }
 
 [dev-dependencies]
 assert_approx_eq = { workspace = true }
