@@ -13,6 +13,7 @@ fn simple_module() -> Module {
         name: Identifier(String::from("SimpleModule")),
         functions: vec![RefCell::new(Function {
             signature: FunctionSignature {
+                type_parameters: Vec::new(),
                 name: Identifier(String::from("fun1")),
                 parameters: vec![
                     (Identifier(String::from("param1")), Type::U64),

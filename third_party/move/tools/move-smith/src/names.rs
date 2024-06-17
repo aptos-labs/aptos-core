@@ -9,7 +9,7 @@ use std::collections::HashMap;
 /// Represents a Move identifier.
 /// Key invariant: each identifier is globally unique.
 /// This is achieved by appending a monotonic counter to the identifier name.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Identifier(pub String);
 
 impl Identifier {
@@ -30,6 +30,21 @@ impl Scope {
     /// Convert the scope to an identifier.
     pub fn to_identifier(&self) -> Option<Identifier> {
         self.0.as_ref().map(|scope| Identifier(scope.clone()))
+    }
+
+    /// Remove all hidden scopes whose name starts with an underscore
+    /// e.g. `Module1::function1::_block1::_block2` will result in `Module1::function1`
+    pub fn remove_hidden_scopes(&self) -> Scope {
+        match &self.0 {
+            Some(ss) => Scope(Some(
+                ss.split("::")
+                    .filter(|s| !s.starts_with('_'))
+                    .map(String::from)
+                    .collect::<Vec<String>>()
+                    .join("::"),
+            )),
+            None => self.clone(),
+        }
     }
 }
 
@@ -59,6 +74,7 @@ pub struct IdentifierPool {
     scripts: Vec<Identifier>,
     constants: Vec<Identifier>,
     blocks: Vec<Identifier>,
+    type_parameters: Vec<Identifier>,
     scopes: HashMap<Identifier, Scope>,
 }
 
@@ -71,6 +87,7 @@ pub enum IdentifierType {
     Module,
     Script,
     Constant,
+    TypeParameter,
 
     // Block identifiers are only used to keep track of scope.
     Block,
@@ -93,6 +110,7 @@ impl IdentifierPool {
             scripts: Vec::new(),
             constants: Vec::new(),
             blocks: Vec::new(),
+            type_parameters: Vec::new(),
             scopes: HashMap::new(),
         }
     }
@@ -205,6 +223,7 @@ impl IdentifierPool {
             IdentifierType::Script => &self.scripts,
             IdentifierType::Constant => &self.constants,
             IdentifierType::Block => &self.blocks,
+            IdentifierType::TypeParameter => &self.type_parameters,
         }
     }
 
@@ -218,6 +237,7 @@ impl IdentifierPool {
             IdentifierType::Script => self.scripts.push(name),
             IdentifierType::Constant => self.constants.push(name),
             IdentifierType::Block => self.blocks.push(name),
+            IdentifierType::TypeParameter => self.type_parameters.push(name),
         }
     }
 
@@ -231,6 +251,7 @@ impl IdentifierPool {
             IdentifierType::Script => self.scripts.len(),
             IdentifierType::Constant => self.constants.len(),
             IdentifierType::Block => self.blocks.len(),
+            IdentifierType::TypeParameter => self.type_parameters.len(),
         }
     }
 
@@ -243,6 +264,7 @@ impl IdentifierPool {
             IdentifierType::Module => "Module",
             IdentifierType::Script => "Script",
             IdentifierType::Constant => "CONST",
+            IdentifierType::TypeParameter => "T",
             IdentifierType::Block => "_block",
         };
         format!("{}{}", type_prefix, idx)

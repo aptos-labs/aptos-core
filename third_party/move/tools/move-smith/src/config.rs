@@ -40,6 +40,11 @@ pub struct Config {
 
     // Maximum depth of nested expression
     pub max_expr_depth: usize,
+    // Maximum depth of nested type instantiation
+    pub max_type_depth: usize,
+
+    pub max_num_type_params_in_func: usize,
+    pub max_num_type_params_in_struct: usize,
 }
 
 impl Default for Config {
@@ -86,6 +91,9 @@ impl Default for Config {
             max_num_calls_in_script: 20,
 
             max_expr_depth: 5,
+            max_type_depth: 5,
+            max_num_type_params_in_func: 3,
+            max_num_type_params_in_struct: 3,
         }
     }
 }

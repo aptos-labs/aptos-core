@@ -5,7 +5,7 @@
 //! Manages typing information during generation.
 
 use crate::names::Identifier;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Collection of Move types.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,9 +27,37 @@ pub enum Type {
     // Custom types
     Struct(Identifier),
     Function(Identifier),
+
+    // Type Parameter
+    TypeParameter(TypeParameter),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TypeParameter {
+    pub name: Identifier,
+    pub abilities: Vec<Ability>,
+    pub is_phantom: bool,
+}
+
+/// Abilities of a struct.
+/// Key requires storage.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Ability {
+    Copy,
+    Drop,
+    Store,
+    Key,
+}
+
+impl Ability {
+    pub const ALL: [Ability; 4] = [Ability::Copy, Ability::Drop, Ability::Store, Ability::Key];
+    pub const NONE: [Ability; 0] = [];
+    pub const PRIMITIVES: [Ability; 3] = [Ability::Copy, Ability::Drop, Ability::Store];
+    pub const REF: [Ability; 2] = [Ability::Copy, Ability::Drop];
 }
 
 impl Type {
+    /// Check if the type is numerical.
     pub fn is_numerical(&self) -> bool {
         matches!(
             self,
@@ -37,12 +65,52 @@ impl Type {
         )
     }
 
+    /// Check if the type is boolean
     pub fn is_bool(&self) -> bool {
         matches!(self, Type::Bool)
     }
 
+    /// Check if the type is numerical or boolean
     pub fn is_num_or_bool(&self) -> bool {
         self.is_numerical() || self.is_bool()
+    }
+
+    /// Get an identifier for the type
+    ///
+    /// The returned name should be used to find the scope of this type
+    /// from the IdentifierPool.
+    pub fn get_name(&self) -> Identifier {
+        match self {
+            Type::U8 => Identifier("U8".to_string()),
+            Type::U16 => Identifier("U16".to_string()),
+            Type::U32 => Identifier("U32".to_string()),
+            Type::U64 => Identifier("U64".to_string()),
+            Type::U128 => Identifier("U128".to_string()),
+            Type::U256 => Identifier("U256".to_string()),
+            Type::Bool => Identifier("Bool".to_string()),
+            Type::Address => Identifier("Address".to_string()),
+            Type::Signer => Identifier("Signer".to_string()),
+            Type::Vector(t) => Identifier(format!("Vector<{}>", t.get_name().0)),
+            Type::Ref(t) => Identifier(format!("&{}", t.get_name().0)),
+            Type::MutRef(t) => Identifier(format!("&mut {}", t.get_name().0)),
+            Type::Struct(id) => id.clone(),
+            Type::Function(id) => id.clone(),
+            Type::TypeParameter(tp) => tp.name.clone(),
+        }
+    }
+
+    /// Get the possible abilities of a struct type.
+    /// Only give the upper bound of possible abilities.
+    pub fn get_possible_abilities(&self) -> Vec<Ability> {
+        match self {
+            Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::U128 | Type::U256 | Type::Bool => {
+                Vec::from(Ability::PRIMITIVES)
+            },
+            // Hardcode struct ability for now, should properly check the `has`
+            Type::Struct(_) => vec![Ability::Copy, Ability::Drop],
+            Type::TypeParameter(tp) => tp.abilities.clone(),
+            _ => Vec::from(Ability::NONE),
+        }
     }
 }
 
@@ -62,7 +130,7 @@ impl Type {
 /// All generated structs are also registered.
 #[derive(Default, Debug, Clone)]
 pub struct TypePool {
-    mapping: HashMap<Identifier, Type>,
+    mapping: BTreeMap<Identifier, Type>,
     all_types: Vec<Type>,
 }
 
@@ -70,7 +138,7 @@ impl TypePool {
     /// Create a new TypePool.
     pub fn new() -> Self {
         Self {
-            mapping: HashMap::new(),
+            mapping: BTreeMap::new(),
             all_types: vec![
                 Type::U8,
                 Type::U16,
@@ -93,6 +161,23 @@ impl TypePool {
     /// Register a new type
     pub fn register_type(&mut self, typ: Type) {
         self.all_types.push(typ);
+    }
+
+    /// Finds all registered types that are compatible with the given abilities.
+    /// If `key` is required, then the type must have `store`.
+    /// For other abilities, the type must have the corresponding ability.
+    pub fn get_types_for_abilities(&self, requires: &[Ability]) -> Vec<Type> {
+        self.all_types
+            .iter()
+            .filter(|t| {
+                let possible_abilities = t.get_possible_abilities();
+                requires.iter().all(|req| match req {
+                    Ability::Key => possible_abilities.contains(&Ability::Store),
+                    _ => possible_abilities.contains(req),
+                })
+            })
+            .cloned()
+            .collect()
     }
 
     /// Get the type of an identifier

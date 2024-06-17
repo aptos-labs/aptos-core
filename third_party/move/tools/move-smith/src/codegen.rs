@@ -1,7 +1,11 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ast::*, names::Identifier, types::Type};
+use crate::{
+    ast::*,
+    names::Identifier,
+    types::{Ability, Type, TypeParameter},
+};
 use std::vec;
 
 /// Generates Move source code from an AST.
@@ -92,6 +96,7 @@ impl CodeGenerator for Script {
             signature: FunctionSignature {
                 name: Identifier("main".to_string()),
                 parameters: Vec::new(),
+                type_parameters: Vec::new(),
                 return_type: None,
             },
             visibility: Visibility { public: false },
@@ -185,11 +190,36 @@ impl CodeGenerator for Ability {
     }
 }
 
+impl CodeGenerator for TypeParameter {
+    fn emit_code_lines(&self) -> Vec<String> {
+        let phantom = match self.is_phantom {
+            true => "phantom ",
+            false => "",
+        };
+        let name = self.name.emit_code();
+        let abilities = match self.abilities.is_empty() {
+            true => "".to_string(),
+            false => {
+                format!(
+                    ": {}",
+                    self.abilities
+                        .iter()
+                        .map(|ability| ability.inline())
+                        .collect::<Vec<String>>()
+                        .join(" + ")
+                )
+            },
+        };
+        vec![format!("{}{}{}", phantom, name, abilities)]
+    }
+}
+
+/// The logic to generate function signature is implemented here.
 impl CodeGenerator for Function {
     fn emit_code_lines(&self) -> Vec<String> {
-        let parameters = match self.signature.parameters.len() {
-            0 => "".to_string(),
-            _ => {
+        let parameters = match self.signature.parameters.is_empty() {
+            true => "".to_string(),
+            false => {
                 let params: Vec<String> = self
                     .signature
                     .parameters
@@ -211,10 +241,26 @@ impl CodeGenerator for Function {
             ""
         };
 
+        let type_params = match self.signature.type_parameters.is_empty() {
+            true => "".to_string(),
+            false => {
+                format!(
+                    "<{}> ",
+                    self.signature
+                        .type_parameters
+                        .iter()
+                        .map(|tp| tp.inline())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            },
+        };
+
         let mut code = vec![format!(
-            "{}fun {}({}){}",
+            "{}fun {}{}({}){}",
             visibility,
             self.signature.name.emit_code(),
+            type_params,
             parameters,
             return_type
         )];
@@ -444,7 +490,8 @@ impl CodeGenerator for Type {
             T::U128 => "u128".to_string(),
             T::U256 => "u256".to_string(),
             T::Bool => "bool".to_string(),
-            T::Struct(id) => id.emit_code(),
+            T::Struct(id) => id.inline(),
+            T::TypeParameter(tp) => tp.name.inline(),
             _ => unimplemented!(),
         }]
     }

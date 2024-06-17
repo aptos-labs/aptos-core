@@ -6,7 +6,10 @@
 //! Ideally when the fuzzer becomes more mature, this AST will converge to the
 //! parser's AST and we might be able to reuse the parser's AST directly.
 
-use crate::{names::Identifier, types::Type};
+use crate::{
+    names::Identifier,
+    types::{Ability, Type, TypeParameter},
+};
 use arbitrary::Arbitrary;
 use num_bigint::BigUint;
 use std::cell::RefCell;
@@ -70,7 +73,7 @@ pub struct Visibility {
 /// A function signature.
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
-    // pub type_parameters: Vec<(Name, Vec<Ability>)>,
+    pub type_parameters: Vec<TypeParameter>,
     pub name: Identifier,
     pub parameters: Vec<(Identifier, Type)>,
     pub return_type: Option<Type>,
@@ -91,18 +94,8 @@ pub struct StructDefinition {
     pub name: Identifier,
     // pub attributes: Vec<Attributes>,
     pub abilities: Vec<Ability>,
-    // pub type_parameters: Vec<StructTypeParameter>,
+    // pub type_parameters: Vec<TypeParameter>,
     pub fields: Vec<(Identifier, Type)>,
-}
-
-/// Abilities of a struct.
-/// Key requires storage.
-#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
-pub enum Ability {
-    Copy,
-    Drop,
-    Store,
-    Key,
 }
 
 /// A statement in a function body.
