@@ -1,0 +1,26 @@
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      source_revision:
+        description: "Revision to cherry-pick"
+        required: true
+      target_branch:
+        description: "Target branch: i.e. aptos-release-v1.14"
+        required: true
+
+jobs:
+  # TODO: determine branch from PR label
+  cherry_pick_pr:
+    runs-on: ubuntu-latest
+    name: Cherry pick into ${{ inputs.target_branch || 'aptos-release-v1.14' }}
+    steps:
+      - name: Checkout aptos-core
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_revision || 'a5679d86a4fc93e32090bfa2ee26d5a6c86f12b6' }}
+          fetch-depth: 0
+      - name: Cherry pick into ${{ inputs.target_branch || 'aptos-release-v1.14' }}
+        uses: carloscastrojumo/github-cherry-pick-action@v1.0.1
+        with:
+          branch: ${{ inputs.target_branch || 'aptos-release-v1.14' }}
