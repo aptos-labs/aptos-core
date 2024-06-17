@@ -757,7 +757,7 @@ impl Default for ReleaseConfig {
     }
 }
 
-pub fn get_execution_hash(result: &Vec<(String, String)>) -> Vec<u8> {
+pub fn get_execution_hash(result: &[(String, String)]) -> Vec<u8> {
     if result.is_empty() {
         "vector::empty<u8>()".to_owned().into_bytes()
     } else {
@@ -821,7 +821,7 @@ impl Default for ProposalMetadata {
     }
 }
 
-fn get_signer_arg(is_testnet: bool, next_execution_hash: &Vec<u8>) -> &str {
+fn get_signer_arg(is_testnet: bool, next_execution_hash: &[u8]) -> &str {
     if is_testnet && next_execution_hash.is_empty() {
         "framework_signer"
     } else {
