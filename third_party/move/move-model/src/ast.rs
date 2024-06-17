@@ -721,6 +721,8 @@ impl ExpData {
         )
     }
 
+    /// Returns true if `self` contains a `break` expression not nested within an enclosing `Loop`
+    /// or `Lambda`, either of which would capture it.
     pub fn contains_free_break(&self) -> bool {
         use ExpData::*;
         match self {
@@ -777,6 +779,10 @@ impl ExpData {
         }
     }
 
+    /// Returns true if `self` is an expression may allow control flow to pass to a following
+    /// expression in a sequence, "reaching" its successor.  In the limit, this is an undecideable
+    /// property, but we can return `false` in many easily checked cases to allow warnings about
+    /// an unreachable successor.
     pub fn has_reachable_successor(&self) -> bool {
         use ExpData::*;
         match self {

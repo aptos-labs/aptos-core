@@ -6,7 +6,7 @@ warning: Unnecessary trailing semicolon
 25 │                 break;
    │                 -----^
    │                 │    │
-   │                 │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │                 │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │                 Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -15,7 +15,7 @@ warning: Unnecessary trailing semicolon
 28 │             continue;
    │             --------^
    │             │       │
-   │             │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │             │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │             Any code after this expression will not be reached
 
 

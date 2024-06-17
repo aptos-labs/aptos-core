@@ -3042,7 +3042,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 let last_id = last_exp.node_id();
                                 let last_loc = self.env().get_node_loc(last_id);
                                 let msg = "Unnecessary trailing semicolon";
-                                let msg1 = "A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.";
+                                let msg1 = "A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.";
                                 let msg2 = "Any code after this expression will not be reached";
                                 let semicolon_loc = self.to_loc(semicolon_loc);
                                 self.env().diag_with_labels(

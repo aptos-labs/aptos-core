@@ -6,7 +6,7 @@ warning: Unnecessary trailing semicolon
 3 │         loop ();
   │         -------^
   │         │      │
-  │         │      A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │         │      A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
   │         Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -15,7 +15,7 @@ warning: Unnecessary trailing semicolon
 9 │         { (loop (): ()) };
   │            -------       ^
   │            │             │
-  │            │             A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │            │             A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
   │            Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -27,7 +27,7 @@ warning: Unnecessary trailing semicolon
 18 │ │         };
    │ │          ^
    │ │          │
-   │ │          A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │ │          A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │ ╰─────────' Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -36,7 +36,7 @@ warning: Unnecessary trailing semicolon
 35 │             break;
    │             -----^
    │             │    │
-   │             │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │             │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │             Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -45,7 +45,7 @@ warning: Unnecessary trailing semicolon
 44 │                 break;
    │                 -----^
    │                 │    │
-   │                 │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │                 │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │                 Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -54,7 +54,7 @@ warning: Unnecessary trailing semicolon
 55 │             if (cond) continue else break;
    │             -----------------------------^
    │             │                            │
-   │             │                            A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │             │                            A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │             Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -63,7 +63,7 @@ warning: Unnecessary trailing semicolon
 63 │             if (cond) abort 0 else return;
    │             -----------------------------^
    │             │                            │
-   │             │                            A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │             │                            A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │             Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -78,7 +78,7 @@ warning: Unnecessary trailing semicolon
 78 │ │             };
    │ │              ^
    │ │              │
-   │ │              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │ │              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │ ╰─────────────' Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -87,7 +87,7 @@ warning: Unnecessary trailing semicolon
 88 │                 break;
    │                 -----^
    │                 │    │
-   │                 │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │                 │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │                 Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -96,7 +96,7 @@ warning: Unnecessary trailing semicolon
 90 │                 continue;
    │                 --------^
    │                 │       │
-   │                 │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │                 │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │                 Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -109,7 +109,7 @@ warning: Unnecessary trailing semicolon
 91 │ │             };
    │ │              ^
    │ │              │
-   │ │              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │ │              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │ ╰─────────────' Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -118,7 +118,7 @@ warning: Unnecessary trailing semicolon
 100 │                 return;
     │                 ------^
     │                 │     │
-    │                 │     A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+    │                 │     A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
     │                 Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -127,7 +127,7 @@ warning: Unnecessary trailing semicolon
 102 │                 abort 0;
     │                 -------^
     │                 │      │
-    │                 │      A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+    │                 │      A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
     │                 Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
@@ -140,7 +140,7 @@ warning: Unnecessary trailing semicolon
 103 │ │             };
     │ │              ^
     │ │              │
-    │ │              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+    │ │              A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
     │ ╰─────────────' Any code after this expression will not be reached
 
 
