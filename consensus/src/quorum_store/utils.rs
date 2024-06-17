@@ -273,7 +273,7 @@ impl ProofQueue {
     }
 
     fn remaining_txns_without_duplicates(&self) -> u64 {
-        // All the bath keys for which batch_to_proof is not None. This is the set of unexpired and uncommitted proofs.
+        // All the batch keys for which batch_to_proof is not None. This is the set of unexpired and uncommitted proofs.
         let unexpired_batch_keys = self
             .batch_to_proof
             .iter()
@@ -355,7 +355,7 @@ impl ProofQueue {
         let mut cur_txns = 0;
         let mut excluded_txns = 0;
         let mut full = false;
-        
+
         counters::PULL_PROOFS_MAX_TXNS.observe(max_txns as f64);
         counters::PULL_PROOFS_MAX_BYTES.observe(max_bytes as f64);
 

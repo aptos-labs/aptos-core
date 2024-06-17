@@ -25,6 +25,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
+use tokio::sync::mpsc::Sender;
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
@@ -135,7 +136,7 @@ pub struct ProofManager {
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
     allow_batches_without_pos_in_proposal: bool,
-    proof_queue_tx: Arc<tokio::sync::mpsc::Sender<ProofQueueCommand>>,
+    proof_queue_tx: Arc<Sender<ProofQueueCommand>>,
 }
 
 impl ProofManager {
@@ -144,7 +145,7 @@ impl ProofManager {
         back_pressure_total_proof_limit: u64,
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
-        proof_queue_tx: Arc<tokio::sync::mpsc::Sender<ProofQueueCommand>>,
+        proof_queue_tx: Arc<Sender<ProofQueueCommand>>,
     ) -> Self {
         Self {
             batch_queue: BatchQueue::new(batch_store),
@@ -158,11 +159,14 @@ impl ProofManager {
     }
 
     pub(crate) async fn receive_proofs(&mut self, proofs: Vec<ProofOfStore>) {
+        for proof in &proofs {
+            self.batch_queue.remove_batch(proof.info());
+        }
         if !proofs.is_empty() {
             let (response_tx, response_rx) = oneshot::channel();
             if self
                 .proof_queue_tx
-                .send(ProofQueueCommand::AddProofs(proofs.clone(), response_tx))
+                .send(ProofQueueCommand::AddProofs(proofs, response_tx))
                 .await
                 .is_ok()
             {
@@ -176,9 +180,6 @@ impl ProofManager {
             } else {
                 warn!("Failed to add proofs to proof queue");
             }
-        }
-        for proof in proofs.into_iter() {
-            self.batch_queue.remove_batch(proof.info());
         }
     }
 
@@ -339,7 +340,7 @@ impl ProofManager {
 
     pub async fn start(
         mut self,
-        back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
+        back_pressure_tx: Sender<BackPressure>,
         mut proposal_rx: Receiver<GetPayloadCommand>,
         mut proof_rx: tokio::sync::mpsc::Receiver<ProofManagerCommand>,
     ) {
