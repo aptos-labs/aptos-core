@@ -93,7 +93,8 @@ pub struct ConsensusObserver {
     // The configuration of the consensus observer
     consensus_observer_config: ConsensusObserverConfig,
     // The consensus observer client to send network messages
-    consensus_observer_client: ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
+    consensus_observer_client:
+        Arc<ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>>,
 
     // The current epoch
     epoch: u64,
@@ -127,7 +128,9 @@ pub struct ConsensusObserver {
 impl ConsensusObserver {
     pub fn new(
         consensus_observer_config: ConsensusObserverConfig,
-        consensus_observer_client: ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
+        consensus_observer_client: Arc<
+            ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
+        >,
         db_reader: Arc<dyn DbReader>,
         execution_client: Arc<dyn TExecutionClient>,
         sync_notification_sender: UnboundedSender<(u64, Round)>,
@@ -312,7 +315,7 @@ impl ConsensusObserver {
                 .send_rpc_request_to_peer(
                     selected_peer,
                     subscription_request,
-                    self.consensus_observer_config.request_timeout_ms,
+                    self.consensus_observer_config.network_request_timeout_ms,
                 )
                 .await;
 
