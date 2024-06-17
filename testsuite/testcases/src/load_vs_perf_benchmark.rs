@@ -274,18 +274,25 @@ impl NetworkTest for LoadVsPerfBenchmark {
                 )?,
             );
 
+            let table = to_table(self.workloads.type_name(), &results);
+            for line in table {
+                info!("{}", line);
+            }
+
             if let Some(job) = continous_job.as_mut() {
-                job.start_next_phase()
+                job.start_next_phase();
+                let stats_by_phase = job.peek_and_accumulate();
+                for line in to_table_continuous(
+                    "continuous traffic".to_string(),
+                    &extract_continuous_stats(stats_by_phase),
+                ) {
+                    info!("{}", line);
+                }
             }
 
             // Note: uncomment below to perform reconfig during a test
             // let mut aptos_info = ctx.swarm().aptos_public_info();
             // runtime.block_on(aptos_info.reconfig());
-
-            let table = to_table(self.workloads.type_name(), &results);
-            for line in table {
-                info!("{}", line);
-            }
         }
 
         let table = to_table(self.workloads.type_name(), &results);
@@ -296,21 +303,11 @@ impl NetworkTest for LoadVsPerfBenchmark {
         let continuous_results = continous_job.map(|job| {
             let stats_by_phase = rt.block_on(job.stop_job());
 
-            let mut result = vec![];
-            for (phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
-                if phase % 2 != 0 {
-                    result.push((
-                        format!("continuous with traffic {}", phase / 2),
-                        phase_stats,
-                    ));
-                }
-            }
+            let result = extract_continuous_stats(stats_by_phase);
 
-            let table = to_table_continuous("continuous traffic".to_string(), &result);
-            for line in table {
+            for line in to_table_continuous("continuous traffic".to_string(), &result) {
                 ctx.report.report_text(line);
             }
-
             result
         });
 
@@ -348,6 +345,19 @@ impl NetworkTest for LoadVsPerfBenchmark {
     }
 }
 
+fn extract_continuous_stats(stats_by_phase: Vec<TxnStats>) -> Vec<(String, TxnStats)> {
+    let mut result = vec![];
+    for (phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
+        if phase % 2 != 0 {
+            result.push((
+                format!("continuous with traffic {}", phase / 2),
+                phase_stats,
+            ));
+        }
+    }
+    result
+}
+
 fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
     let mut table = Vec::new();
     table.push(format!(
@@ -373,17 +383,17 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
         for result in run_results {
             let rate = result.stats.rate();
             table.push(format!(
-                "{: <40} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12}",
+                "{: <40} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12}",
                 result.name,
                 rate.submitted,
                 rate.committed,
                 rate.expired,
                 rate.failed_submission,
                 result.ledger_transactions / result.actual_duration.as_secs(),
-                rate.latency,
-                rate.p50_latency,
-                rate.p90_latency,
-                rate.p99_latency,
+                rate.latency / 1000.0,
+                rate.p50_latency as f64 / 1000.0,
+                rate.p90_latency as f64 / 1000.0,
+                rate.p99_latency as f64 / 1000.0,
                 result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsBatchToPos).max_sample(),
                 result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsPosToProposal).max_sample(),
                 result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusProposalToOrdered).max_sample(),
@@ -414,16 +424,16 @@ fn to_table_continuous(type_name: String, results: &[(String, TxnStats)]) -> Vec
     for (name, stats) in results {
         let rate = stats.rate();
         table.push(format!(
-            "{: <40} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+            "{: <40} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3}",
             name,
             rate.submitted,
             rate.committed,
             rate.expired,
             rate.failed_submission,
-            rate.latency,
-            rate.p50_latency,
-            rate.p90_latency,
-            rate.p99_latency,
+            rate.latency / 1000.0,
+            rate.p50_latency as f64 / 1000.0,
+            rate.p90_latency as f64 / 1000.0,
+            rate.p99_latency as f64 / 1000.0,
         ));
     }
 

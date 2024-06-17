@@ -1161,66 +1161,32 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
                 unique_senders: false,
                 mempool_backlog: 100000,
             },
+            // Very low gas
             TransactionWorkload {
-                transaction_type: TransactionTypeArg::CoinTransfer,
+                transaction_type: TransactionTypeArg::ModifyGlobalFlagAggV2,
+                num_modules: 1,
+                unique_senders: true,
+                mempool_backlog: 100000,
+            },
+            // Very high gas
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB,
                 num_modules: 1,
                 unique_senders: false,
                 mempool_backlog: 100000,
             },
+            // module loading
             TransactionWorkload {
-                transaction_type: TransactionTypeArg::ModifyGlobalResource,
-                num_modules: 1,
+                transaction_type: TransactionTypeArg::NoOp,
+                num_modules: 1000,
                 unique_senders: false,
                 mempool_backlog: 50000,
             },
+            // publishing package - executes sequentially, but conflict_multiplier is 1
             TransactionWorkload {
-                transaction_type: TransactionTypeArg::CreateObjects10WithPayload10k,
+                transaction_type: TransactionTypeArg::PublishPackage,
                 num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 10000,
-            },
-            // very low gas/s
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::CreateObjectsConflict100WithPayload10k,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 2000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::VectorPicture40,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 50000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::VectorPictureRead40,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 50000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::VectorPicture30k,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 10000,
-            },
-            // very high gas/s
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::VectorPicture30k,
-                num_modules: 20,
-                unique_senders: false,
-                mempool_backlog: 10000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::SmartTablePicture30KWith200Change,
-                num_modules: 1,
-                unique_senders: false,
+                unique_senders: true,
                 mempool_backlog: 2000,
             },
             TransactionWorkload {
@@ -1235,20 +1201,68 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
                 unique_senders: false,
                 mempool_backlog: 2000,
             },
-            // publishing package - executes sequentially, but conflict_multiplier is 1
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::PublishPackage,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 20000,
-            },
-            // module loading
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::NoOp,
-                num_modules: 1000,
-                unique_senders: false,
-                mempool_backlog: 50000,
-            },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::CoinTransfer,
+            //     num_modules: 1,
+            //     unique_senders: false,
+            //     mempool_backlog: 100000,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::ModifyGlobalResource,
+            //     num_modules: 1,
+            //     unique_senders: false,
+            //     mempool_backlog: 50000,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::CreateObjects10WithPayload10k,
+            //     num_modules: 1,
+            //     unique_senders: false,
+            //     mempool_backlog: 10000,
+            // },
+            // // very low gas/s
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::CreateObjectsConflict100WithPayload10k,
+            //     num_modules: 1,
+            //     unique_senders: false,
+            //     mempool_backlog: 2000,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
+            //     num_modules: 1,
+            //     unique_senders: false,
+            //     mempool_backlog: 20000,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::VectorPicture40,
+            //     num_modules: 1,
+            //     unique_senders: false,
+            //     mempool_backlog: 50000,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::VectorPictureRead40,
+            //     num_modules: 1,
+            //     unique_senders: false,
+            //     mempool_backlog: 50000,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::VectorPicture30k,
+            //     num_modules: 1,
+            //     unique_senders: false,
+            //     mempool_backlog: 10000,
+            // },
+            // // very high gas/s
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::VectorPicture30k,
+            //     num_modules: 20,
+            //     unique_senders: false,
+            //     mempool_backlog: 10000,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::SmartTablePicture30KWith200Change,
+            //     num_modules: 1,
+            //     unique_senders: false,
+            //     mempool_backlog: 2000,
+            // },
         ]),
         criteria: Vec::new(),
         continuous_traffic: Some(ContinuousTraffic {
