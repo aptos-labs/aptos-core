@@ -4006,7 +4006,7 @@ dependencies = [
  "move-core-types",
  "move-table-extension",
  "move-vm-types",
- "num-bigint 0.4.5",
+ "num-bigint 0.3.3",
  "num-derive",
  "num-traits",
  "once_cell",

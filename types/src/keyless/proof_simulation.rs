@@ -164,7 +164,10 @@ use crate::keyless::bn254_circom::{g1_projective_str_to_affine, g2_projective_st
 /// used to update `test_prove_and_verify` after circuit changes occur
 /// WARNING: The files referenced in this function are not present in this repo and msut be added
 /// manually
-#[allow(dead_code)]
+// TODO: There is a version conflict between this piece of code and `aptos-dkg` with the
+// `num-bigint` dependency. Ideally we resolve this by updating `aptos-dkg` to `num-bigint` version
+// `0.4.5`
+/*#[allow(dead_code)]
 fn generate_keys_and_inputs<E: Pairing>() {
     let cfg = CircomConfig::<E>::new(
         "./circuit-files/keyless_main.wasm",
@@ -190,7 +193,7 @@ fn generate_keys_and_inputs<E: Pairing>() {
     println!("generated pk: {:?}", pk.clone());
     println!("generated vk: {:?}", vk.clone());
     println!("public inputs: {:?}", inputs);
-}
+}*/
 
 
 /// Generates and verifies a simulated proof using a hardcoded simulation prover and verifier key
