@@ -34,7 +34,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         &pkg_path,
         build_config.clone(),
         // TODO(Gas): double check if this is correct
-        UnitTestingConfig::default_with_bound(Some(100_000)),
+        UnitTestingConfig::default_with_bound(Some(1_000_000)),
         aptos_test_natives(),
         aptos_test_feature_flags_genesis(),
         /* cost_table */ None,
