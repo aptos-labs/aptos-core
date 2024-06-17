@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Copyright © Aptos Foundation
-
 use anyhow::{anyhow, bail, Result};
 use std::{fs, process::Command};
 use tempfile::NamedTempFile;
