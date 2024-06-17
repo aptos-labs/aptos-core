@@ -75,7 +75,7 @@ where
         index
     }
 
-    fn evict(&self, key: &usize) {
+    fn evict(&self, key: &usize) -> Option<SizedCacheEntry<T>> {
         // Get lock for cache entry
         let arc = self.cache[*key % self.capacity].clone();
         let mut lock = arc.lock();
@@ -84,7 +84,9 @@ where
         if let Some(prev_value) = lock.take() {
             self.size
                 .fetch_sub(prev_value.size_in_bytes, Ordering::Relaxed);
+            return Some(prev_value);
         }
+        None
     }
 
     fn total_size(&self) -> usize {

@@ -26,7 +26,7 @@ where
     fn insert_with_size(&self, key: usize, value: V, size_in_bytes: usize) -> usize;
 
     /// Evicts the value for a given key from the cache.
-    fn evict(&self, key: &usize);
+    fn evict(&self, key: &usize) -> Option<SizedCacheEntry<V>>;
 
     /// Returns the total size of the cache.
     fn total_size(&self) -> usize;

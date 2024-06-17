@@ -80,7 +80,11 @@ impl<C: SizedCache<NotATransaction> + 'static> TestCache<C> {
                         while cache_arc.total_size() > metadata_arc.target_size_in_bytes {
                             if let Some(entry) = cache_arc.get(&eviction_index) {
                                 if entry.key < watermark_value {
-                                    cache_arc.evict(&entry.key);
+                                    if let Some(value) = cache_arc.evict(&entry.key) {
+                                        if value.key > watermark_value {
+                                            cache_arc.insert_with_size(value.key, value.value, value.size_in_bytes);
+                                        }
+                                    }
                                 }
                             }
                             eviction_index = (eviction_index + 1) % metadata_arc.capacity;
