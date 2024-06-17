@@ -1,3 +1,6 @@
+WARNING: test `move-compiler-v2/tests/more-v1/verification/cross_module_valid.verification.move` and `move-compiler-v2/tests/more-v1/verification/verify/cross_module_valid.move` share common key `verification/cross_module_valid.verification.move`, discarding former one
+WARNING: test `move-compiler-v2/tests/more-v1/verification/double_annotation.verification.move` and `move-compiler-v2/tests/more-v1/verification/verify/double_annotation.move` share common key `verification/double_annotation.verification.move`, discarding former one
+WARNING: test `move-compiler-v2/tests/more-v1/verification/single_module_valid.verification.move` and `move-compiler-v2/tests/more-v1/verification/verify/single_module_valid.move` share common key `verification/single_module_valid.verification.move`, discarding former one
 move-compiler/tests/move_check/borrow_tests/{
   borrow_global_acquires_duplicate_annotation.move,
   eq_bad.move,
@@ -278,11 +281,4 @@ move-compiler/tests/move_check/typing/{
 }
 move-compiler/tests/move_check/v2-not-supported/{
   no_receiver_calls.move,
-}
-move-compiler/tests/move_check/verification/{
-  cross_module_invalid.move,
-  cross_module_valid.move,
-  double_annotation.move,
-  single_module_invalid.move,
-  single_module_valid.move,
 }

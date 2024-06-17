@@ -481,6 +481,13 @@ impl Flags {
         }
     }
 
+    pub fn set_verify(self, value: bool) -> Self {
+        Self {
+            verify: value,
+            ..self
+        }
+    }
+
     pub fn set_keep_testing_functions(self, value: bool) -> Self {
         Self {
             keep_testing_functions: value,
