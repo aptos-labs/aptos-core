@@ -6,7 +6,7 @@ warning: Unnecessary trailing semicolon
 7 │         return(42);
   │         ----------^
   │         │         │
-  │         │         A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │         │         A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
   │         Any code after this expression will not be reached
 
 error: cannot return nothing from a function with result type `u8`
@@ -21,7 +21,7 @@ warning: Unnecessary trailing semicolon
 11 │         return 42;
    │         ---------^
    │         │        │
-   │         │        A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │         │        A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │         Any code after this expression will not be reached
 
 error: cannot return nothing from a function with result type `u8`
@@ -36,5 +36,5 @@ warning: Unnecessary trailing semicolon
 20 │             return 42;
    │             ---------^
    │             │        │
-   │             │        A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+   │             │        A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
    │             Any code after this expression will not be reached

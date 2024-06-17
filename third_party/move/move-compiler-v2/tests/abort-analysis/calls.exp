@@ -6,7 +6,7 @@ warning: Unnecessary trailing semicolon
 4 │         return;
   │         ------^
   │         │     │
-  │         │     A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │         │     A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
   │         Any code after this expression will not be reached
 
 ============ initial bytecode ================

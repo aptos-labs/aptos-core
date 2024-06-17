@@ -1,21 +1,21 @@
 
 Diagnostics:
 warning: Unnecessary trailing semicolon
-  ┌─ tests/bytecode-generator/break_continue_outside_loop.move:3:7
+  ┌─ tests/bytecode-generator/control_flow/break_continue_outside_loop.move:3:7
   │
 3 │     break;
   │     -----^
   │     │    │
-  │     │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │     │    A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
   │     Any code after this expression will not be reached
 
 warning: Unnecessary trailing semicolon
-  ┌─ tests/bytecode-generator/break_continue_outside_loop.move:7:10
+  ┌─ tests/bytecode-generator/control_flow/break_continue_outside_loop.move:7:10
   │
 7 │     continue;
   │     --------^
   │     │       │
-  │     │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon, not needed here.
+  │     │       A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
   │     Any code after this expression will not be reached
 
 // -- Model dump before bytecode pipeline
@@ -33,13 +33,13 @@ module 0xc0ffee::m {
 
 Diagnostics:
 error: missing enclosing loop statement
-  ┌─ tests/bytecode-generator/break_continue_outside_loop.move:3:2
+  ┌─ tests/bytecode-generator/control_flow/break_continue_outside_loop.move:3:2
   │
 3 │     break;
   │     ^^^^^
 
 error: missing enclosing loop statement
-  ┌─ tests/bytecode-generator/break_continue_outside_loop.move:7:2
+  ┌─ tests/bytecode-generator/control_flow/break_continue_outside_loop.move:7:2
   │
 7 │     continue;
   │     ^^^^^^^^
