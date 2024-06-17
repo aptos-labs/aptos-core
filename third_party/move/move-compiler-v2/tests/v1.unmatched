@@ -34,18 +34,7 @@ move-compiler/tests/move_check/control_flow/{
 }
 move-compiler/tests/move_check/deprecated/{
   assert_function.move,
-  deprecated_constant_duplicated_struct.move,
-  deprecated_constant_duplicated_struct2.move,
-  deprecated_field_type.move,
-  deprecated_field_type2.move,
-  deprecated_placement_address.move,
-  deprecated_placement_address_module_members.move,
   deprecated_placement_basecase.move,
-  deprecated_placement_members.move,
-  deprecated_placement_module.move,
-  deprecated_placement_module2.move,
-  deprecated_placement_module_members.move,
-  public_script.move,
 }
 move-compiler/tests/move_check/examples/{
   multi_pool_money_market_token.move,

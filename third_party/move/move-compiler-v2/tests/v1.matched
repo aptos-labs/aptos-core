@@ -155,6 +155,17 @@ move-compiler/tests/move_check/translated_ir_tests/move/commands/use_before_assi
 move-compiler/tests/move_check/control_flow/for_loop_empty_novar.exp   move-compiler-v2/tests/checking/control_flow/for_loop_empty_novar.exp
 move-compiler/tests/move_check/control_flow/for_type_mismatch.exp   move-compiler-v2/tests/checking/control_flow/for_type_mismatch.exp
 move-compiler/tests/move_check/control_flow/loop_after_loop.exp   move-compiler-v2/tests/checking/control_flow/loop_after_loop.exp
+move-compiler/tests/move_check/deprecated/deprecated_constant_duplicated_struct.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_constant_duplicated_struct.exp
+move-compiler/tests/move_check/deprecated/deprecated_constant_duplicated_struct2.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.exp
+move-compiler/tests/move_check/deprecated/deprecated_field_type.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_field_type.exp
+move-compiler/tests/move_check/deprecated/deprecated_field_type2.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_field_type2.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_address.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_placement_address.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_address_module_members.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_placement_address_module_members.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_members.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_placement_members.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_module.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_placement_module.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_module2.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_placement_module2.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_module_members.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_placement_module_members.exp
+move-compiler/tests/move_check/deprecated/public_script.exp   move-compiler-v2/tests/more-v1/deprecated/public_script.exp
 move-compiler/tests/move_check/folding/empty_vectors.exp   move-compiler-v2/tests/folding/empty_vectors.exp
 move-compiler/tests/move_check/folding/empty_vectors2.exp   move-compiler-v2/tests/folding/empty_vectors2.exp
 move-compiler/tests/move_check/folding/non_constant_empty_vec.exp   move-compiler-v2/tests/folding/non_constant_empty_vec.exp
