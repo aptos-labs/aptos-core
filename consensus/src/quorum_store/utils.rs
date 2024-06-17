@@ -384,11 +384,7 @@ impl ProofQueue {
 
         while !iters.is_empty() {
             iters.shuffle(&mut thread_rng());
-            full = false;
             iters.retain_mut(|iter| {
-                if full {
-                    return false;
-                }
                 if let Some((sort_key, batch)) = iter.next() {
                     if excluded_batches.contains(batch) {
                         excluded_txns += batch.num_txns();
@@ -398,7 +394,6 @@ impl ProofQueue {
                         if cur_bytes + batch.num_bytes() > max_bytes
                             || cur_txns + batch.num_txns() > max_txns
                         {
-                            // Exceeded the limit for requested bytes or number of transactions.
                             full = true;
                             return false;
                         }
@@ -408,7 +403,6 @@ impl ProofQueue {
                         ret.push(proof.clone());
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
                         if cur_bytes == max_bytes || cur_txns == max_txns {
-                            // Exactly the limit for requested bytes or number of transactions.
                             full = true;
                             return false;
                         }
@@ -442,6 +436,7 @@ impl ProofQueue {
                 .iter()
                 .map(BatchKey::from_info)
                 .collect::<HashSet<_>>();
+            let mut remaining_proofs = vec![];
             for (batch_key, proof) in &self.batch_to_proof {
                 if proof.is_some()
                     && !ret
@@ -451,8 +446,13 @@ impl ProofQueue {
                 {
                     num_proofs_remaining_after_pull += 1;
                     num_txns_remaining_after_pull += proof.as_ref().unwrap().0.num_txns();
+                    remaining_proofs.push(proof.as_ref().unwrap().0.clone());
                 }
             }
+            info!(
+                "cur_txns: {}, remaining_proofs: {:?}",
+                cur_txns, remaining_proofs
+            );
             counters::NUM_PROOFS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION
                 .observe(num_proofs_remaining_after_pull as f64);
             counters::NUM_TXNS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION
