@@ -90,6 +90,26 @@ module aptos_framework::primary_fungible_store {
         object::create_user_derived_object_address(owner, metadata_addr)
     }
 
+    /// Get the address of the primary store for the given account.
+    /// Use instead of the corresponding view functions for dispatchable hooks to avoid circular dependencies of modules.
+    public inline fun primary_store_address_inlined<T: key>(owner: address, metadata: Object<T>): address {
+        let metadata_addr = object::object_address(&metadata);
+        object::create_user_derived_object_address(owner, metadata_addr)
+    }
+
+    /// Get the primary store object for the given account.
+    /// Use instead of the corresponding view functions for dispatchable hooks to avoid circular dependencies of modules.
+    public inline fun primary_store_inlined<T: key>(owner: address, metadata: Object<T>): Object<FungibleStore> {
+        let store = primary_store_address_inlined(owner, metadata);
+        object::address_to_object(store)
+    }
+
+    /// Return whether the given account's primary store exists.
+    /// Use instead of the corresponding view functions for dispatchable hooks to avoid circular dependencies of modules.
+    public inline fun primary_store_exists_inlined<T: key>(account: address, metadata: Object<T>): bool {
+        fungible_asset::store_exists(primary_store_address_inlined(account, metadata))
+    }
+
     #[view]
     /// Get the primary store object for the given account.
     public fun primary_store<T: key>(owner: address, metadata: Object<T>): Object<FungibleStore> {
