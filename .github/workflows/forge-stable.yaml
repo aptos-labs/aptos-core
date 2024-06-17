@@ -182,9 +182,21 @@ jobs:
       FORGE_TEST_SUITE: realistic_env_graceful_overload
       POST_TO_SLACK: true
 
-  run-forge-realistic-network-tuned-for-throughput:
+  run-forge-realistic-env-graceful-workload-sweep:
     if: ${{ github.event_name != 'pull_request' && always() }}
     needs: [determine-test-metadata, run-forge-realistic-env-graceful-overload] # Only run after the previous job completes
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-realistic-env-graceful-workload-sweep-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
+      FORGE_RUNNER_DURATION_SECS: 2100 # Run for 5 minutes per test, 7 tests.
+      FORGE_TEST_SUITE: realistic_env_graceful_workload_sweep
+      POST_TO_SLACK: true
+
+  run-forge-realistic-network-tuned-for-throughput:
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [ determine-test-metadata, run-forge-realistic-env-graceful-workload-sweep ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
