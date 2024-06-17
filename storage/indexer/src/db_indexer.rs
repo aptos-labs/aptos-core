@@ -143,10 +143,9 @@ impl DBIndexer {
 
     fn get_num_of_transactions(&self, version: Version) -> Result<u64> {
         let highest_version = self.main_db_reader.get_synced_version()?;
-        Ok(min(
-            self.config.batch_size as u64,
-            highest_version - version,
-        ))
+        // we want to include the last transaction since the iterator interface will is right exclusive.
+        let num_of_transaction = min(self.config.batch_size as u64, highest_version - version) + 1;
+        Ok(num_of_transaction)
     }
 
     pub fn process_a_batch(&self, start_version: Option<Version>) -> Result<Version> {
