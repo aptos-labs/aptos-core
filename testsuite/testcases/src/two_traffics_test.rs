@@ -48,6 +48,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
             WARMUP_DURATION_FRACTION,
             COOLDOWN_DURATION_FRACTION,
             None,
+            None,
         )
         .await?;
 
