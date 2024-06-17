@@ -10818,6 +10818,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Event'
+    Ed25519:
+      type: object
+      required:
+      - value
+      properties:
+        value:
+          $ref: '#/components/schemas/HexEncodedBytes'
     Ed25519Signature:
       type: object
       description: A single Ed25519 signature
@@ -11103,6 +11110,13 @@ components:
           format: uint8
         signature:
           $ref: '#/components/schemas/Signature'
+    Keyless:
+      type: object
+      required:
+      - value
+      properties:
+        value:
+          $ref: '#/components/schemas/HexEncodedBytes'
     MoveAbility:
       type: string
     MoveFunction:
@@ -11538,18 +11552,28 @@ components:
     PublicKey:
       type: object
       oneOf:
-      - $ref: '#/components/schemas/PublicKey_string(HexEncodedBytes)'
-      - $ref: '#/components/schemas/PublicKey_string(HexEncodedBytes)'
-      - $ref: '#/components/schemas/PublicKey_string(HexEncodedBytes)'
-      - $ref: '#/components/schemas/PublicKey_string(HexEncodedBytes)'
+      - $ref: '#/components/schemas/PublicKey_Ed25519'
+      - $ref: '#/components/schemas/PublicKey_Secp256k1Ecdsa'
+      - $ref: '#/components/schemas/PublicKey_Secp256r1Ecdsa'
+      - $ref: '#/components/schemas/PublicKey_Keyless'
       discriminator:
         propertyName: type
         mapping:
-          ed25519: '#/components/schemas/PublicKey_string(HexEncodedBytes)'
-          secp256k1_ecdsa: '#/components/schemas/PublicKey_string(HexEncodedBytes)'
-          secp256r1_ecdsa: '#/components/schemas/PublicKey_string(HexEncodedBytes)'
-          keyless: '#/components/schemas/PublicKey_string(HexEncodedBytes)'
-    PublicKey_string(HexEncodedBytes):
+          ed25519: '#/components/schemas/PublicKey_Ed25519'
+          secp256k1_ecdsa: '#/components/schemas/PublicKey_Secp256k1Ecdsa'
+          secp256r1_ecdsa: '#/components/schemas/PublicKey_Secp256r1Ecdsa'
+          keyless: '#/components/schemas/PublicKey_Keyless'
+    PublicKey_Ed25519:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: ed25519
+      - $ref: '#/components/schemas/Ed25519'
+    PublicKey_Keyless:
       allOf:
       - type: object
         required:
@@ -11558,7 +11582,27 @@ components:
           type:
             type: string
             example: keyless
-      - $ref: '#/components/schemas/HexEncodedBytes'
+      - $ref: '#/components/schemas/Keyless'
+    PublicKey_Secp256k1Ecdsa:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: secp256k1_ecdsa
+      - $ref: '#/components/schemas/Secp256k1Ecdsa'
+    PublicKey_Secp256r1Ecdsa:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: secp256r1_ecdsa
+      - $ref: '#/components/schemas/Secp256r1Ecdsa'
     RawTableItemRequest:
       type: object
       description: Table Item request for the GetTableItemRaw API
@@ -11601,21 +11645,45 @@ components:
           $ref: '#/components/schemas/Address'
         script:
           $ref: '#/components/schemas/ScriptPayload'
+    Secp256k1Ecdsa:
+      type: object
+      required:
+      - value
+      properties:
+        value:
+          $ref: '#/components/schemas/HexEncodedBytes'
+    Secp256r1Ecdsa:
+      type: object
+      required:
+      - value
+      properties:
+        value:
+          $ref: '#/components/schemas/HexEncodedBytes'
     Signature:
       type: object
       oneOf:
-      - $ref: '#/components/schemas/Signature_string(HexEncodedBytes)'
-      - $ref: '#/components/schemas/Signature_string(HexEncodedBytes)'
-      - $ref: '#/components/schemas/Signature_string(HexEncodedBytes)'
-      - $ref: '#/components/schemas/Signature_string(HexEncodedBytes)'
+      - $ref: '#/components/schemas/Signature_Ed25519'
+      - $ref: '#/components/schemas/Signature_Secp256k1Ecdsa'
+      - $ref: '#/components/schemas/Signature_WebAuthn'
+      - $ref: '#/components/schemas/Signature_Keyless'
       discriminator:
         propertyName: type
         mapping:
-          ed25519: '#/components/schemas/Signature_string(HexEncodedBytes)'
-          secp256k1_ecdsa: '#/components/schemas/Signature_string(HexEncodedBytes)'
-          web_authn: '#/components/schemas/Signature_string(HexEncodedBytes)'
-          keyless: '#/components/schemas/Signature_string(HexEncodedBytes)'
-    Signature_string(HexEncodedBytes):
+          ed25519: '#/components/schemas/Signature_Ed25519'
+          secp256k1_ecdsa: '#/components/schemas/Signature_Secp256k1Ecdsa'
+          web_authn: '#/components/schemas/Signature_WebAuthn'
+          keyless: '#/components/schemas/Signature_Keyless'
+    Signature_Ed25519:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: ed25519
+      - $ref: '#/components/schemas/Ed25519'
+    Signature_Keyless:
       allOf:
       - type: object
         required:
@@ -11624,7 +11692,27 @@ components:
           type:
             type: string
             example: keyless
-      - $ref: '#/components/schemas/HexEncodedBytes'
+      - $ref: '#/components/schemas/Keyless'
+    Signature_Secp256k1Ecdsa:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: secp256k1_ecdsa
+      - $ref: '#/components/schemas/Secp256k1Ecdsa'
+    Signature_WebAuthn:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: web_authn
+      - $ref: '#/components/schemas/WebAuthn'
     SingleKeySignature:
       type: object
       description: A single key signature
@@ -12146,6 +12234,13 @@ components:
           type: array
           description: Arguments of the function
           items: {}
+    WebAuthn:
+      type: object
+      required:
+      - value
+      properties:
+        value:
+          $ref: '#/components/schemas/HexEncodedBytes'
     WriteModule:
       type: object
       description: Write a new module or update an existing one

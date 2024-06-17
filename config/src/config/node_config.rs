@@ -121,7 +121,7 @@ impl NodeConfig {
     /// Sets the data directory for this config
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         // Set the base directory
-        self.base.data_dir = data_dir.clone();
+        self.base.data_dir.clone_from(&data_dir);
 
         // Set the data directory for each sub-module
         self.consensus.set_data_dir(data_dir.clone());

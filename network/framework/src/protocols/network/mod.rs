@@ -409,6 +409,27 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
         let res_msg = tokio::task::spawn_blocking(move || protocol.from_bytes(&res_data)).await??;
         Ok(res_msg)
     }
+
+    /// Send a protobuf rpc request to a single recipient while handling
+    /// serialization and deserialization of the request and response respectively.
+    /// Assumes that the request and response both have the same message type.
+    pub async fn send_rpc_raw(
+        &self,
+        recipient: PeerId,
+        protocol: ProtocolId,
+        req_msg: Bytes,
+        timeout: Duration,
+    ) -> Result<TMessage, RpcError> {
+        // Send the request and wait for the response
+        let res_data = self
+            .peer_mgr_reqs_tx
+            .send_rpc(recipient, protocol, req_msg, timeout)
+            .await?;
+
+        // Deserialize the response using a blocking task
+        let res_msg = tokio::task::spawn_blocking(move || protocol.from_bytes(&res_data)).await??;
+        Ok(res_msg)
+    }
 }
 
 /// Generalized functionality for any request across `DirectSend` and `Rpc`.
