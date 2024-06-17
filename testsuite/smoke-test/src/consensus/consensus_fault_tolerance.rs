@@ -258,10 +258,16 @@ async fn test_ordered_only_cert() {
 async fn test_execution_retry() {
     let num_validators = 4;
 
-    let mut swarm = create_swarm(num_validators, 1).await;
-
+    let swarm = create_swarm(num_validators, 1).await;
+    let (validator_clients, public_info) = {
+        (
+            swarm.get_validator_clients_with_names(),
+            swarm.aptos_public_info(),
+        )
+    };
     test_consensus_fault_tolerance(
-        &mut swarm,
+        validator_clients,
+        public_info,
         3,
         5.0,
         1,
