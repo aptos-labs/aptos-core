@@ -334,6 +334,24 @@ pub fn pos_to_commit(bucket: u64, secs: f64) {
 // Proof Queue
 //////////////////////
 
+pub static PULL_PROOFS_MAX_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_pull_proofs_max_txns",
+        "Histogram for the number of transactions pulled when pulling proofs",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static PULL_PROOFS_MAX_BYTES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_pull_proofs_max_bytes",
+        "Histogram for the number of bytes pulled when pulling proofs",
+        BYTE_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
 pub static PROOFS_WITHOUT_BATCH_DATA: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "quorum_store_proofs_without_batch_data",

@@ -27,7 +27,7 @@ fn proof_of_store(author: PeerId, batch_id: BatchId, gas_bucket_start: u64) -> P
 #[test]
 fn test_proof_queue_sorting() {
     let my_peer_id = PeerId::random();
-    let mut proof_queue = ProofQueue::new(my_peer_id);
+    let mut proof_queue = ProofQueue::new(my_peer_id, 10, 10);
 
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();

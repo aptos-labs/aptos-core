@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::batch_generator::BackPressure;
 use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
@@ -196,7 +197,7 @@ impl Ord for BatchSortKey {
 pub enum ProofQueueCommand {
     // Proof manager sends this command to add the proofs to the proof queue
     // We send back (remaining_txns, remaining_proofs) to the proof manager
-    AddProofs(Vec<ProofOfStore>, oneshot::Sender<(u64, u64)>),
+    AddProofs(Vec<ProofOfStore>),
     // Batch coordinator sends this command to add the received batches to the proof queue.
     // For each transaction, the proof queue stores the list of batches containing the transaction.
     AddBatches(Vec<(BatchInfo, Vec<TransactionSummary>)>),
@@ -212,7 +213,7 @@ pub enum ProofQueueCommand {
     // Proof manager sends this command to mark these batches as committed and
     // update the block timestamp.
     // We send back the (remaining_txns, remaining_proofs) to the proof manager
-    MarkCommitted(Vec<BatchInfo>, u64, oneshot::Sender<(u64, u64)>),
+    MarkCommitted(Vec<BatchInfo>, u64),
 }
 
 pub struct ProofQueue {
@@ -229,6 +230,8 @@ pub struct ProofQueue {
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
+    back_pressure_total_txn_limit: u64,
+    back_pressure_total_proof_limit: u64,
     remaining_txns_with_duplicates: u64,
     remaining_proofs: u64,
     remaining_local_txns: u64,
@@ -236,7 +239,11 @@ pub struct ProofQueue {
 }
 
 impl ProofQueue {
-    pub(crate) fn new(my_peer_id: PeerId) -> Self {
+    pub(crate) fn new(
+        my_peer_id: PeerId,
+        back_pressure_total_txn_limit: u64,
+        back_pressure_total_proof_limit: u64,
+    ) -> Self {
         Self {
             my_peer_id,
             author_to_batches: HashMap::new(),
@@ -245,6 +252,8 @@ impl ProofQueue {
             batch_to_txn_summaries: HashMap::new(),
             expirations: TimeExpirations::new(),
             latest_block_timestamp: 0,
+            back_pressure_total_txn_limit,
+            back_pressure_total_proof_limit,
             remaining_txns_with_duplicates: 0,
             remaining_proofs: 0,
             remaining_local_txns: 0,
@@ -273,7 +282,7 @@ impl ProofQueue {
     }
 
     fn remaining_txns_without_duplicates(&self) -> u64 {
-        // All the bath keys for which batch_to_proof is not None. This is the set of unexpired and uncommitted proofs.
+        // All the batch keys for which batch_to_proof is not None. This is the set of unexpired and uncommitted proofs.
         let unexpired_batch_keys = self
             .batch_to_proof
             .iter()
@@ -338,6 +347,15 @@ impl ProofQueue {
         self.inc_remaining(&author, num_txns);
     }
 
+    /// return true when quorum store is back pressured
+    pub(crate) fn qs_back_pressure(&self) -> BackPressure {
+        let (remaining_total_txn_num, remaining_total_proof_num) = self.remaining_txns_and_proofs();
+        BackPressure {
+            txn_count: remaining_total_txn_num > self.back_pressure_total_txn_limit,
+            proof_count: remaining_total_proof_num > self.back_pressure_total_proof_limit,
+        }
+    }
+
     // gets excluded and iterates over the vector returning non excluded or expired entries.
     // return the vector of pulled PoS, and the size of the remaining PoS
     // The flag in the second return argument is true iff the entire proof queue is fully utilized
@@ -366,6 +384,9 @@ impl ProofQueue {
             }
         }
 
+        counters::PULL_PROOFS_MAX_TXNS.observe(max_txns as f64);
+        counters::PULL_PROOFS_MAX_BYTES.observe(max_bytes as f64);
+
         let mut iters = vec![];
         for (_, batches) in self.author_to_batches.iter() {
             iters.push(batches.iter().rev());
@@ -374,9 +395,6 @@ impl ProofQueue {
         while !iters.is_empty() {
             iters.shuffle(&mut thread_rng());
             iters.retain_mut(|iter| {
-                if full {
-                    return false;
-                }
                 if let Some((sort_key, batch)) = iter.next() {
                     if excluded_batches.contains(batch) {
                         excluded_txns += batch.num_txns();
@@ -416,7 +434,6 @@ impl ProofQueue {
                         ret.push(proof.clone());
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
                         if cur_bytes == max_bytes || cur_txns == max_txns {
-                            // Exactly the limit for requested bytes or number of transactions.
                             full = true;
                             return false;
                         }
@@ -452,6 +469,7 @@ impl ProofQueue {
                 .iter()
                 .map(BatchKey::from_info)
                 .collect::<HashSet<_>>();
+            let mut remaining_proofs = vec![];
             for (batch_key, proof) in &self.batch_to_proof {
                 if proof.is_some()
                     && !ret
@@ -461,8 +479,13 @@ impl ProofQueue {
                 {
                     num_proofs_remaining_after_pull += 1;
                     num_txns_remaining_after_pull += proof.as_ref().unwrap().0.num_txns();
+                    remaining_proofs.push(proof.as_ref().unwrap().0.clone());
                 }
             }
+            info!(
+                "cur_txns: {}, remaining_proofs: {:?}",
+                cur_txns, remaining_proofs
+            );
             counters::NUM_PROOFS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION
                 .observe(num_proofs_remaining_after_pull as f64);
             counters::NUM_TXNS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION
@@ -576,17 +599,31 @@ impl ProofQueue {
         }
     }
 
-    pub async fn start(mut self, mut command_rx: tokio::sync::mpsc::Receiver<ProofQueueCommand>) {
+    pub async fn start(
+        mut self,
+        back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
+        mut command_rx: tokio::sync::mpsc::Receiver<ProofQueueCommand>,
+    ) {
+        let mut back_pressure = BackPressure {
+            txn_count: false,
+            proof_count: false,
+        };
+
         loop {
             let _timer = counters::PROOF_MANAGER_MAIN_LOOP.start_timer();
             if let Some(msg) = command_rx.recv().await {
                 match msg {
-                    ProofQueueCommand::AddProofs(proofs, response_sender) => {
+                    ProofQueueCommand::AddProofs(proofs) => {
                         for proof in proofs {
                             self.push(proof);
                         }
-                        if let Err(e) = response_sender.send(self.remaining_txns_and_proofs()) {
-                            warn!("Failed to send response to AddProofs: {:?}", e);
+
+                        let updated_back_pressure = self.qs_back_pressure();
+                        if updated_back_pressure != back_pressure {
+                            back_pressure = updated_back_pressure;
+                            if back_pressure_tx.send(back_pressure).await.is_err() {
+                                debug!("Failed to send back_pressure for proposal");
+                            }
                         }
                     },
                     ProofQueueCommand::PullProofs {
@@ -606,11 +643,16 @@ impl ProofQueue {
                             warn!("Failed to send response to PullProofs: {:?}", e);
                         }
                     },
-                    ProofQueueCommand::MarkCommitted(batches, block_timestamp, response_sender) => {
+                    ProofQueueCommand::MarkCommitted(batches, block_timestamp) => {
                         self.mark_committed(batches);
                         self.handle_updated_block_timestamp(block_timestamp);
-                        if let Err(e) = response_sender.send(self.remaining_txns_and_proofs()) {
-                            error!("Failed to send response to MarkCommitted: {:?}", e);
+
+                        let updated_back_pressure = self.qs_back_pressure();
+                        if updated_back_pressure != back_pressure {
+                            back_pressure = updated_back_pressure;
+                            if back_pressure_tx.send(back_pressure).await.is_err() {
+                                debug!("Failed to send back_pressure for proposal");
+                            }
                         }
                     },
                     ProofQueueCommand::AddBatches(batch_summaries) => {

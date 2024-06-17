@@ -320,9 +320,19 @@ impl InnerBuilder {
             )
         );
 
-        let proof_queue = ProofQueue::new(self.author);
+        let proof_queue = ProofQueue::new(
+            self.author,
+            self.config.back_pressure.backlog_txn_limit_count,
+            self.config
+                .back_pressure
+                .backlog_per_validator_batch_limit_count
+                * self.num_validators,
+        );
         let proof_queue_cmd_rx = self.proof_queue_cmd_rx.take().unwrap();
-        spawn_named!("proof_queue", proof_queue.start(proof_queue_cmd_rx));
+        spawn_named!(
+            "proof_queue",
+            proof_queue.start(self.back_pressure_tx.clone(), proof_queue_cmd_rx)
+        );
 
         for (i, remote_batch_coordinator_cmd_rx) in
             self.remote_batch_coordinator_cmd_rx.into_iter().enumerate()
@@ -367,11 +377,6 @@ impl InnerBuilder {
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
         let proof_manager = ProofManager::new(
-            self.config.back_pressure.backlog_txn_limit_count,
-            self.config
-                .back_pressure
-                .backlog_per_validator_batch_limit_count
-                * self.num_validators,
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
             self.proof_queue_cmd_tx.clone(),
@@ -379,7 +384,6 @@ impl InnerBuilder {
         spawn_named!(
             "proof_manager",
             proof_manager.start(
-                self.back_pressure_tx.clone(),
                 self.consensus_to_quorum_store_receiver,
                 proof_manager_cmd_rx,
             )
