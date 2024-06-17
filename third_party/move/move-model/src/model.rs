@@ -73,14 +73,7 @@ use num::ToPrimitive;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
-    any::{Any, TypeId},
-    backtrace::{Backtrace, BacktraceStatus},
-    cell::{Ref, RefCell, RefMut},
-    cmp::Ordering,
-    collections::{BTreeMap, BTreeSet, VecDeque},
-    ffi::OsStr,
-    fmt::{self, Formatter, Write},
-    rc::Rc,
+    any::{Any, TypeId}, backtrace::{Backtrace, BacktraceStatus}, cell::{Ref, RefCell, RefMut}, cmp::Ordering, collections::{BTreeMap, BTreeSet, VecDeque}, ffi::OsStr, fmt::{self, Formatter, Write}, path::Path, rc::Rc
 };
 
 // =================================================================================================
@@ -2677,6 +2670,13 @@ impl<'env> ModuleEnv<'env> {
         self.env.file_id_is_primary_target.contains(&file_id)
     }
 
+    /// Returns true if both modules are defined in the same package.
+    pub fn in_same_package(&self, other: &'env Self) -> bool {
+        let self_path = Path::new(self.get_source_path());
+        let other_path = Path::new(other.get_source_path());
+        self_path.parent().expect("parent") == other_path.parent().expect("parent")
+    }
+
     /// Returns the path to source file of this module.
     pub fn get_source_path(&self) -> &OsStr {
         let file_id = self.data.loc.file_id;
@@ -2745,7 +2745,8 @@ impl<'env> ModuleEnv<'env> {
         self.data.friend_modules.clone()
     }
 
-    /// Returns the set of modules whose public(package) functions are called in the current module.
+    /// Returns the set of modules in the current package,
+    /// whose public(package) functions are called in the current module.
     pub fn needs_be_friend_with(&self) -> BTreeSet<ModuleId> {
         let mut deps = BTreeSet::new();
         for fun_env in self.get_functions() {
@@ -2753,7 +2754,7 @@ impl<'env> ModuleEnv<'env> {
             for fun in called_funs {
                 let mod_id = fun.module_id;
                 let mod_env = self.env.get_module(mod_id);
-                if mod_env.is_target() && mod_env.get_function(fun.id).has_package_visibility() {
+                if mod_env.is_target() && mod_env.get_function(fun.id).has_package_visibility() && self.in_same_package(&mod_env) {
                     deps.insert(mod_id);
                 }
             }
