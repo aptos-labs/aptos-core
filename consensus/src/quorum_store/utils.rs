@@ -299,6 +299,7 @@ impl ProofQueue {
 
         while !iters.is_empty() {
             iters.shuffle(&mut thread_rng());
+            full = false;
             iters.retain_mut(|iter| {
                 if full {
                     return false;
