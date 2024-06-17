@@ -57,10 +57,10 @@ ARGS:
 * Alternatively, the binary can be run directly with `cargo run -p compiler`.
 
 To compile and verify `foo.mvir`, which contains a Move IR module:
-> `compiler --address 0x42 --no-stdlib -m foo.mvir`
+> `compiler -m foo.mvir`
 
 To compile and verify `bar.mvir`, which contains a transaction script:
-> `compiler --address 0xca --no-stdlib bar.mvir`
+> `compiler bar.mvir`
 
 ## Folder Structure
 
