@@ -342,7 +342,18 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
         message: TMessage,
     ) -> Result<(), NetworkError> {
         let mdata = protocol.to_bytes(&message)?.into();
-        self.peer_mgr_reqs_tx.send_to(recipient, protocol, mdata)?;
+        self.send_to_raw(recipient, protocol, mdata)
+    }
+
+    /// Sends a raw message to a single recipient
+    pub fn send_to_raw(
+        &self,
+        recipient: PeerId,
+        protocol: ProtocolId,
+        message: Bytes,
+    ) -> Result<(), NetworkError> {
+        self.peer_mgr_reqs_tx
+            .send_to(recipient, protocol, message)?;
         Ok(())
     }
 
@@ -377,14 +388,8 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
             .into();
 
         // Send the request and wait for the response
-        let res_data = self
-            .peer_mgr_reqs_tx
-            .send_rpc(recipient, protocol, req_data, timeout)
-            .await?;
-
-        // Deserialize the response using a blocking task
-        let res_msg = tokio::task::spawn_blocking(move || protocol.from_bytes(&res_data)).await??;
-        Ok(res_msg)
+        self.send_rpc_raw(recipient, protocol, req_data, timeout)
+            .await
     }
 
     /// Send a protobuf rpc request to a single recipient while handling

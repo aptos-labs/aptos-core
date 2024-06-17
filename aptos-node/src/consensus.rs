@@ -33,7 +33,7 @@ pub fn create_consensus_observer_runtime(
     consensus_observer_network_interfaces: Option<
         ApplicationNetworkInterfaces<ConsensusObserverMessage>,
     >,
-    consensus_observer_publisher: Option<Arc<ConsensusPublisher>>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
     db_rw: DbReaderWriter,
@@ -54,7 +54,7 @@ pub fn create_consensus_observer_runtime(
             node_config,
             consensus_observer_network_interfaces.network_client,
             consensus_observer_network_interfaces.network_service_events,
-            consensus_observer_publisher,
+            consensus_publisher,
             Arc::new(consensus_notifier),
             consensus_to_mempool_sender,
             db_rw,
@@ -66,22 +66,35 @@ pub fn create_consensus_observer_runtime(
     }
 }
 
-/// Creates and returns the consensus publisher (if enabled)
+/// Creates and returns the consensus publisher and runtime (if enabled)
 pub fn create_consensus_publisher(
     node_config: &NodeConfig,
     consensus_observer_network_interfaces: &Option<
         ApplicationNetworkInterfaces<ConsensusObserverMessage>,
     >,
-) -> Option<Arc<ConsensusPublisher>> {
+) -> (Option<Runtime>, Option<Arc<ConsensusPublisher>>) {
     if node_config.consensus_observer.publisher_enabled {
-        consensus_observer_network_interfaces
+        // Get the network interfaces
+        let consensus_observer_network_interfaces = consensus_observer_network_interfaces
             .as_ref()
-            .map(|network| network.network_client.clone())
-            .map(|consensus_observer_client| {
-                Arc::new(ConsensusPublisher::new(consensus_observer_client))
-            })
+            .expect("Consensus publisher is enabled, but network interfaces are missing!");
+
+        // Create the publisher runtime
+        let runtime = aptos_runtimes::spawn_named_runtime("publisher".into(), None);
+
+        // Create the consensus publisher
+        let (consensus_publisher, outbound_message_receiver) = ConsensusPublisher::new(
+            consensus_observer_network_interfaces.network_client.clone(),
+            node_config.consensus_observer,
+        );
+
+        // Start the consensus publisher
+        runtime.spawn(consensus_publisher.clone().start(outbound_message_receiver));
+
+        // Return the runtime and publisher
+        (Some(runtime), Some(Arc::new(consensus_publisher)))
     } else {
-        None
+        (None, None)
     }
 }
 
@@ -94,7 +107,7 @@ pub fn create_consensus_runtime(
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
     vtxn_pool: VTxnPoolState,
-    consensus_observer_publisher: Option<Arc<ConsensusPublisher>>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
     admin_service: &mut AdminService,
 ) -> Option<Runtime> {
     consensus_network_interfaces.map(|consensus_network_interfaces| {
@@ -106,7 +119,7 @@ pub fn create_consensus_runtime(
             consensus_notifier.clone(),
             consensus_to_mempool_sender.clone(),
             vtxn_pool,
-            consensus_observer_publisher.clone(),
+            consensus_publisher.clone(),
         );
         admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
 
