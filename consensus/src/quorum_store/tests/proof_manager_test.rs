@@ -16,10 +16,11 @@ use std::{collections::HashSet, sync::Arc};
 
 async fn create_proof_manager() -> ProofManager {
     let (proof_queue_tx, proof_queue_rx) = tokio::sync::mpsc::channel(100);
-    let proof_queue = ProofQueue::new(PeerId::random());
-    tokio::spawn(proof_queue.start(proof_queue_rx));
+    let proof_queue = ProofQueue::new(PeerId::random(), 10, 10);
+    let (backpressure_tx, _) = tokio::sync::mpsc::channel(10);
+    tokio::spawn(proof_queue.start(backpressure_tx, proof_queue_rx));
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(10, 10, batch_store, true, Arc::new(proof_queue_tx))
+    ProofManager::new(batch_store, true, Arc::new(proof_queue_tx))
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {

@@ -4,7 +4,6 @@
 use crate::{
     monitor,
     quorum_store::{
-        batch_generator::BackPressure,
         batch_store::BatchStore,
         counters,
         utils::{BatchSortKey, ProofQueueCommand},
@@ -131,28 +130,18 @@ impl BatchQueue {
 
 pub struct ProofManager {
     batch_queue: BatchQueue,
-    back_pressure_total_txn_limit: u64,
-    remaining_total_txn_num: u64,
-    back_pressure_total_proof_limit: u64,
-    remaining_total_proof_num: u64,
     allow_batches_without_pos_in_proposal: bool,
     proof_queue_tx: Arc<Sender<ProofQueueCommand>>,
 }
 
 impl ProofManager {
     pub fn new(
-        back_pressure_total_txn_limit: u64,
-        back_pressure_total_proof_limit: u64,
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
         proof_queue_tx: Arc<Sender<ProofQueueCommand>>,
     ) -> Self {
         Self {
             batch_queue: BatchQueue::new(batch_store),
-            back_pressure_total_txn_limit,
-            remaining_total_txn_num: 0,
-            back_pressure_total_proof_limit,
-            remaining_total_proof_num: 0,
             allow_batches_without_pos_in_proposal,
             proof_queue_tx,
         }
@@ -163,22 +152,12 @@ impl ProofManager {
             self.batch_queue.remove_batch(proof.info());
         }
         if !proofs.is_empty() {
-            let (response_tx, response_rx) = oneshot::channel();
-            if self
+            if let Err(e) = self
                 .proof_queue_tx
-                .send(ProofQueueCommand::AddProofs(proofs, response_tx))
+                .send(ProofQueueCommand::AddProofs(proofs))
                 .await
-                .is_ok()
             {
-                if let Ok((remaining_total_txn_num, remaining_total_proof_num)) = response_rx.await
-                {
-                    self.remaining_total_txn_num = remaining_total_txn_num;
-                    self.remaining_total_proof_num = remaining_total_proof_num;
-                } else {
-                    warn!("Failed to get response from proof queue after adding proofs");
-                }
-            } else {
-                warn!("Failed to add proofs to proof queue");
+                warn!("Failed to add proofs to proof queue with error: {:?}", e);
             }
         }
     }
@@ -203,25 +182,15 @@ impl ProofManager {
             self.batch_queue.remove_batch(batch);
         }
 
-        let (response_tx, response_rx) = oneshot::channel();
-        if self
+        if let Err(e) = self
             .proof_queue_tx
-            .send(ProofQueueCommand::MarkCommitted(
-                batches,
-                block_timestamp,
-                response_tx,
-            ))
+            .send(ProofQueueCommand::MarkCommitted(batches, block_timestamp))
             .await
-            .is_ok()
         {
-            if let Ok((remaining_total_txn_num, remaining_total_proof_num)) = response_rx.await {
-                self.remaining_total_txn_num = remaining_total_txn_num;
-                self.remaining_total_proof_num = remaining_total_proof_num;
-            } else {
-                warn!("Failed to get response from proof queue after marking proofs as committed");
-            }
-        } else {
-            warn!("Failed to mark proofs as committed in proof queue");
+            warn!(
+                "Failed to mark proofs as committed in proof queue with error: {:?}",
+                e
+            );
         }
     }
 
@@ -330,39 +299,17 @@ impl ProofManager {
         }
     }
 
-    /// return true when quorum store is back pressured
-    pub(crate) fn qs_back_pressure(&self) -> BackPressure {
-        BackPressure {
-            txn_count: self.remaining_total_txn_num > self.back_pressure_total_txn_limit,
-            proof_count: self.remaining_total_proof_num > self.back_pressure_total_proof_limit,
-        }
-    }
-
     pub async fn start(
         mut self,
-        back_pressure_tx: Sender<BackPressure>,
         mut proposal_rx: Receiver<GetPayloadCommand>,
         mut proof_rx: tokio::sync::mpsc::Receiver<ProofManagerCommand>,
     ) {
-        let mut back_pressure = BackPressure {
-            txn_count: false,
-            proof_count: false,
-        };
-
         loop {
             let _timer = counters::PROOF_MANAGER_MAIN_LOOP.start_timer();
 
             tokio::select! {
                     Some(msg) = proposal_rx.next() => monitor!("proof_manager_handle_proposal", {
                         self.handle_proposal_request(msg).await;
-
-                        let updated_back_pressure = self.qs_back_pressure();
-                        if updated_back_pressure != back_pressure {
-                            back_pressure = updated_back_pressure;
-                            if back_pressure_tx.send(back_pressure).await.is_err() {
-                                debug!("Failed to send back_pressure for proposal");
-                            }
-                        }
                     }),
                     Some(msg) = proof_rx.recv() => {
                         monitor!("proof_manager_handle_command", {
@@ -385,13 +332,6 @@ impl ProofManager {
                                     batches,
                                 ).await;
                             },
-                        }
-                        let updated_back_pressure = self.qs_back_pressure();
-                        if updated_back_pressure != back_pressure {
-                            back_pressure = updated_back_pressure;
-                            if back_pressure_tx.send(back_pressure).await.is_err() {
-                                debug!("Failed to send back_pressure for commit notification");
-                            }
                         }
                     })
                 }
