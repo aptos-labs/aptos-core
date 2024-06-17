@@ -355,6 +355,9 @@ impl ProofQueue {
         let mut cur_txns = 0;
         let mut excluded_txns = 0;
         let mut full = false;
+        
+        counters::PULL_PROOFS_MAX_TXNS.observe(max_txns as f64);
+        counters::PULL_PROOFS_MAX_BYTES.observe(max_bytes as f64);
 
         let mut iters = vec![];
         for (_, batches) in self.author_to_batches.iter() {
@@ -363,6 +366,7 @@ impl ProofQueue {
 
         while !iters.is_empty() {
             iters.shuffle(&mut thread_rng());
+            full = false;
             iters.retain_mut(|iter| {
                 if full {
                     return false;
