@@ -96,7 +96,11 @@ pub enum EmitJobMode {
     },
     WaveTps {
         average_tps: usize,
+        // amount of traffic that is oscilating:
+        // 1.0 means it oscilates between [0, 2 * average_tps]
+        // 0.3 means it oscilates between [0.7 * average_tps, 1.3 * average_tps]
         wave_ratio: f32,
+        // number of waves within the wait_millis interval (which is txn_expiration_time + 180s)
         num_waves: usize,
     },
 }
@@ -228,6 +232,11 @@ impl EmitJobRequest {
 
     pub fn max_gas_per_txn(mut self, max_gas_per_txn: u64) -> Self {
         self.max_gas_per_txn = max_gas_per_txn;
+        self
+    }
+
+    pub fn init_expiration_multiplier(mut self, init_expiration_multiplier: f64) -> Self {
+        self.init_expiration_multiplier = init_expiration_multiplier;
         self
     }
 
