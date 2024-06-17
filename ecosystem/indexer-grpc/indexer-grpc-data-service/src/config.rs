@@ -148,14 +148,14 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             StorageFormat::Base64UncompressedProto
         };
 
-        println!(
-            ">>>> Starting Redis connection: {:?}",
-            &self.redis_read_replica_address.0
+        tracing::info!(
+            redis_connection_address = &self.redis_read_replica_address.0.to_string(),
+            "[data service] Starting Redis connection",
         );
         let redis_conn = redis::Client::open(self.redis_read_replica_address.0.clone())?
             .get_tokio_connection_manager()
             .await?;
-        println!(">>>> Redis connection established");
+        tracing::info!("[data service] Redis connection established");
         // InMemoryCache.
         let in_memory_cache =
             aptos_indexer_grpc_utils::in_memory_cache::InMemoryCache::new_with_redis_connection(
@@ -164,7 +164,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                 cache_storage_format,
             )
             .await?;
-        println!(">>>> InMemoryCache established");
+        tracing::info!("[data service] InMemoryCache established");
         // Add authentication interceptor.
         let server = RawDataServerWrapper::new(
             self.redis_read_replica_address.clone(),
@@ -181,7 +181,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             .send_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Gzip);
-        println!(">>>> Starting gRPC server: {:?}", &svc);
+        tracing::info!("[data service] Starting gRPC server.");
 
         let svc_clone = svc.clone();
         let reflection_service_clone = reflection_service.clone();
