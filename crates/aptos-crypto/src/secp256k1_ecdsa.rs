@@ -122,7 +122,7 @@ impl ValidCryptoMaterial for PrivateKey {
     }
 }
 
-/// Secp256k1 ecds public key
+/// Secp256k1 ecdsa public key
 #[derive(DeserializeKey, Clone, Eq, PartialEq, SerializeKey)]
 #[key_name("Secp256k1EcdsaPublicKey")]
 pub struct PublicKey(pub(crate) libsecp256k1::PublicKey);
