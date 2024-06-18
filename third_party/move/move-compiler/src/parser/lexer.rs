@@ -79,7 +79,6 @@ pub enum Tok {
     Script,
     Const,
     Friend,
-    Package,
     NumSign,
     AtSign,
     Inline,
@@ -157,7 +156,6 @@ impl fmt::Display for Tok {
             Script => "script",
             Const => "const",
             Friend => "friend",
-            Package => "package",
             NumSign => "#",
             AtSign => "@",
         };
@@ -657,7 +655,6 @@ fn get_name_token(name: &str) -> Tok {
         "module" => Tok::Module,
         "move" => Tok::Move,
         "native" => Tok::Native,
-        "package" => Tok::Package,
         "public" => Tok::Public,
         "return" => Tok::Return,
         "script" => Tok::Script,

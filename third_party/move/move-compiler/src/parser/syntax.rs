@@ -569,11 +569,12 @@ fn parse_visibility(context: &mut Context) -> Result<Visibility, Box<Diagnostic>
     consume_token(context.tokens, Tok::Public)?;
     let sub_public_vis = if match_token(context.tokens, Tok::LParen)? {
         let sub_token = context.tokens.peek();
+        let sub_token_content = context.tokens.content();
         context.tokens.advance()?;
         if sub_token != Tok::RParen {
             consume_token(context.tokens, Tok::RParen)?;
         }
-        Some(sub_token)
+        Some((sub_token, sub_token_content))
     } else {
         None
     };
@@ -582,9 +583,9 @@ fn parse_visibility(context: &mut Context) -> Result<Visibility, Box<Diagnostic>
     let loc = make_loc(context.tokens.file_hash(), start_loc, end_loc);
     Ok(match sub_public_vis {
         None => Visibility::Public(loc),
-        Some(Tok::Script) => Visibility::Script(loc),
-        Some(Tok::Friend) => Visibility::Friend(loc),
-        Some(Tok::Package) => Visibility::Package(loc),
+        Some((Tok::Script, _)) => Visibility::Script(loc),
+        Some((Tok::Friend, _)) => Visibility::Friend(loc),
+        Some((Tok::Identifier, content)) if content == "package" => Visibility::Package(loc),
         _ => {
             let msg = format!(
                 "Invalid visibility modifier. Consider removing it or using '{}', '{}', or '{}'",
