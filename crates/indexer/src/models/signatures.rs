@@ -8,7 +8,8 @@ use aptos_api_types::{
     AccountSignature as APIAccountSignature, Ed25519Signature as APIEd25519Signature,
     FeePayerSignature as APIFeePayerSignature, MultiAgentSignature as APIMultiAgentSignature,
     MultiEd25519Signature as APIMultiEd25519Signature, MultiKeySignature as APIMultiKeySignature,
-    SingleKeySignature as APISingleKeySignature, TransactionSignature as APITransactionSignature,
+    NoAccountSignature as APINoAccountSignature, SingleKeySignature as APISingleKeySignature,
+    TransactionSignature as APITransactionSignature,
 };
 use aptos_bitvec::BitVec;
 use field_count::FieldCount;
@@ -301,6 +302,15 @@ impl Signature {
                 multi_agent_index,
                 override_address,
             )],
+            APIAccountSignature::NoAccountSignature(sig) => vec![Self::parse_no_account_signature(
+                sig,
+                sender,
+                transaction_version,
+                transaction_block_height,
+                is_sender_primary,
+                multi_agent_index,
+                override_address,
+            )],
         }
     }
 
@@ -345,6 +355,31 @@ impl Signature {
             signer,
             is_sender_primary,
             type_: String::from("multi_key_signature"),
+            public_key: "Not implemented".into(),
+            threshold: 1,
+            public_key_indices: serde_json::Value::Array(vec![]),
+            signature: "Not implemented".into(),
+            multi_agent_index,
+            multi_sig_index: 0,
+        }
+    }
+
+    fn parse_no_account_signature(
+        _s: &APINoAccountSignature,
+        sender: &String,
+        transaction_version: i64,
+        transaction_block_height: i64,
+        is_sender_primary: bool,
+        multi_agent_index: i64,
+        override_address: Option<&String>,
+    ) -> Self {
+        let signer = standardize_address(override_address.unwrap_or(sender));
+        Self {
+            transaction_version,
+            transaction_block_height,
+            signer,
+            is_sender_primary,
+            type_: String::from("no_account_signature"),
             public_key: "Not implemented".into(),
             threshold: 1,
             public_key_indices: serde_json::Value::Array(vec![]),

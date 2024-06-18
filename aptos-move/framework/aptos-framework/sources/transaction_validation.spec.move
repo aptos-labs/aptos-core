@@ -106,6 +106,7 @@ spec aptos_framework::transaction_validation {
     txn_max_gas_units: u64,
     txn_expiration_time: u64,
     chain_id: u8,
+    is_simulation: bool,
     ) {
         // TODO(fa_migration)
         pragma verify = false;
@@ -121,6 +122,7 @@ spec aptos_framework::transaction_validation {
     txn_expiration_time: u64,
     chain_id: u8,
     _script_hash: vector<u8>,
+    is_simulation: bool,
     ) {
         // TODO(fa_migration)
         pragma verify = false;
@@ -133,6 +135,7 @@ spec aptos_framework::transaction_validation {
     spec schema MultiAgentPrologueCommonAbortsIf {
         secondary_signer_addresses: vector<address>;
         secondary_signer_public_key_hashes: vector<vector<u8>>;
+        is_simulation: bool;
 
         // Vectors to be `zipped with` should be of equal length.
         let num_secondary_signers = len(secondary_signer_addresses);
@@ -142,24 +145,32 @@ spec aptos_framework::transaction_validation {
         // property 2: All secondary signer addresses are verified to be authentic through a validation process.
         /// [high-level-req-2]
         aborts_if exists i in 0..num_secondary_signers:
-            !account::exists_at(secondary_signer_addresses[i])
-                || secondary_signer_public_key_hashes[i] !=
-                account::get_authentication_key(secondary_signer_addresses[i]);
-
+            !account::exists_at(secondary_signer_addresses[i]);
+        aborts_if exists i in 0..num_secondary_signers:
+            !can_skip(features::spec_simulation_enhancement_enabled(), is_simulation, secondary_signer_public_key_hashes[i]) &&
+                secondary_signer_public_key_hashes[i] !=
+                    account::get_authentication_key(secondary_signer_addresses[i]);
         // By the end, all secondary signers account should exist and public key hash should match.
         ensures forall i in 0..num_secondary_signers:
-            account::exists_at(secondary_signer_addresses[i])
-                && secondary_signer_public_key_hashes[i] ==
-                account::get_authentication_key(secondary_signer_addresses[i]);
+            account::exists_at(secondary_signer_addresses[i]);
+        ensures forall i in 0..num_secondary_signers:
+            secondary_signer_public_key_hashes[i] == account::get_authentication_key(secondary_signer_addresses[i])
+                || can_skip(features::spec_simulation_enhancement_enabled(), is_simulation, secondary_signer_public_key_hashes[i]);
+    }
+
+    spec fun can_skip(feature_flag: bool, is_simulation: bool, auth_key: vector<u8>): bool {
+        features::spec_simulation_enhancement_enabled() && is_simulation && vector::is_empty(auth_key)
     }
 
     spec multi_agent_common_prologue(
     secondary_signer_addresses: vector<address>,
     secondary_signer_public_key_hashes: vector<vector<u8>>,
+    is_simulation: bool,
     ) {
         include MultiAgentPrologueCommonAbortsIf {
             secondary_signer_addresses,
             secondary_signer_public_key_hashes,
+            is_simulation,
         };
     }
 
@@ -175,6 +186,7 @@ spec aptos_framework::transaction_validation {
     txn_max_gas_units: u64,
     txn_expiration_time: u64,
     chain_id: u8,
+    is_simulation: bool,
     ) {
         pragma verify_duration_estimate = 120;
         let gas_payer = signer::address_of(sender);
@@ -188,6 +200,7 @@ spec aptos_framework::transaction_validation {
         include MultiAgentPrologueCommonAbortsIf {
             secondary_signer_addresses,
             secondary_signer_public_key_hashes,
+            is_simulation,
         };
     }
 
@@ -203,6 +216,7 @@ spec aptos_framework::transaction_validation {
     txn_max_gas_units: u64,
     txn_expiration_time: u64,
     chain_id: u8,
+    is_simulation: bool,
     ) {
         pragma verify_duration_estimate = 120;
 
@@ -216,6 +230,7 @@ spec aptos_framework::transaction_validation {
         include MultiAgentPrologueCommonAbortsIf {
             secondary_signer_addresses,
             secondary_signer_public_key_hashes,
+            is_simulation,
         };
 
         aborts_if !account::exists_at(gas_payer);
@@ -231,7 +246,8 @@ spec aptos_framework::transaction_validation {
     storage_fee_refunded: u64,
     txn_gas_price: u64,
     txn_max_gas_units: u64,
-    gas_units_remaining: u64
+    gas_units_remaining: u64,
+    is_simulation: bool,
     ) {
         // TODO(fa_migration)
         pragma verify = false;
@@ -247,7 +263,8 @@ spec aptos_framework::transaction_validation {
     storage_fee_refunded: u64,
     txn_gas_price: u64,
     txn_max_gas_units: u64,
-    gas_units_remaining: u64
+    gas_units_remaining: u64,
+    is_simulation: bool,
     ) {
         // TODO(fa_migration)
         pragma verify = false;

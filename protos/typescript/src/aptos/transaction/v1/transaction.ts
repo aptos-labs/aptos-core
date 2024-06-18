@@ -1099,6 +1099,9 @@ export interface MultiKeySignature {
   signaturesRequired?: number | undefined;
 }
 
+export interface NoAccountSignature {
+}
+
 export interface SingleSender {
   sender?: AccountSignature | undefined;
 }
@@ -1112,6 +1115,7 @@ export interface AccountSignature {
   /** 4 is reserved. */
   singleKeySignature?: SingleKeySignature | undefined;
   multiKeySignature?: MultiKeySignature | undefined;
+  noAccountSignature?: NoAccountSignature | undefined;
 }
 
 export enum AccountSignature_Type {
@@ -1120,6 +1124,7 @@ export enum AccountSignature_Type {
   TYPE_MULTI_ED25519 = 2,
   TYPE_SINGLE_KEY = 4,
   TYPE_MULTI_KEY = 5,
+  TYPE_NO_ACCOUNT_SIGNATURE = 6,
   UNRECOGNIZED = -1,
 }
 
@@ -1140,6 +1145,9 @@ export function accountSignature_TypeFromJSON(object: any): AccountSignature_Typ
     case 5:
     case "TYPE_MULTI_KEY":
       return AccountSignature_Type.TYPE_MULTI_KEY;
+    case 6:
+    case "TYPE_NO_ACCOUNT_SIGNATURE":
+      return AccountSignature_Type.TYPE_NO_ACCOUNT_SIGNATURE;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -1159,6 +1167,8 @@ export function accountSignature_TypeToJSON(object: AccountSignature_Type): stri
       return "TYPE_SINGLE_KEY";
     case AccountSignature_Type.TYPE_MULTI_KEY:
       return "TYPE_MULTI_KEY";
+    case AccountSignature_Type.TYPE_NO_ACCOUNT_SIGNATURE:
+      return "TYPE_NO_ACCOUNT_SIGNATURE";
     case AccountSignature_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -10233,6 +10243,83 @@ export const MultiKeySignature = {
   },
 };
 
+function createBaseNoAccountSignature(): NoAccountSignature {
+  return {};
+}
+
+export const NoAccountSignature = {
+  encode(_: NoAccountSignature, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): NoAccountSignature {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseNoAccountSignature();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<NoAccountSignature, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<NoAccountSignature | NoAccountSignature[]>
+      | Iterable<NoAccountSignature | NoAccountSignature[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [NoAccountSignature.encode(p).finish()];
+        }
+      } else {
+        yield* [NoAccountSignature.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, NoAccountSignature>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<NoAccountSignature> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [NoAccountSignature.decode(p)];
+        }
+      } else {
+        yield* [NoAccountSignature.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(_: any): NoAccountSignature {
+    return {};
+  },
+
+  toJSON(_: NoAccountSignature): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<NoAccountSignature>): NoAccountSignature {
+    return NoAccountSignature.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<NoAccountSignature>): NoAccountSignature {
+    const message = createBaseNoAccountSignature();
+    return message;
+  },
+};
+
 function createBaseSingleSender(): SingleSender {
   return { sender: undefined };
 }
@@ -10331,6 +10418,7 @@ function createBaseAccountSignature(): AccountSignature {
     multiEd25519: undefined,
     singleKeySignature: undefined,
     multiKeySignature: undefined,
+    noAccountSignature: undefined,
   };
 }
 
@@ -10350,6 +10438,9 @@ export const AccountSignature = {
     }
     if (message.multiKeySignature !== undefined) {
       MultiKeySignature.encode(message.multiKeySignature, writer.uint32(50).fork()).ldelim();
+    }
+    if (message.noAccountSignature !== undefined) {
+      NoAccountSignature.encode(message.noAccountSignature, writer.uint32(58).fork()).ldelim();
     }
     return writer;
   },
@@ -10395,6 +10486,13 @@ export const AccountSignature = {
           }
 
           message.multiKeySignature = MultiKeySignature.decode(reader, reader.uint32());
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.noAccountSignature = NoAccountSignature.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -10448,6 +10546,9 @@ export const AccountSignature = {
       multiKeySignature: isSet(object.multiKeySignature)
         ? MultiKeySignature.fromJSON(object.multiKeySignature)
         : undefined,
+      noAccountSignature: isSet(object.noAccountSignature)
+        ? NoAccountSignature.fromJSON(object.noAccountSignature)
+        : undefined,
     };
   },
 
@@ -10467,6 +10568,9 @@ export const AccountSignature = {
     }
     if (message.multiKeySignature !== undefined) {
       obj.multiKeySignature = MultiKeySignature.toJSON(message.multiKeySignature);
+    }
+    if (message.noAccountSignature !== undefined) {
+      obj.noAccountSignature = NoAccountSignature.toJSON(message.noAccountSignature);
     }
     return obj;
   },
@@ -10488,6 +10592,9 @@ export const AccountSignature = {
       : undefined;
     message.multiKeySignature = (object.multiKeySignature !== undefined && object.multiKeySignature !== null)
       ? MultiKeySignature.fromPartial(object.multiKeySignature)
+      : undefined;
+    message.noAccountSignature = (object.noAccountSignature !== undefined && object.noAccountSignature !== null)
+      ? NoAccountSignature.fromPartial(object.noAccountSignature)
       : undefined;
     return message;
   },
