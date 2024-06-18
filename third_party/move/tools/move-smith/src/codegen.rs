@@ -428,17 +428,20 @@ impl CodeGenerator for FunctionCall {
                 )
             },
         };
-        let mut code = format!("{}{}(", self.name.emit_code(), type_args);
-        code.push_str(
-            self.args
-                .iter()
-                .map(|arg| arg.emit_code())
-                .collect::<Vec<String>>()
-                .join(", ")
-                .as_str(),
-        );
-        code.push(')');
-        vec![code]
+        let mut code = vec![format!("{}{}(", self.name.emit_code(), type_args)];
+        if self.args.is_empty() {
+            code.last_mut().unwrap().push_str(")");
+            return code;
+        }
+        let mut args = Vec::new();
+        for arg in &self.args {
+            let mut arg_lines = arg.emit_code_lines();
+            arg_lines.last_mut().unwrap().push(',');
+            args.extend(arg_lines);
+        }
+        append_code_lines_with_indentation(&mut code, args, INDENTATION_SIZE);
+        code.push(")".to_string());
+        code
     }
 }
 

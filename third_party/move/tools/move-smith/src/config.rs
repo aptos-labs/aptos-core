@@ -54,7 +54,7 @@ impl Default for Config {
                 "exceeded maximal local count".to_string(),
                 "MOVELOC_UNAVAILABLE_ERROR".to_string(),
                 // unassigned variable should be removed
-                // after copy is properly inserted 
+                // after copy is properly inserted
                 "unassigned variable".to_string(),
             ],
 
