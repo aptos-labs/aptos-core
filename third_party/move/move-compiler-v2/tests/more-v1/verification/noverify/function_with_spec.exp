@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: unresolved spec target
+   ┌─ tests/more-v1/verification/noverify/function_with_spec.move:10:10
+   │
+10 │     spec bar {
+   │          ^^^
+
+error: unresolved spec target
+   ┌─ tests/more-v1/verification/noverify/function_with_spec.move:15:10
+   │
+15 │     spec baz {
+   │          ^^^
