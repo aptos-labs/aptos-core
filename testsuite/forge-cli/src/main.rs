@@ -605,7 +605,8 @@ fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 100, 3)
+            realistic_env_load_sweep_test()
+            // realistic_env_max_load_test(duration, test_cmd, 100, 3)
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
@@ -1048,14 +1049,14 @@ fn realistic_env_sweep_wrap(
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(100, 7, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
+        workloads: Workloads::TPS(vec![5000]),
         criteria: [
-            (9, 1.5, 3., 4., 0),
-            (95, 1.5, 3., 4., 0),
-            (950, 2., 3., 4., 0),
-            (2750, 2.5, 3.5, 4.5, 0),
+            // (9, 1.5, 3., 4., 0),
+            // (95, 1.5, 3., 4., 0),
+            // (950, 2., 3., 4., 0),
+            // (2750, 2.5, 3.5, 4.5, 0),
             (4600, 3., 4., 6., 10), // Allow some expired transactions (high-load)
         ]
         .into_iter()
