@@ -760,9 +760,6 @@ pub fn convert_transaction(
         Transaction::ValidatorTransaction(_) => {
             transaction::transaction::TransactionType::Validator
         },
-        Transaction::BlockMetadataExtTransaction(_) => {
-            todo!()
-        },
     };
 
     let txn_data = match &transaction {
@@ -831,9 +828,6 @@ pub fn convert_transaction(
         Transaction::PendingTransaction(_) => panic!("PendingTransaction not supported"),
         Transaction::ValidatorTransaction(_) => {
             transaction::transaction::TxnData::Validator(transaction::ValidatorTransaction {})
-        },
-        Transaction::BlockMetadataExtTransaction(_) => {
-            todo!()
         },
     };
 

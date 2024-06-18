@@ -4,16 +4,16 @@
 
 use crate::{
     transaction::{
-        BlockEpilogueTransaction, BlockMetadataExtTransaction, DecodedTableData, DeleteModule,
-        DeleteResource, DeleteTableItem, DeletedTableData, MultisigPayload,
-        MultisigTransactionPayload, StateCheckpointTransaction, UserTransactionRequestInner,
-        ValidatorTransaction, WriteModule, WriteResource, WriteTableItem,
+        BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem,
+        DeletedTableData, MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
+        UserTransactionRequestInner, ValidatorTransaction, WriteModule, WriteResource,
+        WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
-    Address, BlockMetadataTransaction, Bytecode, DirectWriteSet, EntryFunctionId,
-    EntryFunctionPayload, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource,
-    MoveScriptBytecode, MoveType, MoveValue, PendingTransaction, ResourceGroup, ScriptPayload,
-    ScriptWriteSet, SubmitTransactionRequest, Transaction, TransactionInfo, TransactionOnChainData,
+    Address, Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event,
+    HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType,
+    MoveValue, PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet,
+    SubmitTransactionRequest, Transaction, TransactionInfo, TransactionOnChainData,
     TransactionPayload, UserTransactionRequest, VersionedEvent, WriteSet, WriteSetChange,
     WriteSetPayload,
 };
@@ -201,15 +201,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 let payload = self.try_into_write_set_payload(write_set)?;
                 (info, payload, events).into()
             },
-            BlockMetadata(txn) => {
-                Transaction::BlockMetadataTransaction(BlockMetadataTransaction::from_internal_repr(
-                    txn, info, events,
-                ))
-                // (&txn, info, events).into()
-            },
-            BlockMetadataExt(txn) => Transaction::BlockMetadataExtTransaction(
-                BlockMetadataExtTransaction::from_internal_repr(txn, info, events),
-            ),
+            BlockMetadata(txn) => (&txn, info, events).into(),
+            BlockMetadataExt(txn) => (&txn, info, events).into(),
             StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,

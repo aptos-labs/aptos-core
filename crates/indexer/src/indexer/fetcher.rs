@@ -296,11 +296,6 @@ async fn fetch_nexts(
                         info.block_height = Some(block_height_bcs);
                         info.epoch = Some(epoch_bcs);
                     },
-                    Transaction::BlockMetadataExtTransaction(ref mut bmet) => {
-                        let info = bmet.transaction_info_mut();
-                        info.block_height = Some(block_height_bcs);
-                        info.epoch = Some(epoch_bcs);
-                    },
                 };
                 txn
             }) {

@@ -250,9 +250,6 @@ impl Transaction {
                 vec![],
                 vec![],
             ),
-            APITransaction::BlockMetadataExtTransaction(_block_metadata_ext_txn) => {
-                todo!()
-            },
         }
     }
 
