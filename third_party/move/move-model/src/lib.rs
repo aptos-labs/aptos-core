@@ -112,13 +112,8 @@ pub fn run_model_builder_in_compiler_mode(
         Flags::model_compilation()
             .set_skip_attribute_checks(skip_attribute_checks)
             .set_keep_testing_functions(compile_test_code)
-            .set_flavor(
-                if language_version != LanguageVersion::V1 {
-                    move_compiler::shared::MOVE_2_FLAVOR
-                } else {
-                    ""
-                },
-            ),
+            .set_lang_v2(language_version != LanguageVersion::V1)
+            .set_compiler_v2(true),
         known_attributes,
     )
 }

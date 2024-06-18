@@ -750,7 +750,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 impl<'env, 'builder, 'module_builder> UnificationContext
     for ExpTranslator<'env, 'builder, 'module_builder>
 {
-    fn get_struct_field_map(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
+    fn get_struct_field_map(
+        &self,
+        id: &QualifiedInstId<StructId>,
+    ) -> (BTreeMap<Symbol, Type>, bool) {
         self.parent.parent.lookup_struct_fields(id)
     }
 
@@ -3311,7 +3314,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let expected_type = &self.subs.specialize(expected_type);
             if let Type::Struct(mid, sid, inst) = self.subs.specialize(expected_type) {
                 // field_map contains the instantiated field type.
-                let field_map = self
+                let (field_map, _) = self
                     .parent
                     .parent
                     .lookup_struct_fields(&mid.qualified_inst(sid, inst));

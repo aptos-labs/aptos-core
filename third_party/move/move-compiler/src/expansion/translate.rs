@@ -1599,7 +1599,7 @@ fn function_(context: &mut Context, pfunction: P::Function) -> (FunctionName, E:
     let attributes = flatten_attributes(context, AttributePosition::Function, pattributes);
     let visibility = visibility(pvisibility);
     let (old_aliases, signature) = function_signature(context, psignature);
-    let (acquires, access_specifiers) = if context.env.flags().v2() {
+    let (acquires, access_specifiers) = if context.env.flags().compiler_v2() {
         (vec![], access_specifier_list(context, access_specifiers))
     } else {
         (
@@ -1648,7 +1648,7 @@ fn access_specifier_list_as_acquires(
             Syntax::InvalidAccessSpecifier,
             (
                 loc,
-                "compiler version 1 only supports simple 'acquires <resource_name>' clauses"
+                "language version 1 only supports simple 'acquires <resource_name>' clauses"
                     .to_owned()
             )
         ));
@@ -2893,7 +2893,7 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
     use P::Bind_ as PB;
     let b_ = match pb_ {
         PB::Var(v) => {
-            if context.env.is_move_2()
+            if context.env.flags().lang_v2()
                 && is_valid_struct_constant_or_schema_name(v.value().as_str())
             {
                 // Interpret as an unqualified module access

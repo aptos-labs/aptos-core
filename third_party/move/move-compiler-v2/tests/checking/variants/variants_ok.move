@@ -13,6 +13,11 @@ module 0x815::m {
         Blue,
     }
 
+    enum CommonFields {
+        Foo{x: u64, y: u8},
+        Bar{x: u64, z: u32}
+    }
+
     fun t1(self: Color): bool {
         match (self) {
             Color::RGB{red, green, blue} => red + green + blue > 0,
@@ -106,11 +111,19 @@ module 0x815::m {
         red + green + blue
     }
 
-    fun unqualified_variant(self: Color): bool {
+    fun t8_unqualified_variant(self: Color): bool {
         match (self) {
             RGB{red, green, blue} => red != green && green != blue,
             Red => true,
             Blue => false,
         }
+    }
+
+    fun t9_common_field(self: CommonFields): u64 {
+        self.x
+    }
+
+    fun t9_common_field_ref(self: &CommonFields): &u64 {
+        &self.x
     }
 }

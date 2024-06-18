@@ -64,7 +64,8 @@ pub const WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG: &str = "Wdeprecation-aptos
 
 pub const WARN_UNUSED_FLAG: &str = "Wunused";
 
-pub const V2_FLAG: &str = "v2";
+pub const LANG_V2_FLAG: &str = "lang_v2";
+pub const COMPILER_V2_FLAG: &str = "compiler_v2";
 
 // Flag to dump a stacktrace on a compiler error, for users who like
 // to keep RUST_BACKTRACE always enabled.

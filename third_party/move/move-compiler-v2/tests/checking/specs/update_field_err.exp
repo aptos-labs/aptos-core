@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: field `z` not declared in `R`
+error: field `z` not declared in struct `R`
    ┌─ tests/checking/specs/update_field_err.move:16:9
    │
 16 │         update_field(r, z, 1)

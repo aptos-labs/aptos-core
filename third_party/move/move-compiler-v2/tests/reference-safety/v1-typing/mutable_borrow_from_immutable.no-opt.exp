@@ -6,7 +6,7 @@ error: cannot mutably borrow from an immutable ref
 6 │         &mut (&s).v;
   │         ^^^^^^^^^^^
 
-error: field `v` not declared in `X`
+error: field `v` not declared in struct `X`
    ┌─ tests/reference-safety/v1-typing/mutable_borrow_from_immutable.move:11:14
    │
 11 │         &mut xref.v;

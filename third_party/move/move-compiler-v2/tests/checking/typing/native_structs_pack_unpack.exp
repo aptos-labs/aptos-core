@@ -18,7 +18,7 @@ error: unable to infer instantiation of type `_` (consider providing type argume
 12 │         let C::T {} = c;
    │             ^^^^^^^
 
-error: field `f` not declared in `C::T`
+error: field `f` not declared in struct `C::T`
    ┌─ tests/checking/typing/native_structs_pack_unpack.move:15:17
    │
 15 │         let f = c.f;

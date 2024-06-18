@@ -1627,6 +1627,7 @@ impl GlobalEnv {
             loc: loc.clone(),
             offset: 0,
             variant: None,
+            common_for_variants: false,
             ty,
         });
         StructData {
@@ -3464,7 +3465,7 @@ impl<'env> StructEnv<'env> {
         self.data
             .field_data
             .values()
-            .filter(|data| data.variant == Some(variant))
+            .filter(|data| data.common_for_variants || data.variant == Some(variant))
             .sorted_by_key(|data| data.offset)
             .map(move |data| FieldEnv {
                 struct_env: self.clone(),
@@ -3574,6 +3575,9 @@ pub struct FieldData {
 
     /// If the field is associated with a variant, the name of that variant.
     pub variant: Option<Symbol>,
+
+    /// Whether the field is common between all variants
+    pub common_for_variants: bool,
 
     /// The type of this field.
     pub ty: Type,

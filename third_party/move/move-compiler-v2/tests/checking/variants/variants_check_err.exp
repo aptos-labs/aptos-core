@@ -36,8 +36,10 @@ error: field `black` not declared in `m::Color`
 34 │             Color::RGB{red, green, blue, black} => false,
    │                                          ^^^^^
 
-error: field `red` not declared in `Color`
+error: field `red` not declared in all variants of `Color`
    ┌─ tests/checking/variants/variants_check_err.move:39:9
    │
 39 │         self.red
    │         ^^^^
+   │
+   = field must be declared in all variants of `Color` to be accessible without match expression

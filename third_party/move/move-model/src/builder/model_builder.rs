@@ -500,15 +500,34 @@ impl<'env> ModelBuilder<'env> {
 
     /// Looks up the fields of a structure, with instantiated field types. Returns empty
     /// map if the struct has variants.
-    pub fn lookup_struct_fields(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
+    pub fn lookup_struct_fields(
+        &self,
+        id: &QualifiedInstId<StructId>,
+    ) -> (BTreeMap<Symbol, Type>, bool) {
         let entry = self.lookup_struct_entry(id.to_qualified_id());
-        if let StructLayout::Singleton(fields) = &entry.layout {
+        let instantiate_fields = |fields: &BTreeMap<Symbol, FieldData>, common_only: bool| {
             fields
                 .values()
-                .map(|f| (f.name, f.ty.instantiate(&id.inst)))
+                .filter_map(|f| {
+                    if !common_only || f.common_for_variants {
+                        Some((f.name, f.ty.instantiate(&id.inst)))
+                    } else {
+                        None
+                    }
+                })
                 .collect()
-        } else {
-            BTreeMap::new()
+        };
+        match &entry.layout {
+            StructLayout::Singleton(fields) => (instantiate_fields(fields, false), false),
+            StructLayout::Variants(variants) => (
+                if variants.is_empty() {
+                    BTreeMap::new()
+                } else {
+                    instantiate_fields(&variants[0].fields, true)
+                },
+                true,
+            ),
+            _ => (BTreeMap::new(), false),
         }
     }
 

@@ -78,7 +78,7 @@ fn add_type_args_ambiguity_label(loc: Loc, mut diag: Box<Diagnostic>) -> Box<Dia
 //**************************************************************************************************
 
 fn require_move_2(context: &mut Context, loc: Loc, description: &str) -> bool {
-    if !context.env.is_move_2() {
+    if !context.env.flags().lang_v2() {
         context.env.add_diag(diag!(
             Syntax::UnsupportedLanguageItem,
             (
@@ -732,7 +732,7 @@ fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
     // it is possible that the user intention was to use a variable name.
     let ty = parse_name_access_chain(context, false, || "a variable or struct or variant name")?;
     let ty_args = parse_optional_type_args(context)?;
-    let args = if !context.env.is_move_2() || context.tokens.peek() == Tok::LBrace {
+    let args = if !context.env.flags().lang_v2() || context.tokens.peek() == Tok::LBrace {
         parse_comma_list(
             context,
             Tok::LBrace,
@@ -1456,7 +1456,7 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
     Ok((parsed_for_loop, ends_in_block))
 }
 
-// Match = "match" "(" <Exp> ")" "{" ( <MatchArm> ","? )*
+// Match = "match" "(" <Exp> ")" "{" ( <MatchArm> ","? )* "}"
 // MatchArm = <Bind> ( "if" <Exp> )? "=>" <Exp>
 fn parse_match_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
@@ -2551,13 +2551,15 @@ fn parse_address_specifier(context: &mut Context) -> Result<AddressSpecifier, Bo
 
 // Parse a struct definition:
 //      StructDecl =
-//          ( "struct" | "enum" )  <StructDefName> ("has" <Ability> (, <Ability>)+)?
-//          /*struct*/ ("{" Comma<FieldAnnot> "}" | ";")
-//          /*enum*/   "{" Comma<EnumVariant> "}"
+//          native struct <StructDefName> <Abilities>? ";"
+//        | "struct" <StructDefName> <Abilities>? "{" Comma<FieldAnnot> "}"
+//        | "enum" <StructDefName> <Abilities>? "{" Comma<EnumVariant> "}"
 //      StructDefName =
 //          <Identifier> <OptionalTypeParameters>
 //      EnumVariant =
 //          <Identifier> "{" Comma<FieldAnnot> "}"
+//      Abilities =
+//          "has" <Ability> (, <Ability>)+
 fn parse_struct_decl(
     is_enum: bool,
     attributes: Vec<Attributes>,
@@ -2571,7 +2573,7 @@ fn parse_struct_decl(
         native,
     } = modifiers;
     match visibility {
-        Some(vis) if !context.env.is_move_2() => {
+        Some(vis) if !context.env.flags().lang_v2() => {
             let msg = format!(
                 "Invalid struct declaration. Structs cannot have visibility modifiers as they are \
              always '{}'",
@@ -2594,7 +2596,7 @@ fn parse_struct_decl(
     }
 
     if is_enum {
-        require_move_2_and_advance(context, "enum structs")?;
+        require_move_2_and_advance(context, "struct variants")?;
     } else {
         consume_token(context.tokens, Tok::Struct)?;
     }

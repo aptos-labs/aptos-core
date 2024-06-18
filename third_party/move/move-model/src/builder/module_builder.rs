@@ -1189,8 +1189,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 EA::StructLayout::Singleton(fields) => StructLayout::Singleton(
                     Self::build_field_map(&mut et, None, struct_abilities, &loc, fields),
                 ),
-                EA::StructLayout::Variants(variants) => StructLayout::Variants(
-                    variants
+                EA::StructLayout::Variants(variants) => {
+                    let mut variant_maps = variants
                         .iter()
                         .map(|v| {
                             let variant_loc = et.to_loc(&v.loc);
@@ -1210,8 +1210,35 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                                 fields: variant_fields,
                             }
                         })
-                        .collect(),
-                ),
+                        .collect_vec();
+                    // Identify common fields
+                    if !variant_maps.is_empty() {
+                        let mut common_fields = BTreeSet::new();
+                        let main = &variant_maps[0];
+                        for field in main.fields.values() {
+                            let mut common = true;
+                            for other in &variant_maps[1..variant_maps.len()] {
+                                if !other
+                                    .fields
+                                    .values()
+                                    .any(|f| f.name == field.name && f.ty == field.ty)
+                                {
+                                    common = false;
+                                    break;
+                                }
+                            }
+                            if common {
+                                common_fields.insert(field.name);
+                            }
+                        }
+                        for variant_map in variant_maps.iter_mut() {
+                            for field in variant_map.fields.values_mut() {
+                                field.common_for_variants = common_fields.contains(&field.name)
+                            }
+                        }
+                    }
+                    StructLayout::Variants(variant_maps)
+                },
                 EA::StructLayout::Native(_) => StructLayout::None,
             };
         self.parent
@@ -1248,6 +1275,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 loc: field_loc.clone(),
                 offset: *idx,
                 variant: for_variant,
+                common_for_variants: false,
                 ty: field_ty,
             });
         }
@@ -1262,6 +1290,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 loc: loc.clone(),
                 offset: 0,
                 variant: None,
+                common_for_variants: false,
                 ty: field_ty,
             });
         }
@@ -3382,11 +3411,16 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         });
                         let pool = self.parent.env.symbol_pool();
                         field_data.extend(variant.fields.values().map(|f| {
-                            let variant_field_name =
+                            let variant_field_name = if !f.common_for_variants {
+                                // If the field is not common between variants, we need to qualify
+                                // the name with the variant for a unique id.
                                 pool.make(&FieldId::make_variant_field_id_str(
                                     pool.string(variant.name).as_str(),
                                     pool.string(f.name).as_str(),
-                                ));
+                                ))
+                            } else {
+                                f.name
+                            };
                             (FieldId::new(variant_field_name), f.clone())
                         }))
                     }

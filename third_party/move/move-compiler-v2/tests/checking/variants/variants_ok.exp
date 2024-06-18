@@ -19,6 +19,16 @@ module 0x815::m {
         Red,
         Blue,
     }
+    enum CommonFields {
+        Foo {
+            x: u64,
+            y: u8,
+        }
+        Bar {
+            x: u64,
+            z: u32,
+        }
+    }
     private fun t1(self: m::Color): bool {
         match (self) {
           m::Color::RGB{ red, green, blue } => {
@@ -174,7 +184,7 @@ module 0x815::m {
           Add<u64>(Add<u64>(red, green), blue)
         }
     }
-    private fun unqualified_variant(self: m::Color): bool {
+    private fun t8_unqualified_variant(self: m::Color): bool {
         match (self) {
           m::Color::RGB{ red, green, blue } => {
             And(Neq<u64>(red, green), Neq<u64>(green, blue))
@@ -187,5 +197,11 @@ module 0x815::m {
           }
         }
 
+    }
+    private fun t9_common_field(self: m::CommonFields): u64 {
+        select m::CommonFields.x<m::CommonFields>(self)
+    }
+    private fun t9_common_field_ref(self: &m::CommonFields): &u64 {
+        Borrow(Immutable)(select m::CommonFields.x<&m::CommonFields>(self))
     }
 } // end 0x815::m
