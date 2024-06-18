@@ -86,14 +86,14 @@ impl Default for Config {
 
             max_num_fields_in_struct: 5,
 
-            max_num_stmts_in_func: 10,
-            max_num_params_in_func: 3,
+            max_num_stmts_in_func: 5,
+            max_num_params_in_func: 5,
 
-            max_num_stmts_in_block: 10,
+            max_num_stmts_in_block: 5,
 
             max_num_calls_in_script: 20,
 
-            max_expr_depth: 5,
+            max_expr_depth: 3,
             max_type_depth: 5,
             max_num_type_params_in_func: 3,
             max_num_type_params_in_struct: 3,

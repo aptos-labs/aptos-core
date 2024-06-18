@@ -19,18 +19,20 @@
 
 use crate::{
     ast::*,
+    codegen::CodeGenerator,
     config::Config,
     names::{Identifier, IdentifierPool, IdentifierType as IDType, Scope, ROOT_SCOPE},
     types::{Ability, Type, TypeParameter, TypePool},
     utils::choose_idx_weighted,
 };
 use arbitrary::{Arbitrary, Result, Unstructured};
+use log::{trace, warn};
 use num_bigint::BigUint;
 use std::{cell::RefCell, collections::BTreeSet};
 
 /// Keeps track of the generation state.
 pub struct MoveSmith {
-    pub config: Config,
+    pub config: RefCell<Config>,
 
     // The output code
     modules: Vec<RefCell<Module>>,
@@ -44,6 +46,7 @@ pub struct MoveSmith {
     id_pool: RefCell<IdentifierPool>,
     type_pool: RefCell<TypePool>,
     expr_depth: RefCell<usize>,
+    expr_depth_stack: RefCell<Vec<usize>>,
     type_depth: RefCell<usize>,
 }
 
@@ -58,7 +61,7 @@ impl MoveSmith {
     /// Create a new MoveSmith instance with the given configuration.
     pub fn new(config: Config) -> Self {
         Self {
-            config,
+            config: RefCell::new(config),
             modules: Vec::new(),
             script: None,
             runs: RefCell::new(Vec::new()),
@@ -66,6 +69,7 @@ impl MoveSmith {
             id_pool: RefCell::new(IdentifierPool::new()),
             type_pool: RefCell::new(TypePool::new()),
             expr_depth: RefCell::new(0),
+            expr_depth_stack: RefCell::new(Vec::new()),
             type_depth: RefCell::new(0),
         }
     }
@@ -93,7 +97,7 @@ impl MoveSmith {
     ///
     /// Script is generated after all modules are generated so that the script can call functions.
     pub fn generate(&mut self, u: &mut Unstructured) -> Result<()> {
-        let num_modules = u.int_in_range(1..=self.config.max_num_modules)?;
+        let num_modules = u.int_in_range(1..=self.config.borrow().max_num_modules)?;
 
         for _ in 0..num_modules {
             self.modules
@@ -122,7 +126,7 @@ impl MoveSmith {
             }
         }
 
-        for _ in 0..u.int_in_range(1..=self.config.max_num_calls_in_script)? {
+        for _ in 0..u.int_in_range(1..=self.config.borrow().max_num_calls_in_script)? {
             let func = u.choose(&all_funcs)?;
             let mut call = self.generate_call_to_function(
                 u,
@@ -145,7 +149,7 @@ impl MoveSmith {
 
         // Struct names
         let mut structs = Vec::new();
-        for _ in 0..u.int_in_range(1..=self.config.max_num_structs_in_module)? {
+        for _ in 0..u.int_in_range(1..=self.config.borrow().max_num_structs_in_module)? {
             structs.push(RefCell::new(self.generate_struct_skeleton(u, &scope)?));
         }
 
@@ -162,7 +166,7 @@ impl MoveSmith {
 
         // Function signatures
         let mut functions = Vec::new();
-        for _ in 0..u.int_in_range(1..=self.config.max_num_functions_in_module)? {
+        for _ in 0..u.int_in_range(1..=self.config.borrow().max_num_functions_in_module)? {
             functions.push(RefCell::new(self.generate_function_skeleton(u, &scope)?));
         }
 
@@ -188,11 +192,23 @@ impl MoveSmith {
         // TODO: re-enable this after function call with type param is done
 
         // Generate function bodies and runners
-        let mut all_runners = Vec::new();
         for f in module.borrow().functions.iter() {
             self.fill_function(u, f)?;
+        }
+
+        trace!("Generating runners for module: {:?}", module.borrow().name);
+        // For runners, we don't want complex expressions to reduce input
+        // consumption and to avoid wasting mutation
+        let old_depth = *self.expr_depth.borrow();
+        self.config.borrow_mut().max_expr_depth = 0;
+
+        let mut all_runners = Vec::new();
+        for f in module.borrow().functions.iter() {
             all_runners.extend(self.generate_runners(u, f)?);
         }
+
+        // Reset the expression depth because we will also genereate other modules
+        self.config.borrow_mut().max_expr_depth = old_depth;
 
         // Insert the runners to the module and add run tasks to the whole compile unit
         // Each task is simply the flat name of the runner function
@@ -220,7 +236,7 @@ impl MoveSmith {
         let signature = callee.borrow().signature.clone();
 
         let mut runners = Vec::new();
-        for i in 0..self.config.num_runs_per_func {
+        for i in 0..self.config.borrow().num_runs_per_func {
             // Generate a call to the target function
             let call = Expression::FunctionCall(self.generate_call_to_function(
                 u,
@@ -304,7 +320,7 @@ impl MoveSmith {
         parent_scope: &Scope,
     ) -> Result<()> {
         let struct_scope = st.borrow().name.to_scope();
-        for _ in 0..u.int_in_range(0..=self.config.max_num_fields_in_struct)? {
+        for _ in 0..u.int_in_range(0..=self.config.borrow().max_num_fields_in_struct)? {
             let (name, _) = self.get_next_identifier(IDType::Var, &struct_scope);
 
             let typ = loop {
@@ -412,11 +428,13 @@ impl MoveSmith {
             .borrow_mut()
             .push(signature.clone());
 
-        Ok(Function {
+        let func = Function {
             signature,
             visibility: Visibility { public: true },
             body: None,
-        })
+        };
+        trace!("Generated function signature: {:?}", func.inline());
+        Ok(func)
     }
 
     /// Fill in the function body and return statement.
@@ -426,6 +444,10 @@ impl MoveSmith {
             .borrow()
             .get_scope_for_children(&function.borrow().signature.name);
         let signature = function.borrow().signature.clone();
+        trace!(
+            "Creating block for the body of function: {:?}",
+            signature.name
+        );
         let body = self.generate_block(u, &scope, None, signature.return_type.clone())?;
         function.borrow_mut().body = Some(body);
         Ok(())
@@ -444,7 +466,7 @@ impl MoveSmith {
     ) -> Result<FunctionSignature> {
         // First generate type parameters so that they can be used in the parameters and return type
         let mut type_parameters = Vec::new();
-        for _ in 0..u.int_in_range(0..=self.config.max_num_type_params_in_func)? {
+        for _ in 0..u.int_in_range(0..=self.config.borrow().max_num_type_params_in_func)? {
             type_parameters.push(self.generate_type_parameter(
                 u,
                 parent_scope,
@@ -456,7 +478,7 @@ impl MoveSmith {
             )?);
         }
 
-        let num_params = u.int_in_range(0..=self.config.max_num_params_in_func)?;
+        let num_params = u.int_in_range(0..=self.config.borrow().max_num_params_in_func)?;
         let mut parameters = Vec::new();
         for _ in 0..num_params {
             let (name, _) = self.get_next_identifier(IDType::Var, parent_scope);
@@ -559,14 +581,28 @@ impl MoveSmith {
         num_stmts: Option<usize>,
         ret_typ: Option<Type>,
     ) -> Result<Block> {
+        trace!(
+            "Generating block with parent scope: {:?}, depth: {}",
+            parent_scope,
+            *self.expr_depth.borrow()
+        );
         let (_, block_scope) = self.get_next_identifier(IDType::Block, parent_scope);
-        let num_stmts =
-            num_stmts.unwrap_or(u.int_in_range(0..=self.config.max_num_stmts_in_block)?);
-        let stmts = self.generate_statements(u, &block_scope, num_stmts)?;
+        trace!("Created block scope: {:?}", block_scope);
+
+        let reach_limit = (*self.expr_depth.borrow() + 1) >= self.config.borrow().max_expr_depth;
+        let stmts = if reach_limit {
+            warn!("Max expr depth will be reached in this block, skipping generating body");
+            Vec::new()
+        } else {
+            let num_stmts = num_stmts
+                .unwrap_or(u.int_in_range(0..=self.config.borrow().max_num_stmts_in_block)?);
+            self.generate_statements(u, &block_scope, num_stmts)?
+        };
         let return_expr = match ret_typ {
             Some(ref typ) => Some(self.generate_block_return(u, &block_scope, typ)?),
             None => None,
         };
+        trace!("Done generating block: {:?}", block_scope);
         Ok(Block { stmts, return_expr })
     }
 
@@ -598,9 +634,12 @@ impl MoveSmith {
         parent_scope: &Scope,
         num_stmts: usize,
     ) -> Result<Vec<Statement>> {
+        trace!("Generating {} statements", num_stmts);
         let mut stmts = Vec::new();
-        for _ in 0..num_stmts {
+        for i in 0..num_stmts {
+            trace!("Generating statement #{}", i + 1);
             stmts.push(self.generate_statement(u, parent_scope)?);
+            trace!("Done generating statement #{}", i + 1);
         }
         Ok(stmts)
     }
@@ -615,11 +654,15 @@ impl MoveSmith {
     }
 
     /// Generate an assignment to an existing variable.
+    ///
+    /// There must be at least one variable in the scope and the type of the variable
+    /// must have been decided.
     fn generate_assignment(
         &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Option<Assignment>> {
+        trace!("Generating assignment");
         let idents = self.get_filtered_identifiers(None, Some(IDType::Var), Some(parent_scope));
         if idents.is_empty() {
             return Ok(None);
@@ -643,6 +686,7 @@ impl MoveSmith {
 
         // TODO: we should not omit type parameter as we can call a function to get an object of that type
         let typ = self.get_random_type(u, parent_scope, true, true, false, false)?;
+        trace!("Generating declaration of type: {:?}", typ);
         // let value = match bool::arbitrary(u)? {
         //     true => Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?),
         //     false => None,
@@ -656,22 +700,25 @@ impl MoveSmith {
 
     /// Generate a random expression.
     ///
+    /// This is used only for generating statements, so some kinds of expressions are omitted.
+    ///
     /// To avoid infinite recursion, we limit the depth of the expression tree.
     fn generate_expression(
         &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Expression> {
+        trace!("Generating expression from scope: {:?}", parent_scope);
         // Increment the expression depth
-        *self.expr_depth.borrow_mut() += 1;
-
         // Reached the maximum depth, generate a dummy number literal
-        if *self.expr_depth.borrow() >= self.config.max_expr_depth {
-            *self.expr_depth.borrow_mut() -= 1;
+        if *self.expr_depth.borrow() >= self.config.borrow().max_expr_depth {
+            warn!("Max expr depth reached in scope: {:?}", parent_scope);
             return Ok(Expression::NumberLiteral(
                 self.generate_number_literal(u, None, None, None)?,
             ));
         }
+
+        self.increase_expr_depth(u);
 
         // If no function is callable, then skip generating function calls.
         let func_call_weight = match self.get_callable_functions(parent_scope).is_empty() {
@@ -690,77 +737,59 @@ impl MoveSmith {
 
         // Decides how often each expression type should be generated
         let weights = vec![
-            0, // NumberLiteral
-            0, // Variable
-            // Boolean
-            // StructInitialization
+            5,                // BinaryOperation
+            5,                // If-Else
             1,                // Block
             func_call_weight, // FunctionCall
-            assign_weight,
-            3, // BinaryOperation
-            3, // If-Else
+            assign_weight,    // Assignment
         ];
 
-        let expr = loop {
-            match choose_idx_weighted(u, &weights)? {
-                // Generate a number literal
-                0 => {
-                    break Expression::NumberLiteral(
-                        self.generate_number_literal(u, None, None, None)?,
-                    )
-                },
-                // Generate a variable access
-                1 => {
-                    let idents =
-                        self.get_filtered_identifiers(None, Some(IDType::Var), Some(parent_scope));
-                    if !idents.is_empty() {
-                        let ident = u.choose(&idents)?.clone();
-                        break Expression::Variable(ident);
-                    }
-                },
-                // Generate a block
-                2 => {
-                    let ret_typ = match bool::arbitrary(u)? {
-                        true => {
-                            Some(self.get_random_type(u, parent_scope, true, true, true, true)?)
-                        },
-                        false => None,
-                    };
-                    let block = self.generate_block(u, parent_scope, None, ret_typ)?;
-                    break Expression::Block(Box::new(block));
-                },
-                // Generate a function call
-                3 => {
-                    let call = self.generate_function_call(u, parent_scope)?;
-                    match call {
-                        Some(c) => break Expression::FunctionCall(c),
-                        None => panic!("No callable functions"),
-                    }
-                },
-                // Generate an assignment expression
-                4 => {
-                    let assign = self.generate_assignment(u, parent_scope)?;
-                    match assign {
-                        Some(a) => break Expression::Assign(Box::new(a)),
-                        None => panic!("No assignable variables"),
-                    }
-                },
-                // Generate a binary operation
-                5 => {
-                    break Expression::BinaryOperation(Box::new(
-                        self.generate_binary_operation(u, parent_scope)?,
-                    ));
-                },
-                // Generate an if-else expression with unit type
-                6 => {
-                    break Expression::IfElse(Box::new(self.generate_if(u, parent_scope, None)?));
-                },
-                _ => panic!("Invalid expression type"),
-            }
+        let idx = choose_idx_weighted(u, &weights)?;
+        trace!(
+            "Chosing expression kind, idx chosen is {}, weight is {:?}",
+            idx,
+            weights
+        );
+
+        let expr = match idx {
+            // Generate a binary operation
+            0 => Expression::BinaryOperation(Box::new(self.generate_binary_operation(
+                u,
+                parent_scope,
+                None,
+            )?)),
+            // Generate an if-else expression with unit type
+            1 => Expression::IfElse(Box::new(self.generate_if(u, parent_scope, None)?)),
+            // Generate a block
+            2 => {
+                let ret_typ = match bool::arbitrary(u)? {
+                    true => Some(self.get_random_type(u, parent_scope, true, true, true, true)?),
+                    false => None,
+                };
+                let block = self.generate_block(u, parent_scope, None, ret_typ)?;
+                Expression::Block(Box::new(block))
+            },
+            // Generate a function call
+            3 => {
+                let call = self.generate_function_call(u, parent_scope)?;
+                match call {
+                    Some(c) => Expression::FunctionCall(c),
+                    None => panic!("No callable functions"),
+                }
+            },
+            // Generate an assignment expression
+            4 => {
+                let assign = self.generate_assignment(u, parent_scope)?;
+                match assign {
+                    Some(a) => Expression::Assign(Box::new(a)),
+                    None => panic!("No assignable variables"),
+                }
+            },
+            _ => panic!("Invalid expression type"),
         };
 
         // Decrement the expression depth
-        *self.expr_depth.borrow_mut() -= 1;
+        self.decrease_expr_depth();
         Ok(expr)
     }
 
@@ -873,6 +902,11 @@ impl MoveSmith {
         allow_var: bool,
         allow_call: bool,
     ) -> Result<Expression> {
+        trace!(
+            "Generating expression of type {:?} in scope {:?}",
+            typ,
+            parent_scope
+        );
         // Check whether the current type pool contains a concrete type
         // for the given type parameter.
         // If so, directly use the concrete type.
@@ -886,7 +920,11 @@ impl MoveSmith {
             Some(concrete) => concrete,
             None => typ,
         };
+        trace!("Concretized type is: {:?}", typ);
 
+        // Store default choices that do not require recursion
+        // If other options are available, will not use these
+        let mut default_choices: Vec<Expression> = Vec::new();
         // Store candidate expressions for the given type
         let mut choices: Vec<Expression> = Vec::new();
 
@@ -932,7 +970,10 @@ impl MoveSmith {
         };
 
         if let Some(candidate) = some_candidate {
-            choices.push(candidate);
+            if let Type::TypeParameter(_) = typ {
+                choices.push(candidate.clone());
+            }
+            default_choices.push(candidate);
         }
 
         // Access identifier with the given type
@@ -943,57 +984,81 @@ impl MoveSmith {
             // TODO: select from many?
             if !idents.is_empty() {
                 let candidate = u.choose(&idents)?.clone();
-                choices.push(Expression::Variable(candidate));
+                let expr = Expression::Variable(candidate);
+                default_choices.push(expr.clone());
+                choices.push(expr);
             }
         }
 
         // Now we have collected all candidate expressions that do not require recursion
         // We can perform the expr_depth check here
-        assert!(!choices.is_empty());
-        *self.expr_depth.borrow_mut() += 1;
-        if *self.expr_depth.borrow() >= self.config.max_expr_depth {
-            return Ok(u.choose(&choices)?.clone());
+        assert!(!default_choices.is_empty());
+        if *self.expr_depth.borrow() >= self.config.borrow().max_expr_depth {
+            warn!("Max expr depth reached while gen expr of type: {:?}", typ);
+            return Ok(u.choose(&default_choices)?.clone());
         }
+        self.increase_expr_depth(u);
 
-        // Call functions with the given return type
-        if allow_call {
-            let callables: Vec<FunctionSignature> = self
-                .get_callable_functions(parent_scope)
-                .into_iter()
-                .filter(|f| f.return_type == Some(typ.clone()))
-                .collect();
-            // Currently, we generate calls to all candidate functions
-            // This could consume a lot raw bytes and may interfere with mutation
-            // TODO: consider just select a subset of functions to call
-            if !callables.is_empty() {
+        let callables: Vec<FunctionSignature> = self
+            .get_callable_functions(parent_scope)
+            .into_iter()
+            .filter(|f| f.return_type == Some(typ.clone()))
+            .collect();
+
+        let func_call_weight = match (allow_call, !callables.is_empty()) {
+            (true, true) => 5,
+            (true, false) => 0,
+            (false, _) => 0,
+        };
+
+        let binop_weight = match typ.is_num_or_bool() {
+            true => 5,
+            false => 0,
+        };
+
+        let weights = vec![
+            2,                // If-Else
+            func_call_weight, // FunctionCall
+            binop_weight,     // BinaryOperation
+        ];
+
+        let idx = choose_idx_weighted(u, &weights)?;
+        trace!(
+            "Selecting expression of type kind, idx is {}, weights: {:?}",
+            idx,
+            weights
+        );
+        match idx {
+            0 => {
+                // Generate an If-Else with the given type
+                let if_else = self.generate_if(u, parent_scope, Some(typ.clone()))?;
+                choices.push(Expression::IfElse(Box::new(if_else)));
+            },
+            1 => {
+                assert!(!callables.is_empty());
                 let func = u.choose(&callables)?;
                 let call =
                     self.generate_call_to_function(u, parent_scope, func, Some(typ), true)?;
                 choices.push(Expression::FunctionCall(call));
-            }
-        }
-
-        // Generate an If-Else with the given type
-        let if_else = self.generate_if(u, parent_scope, Some(typ.clone()))?;
-        choices.push(Expression::IfElse(Box::new(if_else)));
-
-        // Generate a binary operation with the given type
-        // Binary operations can output numerical and boolean values
-        if typ.is_num_or_bool() {
-            let binop = self.generate_numerical_binop(u, parent_scope, Some(typ.clone()))?;
-            choices.push(Expression::BinaryOperation(Box::new(binop)));
-        }
-
-        // Additionally, boolean ops also output boolean values
-        if typ.is_bool() {
-            let binop = self.generate_boolean_binop(u, parent_scope)?;
-            choices.push(Expression::BinaryOperation(Box::new(binop)));
-        }
+            },
+            2 => {
+                // Generate a binary operation with the given type
+                // Binary operations can output numerical and boolean values
+                assert!(typ.is_num_or_bool());
+                let binop = self.generate_binary_operation(u, parent_scope, Some(typ.clone()))?;
+                choices.push(Expression::BinaryOperation(Box::new(binop)));
+            },
+            _ => panic!("Invalid option for expression generation"),
+        };
 
         // Decrement the expression depth
-        *self.expr_depth.borrow_mut() -= 1;
+        self.decrease_expr_depth();
 
-        Ok(u.choose(&choices)?.clone())
+        let use_choice = match choices.is_empty() {
+            true => default_choices,
+            false => choices,
+        };
+        Ok(u.choose(&use_choice)?.clone())
     }
 
     /// Generate an If expression
@@ -1008,8 +1073,11 @@ impl MoveSmith {
         parent_scope: &Scope,
         typ: Option<Type>,
     ) -> Result<IfExpr> {
+        trace!("Generating if expression of type: {:?}", typ);
+        trace!("Generating condition for if expression");
         let condition =
             self.generate_expression_of_type(u, parent_scope, &Type::Bool, true, true)?;
+        trace!("Generating block for if true branch");
         let body = self.generate_block(u, parent_scope, None, typ.clone())?;
 
         // When the If expression has a non-unit type
@@ -1035,28 +1103,50 @@ impl MoveSmith {
         parent_scope: &Scope,
         typ: Option<Type>,
     ) -> Result<ElseExpr> {
+        trace!("Generating block for else branch");
         let body = self.generate_block(u, parent_scope, None, typ.clone())?;
         Ok(ElseExpr { typ, body })
     }
 
-    // Generate a random binary operation.
-    // Type is randomly selected
+    /// Generate a random binary operation.
+    /// `typ` can specify the desired output type.
+    /// `typ` can only be a basic numerical type or boolean.
     fn generate_binary_operation(
         &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
+        typ: Option<Type>,
     ) -> Result<BinaryOperation> {
-        // TODO: we should add more types here, including type parameters
-        match bool::arbitrary(u)? {
-            true => self.generate_numerical_binop(u, parent_scope, None),
-            false => self.generate_boolean_binop(u, parent_scope),
+        trace!("Generating binary operation");
+        let chosen_typ = match typ {
+            Some(t) => match t.is_num_or_bool() {
+                true => t,
+                false => panic!("Invalid type for binary operation"),
+            },
+            None => self.get_random_type(u, parent_scope, true, false, false, false)?,
+        };
+
+        if chosen_typ.is_bool() {
+            let weights = vec![
+                2, // num op
+                3, // bool op
+                5, // equality check
+            ];
+            match choose_idx_weighted(u, &weights)? {
+                0 => self.generate_numerical_binop(u, parent_scope, Some(chosen_typ)),
+                1 => self.generate_boolean_binop(u, parent_scope),
+                2 => self.generate_equality_check(u, parent_scope, None),
+                _ => panic!("Invalid option for binary operation"),
+            }
+        } else {
+            self.generate_numerical_binop(u, parent_scope, Some(chosen_typ))
         }
     }
 
     /// Generate a random binary operation for numerical types
     /// Tries to reduce the chance of abort, but aborts can still happen
     /// If `typ` is provided, the generated expr will have this type
-    /// `typ` can only be a basic numerical type.
+    /// `typ` can only be a basic numerical type or boolean.
     fn generate_numerical_binop(
         &self,
         u: &mut Unstructured,
@@ -1064,7 +1154,6 @@ impl MoveSmith {
         typ: Option<Type>,
     ) -> Result<BinaryOperation> {
         use NumericalBinaryOperator as OP;
-
         // Select the operator
         let op = match &typ {
             // A desired output type is specified
@@ -1084,7 +1173,7 @@ impl MoveSmith {
                         OP::Shr,
                     ],
                     // The output should be boolean
-                    (false, true) => vec![OP::Le, OP::Ge, OP::Leq, OP::Geq, OP::Eq, OP::Neq],
+                    (false, true) => vec![OP::Le, OP::Ge, OP::Leq, OP::Geq],
                     // Numerical Binop cannot produce other types
                     (false, false) => panic!("Invalid output type for num binop"),
                     // A type cannot be both numerical and boolean
@@ -1183,7 +1272,7 @@ impl MoveSmith {
         })
     }
 
-    // Generate a random binary operation for boolean
+    /// Generate a random binary operation for boolean
     fn generate_boolean_binop(
         &self,
         u: &mut Unstructured,
@@ -1194,6 +1283,34 @@ impl MoveSmith {
         let rhs = self.generate_expression_of_type(u, parent_scope, &Type::Bool, true, true)?;
         Ok(BinaryOperation {
             op: BinaryOperator::Boolean(op),
+            lhs,
+            rhs,
+        })
+    }
+
+    /// Generate an equality check expression.
+    /// `typ` can specify the desired type for both operands.
+    /// If `typ` is not provided, it will be randomly selected.
+    fn generate_equality_check(
+        &self,
+        u: &mut Unstructured,
+        parent_scope: &Scope,
+        typ: Option<Type>,
+    ) -> Result<BinaryOperation> {
+        trace!(
+            "Generating equality check with desired operand type: {:?}",
+            typ
+        );
+        let op = EqualityBinaryOperator::arbitrary(u)?;
+        let chosen_typ = match typ {
+            Some(t) => t,
+            None => self.get_random_type(u, parent_scope, true, true, true, true)?,
+        };
+        trace!("Chosen operand type for equality check: {:?}", chosen_typ);
+        let lhs = self.generate_expression_of_type(u, parent_scope, &chosen_typ, true, true)?;
+        let rhs = self.generate_expression_of_type(u, parent_scope, &chosen_typ, true, true)?;
+        Ok(BinaryOperation {
+            op: BinaryOperator::Equality(op),
             lhs,
             rhs,
         })
@@ -1255,6 +1372,7 @@ impl MoveSmith {
         desired_ret_type: Option<&Type>,
         allow_var: bool,
     ) -> Result<FunctionCall> {
+        trace!("Generating call to function: {:?}", func.name);
         let mut type_args = Vec::new();
         let mut args = Vec::new();
 
@@ -1297,6 +1415,7 @@ impl MoveSmith {
                 .unregister_concrete_type(&typ_param.get_name());
         }
 
+        trace!("Done generating call to function: {:?}", func.name);
         Ok(FunctionCall {
             name: func.name.clone(),
             type_args,
@@ -1376,6 +1495,7 @@ impl MoveSmith {
         ];
 
         let mut categories = vec![basics];
+        let mut category_weights = vec![1];
 
         // Choose struct types in scope
         // Every struct has the same weight
@@ -1383,10 +1503,11 @@ impl MoveSmith {
             let struct_ids = self.get_filtered_identifiers(None, Some(IDType::Struct), Some(scope));
             let structs = struct_ids
                 .iter()
-                .map(|id| (Type::Struct(id.clone()), 1))
+                .map(|id: &Identifier| (Type::Struct(id.clone()), 1))
                 .collect::<Vec<(Type, u32)>>();
             if !structs.is_empty() {
                 categories.push(structs);
+                category_weights.push(5);
             }
         }
 
@@ -1410,10 +1531,12 @@ impl MoveSmith {
 
             if !param_cat.is_empty() {
                 categories.push(param_cat);
+                category_weights.push(5);
             }
         }
 
-        let chosen_cat = u.choose(&categories)?;
+        let cat_idx = choose_idx_weighted(u, &category_weights)?;
+        let chosen_cat = &categories[cat_idx];
 
         let weights = chosen_cat.iter().map(|(_, w)| *w).collect::<Vec<u32>>();
         let choice = choose_idx_weighted(u, &weights)?;
@@ -1480,13 +1603,20 @@ impl MoveSmith {
         };
 
         // Filter based on Type
-        match typ {
+        let type_matched = match typ {
             Some(t) => self
                 .type_pool
                 .borrow()
                 .filter_identifier_with_type(t, ident_in_scope),
             None => ident_in_scope,
-        }
+        };
+
+        // Filter out the identifiers that do not have a type
+        // i.e. the one just declared but the RHS of assign is not finished yet
+        type_matched
+            .into_iter()
+            .filter(|id| self.type_pool.borrow().get_type(id).is_some())
+            .collect()
     }
 
     /// Finds all registered types that contains all the required abilities
@@ -1547,5 +1677,27 @@ impl MoveSmith {
         self.id_pool
             .borrow_mut()
             .next_identifier(ident_type, parent_scope)
+    }
+
+    /// Randomly choose a number of depth to increase the expression depth.
+    /// This allows us to end early in some cases.
+    fn increase_expr_depth(&self, u: &mut Unstructured) {
+        let inc = u.choose(&[1, 2, 3]).unwrap();
+        *self.expr_depth.borrow_mut() += *inc;
+        self.expr_depth_stack.borrow_mut().push(*inc);
+        trace!(
+            "Increment expr by {} depth to: {}",
+            *inc,
+            *self.expr_depth.borrow()
+        );
+    }
+
+    /// Decrease the expression depth by the last increased amount.
+    /// This should be called after `increase_expr_depth` and
+    /// they should always be in pairs.
+    fn decrease_expr_depth(&self) {
+        let dec = self.expr_depth_stack.borrow_mut().pop().unwrap();
+        *self.expr_depth.borrow_mut() -= dec;
+        trace!("Decrement expr depth to: {}", *self.expr_depth.borrow());
     }
 }

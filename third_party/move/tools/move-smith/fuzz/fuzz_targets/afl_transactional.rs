@@ -16,6 +16,6 @@ fn main() {
             Err(_) => return,
         };
         let code = smith.get_compile_unit().emit_code();
-        run_transactional_test(code, &smith.config).unwrap();
+        run_transactional_test(code, &smith.config.take()).unwrap();
     });
 }

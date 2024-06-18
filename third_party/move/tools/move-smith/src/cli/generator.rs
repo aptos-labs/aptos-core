@@ -36,6 +36,7 @@ version = "0.0.0"
 "#;
 
 fn main() {
+    env_logger::init();
     let args = Args::parse();
     fs::create_dir_all(&args.output_dir).expect("Failed to create output directory");
 

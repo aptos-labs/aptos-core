@@ -10999,6 +10999,8 @@ version = "0.1.0"
 dependencies = [
  "arbitrary",
  "clap 4.4.14",
+ "env_logger",
+ "log",
  "move-compiler",
  "move-compiler-v2",
  "move-model",

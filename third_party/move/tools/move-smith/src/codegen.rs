@@ -430,7 +430,7 @@ impl CodeGenerator for FunctionCall {
         };
         let mut code = vec![format!("{}{}(", self.name.emit_code(), type_args)];
         if self.args.is_empty() {
-            code.last_mut().unwrap().push_str(")");
+            code.last_mut().unwrap().push(')');
             return code;
         }
         let mut args = Vec::new();
@@ -456,6 +456,7 @@ impl CodeGenerator for BinaryOperator {
         match self {
             BinaryOperator::Numerical(op) => op.emit_code_lines(),
             BinaryOperator::Boolean(op) => op.emit_code_lines(),
+            BinaryOperator::Equality(op) => op.emit_code_lines(),
         }
     }
 }
@@ -478,8 +479,6 @@ impl CodeGenerator for NumericalBinaryOperator {
             OP::Ge => ">".to_string(),
             OP::Leq => "<=".to_string(),
             OP::Geq => ">=".to_string(),
-            OP::Eq => "==".to_string(),
-            OP::Neq => "!=".to_string(),
         }]
     }
 }
@@ -487,10 +486,17 @@ impl CodeGenerator for NumericalBinaryOperator {
 impl CodeGenerator for BooleanBinaryOperator {
     fn emit_code_lines(&self) -> Vec<String> {
         vec![match self {
-            BooleanBinaryOperator::Eq => "==".to_string(),
-            BooleanBinaryOperator::Neq => "!=".to_string(),
             BooleanBinaryOperator::And => "&&".to_string(),
             BooleanBinaryOperator::Or => "||".to_string(),
+        }]
+    }
+}
+
+impl CodeGenerator for EqualityBinaryOperator {
+    fn emit_code_lines(&self) -> Vec<String> {
+        vec![match self {
+            EqualityBinaryOperator::Eq => "==".to_string(),
+            EqualityBinaryOperator::Neq => "!=".to_string(),
         }]
     }
 }

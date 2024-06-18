@@ -163,6 +163,7 @@ pub struct BinaryOperation {
 pub enum BinaryOperator {
     Numerical(NumericalBinaryOperator),
     Boolean(BooleanBinaryOperator),
+    Equality(EqualityBinaryOperator),
 }
 
 #[derive(Debug, Clone, Arbitrary)]
@@ -181,16 +182,18 @@ pub enum NumericalBinaryOperator {
     Ge,
     Leq,
     Geq,
-    Eq,
-    Neq,
 }
 
 #[derive(Debug, Clone, Arbitrary)]
 pub enum BooleanBinaryOperator {
-    Eq,
-    Neq,
     And,
     Or,
+}
+
+#[derive(Debug, Clone, Arbitrary)]
+pub enum EqualityBinaryOperator {
+    Eq,
+    Neq,
 }
 
 /// An assignment expression

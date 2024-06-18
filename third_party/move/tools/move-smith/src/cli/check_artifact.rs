@@ -37,7 +37,7 @@ fn main() {
     compile_modules(code.clone());
     println!("Compiled code with V1 successfully");
 
-    match run_transactional_test(code, &smith.config) {
+    match run_transactional_test(code, &smith.config.take()) {
         Ok(_) => println!("Running as transactional test passed"),
         Err(e) => {
             println!("Transactional test failed: {:?}", e);
