@@ -248,7 +248,6 @@ impl SubmissionWorker {
             )
             .await;
 
-        // self.accounts.iter().for_each(|account| {})
         for account in self.accounts.iter_mut() {
             update_account_seq_num(
                 Arc::get_mut(account).unwrap(),
@@ -258,11 +257,6 @@ impl SubmissionWorker {
         }
         let (num_committed, num_expired) =
             count_committed_expired_stats(account_to_start_and_end_seq_num, latest_fetched_counts);
-        // let (num_committed, num_expired) = update_seq_num_and_get_num_expired(
-        //     self.accounts.clone(),
-        //     account_to_start_and_end_seq_num,
-        //     latest_fetched_counts,
-        // );
 
         if num_expired > 0 {
             loop_stats
