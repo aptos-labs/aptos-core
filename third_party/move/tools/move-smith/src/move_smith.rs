@@ -26,7 +26,7 @@ use crate::{
 };
 use arbitrary::{Arbitrary, Result, Unstructured};
 use num_bigint::BigUint;
-use std::cell::RefCell;
+use std::{cell::RefCell, collections::BTreeSet};
 
 /// Keeps track of the generation state.
 pub struct MoveSmith {
@@ -38,7 +38,7 @@ pub struct MoveSmith {
     runs: RefCell<Vec<Identifier>>,
 
     // Skeleton Information
-    function_signatures: Vec<FunctionSignature>,
+    function_signatures: RefCell<Vec<FunctionSignature>>,
 
     // Bookkeeping
     id_pool: RefCell<IdentifierPool>,
@@ -62,7 +62,7 @@ impl MoveSmith {
             modules: Vec::new(),
             script: None,
             runs: RefCell::new(Vec::new()),
-            function_signatures: Vec::new(),
+            function_signatures: RefCell::new(Vec::new()),
             id_pool: RefCell::new(IdentifierPool::new()),
             type_pool: RefCell::new(TypePool::new()),
             expr_depth: RefCell::new(0),
@@ -124,8 +124,13 @@ impl MoveSmith {
 
         for _ in 0..u.int_in_range(1..=self.config.max_num_calls_in_script)? {
             let func = u.choose(&all_funcs)?;
-            let mut call =
-                self.generate_call_to_function(u, &ROOT_SCOPE, &func.borrow().signature, false)?;
+            let mut call = self.generate_call_to_function(
+                u,
+                &ROOT_SCOPE,
+                &func.borrow().signature,
+                None,
+                false,
+            )?;
             call.name = self.id_pool.borrow().flatten_access(&call.name);
             script.main.push(call);
         }
@@ -143,6 +148,17 @@ impl MoveSmith {
         for _ in 0..u.int_in_range(1..=self.config.max_num_structs_in_module)? {
             structs.push(RefCell::new(self.generate_struct_skeleton(u, &scope)?));
         }
+
+        // Generate a struct with all abilities to avoid having no type to choose for some type parameters
+        let (struct_name, _) = self.get_next_identifier(IDType::Struct, &scope);
+        self.type_pool
+            .borrow_mut()
+            .register_type(Type::Struct(struct_name.clone()));
+        structs.push(RefCell::new(StructDefinition {
+            name: struct_name,
+            abilities: Vec::from(Ability::ALL),
+            fields: Vec::new(),
+        }));
 
         // Function signatures
         let mut functions = Vec::new();
@@ -213,6 +229,7 @@ impl MoveSmith {
                 u,
                 &ROOT_SCOPE,
                 &signature,
+                None,
                 false,
             )?);
 
@@ -289,7 +306,9 @@ impl MoveSmith {
             let typ = loop {
                 match u.int_in_range(0..=2)? {
                     // More chance to use basic types than struct types
-                    0 | 1 => break self.get_random_type(u, parent_scope, true, false, false)?,
+                    0 | 1 => {
+                        break self.get_random_type(u, parent_scope, true, false, false, false)?
+                    },
                     2 => {
                         let candidates = self.get_usable_struct_type(
                             st.borrow().abilities.clone(),
@@ -381,7 +400,13 @@ impl MoveSmith {
         parent_scope: &Scope,
     ) -> Result<Function> {
         let (name, scope) = self.get_next_identifier(IDType::Function, parent_scope);
-        let signature = self.generate_function_signature(u, &scope, name)?;
+        let signature: FunctionSignature = self.generate_function_signature(u, &scope, name)?;
+
+        // Keep track of the function signature separately so that we don't have
+        // to go through all modules to get signatures
+        self.function_signatures
+            .borrow_mut()
+            .push(signature.clone());
 
         Ok(Function {
             signature,
@@ -436,7 +461,7 @@ impl MoveSmith {
             // TODO: cannot create structs
             // TODO: should remove this after visibility check is implemented
             // TODO: structs should be allowed for non-public functions
-            let typ = self.get_random_type(u, parent_scope, true, false, true)?;
+            let typ = self.get_random_type(u, parent_scope, true, false, true, false)?;
             self.type_pool.borrow_mut().insert_mapping(&name, &typ);
             parameters.push((name, typ));
         }
@@ -444,7 +469,7 @@ impl MoveSmith {
         // More chance to have return type than not
         // so that we can compare the the return value
         let return_type = match u.int_in_range(0..=10)? > 2 {
-            true => Some(self.get_random_type(u, parent_scope, true, true, true)?),
+            true => Some(self.get_random_type(u, parent_scope, true, true, true, false)?),
             false => None,
         };
 
@@ -613,7 +638,7 @@ impl MoveSmith {
         let (name, _) = self.get_next_identifier(IDType::Var, parent_scope);
 
         // TODO: we should not omit type parameter as we can call a function to get an object of that type
-        let typ = self.get_random_type(u, parent_scope, true, true, false)?;
+        let typ = self.get_random_type(u, parent_scope, true, true, false, false)?;
         // let value = match bool::arbitrary(u)? {
         //     true => Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?),
         //     false => None,
@@ -647,7 +672,7 @@ impl MoveSmith {
         // If no function is callable, then skip generating function calls.
         let func_call_weight = match self.get_callable_functions(parent_scope).is_empty() {
             true => 0,
-            false => 1,
+            false => 10,
         };
 
         // Check if there are any assignable variables in the current scope
@@ -656,20 +681,20 @@ impl MoveSmith {
             .is_empty()
         {
             true => 0,
-            false => 1,
+            false => 5,
         };
 
         // Decides how often each expression type should be generated
         let weights = vec![
             1, // NumberLiteral
-            1, // Variable
+            5, // Variable
             // Boolean
             // StructInitialization
             1,                // Block
             func_call_weight, // FunctionCall
             assign_weight,
-            1, // BinaryOperation
-            1, // If-Else
+            3, // BinaryOperation
+            3, // If-Else
         ];
 
         let expr = loop {
@@ -692,7 +717,9 @@ impl MoveSmith {
                 // Generate a block
                 2 => {
                     let ret_typ = match bool::arbitrary(u)? {
-                        true => Some(self.get_random_type(u, parent_scope, true, true, true)?),
+                        true => {
+                            Some(self.get_random_type(u, parent_scope, true, true, true, true)?)
+                        },
                         false => None,
                     };
                     let block = self.generate_block(u, parent_scope, None, ret_typ)?;
@@ -789,10 +816,12 @@ impl MoveSmith {
             }
         }
 
-        let choices = self.get_types_for_abilities(parent_scope, &constraints);
-
-        // We do not check if choices is empty but this should be ok since
-        // the primitive types should always be available
+        // !!! We didn't check if the choices are empty
+        // !!! The assumption is that we can find a concrete type that satisfies
+        // !!! the constraints of the type parameter.
+        // !!! This is ensured because we insert a struct with all abilities
+        // !!! to all modules
+        let choices = self.get_types_with_abilities(parent_scope, &constraints, true);
         let chosen = u.choose(&choices).unwrap().clone();
 
         match self.is_type_concretizable(&chosen, parent_scope) {
@@ -811,10 +840,6 @@ impl MoveSmith {
     // If it is defined else where (e.g. struct definition), we can further
     // concretize it using concrete types or local type parameters.
     fn is_type_concretizable(&self, typ: &Type, parent_scope: &Scope) -> bool {
-        println!(
-            "searchme: checking if type {:?} can be concretized in scope {:?}",
-            typ, parent_scope
-        );
         match typ {
             Type::TypeParameter(_) => {
                 // Check if the type parameter is define in parent scope
@@ -824,8 +849,6 @@ impl MoveSmith {
                     .get_parent_scope_of(&typ.get_name())
                     .unwrap();
                 let calling_func_scope = parent_scope.remove_hidden_scopes();
-                println!("searchme: ty_scope is {:?}", tp_scope);
-                println!("searchme: call func is {:?}", calling_func_scope);
                 // The type parameter can be further concretized if it's not
                 // defined immediately in the parent_scope
                 tp_scope != calling_func_scope
@@ -846,6 +869,20 @@ impl MoveSmith {
         allow_var: bool,
         allow_call: bool,
     ) -> Result<Expression> {
+        // Check whether the current type pool contains a concrete type
+        // for the given type parameter.
+        // If so, directly use the concrete type.
+        let concrete_type = if let Type::TypeParameter(_) = typ {
+            self.type_pool.borrow().get_concrete_type(&typ.get_name())
+        } else {
+            None
+        };
+
+        let typ = match &concrete_type {
+            Some(concrete) => concrete,
+            None => typ,
+        };
+
         // Store candidate expressions for the given type
         let mut choices: Vec<Expression> = Vec::new();
 
@@ -926,7 +963,8 @@ impl MoveSmith {
             // TODO: consider just select a subset of functions to call
             if !callables.is_empty() {
                 let func = u.choose(&callables)?;
-                let call = self.generate_call_to_function(u, parent_scope, func, true)?;
+                let call =
+                    self.generate_call_to_function(u, parent_scope, func, Some(typ), true)?;
                 choices.push(Expression::FunctionCall(call));
             }
         }
@@ -1004,6 +1042,7 @@ impl MoveSmith {
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<BinaryOperation> {
+        // TODO: we should add more types here, including type parameters
         match bool::arbitrary(u)? {
             true => self.generate_numerical_binop(u, parent_scope, None),
             false => self.generate_boolean_binop(u, parent_scope),
@@ -1059,7 +1098,7 @@ impl MoveSmith {
             // To generate a boolean, we can select any numerical type
             // If a type is not provided, we also randomly select a numerical type
             Some(Type::Bool) | None => {
-                self.get_random_type(u, parent_scope, false, false, false)?
+                self.get_random_type(u, parent_scope, false, false, false, false)?
             },
             Some(_) => panic!("Invalid type"),
         };
@@ -1196,26 +1235,67 @@ impl MoveSmith {
             u,
             parent_scope,
             &func,
+            None,
             true,
         )?))
     }
 
     /// Generate a call to the given function.
+    /// If the function returns a type parameter, the `ret_type` can specify
+    /// the desired concrete type for this function.
     fn generate_call_to_function(
         &self,
         u: &mut Unstructured,
         parent_scope: &Scope,
         func: &FunctionSignature,
+        desired_ret_type: Option<&Type>,
         allow_var: bool,
     ) -> Result<FunctionCall> {
+        let mut type_args = Vec::new();
         let mut args = Vec::new();
 
+        for tp in func.type_parameters.iter() {
+            let typ_param = Type::TypeParameter(tp.clone());
+
+            // If this type parameter is the same as the return type, we
+            // use the desired return type if provided
+            let concrete_type = match desired_ret_type {
+                Some(ret) => {
+                    if ret == &typ_param {
+                        ret.clone()
+                    } else {
+                        self.concretize_type(u, &typ_param, parent_scope, vec![])
+                            .unwrap_or(typ_param.clone())
+                    }
+                },
+                None => self
+                    .concretize_type(u, &typ_param, parent_scope, vec![])
+                    .unwrap_or(typ_param.clone()),
+            };
+            // Keep track of the concrete types we decided here
+            self.type_pool
+                .borrow_mut()
+                .register_concrete_type(&typ_param.get_name(), &concrete_type);
+            type_args.push(concrete_type);
+        }
+
+        // Generate arguments using the selected concrete types
         for (_, typ) in func.parameters.iter() {
             let expr = self.generate_expression_of_type(u, parent_scope, typ, allow_var, false)?;
             args.push(expr);
         }
+
+        // Done using the concrete types, unregister
+        for tp in func.type_parameters.iter() {
+            let typ_param = Type::TypeParameter(tp.clone());
+            self.type_pool
+                .borrow_mut()
+                .unregister_concrete_type(&typ_param.get_name());
+        }
+
         Ok(FunctionCall {
             name: func.name.clone(),
+            type_args,
             args,
         })
     }
@@ -1235,7 +1315,7 @@ impl MoveSmith {
     ) -> Result<NumberLiteral> {
         let typ = match typ {
             Some(t) => t.clone(),
-            None => self.get_random_type(u, &ROOT_SCOPE, false, false, false)?,
+            None => self.get_random_type(u, &ROOT_SCOPE, false, false, false, false)?,
         };
 
         let mut value = match &typ {
@@ -1274,6 +1354,7 @@ impl MoveSmith {
         allow_bool: bool,
         allow_struct: bool,
         allow_type_param: bool,
+        only_instantiatable: bool,
     ) -> Result<Type> {
         let bool_weight = match allow_bool {
             true => 10,
@@ -1308,14 +1389,23 @@ impl MoveSmith {
         // Choose type parameters in scope
         // Every type parameter has the same weight
         if allow_type_param {
-            let param_ids =
-                self.get_filtered_identifiers(None, Some(IDType::TypeParameter), Some(scope));
-            let paras: Vec<(Type, u32)> = param_ids
-                .iter()
-                .map(|id| (self.type_pool.borrow().get_type(id).unwrap(), 1))
+            let mut params = self
+                .get_filtered_identifiers(None, Some(IDType::TypeParameter), Some(scope))
+                .into_iter()
+                .map(|id| self.type_pool.borrow().get_type(&id).unwrap())
+                .collect::<Vec<Type>>();
+
+            if only_instantiatable {
+                params = self.filter_instantiatable_types(scope, params);
+            }
+
+            let param_cat: Vec<(Type, u32)> = params
+                .into_iter()
+                .map(|typ| (typ, 1))
                 .collect::<Vec<(Type, u32)>>();
-            if !paras.is_empty() {
-                categories.push(paras);
+
+            if !param_cat.is_empty() {
+                categories.push(param_cat);
             }
         }
 
@@ -1326,11 +1416,36 @@ impl MoveSmith {
         Ok(chosen_cat[choice].0.clone())
     }
 
+    // Filter out types that are not instantiatable
+    // For each type, checks if there is an accessible variable in `scope` that has the type
+    fn filter_instantiatable_types(&self, scope: &Scope, types: Vec<Type>) -> Vec<Type> {
+        let instantiatables = self
+            .get_filtered_identifiers(None, Some(IDType::Var), Some(scope))
+            .into_iter()
+            .filter_map(|id| self.type_pool.borrow().get_type(&id))
+            .collect::<BTreeSet<Type>>();
+
+        types
+            .into_iter()
+            .filter(|typ| {
+                if let Type::TypeParameter(_) = typ {
+                    instantiatables.contains(typ)
+                } else {
+                    true
+                }
+            })
+            .collect()
+    }
+
     /// Get all callable functions in the given scope.
+    ///
+    /// If `ret_type` is specified, only functions that can return the given type
+    /// will be returned.
+    ///
     // TODO: Handle visibility check
     fn get_callable_functions(&self, scope: &Scope) -> Vec<FunctionSignature> {
         let mut callable = Vec::new();
-        for f in self.function_signatures.iter() {
+        for f in self.function_signatures.borrow().iter() {
             if self.id_pool.borrow().is_id_in_scope(&f.name, scope) {
                 callable.push(f.clone());
             }
@@ -1370,10 +1485,17 @@ impl MoveSmith {
         }
     }
 
-    /// Finds all types within scope that satisfy the given abilities.
-    fn get_types_for_abilities(&self, parent_scope: &Scope, abilities: &[Ability]) -> Vec<Type> {
-        let compatible_types = self.type_pool.borrow().get_types_for_abilities(abilities);
-        compatible_types
+    /// Finds all registered types that contains all the required abilities
+    pub fn get_types_with_abilities(
+        &self,
+        parent_scope: &Scope,
+        requires: &[Ability],
+        only_instantiatable: bool,
+    ) -> Vec<Type> {
+        let types = self
+            .type_pool
+            .borrow()
+            .get_all_types()
             .iter()
             .filter(|t| match t.is_num_or_bool() {
                 true => true,
@@ -1386,8 +1508,34 @@ impl MoveSmith {
                     self.id_pool.borrow().is_id_in_scope(id, parent_scope)
                 },
             })
+            .filter(|t| {
+                let possible_abilities = self.derive_abilities_of_type(t);
+                requires.iter().all(|req| possible_abilities.contains(req))
+            })
             .cloned()
-            .collect()
+            .collect();
+        match only_instantiatable {
+            true => self.filter_instantiatable_types(parent_scope, types),
+            false => types,
+        }
+    }
+
+    /// Get the possible abilities of a struct type.
+    /// Only give the upper bound of possible abilities.
+    pub fn derive_abilities_of_type(&self, typ: &Type) -> Vec<Ability> {
+        match typ {
+            Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::U128 | Type::U256 | Type::Bool => {
+                Vec::from(Ability::PRIMITIVES)
+            },
+            // TODO: currently only use the `has`
+            // TODO: should properly check the type arguments for concrete struct types.
+            Type::Struct(id) => {
+                let st = self.get_struct_definition_with_identifier(id).unwrap();
+                st.abilities.clone()
+            },
+            Type::TypeParameter(tp) => tp.abilities.clone(),
+            _ => Vec::from(Ability::NONE),
+        }
     }
 
     /// Helper to get the next identifier.

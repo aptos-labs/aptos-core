@@ -415,7 +415,20 @@ impl CodeGenerator for StructInitialization {
 
 impl CodeGenerator for FunctionCall {
     fn emit_code_lines(&self) -> Vec<String> {
-        let mut code = format!("{}(", self.name.emit_code());
+        let type_args = match self.type_args.is_empty() {
+            true => "".to_string(),
+            false => {
+                format!(
+                    "<{}>",
+                    self.type_args
+                        .iter()
+                        .map(|t| t.inline())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            },
+        };
+        let mut code = format!("{}{}(", self.name.emit_code(), type_args);
         code.push_str(
             self.args
                 .iter()

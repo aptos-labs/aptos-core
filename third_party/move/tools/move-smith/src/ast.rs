@@ -220,5 +220,6 @@ pub struct StructInitialization {
 #[derive(Debug, Clone)]
 pub struct FunctionCall {
     pub name: Identifier,
+    pub type_args: Vec<Type>,
     pub args: Vec<Expression>,
 }

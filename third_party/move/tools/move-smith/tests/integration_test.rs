@@ -41,6 +41,7 @@ fn simple_script() -> Script {
     Script {
         main: vec![FunctionCall {
             name: Identifier(String::from("0xCAFE::SimpleModule::fun1")),
+            type_args: vec![],
             args: vec![
                 Expression::NumberLiteral(NumberLiteral {
                     value: BigUint::from(555u64),

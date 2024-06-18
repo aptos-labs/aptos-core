@@ -64,11 +64,11 @@ impl Default for Config {
                     (Experiment::OPTIMIZE.to_string(), false),
                     (Experiment::ACQUIRES_CHECK.to_string(), false),
                 ]),
-                ("optimize-no-simplify".to_string(), vec![
-                    (Experiment::OPTIMIZE.to_string(), true),
-                    (Experiment::AST_SIMPLIFY.to_string(), false),
-                    (Experiment::ACQUIRES_CHECK.to_string(), false),
-                ]),
+                // ("optimize-no-simplify".to_string(), vec![
+                //     (Experiment::OPTIMIZE.to_string(), true),
+                //     (Experiment::AST_SIMPLIFY.to_string(), false),
+                //     (Experiment::ACQUIRES_CHECK.to_string(), false),
+                // ]),
             ],
 
             num_runs_per_func: 10,

@@ -8,7 +8,7 @@ use crate::names::Identifier;
 use std::collections::BTreeMap;
 
 /// Collection of Move types.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Type {
     // Basic types
     U8,
@@ -32,7 +32,7 @@ pub enum Type {
     TypeParameter(TypeParameter),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TypeParameter {
     pub name: Identifier,
     pub abilities: Vec<Ability>,
@@ -98,20 +98,6 @@ impl Type {
             Type::TypeParameter(tp) => tp.name.clone(),
         }
     }
-
-    /// Get the possible abilities of a struct type.
-    /// Only give the upper bound of possible abilities.
-    pub fn get_possible_abilities(&self) -> Vec<Ability> {
-        match self {
-            Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::U128 | Type::U256 | Type::Bool => {
-                Vec::from(Ability::PRIMITIVES)
-            },
-            // Hardcode struct ability for now, should properly check the `has`
-            Type::Struct(_) => vec![Ability::Copy, Ability::Drop],
-            Type::TypeParameter(tp) => tp.abilities.clone(),
-            _ => Vec::from(Ability::NONE),
-        }
-    }
 }
 
 /// The data structure that keeps track of types of things during generation.
@@ -120,18 +106,23 @@ impl Type {
 /// - Variables  (e.g. var1, var2)
 /// - Function arguments (e.g. fun1::arg1, fun2::arg2)
 /// - Struct fields (e.g. Struct1::field1, Struct2::field2)
+/// - Type Parameter name
 ///
 /// A key invariant assumed by the mapping is that each identifier is globally unique.
 /// This is ensured by the IdentifierPool from the names module.
-///
-/// `all_types` is a list of all available types that have been registered.
-/// This can be used to randomly select a type for a let binding.
-/// Currently all basic types are registered by default.
-/// All generated structs are also registered.
 #[derive(Default, Debug, Clone)]
 pub struct TypePool {
     mapping: BTreeMap<Identifier, Type>,
+
+    /// A list of all available types that have been registered.
+    /// This can be used to randomly select a type for a let binding.
+    /// Currently all basic types are registered by default.
+    /// All generated structs and type parameters are also registered.
     all_types: Vec<Type>,
+
+    /// Keeps track of the concrete type for type parameters
+    /// Maps type parameter names to a stack of concrete types
+    parameter_types: BTreeMap<Identifier, Vec<Type>>,
 }
 
 impl TypePool {
@@ -150,6 +141,7 @@ impl TypePool {
                 // Type::Address,
                 // Type::Signer,
             ],
+            parameter_types: BTreeMap::new(),
         }
     }
 
@@ -161,23 +153,6 @@ impl TypePool {
     /// Register a new type
     pub fn register_type(&mut self, typ: Type) {
         self.all_types.push(typ);
-    }
-
-    /// Finds all registered types that are compatible with the given abilities.
-    /// If `key` is required, then the type must have `store`.
-    /// For other abilities, the type must have the corresponding ability.
-    pub fn get_types_for_abilities(&self, requires: &[Ability]) -> Vec<Type> {
-        self.all_types
-            .iter()
-            .filter(|t| {
-                let possible_abilities = t.get_possible_abilities();
-                requires.iter().all(|req| match req {
-                    Ability::Key => possible_abilities.contains(&Ability::Store),
-                    _ => possible_abilities.contains(req),
-                })
-            })
-            .cloned()
-            .collect()
     }
 
     /// Get the type of an identifier
@@ -200,5 +175,31 @@ impl TypePool {
             }
         }
         res
+    }
+
+    pub fn register_concrete_type(&mut self, id: &Identifier, typ: &Type) {
+        println!("searchme: registering concrete type {:?} for {:?}", typ, id);
+        if self.parameter_types.contains_key(id) {
+            self.parameter_types.get_mut(id).unwrap().push(typ.clone());
+        } else {
+            self.parameter_types.insert(id.clone(), vec![typ.clone()]);
+        }
+    }
+
+    pub fn unregister_concrete_type(&mut self, id: &Identifier) {
+        println!("searchme: unregister concrete type for {:?}", id);
+        if let Some(types) = self.parameter_types.get_mut(id) {
+            types.pop();
+        } else {
+            panic!("Cannot unregister type parameter: {:?}", id);
+        }
+    }
+
+    pub fn get_concrete_type(&self, id: &Identifier) -> Option<Type> {
+        if let Some(types) = self.parameter_types.get(id) {
+            types.last().cloned()
+        } else {
+            None
+        }
     }
 }
