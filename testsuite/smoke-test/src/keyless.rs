@@ -5,12 +5,14 @@ use crate::smoke_test_environment::SwarmBuilder;
 use aptos::test::CliTestFramework;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
-    ed25519::Ed25519PrivateKey, poseidon_bn254::keyless::fr_to_bytes_le, PrivateKey, SigningKey, Uniform
+    ed25519::Ed25519PrivateKey, poseidon_bn254::keyless::fr_to_bytes_le, PrivateKey, SigningKey,
 };
 use aptos_forge::{AptosPublicInfo, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
-use aptos_sdk::types::{EphemeralKeyPair, KeylessAccount, LocalAccount};
+use aptos_sdk::types::{
+    keyless::test_utils::get_sample_pepper, EphemeralKeyPair, KeylessAccount, LocalAccount,
+};
 use aptos_types::{
     jwks::{
         jwk::{JWKMoveStruct, JWK},
@@ -20,7 +22,11 @@ use aptos_types::{
     keyless::{
         get_public_inputs_hash,
         test_utils::{
-            self, get_groth16_sig_and_pk_for_upgraded_vk, get_sample_epk_blinder, get_sample_esk, get_sample_exp_date, get_sample_groth16_sig_and_pk, get_sample_groth16_sig_and_pk_no_extra_field, get_sample_iss, get_sample_jwk, get_sample_jwt_token, get_sample_openid_sig_and_pk, get_sample_tw_sk, get_sample_zk_sig, get_upgraded_vk
+            self, get_groth16_sig_and_pk_for_upgraded_vk, get_sample_epk_blinder, get_sample_esk,
+            get_sample_exp_date, get_sample_groth16_sig_and_pk,
+            get_sample_groth16_sig_and_pk_no_extra_field, get_sample_iss, get_sample_jwk,
+            get_sample_jwt_token, get_sample_openid_sig_and_pk, get_sample_tw_sk,
+            get_sample_zk_sig, get_upgraded_vk,
         },
         Configuration, EphemeralCertificate, Groth16ProofAndStatement, Groth16VerificationKey,
         KeylessPublicKey, KeylessSignature, TransactionAndProof, DEVNET_VERIFICATION_KEY,
@@ -37,7 +43,6 @@ use aptos_types::{
 use move_core_types::account_address::AccountAddress;
 use serde::de::DeserializeOwned;
 use std::{fmt::Debug, time::Duration};
-use aptos_sdk::types::keyless::test_utils::get_sample_pepper;
 
 #[tokio::test]
 async fn test_keyless_oidc_txn_verifies() {
