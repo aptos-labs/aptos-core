@@ -860,7 +860,7 @@ pub fn make_function_type(
                 (vis_loc, internal_msg),
             ));
         },
-        Visibility::Package(_) => unreachable!(),
+        Visibility::Package(_) => panic!("unexpected visibility"),
         Visibility::Public(_) => (),
     };
     (defined_loc, ty_args, params, acquires, return_ty)
