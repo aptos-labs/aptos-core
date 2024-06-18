@@ -538,7 +538,7 @@ impl BlockStore {
 
         counters::CONSENSUS_PROPOSAL_PENDING_ROUNDS.observe(pending_rounds as f64);
         counters::CONSENSUS_PROPOSAL_PENDING_DURATION
-            .observe(oldest_not_committed_spent_in_pipeline.as_secs_f64());
+            .observe_duration(oldest_not_committed_spent_in_pipeline);
 
         if pending_rounds > 1 {
             // TODO cleanup
