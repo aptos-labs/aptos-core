@@ -2747,14 +2747,14 @@ impl<'env> ModuleEnv<'env> {
 
     /// Returns the set of modules in the current package,
     /// whose public(package) functions are called in the current module.
-    pub fn needs_be_friend_with(&self) -> BTreeSet<ModuleId> {
+    pub fn need_to_be_friended_by(&self) -> BTreeSet<ModuleId> {
         let mut deps = BTreeSet::new();
         for fun_env in self.get_functions() {
             let called_funs = fun_env.get_called_functions().expect("called functions");
             for fun in called_funs {
                 let mod_id = fun.module_id;
                 let mod_env = self.env.get_module(mod_id);
-                if mod_env.is_target() && mod_env.get_function(fun.id).has_package_visibility() && self.in_same_package(&mod_env) {
+                if mod_env.is_target() && !mod_env.is_script_module() && mod_env.get_function(fun.id).has_package_visibility() && self.in_same_package(&mod_env) {
                     deps.insert(mod_id);
                 }
             }
