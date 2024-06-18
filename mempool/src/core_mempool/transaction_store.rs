@@ -635,10 +635,7 @@ impl TransactionStore {
         (batch, last_timeline_id.into())
     }
 
-    pub(crate) fn timeline_range(
-        &self,
-        start_end_pairs: &Vec<(u64, u64)>,
-    ) -> Vec<SignedTransaction> {
+    pub(crate) fn timeline_range(&self, start_end_pairs: &[(u64, u64)]) -> Vec<SignedTransaction> {
         self.timeline_index
             .timeline_range(start_end_pairs)
             .iter()

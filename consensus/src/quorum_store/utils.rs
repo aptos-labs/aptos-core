@@ -248,7 +248,7 @@ impl ProofQueue {
             return;
         }
         let batch_key = BatchKey::from_info(proof.info());
-        if self.batch_to_proof.get(&batch_key).is_some() {
+        if self.batch_to_proof.contains_key(&batch_key) {
             counters::inc_rejected_pos_count(counters::POS_DUPLICATE_LABEL);
             return;
         }

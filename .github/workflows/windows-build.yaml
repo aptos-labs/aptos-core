@@ -9,7 +9,7 @@ on:
     # Run twice a day at 12PM PT and 8PM PT Monday through Friday
     - cron: "0 19,3 * * 1-5"
     # Run once a day at 12PM PT on Saturday and Sunday
-    - cron: "0 19 * * 6-7"
+    - cron: "0 19 * * 6,0"
 
 jobs:
   windows-build:
@@ -18,7 +18,7 @@ jobs:
       (
         github.event_name == 'workflow_dispatch' ||
         github.event_name == 'schedule' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-windows-tests') ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-windows-tests')
       )
     defaults:
       run:

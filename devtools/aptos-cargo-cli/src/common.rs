@@ -111,7 +111,7 @@ impl SelectedPackageArgs {
             );
             let response = reqwest::blocking::get(url)?.error_for_status()?;
             let response = response.text()?;
-            contents = response.clone();
+            contents.clone_from(&response);
 
             // Write the contents of the file to the local directory
             fs::create_dir_all("target/aptos-x-tool")?;

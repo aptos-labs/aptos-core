@@ -12,12 +12,6 @@ struct ProposalMsg {
     msg: String,
 }
 
-/// This represents a vote message from a validator
-#[derive(Debug, PartialEq, Eq)]
-struct VoteMsg {
-    msg: String,
-}
-
 #[test]
 fn test_fifo() {
     let mut q = PerKeyQueue::new(QueueStyle::FIFO, NonZeroUsize!(3), None);

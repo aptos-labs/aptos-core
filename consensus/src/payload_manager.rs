@@ -153,6 +153,9 @@ impl PayloadManager {
     pub fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64) {
         let request_txns_and_update_status =
             move |proof_with_status: &ProofWithData, batch_reader: Arc<dyn BatchReader>| {
+                if proof_with_status.status.lock().is_some() {
+                    return;
+                }
                 let receivers = PayloadManager::request_transactions(
                     proof_with_status.proofs.clone(),
                     timestamp,

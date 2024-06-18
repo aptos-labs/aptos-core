@@ -486,7 +486,7 @@ mod tests {
     async fn test_rand_item() {
         let ctxt = TestContext::new(vec![1, 2, 3], 1);
         let (tx, _rx) = unbounded();
-        let shares = vec![
+        let shares = [
             create_share_for_round(ctxt.target_epoch, 2, ctxt.authors[0]),
             create_share_for_round(ctxt.target_epoch, 1, ctxt.authors[1]),
             create_share_for_round(ctxt.target_epoch, 1, ctxt.authors[2]),
@@ -528,7 +528,7 @@ mod tests {
             decision_tx,
         );
 
-        let rounds = vec![vec![1], vec![2, 3], vec![5, 8, 13]];
+        let rounds = [vec![1], vec![2, 3], vec![5, 8, 13]];
         let blocks_1 = QueueItem::new(create_ordered_blocks(rounds[0].clone()), None);
         let blocks_2 = QueueItem::new(create_ordered_blocks(rounds[1].clone()), None);
         let metadata_1 = blocks_1.all_rand_metadata();

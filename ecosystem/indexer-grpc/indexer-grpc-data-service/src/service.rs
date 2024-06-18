@@ -82,6 +82,25 @@ pub struct RawDataServerWrapper {
     in_memory_cache: Arc<InMemoryCache>,
 }
 
+// Exclude in_memory-cache
+impl std::fmt::Debug for RawDataServerWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RawDataServerWrapper")
+            .field("redis_client", &"Arc<redis::Client>")
+            .field("file_store_config", &self.file_store_config)
+            .field(
+                "data_service_response_channel_size",
+                &self.data_service_response_channel_size,
+            )
+            .field(
+                "sender_addresses_to_ignore",
+                &self.sender_addresses_to_ignore,
+            )
+            .field("cache_storage_format", &self.cache_storage_format)
+            .finish()
+    }
+}
+
 impl RawDataServerWrapper {
     pub fn new(
         redis_address: RedisUrl,
@@ -597,14 +616,14 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
             // If this batch is fully contained within the previous batch, skip it
             if prev_start <= start_version && prev_end >= end_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE, &"full"])
+                    .with_label_values(&[SERVICE_TYPE, "full"])
                     .inc_by(end_version - start_version);
                 continue;
             }
             // If this batch overlaps with the previous batch, combine them
             if prev_end >= start_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE, &"partial"])
+                    .with_label_values(&[SERVICE_TYPE, "partial"])
                     .inc_by(prev_end - start_version + 1);
                 tracing::debug!(
                     batch_first_version = first_version,
@@ -622,7 +641,7 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
             // Otherwise there is a gap
             if prev_end + 1 != start_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE, &"gap"])
+                    .with_label_values(&[SERVICE_TYPE, "gap"])
                     .inc_by(prev_end - start_version + 1);
 
                 tracing::error!(
