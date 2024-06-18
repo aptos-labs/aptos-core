@@ -348,11 +348,26 @@ impl ProofQueue {
     }
 
     /// return true when quorum store is back pressured
-    pub(crate) fn qs_back_pressure(&self) -> BackPressure {
+    pub(crate) fn qs_back_pressure_1(&self) -> BackPressure {
         let (remaining_total_txn_num, remaining_total_proof_num) = self.remaining_txns_and_proofs();
         if remaining_total_txn_num > self.back_pressure_total_txn_limit {
             info!(
-                "QuorumStore back pressured: txn_count: {}, proof_count: {}",
+                "QuorumStore back pressured Adding Proofs: txn_count: {}, proof_count: {}",
+                remaining_total_txn_num, remaining_total_proof_num
+            );
+        }
+        BackPressure {
+            txn_count: remaining_total_txn_num > self.back_pressure_total_txn_limit,
+            proof_count: remaining_total_proof_num > self.back_pressure_total_proof_limit,
+        }
+    }
+
+    /// return true when quorum store is back pressured
+    pub(crate) fn qs_back_pressure_2(&self) -> BackPressure {
+        let (remaining_total_txn_num, remaining_total_proof_num) = self.remaining_txns_and_proofs();
+        if remaining_total_txn_num > self.back_pressure_total_txn_limit {
+            info!(
+                "QuorumStore back pressured Committed: txn_count: {}, proof_count: {}",
                 remaining_total_txn_num, remaining_total_proof_num
             );
         }
@@ -591,7 +606,7 @@ impl ProofQueue {
                             self.push(proof);
                         }
 
-                        let updated_back_pressure = self.qs_back_pressure();
+                        let updated_back_pressure = self.qs_back_pressure_1();
                         if updated_back_pressure != back_pressure {
                             back_pressure = updated_back_pressure;
                             if back_pressure_tx.send(back_pressure).await.is_err() {
@@ -620,7 +635,7 @@ impl ProofQueue {
                         self.mark_committed(batches);
                         self.handle_updated_block_timestamp(block_timestamp);
 
-                        let updated_back_pressure = self.qs_back_pressure();
+                        let updated_back_pressure = self.qs_back_pressure_2();
                         if updated_back_pressure != back_pressure {
                             back_pressure = updated_back_pressure;
                             if back_pressure_tx.send(back_pressure).await.is_err() {
