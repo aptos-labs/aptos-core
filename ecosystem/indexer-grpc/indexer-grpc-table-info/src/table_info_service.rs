@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::backup_restore::gcs::GcsBackupRestoreOperator;
 use anyhow::Error;
 use aptos_api::context::Context;
 use aptos_api_types::TransactionOnChainData;
@@ -24,6 +25,7 @@ pub struct TableInfoService {
     pub parser_batch_size: u16,
     pub context: Arc<Context>,
     pub enable_expensive_logging: bool,
+    pub backup_restore_operator: Option<Arc<GcsBackupRestoreOperator>>,
     pub indexer_async_v2: Arc<IndexerAsyncV2>,
 }
 
@@ -34,6 +36,7 @@ impl TableInfoService {
         parser_task_count: u16,
         parser_batch_size: u16,
         enable_expensive_logging: bool,
+        backup_restore_operator: Option<Arc<GcsBackupRestoreOperator>>,
         indexer_async_v2: Arc<IndexerAsyncV2>,
     ) -> Self {
         Self {
@@ -42,6 +45,7 @@ impl TableInfoService {
             parser_batch_size,
             context,
             enable_expensive_logging,
+            backup_restore_operator,
             indexer_async_v2,
         }
     }
@@ -52,6 +56,7 @@ impl TableInfoService {
     /// 4. write parsed table info to rocksdb
     /// 5. after all batches from the loop complete, if pending on items not empty, move on to 6, otherwise, start from 1 again
     /// 6. retry all the txns in the loop sequentially to clean up the pending on items
+    /// 7. try to backup rocksdb snapshot if new epoch have been found
     pub async fn run(&mut self) {
         loop {
             let start_time = std::time::Instant::now();
@@ -62,11 +67,30 @@ impl TableInfoService {
                 .await;
             let max_version = self.get_max_batch_version(results).unwrap_or_default();
             let versions_processed = max_version - self.current_version + 1;
+            let context = self.context.clone();
+            let backup_restore_operator = self.backup_restore_operator.clone();
+            let start_version = self.current_version;
+            let indexer_async_v2 = self.indexer_async_v2.clone();
+
+            // Try uploading the rocksdb snapshot by taking a full db checkpoint and save it to gcs if found new epoch
+            // running backup logic in a separate thread to not let it block the main thread to parse table info, since
+            // gcs operation could be slow
+            if let Some(op) = backup_restore_operator {
+                tokio::spawn(async move {
+                    Self::try_backup_db_snapshot(
+                        context.clone(),
+                        max_version,
+                        indexer_async_v2.clone(),
+                        op.clone(),
+                    )
+                    .await;
+                });
+            }
 
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::TableInfoProcessed,
-                Some(self.current_version as i64),
+                Some(start_version as i64),
                 Some(max_version as i64),
                 None,
                 None,
@@ -292,6 +316,53 @@ impl TableInfoService {
         );
 
         Ok(())
+    }
+
+    /// Tries to upload a snapshot of the database if the backup service is enabled.
+    /// This function is called to periodically back up the database state to Google Cloud Storage (GCS).
+    /// It checks the latest epoch of data already backed up in GCS and compares it with the current epoch.
+    async fn try_backup_db_snapshot(
+        context: Arc<Context>,
+        last_version: u64,
+        indexer_async_v2: Arc<IndexerAsyncV2>,
+        backup_restore_operator: Arc<GcsBackupRestoreOperator>,
+    ) {
+        // only try backup db if backup service is enabled
+        let metadata_epoch = backup_restore_operator
+            .clone()
+            .get_metadata_epoch();
+        let (_, _, block_event) = context
+            .db
+            .get_block_info_by_version(last_version)
+            .unwrap_or_else(|_| {
+                panic!("Could not get block_info for last version {}", last_version,)
+            });
+        let block_event_epoch = block_event.epoch();
+        // If gcs most recent transaction version in metadata is behind, take a snapshot of rocksdb and upload
+        if metadata_epoch < block_event_epoch {
+            let start_time = std::time::Instant::now();
+            // temporary path to store the snapshot
+            let snapshot_dir = context
+                .node_config
+                .get_data_dir()
+                .join(block_event_epoch.to_string());
+            let ledger_chain_id = context.chain_id().id();
+            backup_restore_operator
+                .backup_db_snapshot(
+                    ledger_chain_id as u64,
+                    block_event_epoch,
+                    indexer_async_v2,
+                    snapshot_dir.clone(),
+                )
+                .await
+                .expect("Failed to upload snapshot in table info service");
+
+            info!(
+                backup_epoch = block_event_epoch,
+                backup_millis = start_time.elapsed().as_millis(),
+                "[Table Info] Table info db backed up successfully"
+            );
+        }
     }
 
     /// TODO(jill): consolidate it with `ensure_highest_known_version`
