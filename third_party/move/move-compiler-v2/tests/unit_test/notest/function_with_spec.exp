@@ -1,12 +1,6 @@
 
 Diagnostics:
 error: unresolved spec target
-   ┌─ tests/unit_test/notest/function_with_spec.move:13:10
-   │
-13 │     spec bar {
-   │          ^^^
-
-error: unresolved spec target
    ┌─ tests/unit_test/notest/function_with_spec.move:18:10
    │
 18 │     spec baz {
