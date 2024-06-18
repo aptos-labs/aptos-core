@@ -167,6 +167,8 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     env.set_language_version(options.language_version);
     let compile_via_model = options.compile_via_model;
     env.set_extension(options);
+    env.set_is_verification(flags.is_verification());
+    env.set_keep_testing_functions(flags.keep_testing_functions());
 
     let move_sources = move_sources_targets
         .iter()
