@@ -1,0 +1,14 @@
+---
+remote_endpoint: ~
+name: concurrent_fungible_balance
+proposals:
+  - name: enable_concurrent_fungible_balance
+    metadata:
+      title: "Enable for accounts to opt-in into concurrent fungible balance"
+      description: "Enables the changes in AIP-70 https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-70.md"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - CONCURRENT_FUNGIBLE_BALANCE

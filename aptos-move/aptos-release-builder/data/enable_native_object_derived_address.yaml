@@ -1,0 +1,14 @@
+---
+remote_endpoint: ~
+name: object_native_derived_address
+proposals:
+  - name: enable_object_native_derived_address
+    metadata:
+      title: "Enable the native call to compute object derived address"
+      description: "Enables the changes in AIP-85 https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-85.md"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/458"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - OBJECT_NATIVE_DERIVED_ADDRESS

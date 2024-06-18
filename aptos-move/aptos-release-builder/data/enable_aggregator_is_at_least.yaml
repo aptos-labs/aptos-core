@@ -1,0 +1,14 @@
+---
+remote_endpoint: ~
+name: aggregator_v2_is_at_least_api
+proposals:
+  - name: enable_aggregator_v2_is_at_least_api
+    metadata:
+      title: "Introduce native API to evaluate aggregator value is greater or equal to given amount"
+      description: "Enables the changes in AIP-87 https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-87.md"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/457"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - AGGREGATOR_V2_IS_AT_LEAST_API
