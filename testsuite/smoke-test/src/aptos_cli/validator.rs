@@ -388,7 +388,7 @@ async fn test_onchain_shuffling_change() {
 
     assert_eq!(
         current_execution_config.transaction_shuffler_type(),
-        TransactionShufflerType::SenderAwareV2(32),
+        TransactionShufflerType::default_for_genesis(),
     );
 
     assert_reordering(&mut swarm, true).await;
