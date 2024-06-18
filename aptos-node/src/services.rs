@@ -27,6 +27,7 @@ use aptos_peer_monitoring_service_server::{
     PeerMonitoringServiceServer,
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
+use aptos_schemadb::DB;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
@@ -44,6 +45,7 @@ pub fn bootstrap_api_and_indexer(
     node_config: &NodeConfig,
     db_rw: DbReaderWriter,
     chain_id: ChainId,
+    internal_indexer_db: Option<Arc<DB>>,
 ) -> anyhow::Result<(
     Receiver<MempoolClientRequest>,
     Option<Runtime>,
@@ -67,7 +69,7 @@ pub fn bootstrap_api_and_indexer(
     };
 
     let (db_indexer_runtime, txn_event_reader) =
-        match bootstrap_internal_indexer_db(node_config, db_rw.clone()) {
+        match bootstrap_internal_indexer_db(node_config, db_rw.clone(), internal_indexer_db) {
             Some((runtime, db_indexer)) => (Some(runtime), Some(db_indexer)),
             None => (None, None),
         };

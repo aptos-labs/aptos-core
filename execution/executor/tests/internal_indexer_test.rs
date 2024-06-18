@@ -16,13 +16,16 @@ use aptos_sdk::{
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::{
+    account_address::AccountAddress,
     account_config::aptos_test_root_address,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
+    state_store::state_key::prefix::StateKeyPrefix,
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
-        signature_verified_transaction::into_signature_verified_block, Transaction,
-        Transaction::UserTransaction, WriteSetPayload,
+        signature_verified_transaction::into_signature_verified_block,
+        Transaction::{self, UserTransaction},
+        WriteSetPayload,
     },
 };
 use rand::SeedableRng;
@@ -143,8 +146,8 @@ fn test_db_indexer_data() {
     );
     let db_indexer = DBIndexer::new(
         db.clone(),
-        aptos_db,
-        &InternalIndexerDBConfig::new(true, true, 2),
+        aptos_db.clone(),
+        &InternalIndexerDBConfig::new(true, true, true, 2),
     );
     // assert the data matches the expected data
     let mut version = db_indexer.get_persisted_version().unwrap();
@@ -168,5 +171,20 @@ fn test_db_indexer_data() {
 
     let x = db_indexer.get_event_by_key_iter().unwrap();
     let res: Vec<_> = x.collect();
-    assert!(res.len() == 14);
+    assert_eq!(res.len(), 27);
+
+    let core_kv_iter = db_indexer
+        .get_prefixed_state_value_iterator(&StateKeyPrefix::from(core_account.address()), None, 12)
+        .unwrap();
+    let core_kv_res: Vec<_> = core_kv_iter.collect();
+    assert_eq!(core_kv_res.len(), 5);
+    let address_one_kv_iter = db_indexer
+        .get_prefixed_state_value_iterator(
+            &StateKeyPrefix::from(AccountAddress::from_hex_literal("0x1").unwrap()),
+            None,
+            12,
+        )
+        .unwrap();
+    let address_one_kv_res: Vec<_> = address_one_kv_iter.collect();
+    assert_eq!(address_one_kv_res.len(), 152);
 }
