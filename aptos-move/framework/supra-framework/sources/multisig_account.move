@@ -1,3 +1,4 @@
+/// Supra note: This is customized version of multisig account with timeout setup.
 /// Enhanced multisig account standard on Aptos. This is different from the native multisig scheme support enforced via
 /// the account's auth key.
 ///
@@ -93,6 +94,13 @@ module supra_framework::multisig_account {
     const EINVALID_SEQUENCE_NUMBER: u64 = 17;
     /// Provided owners to remove and new owners overlap.
     const EOWNERS_TO_REMOVE_NEW_OWNERS_OVERLAP: u64 = 18;
+    /// The transaction has timed out and cannot be executed.
+    const ETRANSACTION_TIMED_OUT:u64 = 19;
+    /// Timeout duration must be at least 300 seconds.
+    const EINVALID_TIMEOUT_DURATION: u64 = 20;
+
+    /// Define the minimum timeout duration for a transaction.
+    const MINIMAL_TIMEOUT_DURATION: u64 = 300;
 
     const ZERO_AUTH_KEY: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -122,6 +130,8 @@ module supra_framework::multisig_account {
         // Note: Attributes can be arbitrarily set by the multisig account and thus will only be used for off-chain
         // display purposes only. They don't change any on-chain semantics of the multisig account.
         metadata: SimpleMap<String, vector<u8>>,
+        // Timeout for the transaction in seconds. If the transaction is not executed within this time, it should be rejected.
+        timeout_duration: u64,
 
         // Events.
         add_owners_events: EventHandle<AddOwnersEvent>,
@@ -133,6 +143,7 @@ module supra_framework::multisig_account {
         execute_transaction_events: EventHandle<TransactionExecutionSucceededEvent>,
         transaction_execution_failed_events: EventHandle<TransactionExecutionFailedEvent>,
         metadata_updated_events: EventHandle<MetadataUpdatedEvent>,
+        TimeoutDurationUpdatedEvent: EventHandle<TimeoutDurationUpdatedEvent>,
     }
 
     /// A transaction to be executed in a multisig account.
@@ -253,12 +264,25 @@ module supra_framework::multisig_account {
         new_metadata: SimpleMap<String, vector<u8>>,
     }
 
+    /// Event emitted when a transaction's timeout duration is updated.
+    struct TimeoutDurationUpdatedEvent has drop, store {
+        executor: address,
+        old_timeout_duration: u64,
+        new_timeout_duration: u64,
+    }
+
     ////////////////////////// View functions ///////////////////////////////
 
     #[view]
     /// Return the multisig account's metadata.
     public fun metadata(multisig_account: address): SimpleMap<String, vector<u8>> acquires MultisigAccount {
         borrow_global<MultisigAccount>(multisig_account).metadata
+    }
+
+    #[view]
+    /// Return the timeout duration for the multisig account.
+    public fun timeout_duration(multisig_account: address): u64 acquires MultisigAccount {
+        borrow_global<MultisigAccount>(multisig_account).timeout_duration
     }
 
     #[view]
@@ -329,7 +353,8 @@ module supra_framework::multisig_account {
         let transaction = table::borrow(&multisig_account_resource.transactions, sequence_number);
         let (num_approvals, _) = num_approvals_and_rejections(&multisig_account_resource.owners, transaction);
         sequence_number == multisig_account_resource.last_executed_sequence_number + 1 &&
-            num_approvals >= multisig_account_resource.num_signatures_required
+            num_approvals >= multisig_account_resource.num_signatures_required &&
+            multisig_account_resource.timeout_duration >= now_seconds() - transaction.creation_time_secs
     }
 
     #[view]
@@ -344,7 +369,8 @@ module supra_framework::multisig_account {
         let transaction = table::borrow(&multisig_account_resource.transactions, sequence_number);
         let (_, num_rejections) = num_approvals_and_rejections(&multisig_account_resource.owners, transaction);
         sequence_number == multisig_account_resource.last_executed_sequence_number + 1 &&
-            num_rejections >= multisig_account_resource.num_signatures_required
+           ( (num_rejections >= multisig_account_resource.num_signatures_required) ||
+            (multisig_account_resource.timeout_duration < now_seconds() - transaction.creation_time_secs))
     }
 
     #[view]
@@ -404,7 +430,9 @@ module supra_framework::multisig_account {
         create_multisig_account_signed_message: vector<u8>,
         metadata_keys: vector<String>,
         metadata_values: vector<vector<u8>>,
+        timeout_duration: u64,
     ) acquires MultisigAccount {
+        assert!(timeout_duration >= MINIMAL_TIMEOUT_DURATION, error::invalid_argument(EINVALID_TIMEOUT_DURATION));
         // Verify that the `MultisigAccountCreationMessage` has the right information and is signed by the account
         // owner's key.
         let proof_challenge = MultisigAccountCreationMessage {
@@ -433,6 +461,7 @@ module supra_framework::multisig_account {
             option::none<SignerCapability>(),
             metadata_keys,
             metadata_values,
+            timeout_duration
         );
     }
 
@@ -450,7 +479,9 @@ module supra_framework::multisig_account {
         create_multisig_account_signed_message: vector<u8>,
         metadata_keys: vector<String>,
         metadata_values: vector<vector<u8>>,
+        timeout_duration: u64,
     ) acquires MultisigAccount {
+        assert!(timeout_duration >= MINIMAL_TIMEOUT_DURATION, error::invalid_argument(EINVALID_TIMEOUT_DURATION));
         // Verify that the `MultisigAccountCreationMessage` has the right information and is signed by the account
         // owner's key.
         let proof_challenge = MultisigAccountCreationWithAuthKeyRevocationMessage {
@@ -479,6 +510,7 @@ module supra_framework::multisig_account {
             option::none<SignerCapability>(),
             metadata_keys,
             metadata_values,
+            timeout_duration
         );
 
         // Rotate the account's auth key to 0x0, which effectively revokes control via auth key.
@@ -500,8 +532,9 @@ module supra_framework::multisig_account {
         num_signatures_required: u64,
         metadata_keys: vector<String>,
         metadata_values: vector<vector<u8>>,
+        timeout_duration: u64,
     ) acquires MultisigAccount {
-        create_with_owners(owner, vector[], num_signatures_required, metadata_keys, metadata_values);
+        create_with_owners(owner, vector[], num_signatures_required, metadata_keys, metadata_values, timeout_duration);
     }
 
     /// Creates a new multisig account with the specified additional owner list and signatures required.
@@ -516,7 +549,9 @@ module supra_framework::multisig_account {
         num_signatures_required: u64,
         metadata_keys: vector<String>,
         metadata_values: vector<vector<u8>>,
+        timeout_duration: u64,
     ) acquires MultisigAccount {
+        assert!(timeout_duration >= MINIMAL_TIMEOUT_DURATION, error::invalid_argument(EINVALID_TIMEOUT_DURATION));
         let (multisig_account, multisig_signer_cap) = create_multisig_account(owner);
         vector::push_back(&mut additional_owners, address_of(owner));
         create_with_owners_internal(
@@ -526,6 +561,7 @@ module supra_framework::multisig_account {
             option::some(multisig_signer_cap),
             metadata_keys,
             metadata_values,
+            timeout_duration,
         );
     }
 
@@ -539,6 +575,7 @@ module supra_framework::multisig_account {
         num_signatures_required: u64,
         metadata_keys: vector<String>,
         metadata_values: vector<vector<u8>>,
+        timeout_duration: u64,
     ) acquires MultisigAccount {
         let bootstrapper_address = address_of(bootstrapper);
         create_with_owners(
@@ -546,7 +583,8 @@ module supra_framework::multisig_account {
             owners,
             num_signatures_required,
             metadata_keys,
-            metadata_values
+            metadata_values,
+            timeout_duration,
         );
         update_owner_schema(
             get_next_multisig_account_address(bootstrapper_address),
@@ -563,6 +601,7 @@ module supra_framework::multisig_account {
         multisig_account_signer_cap: Option<SignerCapability>,
         metadata_keys: vector<String>,
         metadata_values: vector<vector<u8>>,
+        timeout_duration: u64,
     ) acquires MultisigAccount {
         assert!(features::multisig_accounts_enabled(), error::unavailable(EMULTISIG_ACCOUNTS_NOT_ENABLED_YET));
         assert!(
@@ -581,6 +620,7 @@ module supra_framework::multisig_account {
             last_executed_sequence_number: 0,
             next_sequence_number: 1,
             signer_cap: multisig_account_signer_cap,
+            timeout_duration,
             add_owners_events: new_event_handle<AddOwnersEvent>(multisig_account),
             remove_owners_events: new_event_handle<RemoveOwnersEvent>(multisig_account),
             update_signature_required_events: new_event_handle<UpdateSignaturesRequiredEvent>(multisig_account),
@@ -590,6 +630,7 @@ module supra_framework::multisig_account {
             execute_transaction_events: new_event_handle<TransactionExecutionSucceededEvent>(multisig_account),
             transaction_execution_failed_events: new_event_handle<TransactionExecutionFailedEvent>(multisig_account),
             metadata_updated_events: new_event_handle<MetadataUpdatedEvent>(multisig_account),
+            TimeoutDurationUpdatedEvent: new_event_handle<TimeoutDurationUpdatedEvent>(multisig_account),
         });
 
         update_metadata_internal(multisig_account, metadata_keys, metadata_values, false);
@@ -768,6 +809,24 @@ module supra_framework::multisig_account {
         };
     }
 
+    /// Update the timeout duration for the multisig account.
+    entry fun update_timeout_duration(
+        multisig_account: &signer, timeout_duration: u64) acquires MultisigAccount {
+        assert!(timeout_duration >= MINIMAL_TIMEOUT_DURATION, error::invalid_argument(EINVALID_TIMEOUT_DURATION));
+        assert_multisig_account_exists(address_of(multisig_account));
+        let multisig_account_resource = borrow_global_mut<MultisigAccount>(address_of(multisig_account));
+        let old_timeout_duration = multisig_account_resource.timeout_duration;
+        multisig_account_resource.timeout_duration = timeout_duration;
+        emit_event(
+            &mut multisig_account_resource.TimeoutDurationUpdatedEvent,
+            TimeoutDurationUpdatedEvent {
+                executor: address_of(multisig_account),
+                old_timeout_duration,
+                new_timeout_duration: timeout_duration,
+            }
+        );
+    }
+
     ////////////////////////// Multisig transaction flow ///////////////////////////////
 
     /// Create a multisig transaction, which will have one approval initially (from the creator).
@@ -875,9 +934,11 @@ module supra_framework::multisig_account {
             table::contains(&multisig_account_resource.transactions, sequence_number),
             error::not_found(ETRANSACTION_NOT_FOUND),
         );
+        let creation_time_secs = table::borrow(&multisig_account_resource.transactions, sequence_number).creation_time_secs;
         let (_, num_rejections) = remove_executed_transaction(multisig_account_resource);
         assert!(
-            num_rejections >= multisig_account_resource.num_signatures_required,
+            // Can be removed if the number of rejections is greater than or equal to the number of signatures required or if the transaction has timed out.
+            num_rejections >= multisig_account_resource.num_signatures_required || multisig_account_resource.timeout_duration < now_seconds() - creation_time_secs,
             error::invalid_state(ENOT_ENOUGH_REJECTIONS),
         );
 
@@ -912,6 +973,11 @@ module supra_framework::multisig_account {
         assert!(
             num_approvals >= multisig_account_resource.num_signatures_required,
             error::invalid_argument(ENOT_ENOUGH_APPROVALS),
+        );
+
+        assert!(
+            multisig_account_resource.timeout_duration >= now_seconds() - transaction.creation_time_secs,
+            error::invalid_argument(ETRANSACTION_TIMED_OUT),
         );
 
         // If the transaction payload is not stored on chain, verify that the provided payload matches the hashes stored
@@ -1151,6 +1217,8 @@ module supra_framework::multisig_account {
     use supra_framework::coin::{destroy_mint_cap, destroy_burn_cap};
     #[test_only]
     use supra_framework::supra_coin;
+    #[test_only]
+    use supra_framework::timestamp::fast_forward_seconds;
 
     #[test_only]
     const PAYLOAD: vector<u8> = vector[1, 2, 3];
@@ -1200,7 +1268,7 @@ module supra_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         // Create three transactions.
         create_transaction(owner_1, multisig_account, PAYLOAD);
@@ -1242,12 +1310,38 @@ module supra_framework::multisig_account {
         assert!(get_pending_transactions(multisig_account) == vector[], 0);
     }
 
+    #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
+    public entry fun test_end_to_end_customization(
+        owner_1: &signer, owner_2: &signer, owner_3: &signer) acquires MultisigAccount {
+        setup();
+        let owner_1_addr = address_of(owner_1);
+        let owner_2_addr = address_of(owner_2);
+        let owner_3_addr = address_of(owner_3);
+        create_account(owner_1_addr);
+        let multisig_account = get_next_multisig_account_address(owner_1_addr);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
+
+        // Create one transactions.
+        create_transaction(owner_1, multisig_account, PAYLOAD);
+        assert!(get_pending_transactions(multisig_account) == vector[
+            get_transaction(multisig_account, 1),
+        ], 0);
+
+        // Owner 1 doesn't need to explicitly approve as they created the transaction.
+        approve_transaction(owner_2, multisig_account, 1);
+        // First transaction has 2 approvals so it can be executed.
+        assert!(can_be_executed(multisig_account, 1), 1);
+
+        fast_forward_seconds(MINIMAL_TIMEOUT_DURATION + now_seconds() + 1);
+        assert!(!can_be_executed(multisig_account, 1), 1);
+    }
+
     #[test(owner = @0x123)]
     public entry fun test_create_with_single_owner(owner: &signer) acquires MultisigAccount {
         setup();
         let owner_addr = address_of(owner);
         create_account(owner_addr);
-        create(owner, 1, vector[], vector[]);
+        create(owner, 1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(owner_addr);
         assert_multisig_account_exists(multisig_account);
         assert!(owners(multisig_account) == vector[owner_addr], 0);
@@ -1259,7 +1353,7 @@ module supra_framework::multisig_account {
         setup();
         let owner_1_addr = address_of(owner_1);
         create_account(owner_1_addr);
-        create_with_owners(owner_1, vector[address_of(owner_2), address_of(owner_3)], 3, vector[], vector[]);
+        create_with_owners(owner_1, vector[address_of(owner_2), address_of(owner_3)], 3, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         assert_multisig_account_exists(multisig_account);
     }
@@ -1270,7 +1364,7 @@ module supra_framework::multisig_account {
         owner: &signer) acquires MultisigAccount {
         setup();
         create_account(address_of(owner));
-        create(owner, 0, vector[], vector[]);
+        create(owner, 0, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
     }
 
     #[test(owner = @0x123)]
@@ -1279,7 +1373,7 @@ module supra_framework::multisig_account {
         owner: &signer) acquires MultisigAccount {
         setup();
         create_account(address_of(owner));
-        create(owner, 2, vector[], vector[]);
+        create(owner, 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
     }
 
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
@@ -1298,7 +1392,8 @@ module supra_framework::multisig_account {
             ],
             2,
             vector[],
-            vector[]);
+            vector[],
+            MINIMAL_TIMEOUT_DURATION,);
     }
 
     #[test(owner = @0x123)]
@@ -1307,7 +1402,7 @@ module supra_framework::multisig_account {
         owner: &signer) acquires MultisigAccount {
         setup_disabled();
         create_account(address_of(owner));
-        create(owner, 1, vector[], vector[]);
+        create(owner, 1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
     }
 
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
@@ -1324,6 +1419,7 @@ module supra_framework::multisig_account {
         ], 2,
             vector[],
             vector[],
+            MINIMAL_TIMEOUT_DURATION,
         );
     }
 
@@ -1355,6 +1451,7 @@ module supra_framework::multisig_account {
             multi_ed25519::signature_to_bytes(&signed_proof),
             vector[],
             vector[],
+            MINIMAL_TIMEOUT_DURATION,
         );
         assert_multisig_account_exists(multisig_address);
         assert!(owners(multisig_address) == expected_owners, 0);
@@ -1392,6 +1489,7 @@ module supra_framework::multisig_account {
             multi_ed25519::signature_to_bytes(&signed_proof),
             vector[],
             vector[],
+            MINIMAL_TIMEOUT_DURATION,
         );
         assert_multisig_account_exists(multisig_address);
         assert!(owners(multisig_address) == expected_owners, 0);
@@ -1407,7 +1505,7 @@ module supra_framework::multisig_account {
         setup();
         let owner_1_addr = address_of(owner_1);
         create_account(owner_1_addr);
-        create_with_owners(owner_1, vector[address_of(owner_2), address_of(owner_3)], 1, vector[], vector[]);
+        create_with_owners(owner_1, vector[address_of(owner_2), address_of(owner_3)], 1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         assert!(num_signatures_required(multisig_account) == 1, 0);
         update_signatures_required(&create_signer(multisig_account), 2);
@@ -1422,7 +1520,7 @@ module supra_framework::multisig_account {
         setup();
         let owner_addr = address_of(owner);
         create_account(owner_addr);
-        create(owner,1, vector[], vector[]);
+        create(owner,1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(owner_addr);
         update_metadata(
             &create_signer(multisig_account),
@@ -1436,12 +1534,24 @@ module supra_framework::multisig_account {
     }
 
     #[test(owner = @0x123)]
+    public entry fun test_update_timeout(owner: &signer) acquires MultisigAccount {
+        setup();
+        let owner_addr = address_of(owner);
+        create_account(owner_addr);
+        create(owner,1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
+        let multisig_account = get_next_multisig_account_address(owner_addr);
+        update_timeout_duration(&create_signer(multisig_account), 1000);
+        let updated_timeout = timeout_duration(multisig_account);
+        assert!(updated_timeout == 1000, 0);
+    }
+
+    #[test(owner = @0x123)]
     #[expected_failure(abort_code = 0x1000B, location = Self)]
     public entry fun test_update_with_zero_signatures_required_should_fail(
         owner:& signer) acquires MultisigAccount {
         setup();
         create_account(address_of(owner));
-        create(owner,1, vector[], vector[]);
+        create(owner,1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(address_of(owner));
         update_signatures_required(&create_signer(multisig_account), 0);
     }
@@ -1452,7 +1562,7 @@ module supra_framework::multisig_account {
         owner: &signer) acquires MultisigAccount {
         setup();
         create_account(address_of(owner));
-        create(owner,1, vector[], vector[]);
+        create(owner,1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(address_of(owner));
         update_signatures_required(&create_signer(multisig_account), 2);
     }
@@ -1462,7 +1572,7 @@ module supra_framework::multisig_account {
         owner_1: &signer, owner_2: &signer, owner_3: &signer) acquires MultisigAccount {
         setup();
         create_account(address_of(owner_1));
-        create(owner_1, 1, vector[], vector[]);
+        create(owner_1, 1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let owner_1_addr = address_of(owner_1);
         let owner_2_addr = address_of(owner_2);
         let owner_3_addr = address_of(owner_3);
@@ -1484,7 +1594,7 @@ module supra_framework::multisig_account {
         let owner_2_addr = address_of(owner_2);
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 1, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         let multisig_signer = &create_signer(multisig_account);
         assert!(owners(multisig_account) == vector[owner_2_addr, owner_3_addr, owner_1_addr], 0);
@@ -1510,7 +1620,7 @@ module supra_framework::multisig_account {
         let owner_2_addr = address_of(owner_2);
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 1, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         assert!(owners(multisig_account) == vector[owner_2_addr, owner_3_addr, owner_1_addr], 0);
         let multisig_signer = &create_signer(multisig_account);
@@ -1526,7 +1636,7 @@ module supra_framework::multisig_account {
         let owner_2_addr = address_of(owner_2);
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
         let multisig_signer = &create_signer(multisig_account);
         // Remove 2 owners so there's one left, which is less than the signature threshold of 2.
@@ -1542,7 +1652,7 @@ module supra_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
         let transaction = get_transaction(multisig_account, 1);
@@ -1562,7 +1672,7 @@ module supra_framework::multisig_account {
         owner: &signer) acquires MultisigAccount {
         setup();
         create_account(address_of(owner));
-        create(owner,1, vector[], vector[]);
+        create(owner,1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(address_of(owner));
         create_transaction(owner, multisig_account, vector[]);
     }
@@ -1573,7 +1683,7 @@ module supra_framework::multisig_account {
         owner: &signer, non_owner: &signer) acquires MultisigAccount {
         setup();
         create_account(address_of(owner));
-        create(owner,1, vector[], vector[]);
+        create(owner,1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(address_of(owner));
         create_transaction(non_owner, multisig_account, PAYLOAD);
     }
@@ -1583,7 +1693,7 @@ module supra_framework::multisig_account {
         owner: &signer) acquires MultisigAccount {
         setup();
         create_account(address_of(owner));
-        create(owner,1, vector[], vector[]);
+        create(owner,1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(address_of(owner));
         create_transaction_with_hash(owner, multisig_account, sha3_256(PAYLOAD));
     }
@@ -1594,7 +1704,7 @@ module supra_framework::multisig_account {
         owner: &signer) acquires MultisigAccount {
         setup();
         create_account(address_of(owner));
-        create(owner,1, vector[], vector[]);
+        create(owner,1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(address_of(owner));
         create_transaction_with_hash(owner, multisig_account, vector[]);
     }
@@ -1605,7 +1715,7 @@ module supra_framework::multisig_account {
         owner: &signer, non_owner: &signer) acquires MultisigAccount {
         setup();
         create_account(address_of(owner));
-        create(owner,1, vector[], vector[]);
+        create(owner,1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         let multisig_account = get_next_multisig_account_address(address_of(owner));
         create_transaction_with_hash(non_owner, multisig_account, sha3_256(PAYLOAD));
     }
@@ -1619,7 +1729,7 @@ module supra_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
         approve_transaction(owner_2, multisig_account, 1);
@@ -1640,7 +1750,7 @@ module supra_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         // Owner 1 and 2 approved but then owner 1 got removed.
         create_transaction(owner_1, multisig_account, PAYLOAD);
@@ -1661,7 +1771,7 @@ module supra_framework::multisig_account {
         setup();
         create_account(address_of(owner));
         let multisig_account = get_next_multisig_account_address(address_of(owner));
-        create(owner, 1, vector[], vector[]);
+        create(owner, 1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         // Transaction is created with id 1.
         create_transaction(owner, multisig_account, PAYLOAD);
         approve_transaction(owner, multisig_account, 2);
@@ -1674,7 +1784,7 @@ module supra_framework::multisig_account {
         setup();
         create_account(address_of(owner));
         let multisig_account = get_next_multisig_account_address(address_of(owner));
-        create(owner, 1, vector[], vector[]);
+        create(owner, 1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         // Transaction is created with id 1.
         create_transaction(owner, multisig_account, PAYLOAD);
         approve_transaction(non_owner, multisig_account, 1);
@@ -1687,7 +1797,7 @@ module supra_framework::multisig_account {
         let owner_addr = address_of(owner);
         create_account(owner_addr);
         let multisig_account = get_next_multisig_account_address(owner_addr);
-        create(owner, 1, vector[], vector[]);
+        create(owner, 1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction(owner, multisig_account, PAYLOAD);
         reject_transaction(owner, multisig_account, 1);
@@ -1705,7 +1815,7 @@ module supra_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
         reject_transaction(owner_1, multisig_account, 1);
@@ -1725,7 +1835,7 @@ module supra_framework::multisig_account {
         let owner_addr = address_of(owner);
         create_account(owner_addr);
         let multisig_account = get_next_multisig_account_address(owner_addr);
-        create(owner, 1, vector[], vector[]);
+        create(owner, 1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction(owner, multisig_account, PAYLOAD);
         reject_transaction(owner, multisig_account, 1);
@@ -1740,7 +1850,7 @@ module supra_framework::multisig_account {
         setup();
         create_account(address_of(owner));
         let multisig_account = get_next_multisig_account_address(address_of(owner));
-        create(owner, 1, vector[], vector[]);
+        create(owner, 1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         // Transaction is created with id 1.
         create_transaction(owner, multisig_account, PAYLOAD);
         reject_transaction(owner, multisig_account, 2);
@@ -1753,7 +1863,7 @@ module supra_framework::multisig_account {
         setup();
         create_account(address_of(owner));
         let multisig_account = get_next_multisig_account_address(address_of(owner));
-        create(owner, 1, vector[], vector[]);
+        create(owner, 1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
         reject_transaction(non_owner, multisig_account, 1);
     }
 
@@ -1766,7 +1876,7 @@ module supra_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
         // Owner 1 doesn't need to explicitly approve as they created the transaction.
@@ -1785,7 +1895,7 @@ module supra_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
         // Owner 1 doesn't need to explicitly approve as they created the transaction.
@@ -1804,7 +1914,7 @@ module supra_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction_with_hash(owner_3, multisig_account, sha3_256(PAYLOAD));
         // Owner 3 doesn't need to explicitly approve as they created the transaction.
@@ -1823,7 +1933,7 @@ module supra_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
         reject_transaction(owner_2, multisig_account, 1);
@@ -1840,7 +1950,7 @@ module supra_framework::multisig_account {
         setup();
         create_account(address_of(owner));
         let multisig_account = get_next_multisig_account_address(address_of(owner));
-        create(owner,1, vector[], vector[]);
+        create(owner,1, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction(owner, multisig_account, PAYLOAD);
         reject_transaction(owner, multisig_account, 1);
@@ -1857,10 +1967,28 @@ module supra_framework::multisig_account {
         let owner_3_addr = address_of(owner_3);
         create_account(owner_1_addr);
         let multisig_account = get_next_multisig_account_address(owner_1_addr);
-        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[]);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
 
         create_transaction(owner_1, multisig_account, PAYLOAD);
         reject_transaction(owner_2, multisig_account, 1);
+        execute_rejected_transaction(owner_3, multisig_account);
+    }
+
+    #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
+    #[expected_failure(abort_code = 0x3000A, location = Self)]
+    public entry fun test_execute_rejected_transaction_timeout_should_success(
+        owner_1: &signer, owner_2: &signer, owner_3: &signer) acquires MultisigAccount {
+        setup();
+        let owner_1_addr = address_of(owner_1);
+        let owner_2_addr = address_of(owner_2);
+        let owner_3_addr = address_of(owner_3);
+        create_account(owner_1_addr);
+        let multisig_account = get_next_multisig_account_address(owner_1_addr);
+        create_with_owners(owner_1, vector[owner_2_addr, owner_3_addr], 2, vector[], vector[], MINIMAL_TIMEOUT_DURATION);
+
+        create_transaction(owner_1, multisig_account, PAYLOAD);
+        reject_transaction(owner_2, multisig_account, 1);
+        fast_forward_seconds(MINIMAL_TIMEOUT_DURATION);
         execute_rejected_transaction(owner_3, multisig_account);
     }
 
@@ -1886,7 +2014,8 @@ module supra_framework::multisig_account {
             vector[owner_2_addr, owner_3_addr],
             2,
             vector[],
-            vector[]
+            vector[],
+            MINIMAL_TIMEOUT_DURATION
         );
         update_owner_schema(
             multisig_address,
