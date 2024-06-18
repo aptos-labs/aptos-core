@@ -104,13 +104,6 @@ impl BlockMetadataExt {
             BlockMetadataExt::V1(obj) => obj.round,
         }
     }
-
-    pub fn type_name(&self) -> &'static str {
-        match self {
-            BlockMetadataExt::V0(_) => "block_metadata_ext_transaction__v0",
-            BlockMetadataExt::V1(_) => "block_metadata_ext_transaction__v1",
-        }
-    }
 }
 
 impl From<BlockMetadata> for BlockMetadataExt {
