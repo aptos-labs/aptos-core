@@ -472,6 +472,7 @@ impl NameAccessChain_ {
             NameAccessChain_::One(x) => x,
             NameAccessChain_::Two(_, x) => x,
             NameAccessChain_::Three(_, x) => x,
+            NameAccessChain_::Four(_, x,_) => x
         }
     }
 }

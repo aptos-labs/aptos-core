@@ -2511,7 +2511,7 @@ fn call_to_vector_borrow(
     let borrow_fun = if mutable { "borrow_mut" } else { "borrow" };
     let access = E::ModuleAccess::new(
         *loc,
-        E::ModuleAccess_::ModuleAccess(sp(*loc, ident), Name::new(*loc, Symbol::from(borrow_fun))),
+        E::ModuleAccess_::ModuleAccess(sp(*loc, ident), Name::new(*loc, Symbol::from(borrow_fun)), None),
     );
     let vector_var = exp_(context, e.clone());
     sp(
@@ -2790,7 +2790,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         PE::Borrow(mut_, pr) => {
             if let PE::Index(ref e, ref i) = pr.value {
                 // handling `&_[_]` or `&mut _[_]`
-                if context.env.flags().v2() {
+                if context.env.flags().compiler_v2() {
                     if let PE::Name(sp!(_, ref ptn), _) = e.value {
                         let name = ptn.name();
                         if is_struct_in_current_module(context, name) {
@@ -2828,7 +2828,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         },
         PE::Cast(e, ty) => EE::Cast(exp(context, *e), type_(context, ty)),
         PE::Index(e, i) => {
-            if context.env.flags().v2() {
+            if context.env.flags().compiler_v2() {
                 // handling `_[_]` or `_[_]` (without `&` or `&mut`)
                 if let PE::Name(sp!(_, ref ptn), _) = e.value {
                     let name = ptn.name();
