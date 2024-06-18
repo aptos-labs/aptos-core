@@ -41,7 +41,7 @@ module 0xcafe::permissioned_token_tests {
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    #[expected_failure(abort_code = 1, location = creator::permissioned_token)]
+    #[expected_failure(abort_code = 1, location = 0xcafe::permissioned_token)]
     fun test_permissioned_disallowed_sender(
         creator: &signer,
         aaron: &signer,
