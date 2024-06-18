@@ -579,26 +579,6 @@ pub struct BlockMetadataTransaction {
     pub timestamp: U64,
 }
 
-impl BlockMetadataTransaction {
-    pub fn from_internal_repr(
-        internal: BlockMetadata,
-        info: TransactionInfo,
-        events: Vec<Event>,
-    ) -> Self {
-        Self {
-            info,
-            id: internal.id().into(),
-            epoch: internal.epoch().into(),
-            round: internal.round().into(),
-            events,
-            previous_block_votes_bitvec: internal.previous_block_votes_bitvec().clone(),
-            proposer: internal.proposer().into(),
-            failed_proposer_indices: internal.failed_proposer_indices().clone(),
-            timestamp: internal.timestamp_usecs().into(),
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "validator_transaction_type", rename_all = "snake_case")]
 #[oai(
@@ -641,20 +621,31 @@ impl ValidatorTransaction {
             ValidatorTransaction::DkgResult(t) => t.timestamp,
         }
     }
+}
 
-    pub fn from_internal_repr(
-        internal: aptos_types::validator_txn::ValidatorTransaction,
-        info: TransactionInfo,
-        events: Vec<Event>,
-        timestamp: u64,
+impl
+    From<(
+        aptos_types::validator_txn::ValidatorTransaction,
+        TransactionInfo,
+        Vec<Event>,
+        u64,
+    )> for ValidatorTransaction
+{
+    fn from(
+        (txn, info, events, timestamp): (
+            aptos_types::validator_txn::ValidatorTransaction,
+            TransactionInfo,
+            Vec<Event>,
+            u64,
+        ),
     ) -> Self {
-        match internal {
+        match txn {
             aptos_types::validator_txn::ValidatorTransaction::DKGResult(dkg_transcript) => {
                 Self::DkgResult(DKGResultTransaction {
                     info,
                     events,
                     timestamp: U64::from(timestamp),
-                    dkg_transcript: ExportedDKGTranscript::from_internal_repr(dkg_transcript),
+                    dkg_transcript: dkg_transcript.into(),
                 })
             },
             aptos_types::validator_txn::ValidatorTransaction::ObservedJWKUpdate(
@@ -663,9 +654,7 @@ impl ValidatorTransaction {
                 info,
                 events,
                 timestamp: U64::from(timestamp),
-                quorum_certified_update: ExportedQuorumCertifiedUpdate::from_internal_repr(
-                    quorum_certified_update,
-                ),
+                quorum_certified_update: quorum_certified_update.into(),
             }),
         }
     }
@@ -688,12 +677,12 @@ pub struct ExportedQuorumCertifiedUpdate {
     pub multi_sig: ExportedAggregateSignature,
 }
 
-impl ExportedQuorumCertifiedUpdate {
-    pub fn from_internal_repr(internal: QuorumCertifiedUpdate) -> Self {
-        let QuorumCertifiedUpdate { update, multi_sig } = internal;
+impl From<QuorumCertifiedUpdate> for ExportedQuorumCertifiedUpdate {
+    fn from(value: QuorumCertifiedUpdate) -> Self {
+        let QuorumCertifiedUpdate { update, multi_sig } = value;
         Self {
-            update: ExportedProviderJWKs::from_internal_repr(update),
-            multi_sig: ExportedAggregateSignature::from_internal_repr(multi_sig),
+            update: update.into(),
+            multi_sig: multi_sig.into(),
         }
     }
 }
@@ -703,14 +692,17 @@ impl ExportedQuorumCertifiedUpdate {
 pub struct ExportedAggregateSignature {
     signer_indices: Vec<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    sig: Option<Vec<u8>>,
+    sig: Option<HexEncodedBytes>,
 }
 
-impl ExportedAggregateSignature {
-    pub fn from_internal_repr(internal: AggregateSignature) -> Self {
+impl From<AggregateSignature> for ExportedAggregateSignature {
+    fn from(value: AggregateSignature) -> Self {
         Self {
-            signer_indices: internal.get_signers_bitvec().iter_ones().collect(),
-            sig: internal.sig().as_ref().map(|s| s.to_bytes().to_vec()),
+            signer_indices: value.get_signers_bitvec().iter_ones().collect(),
+            sig: value
+                .sig()
+                .as_ref()
+                .map(|s| HexEncodedBytes::from(s.to_bytes().to_vec())),
         }
     }
 }
@@ -723,13 +715,13 @@ pub struct ExportedProviderJWKs {
     pub jwks: Vec<JWK>,
 }
 
-impl ExportedProviderJWKs {
-    pub fn from_internal_repr(internal: ProviderJWKs) -> Self {
+impl From<ProviderJWKs> for ExportedProviderJWKs {
+    fn from(value: ProviderJWKs) -> Self {
         let ProviderJWKs {
             issuer,
             version,
             jwks,
-        } = internal;
+        } = value;
         Self {
             issuer: String::from_utf8(issuer).unwrap_or("non_utf8_issuer".to_string()),
             version,
@@ -754,20 +746,20 @@ pub struct DKGResultTransaction {
 pub struct ExportedDKGTranscript {
     epoch: U64,
     author: Address,
-    payload: Vec<u8>,
+    payload: HexEncodedBytes,
 }
 
-impl ExportedDKGTranscript {
-    pub fn from_internal_repr(internal: DKGTranscript) -> Self {
+impl From<DKGTranscript> for ExportedDKGTranscript {
+    fn from(value: DKGTranscript) -> Self {
         let DKGTranscript {
             metadata,
             transcript_bytes,
-        } = internal;
+        } = value;
         let DKGTranscriptMetadata { epoch, author } = metadata;
         Self {
             epoch: epoch.into(),
             author: author.into(),
-            payload: transcript_bytes,
+            payload: HexEncodedBytes::from(transcript_bytes),
         }
     }
 }

@@ -6,8 +6,7 @@ use crate::{
     transaction::{
         BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem,
         DeletedTableData, MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
-        UserTransactionRequestInner, ValidatorTransaction, WriteModule, WriteResource,
-        WriteTableItem,
+        UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
     Address, Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event,
@@ -233,9 +232,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 })
             },
             aptos_types::transaction::Transaction::ValidatorTransaction(txn) => {
-                Transaction::ValidatorTransaction(ValidatorTransaction::from_internal_repr(
-                    txn, info, events, timestamp,
-                ))
+                Transaction::ValidatorTransaction((txn, info, events, timestamp).into())
             },
         })
     }
