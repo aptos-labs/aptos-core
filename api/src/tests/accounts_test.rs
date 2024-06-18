@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
-use aptos_api_test_context::{current_function_name, find_value};
+use crate::tests::new_test_context_with_db_sharding_and_internal_indexer;
+use aptos_api_test_context::{current_function_name, find_value, TestContext};
 use aptos_api_types::{MoveModuleBytecode, MoveResource, MoveStructTag, StateKeyWrapper};
 use aptos_cached_packages::aptos_stdlib;
 use serde_json::json;
@@ -36,9 +37,21 @@ async fn test_get_account_resources_by_address_0x0() {
 async fn test_get_account_resources_by_valid_account_address() {
     let context = new_test_context(current_function_name!());
     let addresses = vec!["0x1", "0x00000000000000000000000000000001"];
+    let mut res = vec![];
     for address in &addresses {
-        context.get(&account_resources(address)).await;
+        let resp = context.get(&account_resources(address)).await;
+        res.push(resp);
     }
+
+    let shard_context =
+        new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let mut shard_res = vec![];
+    for address in &addresses {
+        let resp = shard_context.get(&account_resources(address)).await;
+        shard_res.push(resp);
+    }
+
+    assert_eq!(res, shard_res);
 }
 
 // Unstable due to framework changes
@@ -96,9 +109,7 @@ async fn test_account_modules_structs() {
     context.check_golden_output(resp);
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_account_resources_by_ledger_version() {
-    let mut context = new_test_context(current_function_name!());
+async fn test_account_resources_by_ledger_version_with_context(mut context: TestContext) {
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn.clone()]).await;
@@ -123,6 +134,15 @@ async fn test_get_account_resources_by_ledger_version() {
         f["type"] == "0x1::account::Account"
     });
     assert_eq!(root_account["data"]["sequence_number"], "0");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_account_resources_by_ledger_version() {
+    let context = new_test_context(current_function_name!());
+    test_account_resources_by_ledger_version_with_context(context).await;
+    let shard_context =
+        new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    test_account_resources_by_ledger_version_with_context(shard_context).await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -151,9 +171,7 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
     context.check_golden_output(resp);
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_account_modules_by_ledger_version() {
-    let mut context = new_test_context(current_function_name!());
+async fn test_get_account_modules_by_ledger_version_with_context(mut context: TestContext) {
     let payload =
         aptos_stdlib::publish_module_source("test_module", "module 0xa550c18::test_module {}");
 
@@ -176,6 +194,15 @@ async fn test_get_account_modules_by_ledger_version() {
         ))
         .await;
     assert_eq!(modules, json!([]));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_account_modules_by_ledger_version() {
+    let context = new_test_context(current_function_name!());
+    test_get_account_modules_by_ledger_version_with_context(context).await;
+    let shard_context =
+        new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    test_get_account_modules_by_ledger_version_with_context(shard_context).await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
