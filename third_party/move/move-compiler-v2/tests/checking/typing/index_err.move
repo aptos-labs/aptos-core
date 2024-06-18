@@ -15,7 +15,8 @@ module 0x42::test {
     }
 
     fun test_no_schema_ref() {
-        &Test[@0x1];
+        use 0x42::test;
+        &test::Test[@0x1];
     }
 
 }
