@@ -18,6 +18,7 @@ impl AptosDB {
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false, /* indexer */
+            false,
         )
     }
 
@@ -44,17 +45,18 @@ impl AptosDB {
 
     /// This opens db in non-readonly mode, without the pruner and cache.
     pub fn new_for_test_no_cache<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false, BUFFERED_STATE_TARGET_ITEMS, 0, false)
+        Self::new_without_pruner(db_root_path, false, BUFFERED_STATE_TARGET_ITEMS, 0, false, false)
     }
 
     /// This opens db in non-readonly mode, without the pruner, and with the indexer
-    pub fn new_for_test_with_indexer<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
+    pub fn new_for_test_with_indexer<P: AsRef<Path> + Clone>(db_root_path: P, enable_sharding: bool) -> Self {
         Self::new_without_pruner(
             db_root_path,
             false,
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             true, /* indexer */
+            enable_sharding,
         )
     }
 
@@ -69,6 +71,7 @@ impl AptosDB {
             buffered_state_target_items,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false, /* indexer */
+            false,
         )
     }
 
@@ -80,6 +83,7 @@ impl AptosDB {
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             false, /* indexer */
+            false,
         )
     }
 

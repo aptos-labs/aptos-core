@@ -122,7 +122,7 @@ pub(crate) fn save_transactions(
     )>,
     kv_replay: bool,
 ) -> Result<()> {
-    if let Some((ledger_db_batch, state_kv_batches, state_kv_metadata_batch)) = existing_batch {
+    if let Some((ledger_db_batch, state_kv_batches, _state_kv_metadata_batch)) = existing_batch {
         save_transactions_impl(
             state_store,
             ledger_db,
@@ -133,7 +133,6 @@ pub(crate) fn save_transactions(
             write_sets.as_ref(),
             ledger_db_batch,
             state_kv_batches,
-            state_kv_metadata_batch,
             kv_replay,
         )?;
     } else {
@@ -150,7 +149,6 @@ pub(crate) fn save_transactions(
             write_sets.as_ref(),
             &mut ledger_db_batch,
             &mut sharded_kv_schema_batch,
-            &state_kv_metadata_batch,
             kv_replay,
         )?;
         // get the last version and commit to the state kv db
@@ -193,7 +191,6 @@ pub(crate) fn save_transactions_impl(
     write_sets: &[WriteSet],
     ledger_db_batch: &mut LedgerDbSchemaBatches,
     state_kv_batches: &mut ShardedStateKvSchemaBatch,
-    state_kv_metadata_batch: &SchemaBatch,
     kv_replay: bool,
 ) -> Result<()> {
     for (idx, txn) in txns.iter().enumerate() {
@@ -241,7 +238,6 @@ pub(crate) fn save_transactions_impl(
             first_version,
             &ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
             state_kv_batches,
-            state_kv_metadata_batch,
             state_store.state_kv_db.enabled_sharding(),
         )?;
     }

@@ -158,10 +158,14 @@ impl DBIndexer {
 
     fn get_num_of_transactions(&self, version: Version) -> Result<u64> {
         let highest_version = self.main_db_reader.get_synced_version()?;
+        if version > highest_version {
+            // In case main db is not synced yet or recreated
+            return Ok(0);
+        }
         // we want to include the last transaction since the iterator interface will is right exclusive.
         let num_of_transaction = min(
             (self.config.batch_size + 1) as u64,
-            highest_version - version + 1,
+            highest_version + 1 - version,
         );
         Ok(num_of_transaction)
     }
@@ -211,7 +215,6 @@ impl DBIndexer {
                     }
                 });
             }
-
             version += 1;
             Ok::<(), AptosDbError>(())
         })?;

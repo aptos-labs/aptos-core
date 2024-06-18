@@ -23,7 +23,7 @@ use aptos_logger::{error, info, Schema};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
-    DbReader, Order, MAX_REQUEST_LIMIT,
+    AptosDbError, DbReader, Order, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::{AccessPath, Path},
@@ -350,19 +350,26 @@ impl Context {
         address: AccountAddress,
         version: u64,
     ) -> Result<HashMap<StateKey, StateValue>> {
-        let mut iter = self.db.get_prefixed_state_value_iterator(
-            &StateKeyPrefix::from(address),
-            None,
-            version,
-        )?;
+        let mut iter = if !db_sharding_enabled(&self.node_config) {
+            Box::new(
+                self.db
+                    .get_prefixed_state_value_iterator(
+                        &StateKeyPrefix::from(address),
+                        None,
+                        version,
+                    )?
+                    .map(|item| item.map_err(|err| anyhow!(err.to_string()))),
+            )
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
+                .get_prefixed_state_value_iterator(&StateKeyPrefix::from(address), None, version)?
+        };
 
         let kvs = iter
             .by_ref()
             .take(MAX_REQUEST_LIMIT as usize)
-            .map(|res| match res {
-                Ok((k, v)) => Ok((k, v)),
-                Err(res) => Err(anyhow::Error::from(res)),
-            })
             .collect::<Result<_>>()?;
         if iter.next().transpose()?.is_some() {
             bail!("Too many state items under account ({:?}).", address);
@@ -377,11 +384,26 @@ impl Context {
         version: u64,
         limit: u64,
     ) -> Result<(Vec<(StructTag, Vec<u8>)>, Option<StateKey>)> {
-        let account_iter = self.db.get_prefixed_state_value_iterator(
-            &StateKeyPrefix::from(address),
-            prev_state_key,
-            version,
-        )?;
+        let account_iter = if !db_sharding_enabled(&self.node_config) {
+            Box::new(
+                self.db
+                    .get_prefixed_state_value_iterator(
+                        &StateKeyPrefix::from(address),
+                        prev_state_key,
+                        version,
+                    )?
+                    .map(|item| item.map_err(|err| anyhow!(err.to_string()))),
+            )
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
+                .get_prefixed_state_value_iterator(
+                    &StateKeyPrefix::from(address),
+                    prev_state_key,
+                    version,
+                )?
+        };
         // TODO: Consider rewriting this to consider resource groups:
         // * If a resource group is found, expand
         // * Return Option<Result<(PathType, StructTag, Vec<u8>)>>
@@ -408,7 +430,7 @@ impl Context {
                         Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
                     }
                 },
-                Err(e) => Some(Err(e.into())),
+                Err(e) => Some(Err(e)),
             })
             .take(limit as usize + 1);
         let kvs = resource_iter
@@ -453,11 +475,26 @@ impl Context {
         version: u64,
         limit: u64,
     ) -> Result<(Vec<(ModuleId, Vec<u8>)>, Option<StateKey>)> {
-        let account_iter = self.db.get_prefixed_state_value_iterator(
-            &StateKeyPrefix::from(address),
-            prev_state_key,
-            version,
-        )?;
+        let account_iter = if !db_sharding_enabled(&self.node_config) {
+            Box::new(
+                self.db
+                    .get_prefixed_state_value_iterator(
+                        &StateKeyPrefix::from(address),
+                        prev_state_key,
+                        version,
+                    )?
+                    .map(|item| item.map_err(|err| anyhow!(err.to_string()))),
+            )
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or_else(|| format_err!("Indexer reader doesn't exist"))?
+                .get_prefixed_state_value_iterator(
+                    &StateKeyPrefix::from(address),
+                    prev_state_key,
+                    version,
+                )?
+        };
         let mut module_iter = account_iter
             .filter_map(|res| match res {
                 Ok((k, v)) => match k.inner() {
@@ -473,7 +510,7 @@ impl Context {
                         Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
                     }
                 },
-                Err(e) => Some(Err(e.into())),
+                Err(e) => Some(Err(e)),
             })
             .take(limit as usize + 1);
         let kvs = module_iter
@@ -730,15 +767,31 @@ impl Context {
             .saturating_sub(limit as u64)
         };
 
-        let txns = self
-            .db
-            .get_account_transactions(
+        let txns_res = if !db_sharding_enabled(&self.node_config) {
+            self.db.get_account_transactions(
                 address,
                 start_seq_number,
                 limit as u64,
                 true,
                 ledger_version,
             )
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or(anyhow!("Indexer reader is None"))
+                .map_err(|err| {
+                    E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
+                })?
+                .get_account_transactions(
+                    address,
+                    start_seq_number,
+                    limit as u64,
+                    true,
+                    ledger_version,
+                )
+                .map_err(|e| AptosDbError::Other(e.to_string()))
+        };
+        let txns = txns_res
             .context("Failed to retrieve account transactions")
             .map_err(|err| {
                 E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
@@ -813,29 +866,21 @@ impl Context {
         limit: u16,
         ledger_version: u64,
     ) -> Result<Vec<EventWithVersion>> {
-        if let Some(start) = start {
-            Ok(self.db.get_events(
-                event_key,
-                start,
-                Order::Ascending,
-                limit as u64,
-                ledger_version,
-            )?)
+        let (start, order) = if let Some(start) = start {
+            (start, Order::Ascending)
         } else {
-            Ok(self
-                .db
-                .get_events(
-                    event_key,
-                    u64::MAX,
-                    Order::Descending,
-                    limit as u64,
-                    ledger_version,
-                )
-                .map(|mut result| {
-                    result.reverse();
-                    result
-                })?)
-        }
+            (u64::MAX, Order::Descending)
+        };
+        let res = if !db_sharding_enabled(&self.node_config) {
+            self.db
+                .get_events(event_key, start, order, limit as u64, ledger_version)?
+        } else {
+            self.indexer_reader
+                .as_ref()
+                .ok_or(anyhow!("Internal indexer reader doesn't exist"))?
+                .get_events(event_key, start, order, limit as u64, ledger_version)?
+        };
+        Ok(res)
     }
 
     fn next_bucket(&self, gas_unit_price: u64) -> u64 {
@@ -1443,4 +1488,8 @@ impl FunctionStats {
             stats.invalidate_all();
         }
     }
+}
+
+fn db_sharding_enabled(node_config: &NodeConfig) -> bool {
+    node_config.storage.rocksdb_configs.enable_storage_sharding
 }
