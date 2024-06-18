@@ -2828,39 +2828,40 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         },
         PE::Cast(e, ty) => EE::Cast(exp(context, *e), type_(context, ty)),
         PE::Index(e, i) => {
-            let mut err_msg =
-                "`_[_]` index operator in non-specification code only allowed in Move 2";
             if context.env.flags().v2() {
                 // handling `_[_]` or `_[_]` (without `&` or `&mut`)
                 if let PE::Name(sp!(_, ref ptn), _) = e.value {
                     let name = ptn.name();
                     if is_struct_in_current_module(context, name) {
-                        if context.in_spec_context {
-                            if let PE::Name(chain, types) = &e.value {
-                                let ty = PT::Apply(
-                                    Box::new(chain.clone()),
-                                    types.clone().unwrap_or(vec![]),
-                                );
-                                return call_to_borrow_global(context, &loc, ty, *i.clone(), false);
+                        if let PE::Name(chain, types) = &e.value {
+                            let ty =
+                                PT::Apply(Box::new(chain.clone()), types.clone().unwrap_or(vec![]));
+                            let call = call_to_borrow_global(context, &loc, ty, *i.clone(), false);
+                            if !context.in_spec_context {
+                                context
+                                    .env
+                                    .add_diag(diag!(Syntax::UnexpectedToken, (loc, "resource indexing using `_[_]` needs to be paired with `&` or `&mut`")));
                             }
-                        } else {
-                            err_msg =
-                                "resource indexing using `_[_]` needs to be paired with `&` or `&mut`";
+                            return call;
                         }
-                    } else if is_valid_local_name(name.value) || is_constant(context, name) {
+                    } else {
                         let exp_ = if context.in_spec_context {
-                            EE::Index(exp(context, *e), exp(context, *i))
+                            EE::Index(exp(context, *e.clone()), exp(context, *i))
                         } else {
                             // v[i] without `&` or `&mut` is translated into
                             // *(vector::borrow(&v, i))
                             EE::Dereference(Box::new(sp(
                                 loc,
-                                call_to_vector_borrow(context, &loc, *e, *i, false).value,
+                                call_to_vector_borrow(context, &loc, *e.clone(), *i, false).value,
                             )))
                         };
+                        if !is_valid_local_name(name.value) && !is_constant(context, name) {
+                            context.env.add_diag(diag!(
+                                Syntax::UnexpectedToken,
+                                (loc, "index notation `_[_]` expects a resource or vector")
+                            ));
+                        }
                         return sp(loc, exp_);
-                    } else {
-                        err_msg = "index notation `_[_]` expects a resource or vector";
                     }
                 } else {
                     let exp_ = if context.in_spec_context {
@@ -2873,16 +2874,17 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                     };
                     return sp(loc, exp_);
                 }
-                context
-                    .env
-                    .add_diag(diag!(Syntax::UnexpectedToken, (loc, err_msg)));
-                EE::UnresolvedError
+                unreachable!();
             } else if context.in_spec_context {
                 EE::Index(exp(context, *e), exp(context, *i))
             } else {
-                context
-                    .env
-                    .add_diag(diag!(Syntax::SpecContextRestricted, (loc, err_msg)));
+                context.env.add_diag(diag!(
+                    Syntax::SpecContextRestricted,
+                    (
+                        loc,
+                        "`_[_]` index operator in non-specification code only allowed in Move 2"
+                    )
+                ));
                 EE::UnresolvedError
             }
         },
