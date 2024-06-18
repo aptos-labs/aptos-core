@@ -175,7 +175,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
         &self,
         nid: NodeId,
         callee: QualifiedInstId<FunId>,
-        callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
+        callers_chain: &mut [(Loc, QualifiedInstId<FunId>)],
     ) {
         let root = callers_chain[0].1.id;
         let mut labels = (0..callers_chain.len() - 1)

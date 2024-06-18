@@ -279,7 +279,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.75.0"
+rust-version = "1.78.0"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -517,7 +517,7 @@ codespan = "0.11.1"
 codespan-reporting = "0.11.1"
 colored = "2.0.0"
 concurrent-queue = "2.2.0"
-console-subscriber = "0.1.8"
+console-subscriber = "0.3.0"
 const_format = "0.2.26"
 core_affinity = "0.8.1"
 coset = "0.3"
@@ -539,7 +539,12 @@ derive_more = "0.99.11"
 diesel = "2.1"
 # Use the crate version once this feature gets released on crates.io:
 # https://github.com/weiznich/diesel_async/commit/e165e8c96a6c540ebde2d6d7c52df5c5620a4bf1
-diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d02798c67065d763154d7272dd0c09b39757d0f2", features = ["async-connection-wrapper", "postgres", "bb8", "tokio"] }
+diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d02798c67065d763154d7272dd0c09b39757d0f2", features = [
+    "async-connection-wrapper",
+    "postgres",
+    "bb8",
+    "tokio",
+] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 difference = "2.0.0"
 digest = "0.9.0"
@@ -864,3 +869,4 @@ debug = true
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
+tonic = { git = "https://github.com/aptos-labs/tonic.git", rev = "0da1ba8b1751d6e19eb55be24cccf9ae933c666e" }

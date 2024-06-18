@@ -346,7 +346,7 @@ impl MultiBucketTimelineIndex {
     /// Read transactions from the timeline from `start_id` (exclusive) to `end_id` (inclusive).
     pub(crate) fn timeline_range(
         &self,
-        start_end_pairs: &Vec<(u64, u64)>,
+        start_end_pairs: &[(u64, u64)],
     ) -> Vec<(AccountAddress, u64)> {
         assert_eq!(start_end_pairs.len(), self.timelines.len());
 

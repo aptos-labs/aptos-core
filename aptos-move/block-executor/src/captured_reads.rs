@@ -1204,7 +1204,7 @@ mod test {
         let with_metadata_reads = with_metadata_reads_by_kind();
 
         let resolved = DataRead::Resolved::<ValueType>(200);
-        let mixed_reads = vec![
+        let mixed_reads = [
             deletion_reads[0].clone(),
             with_metadata_reads[1].clone(),
             resolved,

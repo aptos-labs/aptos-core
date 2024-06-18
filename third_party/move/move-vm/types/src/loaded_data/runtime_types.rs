@@ -595,7 +595,7 @@ impl Type {
         use Type::*;
 
         thread_local! {
-            static CACHE: RefCell<BTreeMap<usize, usize>> = RefCell::new(BTreeMap::new());
+            static CACHE: RefCell<BTreeMap<usize, usize>> = const { RefCell::new(BTreeMap::new()) };
         }
 
         CACHE.with(|cache| {

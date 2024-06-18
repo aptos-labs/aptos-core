@@ -66,7 +66,7 @@ impl MetricsThreshold {
     pub fn ensure_metrics_threshold(
         &self,
         metrics_name: &str,
-        metrics: &Vec<Sample>,
+        metrics: &[Sample],
     ) -> anyhow::Result<()> {
         if self.expect_empty {
             if !metrics.is_empty() {
