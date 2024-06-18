@@ -9,6 +9,7 @@
 pub mod event_by_key;
 pub mod event_by_version;
 pub mod indexer_metadata;
+pub mod state_keys;
 pub mod table_info;
 pub mod transaction_by_account;
 use aptos_schemadb::ColumnFamilyName;
@@ -20,6 +21,7 @@ pub const TABLE_INFO_CF_NAME: ColumnFamilyName = "table_info";
 pub const EVENT_BY_KEY_CF_NAME: ColumnFamilyName = "event_by_key";
 pub const EVENT_BY_VERSION_CF_NAME: ColumnFamilyName = "event_by_version";
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
+pub const STATE_KEYS_CF_NAME: ColumnFamilyName = "state_keys";
 
 pub fn column_families() -> Vec<ColumnFamilyName> {
     vec![
@@ -36,5 +38,6 @@ pub fn internal_indexer_column_families() -> Vec<ColumnFamilyName> {
         EVENT_BY_KEY_CF_NAME,
         EVENT_BY_VERSION_CF_NAME,
         TRANSACTION_BY_ACCOUNT_CF_NAME,
+        STATE_KEYS_CF_NAME,
     ]
 }
