@@ -188,14 +188,12 @@ impl MoveSmith {
         // TODO: re-enable this after function call with type param is done
 
         // Generate function bodies and runners
-        // let mut all_runners = Vec::new();
+        let mut all_runners = Vec::new();
         for f in module.borrow().functions.iter() {
             self.fill_function(u, f)?;
-            // all_runners.extend(self.generate_runners(u, f)?);
+            all_runners.extend(self.generate_runners(u, f)?);
         }
 
-        // Skipping generating runners until we handle function call
-        /*
         // Insert the runners to the module and add run tasks to the whole compile unit
         // Each task is simply the flat name of the runner function
         for r in all_runners.into_iter() {
@@ -204,7 +202,6 @@ impl MoveSmith {
             self.runs.borrow_mut().push(run_flat);
             module.borrow_mut().functions.push(RefCell::new(r));
         }
-        */
 
         Ok(())
     }
@@ -233,8 +230,15 @@ impl MoveSmith {
                 false,
             )?);
 
+            // If the callee returns a type parameter, we ignore the return.
+            let new_ret = match &signature.return_type {
+                Some(Type::TypeParameter(_)) => None,
+                Some(t) => Some(t.clone()),
+                None => None,
+            };
+
             // Generate a body with only one statement/return expr
-            let body = match signature.return_type.is_none() {
+            let body = match new_ret.is_none() {
                 true => Block {
                     stmts: vec![Statement::Expr(call)],
                     return_expr: None,
@@ -253,7 +257,7 @@ impl MoveSmith {
                     type_parameters: Vec::new(),
                     name: Identifier(format!("{}_runner_{}", signature.name.0, i)),
                     parameters: Vec::new(),
-                    return_type: signature.return_type.clone(),
+                    return_type: new_ret,
                 },
                 visibility: Visibility { public: true },
                 body: Some(body),
@@ -448,7 +452,7 @@ impl MoveSmith {
                 // TODO: unused vars are auto dropped so this prevents the error.
                 // TODO: should remove this after drop is properly handled
                 Some(vec![Ability::Drop]),
-                None,
+                Some(vec![Ability::Key]),
             )?);
         }
 
@@ -686,8 +690,8 @@ impl MoveSmith {
 
         // Decides how often each expression type should be generated
         let weights = vec![
-            1, // NumberLiteral
-            5, // Variable
+            0, // NumberLiteral
+            0, // Variable
             // Boolean
             // StructInitialization
             1,                // Block

@@ -178,7 +178,6 @@ impl TypePool {
     }
 
     pub fn register_concrete_type(&mut self, id: &Identifier, typ: &Type) {
-        println!("searchme: registering concrete type {:?} for {:?}", typ, id);
         if self.parameter_types.contains_key(id) {
             self.parameter_types.get_mut(id).unwrap().push(typ.clone());
         } else {
@@ -187,7 +186,6 @@ impl TypePool {
     }
 
     pub fn unregister_concrete_type(&mut self, id: &Identifier) {
-        println!("searchme: unregister concrete type for {:?}", id);
         if let Some(types) = self.parameter_types.get_mut(id) {
             types.pop();
         } else {
