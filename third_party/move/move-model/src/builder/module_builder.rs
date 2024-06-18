@@ -941,7 +941,16 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 },
                 None => {
                     let loc = self.parent.to_loc(&spec.value.target.loc);
-                    self.parent.error(&loc, "unresolved spec target");
+                    if self.parent.env.is_verification() && self.parent.env.keep_testing_functions()
+                    {
+                        // Only error out on an unknown spec target if we could not
+                        // have elided any as `#[test_only]` or `#[verify_only]`.
+                        self.parent.error(&loc, "unresolved spec target");
+                    } else {
+                        self.parent
+                            .env
+                            .diag(Severity::Warning, &loc, "unresolved spec target");
+                    }
                 },
             }
         }
