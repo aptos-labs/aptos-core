@@ -2472,21 +2472,7 @@ fn pfn_const_tps(
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
                 }),
-        );
-
-    if USE_CRAZY_MACHINES {
-        forge_config = forge_config
-            .with_validator_resource_override(NodeResourceOverride {
-                cpu_cores: Some(58),
-                memory_gib: Some(200),
-            })
-            .with_fullnode_resource_override(NodeResourceOverride {
-                cpu_cores: Some(58),
-                memory_gib: Some(200),
-            })
-    }
-
-    forge_config
+        )
 }
 
 /// This test runs a performance benchmark where the network includes
