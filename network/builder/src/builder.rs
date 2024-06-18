@@ -412,6 +412,7 @@ impl NetworkBuilder {
         let (hc_network_tx, hc_network_rx) = self.add_client_and_service(
             &health_checker::health_checker_network_config(),
             max_parallel_deserialization_tasks,
+            true,
         );
         self.health_checker_builder = Some(HealthCheckerBuilder::new(
             self.network_context(),
@@ -437,12 +438,14 @@ impl NetworkBuilder {
         &mut self,
         config: &NetworkApplicationConfig,
         max_parallel_deserialization_tasks: Option<usize>,
+        allow_out_of_order_delivery: bool,
     ) -> (SenderT, EventsT) {
         (
             self.add_client(&config.network_client_config),
             self.add_service(
                 &config.network_service_config,
                 max_parallel_deserialization_tasks,
+                allow_out_of_order_delivery,
             ),
         )
     }
@@ -461,6 +464,7 @@ impl NetworkBuilder {
         &mut self,
         config: &NetworkServiceConfig,
         max_parallel_deserialization_tasks: Option<usize>,
+        allow_out_of_order_delivery: bool,
     ) -> EventsT {
         let (peer_mgr_reqs_rx, connection_notifs_rx) =
             self.peer_manager_builder.add_service(config);
@@ -468,6 +472,7 @@ impl NetworkBuilder {
             peer_mgr_reqs_rx,
             connection_notifs_rx,
             max_parallel_deserialization_tasks,
+            allow_out_of_order_delivery,
         )
     }
 }

@@ -159,7 +159,7 @@ fn create_network(
         playground.peer_protocols(),
     );
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
-    let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
+    let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None, true);
 
     let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
     let network = NetworkSender::new(author, consensus_network_client, self_sender, validators);
