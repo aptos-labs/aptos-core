@@ -89,6 +89,7 @@ fn from_u32_be(val: u32) -> Vec<u8> {
 /// Tests malleability
 #[test]
 fn malleability() {
+    println!("running mal test");
     let mut rng = OsRng;
     let message = b"Hello world";
     let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);

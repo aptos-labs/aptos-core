@@ -217,7 +217,9 @@ impl Signature {
     // secp256k1
     fn s_equal_half_order_floor(&self) -> bool {
         let s_bytes = self.0.s.b32();
+        println!("in s_equal_half_order_floor");
         let s_limb_0 = as_u32_be(&s_bytes[0..3].try_into().unwrap());
+        println!("did first as_u32_be");
         let s_limb_1 = as_u32_be(&s_bytes[0..3].try_into().unwrap());
         let s_limb_2 = as_u32_be(&s_bytes[0..3].try_into().unwrap());
         let s_limb_3 = as_u32_be(&s_bytes[0..3].try_into().unwrap());
@@ -267,6 +269,7 @@ impl TryFrom<&[u8]> for Signature {
     type Error = CryptoMaterialError;
 
     fn try_from(bytes: &[u8]) -> std::result::Result<Signature, CryptoMaterialError> {
+        println!("in try from");
         match libsecp256k1::Signature::parse_standard_slice(bytes) {
             Ok(signature) => Ok(Signature(signature)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
