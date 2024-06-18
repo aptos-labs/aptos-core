@@ -299,11 +299,7 @@ impl ProofQueue {
 
         while !iters.is_empty() {
             iters.shuffle(&mut thread_rng());
-            full = false;
             iters.retain_mut(|iter| {
-                if full {
-                    return false;
-                }
                 if let Some((sort_key, batch)) = iter.next() {
                     if excluded_batches.contains(batch) {
                         excluded_txns += batch.num_txns();
