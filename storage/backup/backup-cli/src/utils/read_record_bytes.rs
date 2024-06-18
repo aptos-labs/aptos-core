@@ -2,8 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::error_notes::ErrorNotes;
+use crate::{metrics::backup::BACKUP_TIMER, utils::error_notes::ErrorNotes};
 use anyhow::{bail, Result};
+use aptos_metrics_core::TimerHelper;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use std::convert::TryInto;
@@ -42,6 +43,7 @@ impl<R: AsyncRead + Send + Unpin> ReadRecordBytes for R {
     }
 
     async fn read_record_bytes(&mut self) -> Result<Option<Bytes>> {
+        let _timer = BACKUP_TIMER.timer_with(&["read_record_bytes"]);
         // read record size
         let mut size_buf = BytesMut::with_capacity(4);
         self.read_full_buf_or_none(&mut size_buf).await?;
