@@ -35,3 +35,7 @@ path = "src/cli/generator.rs"
 [[bin]]
 name = "check_artifact"
 path = "src/cli/check_artifact.rs"
+
+[[bin]]
+name = "flame"
+path = "src/cli/flame.rs"
