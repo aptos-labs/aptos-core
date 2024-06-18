@@ -141,7 +141,7 @@ function run_afl() {
         afl_flags="AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 AFL_SKIP_CPUFREQ=1"
     fi
 
-    afl_prefix="$afl_flags AFL_AUTORESUME=1 cargo afl fuzz -i $input_dir -o $output_dir -V $total_seconds"
+    afl_prefix="$afl_flags AFL_AUTORESUME=1 cargo afl fuzz -i $input_dir -o $output_dir -V $total_seconds -t 3000 -m 2048"
     afl_suffix="-- $TARGET_BIN"
 
     echo "Running AFL Main node, for $total_hour hours"

@@ -74,11 +74,11 @@ impl Default for Config {
                 // ]),
             ],
 
-            num_runs_per_func: 10,
+            num_runs_per_func: 3,
 
             max_num_modules: 3,
-            max_num_functions_in_module: 5,
-            max_num_structs_in_module: 5,
+            max_num_functions_in_module: 7,
+            max_num_structs_in_module: 7,
             max_num_uses_in_module: 5,
             max_num_friends_in_module: 5,
             max_num_constants_in_module: 5,
@@ -93,7 +93,7 @@ impl Default for Config {
 
             max_num_calls_in_script: 20,
 
-            max_expr_depth: 3,
+            max_expr_depth: 5,
             max_type_depth: 5,
             max_num_type_params_in_func: 3,
             max_num_type_params_in_struct: 3,
