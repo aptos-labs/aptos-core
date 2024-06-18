@@ -4,21 +4,23 @@
 
 use crate::{
     transaction::{
-        DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
-        MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
+        BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem,
+        DeletedTableData, MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
         UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
-    Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event, HexEncodedBytes,
-    MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType, MoveValue,
-    PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest,
-    Transaction, TransactionInfo, TransactionOnChainData, TransactionPayload,
-    UserTransactionRequest, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
+    Address, Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event,
+    HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType,
+    MoveValue, PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet,
+    SubmitTransactionRequest, Transaction, TransactionInfo, TransactionOnChainData,
+    TransactionPayload, UserTransactionRequest, VersionedEvent, WriteSet, WriteSetChange,
+    WriteSetPayload,
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_logger::{sample, sample::SampleRate};
+use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     access_path::{AccessPath, Path},
@@ -27,28 +29,29 @@ use aptos_types::{
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
         table::{TableHandle, TableInfo},
+        StateView,
     },
     transaction::{
-        EntryFunction, ExecutionStatus, Multisig, RawTransaction, Script, SignedTransaction,
+        BlockEndInfo, BlockEpiloguePayload, EntryFunction, ExecutionStatus, Multisig,
+        RawTransaction, Script, SignedTransaction, TransactionAuxiliaryData,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
 };
+use bytes::Bytes;
 use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::ModuleResolver,
     value::{MoveStructLayout, MoveTypeLayout},
 };
-use move_resource_viewer::{Limiter, MoveValueAnnotator};
 use serde_json::Value;
 use std::{
+    collections::BTreeMap,
     convert::{TryFrom, TryInto},
     iter::IntoIterator,
-    rc::Rc,
     sync::Arc,
     time::Duration,
 };
@@ -60,20 +63,20 @@ const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
 ///
 /// This reads the underlying BCS types and ABIs to convert them into
 /// JSON outputs
-pub struct MoveConverter<'a, R: ?Sized> {
-    inner: MoveValueAnnotator<'a, R>,
+pub struct MoveConverter<'a, S> {
+    inner: AptosValueAnnotator<'a, S>,
     db: Arc<dyn DbReader>,
     table_info_reader: Option<Arc<dyn TableInfoReader>>,
 }
 
-impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
+impl<'a, S: StateView> MoveConverter<'a, S> {
     pub fn new(
-        inner: &'a R,
+        inner: &'a S,
         db: Arc<dyn DbReader>,
         table_info_reader: Option<Arc<dyn TableInfoReader>>,
     ) -> Self {
         Self {
-            inner: MoveValueAnnotator::new(inner),
+            inner: AptosValueAnnotator::new(inner),
             db,
             table_info_reader,
         }
@@ -83,17 +86,51 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         &self,
         data: impl Iterator<Item = (StructTag, &'b [u8])>,
     ) -> Result<Vec<MoveResource>> {
-        let mut limiter = Limiter::default();
-        data.map(|(typ, bytes)| {
-            self.inner
-                .view_resource_with_limit(&typ, bytes, &mut limiter)?
-                .try_into()
-        })
-        .collect()
+        data.map(|(typ, bytes)| self.inner.view_resource(&typ, bytes)?.try_into())
+            .collect()
     }
 
-    pub fn try_into_resource(&self, typ: &StructTag, bytes: &'_ [u8]) -> Result<MoveResource> {
-        self.inner.view_resource(typ, bytes)?.try_into()
+    pub fn try_into_resource(&self, tag: &StructTag, bytes: &'_ [u8]) -> Result<MoveResource> {
+        self.inner.view_resource(tag, bytes)?.try_into()
+    }
+
+    pub fn is_resource_group(&self, tag: &StructTag) -> bool {
+        if let Ok(Some(module)) = self.inner.view_module(&tag.module_id()) {
+            if let Some(md) = aptos_framework::get_metadata(&module.metadata) {
+                if let Some(attrs) = md.struct_attributes.get(tag.name.as_ident_str().as_str()) {
+                    return attrs
+                        .iter()
+                        .find(|attr| attr.is_resource_group())
+                        .map(|_| true)
+                        .unwrap_or(false);
+                }
+            }
+        }
+        false
+    }
+
+    pub fn find_resource(
+        &self,
+        state_view: &impl StateView,
+        address: Address,
+        tag: &StructTag,
+    ) -> Result<Option<Bytes>> {
+        Ok(match self.inner.view_resource_group_member(tag) {
+            Some(group_tag) => {
+                let key = StateKey::resource_group(&address.into(), &group_tag);
+                match state_view.get_state_value_bytes(&key)? {
+                    Some(group_bytes) => {
+                        let group: BTreeMap<StructTag, Bytes> = bcs::from_bytes(&group_bytes)?;
+                        group.get(tag).cloned()
+                    },
+                    None => None,
+                }
+            },
+            None => {
+                let key = StateKey::resource(&address.into(), tag)?;
+                state_view.get_state_value_bytes(&key)?
+            },
+        })
     }
 
     pub fn try_into_resources_from_resource_group(
@@ -118,7 +155,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         typ: &StructTag,
         bytes: &'_ [u8],
     ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>> {
-        self.inner.move_struct_fields(typ, bytes)
+        self.inner.view_struct_fields(typ, bytes)
     }
 
     pub fn try_into_pending_transaction(&self, txn: SignedTransaction) -> Result<Transaction> {
@@ -140,11 +177,15 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
         use aptos_types::transaction::Transaction::*;
+        let aux_data = self
+            .db
+            .get_transaction_auxiliary_data_by_version(data.version)?;
         let info = self.into_transaction_info(
             data.version,
             &data.info,
             data.accumulator_root_hash,
             data.changes,
+            aux_data,
         );
         let events = self.try_into_events(&data.events)?;
         Ok(match data.transaction {
@@ -164,6 +205,29 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                     timestamp: timestamp.into(),
                 })
             },
+            BlockEpilogue(block_epilogue_payload) => {
+                Transaction::BlockEpilogueTransaction(BlockEpilogueTransaction {
+                    info,
+                    timestamp: timestamp.into(),
+                    block_end_info: match block_epilogue_payload {
+                        BlockEpiloguePayload::V0 {
+                            block_end_info:
+                                BlockEndInfo::V0 {
+                                    block_gas_limit_reached,
+                                    block_output_limit_reached,
+                                    block_effective_block_gas_units,
+                                    block_approx_output_size,
+                                },
+                            ..
+                        } => Some(crate::transaction::BlockEndInfo {
+                            block_gas_limit_reached,
+                            block_output_limit_reached,
+                            block_effective_block_gas_units,
+                            block_approx_output_size,
+                        }),
+                    },
+                })
+            },
             ValidatorTransaction(_txn) => (info, events, timestamp).into(),
         })
     }
@@ -174,6 +238,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         info: &aptos_types::transaction::TransactionInfo,
         accumulator_root_hash: HashValue,
         write_set: aptos_types::write_set::WriteSet,
+        txn_aux_data: Option<TransactionAuxiliaryData>,
     ) -> TransactionInfo {
         TransactionInfo {
             version: version.into(),
@@ -183,7 +248,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
             state_checkpoint_hash: info.state_checkpoint_hash().map(|h| h.into()),
             gas_used: info.gas_used().into(),
             success: info.status().is_success(),
-            vm_status: self.explain_vm_status(info.status()),
+            vm_status: self.explain_vm_status(info.status(), txn_aux_data),
             accumulator_root_hash: accumulator_root_hash.into(),
             // TODO: the resource value is interpreted by the type definition at the version of the converter, not the version of the tx: must be fixed before we allow module updates
             changes: write_set
@@ -503,7 +568,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
             .signature
             .clone()
             .ok_or_else(|| format_err!("missing signature"))?;
-        Ok(SignedTransaction::new_with_authenticator(
+        Ok(SignedTransaction::new_signed_transaction(
             self.try_into_raw_transaction(txn, chain_id)?,
             signature.try_into()?,
         ))
@@ -514,7 +579,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         submit_transaction_request: SubmitTransactionRequest,
         chain_id: ChainId,
     ) -> Result<SignedTransaction> {
-        Ok(SignedTransaction::new_with_authenticator(
+        Ok(SignedTransaction::new_signed_transaction(
             self.try_into_raw_transaction_poem(
                 submit_transaction_request.user_transaction_request,
                 chain_id,
@@ -588,7 +653,8 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                 } = entry_func_payload;
 
                 let module = function.module.clone();
-                let code = self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
+                let code =
+                    self.inner.view_existing_module(&module.clone().into())? as Arc<dyn Bytecode>;
                 let func = code
                     .find_entry_function(function.name.0.as_ident_str())
                     .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
@@ -651,8 +717,8 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                             } = entry_function;
 
                             let module = function.module.clone();
-                            let code =
-                                self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
+                            let code = self.inner.view_existing_module(&module.clone().into())?
+                                as Arc<dyn Bytecode>;
                             let func = code
                                 .find_entry_function(function.name.0.as_ident_str())
                                 .ok_or_else(|| {
@@ -763,10 +829,10 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                     MoveTypeLayout::Address
                 } else {
                     // For all other structs, use their set layout
-                    self.inner.get_type_layout_with_types(type_tag)?
+                    self.inner.view_fully_decorated_ty_layout(type_tag)?
                 }
             },
-            _ => self.inner.get_type_layout_with_types(type_tag)?,
+            _ => self.inner.view_fully_decorated_ty_layout(type_tag)?,
         };
 
         self.try_into_vm_value_from_layout(&layout, val)
@@ -871,7 +937,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
 
     pub fn function_return_types(&self, function: &ViewFunction) -> Result<Vec<MoveType>> {
         let module = function.module.clone();
-        let code = self.inner.get_module(&module)? as Rc<dyn Bytecode>;
+        let code = self.inner.view_existing_module(&module)? as Arc<dyn Bytecode>;
         let func = code
             .find_function(function.function.as_ident_str())
             .ok_or_else(|| format_err!("could not find entry function by {:?}", function))?;
@@ -887,7 +953,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         } = view_request;
 
         let module = function.module.clone();
-        let code = self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
+        let code = self.inner.view_existing_module(&module.clone().into())? as Arc<dyn Bytecode>;
         let func = code
             .find_function(function.name.0.as_ident_str())
             .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
@@ -926,70 +992,12 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
             Ok(None)
         }
     }
-}
 
-fn log_missing_table_info(handle: TableHandle) {
-    sample!(
-        SampleRate::Duration(Duration::from_secs(1)),
-        aptos_logger::debug!(
-            "Table info not found for handle {:?}, can't decode table item. OK for simulation",
-            handle
-        )
-    );
-}
-
-impl<'a, R: ModuleResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
-    fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>> {
-        self.inner
-            .get_module(module_id)
-            .map(|inner| inner as Rc<dyn Bytecode>)
-    }
-}
-pub trait AsConverter<R> {
-    fn as_converter(
+    fn explain_vm_status(
         &self,
-        db: Arc<dyn DbReader>,
-        table_info_reader: Option<Arc<dyn TableInfoReader>>,
-    ) -> MoveConverter<R>;
-}
-
-impl<R: ModuleResolver> AsConverter<R> for R {
-    fn as_converter(
-        &self,
-        db: Arc<dyn DbReader>,
-        table_info_reader: Option<Arc<dyn TableInfoReader>>,
-    ) -> MoveConverter<R> {
-        MoveConverter::new(self, db, table_info_reader)
-    }
-}
-
-pub fn new_vm_utf8_string(string: &str) -> move_core_types::value::MoveValue {
-    use move_core_types::value::{MoveStruct, MoveValue};
-
-    let byte_vector = MoveValue::Vector(
-        string
-            .as_bytes()
-            .iter()
-            .map(|byte| MoveValue::U8(*byte))
-            .collect(),
-    );
-    let move_string = MoveStruct::Runtime(vec![byte_vector]);
-    MoveValue::Struct(move_string)
-}
-
-fn abort_location_to_str(loc: &AbortLocation) -> String {
-    match loc {
-        AbortLocation::Module(mid) => {
-            format!("{}::{}", mid.address().to_hex_literal(), mid.name())
-        },
-        _ => loc.to_string(),
-    }
-}
-
-pub trait ExplainVMStatus {
-    fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>>;
-
-    fn explain_vm_status(&self, status: &ExecutionStatus) -> String {
+        status: &ExecutionStatus,
+        txn_aux_data: Option<TransactionAuxiliaryData>,
+    ) -> String {
         match status {
             ExecutionStatus::MoveAbort {
                 location,
@@ -1041,19 +1049,78 @@ pub trait ExplainVMStatus {
                     func_name, code_offset
                 )
             },
-            ExecutionStatus::MiscellaneousError(code) => code.map_or(
-                "Execution failed with miscellaneous error and no status code".to_owned(),
-                |e| format!("{:#?}", e),
-            ),
+            ExecutionStatus::MiscellaneousError(code) => {
+                if txn_aux_data.is_none() && code.is_none() {
+                    "Execution failed with miscellaneous error and no status code".to_owned()
+                } else if code.is_some() {
+                    format!("{:#?}", code.unwrap())
+                } else {
+                    let aux_data = txn_aux_data.unwrap();
+                    let vm_details = aux_data.get_detail_error_message();
+                    vm_details.map_or(
+                        "Execution failed with miscellaneous error and no status code".to_owned(),
+                        |e| format!("{:#?}", e.status_code()),
+                    )
+                }
+            },
         }
     }
 
     fn explain_function_index(&self, module_id: &ModuleId, function: &u16) -> Result<String> {
-        let code = self.get_module_bytecode(module_id)?;
+        let code = self.inner.view_existing_module(module_id)?;
         let func = code.function_handle_at(FunctionHandleIndex::new(*function));
         let id = code.identifier_at(func.name);
         Ok(id.to_string())
     }
 }
 
-// TODO: add caching?
+fn log_missing_table_info(handle: TableHandle) {
+    sample!(
+        SampleRate::Duration(Duration::from_secs(1)),
+        aptos_logger::debug!(
+            "Table info not found for handle {:?}, can't decode table item. OK for simulation",
+            handle
+        )
+    );
+}
+
+pub trait AsConverter<R> {
+    fn as_converter(
+        &self,
+        db: Arc<dyn DbReader>,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    ) -> MoveConverter<R>;
+}
+
+impl<R: StateView> AsConverter<R> for R {
+    fn as_converter(
+        &self,
+        db: Arc<dyn DbReader>,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    ) -> MoveConverter<R> {
+        MoveConverter::new(self, db, table_info_reader)
+    }
+}
+
+pub fn new_vm_utf8_string(string: &str) -> move_core_types::value::MoveValue {
+    use move_core_types::value::{MoveStruct, MoveValue};
+
+    let byte_vector = MoveValue::Vector(
+        string
+            .as_bytes()
+            .iter()
+            .map(|byte| MoveValue::U8(*byte))
+            .collect(),
+    );
+    let move_string = MoveStruct::Runtime(vec![byte_vector]);
+    MoveValue::Struct(move_string)
+}
+
+fn abort_location_to_str(loc: &AbortLocation) -> String {
+    match loc {
+        AbortLocation::Module(mid) => {
+            format!("{}::{}", mid.address().to_hex_literal(), mid.name())
+        },
+        _ => loc.to_string(),
+    }
+}

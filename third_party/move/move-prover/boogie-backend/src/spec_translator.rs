@@ -626,7 +626,7 @@ impl<'env> SpecTranslator<'env> {
         } else {
             // Use a clone with the given type instantiation.
             let mut trans = self.clone();
-            trans.type_inst = type_inst.to_owned();
+            type_inst.clone_into(&mut trans.type_inst);
             trans.translate_exp(exp)
         }
     }

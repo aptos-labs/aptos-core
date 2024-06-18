@@ -49,7 +49,7 @@ module aptos_framework::object {
     /// Cannot reclaim objects that weren't burnt.
     const EOBJECT_NOT_BURNT: u64 = 8;
     /// Object is untransferable any operations that might result in a transfer are disallowed.
-    const ENOT_MOVABLE: u64 = 9;
+    const EOBJECT_NOT_TRANSFERRABLE: u64 = 9;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -354,7 +354,7 @@ module aptos_framework::object {
 
     /// Generates the TransferRef, which can be used to manage object transfers.
     public fun generate_transfer_ref(ref: &ConstructorRef): TransferRef {
-        assert!(!exists<Untransferable>(ref.self), error::permission_denied(ENOT_MOVABLE));
+        assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
         TransferRef { self: ref.self }
     }
 
@@ -458,7 +458,7 @@ module aptos_framework::object {
 
     /// Enable direct transfer.
     public fun enable_ungated_transfer(ref: &TransferRef) acquires ObjectCore {
-        assert!(!exists<Untransferable>(ref.self), error::permission_denied(ENOT_MOVABLE));
+        assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
         let object = borrow_global_mut<ObjectCore>(ref.self);
         object.allow_ungated_transfer = true;
     }
@@ -466,7 +466,7 @@ module aptos_framework::object {
     /// Create a LinearTransferRef for a one-time transfer. This requires that the owner at the
     /// time of generation is the owner at the time of transferring.
     public fun generate_linear_transfer_ref(ref: &TransferRef): LinearTransferRef acquires ObjectCore {
-        assert!(!exists<Untransferable>(ref.self), error::permission_denied(ENOT_MOVABLE));
+        assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
         let owner = owner(Object<ObjectCore> { inner: ref.self });
         LinearTransferRef {
             self: ref.self,
@@ -475,8 +475,14 @@ module aptos_framework::object {
     }
 
     /// Transfer to the destination address using a LinearTransferRef.
-    public fun transfer_with_ref(ref: LinearTransferRef, to: address) acquires ObjectCore {
-        assert!(!exists<Untransferable>(ref.self), error::permission_denied(ENOT_MOVABLE));
+    public fun transfer_with_ref(ref: LinearTransferRef, to: address) acquires ObjectCore, TombStone {
+        assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
+
+        // Undo soft burn if present as we don't want the original owner to be able to reclaim by calling unburn later.
+        if (exists<TombStone>(ref.self)) {
+            let TombStone { original_owner: _ } = move_from<TombStone>(ref.self);
+        };
+
         let object = borrow_global_mut<ObjectCore>(ref.self);
         assert!(
             object.owner == ref.owner,
@@ -588,9 +594,7 @@ module aptos_framework::object {
         let count = 0;
         while (owner != current_address) {
             count = count + 1;
-            if (std::features::max_object_nesting_check_enabled()) {
-                assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING))
-            };
+            assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
             // At this point, the first object exists and so the more likely case is that the
             // object's owner is not an object. So we return a more sensible error.
             assert!(
@@ -672,9 +676,7 @@ module aptos_framework::object {
         let count = 0;
         while (owner != current_address) {
             count = count + 1;
-            if (std::features::max_object_nesting_check_enabled()) {
-                assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING))
-            };
+            assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
             if (!exists<ObjectCore>(current_address)) {
                 return false
             };
@@ -789,7 +791,7 @@ module aptos_framework::object {
     }
 
     #[test(creator = @0x123)]
-    fun test_linear_transfer(creator: &signer) acquires ObjectCore {
+    fun test_linear_transfer(creator: &signer) acquires ObjectCore, TombStone {
         let (hero_constructor, hero) = create_hero(creator);
         assert!(root_owner(hero) == @0x123, 0);
 
@@ -803,7 +805,7 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x50004, location = Self)]
-    fun test_bad_linear_transfer(creator: &signer) acquires ObjectCore {
+    fun test_bad_linear_transfer(creator: &signer) acquires ObjectCore, TombStone {
         let (hero_constructor, hero) = create_hero(creator);
         let transfer_ref = generate_transfer_ref(&hero_constructor);
         let linear_transfer_ref_good = generate_linear_transfer_ref(&transfer_ref);
@@ -814,12 +816,18 @@ module aptos_framework::object {
         transfer_with_ref(linear_transfer_ref_bad, @0x789);
     }
 
-    #[test(fx = @std)]
-    fun test_correct_auid(fx: signer) {
-        use std::features;
-        let feature = features::get_auids();
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
+    #[test(creator = @0x123)]
+    #[expected_failure(abort_code = 0x10008, location = Self)]
+    fun test_cannot_unburn_after_transfer_with_ref(creator: &signer) acquires ObjectCore, TombStone {
+        let (hero_constructor, hero) = create_hero(creator);
+        burn(creator, hero);
+        let transfer_ref = generate_transfer_ref(&hero_constructor);
+        transfer_with_ref(generate_linear_transfer_ref(&transfer_ref), @0x456);
+        unburn(creator, hero);
+    }
 
+    #[test(fx = @std)]
+    fun test_correct_auid() {
         let auid1 = aptos_framework::transaction_context::generate_auid_address();
         let bytes = aptos_framework::transaction_context::get_transaction_hash();
         std::vector::push_back(&mut bytes, 1);
@@ -907,11 +915,6 @@ module aptos_framework::object {
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 131078, location = Self)]
     fun test_exceeding_maximum_object_nesting_owns_should_fail(creator: &signer) acquires ObjectCore {
-        use std::features;
-        let feature = features::get_max_object_nesting_check_feature();
-        let fx = account::create_signer_for_test(@0x1);
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
-
         let obj1 = create_simple_object(creator, b"1");
         let obj2 = create_simple_object(creator, b"2");
         let obj3 = create_simple_object(creator, b"3");
@@ -947,11 +950,6 @@ module aptos_framework::object {
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 131078, location = Self)]
     fun test_exceeding_maximum_object_nesting_transfer_should_fail(creator: &signer) acquires ObjectCore {
-        use std::features;
-        let feature = features::get_max_object_nesting_check_feature();
-        let fx = account::create_signer_for_test(@0x1);
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
-
         let obj1 = create_simple_object(creator, b"1");
         let obj2 = create_simple_object(creator, b"2");
         let obj3 = create_simple_object(creator, b"3");
@@ -978,11 +976,6 @@ module aptos_framework::object {
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 131078, location = Self)]
     fun test_cyclic_ownership_transfer_should_fail(creator: &signer) acquires ObjectCore {
-        use std::features;
-        let feature = features::get_max_object_nesting_check_feature();
-        let fx = account::create_signer_for_test(@0x1);
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
-
         let obj1 = create_simple_object(creator, b"1");
         // This creates a cycle (self-loop) in ownership.
         transfer(creator, obj1, object_address(&obj1));
@@ -993,11 +986,6 @@ module aptos_framework::object {
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 131078, location = Self)]
     fun test_cyclic_ownership_owns_should_fail(creator: &signer) acquires ObjectCore {
-        use std::features;
-        let feature = features::get_max_object_nesting_check_feature();
-        let fx = account::create_signer_for_test(@0x1);
-        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
-
         let obj1 = create_simple_object(creator, b"1");
         // This creates a cycle (self-loop) in ownership.
         transfer(creator, obj1, object_address(&obj1));
@@ -1032,7 +1020,7 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 327689, location = Self)]
-    fun test_untransferable_direct_ownership_with_linear_transfer_ref(creator: &signer) acquires ObjectCore {
+    fun test_untransferable_direct_ownership_with_linear_transfer_ref(creator: &signer) acquires ObjectCore, TombStone {
         let (hero_constructor_ref, _) = create_hero(creator);
         let transfer_ref = generate_transfer_ref(&hero_constructor_ref);
         let linear_transfer_ref = generate_linear_transfer_ref(&transfer_ref);
@@ -1073,7 +1061,7 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 327689, location = Self)]
-    fun test_untransferable_indirect_ownership_with_linear_transfer_ref(creator: &signer) acquires ObjectCore {
+    fun test_untransferable_indirect_ownership_with_linear_transfer_ref(creator: &signer) acquires ObjectCore, TombStone {
         let (_, hero) = create_hero(creator);
         let (weapon_constructor_ref, weapon) = create_weapon(creator);
         transfer_to_object(creator, weapon, hero);

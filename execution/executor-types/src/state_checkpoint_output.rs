@@ -7,7 +7,10 @@ use crate::parsed_transaction_output::TransactionsWithParsedOutput;
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_storage_interface::cached_state_view::ShardedStateCache;
-use aptos_types::{state_store::ShardedStateUpdates, transaction::TransactionStatus};
+use aptos_types::{
+    state_store::ShardedStateUpdates,
+    transaction::{block_epilogue::BlockEndInfo, TransactionStatus},
+};
 use itertools::zip_eq;
 
 #[derive(Default)]
@@ -65,6 +68,7 @@ pub struct StateCheckpointOutput {
     state_checkpoint_hashes: Vec<Option<HashValue>>,
     state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
     sharded_state_cache: ShardedStateCache,
+    block_end_info: Option<BlockEndInfo>,
 }
 
 impl StateCheckpointOutput {
@@ -74,6 +78,7 @@ impl StateCheckpointOutput {
         state_checkpoint_hashes: Vec<Option<HashValue>>,
         state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
         sharded_state_cache: ShardedStateCache,
+        block_end_info: Option<BlockEndInfo>,
     ) -> Self {
         Self {
             txns,
@@ -81,6 +86,7 @@ impl StateCheckpointOutput {
             state_checkpoint_hashes,
             state_updates_before_last_checkpoint,
             sharded_state_cache,
+            block_end_info,
         }
     }
 
@@ -100,6 +106,7 @@ impl StateCheckpointOutput {
         Vec<Option<HashValue>>,
         Option<ShardedStateUpdates>,
         ShardedStateCache,
+        Option<BlockEndInfo>,
     ) {
         (
             self.txns,
@@ -107,6 +114,7 @@ impl StateCheckpointOutput {
             self.state_checkpoint_hashes,
             self.state_updates_before_last_checkpoint,
             self.sharded_state_cache,
+            self.block_end_info,
         )
     }
 

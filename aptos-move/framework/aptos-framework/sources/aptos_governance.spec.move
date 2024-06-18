@@ -851,4 +851,25 @@ spec aptos_framework::aptos_governance {
     spec force_end_epoch_test_only {
         pragma verify = false;
     }
+
+    spec batch_vote(
+        voter: &signer,
+        stake_pools: vector<address>,
+        proposal_id: u64,
+        should_pass: bool,
+    ) {
+        // TODO: Temporary mockup. Specify the `for_each` statement.
+        pragma verify = false;
+    }
+
+    spec batch_partial_vote(
+        voter: &signer,
+        stake_pools: vector<address>,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
+    ) {
+        // TODO: Temporary mockup. Specify the `for_each` statement.
+        pragma verify = false;
+    }
 }

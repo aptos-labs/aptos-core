@@ -85,8 +85,8 @@ impl PeerMetadata {
         self.connection_metadata.clone()
     }
 
-    /// Returns a copy of the peer monitoring metadata
-    pub fn get_peer_monitoring_metadata(&self) -> PeerMonitoringMetadata {
-        self.peer_monitoring_metadata.clone()
+    /// Returns a reference to the peer monitoring metadata
+    pub fn get_peer_monitoring_metadata(&self) -> &PeerMonitoringMetadata {
+        &self.peer_monitoring_metadata
     }
 }

@@ -18,7 +18,7 @@ use once_cell::sync::Lazy;
 use petgraph::{algo::astar as petgraph_astar, graphmap::DiGraphMap};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt,
+    fmt::{self, Debug},
     hash::Hash,
     string::ToString,
     sync::atomic::{AtomicUsize, Ordering as AtomicOrdering},
@@ -161,7 +161,10 @@ impl NamedAddressMaps {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PackagePaths<Path: Into<Symbol> = Symbol, NamedAddress: Into<Symbol> = Symbol> {
+pub struct PackagePaths<
+    Path: Into<Symbol> + Debug = Symbol,
+    NamedAddress: Into<Symbol> + Debug = Symbol,
+> {
     pub name: Option<Symbol>,
     pub paths: Vec<Path>,
     pub named_address_map: BTreeMap<NamedAddress, NumericalAddress>,
@@ -172,6 +175,31 @@ pub struct IndexedPackagePath {
     pub package: Option<Symbol>,
     pub path: Symbol,
     pub named_address_map: NamedAddressMapIndex,
+}
+
+// Convenient helper functions for dealing with PackagePaths
+pub fn string_vec_to_symbol_vec(string_vec: &[String]) -> Vec<Symbol> {
+    string_vec
+        .iter()
+        .map(|s| Symbol::from(s.as_str()))
+        .collect()
+}
+
+pub fn string_map_to_symbol_map<T: Clone>(string_map: &BTreeMap<String, T>) -> BTreeMap<Symbol, T> {
+    string_map
+        .iter()
+        .map(|(s, v)| (Symbol::from(s.as_str()), v.clone()))
+        .collect()
+}
+
+pub fn string_packagepath_to_symbol_packagepath<T: Clone>(
+    input: &PackagePaths<String, String>,
+) -> PackagePaths {
+    PackagePaths {
+        name: input.name,
+        paths: string_vec_to_symbol_vec(&input.paths),
+        named_address_map: string_map_to_symbol_map(&input.named_address_map),
+    }
 }
 
 pub type AttributeDeriver = dyn Fn(&mut CompilationEnv, &mut ModuleDefinition);

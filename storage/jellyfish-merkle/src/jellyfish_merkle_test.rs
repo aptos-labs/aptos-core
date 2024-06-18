@@ -16,7 +16,6 @@ use aptos_types::nibble::Nibble;
 use mock_tree_store::MockTreeStore;
 use proptest::{collection::hash_set, prelude::*};
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::collections::HashMap;
 
 fn update_nibble(original_key: &HashValue, n: usize, nibble: u8) -> HashValue {
     assert!(nibble < 16);
@@ -113,7 +112,7 @@ fn test_insert_at_leaf_with_internal_created() {
 
     let leaf1 = gen_leaf(key1, &value1, 0);
     let leaf2 = gen_leaf(key2, &value2, 1);
-    let mut children = HashMap::new();
+    let mut children = BTreeMap::new();
     children.insert(
         Nibble::from(0),
         Child::new(leaf1.hash(), 1 /* version */, NodeType::Leaf),
@@ -122,7 +121,7 @@ fn test_insert_at_leaf_with_internal_created() {
         Nibble::from(15),
         Child::new(leaf2.hash(), 1 /* version */, NodeType::Leaf),
     );
-    let internal = Node::new_internal(children);
+    let internal = Node::new_internal(Children::from_sorted(children));
     assert_eq!(db.get_node(&NodeKey::new(0, nibble_path)).unwrap(), leaf1);
     assert_eq!(
         db.get_node(&internal_node_key.gen_child_node_key(1 /* version */, Nibble::from(0)))
@@ -188,7 +187,7 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
     let leaf1 = gen_leaf(key1, &value1, 0);
     let leaf2 = gen_leaf(key2, &value2, 1);
     let internal = {
-        let mut children = HashMap::new();
+        let mut children = BTreeMap::new();
         children.insert(
             Nibble::from(0),
             Child::new(leaf1.hash(), 1 /* version */, NodeType::Leaf),
@@ -197,11 +196,11 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
             Nibble::from(1),
             Child::new(leaf2.hash(), 1 /* version */, NodeType::Leaf),
         );
-        Node::new_internal(children)
+        Node::new_internal(Children::from_sorted(children))
     };
 
     let root_internal = {
-        let mut children = HashMap::new();
+        let mut children = BTreeMap::new();
         children.insert(
             Nibble::from(0),
             Child::new(
@@ -210,7 +209,7 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
                 NodeType::Internal { leaf_count: 2 },
             ),
         );
-        Node::new_internal(children)
+        Node::new_internal(Children::from_sorted(children))
     };
 
     assert_eq!(db.get_node(&NodeKey::new(0, nibble_path)).unwrap(), leaf1);

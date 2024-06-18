@@ -157,7 +157,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Whether to keep functions after inlining \
             or remove them from the model"
                 .to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::AST_SIMPLIFY.to_string(),

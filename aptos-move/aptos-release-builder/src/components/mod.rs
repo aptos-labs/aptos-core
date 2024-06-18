@@ -26,10 +26,10 @@ use aptos_types::{
 use futures::executor::block_on;
 use handlebars::Handlebars;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
+use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::HashMap,
-    fs::File,
+    fs::{self, File},
     io::{Read, Write},
     path::{Path, PathBuf},
     thread::sleep,
@@ -73,10 +73,7 @@ impl Proposal {
                     features_diff.squash(feature_flags.clone())
                 },
                 ReleaseEntry::Framework(_)
-                | ReleaseEntry::CustomGas(_)
-                | ReleaseEntry::DefaultGas
-                | ReleaseEntry::DefaultGasWithOverride(_)
-                | ReleaseEntry::DefaultGasWithOverrideOld(_)
+                | ReleaseEntry::Gas { .. }
                 | ReleaseEntry::Version(_)
                 | ReleaseEntry::Consensus(_)
                 | ReleaseEntry::Execution(_)
@@ -116,10 +113,11 @@ pub enum ExecutionMode {
     RootSigner,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
-pub struct GasOverrideConfig {
-    feature_version: Option<u64>,
-    overrides: Option<Vec<GasOverride>>,
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum GasScheduleLocator {
+    LocalFile(String),
+    RemoteFile(Url),
+    Current,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -131,11 +129,10 @@ pub struct GasOverride {
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub enum ReleaseEntry {
     Framework(FrameworkReleaseConfig),
-    CustomGas(GasScheduleV2),
-    DefaultGas,
-    DefaultGasWithOverride(GasOverrideConfig),
-    /// Only used before randomness framework upgrade.
-    DefaultGasWithOverrideOld(GasOverrideConfig),
+    Gas {
+        old: Option<GasScheduleLocator>,
+        new: GasScheduleLocator,
+    },
     Version(AptosVersion),
     FeatureFlag(Features),
     Consensus(OnChainConsensusConfig),
@@ -147,8 +144,76 @@ pub enum ReleaseEntry {
     Randomness(ReleaseFriendlyRandomnessConfig),
 }
 
+impl Serialize for GasScheduleLocator {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            GasScheduleLocator::LocalFile(path) => serializer.serialize_str(path),
+            GasScheduleLocator::RemoteFile(url) => serializer.serialize_str(url.as_str()),
+            GasScheduleLocator::Current => serializer.serialize_str("current"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for GasScheduleLocator {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct GasScheduleLocatorVisitor;
+
+        impl<'de> Visitor<'de> for GasScheduleLocatorVisitor {
+            type Value = GasScheduleLocator;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str(
+                    "a valid gas schedule locator (path to local file, url to remote file or `current`)",
+                )
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<GasScheduleLocator, E>
+            where
+                E: serde::de::Error,
+            {
+                if value == "current" {
+                    Ok(GasScheduleLocator::Current)
+                } else if let Ok(url) = Url::parse(value) {
+                    Ok(GasScheduleLocator::RemoteFile(url))
+                } else {
+                    Ok(GasScheduleLocator::LocalFile(value.to_string()))
+                }
+            }
+        }
+
+        deserializer.deserialize_str(GasScheduleLocatorVisitor)
+    }
+}
+
+impl GasScheduleLocator {
+    async fn fetch_gas_schedule(&self) -> Result<GasScheduleV2> {
+        println!("{:?}", self);
+        match self {
+            GasScheduleLocator::LocalFile(path) => {
+                let file_contents = fs::read_to_string(path)?;
+                let gas_schedule: GasScheduleV2 = serde_json::from_str(&file_contents)?;
+                Ok(gas_schedule)
+            },
+            GasScheduleLocator::RemoteFile(url) => {
+                let response = reqwest::get(url.as_str()).await?;
+                let gas_schedule: GasScheduleV2 = response.json().await?;
+                Ok(gas_schedule)
+            },
+            GasScheduleLocator::Current => Ok(aptos_gas_schedule_updator::current_gas_schedule(
+                LATEST_GAS_FEATURE_VERSION,
+            )),
+        }
+    }
+}
+
 impl ReleaseEntry {
-    pub fn generate_release_script(
+    pub async fn generate_release_script(
         &self,
         client: Option<&Client>,
         result: &mut Vec<(String, String)>,
@@ -173,77 +238,39 @@ impl ReleaseEntry {
                     .unwrap(),
                 );
             },
-            ReleaseEntry::CustomGas(gas_schedule) => {
-                if !fetch_and_equals::<GasScheduleV2>(client, gas_schedule)? {
+            ReleaseEntry::Gas { old, new } => {
+                let new_gas_schedule = new
+                    .fetch_gas_schedule()
+                    .await
+                    .map_err(|err| anyhow!("Failed to fetch new gas schedule: {}", err))?;
+                let old_gas_schedule = match old {
+                    Some(old) => Some(
+                        old.fetch_gas_schedule()
+                            .await
+                            .map_err(|err| anyhow!("Failed to fetch old gas schedule: {}", err))?,
+                    ),
+                    None => {
+                        match client {
+                            Some(client) => Some(fetch_config::<GasScheduleV2>(client)?),
+                            None => {
+                                println!("!!! WARNING !!!");
+                                println!("Generating gas schedule upgrade without a base for comparison.");
+                                println!("It is strongly recommended you specify an old gas schedule or a remote end point where it can be fetched.");
+                                println!("!!! WARNING !!!");
+                                None
+                            },
+                        }
+                    },
+                };
+
+                if old_gas_schedule
+                    .as_ref()
+                    .map(|old| old != &new_gas_schedule)
+                    .unwrap_or(true)
+                {
                     result.append(&mut gas::generate_gas_upgrade_proposal(
-                        true,
-                        gas_schedule,
-                        is_testnet,
-                        if is_multi_step {
-                            get_execution_hash(result)
-                        } else {
-                            "".to_owned().into_bytes()
-                        },
-                    )?);
-                }
-            },
-            ReleaseEntry::DefaultGas => {
-                let gas_schedule =
-                    aptos_gas_schedule_updator::current_gas_schedule(LATEST_GAS_FEATURE_VERSION);
-                if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
-                    result.append(&mut gas::generate_gas_upgrade_proposal(
-                        true,
-                        &gas_schedule,
-                        is_testnet,
-                        if is_multi_step {
-                            get_execution_hash(result)
-                        } else {
-                            "".to_owned().into_bytes()
-                        },
-                    )?);
-                }
-            },
-            ReleaseEntry::DefaultGasWithOverride(GasOverrideConfig {
-                feature_version,
-                overrides,
-            }) => {
-                let feature_version = feature_version.unwrap_or(LATEST_GAS_FEATURE_VERSION);
-                let gas_schedule = gas_override_default(
-                    feature_version,
-                    overrides
-                        .as_ref()
-                        .map(|overrides| overrides.as_slice())
-                        .unwrap_or(&[]),
-                )?;
-                if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
-                    result.append(&mut gas::generate_gas_upgrade_proposal(
-                        true,
-                        &gas_schedule,
-                        is_testnet,
-                        if is_multi_step {
-                            get_execution_hash(result)
-                        } else {
-                            "".to_owned().into_bytes()
-                        },
-                    )?);
-                }
-            },
-            ReleaseEntry::DefaultGasWithOverrideOld(GasOverrideConfig {
-                feature_version,
-                overrides,
-            }) => {
-                let feature_version = feature_version.unwrap_or(LATEST_GAS_FEATURE_VERSION);
-                let gas_schedule = gas_override_default(
-                    feature_version,
-                    overrides
-                        .as_ref()
-                        .map(|overrides| overrides.as_slice())
-                        .unwrap_or(&[]),
-                )?;
-                if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
-                    result.append(&mut gas::generate_gas_upgrade_proposal(
-                        false,
-                        &gas_schedule,
+                        old_gas_schedule.as_ref(),
+                        &new_gas_schedule,
                         is_testnet,
                         if is_multi_step {
                             get_execution_hash(result)
@@ -404,45 +431,15 @@ impl ReleaseEntry {
         Ok(())
     }
 
-    pub fn validate_upgrade(&self, client: &Client) -> Result<()> {
+    pub async fn validate_upgrade(&self, client: &Client) -> Result<()> {
         let client_opt = Some(client);
         match self {
             ReleaseEntry::Framework(_) => (),
             ReleaseEntry::RawScript(_) => (),
-            ReleaseEntry::CustomGas(gas_schedule) => {
-                if !wait_until_equals(client_opt, gas_schedule, *MAX_ASYNC_RECONFIG_TIME) {
-                    bail!("Gas schedule config mismatch: Expected {:?}", gas_schedule);
-                }
-            },
-            ReleaseEntry::DefaultGas => {
-                if !wait_until_equals(
-                    client_opt,
-                    &aptos_gas_schedule_updator::current_gas_schedule(LATEST_GAS_FEATURE_VERSION),
-                    *MAX_ASYNC_RECONFIG_TIME,
-                ) {
-                    bail!("Gas schedule config mismatch: Expected Default");
-                }
-            },
-            ReleaseEntry::DefaultGasWithOverrideOld(config)
-            | ReleaseEntry::DefaultGasWithOverride(config) => {
-                let GasOverrideConfig {
-                    overrides,
-                    feature_version,
-                } = config;
+            ReleaseEntry::Gas { old: _old, new } => {
+                let new_gas_schedule = new.fetch_gas_schedule().await?;
 
-                let feature_version = feature_version.unwrap_or(LATEST_GAS_FEATURE_VERSION);
-
-                if !wait_until_equals(
-                    client_opt,
-                    &gas_override_default(
-                        feature_version,
-                        overrides
-                            .as_ref()
-                            .map(|overrides| overrides.as_slice())
-                            .unwrap_or(&[]),
-                    )?,
-                    Duration::from_secs(60),
-                ) {
+                if !wait_until_equals(client_opt, &new_gas_schedule, Duration::from_secs(60)) {
                     bail!("Gas schedule config mismatch: Expected Default");
                 }
             },
@@ -512,30 +509,6 @@ impl ReleaseEntry {
     }
 }
 
-fn gas_override_default(
-    feature_version: u64,
-    gas_overrides: &[GasOverride],
-) -> Result<GasScheduleV2> {
-    let mut gas_schedule = aptos_gas_schedule_updator::current_gas_schedule(feature_version);
-    for gas_override in gas_overrides {
-        let mut found = false;
-        for (name, value) in &mut gas_schedule.entries {
-            if name == &gas_override.name {
-                *value = gas_override.value;
-                found = true;
-                break;
-            }
-        }
-        if !found {
-            bail!(
-                "Gas override config mismatch: Expected {:?} to be in the gas schedule",
-                gas_override.name
-            );
-        }
-    }
-    Ok(gas_schedule)
-}
-
 // Compare the current on chain config with the value recorded on chain. Return false if there's a difference.
 fn fetch_and_equals<T: OnChainConfig + PartialEq>(
     client: Option<&Client>,
@@ -587,7 +560,7 @@ pub fn fetch_config<T: OnChainConfig>(client: &Client) -> Result<T> {
 }
 
 impl ReleaseConfig {
-    pub fn generate_release_proposal_scripts(&self, base_path: &Path) -> Result<()> {
+    pub async fn generate_release_proposal_scripts(&self, base_path: &Path) -> Result<()> {
         let client = self
             .remote_endpoint
             .as_ref()
@@ -640,20 +613,24 @@ impl ReleaseConfig {
             let mut result: Vec<(String, String)> = vec![];
             if let ExecutionMode::MultiStep = &proposal.execution_mode {
                 for entry in proposal.update_sequence.iter().rev() {
-                    entry.generate_release_script(
-                        client.as_ref(),
-                        &mut result,
-                        proposal.execution_mode,
-                    )?;
+                    entry
+                        .generate_release_script(
+                            client.as_ref(),
+                            &mut result,
+                            proposal.execution_mode,
+                        )
+                        .await?;
                 }
                 result.reverse();
             } else {
                 for entry in proposal.update_sequence.iter() {
-                    entry.generate_release_script(
-                        client.as_ref(),
-                        &mut result,
-                        proposal.execution_mode,
-                    )?;
+                    entry
+                        .generate_release_script(
+                            client.as_ref(),
+                            &mut result,
+                            proposal.execution_mode,
+                        )
+                        .await?;
                 }
             }
 
@@ -720,10 +697,10 @@ impl ReleaseConfig {
     }
 
     // Fetch all configs from a remote rest endpoint and assert all the configs are the same as the ones specified locally.
-    pub fn validate_upgrade(&self, endpoint: &Url, proposal: &Proposal) -> Result<()> {
+    pub async fn validate_upgrade(&self, endpoint: &Url, proposal: &Proposal) -> Result<()> {
         let client = Client::new(endpoint.clone());
         for entry in proposal.consolidated_side_effects() {
-            entry.validate_upgrade(&client)?;
+            entry.validate_upgrade(&client).await?;
         }
         Ok(())
     }
@@ -748,7 +725,10 @@ impl Default for ReleaseConfig {
                     execution_mode: ExecutionMode::MultiStep,
                     metadata: ProposalMetadata::default(),
                     name: "gas".to_string(),
-                    update_sequence: vec![ReleaseEntry::DefaultGas],
+                    update_sequence: vec![ReleaseEntry::Gas {
+                        old: None,
+                        new: GasScheduleLocator::Current,
+                    }],
                 },
                 Proposal {
                     execution_mode: ExecutionMode::MultiStep,
@@ -777,7 +757,7 @@ impl Default for ReleaseConfig {
     }
 }
 
-pub fn get_execution_hash(result: &Vec<(String, String)>) -> Vec<u8> {
+pub fn get_execution_hash(result: &[(String, String)]) -> Vec<u8> {
     if result.is_empty() {
         "vector::empty<u8>()".to_owned().into_bytes()
     } else {
@@ -841,7 +821,7 @@ impl Default for ProposalMetadata {
     }
 }
 
-fn get_signer_arg(is_testnet: bool, next_execution_hash: &Vec<u8>) -> &str {
+fn get_signer_arg(is_testnet: bool, next_execution_hash: &[u8]) -> &str {
     if is_testnet && next_execution_hash.is_empty() {
         "framework_signer"
     } else {

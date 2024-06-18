@@ -34,6 +34,8 @@ pub struct MetricsThreshold {
     max: f64,
     // % of the data point that can breach the max threshold
     max_breach_pct: usize,
+
+    expect_empty: bool,
 }
 
 impl MetricsThreshold {
@@ -41,6 +43,15 @@ impl MetricsThreshold {
         Self {
             max,
             max_breach_pct,
+            expect_empty: false,
+        }
+    }
+
+    pub fn new_expect_empty() -> Self {
+        Self {
+            max: 0.0,
+            max_breach_pct: 0,
+            expect_empty: true,
         }
     }
 
@@ -48,14 +59,22 @@ impl MetricsThreshold {
         Self {
             max: max * 1024.0 * 1024.0 * 1024.0,
             max_breach_pct,
+            expect_empty: false,
         }
     }
 
     pub fn ensure_metrics_threshold(
         &self,
         metrics_name: &str,
-        metrics: &Vec<Sample>,
+        metrics: &[Sample],
     ) -> anyhow::Result<()> {
+        if self.expect_empty {
+            if !metrics.is_empty() {
+                bail!("Data found for metrics expected to be empty");
+            }
+            return Ok(());
+        }
+
         if metrics.is_empty() {
             bail!("Empty metrics provided");
         }

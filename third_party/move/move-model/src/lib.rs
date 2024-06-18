@@ -44,6 +44,7 @@ use move_ir_types::location::sp;
 use move_symbol_pool::Symbol as MoveSymbol;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
+    fmt::Debug,
     rc::Rc,
 };
 
@@ -75,10 +76,13 @@ pub struct PackageInfo {
     pub address_map: BTreeMap<String, NumericalAddress>,
 }
 
-/// Builds the Move model for the v2 compiler. This builds the model, compiling both code
-/// and specs from sources into typed-checked AST. No bytecode is attached to the model.
-/// This currently uses the v1 compiler as the parser (up to expansion AST), after that
-/// a new type checker.
+/// Builds the Move model for the v2 compiler. This builds the model, compiling both code and specs
+/// from sources into typed-checked AST. No bytecode is attached to the model.  This currently uses
+/// the v1 compiler as the parser (up to expansion AST), after that a new type checker.
+///
+/// Note that `source` and  `source_deps` are either Move files or package subdirectories which
+/// contain Move files, all of which should be compiled (not the root of a package, but the
+/// `sources`, `scripts`, and/or `tests`, depending on compilation mode.
 pub fn run_model_builder_in_compiler_mode(
     source: PackageInfo,
     source_deps: PackageInfo,
@@ -117,8 +121,8 @@ pub fn run_model_builder_in_compiler_mode(
 
 /// Build the move model with default compilation flags and custom options.
 pub fn run_model_builder_with_options<
-    Paths: Into<MoveSymbol> + Clone,
-    NamedAddress: Into<MoveSymbol> + Clone,
+    Paths: Into<MoveSymbol> + Clone + Debug,
+    NamedAddress: Into<MoveSymbol> + Clone + Debug,
 >(
     move_sources: Vec<PackagePaths<Paths, NamedAddress>>,
     move_deps: Vec<PackagePaths<Paths, NamedAddress>>,
@@ -141,8 +145,8 @@ pub fn run_model_builder_with_options<
 
 /// Build the move model with custom compilation flags and custom options
 pub fn run_model_builder_with_options_and_compilation_flags<
-    Paths: Into<MoveSymbol> + Clone,
-    NamedAddress: Into<MoveSymbol> + Clone,
+    Paths: Into<MoveSymbol> + Clone + Debug,
+    NamedAddress: Into<MoveSymbol> + Clone + Debug,
 >(
     move_sources_targets: Vec<PackagePaths<Paths, NamedAddress>>,
     move_sources_deps: Vec<PackagePaths<Paths, NamedAddress>>,
@@ -170,6 +174,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
                 .to_owned()
         })
         .collect();
+
     // Step 1: parse the program to get comments and a separation of targets and dependencies.
     let (files, comments_and_compiler_res) =
         Compiler::from_package_paths(move_sources, deps, flags, known_attributes)
@@ -725,7 +730,7 @@ fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut 
                 // Convert the script into a module.
                 let address = E::Address::Numerical(
                     None,
-                    sp(expanded_script.loc, NumericalAddress::DEFAULT_ERROR_ADDRESS),
+                    sp(expanded_script.loc, NumericalAddress::MAX_ADDRESS),
                 );
                 let ident = sp(
                     expanded_script.loc,

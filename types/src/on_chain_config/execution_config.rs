@@ -75,17 +75,7 @@ impl OnChainExecutionConfig {
                 module_conflict_window_size: 1,
                 entry_fun_conflict_window_size: 2,
             },
-            block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
-                effective_block_gas_limit: 30000,
-                execution_gas_effective_multiplier: 1,
-                io_gas_effective_multiplier: 1,
-                conflict_penalty_window: 9,
-                use_granular_resource_group_conflicts: false,
-                use_module_publishing_block_conflict: true,
-                block_output_limit: Some(5 * 1024 * 1024),
-                include_user_txn_size_in_block_output: true,
-                add_block_limit_outcome_onchain: false,
-            },
+            block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         })
     }
@@ -94,6 +84,22 @@ impl OnChainExecutionConfig {
     /// This value should not be changed, for replay purposes.
     pub fn default_if_missing() -> Self {
         OnChainExecutionConfig::Missing
+    }
+}
+
+impl BlockGasLimitType {
+    pub fn default_for_genesis() -> Self {
+        BlockGasLimitType::ComplexLimitV1 {
+            effective_block_gas_limit: 30000,
+            execution_gas_effective_multiplier: 1,
+            io_gas_effective_multiplier: 1,
+            conflict_penalty_window: 9,
+            use_granular_resource_group_conflicts: false,
+            use_module_publishing_block_conflict: true,
+            block_output_limit: Some(5 * 1024 * 1024),
+            include_user_txn_size_in_block_output: true,
+            add_block_limit_outcome_onchain: true,
+        }
     }
 }
 

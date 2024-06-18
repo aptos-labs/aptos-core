@@ -124,14 +124,21 @@ transferred to A
 -  [Resource `BeneficiaryForOperator`](#0x1_delegation_pool_BeneficiaryForOperator)
 -  [Resource `NextCommissionPercentage`](#0x1_delegation_pool_NextCommissionPercentage)
 -  [Resource `DelegationPoolAllowlisting`](#0x1_delegation_pool_DelegationPoolAllowlisting)
+-  [Struct `AddStake`](#0x1_delegation_pool_AddStake)
 -  [Struct `AddStakeEvent`](#0x1_delegation_pool_AddStakeEvent)
+-  [Struct `ReactivateStake`](#0x1_delegation_pool_ReactivateStake)
 -  [Struct `ReactivateStakeEvent`](#0x1_delegation_pool_ReactivateStakeEvent)
+-  [Struct `UnlockStake`](#0x1_delegation_pool_UnlockStake)
 -  [Struct `UnlockStakeEvent`](#0x1_delegation_pool_UnlockStakeEvent)
+-  [Struct `WithdrawStake`](#0x1_delegation_pool_WithdrawStake)
 -  [Struct `WithdrawStakeEvent`](#0x1_delegation_pool_WithdrawStakeEvent)
 -  [Struct `DistributeCommissionEvent`](#0x1_delegation_pool_DistributeCommissionEvent)
 -  [Struct `DistributeCommission`](#0x1_delegation_pool_DistributeCommission)
+-  [Struct `Vote`](#0x1_delegation_pool_Vote)
 -  [Struct `VoteEvent`](#0x1_delegation_pool_VoteEvent)
+-  [Struct `CreateProposal`](#0x1_delegation_pool_CreateProposal)
 -  [Struct `CreateProposalEvent`](#0x1_delegation_pool_CreateProposalEvent)
+-  [Struct `DelegateVotingPower`](#0x1_delegation_pool_DelegateVotingPower)
 -  [Struct `DelegateVotingPowerEvent`](#0x1_delegation_pool_DelegateVotingPowerEvent)
 -  [Struct `SetBeneficiaryForOperator`](#0x1_delegation_pool_SetBeneficiaryForOperator)
 -  [Struct `CommissionPercentageChange`](#0x1_delegation_pool_CommissionPercentageChange)
@@ -158,6 +165,7 @@ transferred to A
 -  [Function `calculate_and_update_voter_total_voting_power`](#0x1_delegation_pool_calculate_and_update_voter_total_voting_power)
 -  [Function `calculate_and_update_remaining_voting_power`](#0x1_delegation_pool_calculate_and_update_remaining_voting_power)
 -  [Function `calculate_and_update_delegator_voter`](#0x1_delegation_pool_calculate_and_update_delegator_voter)
+-  [Function `calculate_and_update_voting_delegation`](#0x1_delegation_pool_calculate_and_update_voting_delegation)
 -  [Function `get_expected_stake_pool_address`](#0x1_delegation_pool_get_expected_stake_pool_address)
 -  [Function `min_remaining_secs_for_commission_change`](#0x1_delegation_pool_min_remaining_secs_for_commission_change)
 -  [Function `allowlisting_enabled`](#0x1_delegation_pool_allowlisting_enabled)
@@ -672,14 +680,14 @@ evicted later by the pool owner.
 
 </details>
 
-<a id="0x1_delegation_pool_AddStakeEvent"></a>
+<a id="0x1_delegation_pool_AddStake"></a>
 
-## Struct `AddStakeEvent`
+## Struct `AddStake`
 
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_AddStakeEvent">AddStakeEvent</a> <b>has</b> drop, store
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_AddStake">AddStake</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -718,14 +726,59 @@ evicted later by the pool owner.
 
 </details>
 
-<a id="0x1_delegation_pool_ReactivateStakeEvent"></a>
+<a id="0x1_delegation_pool_AddStakeEvent"></a>
 
-## Struct `ReactivateStakeEvent`
+## Struct `AddStakeEvent`
+
+
+
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_AddStakeEvent">AddStakeEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>delegator_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount_added: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>add_stake_fee: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_ReactivateStake"></a>
+
+## Struct `ReactivateStake`
 
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_ReactivateStakeEvent">ReactivateStakeEvent</a> <b>has</b> drop, store
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_ReactivateStake">ReactivateStake</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -758,14 +811,53 @@ evicted later by the pool owner.
 
 </details>
 
-<a id="0x1_delegation_pool_UnlockStakeEvent"></a>
+<a id="0x1_delegation_pool_ReactivateStakeEvent"></a>
 
-## Struct `UnlockStakeEvent`
+## Struct `ReactivateStakeEvent`
+
+
+
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_ReactivateStakeEvent">ReactivateStakeEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>delegator_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount_reactivated: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_UnlockStake"></a>
+
+## Struct `UnlockStake`
 
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_UnlockStakeEvent">UnlockStakeEvent</a> <b>has</b> drop, store
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_UnlockStake">UnlockStake</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -798,14 +890,92 @@ evicted later by the pool owner.
 
 </details>
 
+<a id="0x1_delegation_pool_UnlockStakeEvent"></a>
+
+## Struct `UnlockStakeEvent`
+
+
+
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_UnlockStakeEvent">UnlockStakeEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>delegator_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount_unlocked: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_WithdrawStake"></a>
+
+## Struct `WithdrawStake`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_WithdrawStake">WithdrawStake</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>delegator_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount_withdrawn: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_delegation_pool_WithdrawStakeEvent"></a>
 
 ## Struct `WithdrawStakeEvent`
 
 
 
-<pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_WithdrawStakeEvent">WithdrawStakeEvent</a> <b>has</b> drop, store
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_WithdrawStakeEvent">WithdrawStakeEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -936,14 +1106,14 @@ evicted later by the pool owner.
 
 </details>
 
-<a id="0x1_delegation_pool_VoteEvent"></a>
+<a id="0x1_delegation_pool_Vote"></a>
 
-## Struct `VoteEvent`
+## Struct `Vote`
 
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_VoteEvent">VoteEvent</a> <b>has</b> drop, store
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_Vote">Vote</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -988,14 +1158,65 @@ evicted later by the pool owner.
 
 </details>
 
-<a id="0x1_delegation_pool_CreateProposalEvent"></a>
+<a id="0x1_delegation_pool_VoteEvent"></a>
 
-## Struct `CreateProposalEvent`
+## Struct `VoteEvent`
+
+
+
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_VoteEvent">VoteEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>voter: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>proposal_id: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code><a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>num_votes: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>should_pass: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_CreateProposal"></a>
+
+## Struct `CreateProposal`
 
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">CreateProposalEvent</a> <b>has</b> drop, store
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_CreateProposal">CreateProposal</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -1028,14 +1249,92 @@ evicted later by the pool owner.
 
 </details>
 
+<a id="0x1_delegation_pool_CreateProposalEvent"></a>
+
+## Struct `CreateProposalEvent`
+
+
+
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">CreateProposalEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>proposal_id: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>voter: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code><a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_DelegateVotingPower"></a>
+
+## Struct `DelegateVotingPower`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPower">DelegateVotingPower</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>delegator: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>voter: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_delegation_pool_DelegateVotingPowerEvent"></a>
 
 ## Struct `DelegateVotingPowerEvent`
 
 
 
-<pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a> <b>has</b> drop, store
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -2274,6 +2573,42 @@ latest state.
 
 </details>
 
+<a id="0x1_delegation_pool_calculate_and_update_voting_delegation"></a>
+
+## Function `calculate_and_update_voting_delegation`
+
+Return the current state of a voting delegation of a delegator in a delegation pool.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voting_delegation">calculate_and_update_voting_delegation</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): (<b>address</b>, <b>address</b>, u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voting_delegation">calculate_and_update_voting_delegation</a>(
+    pool_address: <b>address</b>,
+    delegator_address: <b>address</b>
+): (<b>address</b>, <b>address</b>, u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
+    <b>let</b> vote_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation">update_and_borrow_mut_delegator_vote_delegation</a>(
+        <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address),
+        <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address),
+        delegator_address
+    );
+
+    (vote_delegation.voter, vote_delegation.pending_voter, vote_delegation.last_locked_until_secs)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_delegation_pool_get_expected_stake_pool_address"></a>
 
 ## Function `get_expected_stake_pool_address`
@@ -2633,7 +2968,7 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_VoteEvent">VoteEvent</a> {
+            <a href="delegation_pool.md#0x1_delegation_pool_Vote">Vote</a> {
                 voter: voter_address,
                 proposal_id,
                 <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
@@ -2712,7 +3047,7 @@ voting power in THIS delegation pool must be not less than the minimum required 
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">CreateProposalEvent</a> {
+            <a href="delegation_pool.md#0x1_delegation_pool_CreateProposal">CreateProposal</a> {
                 proposal_id,
                 voter: voter_addr,
                 <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
@@ -3231,9 +3566,9 @@ Update VoteDelegation of a delegator to up-to-date then borrow_mut it.
 
     <b>let</b> vote_delegation = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut">smart_table::borrow_mut</a>(vote_delegation_table, delegator);
     // A lockup period <b>has</b> passed since last time `vote_delegation` was updated. Pending voter takes effect.
-    <b>if</b> (vote_delegation.last_locked_until_secs &lt; locked_until_secs &&
-        vote_delegation.voter != vote_delegation.pending_voter) {
+    <b>if</b> (vote_delegation.last_locked_until_secs &lt; locked_until_secs) {
         vote_delegation.voter = vote_delegation.pending_voter;
+        vote_delegation.last_locked_until_secs = locked_until_secs;
     };
     vote_delegation
 }
@@ -3680,7 +4015,7 @@ this change won't take effects until the next lockup period.
     };
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a> {
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPower">DelegateVotingPower</a> {
             pool_address,
             delegator: delegator_address,
             voter: new_voter,
@@ -3935,7 +4270,7 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_AddStakeEvent">AddStakeEvent</a> {
+            <a href="delegation_pool.md#0x1_delegation_pool_AddStake">AddStake</a> {
                 pool_address,
                 delegator_address,
                 amount_added: amount,
@@ -4039,7 +4374,7 @@ at most how much active stake there is on the stake pool.
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_UnlockStakeEvent">UnlockStakeEvent</a> {
+            <a href="delegation_pool.md#0x1_delegation_pool_UnlockStake">UnlockStake</a> {
                 pool_address,
                 delegator_address,
                 amount_unlocked: amount,
@@ -4109,7 +4444,7 @@ Move <code>amount</code> of coins from pending_inactive to active.
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_ReactivateStakeEvent">ReactivateStakeEvent</a> {
+            <a href="delegation_pool.md#0x1_delegation_pool_ReactivateStake">ReactivateStake</a> {
                 pool_address,
                 delegator_address,
                 amount_reactivated: amount,
@@ -4234,7 +4569,7 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_WithdrawStakeEvent">WithdrawStakeEvent</a> {
+            <a href="delegation_pool.md#0x1_delegation_pool_WithdrawStake">WithdrawStake</a> {
                 pool_address,
                 delegator_address,
                 amount_withdrawn: amount,

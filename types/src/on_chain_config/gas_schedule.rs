@@ -3,7 +3,7 @@
 
 use crate::on_chain_config::OnChainConfig;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{btree_map, BTreeMap};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct GasSchedule {
@@ -14,6 +14,13 @@ pub struct GasSchedule {
 pub struct GasScheduleV2 {
     pub feature_version: u64,
     pub entries: Vec<(String, u64)>,
+}
+
+#[derive(Debug)]
+pub enum DiffItem<T> {
+    Add { new_val: T },
+    Delete { old_val: T },
+    Modify { old_val: T, new_val: T },
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -40,16 +47,48 @@ impl StorageGasSchedule {
 }
 
 impl GasSchedule {
-    pub fn to_btree_map(self) -> BTreeMap<String, u64> {
+    pub fn into_btree_map(self) -> BTreeMap<String, u64> {
         // TODO: what if the gas schedule contains duplicated entries?
         self.entries.into_iter().collect()
     }
 }
 
 impl GasScheduleV2 {
-    pub fn to_btree_map(self) -> BTreeMap<String, u64> {
+    pub fn into_btree_map(self) -> BTreeMap<String, u64> {
         // TODO: what if the gas schedule contains duplicated entries?
         self.entries.into_iter().collect()
+    }
+
+    pub fn to_btree_map_borrowed(&self) -> BTreeMap<&str, u64> {
+        self.entries.iter().map(|(k, v)| (k.as_str(), *v)).collect()
+    }
+
+    pub fn diff<'a>(old: &'a Self, new: &'a Self) -> BTreeMap<&'a str, DiffItem<u64>> {
+        let mut old = old.to_btree_map_borrowed();
+        let new = new.to_btree_map_borrowed();
+
+        let mut diff = BTreeMap::new();
+        for (param_name, new_val) in new {
+            match old.entry(param_name) {
+                btree_map::Entry::Occupied(entry) => {
+                    let (param_name, old_val) = entry.remove_entry();
+
+                    if old_val != new_val {
+                        diff.insert(param_name, DiffItem::Modify { old_val, new_val });
+                    }
+                },
+                btree_map::Entry::Vacant(entry) => {
+                    let param_name = entry.into_key();
+                    diff.insert(param_name, DiffItem::Add { new_val });
+                },
+            }
+        }
+        diff.extend(
+            old.into_iter()
+                .map(|(param_name, old_val)| (param_name, DiffItem::Delete { old_val })),
+        );
+
+        diff
     }
 }
 

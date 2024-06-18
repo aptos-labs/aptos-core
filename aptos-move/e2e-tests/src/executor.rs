@@ -20,12 +20,8 @@ use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_gas_schedule::{
-    AptosGasParameters, InitialGasSchedule, MiscGasParameters, NativeGasParameters,
-    LATEST_GAS_FEATURE_VERSION,
-};
+use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
-use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_types::{
     account_config::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
@@ -57,7 +53,7 @@ use aptos_types::{
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
-    gas::get_gas_parameters,
+    gas::{get_gas_parameters, make_prod_gas_meter},
     move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionId},
     verifier, AptosVM, VMValidator,
 };
@@ -73,6 +69,8 @@ use move_core_types::{
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
+#[cfg(any(test, feature = "fuzzing"))]
+use rayon::ThreadPool;
 use serde::Serialize;
 use std::{
     collections::BTreeSet,
@@ -155,6 +153,29 @@ impl FakeExecutor {
                 .build()
                 .unwrap(),
         );
+        let mut executor = FakeExecutor {
+            data_store: FakeDataStore::default(),
+            event_store: Vec::new(),
+            executor_thread_pool,
+            block_time: 0,
+            executed_output: None,
+            trace_dir: None,
+            rng: KeyGen::from_seed(RNG_SEED),
+            executor_mode: None,
+            features: Features::default(),
+            chain_id: chain_id.id(),
+            allow_block_executor_fallback: true,
+        };
+        executor.apply_write_set(write_set);
+        executor
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn from_genesis_with_existing_thread_pool(
+        write_set: &WriteSet,
+        chain_id: ChainId,
+        executor_thread_pool: Arc<ThreadPool>,
+    ) -> Self {
         let mut executor = FakeExecutor {
             data_store: FakeDataStore::default(),
             event_store: Vec::new(),
@@ -519,13 +540,17 @@ impl FakeExecutor {
             },
             onchain: onchain_config,
         };
-        BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
+        BlockAptosVM::execute_block::<
+            _,
+            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+        >(
             self.executor_thread_pool.clone(),
             txn_block,
             &state_view,
             config,
             None,
-        ).map(BlockOutput::into_transaction_outputs_forced)
+        )
+        .map(BlockOutput::into_transaction_outputs_forced)
     }
 
     pub fn execute_transaction_block_with_state_view(
@@ -638,9 +663,11 @@ impl FakeExecutor {
         let mut outputs = self
             .execute_block(txn_block)
             .expect("The VM should not fail to startup");
-        outputs
+        let mut txn_output = outputs
             .pop()
-            .expect("A block with one transaction should have one output")
+            .expect("A block with one transaction should have one output");
+        txn_output.fill_error_status();
+        txn_output
     }
 
     pub fn execute_transaction_with_gas_profiler(
@@ -659,18 +686,11 @@ impl FakeExecutor {
             &resolver, /*override_is_delayed_field_optimization_capable=*/ None,
         );
 
-        let (_status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
+        let (_status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
             &txn,
             &log_context,
-            |gas_feature_version, gas_params, storage_gas_params, balance| {
-                let gas_meter =
-                    MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
-                        gas_feature_version,
-                        gas_params,
-                        storage_gas_params,
-                        balance,
-                    )));
+            |gas_meter| {
                 let gas_profiler = match txn.payload() {
                     TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
                     TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
@@ -686,7 +706,7 @@ impl FakeExecutor {
                         unreachable!("Module bundle payload has been removed")
                     },
                 };
-                Ok(gas_profiler)
+                gas_profiler
             },
         )?;
 
@@ -868,9 +888,8 @@ impl FakeExecutor {
         };
 
         let vm = MoveVmExt::new(
-            gas_params.natives.clone(),
-            gas_params.vm.misc.clone(),
             LATEST_GAS_FEATURE_VERSION,
+            Ok(&gas_params),
             self.chain_id,
             self.features.clone(),
             timed_features,
@@ -907,14 +926,13 @@ impl FakeExecutor {
 
             let (mut regular, mut unmetered) = match gas_meter_type {
                 GasMeterType::RegularGasMeter => (
-                    Some(MemoryTrackedGasMeter::new(StandardGasMeter::new(
-                        StandardGasAlgebra::new(
-                            LATEST_GAS_FEATURE_VERSION,
-                            gas_params.vm.clone(),
-                            storage_gas_params.clone(),
-                            1_000_000_000_000_000,
-                        ),
-                    ))),
+                    Some(make_prod_gas_meter(
+                        LATEST_GAS_FEATURE_VERSION,
+                        gas_params.vm.clone(),
+                        storage_gas_params.clone(),
+                        false,
+                        1_000_000_000_000_000.into(),
+                    )),
                     None,
                 ),
                 GasMeterType::UnmeteredGasMeter => (None, Some(UnmeteredGasMeter)),
@@ -986,9 +1004,8 @@ impl FakeExecutor {
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new_with_gas_hook(
-                NativeGasParameters::zeros(),
-                MiscGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
+                Ok(&AptosGasParameters::zeros()),
                 self.chain_id,
                 self.features.clone(),
                 timed_features,
@@ -1016,6 +1033,7 @@ impl FakeExecutor {
                         LATEST_GAS_FEATURE_VERSION,
                         InitialGasSchedule::initial(),
                         StorageGasParameters::latest(),
+                        false,
                         10000000000000,
                     ),
                     // coeff_buffer: BTreeMap::new(),
@@ -1065,9 +1083,8 @@ impl FakeExecutor {
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
-                NativeGasParameters::zeros(),
-                MiscGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
+                Ok(&AptosGasParameters::zeros()),
                 self.chain_id,
                 self.features.clone(),
                 timed_features,
@@ -1125,31 +1142,16 @@ impl FakeExecutor {
         state_view: &impl AptosMoveResolver,
         features: Features,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-        let (
-            gas_params_res,
-            storage_gas_params,
-            native_gas_params,
-            misc_gas_params,
-            gas_feature_version,
-        ) = get_gas_parameters(&features, state_view);
-
-        let gas_params = gas_params_res.unwrap();
-        let mut gas_meter =
-            MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
-                gas_feature_version,
-                gas_params.clone().vm,
-                storage_gas_params.unwrap(),
-                10000000000000,
-            )));
+        let (gas_params, storage_gas_params, gas_feature_version) =
+            get_gas_parameters(&features, state_view);
 
         let timed_features = TimedFeaturesBuilder::enable_all()
             .with_override_profile(TimedFeatureOverride::Testing)
             .build();
         let struct_constructors = features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let vm = MoveVmExt::new(
-            native_gas_params,
-            misc_gas_params,
             LATEST_GAS_FEATURE_VERSION,
+            gas_params.as_ref(),
             self.chain_id,
             features,
             timed_features,
@@ -1157,22 +1159,30 @@ impl FakeExecutor {
             false,
         )
         .unwrap();
+
         let mut session = vm.new_session(state_view, SessionId::void(), None);
-        let function =
+        let func =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             &mut session,
             senders,
             entry_fn.args().to_vec(),
-            &function,
+            &func,
             struct_constructors,
         )?;
+
+        let mut gas_meter = make_prod_gas_meter(
+            gas_feature_version,
+            gas_params.unwrap().clone().vm,
+            storage_gas_params.unwrap(),
+            false,
+            10_000_000_000_000.into(),
+        );
+
         let storage = TraversalStorage::new();
         session
             .execute_entry_function(
-                entry_fn.module(),
-                entry_fn.function(),
-                entry_fn.ty_args().to_vec(),
+                func,
                 args,
                 &mut gas_meter,
                 &mut TraversalContext::new(&storage),
@@ -1203,9 +1213,8 @@ impl FakeExecutor {
 
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
-            NativeGasParameters::zeros(),
-            MiscGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
+            Ok(&AptosGasParameters::zeros()),
             self.chain_id,
             self.features.clone(),
             // FIXME: should probably read the timestamp from storage.
@@ -1259,9 +1268,9 @@ impl FakeExecutor {
 }
 
 pub fn assert_outputs_equal(
-    txns_output_1: &Vec<TransactionOutput>,
+    txns_output_1: &[TransactionOutput],
     name1: &str,
-    txns_output_2: &Vec<TransactionOutput>,
+    txns_output_2: &[TransactionOutput],
     name2: &str,
 ) {
     assert_eq!(

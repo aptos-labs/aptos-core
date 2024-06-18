@@ -18,7 +18,7 @@ use crate::{
     AptosDB,
 };
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
-use aptos_schemadb::{schema::Schema, ReadOptions, DB};
+use aptos_schemadb::{schema::Schema, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use clap::Parser;
@@ -49,7 +49,7 @@ impl Cmd {
 
         println!(
             "Overall Progress: {:?}",
-            ledger_db.metadata_db().get_latest_version()?
+            ledger_db.metadata_db().get_synced_version()?
         );
 
         println!(
@@ -133,7 +133,7 @@ impl Cmd {
         {
             let mut iter = ledger_db
                 .transaction_accumulator_db_raw()
-                .iter::<TransactionAccumulatorSchema>(ReadOptions::default())?;
+                .iter::<TransactionAccumulatorSchema>()?;
             iter.seek_to_last();
             let position = iter.next().transpose()?.map(|kv| kv.0);
             let num_frozen_nodes = position.map(|p| p.to_postorder_index() + 1);
@@ -150,7 +150,7 @@ impl Cmd {
     where
         S: Schema<Key = Version>,
     {
-        let mut iter = db.iter::<S>(ReadOptions::default())?;
+        let mut iter = db.iter::<S>()?;
         iter.seek_to_last();
         Ok(iter.next().transpose()?.map(|kv| kv.0))
     }
