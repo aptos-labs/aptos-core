@@ -481,17 +481,17 @@ impl<'env> ModelBuilder<'env> {
         let target_modules = self
             .env
             .get_modules()
-            .filter(|module_env| module_env.is_target())
+            .filter(|module_env| module_env.is_target() && !module_env.is_script_module())
             .map(|module_env| module_env.get_id())
             .collect_vec();
         for cur_mod in target_modules {
             let cur_mod_env = self.env.get_module(cur_mod);
             let cur_mod_name = cur_mod_env.get_name().clone();
-            for need_to_be_friend_with in cur_mod_env.needs_be_friend_with() {
-                if need_to_be_friend_with == cur_mod {
+            for need_to_be_friended_by in cur_mod_env.need_to_be_friended_by() {
+                if need_to_be_friended_by == cur_mod {
                     continue;
                 }
-                let need_to_be_friend_with = self.env.get_module_data_mut(need_to_be_friend_with);
+                let need_to_be_friend_with = self.env.get_module_data_mut(need_to_be_friended_by);
                 let already_friended = need_to_be_friend_with
                     .friend_decls
                     .iter()
