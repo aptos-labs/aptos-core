@@ -926,8 +926,12 @@ fn create_network_sender_and_events(
             PeerManagerRequestSender::new(outbound_request_sender),
             ConnectionRequestSender::new(connection_outbound_sender),
         );
-        let network_events =
-            NetworkEvents::new(inbound_request_receiver, connection_inbound_receiver, None);
+        let network_events = NetworkEvents::new(
+            inbound_request_receiver,
+            connection_inbound_receiver,
+            None,
+            true,
+        );
 
         // Save the sender, events and receivers
         network_senders.insert(*network_id, network_sender);
