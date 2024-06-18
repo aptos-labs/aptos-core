@@ -253,8 +253,6 @@ async fn test_keyless_no_training_wheels_groth16_verifies() {
     let signed_txn =
         sign_transaction(&mut info, sig.clone(), pk.clone(), &jwk, &config, None, 1).await;
 
-    remove_training_wheels(&mut swarm, &mut cli).await;
-
     info!("Submit keyless Groth16 transaction");
     let result = info
         .client()
@@ -268,7 +266,7 @@ async fn test_keyless_no_training_wheels_groth16_verifies() {
 
 #[tokio::test]
 async fn test_keyless_groth16_verifies_using_rust_sdk() {
-    let (_tw_sk, _, _, mut swarm, mut cli) = setup_local_net().await;
+    let (_tw_sk, _, _, mut swarm, mut cli, root_idx) = setup_local_net().await;
 
     let jwt = get_sample_jwt_token();
     let blinder = get_sample_epk_blinder();
@@ -308,7 +306,7 @@ async fn test_keyless_groth16_verifies_using_rust_sdk() {
         .payload(aptos_stdlib::aptos_coin_transfer(recipient.address(), 100));
     let signed_txn = account.sign_with_transaction_builder(builder);
 
-    remove_training_wheels(&mut swarm, &mut cli).await;
+    remove_training_wheels(&mut swarm, &mut cli, root_idx).await;
 
     info!("Submit keyless Groth16 transaction");
     let result = swarm
