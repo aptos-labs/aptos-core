@@ -379,7 +379,7 @@ impl IndexerStreamCoordinator {
                 }
             }
             let size_info = Self::get_size_info(&raw_txn);
-            match converter
+            let res = converter
                 .try_into_onchain_transaction(timestamp, raw_txn)
                 .map(|mut txn| {
                     match txn {
@@ -404,13 +404,18 @@ impl IndexerStreamCoordinator {
                             sct.info.block_height = Some(block_height_bcs);
                             sct.info.epoch = Some(epoch_bcs);
                         },
+                        APITransaction::BlockEpilogueTransaction(ref mut bet) => {
+                            bet.info.block_height = Some(block_height_bcs);
+                            bet.info.epoch = Some(epoch_bcs);
+                        },
                         APITransaction::ValidatorTransaction(ref mut vt) => {
                             vt.info.block_height = Some(block_height_bcs);
                             vt.info.epoch = Some(epoch_bcs);
                         },
                     };
                     txn
-                }) {
+                });
+            match res {
                 Ok(transaction) => transactions.push((transaction, size_info)),
                 Err(err) => {
                     UNABLE_TO_FETCH_TRANSACTION.inc();

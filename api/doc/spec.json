@@ -14146,6 +14146,91 @@
           }
         }
       },
+      "BlockEndInfo": {
+        "type": "object",
+        "required": [
+          "block_gas_limit_reached",
+          "block_output_limit_reached",
+          "block_effective_block_gas_units",
+          "block_approx_output_size"
+        ],
+        "properties": {
+          "block_gas_limit_reached": {
+            "type": "boolean"
+          },
+          "block_output_limit_reached": {
+            "type": "boolean"
+          },
+          "block_effective_block_gas_units": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "block_approx_output_size": {
+            "type": "integer",
+            "format": "uint64"
+          }
+        }
+      },
+      "BlockEpilogueTransaction": {
+        "type": "object",
+        "description": "A block epilogue transaction",
+        "required": [
+          "version",
+          "hash",
+          "state_change_hash",
+          "event_root_hash",
+          "gas_used",
+          "success",
+          "vm_status",
+          "accumulator_root_hash",
+          "changes",
+          "timestamp"
+        ],
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_change_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "event_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_checkpoint_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "gas_used": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the transaction was successful"
+          },
+          "vm_status": {
+            "type": "string",
+            "description": "The VM status of the transaction, can tell useful information in a failure"
+          },
+          "accumulator_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "changes": {
+            "type": "array",
+            "description": "Final state of resources changed by the transaction",
+            "items": {
+              "$ref": "#/components/schemas/WriteSetChange"
+            }
+          },
+          "timestamp": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "block_end_info": {
+            "$ref": "#/components/schemas/BlockEndInfo"
+          }
+        }
+      },
       "BlockMetadataTransaction": {
         "type": "object",
         "description": "A block metadata transaction\n\nThis signifies the beginning of a block, and contains information\nabout the specific block",
@@ -14374,6 +14459,17 @@
             "items": {
               "$ref": "#/components/schemas/Event"
             }
+          }
+        }
+      },
+      "Ed25519": {
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },
@@ -14758,6 +14854,17 @@
           },
           "signature": {
             "$ref": "#/components/schemas/Signature"
+          }
+        }
+      },
+      "Keyless": {
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },
@@ -15260,29 +15367,48 @@
         "type": "object",
         "oneOf": [
           {
-            "$ref": "#/components/schemas/PublicKey_string(HexEncodedBytes)"
+            "$ref": "#/components/schemas/PublicKey_Ed25519"
           },
           {
-            "$ref": "#/components/schemas/PublicKey_string(HexEncodedBytes)"
+            "$ref": "#/components/schemas/PublicKey_Secp256k1Ecdsa"
           },
           {
-            "$ref": "#/components/schemas/PublicKey_string(HexEncodedBytes)"
+            "$ref": "#/components/schemas/PublicKey_Secp256r1Ecdsa"
           },
           {
-            "$ref": "#/components/schemas/PublicKey_string(HexEncodedBytes)"
+            "$ref": "#/components/schemas/PublicKey_Keyless"
           }
         ],
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "ed25519": "#/components/schemas/PublicKey_string(HexEncodedBytes)",
-            "secp256k1_ecdsa": "#/components/schemas/PublicKey_string(HexEncodedBytes)",
-            "secp256r1_ecdsa": "#/components/schemas/PublicKey_string(HexEncodedBytes)",
-            "keyless": "#/components/schemas/PublicKey_string(HexEncodedBytes)"
+            "ed25519": "#/components/schemas/PublicKey_Ed25519",
+            "secp256k1_ecdsa": "#/components/schemas/PublicKey_Secp256k1Ecdsa",
+            "secp256r1_ecdsa": "#/components/schemas/PublicKey_Secp256r1Ecdsa",
+            "keyless": "#/components/schemas/PublicKey_Keyless"
           }
         }
       },
-      "PublicKey_string(HexEncodedBytes)": {
+      "PublicKey_Ed25519": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "ed25519"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/Ed25519"
+          }
+        ]
+      },
+      "PublicKey_Keyless": {
         "allOf": [
           {
             "type": "object",
@@ -15297,7 +15423,45 @@
             }
           },
           {
-            "$ref": "#/components/schemas/HexEncodedBytes"
+            "$ref": "#/components/schemas/Keyless"
+          }
+        ]
+      },
+      "PublicKey_Secp256k1Ecdsa": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "secp256k1_ecdsa"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/Secp256k1Ecdsa"
+          }
+        ]
+      },
+      "PublicKey_Secp256r1Ecdsa": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "secp256r1_ecdsa"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/Secp256r1Ecdsa"
           }
         ]
       },
@@ -15361,33 +15525,74 @@
           }
         }
       },
+      "Secp256k1Ecdsa": {
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          }
+        }
+      },
+      "Secp256r1Ecdsa": {
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          }
+        }
+      },
       "Signature": {
         "type": "object",
         "oneOf": [
           {
-            "$ref": "#/components/schemas/Signature_string(HexEncodedBytes)"
+            "$ref": "#/components/schemas/Signature_Ed25519"
           },
           {
-            "$ref": "#/components/schemas/Signature_string(HexEncodedBytes)"
+            "$ref": "#/components/schemas/Signature_Secp256k1Ecdsa"
           },
           {
-            "$ref": "#/components/schemas/Signature_string(HexEncodedBytes)"
+            "$ref": "#/components/schemas/Signature_WebAuthn"
           },
           {
-            "$ref": "#/components/schemas/Signature_string(HexEncodedBytes)"
+            "$ref": "#/components/schemas/Signature_Keyless"
           }
         ],
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "ed25519": "#/components/schemas/Signature_string(HexEncodedBytes)",
-            "secp256k1_ecdsa": "#/components/schemas/Signature_string(HexEncodedBytes)",
-            "web_authn": "#/components/schemas/Signature_string(HexEncodedBytes)",
-            "keyless": "#/components/schemas/Signature_string(HexEncodedBytes)"
+            "ed25519": "#/components/schemas/Signature_Ed25519",
+            "secp256k1_ecdsa": "#/components/schemas/Signature_Secp256k1Ecdsa",
+            "web_authn": "#/components/schemas/Signature_WebAuthn",
+            "keyless": "#/components/schemas/Signature_Keyless"
           }
         }
       },
-      "Signature_string(HexEncodedBytes)": {
+      "Signature_Ed25519": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "ed25519"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/Ed25519"
+          }
+        ]
+      },
+      "Signature_Keyless": {
         "allOf": [
           {
             "type": "object",
@@ -15402,7 +15607,45 @@
             }
           },
           {
-            "$ref": "#/components/schemas/HexEncodedBytes"
+            "$ref": "#/components/schemas/Keyless"
+          }
+        ]
+      },
+      "Signature_Secp256k1Ecdsa": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "secp256k1_ecdsa"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/Secp256k1Ecdsa"
+          }
+        ]
+      },
+      "Signature_WebAuthn": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "web_authn"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/WebAuthn"
           }
         ]
       },
@@ -15560,6 +15803,9 @@
             "$ref": "#/components/schemas/Transaction_StateCheckpointTransaction"
           },
           {
+            "$ref": "#/components/schemas/Transaction_BlockEpilogueTransaction"
+          },
+          {
             "$ref": "#/components/schemas/Transaction_ValidatorTransaction"
           }
         ],
@@ -15571,6 +15817,7 @@
             "genesis_transaction": "#/components/schemas/Transaction_GenesisTransaction",
             "block_metadata_transaction": "#/components/schemas/Transaction_BlockMetadataTransaction",
             "state_checkpoint_transaction": "#/components/schemas/Transaction_StateCheckpointTransaction",
+            "block_epilogue_transaction": "#/components/schemas/Transaction_BlockEpilogueTransaction",
             "validator_transaction": "#/components/schemas/Transaction_ValidatorTransaction"
           }
         }
@@ -15801,6 +16048,25 @@
           },
           {
             "$ref": "#/components/schemas/MultiEd25519Signature"
+          }
+        ]
+      },
+      "Transaction_BlockEpilogueTransaction": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "block_epilogue_transaction"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/BlockEpilogueTransaction"
           }
         ]
       },
@@ -16176,6 +16442,17 @@
             "type": "array",
             "description": "Arguments of the function",
             "items": {}
+          }
+        }
+      },
+      "WebAuthn": {
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },

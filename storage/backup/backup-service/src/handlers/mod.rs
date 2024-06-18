@@ -2,11 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+mod bytes_sender;
 mod utils;
 
 use crate::handlers::utils::{
-    handle_rejection, reply_with_async_channel_writer, reply_with_bcs_bytes,
-    send_size_prefixed_bcs_bytes, unwrap_or_500, LATENCY_HISTOGRAM,
+    handle_rejection, reply_with_bcs_bytes, reply_with_bytes_sender, unwrap_or_500,
+    LATENCY_HISTOGRAM,
 };
 use aptos_crypto::hash::HashValue;
 use aptos_db::backup::backup_handler::BackupHandler;
@@ -45,8 +46,9 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> BoxedFilter<(impl Rep
     let bh = backup_handler.clone();
     let state_snapshot = warp::path!(Version)
         .map(move |version| {
-            reply_with_async_channel_writer(&bh, STATE_SNAPSHOT, |bh, sender| {
-                send_size_prefixed_bcs_bytes(bh.get_account_iter(version), sender)
+            reply_with_bytes_sender(&bh, STATE_SNAPSHOT, move |bh, sender| {
+                bh.get_account_iter(version)?
+                    .try_for_each(|record_res| sender.send_size_prefixed_bcs_bytes(record_res?))
             })
         })
         .recover(handle_rejection);
@@ -64,19 +66,10 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> BoxedFilter<(impl Rep
     let bh = backup_handler.clone();
     let epoch_ending_ledger_infos = warp::path!(u64 / u64)
         .map(move |start_epoch, end_epoch| {
-            // use async move block to group `bh` and the iterator into the same lifetime, since the
-            // latter references the former.
-            reply_with_async_channel_writer(
-                &bh,
-                EPOCH_ENDING_LEDGER_INFOS,
-                |bh, sender| async move {
-                    send_size_prefixed_bcs_bytes(
-                        bh.get_epoch_ending_ledger_info_iter(start_epoch, end_epoch),
-                        sender,
-                    )
-                    .await
-                },
-            )
+            reply_with_bytes_sender(&bh, EPOCH_ENDING_LEDGER_INFOS, move |bh, sender| {
+                bh.get_epoch_ending_ledger_info_iter(start_epoch, end_epoch)?
+                    .try_for_each(|record_res| sender.send_size_prefixed_bcs_bytes(record_res?))
+            })
         })
         .recover(handle_rejection);
 
@@ -84,14 +77,9 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> BoxedFilter<(impl Rep
     let bh = backup_handler.clone();
     let transactions = warp::path!(Version / usize)
         .map(move |start_version, num_transactions| {
-            // use async move block to group `bh` and the iterator into the same lifetime, since the
-            // latter references the former.
-            reply_with_async_channel_writer(&bh, TRANSACTIONS, |bh, sender| async move {
-                send_size_prefixed_bcs_bytes(
-                    bh.get_transaction_iter(start_version, num_transactions),
-                    sender,
-                )
-                .await
+            reply_with_bytes_sender(&bh, TRANSACTIONS, move |bh, sender| {
+                bh.get_transaction_iter(start_version, num_transactions)?
+                    .try_for_each(|record_res| sender.send_size_prefixed_bcs_bytes(record_res?))
             })
         })
         .recover(handle_rejection);

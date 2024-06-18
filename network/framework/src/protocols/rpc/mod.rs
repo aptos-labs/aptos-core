@@ -70,7 +70,7 @@ use bytes::Bytes;
 use error::RpcError;
 use futures::{
     channel::oneshot,
-    future::{BoxFuture, FusedFuture, Future, FutureExt},
+    future::{BoxFuture, FusedFuture, FutureExt},
     sink::SinkExt,
     stream::{FuturesUnordered, StreamExt},
 };
@@ -317,7 +317,7 @@ impl InboundRpcs {
     /// `futures::select!`.
     pub fn next_completed_response(
         &mut self,
-    ) -> impl Future<Output = Result<(RpcResponse, ProtocolId), RpcError>> + FusedFuture + '_ {
+    ) -> impl FusedFuture<Output = Result<(RpcResponse, ProtocolId), RpcError>> + '_ {
         self.inbound_rpc_tasks.select_next_some()
     }
 
@@ -598,7 +598,7 @@ impl OutboundRpcs {
     /// `futures::select!`.
     pub fn next_completed_request(
         &mut self,
-    ) -> impl Future<Output = (RequestId, Result<(f64, u64), RpcError>)> + FusedFuture + '_ {
+    ) -> impl FusedFuture<Output = (RequestId, Result<(f64, u64), RpcError>)> + '_ {
         self.outbound_rpc_tasks.select_next_some()
     }
 

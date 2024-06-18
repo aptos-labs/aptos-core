@@ -344,7 +344,9 @@ impl StorageConfig {
         let mut state_merkle_db_paths = ShardedDbPaths::default();
 
         if let Some(db_path_overrides) = self.db_path_overrides.as_ref() {
-            ledger_db_path = db_path_overrides.ledger_db_path.clone();
+            db_path_overrides
+                .ledger_db_path
+                .clone_into(&mut ledger_db_path);
 
             if let Some(state_kv_db_path) = db_path_overrides.state_kv_db_path.as_ref() {
                 state_kv_db_paths = ShardedDbPaths::new(state_kv_db_path);

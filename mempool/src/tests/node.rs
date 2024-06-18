@@ -576,7 +576,7 @@ fn setup_node_network_interface(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );
-    let network_events = NetworkEvents::new(network_notifs_rx, conn_status_rx, None);
+    let network_events = NetworkEvents::new(network_notifs_rx, conn_status_rx, None, true);
 
     (
         NodeNetworkInterface {

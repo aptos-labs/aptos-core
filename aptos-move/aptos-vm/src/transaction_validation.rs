@@ -188,6 +188,7 @@ pub(crate) fn run_multisig_prologue(
     session: &mut SessionExt,
     txn_data: &TransactionMetadata,
     payload: &Multisig,
+    features: &Features,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
@@ -196,7 +197,11 @@ pub(crate) fn run_multisig_prologue(
         bcs::to_bytes(&payload).map_err(|_| unreachable_error.clone())?
     } else {
         // Default to empty bytes if payload is not provided.
-        bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error)?
+        if features.is_abort_if_multisig_payload_mismatch_enabled() {
+            vec![]
+        } else {
+            bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error)?
+        }
     };
 
     session

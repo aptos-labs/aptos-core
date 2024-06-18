@@ -48,7 +48,7 @@ async fn test_consensus_events_rejected_txns() {
 
     let pool = smp.mempool.lock();
     // TODO: make less brittle to broadcast buckets changes
-    let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10);
+    let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10, None);
     assert_eq!(timeline.len(), 2);
     assert_eq!(timeline.first().unwrap(), &kept_txn);
 }
@@ -89,7 +89,7 @@ async fn test_mempool_notify_committed_txns() {
     let wait_for_commit = async {
         let pool = smp.mempool.lock();
         // TODO: make less brittle to broadcast buckets changes
-        let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10);
+        let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10, None);
         if timeline.len() == 10 && timeline.first().unwrap() == &kept_txn {
             return; // Mempool handled the commit notification
         }

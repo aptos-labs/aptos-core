@@ -720,12 +720,7 @@ impl<'a> FunctionGenerator<'a> {
         }
     }
 
-    fn gen_vector_load_push(
-        &mut self,
-        ctx: &BytecodeContext,
-        vec: &Vec<Constant>,
-        vec_type: &Type,
-    ) {
+    fn gen_vector_load_push(&mut self, ctx: &BytecodeContext, vec: &[Constant], vec_type: &Type) {
         let fun_ctx = ctx.fun_ctx;
         let elem_type = if let Type::Vector(el) = vec_type {
             el.as_ref().clone()

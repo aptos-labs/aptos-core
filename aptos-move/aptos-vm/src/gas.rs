@@ -6,7 +6,7 @@ use aptos_gas_algebra::{Gas, GasExpression, InternalGas};
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
     gas_feature_versions::RELEASE_V1_13, gas_params::txn::KEYLESS_BASE_COST, AptosGasParameters,
-    FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters, VMGasParameters,
+    FromOnChainGasSchedule, VMGasParameters,
 };
 use aptos_logger::{enabled, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
@@ -31,7 +31,7 @@ pub fn get_gas_config_from_storage(
     match GasScheduleV2::fetch_config(config_storage) {
         Some(gas_schedule) => {
             let feature_version = gas_schedule.feature_version;
-            let map = gas_schedule.to_btree_map();
+            let map = gas_schedule.into_btree_map();
             (
                 AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
                 feature_version,
@@ -39,7 +39,7 @@ pub fn get_gas_config_from_storage(
         },
         None => match GasSchedule::fetch_config(config_storage) {
             Some(gas_schedule) => {
-                let map = gas_schedule.to_btree_map();
+                let map = gas_schedule.into_btree_map();
                 (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
             },
             None => (Err("Neither gas schedule v2 nor v1 exists.".to_string()), 0),
@@ -53,8 +53,6 @@ pub fn get_gas_parameters(
 ) -> (
     Result<AptosGasParameters, String>,
     Result<StorageGasParameters, String>,
-    NativeGasParameters,
-    MiscGasParameters,
     u64,
 ) {
     let (mut gas_params, gas_feature_version) = get_gas_config_from_storage(config_storage);
@@ -97,22 +95,7 @@ pub fn get_gas_parameters(
         Err(err) => Err(format!("Failed to initialize storage gas params due to failure to load main gas parameters: {}", err)),
     };
 
-    // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
-    //            This only happens in a edge case that is probably related to write set transactions or genesis,
-    //            which logically speaking, shouldn't be handled by the VM at all.
-    //            We should clean up the logic here once we get that refactored.
-    let (native_gas_params, misc_gas_params) = match &gas_params {
-        Ok(gas_params) => (gas_params.natives.clone(), gas_params.vm.misc.clone()),
-        Err(_) => (NativeGasParameters::zeros(), MiscGasParameters::zeros()),
-    };
-
-    (
-        gas_params,
-        storage_gas_params,
-        native_gas_params,
-        misc_gas_params,
-        gas_feature_version,
-    )
+    (gas_params, storage_gas_params, gas_feature_version)
 }
 
 /// Gas meter used in the production (validator) setup.
