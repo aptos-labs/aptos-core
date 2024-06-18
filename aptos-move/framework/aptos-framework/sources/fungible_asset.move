@@ -182,6 +182,11 @@ module aptos_framework::fungible_asset {
         metadata: Object<Metadata>
     }
 
+    /// MutateMetadataRef can be used to directly modify the fungible asset's Metadata.
+    struct MutateMetadataRef has drop, store {
+        metadata: Object<Metadata>
+    }
+
     #[event]
     /// Emitted when fungible assets are deposited into a store.
     struct Deposit has drop, store {
@@ -399,6 +404,14 @@ module aptos_framework::fungible_asset {
     public fun generate_transfer_ref(constructor_ref: &ConstructorRef): TransferRef {
         let metadata = object::object_from_constructor_ref<Metadata>(constructor_ref);
         TransferRef { metadata }
+    }
+
+    /// Creates a mutate metadata ref that can be used to change the metadata information of fungible assets from the
+    /// given fungible object's constructor ref.
+    /// This can only be called at object creation time as constructor_ref is only available then.
+    public fun generate_mutate_metadata_ref(constructor_ref: &ConstructorRef): MutateMetadataRef {
+        let metadata = object::object_from_constructor_ref<Metadata>(constructor_ref);
+        MutateMetadataRef { metadata }
     }
 
     #[view]
@@ -628,6 +641,11 @@ module aptos_framework::fungible_asset {
 
     /// Get the underlying metadata object from the `BurnRef`.
     public fun burn_ref_metadata(ref: &BurnRef): Object<Metadata> {
+        ref.metadata
+    }
+
+    /// Get the underlying metadata object from the `MutateMetadataRef`.
+    public fun mutate_metadata_ref_metadata(ref: &MutateMetadataRef): Object<Metadata> {
         ref.metadata
     }
 
@@ -864,6 +882,35 @@ module aptos_framework::fungible_asset {
         deposit_with_ref(transfer_ref, to, fa);
     }
 
+    /// Mutate specified fields of the fungible asset's `Metadata`.
+    public fun mutate_metadata(
+        metadata_ref: &MutateMetadataRef,
+        name: Option<String>,
+        symbol: Option<String>,
+        decimals: Option<u8>,
+        icon_uri: Option<String>,
+        project_uri: Option<String>,
+    ) acquires Metadata {
+        let metadata_address = object::object_address(&metadata_ref.metadata);
+        let mutable_metadata = borrow_global_mut<Metadata>(metadata_address);
+
+        if(option::is_some(&name)){
+            mutable_metadata.name = option::extract(&mut name);
+        };
+        if(option::is_some(&symbol)){
+            mutable_metadata.symbol = option::extract(&mut symbol);
+        };
+        if(option::is_some(&decimals)){
+            mutable_metadata.decimals = option::extract(&mut decimals);
+        };
+        if(option::is_some(&icon_uri)){
+            mutable_metadata.icon_uri = option::extract(&mut icon_uri);
+        };
+        if(option::is_some(&project_uri)){
+            mutable_metadata.project_uri = option::extract(&mut project_uri);
+        };
+    }
+
     /// Create a fungible asset with zero amount.
     /// This can be useful when starting a series of computations where the initial value is 0.
     public fun zero<T: key>(metadata: Object<T>): FungibleAsset {
@@ -1087,7 +1134,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[test_only]
-    public fun init_test_metadata(constructor_ref: &ConstructorRef): (MintRef, TransferRef, BurnRef) {
+    public fun init_test_metadata(constructor_ref: &ConstructorRef): (MintRef, TransferRef, BurnRef, MutateMetadataRef) {
         add_fungibility(
             constructor_ref,
             option::some(100) /* max supply */,
@@ -1100,16 +1147,17 @@ module aptos_framework::fungible_asset {
         let mint_ref = generate_mint_ref(constructor_ref);
         let burn_ref = generate_burn_ref(constructor_ref);
         let transfer_ref = generate_transfer_ref(constructor_ref);
-        (mint_ref, transfer_ref, burn_ref)
+        let mutate_metadata_ref= generate_mutate_metadata_ref(constructor_ref);
+        (mint_ref, transfer_ref, burn_ref, mutate_metadata_ref)
     }
 
     #[test_only]
     public fun create_fungible_asset(
         creator: &signer
-    ): (MintRef, TransferRef, BurnRef, Object<Metadata>) {
+    ): (MintRef, TransferRef, BurnRef, MutateMetadataRef, Object<Metadata>) {
         let (creator_ref, token_object) = create_test_token(creator);
-        let (mint, transfer, burn) = init_test_metadata(&creator_ref);
-        (mint, transfer, burn, object::convert(token_object))
+        let (mint, transfer, burn, mutate_metadata) = init_test_metadata(&creator_ref);
+        (mint, transfer, burn, mutate_metadata, object::convert(token_object))
     }
 
     #[test_only]
@@ -1157,7 +1205,7 @@ module aptos_framework::fungible_asset {
 
     #[test(creator = @0xcafe)]
     fun test_create_and_remove_store(creator: &signer) acquires FungibleStore, FungibleAssetEvents, ConcurrentFungibleBalance {
-        let (_, _, _, metadata) = create_fungible_asset(creator);
+        let (_, _, _, _, metadata) = create_fungible_asset(creator);
         let creator_ref = object::create_object_from_account(creator);
         create_store(&creator_ref, metadata);
         let delete_ref = object::generate_delete_ref(&creator_ref);
@@ -1168,8 +1216,8 @@ module aptos_framework::fungible_asset {
     fun test_e2e_basic_flow(
         creator: &signer,
         aaron: &signer,
-    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
-        let (mint_ref, transfer_ref, burn_ref, test_token) = create_fungible_asset(creator);
+    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance, Metadata {
+        let (mint_ref, transfer_ref, burn_ref, mutate_metadata_ref, test_token) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
         let aaron_store = create_test_store(aaron, metadata);
@@ -1194,6 +1242,20 @@ module aptos_framework::fungible_asset {
 
         set_frozen_flag(&transfer_ref, aaron_store, true);
         assert!(is_frozen(aaron_store), 7);
+        // Mutate Metadata
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::some(string::utf8(b"mutated_name")),
+            option::some(string::utf8(b"mutated_symbol")),
+            option::none(),
+            option::none(),
+            option::none()
+        );
+        assert!(name(metadata) == string::utf8(b"mutated_name"), 8);
+        assert!(symbol(metadata) == string::utf8(b"mutated_symbol"), 9);
+        assert!(decimals(metadata) == 0, 10);
+        assert!(icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 11);
+        assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 12);
     }
 
     #[test(creator = @0xcafe)]
@@ -1201,7 +1263,7 @@ module aptos_framework::fungible_asset {
     fun test_frozen(
         creator: &signer
     ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
-        let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
+        let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref,  _) = create_fungible_asset(creator);
 
         let creator_store = create_test_store(creator, mint_ref.metadata);
         let fa = mint(&mint_ref, 100);
@@ -1214,7 +1276,7 @@ module aptos_framework::fungible_asset {
     fun test_mint_to_frozen(
         creator: &signer
     ) acquires FungibleStore, ConcurrentFungibleBalance, Supply, ConcurrentSupply, DispatchFunctionStore {
-        let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
+        let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref, _) = create_fungible_asset(creator);
 
         let creator_store = create_test_store(creator, mint_ref.metadata);
         set_frozen_flag(&transfer_ref, creator_store, true);
@@ -1227,7 +1289,7 @@ module aptos_framework::fungible_asset {
         creator: &signer
     ) {
         let (creator_ref, _) = create_test_token(creator);
-        let (mint_ref, _, _) = init_test_metadata(&creator_ref);
+        let (mint_ref, _, _, _) = init_test_metadata(&creator_ref);
         set_untransferable(&creator_ref);
 
         let creator_store = create_test_store(creator, mint_ref.metadata);
@@ -1239,7 +1301,7 @@ module aptos_framework::fungible_asset {
         creator: &signer,
         aaron: &signer,
     ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
-        let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
+        let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref, _) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
         let aaron_store = create_test_store(aaron, metadata);
@@ -1256,8 +1318,52 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(creator = @0xcafe)]
+    fun test_mutate_metadata(
+        creator: &signer
+    ) acquires Metadata {
+        let (mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) = create_fungible_asset(creator);
+        let metadata = mint_ref.metadata;
+
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::some(string::utf8(b"mutated_name")),
+            option::some(string::utf8(b"mutated_symbol")),
+            option::some(10),
+            option::some(string::utf8(b"http://www.mutated-example.com/favicon.ico")),
+            option::some(string::utf8(b"http://www.mutated-example.com"))
+        );
+        assert!(name(metadata) == string::utf8(b"mutated_name"), 1);
+        assert!(symbol(metadata) == string::utf8(b"mutated_symbol"), 2);
+        assert!(decimals(metadata) == 10, 3);
+        assert!(icon_uri(metadata) == string::utf8(b"http://www.mutated-example.com/favicon.ico"), 4);
+        assert!(project_uri(metadata) == string::utf8(b"http://www.mutated-example.com"), 5);
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_partial_mutate_metadata(
+        creator: &signer
+    ) acquires Metadata {
+        let (mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) = create_fungible_asset(creator);
+        let metadata = mint_ref.metadata;
+
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::some(string::utf8(b"mutated_name")),
+            option::some(string::utf8(b"mutated_symbol")),
+            option::none(),
+            option::none(),
+            option::none()
+        );
+        assert!(name(metadata) == string::utf8(b"mutated_name"), 8);
+        assert!(symbol(metadata) == string::utf8(b"mutated_symbol"), 9);
+        assert!(decimals(metadata) == 0, 10);
+        assert!(icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 11);
+        assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 12);
+    }
+
+    #[test(creator = @0xcafe)]
     fun test_merge_and_exact(creator: &signer) acquires Supply, ConcurrentSupply {
-        let (mint_ref, _transfer_ref, burn_ref, _) = create_fungible_asset(creator);
+        let (mint_ref, _transfer_ref, burn_ref, _mutate_metadata_ref, _) = create_fungible_asset(creator);
         let fa = mint(&mint_ref, 100);
         let cash = extract(&mut fa, 80);
         assert!(fa.amount == 20, 1);
@@ -1280,8 +1386,8 @@ module aptos_framework::fungible_asset {
     #[test(creator = @0xcafe, aaron = @0xface)]
     #[expected_failure(abort_code = 0x10006, location = Self)]
     fun test_fungible_asset_mismatch_when_merge(creator: &signer, aaron: &signer) {
-        let (_, _, _, metadata1) = create_fungible_asset(creator);
-        let (_, _, _, metadata2) = create_fungible_asset(aaron);
+        let (_, _, _, _, metadata1) = create_fungible_asset(creator);
+        let (_, _, _, _, metadata2) = create_fungible_asset(aaron);
         let base = FungibleAsset {
             metadata: metadata1,
             amount: 1,
@@ -1306,7 +1412,7 @@ module aptos_framework::fungible_asset {
         features::change_feature_flags_for_testing(fx, vector[], vector[supply_feature, balance_feature, default_balance_feature]);
 
         let (creator_ref, token_object) = create_test_token(creator);
-        let (mint_ref, transfer_ref, _burn) = init_test_metadata(&creator_ref);
+        let (mint_ref, transfer_ref, _burn, _mutate_metadata_ref) = init_test_metadata(&creator_ref);
         let test_token = object::convert<TestToken, Metadata>(token_object);
         assert!(exists<Supply>(object::object_address(&test_token)), 1);
         assert!(!exists<ConcurrentSupply>(object::object_address(&test_token)), 2);
@@ -1351,7 +1457,7 @@ module aptos_framework::fungible_asset {
         features::change_feature_flags_for_testing(fx, vector[supply_feature, balance_feature, default_balance_feature], vector[]);
 
         let (creator_ref, token_object) = create_test_token(creator);
-        let (mint_ref, transfer_ref, _burn) = init_test_metadata(&creator_ref);
+        let (mint_ref, transfer_ref, _burn, _mutate_metadata_ref) = init_test_metadata(&creator_ref);
         let test_token = object::convert<TestToken, Metadata>(token_object);
         assert!(!exists<Supply>(object::object_address(&test_token)), 1);
         assert!(exists<ConcurrentSupply>(object::object_address(&test_token)), 2);
