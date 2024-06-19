@@ -4,6 +4,7 @@
 
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
+use itertools::Itertools;
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
@@ -22,7 +23,10 @@ use move_stackless_bytecode::{
     stackless_bytecode_generator::BytecodeGeneratorContext,
 };
 use num::ToPrimitive;
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    vec,
+};
 
 // ======================================================================================
 // Entry
@@ -43,9 +47,11 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         results: vec![],
         code: vec![],
         local_names: BTreeMap::new(),
+        target_attrs: BTreeMap::new(),
+        src_attrs: BTreeMap::new(),
     };
     let mut scope = BTreeMap::new();
-    for Parameter(name, ty, _) in gen.func_env.get_parameters() {
+    for Parameter(name, ty, _loc) in gen.func_env.get_parameters() {
         let temp = gen.new_temp(ty);
         scope.insert(name, temp);
         gen.local_names.insert(temp, name);
@@ -66,11 +72,16 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
     gen.scopes.push(scope);
     let optional_def = gen.func_env.get_def().cloned();
     if let Some(def) = optional_def {
+        let result_node_id = def.result_node_id();
         let results = gen.results.clone();
         // Need to clone expression if present because of sharing issues with `gen`. However, because
         // of interning, clone is cheap.
-        gen.gen(results.clone(), &def);
-        gen.emit_with(def.result_node_id(), |attr| Bytecode::Ret(attr, results))
+        gen.gen(results.clone(), vec![result_node_id; results.len()], &def);
+        let target_nodes = vec![];
+        let src_nodes = vec![result_node_id; results.len()];
+        gen.emit_with(def.result_node_id(), target_nodes, src_nodes, |attr| {
+            Bytecode::Ret(attr, results)
+        })
     }
     let Generator {
         func_env,
@@ -84,6 +95,8 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         results: _,
         code,
         local_names,
+        target_attrs: target_locations,
+        src_attrs: src_locations,
     } = gen;
     let BytecodeGeneratorContext {
         loop_unrolling,
@@ -102,6 +115,8 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         loop_unrolling,
         loop_invariants,
         local_names,
+        target_locations,
+        src_locations,
     )
 }
 
@@ -138,6 +153,10 @@ struct Generator<'env> {
     code: Vec<Bytecode>,
     /// Local names, as far as they have names
     local_names: BTreeMap<TempIndex, Symbol>,
+    /// Maps the attribute id of a bytecode to the ids of the source temporaries.
+    src_attrs: BTreeMap<AttrId, Vec<AttrId>>,
+    /// Maps the attribute id of a bytecode to the ids of the target temporaries.
+    target_attrs: BTreeMap<AttrId, Vec<AttrId>>,
 }
 
 type Scope = BTreeMap<Symbol, TempIndex>;
@@ -166,10 +185,51 @@ impl<'env> Generator<'env> {
         self.code.push(b)
     }
 
-    /// Emit bytecode with attribute derived from node_id.
-    fn emit_with(&mut self, id: NodeId, mk: impl FnOnce(AttrId) -> Bytecode) {
-        let bytecode = mk(self.new_loc_attr(id));
+    /// Insert attribute ids derived from `arg_node_ids` for the target or source (controlled by `for_target`)
+    /// temporaries of bytecode with attr id `bytecode_attr`.
+    /// Panic on duplicate insertion.
+    fn insert_arg_attrs(
+        &mut self,
+        bytecode_attr: AttrId,
+        arg_node_ids: Vec<NodeId>,
+        for_target: bool,
+    ) {
+        let arg_attrs = arg_node_ids
+            .into_iter()
+            .map(|id| self.new_loc_attr(id))
+            .collect();
+        let old_node_ids = if for_target {
+            &mut self.target_attrs
+        } else {
+            &mut self.src_attrs
+        }
+        .insert(bytecode_attr, arg_attrs);
+        debug_assert!(
+            old_node_ids.is_none(),
+            "duplicate insertion of attribute ids"
+        )
+    }
+
+    /// Emit bytecode with attribute derived from `id`,
+    /// and target and source attribute ids derived from `target_node_ids` and `source_node_ids`.
+    fn emit_with(
+        &mut self,
+        id: NodeId,
+        target_node_ids: Vec<NodeId>,
+        source_node_ids: Vec<NodeId>,
+        mk: impl FnOnce(AttrId) -> Bytecode,
+    ) {
+        let bytecode_attr = self.new_loc_attr(id);
+        let bytecode = mk(bytecode_attr);
+        self.insert_arg_attrs(bytecode_attr, target_node_ids, true);
+        self.insert_arg_attrs(bytecode_attr, source_node_ids, false);
         self.emit(bytecode)
+    }
+
+    /// Emit bytecode with attribute derived from `id`.
+    /// The bytecode should not have any target or source temporaries.
+    fn emit_with_no_arg_id(&mut self, id: NodeId, mk: impl FnOnce(AttrId) -> Bytecode) {
+        self.emit_with(id, Vec::new(), Vec::new(), mk)
     }
 
     /// Shortcut to emit a Call instruction.
@@ -177,10 +237,12 @@ impl<'env> Generator<'env> {
         &mut self,
         id: NodeId,
         targets: Vec<TempIndex>,
+        target_node_ids: Vec<NodeId>,
         oper: BytecodeOperation,
         sources: Vec<TempIndex>,
+        source_node_ids: Vec<NodeId>,
     ) {
-        self.emit_with(id, |attr| {
+        self.emit_with(id, target_node_ids, source_node_ids, |attr| {
             Bytecode::Call(attr, targets, oper, sources, None)
         })
     }
@@ -324,13 +386,16 @@ impl<'env> Generator<'env> {
 // Dispatcher
 
 impl<'env> Generator<'env> {
-    fn gen(&mut self, targets: Vec<TempIndex>, exp: &Exp) {
+    fn gen(&mut self, targets: Vec<TempIndex>, target_node_ids: Vec<NodeId>, exp: &Exp) {
+        debug_assert!(targets.len() == target_node_ids.len());
         match exp.as_ref() {
             ExpData::Invalid(id) => self.internal_error(*id, "invalid expression"),
-            ExpData::Temporary(id, temp) => self.gen_temporary(targets, *id, *temp),
-            ExpData::Value(id, val) => self.gen_value(targets, *id, val),
-            ExpData::LocalVar(id, name) => self.gen_local(targets, *id, *name),
-            ExpData::Call(id, op, args) => self.gen_call(targets, *id, op, args),
+            ExpData::Temporary(id, temp) => {
+                self.gen_temporary(targets, target_node_ids, *id, *temp)
+            },
+            ExpData::Value(id, val) => self.gen_value(targets, target_node_ids, *id, val),
+            ExpData::LocalVar(id, name) => self.gen_local(targets, target_node_ids, *id, *name),
+            ExpData::Call(id, op, args) => self.gen_call(targets, target_node_ids, *id, op, args),
             ExpData::Sequence(_, exps) => {
                 for step in exps.iter().take(exps.len() - 1) {
                     // Result is thrown away, but for typing reasons, we need to introduce
@@ -341,11 +406,15 @@ impl<'env> Generator<'env> {
                         .into_iter()
                         .map(|ty| self.new_temp(ty))
                         .collect::<Vec<_>>();
-                    self.gen(step_targets.clone(), step);
+                    // The target ids are the node id of the step expression. For instance,
+                    // if the step is f(x) in { ...; f(x); ... } with type (T1, T2), then
+                    // the targets t1, t2 in the translated bytecode t1, t2 = f(x); are both assigned the id of f(x)
+                    let target_ids = vec![step.node_id(); step_targets.len()];
+                    self.gen(step_targets.clone(), target_ids, step);
                     self.release_temps(step_targets)
                 }
                 if let Some(final_step) = exps.last() {
-                    self.gen(targets, final_step)
+                    self.gen(targets, target_node_ids, final_step)
                 } else {
                     self.release_temps(targets)
                 }
@@ -366,14 +435,14 @@ impl<'env> Generator<'env> {
                         // temporary for `binding` and directly pass the temp for `x` into
                         // translation.
                         let local = self.find_local_for_pattern(*var_id, *sym, Some(&scope));
-                        self.without_reference_mode(|s| s.gen(vec![local], binding))
+                        self.without_reference_mode(|s| s.gen(vec![local], vec![*var_id], binding))
                     } else {
                         self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
                     }
                 }
                 // Compile the body
                 self.scopes.push(scope);
-                self.gen(targets, body);
+                self.gen(targets, target_node_ids, body);
                 self.scopes.pop();
             },
             ExpData::Mutate(id, lhs, rhs) => {
@@ -400,32 +469,45 @@ impl<'env> Generator<'env> {
                         ),
                     );
                 }
-                self.emit_call(*id, targets, BytecodeOperation::WriteRef, vec![
-                    lhs_temp, rhs_temp,
-                ])
+                let src_ids = vec![lhs.node_id(), rhs.node_id()];
+                self.emit_call(
+                    *id,
+                    targets,
+                    target_node_ids,
+                    BytecodeOperation::WriteRef,
+                    vec![lhs_temp, rhs_temp],
+                    src_ids,
+                )
             },
             ExpData::Assign(id, lhs, rhs) => self.gen_assign(*id, lhs, rhs, None),
             ExpData::Return(id, exp) => {
                 let results = self.results.clone();
-                self.gen(results.clone(), exp);
-                self.emit_with(*id, |attr| Bytecode::Ret(attr, results))
+                // The target ids are the node ids of `exp`. For instance,
+                // if `exp` has type (T1, T2), then the generated bytecode is
+                // t1, t2 = exp; return t1, t2;
+                // and the ids of t1, t2 in the first assignment are both the id of `exp`
+                let results_ids = vec![exp.node_id(); results.len()];
+                self.gen(results.clone(), results_ids.clone(), exp);
+                self.emit_with(*id, Vec::new(), results_ids, |attr| {
+                    Bytecode::Ret(attr, results)
+                })
             },
             ExpData::IfElse(id, cond, then_exp, else_exp) => {
                 let cond_temp = self.gen_escape_auto_ref_arg(cond, false);
                 let then_label = self.new_label(*id);
                 let else_label = self.new_label(*id);
                 let end_label = self.new_label(*id);
-                self.emit_with(*id, |attr| {
+                self.emit_with(*id, Vec::new(), vec![cond.node_id()], |attr| {
                     Bytecode::Branch(attr, then_label, else_label, cond_temp)
                 });
                 let then_id = then_exp.node_id();
-                self.emit_with(then_id, |attr| Bytecode::Label(attr, then_label));
-                self.gen(targets.clone(), then_exp);
-                self.emit_with(then_id, |attr| Bytecode::Jump(attr, end_label));
+                self.emit_with_no_arg_id(then_id, |attr| Bytecode::Label(attr, then_label));
+                self.gen(targets.clone(), target_node_ids.clone(), then_exp);
+                self.emit_with_no_arg_id(then_id, |attr| Bytecode::Jump(attr, end_label));
                 let else_id = else_exp.node_id();
-                self.emit_with(else_id, |attr| Bytecode::Label(attr, else_label));
-                self.gen(targets, else_exp);
-                self.emit_with(else_id, |attr| Bytecode::Label(attr, end_label));
+                self.emit_with_no_arg_id(else_id, |attr| Bytecode::Label(attr, else_label));
+                self.gen(targets, target_node_ids, else_exp);
+                self.emit_with_no_arg_id(else_id, |attr| Bytecode::Label(attr, end_label));
             },
             ExpData::Loop(id, body) => {
                 let continue_label = self.new_label(*id);
@@ -434,11 +516,11 @@ impl<'env> Generator<'env> {
                     continue_label,
                     break_label,
                 });
-                self.emit_with(*id, |attr| Bytecode::Label(attr, continue_label));
-                self.gen(vec![], body);
+                self.emit_with_no_arg_id(*id, |attr| Bytecode::Label(attr, continue_label));
+                self.gen(vec![], Vec::new(), body);
                 self.loops.pop();
-                self.emit_with(*id, |attr| Bytecode::Jump(attr, continue_label));
-                self.emit_with(*id, |attr| Bytecode::Label(attr, break_label));
+                self.emit_with_no_arg_id(*id, |attr| Bytecode::Jump(attr, continue_label));
+                self.emit_with_no_arg_id(*id, |attr| Bytecode::Label(attr, break_label));
             },
             ExpData::LoopCont(id, do_continue) => {
                 if let Some(LoopContext {
@@ -451,7 +533,7 @@ impl<'env> Generator<'env> {
                     } else {
                         *break_label
                     };
-                    self.emit_with(*id, |attr| Bytecode::Jump(attr, target))
+                    self.emit_with_no_arg_id(*id, |attr| Bytecode::Jump(attr, target))
                 } else {
                     self.error(*id, "missing enclosing loop statement")
                 }
@@ -467,7 +549,7 @@ impl<'env> Generator<'env> {
                 };
                 let (_, spec) = ExpRewriter::new(self.env(), &mut replacer)
                     .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
-                self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
+                self.emit_with_no_arg_id(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
             ExpData::Invoke(id, _, _) | ExpData::Lambda(id, _, _) => {
                 self.internal_error(*id, format!("not yet implemented: {:?}", exp))
@@ -483,11 +565,19 @@ impl<'env> Generator<'env> {
 // Values
 
 impl<'env> Generator<'env> {
-    fn gen_value(&mut self, target: Vec<TempIndex>, id: NodeId, val: &Value) {
+    fn gen_value(
+        &mut self,
+        target: Vec<TempIndex>,
+        target_node_ids: Vec<NodeId>,
+        id: NodeId,
+        val: &Value,
+    ) {
         let target = self.require_unary_target(id, target);
         let ty = self.get_node_type(id);
         let cons = self.to_constant(id, ty, val);
-        self.emit_with(id, |attr| Bytecode::Load(attr, target, cons))
+        self.emit_with(id, target_node_ids, vec![id], |attr| {
+            Bytecode::Load(attr, target, cons)
+        })
     }
 
     /// Convert a value from AST world into a constant as expected in bytecode.
@@ -555,16 +645,32 @@ impl<'env> Generator<'env> {
 // Locals
 
 impl<'env> Generator<'env> {
-    fn gen_local(&mut self, targets: Vec<TempIndex>, id: NodeId, name: Symbol) {
+    fn gen_local(
+        &mut self,
+        targets: Vec<TempIndex>,
+        targets_node_ids: Vec<NodeId>,
+        id: NodeId,
+        name: Symbol,
+    ) {
         let target = self.require_unary_target(id, targets);
         let attr = self.new_loc_attr(id);
         let temp = self.find_local(id, name);
+
+        self.insert_arg_attrs(attr, targets_node_ids, true);
+        self.src_attrs.insert(attr, vec![attr]);
+
         self.emit(Bytecode::Assign(attr, target, temp, AssignKind::Inferred));
     }
 
-    fn gen_temporary(&mut self, targets: Vec<TempIndex>, id: NodeId, temp: TempIndex) {
+    fn gen_temporary(
+        &mut self,
+        targets: Vec<TempIndex>,
+        targets_node_ids: Vec<NodeId>,
+        id: NodeId,
+        temp: TempIndex,
+    ) {
         let target = self.require_unary_target(id, targets);
-        self.emit_with(id, |attr| {
+        self.emit_with(id, targets_node_ids, vec![id], |attr| {
             Bytecode::Assign(attr, target, temp, AssignKind::Inferred)
         })
     }
@@ -574,12 +680,29 @@ impl<'env> Generator<'env> {
 // Calls
 
 impl<'env> Generator<'env> {
-    fn gen_call(&mut self, targets: Vec<TempIndex>, id: NodeId, op: &Operation, args: &[Exp]) {
+    fn gen_call(
+        &mut self,
+        targets: Vec<TempIndex>,
+        targets_node_ids: Vec<NodeId>,
+        id: NodeId,
+        op: &Operation,
+        args: &[Exp],
+    ) {
         match op {
-            Operation::Vector => self.gen_op_call(targets, id, BytecodeOperation::Vector, args),
-            Operation::Freeze(explicit) => {
-                self.gen_op_call(targets, id, BytecodeOperation::FreezeRef(*explicit), args)
-            },
+            Operation::Vector => self.gen_op_call(
+                targets,
+                targets_node_ids,
+                id,
+                BytecodeOperation::Vector,
+                args,
+            ),
+            Operation::Freeze(explicit) => self.gen_op_call(
+                targets,
+                targets_node_ids,
+                id,
+                BytecodeOperation::FreezeRef(*explicit),
+                args,
+            ),
             Operation::Tuple => {
                 if targets.len() != args.len() {
                     self.internal_error(
@@ -591,14 +714,22 @@ impl<'env> Generator<'env> {
                         ),
                     )
                 } else {
-                    for (target, arg) in targets.into_iter().zip(args.iter()) {
-                        self.gen(vec![target], arg)
+                    for ((target, target_id), arg) in
+                        targets.into_iter().zip(targets_node_ids).zip(args.iter())
+                    {
+                        self.gen(vec![target], vec![target_id], arg)
                     }
                 }
             },
             Operation::Pack(mid, sid) => {
                 let inst = self.env().get_node_instantiation(id);
-                self.gen_op_call(targets, id, BytecodeOperation::Pack(*mid, *sid, inst), args)
+                self.gen_op_call(
+                    targets,
+                    targets_node_ids,
+                    id,
+                    BytecodeOperation::Pack(*mid, *sid, inst),
+                    args,
+                )
             },
             Operation::Select(mid, sid, fid) => {
                 let target = self.require_unary_target(id, targets);
@@ -612,6 +743,7 @@ impl<'env> Generator<'env> {
                 {
                     self.gen_select(
                         target,
+                        targets_node_ids,
                         id,
                         mid.qualified_inst(*sid, inst.to_vec()),
                         *fid,
@@ -649,6 +781,7 @@ impl<'env> Generator<'env> {
                 let (mid, sid, inst) = inst[0].require_struct();
                 self.gen_op_call(
                     targets,
+                    targets_node_ids,
                     id,
                     BytecodeOperation::Exists(mid, sid, inst.to_owned()),
                     args,
@@ -659,6 +792,7 @@ impl<'env> Generator<'env> {
                 let (mid, sid, inst) = inst[0].require_struct();
                 self.gen_op_call(
                     targets,
+                    targets_node_ids,
                     id,
                     BytecodeOperation::BorrowGlobal(mid, sid, inst.to_owned()),
                     args,
@@ -669,6 +803,7 @@ impl<'env> Generator<'env> {
                 let (mid, sid, inst) = inst[0].require_struct();
                 self.gen_op_call(
                     targets,
+                    targets_node_ids,
                     id,
                     BytecodeOperation::MoveTo(mid, sid, inst.to_owned()),
                     args,
@@ -679,6 +814,7 @@ impl<'env> Generator<'env> {
                 let (mid, sid, inst) = inst[0].require_struct();
                 self.gen_op_call(
                     targets,
+                    targets_node_ids,
                     id,
                     BytecodeOperation::MoveFrom(mid, sid, inst.to_owned()),
                     args,
@@ -692,7 +828,9 @@ impl<'env> Generator<'env> {
                 } else {
                     AssignKind::Move
                 };
-                self.emit_with(id, |attr| Bytecode::Assign(attr, target, arg, assign_kind))
+                self.emit_with(id, targets_node_ids, vec![args[0].node_id()], |attr| {
+                    Bytecode::Assign(attr, target, arg, assign_kind)
+                })
             },
             Operation::Borrow(kind) => {
                 let target = self.require_unary_target(id, targets);
@@ -705,37 +843,87 @@ impl<'env> Generator<'env> {
                 if let Type::Reference(ReferenceKind::Immutable, ty) = self.temp_type(target) {
                     self.temps[target] = Type::Reference(*kind, ty.clone());
                 }
-                self.gen_borrow(target, id, *kind, &arg)
+                self.gen_borrow(target, targets_node_ids, id, *kind, &arg)
             },
             Operation::Abort => {
                 let arg = self.require_unary_arg(id, args);
                 let temp = self.gen_escape_auto_ref_arg(&arg, false);
-                self.emit_with(id, |attr| Bytecode::Abort(attr, temp))
+                self.emit_with(id, Vec::new(), vec![arg.node_id()], |attr| {
+                    Bytecode::Abort(attr, temp)
+                })
             },
-            Operation::Deref => self.gen_op_call(targets, id, BytecodeOperation::ReadRef, args),
+            Operation::Deref => self.gen_op_call(
+                targets,
+                targets_node_ids,
+                id,
+                BytecodeOperation::ReadRef,
+                args,
+            ),
             Operation::MoveFunction(m, f) => {
-                self.gen_function_call(targets, id, m.qualified(*f), args)
+                self.gen_function_call(targets, targets_node_ids, id, m.qualified(*f), args)
             },
-            Operation::Cast => self.gen_cast_call(targets, id, args),
-            Operation::Add => self.gen_op_call(targets, id, BytecodeOperation::Add, args),
-            Operation::Sub => self.gen_op_call(targets, id, BytecodeOperation::Sub, args),
-            Operation::Mul => self.gen_op_call(targets, id, BytecodeOperation::Mul, args),
-            Operation::Mod => self.gen_op_call(targets, id, BytecodeOperation::Mod, args),
-            Operation::Div => self.gen_op_call(targets, id, BytecodeOperation::Div, args),
-            Operation::BitOr => self.gen_op_call(targets, id, BytecodeOperation::BitOr, args),
-            Operation::BitAnd => self.gen_op_call(targets, id, BytecodeOperation::BitAnd, args),
-            Operation::Xor => self.gen_op_call(targets, id, BytecodeOperation::Xor, args),
-            Operation::Shl => self.gen_op_call(targets, id, BytecodeOperation::Shl, args),
-            Operation::Shr => self.gen_op_call(targets, id, BytecodeOperation::Shr, args),
-            Operation::And => self.gen_logical_shortcut(true, targets, id, args),
-            Operation::Or => self.gen_logical_shortcut(false, targets, id, args),
-            Operation::Eq => self.gen_op_call(targets, id, BytecodeOperation::Eq, args),
-            Operation::Neq => self.gen_op_call(targets, id, BytecodeOperation::Neq, args),
-            Operation::Lt => self.gen_op_call(targets, id, BytecodeOperation::Lt, args),
-            Operation::Gt => self.gen_op_call(targets, id, BytecodeOperation::Gt, args),
-            Operation::Le => self.gen_op_call(targets, id, BytecodeOperation::Le, args),
-            Operation::Ge => self.gen_op_call(targets, id, BytecodeOperation::Ge, args),
-            Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
+            Operation::Cast => self.gen_cast_call(targets, targets_node_ids, id, args),
+            Operation::Add => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Add, args)
+            },
+            Operation::Sub => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Sub, args)
+            },
+            Operation::Mul => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Mul, args)
+            },
+            Operation::Mod => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Mod, args)
+            },
+            Operation::Div => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Div, args)
+            },
+            Operation::BitOr => self.gen_op_call(
+                targets,
+                targets_node_ids,
+                id,
+                BytecodeOperation::BitOr,
+                args,
+            ),
+            Operation::BitAnd => self.gen_op_call(
+                targets,
+                targets_node_ids,
+                id,
+                BytecodeOperation::BitAnd,
+                args,
+            ),
+            Operation::Xor => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Xor, args)
+            },
+            Operation::Shl => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Shl, args)
+            },
+            Operation::Shr => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Shr, args)
+            },
+            Operation::And => self.gen_logical_shortcut(true, targets, targets_node_ids, id, args),
+            Operation::Or => self.gen_logical_shortcut(false, targets, targets_node_ids, id, args),
+            Operation::Eq => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Eq, args)
+            },
+            Operation::Neq => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Neq, args)
+            },
+            Operation::Lt => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Lt, args)
+            },
+            Operation::Gt => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Gt, args)
+            },
+            Operation::Le => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Le, args)
+            },
+            Operation::Ge => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Ge, args)
+            },
+            Operation::Not => {
+                self.gen_op_call(targets, targets_node_ids, id, BytecodeOperation::Not, args)
+            },
 
             Operation::NoOp => {}, // do nothing
 
@@ -792,7 +980,13 @@ impl<'env> Generator<'env> {
         }
     }
 
-    fn gen_cast_call(&mut self, targets: Vec<TempIndex>, id: NodeId, args: &[Exp]) {
+    fn gen_cast_call(
+        &mut self,
+        targets: Vec<TempIndex>,
+        targets_node_ids: Vec<NodeId>,
+        id: NodeId,
+        args: &[Exp],
+    ) {
         let ty = self.get_node_type(id);
         let bytecode_op = match ty {
             Type::Primitive(PrimitiveType::U8) => BytecodeOperation::CastU8,
@@ -806,26 +1000,31 @@ impl<'env> Generator<'env> {
                 return;
             },
         };
-        self.gen_op_call(targets, id, bytecode_op, args)
+        self.gen_op_call(targets, targets_node_ids, id, bytecode_op, args)
     }
 
     fn gen_op_call(
         &mut self,
         targets: Vec<TempIndex>,
+        targets_node_ids: Vec<NodeId>,
         id: NodeId,
         op: BytecodeOperation,
         args: &[Exp],
     ) {
         let arg_temps = self.gen_arg_list(args);
-        self.emit_with(id, |attr| {
-            Bytecode::Call(attr, targets, op, arg_temps, None)
-        })
+        self.emit_with(
+            id,
+            targets_node_ids,
+            args.iter().map(|e| e.node_id()).collect(),
+            |attr| Bytecode::Call(attr, targets, op, arg_temps, None),
+        )
     }
 
     fn gen_logical_shortcut(
         &mut self,
         is_and: bool,
         targets: Vec<TempIndex>,
+        targets_node_ids: Vec<NodeId>,
         id: NodeId,
         args: &[Exp],
     ) {
@@ -834,32 +1033,33 @@ impl<'env> Generator<'env> {
         let true_label = self.new_label(id);
         let false_label = self.new_label(id);
         let done_label = self.new_label(id);
-        self.emit_with(id, |attr| {
+        self.emit_with(id, Vec::new(), vec![args[0].node_id()], |attr| {
             Bytecode::Branch(attr, true_label, false_label, arg1)
         });
-        self.emit_with(id, |attr| Bytecode::Label(attr, true_label));
+        self.emit_with_no_arg_id(id, |attr| Bytecode::Label(attr, true_label));
         if is_and {
-            self.gen(vec![target], &args[1]);
+            self.gen(vec![target], targets_node_ids.clone(), &args[1]);
         } else {
-            self.emit_with(id, |attr| {
+            self.emit_with(id, targets_node_ids.clone(), vec![id], |attr| {
                 Bytecode::Load(attr, target, Constant::Bool(true))
             })
         }
-        self.emit_with(id, |attr| Bytecode::Jump(attr, done_label));
-        self.emit_with(id, |attr| Bytecode::Label(attr, false_label));
+        self.emit_with_no_arg_id(id, |attr| Bytecode::Jump(attr, done_label));
+        self.emit_with_no_arg_id(id, |attr| Bytecode::Label(attr, false_label));
         if is_and {
-            self.emit_with(id, |attr| {
+            self.emit_with(id, targets_node_ids.clone(), vec![id], |attr| {
                 Bytecode::Load(attr, target, Constant::Bool(false))
             })
         } else {
-            self.gen(vec![target], &args[1]);
+            self.gen(vec![target], targets_node_ids, &args[1]);
         }
-        self.emit_with(id, |attr| Bytecode::Label(attr, done_label));
+        self.emit_with_no_arg_id(id, |attr| Bytecode::Label(attr, done_label));
     }
 
     fn gen_function_call(
         &mut self,
         targets: Vec<TempIndex>,
+        targets_node_ids: Vec<NodeId>,
         id: NodeId,
         fun: QualifiedId<FunId>,
         args: &[Exp],
@@ -886,8 +1086,9 @@ impl<'env> Generator<'env> {
             .zip(param_types)
             .map(|(e, t)| self.maybe_convert(e, &t))
             .collect::<Vec<_>>();
+        let args_node_ids = args.iter().map(|e| e.node_id()).collect_vec();
         let args = self.gen_arg_list(&args);
-        self.emit_with(id, |attr| {
+        self.emit_with(id, targets_node_ids, args_node_ids, |attr| {
             Bytecode::Call(
                 attr,
                 targets,
@@ -956,7 +1157,7 @@ impl<'env> Generator<'env> {
                 let ty =
                     Type::Reference(self.reference_mode_kind, Box::new(self.get_node_type(*id)));
                 let temp = self.new_temp(ty);
-                self.gen(vec![temp], exp);
+                self.gen(vec![temp], vec![*id], exp);
                 temp
             },
             _ => {
@@ -969,7 +1170,7 @@ impl<'env> Generator<'env> {
                     self.get_node_type(id)
                 };
                 let temp = self.new_temp(ty);
-                self.gen(vec![temp], exp);
+                self.gen(vec![temp], vec![id], exp);
                 temp
             },
         }
@@ -997,8 +1198,10 @@ impl<'env> Generator<'env> {
             self.emit_call(
                 exp.node_id(),
                 vec![temp_ref],
+                vec![exp.node_id()],
                 BytecodeOperation::BorrowLoc,
                 vec![temp],
+                vec![exp.node_id()],
             );
             temp_ref
         }
@@ -1016,11 +1219,19 @@ impl<'env> Generator<'env> {
 // References
 
 impl<'env> Generator<'env> {
-    fn gen_borrow(&mut self, target: TempIndex, id: NodeId, kind: ReferenceKind, arg: &Exp) {
+    fn gen_borrow(
+        &mut self,
+        target: TempIndex,
+        target_node_id: Vec<NodeId>,
+        id: NodeId,
+        kind: ReferenceKind,
+        arg: &Exp,
+    ) {
         match arg.as_ref() {
             ExpData::Call(_arg_id, Operation::Select(mid, sid, fid), args) => {
                 return self.gen_borrow_field(
                     target,
+                    target_node_id,
                     id,
                     kind,
                     mid.qualified(*sid),
@@ -1028,28 +1239,60 @@ impl<'env> Generator<'env> {
                     &self.require_unary_arg(id, args),
                 )
             },
-            ExpData::LocalVar(_arg_id, sym) => return self.gen_borrow_local(target, id, *sym),
-            ExpData::Temporary(_arg_id, temp) => return self.gen_borrow_temp(target, id, *temp),
+            ExpData::LocalVar(arg_id, sym) => {
+                return self.gen_borrow_local(target, target_node_id, id, *sym, *arg_id)
+            },
+            ExpData::Temporary(arg_id, temp) => {
+                return self.gen_borrow_temp(target, target_node_id, id, *temp, *arg_id)
+            },
             _ => {},
         }
         // Borrow the temporary, allowing to do e.g. `&(1+2)`. Note to match
         // this capability in the stack machine, we need to keep those temps in locals
         // and can't manage them on the stack during stackification.
         let temp = self.gen_arg(arg, false);
-        self.gen_borrow_temp(target, id, temp)
+        self.gen_borrow_temp(target, target_node_id, id, temp, arg.node_id())
     }
 
-    fn gen_borrow_local(&mut self, target: TempIndex, id: NodeId, name: Symbol) {
-        self.gen_borrow_temp(target, id, self.find_local(id, name))
+    fn gen_borrow_local(
+        &mut self,
+        target: TempIndex,
+        target_node_id: Vec<NodeId>,
+        id: NodeId,
+        name: Symbol,
+        src_id: NodeId,
+    ) {
+        self.gen_borrow_temp(
+            target,
+            target_node_id,
+            id,
+            self.find_local(id, name),
+            src_id,
+        )
     }
 
-    fn gen_borrow_temp(&mut self, target: TempIndex, id: NodeId, temp: TempIndex) {
-        self.emit_call(id, vec![target], BytecodeOperation::BorrowLoc, vec![temp]);
+    fn gen_borrow_temp(
+        &mut self,
+        target: TempIndex,
+        target_node_id: Vec<NodeId>,
+        id: NodeId,
+        temp: TempIndex,
+        src_id: NodeId,
+    ) {
+        self.emit_call(
+            id,
+            vec![target],
+            target_node_id,
+            BytecodeOperation::BorrowLoc,
+            vec![temp],
+            vec![src_id],
+        );
     }
 
     fn gen_borrow_field(
         &mut self,
         target: TempIndex,
+        target_node_id: Vec<NodeId>,
         id: NodeId,
         kind: ReferenceKind,
         struct_id: QualifiedId<StructId>,
@@ -1072,6 +1315,7 @@ impl<'env> Generator<'env> {
             self.emit_call(
                 id,
                 vec![target],
+                target_node_id,
                 BytecodeOperation::BorrowField(
                     struct_id.module_id,
                     struct_id.id,
@@ -1079,6 +1323,7 @@ impl<'env> Generator<'env> {
                     field_offset,
                 ),
                 vec![temp],
+                vec![oper.node_id()],
             );
         } else {
             self.internal_error(id, "inconsistent type in select expression")
@@ -1097,6 +1342,7 @@ impl<'env> Generator<'env> {
     fn gen_select(
         &mut self,
         target: TempIndex,
+        target_node_id: Vec<NodeId>,
         id: NodeId,
         str: QualifiedInstId<StructId>,
         field: FieldId,
@@ -1144,13 +1390,20 @@ impl<'env> Generator<'env> {
         self.emit_call(
             id,
             vec![borrow_dest],
+            target_node_id.clone(),
             BytecodeOperation::BorrowField(str.module_id, str.id, str.inst, field_offset),
             vec![oper_temp],
+            vec![oper.node_id()],
         );
         if need_read_ref {
-            self.emit_call(id, vec![target], BytecodeOperation::ReadRef, vec![
-                borrow_dest,
-            ])
+            self.emit_call(
+                id,
+                vec![target],
+                target_node_id,
+                BytecodeOperation::ReadRef,
+                vec![borrow_dest],
+                vec![oper.node_id()],
+            );
         }
     }
 }
@@ -1167,7 +1420,7 @@ impl<'env> Generator<'env> {
             self.gen_tuple_assign(id, pat_args, exp, next_scope)
         } else {
             let arg = self.gen_escape_auto_ref_arg(exp, false);
-            self.gen_assign_from_temp(id, pat, arg, next_scope)
+            self.gen_assign_from_temp(id, pat, arg, exp.node_id(), next_scope)
         }
     }
 
@@ -1195,8 +1448,9 @@ impl<'env> Generator<'env> {
                         .iter()
                         .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
                         .collect::<Vec<_>>();
-                    for (pat, temp) in pats.iter().zip(temps.into_iter()) {
-                        self.gen_assign_from_temp(id, pat, temp, next_scope)
+                    let temps_ids = args.iter().map(|e| e.node_id()).collect_vec();
+                    for ((pat, temp), id) in pats.iter().zip(temps.into_iter()).zip(temps_ids) {
+                        self.gen_assign_from_temp(id, pat, temp, id, next_scope)
                     }
                 } else {
                     // No overlap, or a 1-tuple: just do point-wise assignment.
@@ -1206,11 +1460,11 @@ impl<'env> Generator<'env> {
                 }
             },
             _ => {
-                // The type checker has ensured that this expression represents  tuple
+                // The type checker has ensured that this expression represents tuple
                 let (temps, cont_assigns) = self.flatten_patterns(pats, next_scope);
-                self.gen(temps, exp);
+                self.gen(temps, pats.iter().map(|p| p.node_id()).collect(), exp);
                 for (cont_id, cont_pat, cont_temp) in cont_assigns {
-                    self.gen_assign_from_temp(cont_id, &cont_pat, cont_temp, next_scope)
+                    self.gen_assign_from_temp(cont_id, &cont_pat, cont_temp, cont_id, next_scope)
                 }
             },
         }
@@ -1223,7 +1477,9 @@ impl<'env> Generator<'env> {
         id: &NodeId,
         str: &QualifiedInstId<StructId>,
         arg: TempIndex,
+        arg_id: NodeId,
         temps: Vec<TempIndex>,
+        temps_ids: Vec<NodeId>,
         ref_kind: ReferenceKind,
     ) {
         let struct_env = self.env().get_struct(str.to_qualified_id());
@@ -1231,6 +1487,7 @@ impl<'env> Generator<'env> {
         for (field, input_temp) in struct_env.get_fields().zip(temps.clone()) {
             temp_to_field_offsets.insert(input_temp, field.get_offset());
         }
+        let temp_to_id: BTreeMap<_, _> = temps.into_iter().zip(temps_ids).collect();
         for (temp, field_offset) in temp_to_field_offsets {
             self.with_reference_mode(|s, entering| {
                 if entering {
@@ -1246,6 +1503,7 @@ impl<'env> Generator<'env> {
                 s.emit_call(
                     *id,
                     vec![temp],
+                    vec![temp_to_id[&temp]],
                     BytecodeOperation::BorrowField(
                         str.module_id,
                         str.id,
@@ -1253,6 +1511,7 @@ impl<'env> Generator<'env> {
                         field_offset,
                     ),
                     vec![arg],
+                    vec![arg_id],
                 );
             });
         }
@@ -1263,21 +1522,22 @@ impl<'env> Generator<'env> {
         id: NodeId,
         pat: &Pattern,
         arg: TempIndex,
+        arg_id: NodeId,
         next_scope: Option<&Scope>,
     ) {
         match pat {
-            Pattern::Wildcard(_) => {
+            Pattern::Wildcard(wildcard_id) => {
                 let ty = self.temp_type(arg).to_owned();
                 let temp = self.new_temp(ty);
                 // Assign to a temporary to allow stackless bytecode checkers to report any errors
                 // due to the assignment.
-                self.emit_with(id, |attr| {
+                self.emit_with(id, vec![*wildcard_id], vec![arg_id], |attr| {
                     Bytecode::Assign(attr, temp, arg, AssignKind::Inferred)
                 })
             },
             Pattern::Var(var_id, sym) => {
                 let local = self.find_local_for_pattern(*var_id, *sym, next_scope);
-                self.emit_with(id, |attr| {
+                self.emit_with(id, vec![*var_id], vec![arg_id], |attr| {
                     Bytecode::Assign(attr, local, arg, AssignKind::Inferred)
                 })
             },
@@ -1290,17 +1550,27 @@ impl<'env> Generator<'env> {
                     } else {
                         ReferenceKind::Mutable
                     };
-                    self.gen_borrow_field_for_unpack_ref(id, str, arg, temps, ref_kind);
+                    self.gen_borrow_field_for_unpack_ref(
+                        id,
+                        str,
+                        arg,
+                        arg_id,
+                        temps,
+                        args.iter().map(|p| p.node_id()).collect_vec(),
+                        ref_kind,
+                    );
                 } else {
                     self.emit_call(
                         *id,
                         temps,
+                        args.iter().map(|p| p.node_id()).collect(),
                         BytecodeOperation::Unpack(str.module_id, str.id, str.inst.to_owned()),
                         vec![arg],
+                        vec![arg_id],
                     );
                 }
                 for (cont_id, cont_pat, cont_temp) in cont_assigns {
-                    self.gen_assign_from_temp(cont_id, &cont_pat, cont_temp, next_scope)
+                    self.gen_assign_from_temp(cont_id, &cont_pat, cont_temp, cont_id, next_scope)
                 }
             },
             Pattern::Tuple(id, _) => self.error(*id, "tuple not allowed here"),
@@ -1386,7 +1656,12 @@ impl<'env> Generator<'env> {
             .into_iter()
             .map(|p| p.0)
             .collect::<Vec<_>>();
-        let rhs_vars = rhs.free_vars_and_used_params(&param_symbols);
+        let mut rhs_vars = rhs
+            .used_temporaries_with_types(self.env())
+            .into_iter()
+            .map(|t| param_symbols[t.0])
+            .collect::<BTreeSet<_>>();
+        rhs_vars.append(&mut rhs.free_vars());
         lhs_vars.intersection(&rhs_vars).next().is_some()
     }
 }

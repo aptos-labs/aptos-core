@@ -90,6 +90,10 @@ pub struct FunctionData {
     pub ghost_type_param_count: usize,
     /// A map for temporaries to associated name, if available.
     pub local_names: BTreeMap<TempIndex, Symbol>,
+    /// Maps the attribute id of a bytecode to the ids of the source temporaries.
+    pub target_attrs: BTreeMap<AttrId, Vec<AttrId>>,
+    /// Maps the attribute id of a bytecode to the ids of the source temporaries.
+    pub src_attrs: BTreeMap<AttrId, Vec<AttrId>>,
 }
 
 impl<'env> FunctionTarget<'env> {
@@ -265,7 +269,7 @@ impl<'env> FunctionTarget<'env> {
     }
 
     /// Returns a printable name for a local. If the local is a temporary which has
-    /// no name, returns `local`, otherwise `local <name>`. The returned value
+    /// no name, returns "value", otherwise "local <name>". The returned value
     /// should produce correct English whether a name is available or not.
     pub fn get_local_name_for_error_message(&self, temp: TempIndex) -> String {
         if let Some(sym) = self.data.local_names.get(&temp) {
@@ -498,6 +502,8 @@ impl FunctionData {
         loop_unrolling: BTreeMap<AttrId, usize>,
         loop_invariants: BTreeSet<AttrId>,
         local_names: BTreeMap<TempIndex, Symbol>,
+        target_attrs: BTreeMap<AttrId, Vec<AttrId>>,
+        src_attrs: BTreeMap<AttrId, Vec<AttrId>>,
     ) -> Self {
         let modify_targets = func_env.get_modify_targets();
         FunctionData {
@@ -517,6 +523,8 @@ impl FunctionData {
             modify_targets,
             ghost_type_param_count: 0,
             local_names,
+            target_attrs,
+            src_attrs,
         }
     }
 
