@@ -42,6 +42,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation
+
 jobs:
   determine-test-metadata:
     runs-on: ubuntu-latest
@@ -70,7 +74,7 @@ jobs:
       TXNS_TO_SKIP: 0
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
-      RUNS_ON: "high-perf-docker-with-local-ssd"
+      RUNS_ON: "runs-on,cpu=64,family=m6id,hdd=100,image=ubuntu22-full-x64,run-id=${{ github.run_id }}"
       TIMEOUT_MINUTES: 480
 
   replay-mainnet:
@@ -90,7 +94,7 @@ jobs:
       TXNS_TO_SKIP: 12253479 12277499 148358668
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
-      RUNS_ON: "high-perf-docker-with-local-ssd"
+      RUNS_ON: "runs-on,cpu=64,family=m6id,hdd=100,image=ubuntu22-full-x64,run-id=${{ github.run_id }}"
       TIMEOUT_MINUTES: 480
 
   test-replay:
@@ -108,5 +112,5 @@ jobs:
       TXNS_TO_SKIP: 0
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
-      RUNS_ON: "high-perf-docker-with-local-ssd"
+      RUNS_ON: "runs-on,cpu=64,family=m6id,hdd=100,image=ubuntu22-full-x64,run-id=${{ github.run_id }}"
       TIMEOUT_MINUTES: 120 # increase test replay timeout to capture more flaky errors
