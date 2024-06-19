@@ -731,7 +731,7 @@ serde-name = "0.1.1"
 serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde_with = "3.4.0"
-serde_yaml = "0.8.24"
+serde_yaml = "0.9.34"
 shadow-rs = "0.16.2"
 simplelog = "0.9.0"
 smallbitvec = "2.5.1"

@@ -315,7 +315,7 @@ dependencies = [
  "self_update",
  "serde",
  "serde_json",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "server-framework",
  "shadow-rs",
  "tempfile",
@@ -572,7 +572,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "thiserror",
  "tokio",
  "tokio-io-timeout",
@@ -824,7 +824,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_merge",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "tempfile",
  "thiserror",
  "url",
@@ -901,7 +901,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "sha3 0.9.1",
  "strum_macros 0.24.3",
  "tempfile",
@@ -1608,7 +1608,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "tokio",
  "url",
 ]
@@ -1698,7 +1698,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "tempfile",
  "termcolor",
  "thiserror",
@@ -1728,7 +1728,7 @@ dependencies = [
  "rand 0.7.3",
  "random_word",
  "reqwest",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "tokio",
  "url",
 ]
@@ -1916,7 +1916,7 @@ dependencies = [
  "bcs 0.1.4",
  "rand 0.7.3",
  "serde",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
 ]
 
 [[package]]
@@ -2153,7 +2153,7 @@ dependencies = [
  "clap 4.4.14",
  "prometheus",
  "serde",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "tempfile",
  "tokio",
  "toml 0.7.8",
@@ -2910,7 +2910,7 @@ dependencies = [
  "futures",
  "once_cell",
  "rand 0.7.3",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "tokio",
  "url",
 ]
@@ -3013,7 +3013,7 @@ dependencies = [
  "rstack-self",
  "serde",
  "serde_json",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "tokio",
  "url",
 ]
@@ -3040,7 +3040,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "thiserror",
  "tokio",
  "url",
@@ -3306,7 +3306,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "sha3 0.9.1",
  "strum 0.24.1",
  "strum_macros 0.24.3",
@@ -3413,7 +3413,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "tokio",
  "url",
  "warp",
@@ -3550,7 +3550,7 @@ dependencies = [
  "once_cell",
  "serde-generate",
  "serde-reflection",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "tempfile",
  "textwrap 0.15.2",
  "which",
@@ -3900,7 +3900,7 @@ dependencies = [
  "reqwest-retry",
  "serde",
  "serde_json",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "thiserror",
  "tokio",
  "tracing",
@@ -4141,7 +4141,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_with",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "thiserror",
@@ -8223,7 +8223,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "serde-reflection",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
 ]
 
 [[package]]
@@ -10808,7 +10808,7 @@ dependencies = [
  "petgraph 0.5.1",
  "regex",
  "serde",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "sha2 0.9.9",
  "tempfile",
  "termcolor",
@@ -12436,7 +12436,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
- "serde_yaml 0.9.30",
+ "serde_yaml 0.9.34+deprecated",
  "thiserror",
  "tokio",
  "url",
@@ -14382,9 +14382,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.9.30"
+version = "0.9.34+deprecated"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1bf28c79a99f70ee1f1d83d10c875d2e70618417fda01ad1785e027579d9d38"
+checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
 dependencies = [
  "indexmap 2.2.5",
  "itoa",
@@ -14810,7 +14810,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.34+deprecated",
  "tokio",
  "url",
  "walkdir",
@@ -16315,9 +16315,9 @@ dependencies = [
 
 [[package]]
 name = "unsafe-libyaml"
-version = "0.2.10"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab4c90930b95a82d00dc9e9ac071b4991924390d46cbd0dfe566148667605e4b"
+checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
 
 [[package]]
 name = "untrusted"

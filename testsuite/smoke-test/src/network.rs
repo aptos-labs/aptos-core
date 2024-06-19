@@ -22,6 +22,7 @@ use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_temppath::TempPath;
 use std::{
     collections::HashMap,
+    fs::File,
     path::Path,
     sync::Arc,
     time::{Duration, Instant},
@@ -308,6 +309,5 @@ fn add_identity_to_config(
 }
 
 pub fn write_peerset_to_file(path: &Path, peers: PeerSet) {
-    let file_contents = serde_yaml::to_vec(&peers).unwrap();
-    std::fs::write(path, file_contents).unwrap();
+    serde_yaml::to_writer(File::create(path).unwrap(), &peers).unwrap();
 }

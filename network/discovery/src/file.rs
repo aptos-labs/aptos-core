@@ -67,7 +67,7 @@ mod tests {
     use aptos_temppath::TempPath;
     use aptos_types::{network_address::NetworkAddress, PeerId};
     use futures::StreamExt;
-    use std::{collections::HashSet, str::FromStr, sync::Arc};
+    use std::{collections::HashSet, fs::File, str::FromStr, sync::Arc};
     use tokio::time::sleep;
 
     fn create_listener(path: Arc<TempPath>) -> Receiver<ConnectivityRequest> {
@@ -94,8 +94,7 @@ mod tests {
     }
 
     fn write_peer_set(peers: &PeerSet, path: &Path) {
-        let file_contents = serde_yaml::to_vec(peers).unwrap();
-        std::fs::write(path, file_contents).unwrap();
+        serde_yaml::to_writer(File::create(path).unwrap(), &peers).unwrap();
     }
 
     #[tokio::test]
@@ -131,8 +130,7 @@ mod tests {
             PeerId::random(),
             Peer::new(addrs, keys, PeerRole::Downstream),
         );
-        let file_contents = serde_yaml::to_vec(&peers).unwrap();
-        std::fs::write(path.as_ref(), file_contents).unwrap();
+        serde_yaml::to_writer(File::create(path.as_ref()).unwrap(), &peers).unwrap();
         // Clear old items
         while conn_mgr_reqs_rx.next().await.is_none() {}
 

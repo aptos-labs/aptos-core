@@ -683,8 +683,9 @@ impl ReleaseConfig {
     }
 
     pub fn save_config<P: AsRef<Path>>(&self, output_file: P) -> Result<()> {
-        let contents =
-            serde_yaml::to_vec(&self).map_err(|e| anyhow!("failed to generate config: {:?}", e))?;
+        let contents = serde_yaml::to_string(&self)
+            .map_err(|e| anyhow!("failed to generate config: {:?}", e))?
+            .into_bytes();
         let mut file = File::create(output_file.as_ref())
             .map_err(|e| anyhow!("failed to create file: {:?}", e))?;
         file.write_all(&contents)
