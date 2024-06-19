@@ -196,7 +196,6 @@ impl Ord for BatchSortKey {
 #[derive(Debug)]
 pub enum ProofQueueCommand {
     // Proof manager sends this command to add the proofs to the proof queue
-    // We send back (remaining_txns, remaining_proofs) to the proof manager
     AddProofs(Vec<ProofOfStore>),
     // Batch coordinator sends this command to add the received batches to the proof queue.
     // For each transaction, the proof queue stores the list of batches containing the transaction.
@@ -212,7 +211,6 @@ pub enum ProofQueueCommand {
     },
     // Proof manager sends this command to mark these batches as committed and
     // update the block timestamp.
-    // We send back the (remaining_txns, remaining_proofs) to the proof manager
     MarkCommitted(Vec<BatchInfo>, u64),
 }
 
@@ -347,30 +345,25 @@ impl ProofQueue {
         self.inc_remaining(&author, num_txns);
     }
 
-    /// return true when quorum store is back pressured
-    pub(crate) fn qs_back_pressure_1(&self) -> BackPressure {
-        let (remaining_total_txn_num, remaining_total_proof_num) = self.remaining_txns_and_proofs();
-        if remaining_total_txn_num > self.back_pressure_total_txn_limit {
-            info!(
-                "QuorumStore back pressured Adding Proofs: txn_count: {}, proof_count: {}",
-                remaining_total_txn_num, remaining_total_proof_num
-            );
-        }
-        BackPressure {
-            txn_count: remaining_total_txn_num > self.back_pressure_total_txn_limit,
-            proof_count: remaining_total_proof_num > self.back_pressure_total_proof_limit,
+    pub(crate) fn add_batch_summaries(
+        &mut self,
+        batch_summaries: Vec<(BatchInfo, Vec<TransactionSummary>)>,
+    ) {
+        for (batch_info, txn_summaries) in batch_summaries {
+            let batch_key = BatchKey::from_info(&batch_info);
+            for txn_summary in txn_summaries {
+                self.txn_summary_to_batches
+                    .entry(txn_summary)
+                    .or_default()
+                    .insert(batch_key.clone());
+            }
+            self.batches_with_txn_summary.insert(batch_key);
         }
     }
 
     /// return true when quorum store is back pressured
-    pub(crate) fn qs_back_pressure_2(&self) -> BackPressure {
+    pub(crate) fn qs_back_pressure(&self) -> BackPressure {
         let (remaining_total_txn_num, remaining_total_proof_num) = self.remaining_txns_and_proofs();
-        if remaining_total_txn_num > self.back_pressure_total_txn_limit {
-            info!(
-                "QuorumStore back pressured Committed: txn_count: {}, proof_count: {}",
-                remaining_total_txn_num, remaining_total_proof_num
-            );
-        }
         BackPressure {
             txn_count: remaining_total_txn_num > self.back_pressure_total_txn_limit,
             proof_count: remaining_total_proof_num > self.back_pressure_total_proof_limit,
@@ -394,9 +387,6 @@ impl ProofQueue {
         let mut cur_txns = 0;
         let mut excluded_txns = 0;
         let mut full = false;
-
-        counters::PULL_PROOFS_MAX_TXNS.observe(max_txns as f64);
-        counters::PULL_PROOFS_MAX_BYTES.observe(max_bytes as f64);
 
         let mut iters = vec![];
         for (_, batches) in self.author_to_batches.iter() {
@@ -606,7 +596,7 @@ impl ProofQueue {
                             self.push(proof);
                         }
 
-                        let updated_back_pressure = self.qs_back_pressure_1();
+                        let updated_back_pressure = self.qs_back_pressure();
                         if updated_back_pressure != back_pressure {
                             back_pressure = updated_back_pressure;
                             if back_pressure_tx.send(back_pressure).await.is_err() {
@@ -635,7 +625,7 @@ impl ProofQueue {
                         self.mark_committed(batches);
                         self.handle_updated_block_timestamp(block_timestamp);
 
-                        let updated_back_pressure = self.qs_back_pressure_2();
+                        let updated_back_pressure = self.qs_back_pressure();
                         if updated_back_pressure != back_pressure {
                             back_pressure = updated_back_pressure;
                             if back_pressure_tx.send(back_pressure).await.is_err() {
@@ -644,16 +634,7 @@ impl ProofQueue {
                         }
                     },
                     ProofQueueCommand::AddBatches(batch_summaries) => {
-                        for (batch_info, txn_summaries) in batch_summaries {
-                            let batch_key = BatchKey::from_info(&batch_info);
-                            for txn_summary in txn_summaries {
-                                self.txn_summary_to_batches
-                                    .entry(txn_summary)
-                                    .or_default()
-                                    .insert(batch_key.clone());
-                            }
-                            self.batches_with_txn_summary.insert(batch_key);
-                        }
+                        self.add_batch_summaries(batch_summaries);
                     },
                 }
             }

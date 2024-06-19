@@ -748,16 +748,6 @@ pub static NUM_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Histogram for the number of input txns in the committed blocks.
-pub static NUM_INPUT_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "aptos_consensus_num_input_txns_per_block",
-        "Histogram for the number of input txns per (committed) blocks.",
-        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
-    )
-    .unwrap()
-});
-
 /// Histogram for the number of bytes in the committed blocks.
 pub static NUM_BYTES_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
@@ -1069,8 +1059,6 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlo
         observe_block(block.block().timestamp_usecs(), BlockStage::COMMITTED);
         let txn_status = block.compute_result().compute_status_for_input_txns();
         NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
-        NUM_INPUT_TXNS_PER_BLOCK
-            .observe(block.block().payload().map_or(0, |payload| payload.len()) as f64);
         NUM_BYTES_PER_BLOCK
             .observe(block.block().payload().map_or(0, |payload| payload.size()) as f64);
         COMMITTED_BLOCKS_COUNT.inc();

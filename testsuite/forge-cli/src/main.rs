@@ -2442,35 +2442,10 @@ fn pfn_const_tps(
         60 * 60 * 2 // 2 hours; avoid epoch changes which can introduce noise
     };
 
-    // Increase the concurrency level
-    const USE_CRAZY_MACHINES: bool = false;
-
-    let mut forge_config = ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-            optimize_state_sync_for_throughput(config);
-
-            config.consensus_observer.publisher_enabled = true;
-
-            // Increase the concurrency level
-            if USE_CRAZY_MACHINES {
-                config.execution.concurrency_level = 58;
-            }
-        }))
-        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
-            // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-            optimize_state_sync_for_throughput(config);
-
-            config.consensus_observer.observer_enabled = true;
-
-            // Increase the concurrency level
-            if USE_CRAZY_MACHINES {
-                config.execution.concurrency_level = 58;
-            }
-        }))
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
@@ -2481,14 +2456,14 @@ fn pfn_const_tps(
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(12000)
+            SuccessCriteria::new(95)
                 .add_no_restarts()
                 .add_max_expired_tps(0)
                 .add_max_failed_submission_tps(0)
                 // Percentile thresholds are set to +1 second of non-PFN tests. Should be revisited.
-                .add_latency_threshold(5., LatencyType::P50)
-                .add_latency_threshold(6., LatencyType::P90)
-                .add_latency_threshold(7., LatencyType::P99)
+                .add_latency_threshold(2.5, LatencyType::P50)
+                .add_latency_threshold(4., LatencyType::P90)
+                .add_latency_threshold(5., LatencyType::P99)
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup and at most 10% of the run
                     (duration.as_secs() / 10).max(60),
@@ -2497,21 +2472,7 @@ fn pfn_const_tps(
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
                 }),
-        );
-
-    if USE_CRAZY_MACHINES {
-        forge_config = forge_config
-            .with_validator_resource_override(NodeResourceOverride {
-                cpu_cores: Some(58),
-                memory_gib: Some(200),
-            })
-            .with_fullnode_resource_override(NodeResourceOverride {
-                cpu_cores: Some(58),
-                memory_gib: Some(200),
-            })
-    }
-
-    forge_config
+        )
 }
 
 /// This test runs a performance benchmark where the network includes
