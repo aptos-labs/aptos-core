@@ -37,5 +37,9 @@ name = "check_artifact"
 path = "src/cli/check_artifact.rs"
 
 [[bin]]
+name = "run_transactional"
+path = "src/cli/run_transactional.rs"
+
+[[bin]]
 name = "flame"
 path = "src/cli/flame.rs"
