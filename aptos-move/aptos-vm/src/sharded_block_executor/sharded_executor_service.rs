@@ -226,6 +226,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             self.shard_id,
             self.num_shards
         );
+        // Setting shard id for the transaction provider
+        static_set_shard_id(self.shard_id);
 
         let mut cumulative_txns = 0;
         loop {
@@ -253,8 +255,6 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     break;
                 },
             };
-            // Setting shard id for the transaction provider
-            static_set_shard_id(self.shard_id);
 
             cumulative_txns += num_txns_in_the_block;
             /*let blocking_transactions_provider_clone = blocking_transactions_provider.clone();

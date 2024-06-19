@@ -17,6 +17,5 @@ pub static REMOTE_EXECUTOR_TIMER_V2: Lazy<HistogramVec> = Lazy::new(|| {
         // metric labels (dimensions)
         &["shard_id", "name"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
-    )
-        .unwrap()
+    ).unwrap()
 });
