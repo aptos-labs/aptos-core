@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
+use aptos_framework::extended_checks::get_all_attribute_names;
 use move_command_line_common::testing::{
     add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT, EXP_EXT_V2,
 };
-use move_compiler::shared::known_attributes::KnownAttribute;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{
     compilation::{build_plan::BuildPlan, model_builder::ModelBuilder},
@@ -36,7 +36,7 @@ fn run_test_impl(
     compiler_version: CompilerVersion,
 ) -> datatest_stable::Result<String> {
     let mut compiler_config = CompilerConfig {
-        known_attributes: KnownAttribute::get_all_attribute_names().clone(),
+        known_attributes: get_all_attribute_names().clone(),
         ..Default::default()
     };
     compiler_config.compiler_version = Some(compiler_version);
