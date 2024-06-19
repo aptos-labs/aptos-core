@@ -519,7 +519,7 @@ impl ConsensusObserver {
 
             // If the payload exists, add the commit decision to the pending blocks
             if payload_exists {
-                info!(
+                debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Adding decision to pending block: {}",
                         commit_decision.ledger_info().commit_info()
@@ -529,7 +529,7 @@ impl ConsensusObserver {
 
                 // If we are not in sync mode, forward the commit decision to the execution pipeline
                 if self.sync_handle.is_none() {
-                    info!(
+                    debug!(
                         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                             "Forwarding commit decision to the execution pipeline: {}",
                             commit_decision.ledger_info().commit_info()
@@ -574,7 +574,7 @@ impl ConsensusObserver {
         // Process the message based on the type
         match message {
             ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
-                info!(
+                debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Received ordered block: {}, from peer: {}!",
                         ordered_block.ordered_proof.commit_info(),
@@ -584,7 +584,7 @@ impl ConsensusObserver {
                 self.process_ordered_block(ordered_block).await;
             },
             ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
-                info!(
+                debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Received commit decision: {}, from peer: {}!",
                         commit_decision.ledger_info().commit_info(),
@@ -594,7 +594,7 @@ impl ConsensusObserver {
                 self.process_commit_decision(commit_decision);
             },
             ConsensusObserverDirectSend::BlockPayload(block_payload) => {
-                info!(
+                debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Received block payload: {}, from peer: {}!",
                         block_payload.block, peer_network_id
@@ -615,7 +615,7 @@ impl ConsensusObserver {
 
         // If the block is a child of our last block, we can insert it
         if self.get_last_block().id() == blocks.first().unwrap().parent_id() {
-            info!(
+            debug!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                     "Adding ordered block to the pending blocks: {}",
                     ordered_proof.commit_info()
@@ -629,7 +629,7 @@ impl ConsensusObserver {
 
             // If we are not in sync mode, forward the blocks to the execution pipeline
             if self.sync_handle.is_none() {
-                info!(
+                debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Forwarding blocks to the execution pipeline: {}",
                         ordered_proof.commit_info()
