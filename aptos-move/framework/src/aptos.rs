@@ -106,7 +106,6 @@ impl ReleaseTarget {
                 with_source_maps: false,
                 with_error_map: true,
                 named_addresses: Default::default(),
-                override_std: None,
                 install_dir: None,
                 with_docs: true,
                 docgen_options: Some(DocgenOptions {
