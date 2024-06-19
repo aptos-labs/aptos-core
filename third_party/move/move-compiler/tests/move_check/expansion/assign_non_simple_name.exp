@@ -1,3 +1,9 @@
+warning[W09001]: unused alias
+  ┌─ tests/move_check/expansion/assign_non_simple_name.move:6:15
+  │
+6 │     use 0x42::X;
+  │               ^ Unused 'use' of alias 'X'. Consider removing it
+
 error[E01010]: syntax item restricted to spec contexts
    ┌─ tests/move_check/expansion/assign_non_simple_name.move:16:9
    │

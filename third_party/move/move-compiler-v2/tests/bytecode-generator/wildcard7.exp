@@ -14,7 +14,7 @@ module 0xc0ffee::m {
           {
             let y: u8 = Move(x);
             {
-              let (_, q: u64): (u8, u64) = Tuple(x, 30);
+              let (_: u8, q: u64): (u8, u64) = Tuple(x, 30);
               y
             }
           }
