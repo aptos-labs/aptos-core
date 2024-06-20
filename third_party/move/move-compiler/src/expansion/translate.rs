@@ -9,7 +9,7 @@ use crate::{
     diagnostics::{codes::DeprecatedItem, Diagnostic},
     expansion::{
         aliases::{AliasMap, AliasSet},
-        ast::{self as E, Address, Fields, ModuleIdent, ModuleIdent_, SpecId},
+        ast::{self as E, Address, Fields, ModuleAccess_, ModuleIdent, ModuleIdent_, SpecId},
         byte_string, hex_string,
     },
     parser::ast::{
@@ -1395,7 +1395,7 @@ fn struct_def_(
         name,
         abilities: abilities_vec,
         type_parameters: pty_params,
-        fields: pfields,
+        layout: pfields,
     } = pstruct;
     let was_in_deprecated_code = context.enter_possibly_deprecated_member(&name.0);
     let attributes = flatten_attributes(context, AttributePosition::Struct, attributes);
@@ -1404,46 +1404,87 @@ fn struct_def_(
         .aliases
         .shadow_for_type_parameters(type_parameters.iter().map(|tp| &tp.name));
     let abilities = ability_set(context, "modifier", abilities_vec);
-    let fields = struct_fields(context, &name, pfields);
+    let fields = struct_layout(context, &name, pfields);
     let sdef = E::StructDefinition {
         attributes,
         loc,
         abilities,
         type_parameters,
-        fields,
+        layout: fields,
     };
     context.set_to_outer_scope(old_aliases);
     context.set_in_deprecated_code(was_in_deprecated_code);
     (name, sdef)
 }
 
-fn struct_fields(
+fn struct_layout(
     context: &mut Context,
-    sname: &StructName,
-    pfields: P::StructFields,
-) -> E::StructFields {
-    let pfields_vec = match pfields {
-        P::StructFields::Native(loc) => return E::StructFields::Native(loc),
-        P::StructFields::Defined(v) => v,
-    };
+    _sname: &StructName,
+    parsed_layout: P::StructLayout,
+) -> E::StructLayout {
+    match parsed_layout {
+        P::StructLayout::Native(loc) => E::StructLayout::Native(loc),
+        P::StructLayout::Singleton(fields) => {
+            E::StructLayout::Singleton(struct_fields(context, fields))
+        },
+        P::StructLayout::Variants(variants) => {
+            let mut previous_variants = BTreeMap::new();
+            E::StructLayout::Variants(
+                variants
+                    .into_iter()
+                    .map(|v| {
+                        if !is_valid_struct_constant_or_schema_name(v.name.0.value.as_str()) {
+                            let msg = format!(
+                                "Invalid variant name '{}'. variant names must start with 'A'..'Z'",
+                                v.name
+                            );
+                            context
+                                .env
+                                .add_diag(diag!(Declarations::InvalidName, (v.loc, msg)));
+                        }
+                        if let Some(old_loc) = previous_variants.insert(v.name, v.loc) {
+                            context.env.add_diag(diag!(
+                                Declarations::DuplicateItem,
+                                (
+                                    v.loc,
+                                    format!("Duplicate definition for variant '{}'", v.name),
+                                ),
+                                (old_loc, "Variant previously defined here"),
+                            ));
+                        }
+                        E::StructVariant {
+                            attributes: flatten_attributes(
+                                context,
+                                AttributePosition::Struct,
+                                v.attributes,
+                            ),
+                            loc: v.loc,
+                            name: v.name,
+                            fields: struct_fields(context, v.fields),
+                        }
+                    })
+                    .collect(),
+            )
+        },
+    }
+}
+
+fn struct_fields(context: &mut Context, fields: Vec<(P::Field, P::Type)>) -> Fields<E::Type> {
     let mut field_map = UniqueMap::new();
-    for (idx, (field, pt)) in pfields_vec.into_iter().enumerate() {
+    for (idx, (field, pt)) in fields.into_iter().enumerate() {
         let t = type_(context, pt);
         if let Err((field, old_loc)) = field_map.add(field, (idx, t)) {
             context.env.add_diag(diag!(
                 Declarations::DuplicateItem,
                 (
                     field.loc(),
-                    format!(
-                        "Duplicate definition for field '{}' in struct '{}'",
-                        field, sname
-                    ),
+                    format!("Duplicate definition for field '{}'", field),
                 ),
                 (old_loc, "Field previously defined here"),
             ));
         }
     }
-    E::StructFields::Defined(field_map)
+    field_map
 }
 
 //**************************************************************************************************
@@ -1558,7 +1599,7 @@ fn function_(context: &mut Context, pfunction: P::Function) -> (FunctionName, E:
     let attributes = flatten_attributes(context, AttributePosition::Function, pattributes);
     let visibility = visibility(pvisibility);
     let (old_aliases, signature) = function_signature(context, psignature);
-    let (acquires, access_specifiers) = if context.env.flags().v2() {
+    let (acquires, access_specifiers) = if context.env.flags().compiler_v2() {
         (vec![], access_specifier_list(context, access_specifiers))
     } else {
         (
@@ -1607,7 +1648,7 @@ fn access_specifier_list_as_acquires(
             Syntax::InvalidAccessSpecifier,
             (
                 loc,
-                "compiler version 1 only supports simple 'acquires <resource_name>' clauses"
+                "language version 1 only supports simple 'acquires <resource_name>' clauses"
                     .to_owned()
             )
         ));
@@ -1648,6 +1689,10 @@ fn access_specifier_list_as_acquires(
                             && check_wildcard(context, second)
                             && check_wildcard(context, third)
                     },
+                    NameAccessChain_::Four(..) => {
+                        invalid_variant_access(context, specifier.loc);
+                        false
+                    },
                 };
                 if ok {
                     if let Some(maccess) = name_access_chain(
@@ -1665,6 +1710,13 @@ fn access_specifier_list_as_acquires(
         }
     }
     acquires
+}
+
+fn invalid_variant_access(context: &mut Context, loc: Loc) {
+    context.env.add_diag(diag!(
+        Syntax::InvalidVariantAccess,
+        (loc, "variant name not expected in this context".to_owned())
+    ));
 }
 
 fn access_specifier(context: &mut Context, specifier: P::AccessSpecifier) -> E::AccessSpecifier {
@@ -1711,6 +1763,10 @@ fn access_specifier_name_access_chain(
     chain: NameAccessChain,
 ) -> (Option<Address>, Option<ModuleName>, Option<Name>) {
     match chain.value {
+        NameAccessChain_::Four(..) => {
+            invalid_variant_access(context, chain.loc);
+            (None, None, None)
+        },
         NameAccessChain_::One(name) if name.value.as_str() == "*" => {
             // A single wildcard means any resource at the specified address, e.g. `*(0x2)`
             (None, None, None)
@@ -2224,12 +2280,15 @@ fn name_access_chain(
         (Access::ApplyPositional, PN::One(n))
         | (Access::ApplyNamed, PN::One(n))
         | (Access::Type, PN::One(n)) => match context.aliases.member_alias_get(&n) {
-            Some((mident, mem)) => EN::ModuleAccess(mident, mem),
-            None => EN::Name(n),
+            Some((mident, mem)) => EN::ModuleAccess(mident, mem, None),
+            None => {
+                // left unresolved
+                EN::Name(n)
+            },
         },
         (Access::Term, PN::One(n)) if is_valid_struct_constant_or_schema_name(n.value.as_str()) => {
             match context.aliases.member_alias_get(&n) {
-                Some((mident, mem)) => EN::ModuleAccess(mident, mem),
+                Some((mident, mem)) => EN::ModuleAccess(mident, mem, None),
                 None => EN::Name(n),
             }
         },
@@ -2240,27 +2299,55 @@ fn name_access_chain(
                 .add_diag(unexpected_address_module_error(loc, nloc, access));
             return None;
         },
-
-        (_, PN::Two(sp!(_, LN::Name(n1)), n2)) => match context.aliases.module_alias_get(&n1) {
-            None => {
+        (_, PN::Two(sp!(_, LN::Name(n1)), n2)) => {
+            if let Some((mident, mem)) = context.aliases.member_alias_get(&n1).filter(|_| {
+                is_valid_struct_constant_or_schema_name(n1.value.as_str())
+                    && is_valid_struct_constant_or_schema_name(n2.value.as_str())
+            }) {
+                // n1 is interpreted as a type and n2 as a variant in the type
+                EN::ModuleAccess(mident, mem, Some(n2))
+            } else if let Some(mident) = context.aliases.module_alias_get(&n1) {
+                // n1 is interpreted as a module and n2 as type.
+                EN::ModuleAccess(mident, n2, None)
+            } else {
                 context.env.add_diag(diag!(
                     NameResolution::UnboundModule,
-                    (n1.loc, format!("Unbound module alias '{}'", n1))
+                    (n1.loc, format!("Unbound module or type alias '{}'", n1))
                 ));
                 return None;
-            },
-            Some(mident) => EN::ModuleAccess(mident, n2),
+            }
         },
         (_, PN::Three(sp!(ident_loc, (ln, n2)), n3)) => {
+            let default_interpretation = |context: &mut Context| {
+                let addr = address(context, /* suggest_declaration */ false, ln);
+                let mident = sp(ident_loc, ModuleIdent_::new(addr, ModuleName(n2)));
+                EN::ModuleAccess(mident, n3, None)
+            };
+            match &ln.value {
+                LeadingNameAccess_::Name(n1)
+                    if is_valid_struct_constant_or_schema_name(n2.value.as_str()) =>
+                {
+                    // Attempt to interpret n1 as module alias. This is for
+                    // reaching struct variants as in `module::Struct::Variant`.
+                    if let Some(mident) = context.aliases.module_alias_get(n1) {
+                        EN::ModuleAccess(mident, n2, Some(n3))
+                    } else {
+                        default_interpretation(context)
+                    }
+                },
+                _ => default_interpretation(context),
+            }
+        },
+        (_, PN::Four(sp!(ident_loc, (ln, n2)), n3, n4)) => {
             let addr = address(context, /* suggest_declaration */ false, ln);
             let mident = sp(ident_loc, ModuleIdent_::new(addr, ModuleName(n2)));
-            EN::ModuleAccess(mident, n3)
+            EN::ModuleAccess(mident, n3, Some(n4))
         },
     };
 
     if let Some(deprecated_item_kind) = deprecated_item_kind {
         match &tn_ {
-            EN::ModuleAccess(mident, n) => {
+            EN::ModuleAccess(mident, n, _) => {
                 check_for_deprecated_member_use(context, Some(mident), n, deprecated_item_kind);
             },
             EN::Name(n) => {
@@ -2298,7 +2385,7 @@ fn name_access_chain_to_module_ident(
             };
             Some(module_ident(context, sp(loc, pmident_)))
         },
-        PN::Three(sp!(ident_loc, (ln, n)), mem) => {
+        PN::Three(sp!(ident_loc, (ln, n)), mem) | PN::Four(sp!(ident_loc, (ln, n)), mem, _) => {
             // Process the module ident just for errors
             let pmident_ = P::ModuleIdent_ {
                 address: ln,
@@ -2502,6 +2589,21 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 Some(pf) => exp(context, *pf),
             };
             EE::IfElse(eb, et, ef)
+        },
+        PE::Match(pd, parms) => {
+            let discriminator = exp(context, *pd);
+            let match_arms = parms
+                .into_iter()
+                .map(|parm| {
+                    let loc = parm.loc;
+                    let (pbl, pc, pb) = parm.value;
+                    let bind_list = bind_list(context, pbl).expect("bind list always present");
+                    let opt_cond = pc.map(|e| *exp(context, e));
+                    let body = *exp(context, pb);
+                    sp(loc, (bind_list, opt_cond, body))
+                })
+                .collect::<Vec<_>>();
+            EE::Match(discriminator, match_arms)
         },
         PE::While(pb, ploop) => EE::While(exp(context, *pb), exp(context, *ploop)),
         PE::Loop(ploop) => EE::Loop(exp(context, *ploop)),
@@ -2791,8 +2893,15 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
     use P::Bind_ as PB;
     let b_ = match pb_ {
         PB::Var(v) => {
-            check_valid_local_name(context, &v);
-            EL::Var(sp(loc, E::ModuleAccess_::Name(v.0)), None)
+            if context.env.flags().lang_v2()
+                && is_valid_struct_constant_or_schema_name(v.value().as_str())
+            {
+                // Interpret as an unqualified module access
+                EL::Unpack(sp(v.loc(), ModuleAccess_::Name(v.0)), None, Fields::new())
+            } else {
+                check_valid_local_name(context, &v);
+                EL::Var(sp(loc, E::ModuleAccess_::Name(v.0)), None)
+            }
         },
         PB::Unpack(ptn, ptys_opt, pfields) => {
             // check for type use
@@ -2865,6 +2974,10 @@ fn assign(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<E::LValue> {
 
             return None;
         },
+        PE::Name(sp!(_, P::NameAccessChain_::Four(_, _, _)), _) => {
+            invalid_variant_access(context, loc);
+            return None;
+        },
         PE::Name(n, Some(_)) if !context.in_spec_context => {
             let msg = format!(
                 "Unexpected assignment of instantiated type without fields outside of a spec \
@@ -2883,7 +2996,7 @@ fn assign(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<E::LValue> {
         PE::Name(pn, ptys_opt) => {
             let en = name_access_chain(context, Access::Term, pn, Some(DeprecatedItem::Struct))?;
             match &en.value {
-                E::ModuleAccess_::ModuleAccess(m, n) if !context.in_spec_context => {
+                E::ModuleAccess_::ModuleAccess(m, n, _) if !context.in_spec_context => {
                     let msg = format!(
                         "Unexpected assignment of module access without fields outside of a spec \
                          context.\nIf you are trying to unpack a struct, try adding fields, e.g. \
@@ -3021,6 +3134,16 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
             unbound_names_exp(unbound, ef);
             unbound_names_exp(unbound, et);
             unbound_names_exp(unbound, econd)
+        },
+        EE::Match(ed, arms) => {
+            unbound_names_exp(unbound, ed);
+            for arm in arms {
+                unbound_names_binds(unbound, &arm.value.0);
+                if let Some(c) = &arm.value.1 {
+                    unbound_names_exp(unbound, c)
+                }
+                unbound_names_exp(unbound, &arm.value.2)
+            }
         },
         EE::While(econd, eloop) => {
             unbound_names_exp(unbound, eloop);

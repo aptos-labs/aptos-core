@@ -342,10 +342,8 @@ impl Account {
                 let state_view = self
                     .context
                     .latest_state_view_poem(&self.latest_ledger_info)?;
-                let converter = state_view.as_converter(
-                    self.context.db.clone(),
-                    self.context.table_info_reader.clone(),
-                );
+                let converter = state_view
+                    .as_converter(self.context.db.clone(), self.context.indexer_reader.clone());
                 let converted_resources = converter
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
@@ -522,10 +520,7 @@ impl Account {
             self.context.state_view(Some(self.ledger_version))?;
 
         let bytes = state_view
-            .as_converter(
-                self.context.db.clone(),
-                self.context.table_info_reader.clone(),
-            )
+            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
             .find_resource(&state_view, self.address, resource_type)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
@@ -543,10 +538,7 @@ impl Account {
             })?;
 
         state_view
-            .as_converter(
-                self.context.db.clone(),
-                self.context.table_info_reader.clone(),
-            )
+            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
             .move_struct_fields(resource_type, &bytes)
             .context("Failed to convert move structs from storage")
             .map_err(|err| {

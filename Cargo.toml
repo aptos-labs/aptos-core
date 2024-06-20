@@ -172,6 +172,7 @@ members = [
     "storage/db-tool",
     "storage/executable-store",
     "storage/indexer",
+    "storage/indexer_schemas",
     "storage/jellyfish-merkle",
     "storage/rocksdb-options",
     "storage/schemadb",
@@ -314,6 +315,7 @@ aptos-data-client = { path = "state-sync/aptos-data-client" }
 aptos-data-streaming-service = { path = "state-sync/data-streaming-service" }
 aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
+aptos-db-indexer-schemas = { path = "storage/indexer_schemas" }
 aptos-db-tool = { path = "storage/db-tool" }
 aptos-debugger = { path = "crates/aptos-debugger" }
 aptos-dkg = { path = "crates/aptos-dkg" }

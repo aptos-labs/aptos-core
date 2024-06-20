@@ -327,6 +327,7 @@ impl<'env> Generator<'env> {
     fn gen(&mut self, targets: Vec<TempIndex>, exp: &Exp) {
         match exp.as_ref() {
             ExpData::Invalid(id) => self.internal_error(*id, "invalid expression"),
+            ExpData::Match(id, ..) => self.internal_error(*id, "match not yet implemented"),
             ExpData::Temporary(id, temp) => self.gen_temporary(targets, *id, *temp),
             ExpData::Value(id, val) => self.gen_value(targets, *id, val),
             ExpData::LocalVar(id, name) => self.gen_local(targets, *id, *name),
@@ -596,7 +597,10 @@ impl<'env> Generator<'env> {
                     }
                 }
             },
-            Operation::Pack(mid, sid) => {
+            Operation::Pack(_, _, Some(_)) => {
+                self.internal_error(id, "variants not yet implemented")
+            },
+            Operation::Pack(mid, sid, None) => {
                 let inst = self.env().get_node_instantiation(id);
                 self.gen_op_call(targets, id, BytecodeOperation::Pack(*mid, *sid, inst), args)
             },
@@ -1281,7 +1285,10 @@ impl<'env> Generator<'env> {
                     Bytecode::Assign(attr, local, arg, AssignKind::Inferred)
                 })
             },
-            Pattern::Struct(id, str, args) => {
+            Pattern::Struct(id, _, Some(_), _) => {
+                self.internal_error(*id, "variants not yet implemented")
+            },
+            Pattern::Struct(id, str, None, args) => {
                 let (temps, cont_assigns) = self.flatten_patterns(args, next_scope);
                 let ty = self.temp_type(arg);
                 if ty.is_reference() {

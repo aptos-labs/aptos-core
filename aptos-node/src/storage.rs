@@ -73,7 +73,6 @@ pub(crate) fn bootstrap_db(
 
                 let db_backup_service =
                     start_backup_service(node_config.storage.backup_service_address, fast_sync_db);
-
                 (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
             },
         };
