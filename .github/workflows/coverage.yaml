@@ -34,11 +34,11 @@ jobs:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - run: rustup component add llvm-tools-preview
-      - uses: taiki-e/install-action@6f1ebcd9e21315fc37d7f7bc851dfcc8356d7da3 # pin@v1.5.6
+      - uses: taiki-e/install-action@4fedbddde88aab767a45a011661f832d68202716 # pin@v2.33.28
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov nextest --ignore-run-fail --workspace --exclude smoke-test --exclude aptos-testcases --lcov --jobs 32 --output-path lcov_unit.info -vv
+      - run: cargo llvm-cov nextest --lcov --output-path lcov_unit.info -vv --ignore-run-fail --workspace --exclude smoke-test --exclude aptos-testcases
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
           RUST_MIN_STACK: 33554432 # 32 MB of stack
@@ -65,11 +65,11 @@ jobs:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - run: rustup component add llvm-tools-preview
-      - uses: taiki-e/install-action@6f1ebcd9e21315fc37d7f7bc851dfcc8356d7da3 # pin@v1.5.6
+      - uses: taiki-e/install-action@4fedbddde88aab767a45a011661f832d68202716 # pin@v2.33.28
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov nextest --ignore-run-fail --package smoke-test --lcov --output-path lcov_smoke.info -vv
+      - run: cargo build --locked --package=aptos-node --features=failpoints,indexer --release && LLVM_PROFDATA_FLAGS="--failure-mode=all" LOCAL_SWARM_NODE_RELEASE=1 cargo llvm-cov nextest --lcov --output-path lcov_smoke.info -vv --ignore-run-fail --profile smoke-test -p smoke-test
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
           RUST_MIN_STACK: 33554432

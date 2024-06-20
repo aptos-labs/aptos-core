@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+   ┌─ tests/checking/variants/variants_parse_err3.move:13:13
+   │
+13 │             Color::Blue => false,
+   │             ^^^^^
+   │             │
+   │             Unexpected 'Color'
+   │             Expected ','

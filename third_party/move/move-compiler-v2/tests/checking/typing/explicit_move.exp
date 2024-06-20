@@ -15,7 +15,7 @@ module 0x8675309::M {
               let r: M::R = pack M::R(false);
               Move(u);
               Move(s);
-              M::R{ dummy_field: _ }: M::R = Move(r);
+              M::R{ dummy_field: _ } = Move(r);
               Tuple()
             }
           }

@@ -14,7 +14,7 @@ use crate::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_channels::aptos_channel;
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{network_address::NetworkAddress, PeerId};
@@ -24,16 +24,12 @@ use futures::{
     stream::{FusedStream, Map, Select, Stream, StreamExt},
     task::{Context, Poll},
 };
-use futures_util::FutureExt;
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{cmp::min, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
+use std::{cmp::min, fmt::Debug, future, marker::PhantomData, pin::Pin, time::Duration};
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
-
-// TODO: do we want to make this configurable?
-const MAX_DESERIALIZATION_QUEUE_SIZE_PER_PEER: usize = 50;
 
 /// Events received by network clients in a validator
 ///
@@ -157,7 +153,7 @@ impl NetworkApplicationConfig {
 pub struct NetworkEvents<TMessage> {
     #[pin]
     event_stream: Select<
-        aptos_channel::Receiver<PeerId, Event<TMessage>>,
+        Pin<Box<dyn Stream<Item = Event<TMessage>> + Send + Sync + 'static>>,
         Map<
             aptos_channel::Receiver<PeerId, ConnectionNotification>,
             fn(ConnectionNotification) -> Event<TMessage>,
@@ -172,65 +168,46 @@ pub trait NewNetworkEvents {
         peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
         connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
         max_parallel_deserialization_tasks: Option<usize>,
+        allow_out_of_order_delivery: bool,
     ) -> Self;
 }
 
-impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMessage> {
+impl<TMessage: Message + Send + Sync + 'static> NewNetworkEvents for NetworkEvents<TMessage> {
     fn new(
         peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
         connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
         max_parallel_deserialization_tasks: Option<usize>,
+        allow_out_of_order_delivery: bool,
     ) -> Self {
-        // Create a channel for deserialized messages
-        let (deserialized_message_sender, deserialized_message_receiver) = aptos_channel::new(
-            QueueStyle::FIFO,
-            MAX_DESERIALIZATION_QUEUE_SIZE_PER_PEER,
-            None,
-        );
+        // Determine the number of parallel deserialization tasks to use
+        let max_parallel_deserialization_tasks = max_parallel_deserialization_tasks.unwrap_or(1);
 
-        // Deserialize the peer manager notifications in parallel (for each
-        // network application) and send them to the receiver. Note: this
-        // may cause out of order message delivery, but applications
-        // should already be handling this.
-        tokio::spawn(async move {
-            peer_mgr_notifs_rx
-                .for_each_concurrent(
-                    max_parallel_deserialization_tasks,
-                    move |peer_manager_notification| {
-                        // Get the peer ID for the notification
-                        let deserialized_message_sender = deserialized_message_sender.clone();
-                        let peer_id_for_notification = peer_manager_notification.get_peer_id();
-
-                        // Spawn a new blocking task to deserialize the message
-                        tokio::task::spawn_blocking(move || {
-                            if let Some(deserialized_message) =
-                                peer_mgr_notif_to_event(peer_manager_notification)
-                            {
-                                if let Err(error) = deserialized_message_sender
-                                    .push(peer_id_for_notification, deserialized_message)
-                                {
-                                    warn!(
-                                        "Failed to send deserialized message to receiver: {:?}",
-                                        error
-                                    );
-                                }
-                            }
-                        })
-                        .map(|_| ())
-                    },
-                )
-                .await
+        let data_event_stream = peer_mgr_notifs_rx.map(|notification| {
+            tokio::task::spawn_blocking(move || peer_mgr_notif_to_event(notification))
         });
+
+        let data_event_stream: Pin<
+            Box<dyn Stream<Item = Event<TMessage>> + Send + Sync + 'static>,
+        > = if allow_out_of_order_delivery {
+            Box::pin(
+                data_event_stream
+                    .buffer_unordered(max_parallel_deserialization_tasks)
+                    .filter_map(|res| future::ready(res.expect("JoinError from spawn blocking"))),
+            )
+        } else {
+            Box::pin(
+                data_event_stream
+                    .buffered(max_parallel_deserialization_tasks)
+                    .filter_map(|res| future::ready(res.expect("JoinError from spawn blocking"))),
+            )
+        };
 
         // Process the control messages
         let control_event_stream = connection_notifs_rx
             .map(control_msg_to_event as fn(ConnectionNotification) -> Event<TMessage>);
 
         Self {
-            event_stream: ::futures::stream::select(
-                deserialized_message_receiver,
-                control_event_stream,
-            ),
+            event_stream: ::futures::stream::select(data_event_stream, control_event_stream),
             _marker: PhantomData,
         }
     }
@@ -403,6 +380,27 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
         let res_data = self
             .peer_mgr_reqs_tx
             .send_rpc(recipient, protocol, req_data, timeout)
+            .await?;
+
+        // Deserialize the response using a blocking task
+        let res_msg = tokio::task::spawn_blocking(move || protocol.from_bytes(&res_data)).await??;
+        Ok(res_msg)
+    }
+
+    /// Send a protobuf rpc request to a single recipient while handling
+    /// serialization and deserialization of the request and response respectively.
+    /// Assumes that the request and response both have the same message type.
+    pub async fn send_rpc_raw(
+        &self,
+        recipient: PeerId,
+        protocol: ProtocolId,
+        req_msg: Bytes,
+        timeout: Duration,
+    ) -> Result<TMessage, RpcError> {
+        // Send the request and wait for the response
+        let res_data = self
+            .peer_mgr_reqs_tx
+            .send_rpc(recipient, protocol, req_msg, timeout)
             .await?;
 
         // Deserialize the response using a blocking task

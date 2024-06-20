@@ -11,7 +11,7 @@ use super::{
 use crate::{
     ledger_info::LedgerInfo,
     proof::accumulator::InMemoryTransactionAccumulator,
-    transaction::{TransactionAuxiliaryData, TransactionInfo, Version},
+    transaction::{TransactionInfo, Version},
 };
 use anyhow::{bail, ensure, format_err, Context, Result};
 #[cfg(any(test, feature = "fuzzing"))]
@@ -845,16 +845,6 @@ impl TransactionInfoWithProof {
         Self {
             ledger_info_to_transaction_info_proof,
             transaction_info,
-        }
-    }
-
-    /// Inject auxiliary error data into transaction info if auxiliary data is present
-    pub fn inject_auxiliary_error_data(
-        &mut self,
-        auxiliary_data_opt: Option<TransactionAuxiliaryData>,
-    ) {
-        if let Some(aux_data) = auxiliary_data_opt {
-            self.transaction_info.inject_auxiliary_error_data(aux_data);
         }
     }
 

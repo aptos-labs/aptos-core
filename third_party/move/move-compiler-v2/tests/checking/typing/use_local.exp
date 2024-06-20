@@ -13,7 +13,7 @@ module 0x8675309::M {
             let r: M::R = pack M::R(false);
             0;
             s;
-            M::R{ dummy_field: _ }: M::R = r;
+            M::R{ dummy_field: _ } = r;
             Tuple()
           }
         }

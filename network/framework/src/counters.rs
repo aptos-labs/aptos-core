@@ -628,3 +628,12 @@ fn observe_ping_time(network_context: &NetworkContext, ping_latency_secs: f64, l
         .with_label_values(&[network_context.network_id().as_str(), label])
         .observe(ping_latency_secs);
 }
+
+pub static OP_MEASURE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_measure",
+        "Measures the time and count of an operation",
+        &["op"]
+    )
+    .unwrap()
+});

@@ -204,19 +204,19 @@ fn bls12381_aggsig_zero_messages_or_pks_does_not_verify() {
 
     // aggsig should NOT verify on zero messages and zero PKs
     let pubkeys: Vec<&PublicKey> = vec![];
-    let messages = vec![];
+    let messages = [];
     let msgs_refs = messages.iter().collect::<Vec<&TestAptosCrypto>>();
     assert!(aggsig.verify_aggregate(&msgs_refs, &pubkeys).is_err());
 
     // aggsig should NOT verify on zero PKs
     let pubkeys: Vec<&PublicKey> = vec![];
-    let messages = vec![message];
+    let messages = [message];
     let msgs_refs = messages.iter().collect::<Vec<&TestAptosCrypto>>();
     assert!(aggsig.verify_aggregate(&msgs_refs, &pubkeys).is_err());
 
     // aggsig should NOT verify on zero messages
     let pubkeys: Vec<&PublicKey> = vec![&key_pair.public_key];
-    let messages = vec![];
+    let messages = [];
     let msgs_refs = messages.iter().collect::<Vec<&TestAptosCrypto>>();
     assert!(aggsig.verify_aggregate(&msgs_refs, &pubkeys).is_err());
 }

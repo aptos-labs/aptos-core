@@ -456,6 +456,18 @@ module aptos_framework::fungible_asset {
     }
 
     #[view]
+    /// Get the icon uri from the `metadata` object.
+    public fun icon_uri<T: key>(metadata: Object<T>): String acquires Metadata {
+        borrow_fungible_metadata(&metadata).icon_uri
+    }
+
+    #[view]
+    /// Get the project uri from the `metadata` object.
+    public fun project_uri<T: key>(metadata: Object<T>): String acquires Metadata {
+        borrow_fungible_metadata(&metadata).project_uri
+    }
+
+    #[view]
     /// Return whether the provided address has a store initialized.
     public fun store_exists(store: address): bool {
         store_exists_inline(store)
@@ -1112,11 +1124,13 @@ module aptos_framework::fungible_asset {
         assert!(name(metadata) == string::utf8(b"TEST"), 3);
         assert!(symbol(metadata) == string::utf8(b"@@"), 4);
         assert!(decimals(metadata) == 0, 5);
+        assert!(icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 6);
+        assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 7);
 
         increase_supply(&metadata, 50);
-        assert!(supply(metadata) == option::some(50), 6);
+        assert!(supply(metadata) == option::some(50), 8);
         decrease_supply(&metadata, 30);
-        assert!(supply(metadata) == option::some(20), 7);
+        assert!(supply(metadata) == option::some(20), 9);
     }
 
     #[test(creator = @0xcafe)]

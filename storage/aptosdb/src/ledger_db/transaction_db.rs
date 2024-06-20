@@ -6,13 +6,13 @@ use crate::{
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction::TransactionSchema,
-        transaction_by_account::TransactionByAccountSchema,
         transaction_by_hash::TransactionByHashSchema,
     },
     utils::iterators::ExpectContinuousVersions,
 };
 use aptos_crypto::hash::{CryptoHash, HashValue};
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_db_indexer_schemas::schema::transaction_by_account::TransactionByAccountSchema;
+use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::transaction::{Transaction, TransactionToCommit, Version};
 use rayon::prelude::*;
@@ -60,7 +60,7 @@ impl TransactionDb {
         start_version: Version,
         num_transactions: usize,
     ) -> Result<impl Iterator<Item = Result<Transaction>> + '_> {
-        let mut iter = self.db.iter::<TransactionSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<TransactionSchema>()?;
         iter.seek(&start_version)?;
         iter.expect_continuous_versions(start_version, num_transactions)
     }

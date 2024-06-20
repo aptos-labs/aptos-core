@@ -11,10 +11,9 @@ use move_core_types::{
     language_storage::CORE_CODE_ADDRESS,
 };
 use serde::{Deserialize, Serialize};
-use strum_macros::FromRepr;
-
+use strum_macros::{EnumString, FromRepr};
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr, EnumString)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
@@ -85,6 +84,8 @@ pub enum FeatureFlag {
     AGGREGATOR_V2_IS_AT_LEAST_API = 66,
     CONCURRENT_FUNGIBLE_BALANCE = 67,
     DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE = 68,
+    LIMIT_VM_TYPE_SIZE = 69,
+    ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
 }
 
 impl FeatureFlag {
@@ -149,6 +150,8 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
+            // FeatureFlag::LIMIT_VM_TYPE_SIZE, // TODO: Enable when type builder rolls out
+            FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
         ]
     }
 }
@@ -169,6 +172,7 @@ impl Default for Features {
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
         }
+
         features
     }
 }
@@ -285,6 +289,14 @@ impl Features {
 
     pub fn is_refundable_bytes_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
+    }
+
+    pub fn is_limit_type_size_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE)
+    }
+
+    pub fn is_abort_if_multisig_payload_mismatch_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

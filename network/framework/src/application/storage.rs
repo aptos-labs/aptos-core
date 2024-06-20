@@ -7,6 +7,7 @@ use crate::{
         error::Error,
         metadata::{ConnectionState, PeerMetadata},
     },
+    counters,
     transport::{ConnectionId, ConnectionMetadata},
     ProtocolId,
 };
@@ -359,6 +360,34 @@ impl PeersAndMetadata {
         let cached_peers_and_metadata = self.cached_peers_and_metadata.clone();
 
         (peers_and_metadata, trusted_peers, cached_peers_and_metadata)
+    }
+
+    /// Sorts the give peer slice in the order of decreasing latency.
+    pub fn sort_peers_by_latency(&self, network_id: NetworkId, peers: &mut [PeerId]) {
+        let _timer = counters::OP_MEASURE
+            .with_label_values(&["sort_peers"])
+            .start_timer();
+
+        let cached_peers_and_metadata = self.cached_peers_and_metadata.load();
+
+        peers.sort_unstable_by(|peer_network_a, peer_network_b| {
+            let get_latency = |&network_id, peer| -> f64 {
+                cached_peers_and_metadata
+                    .get(&network_id)
+                    .and_then(|peers| peers.get(peer))
+                    .and_then(|peer| {
+                        peer.get_peer_monitoring_metadata()
+                            .average_ping_latency_secs
+                    })
+                    .unwrap_or_default()
+            };
+
+            let a_latency = get_latency(&network_id, peer_network_a);
+            let b_latency = get_latency(&network_id, peer_network_b);
+            b_latency
+                .partial_cmp(&a_latency)
+                .expect("latency is never NaN")
+        })
     }
 }
 

@@ -4,6 +4,7 @@
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{NetworkContext, NetworkTest, SwarmChaos, SwarmNetworkLoss, Test};
 
+/// This is deprecated. Use [crate::multi_region_network_test::MultiRegionNetworkEmulationTest] instead
 pub struct NetworkLossTest;
 
 // Loss parameters

@@ -6,11 +6,11 @@
 
 use crate::{
     gas_schedule::VMGasParameters,
-    ver::gas_feature_versions::{RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13},
+    ver::gas_feature_versions::{RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15},
 };
 use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasExpression,
-    GasScalingFactor, GasUnit, NumModules, NumSlots,
+    GasScalingFactor, GasUnit, NumModules, NumSlots, NumTypeNodes,
 };
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitWithParams,
@@ -257,7 +257,17 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             keyless_base_cost: InternalGas,
             { RELEASE_V1_12.. => "keyless.base" },
-            138_000_000,
+            32_000_000,
+        ],
+        [
+            max_ty_size: NumTypeNodes,
+            { RELEASE_V1_15.. => "max_ty_size" },
+            128,
+        ],
+        [
+            max_ty_depth: NumTypeNodes,
+            { RELEASE_V1_15.. => "max_ty_depth" },
+            20,
         ]
     ]
 );
