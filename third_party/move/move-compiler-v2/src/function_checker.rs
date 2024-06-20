@@ -253,27 +253,17 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                 Visibility::Friend => {
                                     if callee_func.module_env.has_friend(&caller_module_id) {
                                         true
-                                    } else {
-                                        if callee_func.has_package_visibility() {
-                                            if callee_func.module_env.self_address()
-                                                == caller_func.module_env.self_address()
+                                    } else if callee_func.has_package_visibility() {
+                                        if callee_func.module_env.self_address()
+                                            == caller_func.module_env.self_address()
+                                        {
+                                            if callee_func
+                                                .module_env
+                                                .in_same_package(&caller_func.module_env)
                                             {
-                                                if callee_func
-                                                    .module_env
-                                                    .in_same_package(&caller_func.module_env)
-                                                {
-                                                    true
-                                                } else {
-                                                    diff_package_error(
-                                                        env,
-                                                        sites,
-                                                        &caller_func,
-                                                        &callee_func,
-                                                    );
-                                                    false
-                                                }
+                                                true
                                             } else {
-                                                diff_addr_error(
+                                                diff_package_error(
                                                     env,
                                                     sites,
                                                     &caller_func,
@@ -282,14 +272,12 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                                 false
                                             }
                                         } else {
-                                            not_a_friend_error(
-                                                env,
-                                                sites,
-                                                &caller_func,
-                                                &callee_func,
-                                            );
+                                            diff_addr_error(env, sites, &caller_func, &callee_func);
                                             false
                                         }
+                                    } else {
+                                        not_a_friend_error(env, sites, &caller_func, &callee_func);
+                                        false
                                     }
                                 },
                                 Visibility::Private => {
@@ -370,7 +358,13 @@ fn generic_error(
     let msg = format!(
         "{}function `{}` cannot be called from {}\
          because {}",
-        if callee.is_inline() { "inline " } else if callee.has_package_visibility() { "public(package) " } else { "" },
+        if callee.is_inline() {
+            "inline "
+        } else if callee.has_package_visibility() {
+            "public(package) "
+        } else {
+            ""
+        },
         callee_name,
         called_from,
         why,
@@ -432,10 +426,8 @@ fn diff_package_error(
     caller: &FunctionEnv,
     callee: &FunctionEnv,
 ) {
-    let why = format!(
-        "they are from different packages",
-    );
-    cannot_call_error(env, &why, sites, caller, callee);
+    let why = "they are from different packages";
+    cannot_call_error(env, why, sites, caller, callee);
 }
 
 fn diff_addr_error(
@@ -445,5 +437,5 @@ fn diff_addr_error(
     callee: &FunctionEnv,
 ) {
     let why = "they are from different addresses";
-    cannot_call_error(env,why, sites, caller, callee);
+    cannot_call_error(env, why, sites, caller, callee);
 }
