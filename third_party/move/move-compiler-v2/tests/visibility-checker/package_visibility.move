@@ -7,30 +7,30 @@ module 0x42::B {
     use 0x42::A;
 
     public(package) fun foo() {
-		A::bar()
-	}
+        A::bar()
+    }
 
     public fun bar() {
-		A::bar()
-	}
+        A::bar()
+    }
 
     fun baz() {
-		A::bar()
-	}
+        A::bar()
+    }
 }
 
 module 0x42::C {
     use 0x42::B;
 
     public(package) fun foo() {
-		B::foo()
-	}
+        B::foo()
+    }
 
     public fun bar() {
-		B::foo()
-	}
+        B::foo()
+    }
 
     fun baz() {
-		B::foo()
-	}
+        B::foo()
+    }
 }

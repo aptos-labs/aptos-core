@@ -1,9 +1,9 @@
 module 0x42::test {
-	public(package) fun foo() {}
+    public(package) fun foo() {}
 }
 
 script {
-	fun main() {
-		0x42::test::foo()
-	}
+    fun main() {
+        0x42::test::foo()
+    }
 }
