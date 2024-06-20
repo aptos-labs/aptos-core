@@ -50,10 +50,7 @@ use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::env::MOVE_HOME;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
 use move_model::metadata::{CompilerVersion, LanguageVersion};
-use move_package::{
-    source_package::{layout::SourcePackageLayout, std_lib::StdVersion},
-    BuildConfig, CompilerConfig,
-};
+use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
 use serde::{Deserialize, Serialize};
@@ -334,7 +331,6 @@ impl CliCommand<Vec<String>> for CompilePackage {
                     self.move_options.dev,
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
-                    self.move_options.override_std.clone(),
                     self.move_options.bytecode_version,
                     self.move_options.compiler_version,
                     self.move_options.language_version,
@@ -398,7 +394,6 @@ impl CompileScript {
                 self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
-                self.move_options.override_std.clone(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
@@ -616,7 +611,6 @@ impl CliCommand<&'static str> for DocumentPackage {
             with_docs: true,
             install_dir: None,
             named_addresses: move_options.named_addresses(),
-            override_std: move_options.override_std.clone(),
             docgen_options: Some(docgen_options),
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
             bytecode_version: move_options.bytecode_version,
@@ -688,7 +682,6 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
                 self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
-                self.move_options.override_std.clone(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
@@ -760,7 +753,6 @@ impl IncludedArtifacts {
         dev: bool,
         skip_fetch_latest_git_deps: bool,
         named_addresses: BTreeMap<String, AccountAddress>,
-        override_std: Option<StdVersion>,
         bytecode_version: Option<u32>,
         compiler_version: Option<CompilerVersion>,
         language_version: Option<LanguageVersion>,
@@ -777,7 +769,6 @@ impl IncludedArtifacts {
                 // Always enable error map bytecode injection
                 with_error_map: true,
                 named_addresses,
-                override_std,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
                 compiler_version,
@@ -794,7 +785,6 @@ impl IncludedArtifacts {
                 with_source_maps: false,
                 with_error_map: true,
                 named_addresses,
-                override_std,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
                 compiler_version,
@@ -811,7 +801,6 @@ impl IncludedArtifacts {
                 with_source_maps: true,
                 with_error_map: true,
                 named_addresses,
-                override_std,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
                 compiler_version,
@@ -934,7 +923,6 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
-                self.move_options.override_std.clone(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
@@ -1012,7 +1000,6 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
-                self.move_options.override_std.clone(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,
@@ -1138,7 +1125,6 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
             move_options.dev,
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
-            move_options.override_std,
             move_options.bytecode_version,
             move_options.compiler_version,
             move_options.language_version,
@@ -1291,7 +1277,6 @@ impl CliCommand<&'static str> for VerifyPackage {
                 self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
-                self.move_options.override_std.clone(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
                 self.move_options.language_version,

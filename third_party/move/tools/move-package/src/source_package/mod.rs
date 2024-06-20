@@ -5,4 +5,3 @@
 pub mod layout;
 pub mod manifest_parser;
 pub mod parsed_manifest;
-pub mod std_lib;
