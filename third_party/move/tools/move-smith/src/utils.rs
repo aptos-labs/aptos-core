@@ -6,20 +6,24 @@
 
 use crate::{ast::CompileUnit, config::Config, move_smith::MoveSmith};
 use arbitrary::{Result, Unstructured};
-use move_compiler::{
-    shared::{known_attributes::KnownAttribute, Flags},
-    Compiler as MoveCompiler,
-};
-use move_model::metadata::LanguageVersion;
+use log::{error, info};
+use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_package::BuildConfig;
 use move_transactional_test_runner::{vm_test_harness, vm_test_harness::TestRunConfig};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     error::Error,
+    fs,
     fs::File,
-    io::Write,
+    io::{stderr, Write},
     path::{Path, PathBuf},
 };
 use tempfile::{tempdir, TempDir};
+
+const MOVE_TOML_TEMPLATE: &str = r#"[package]
+name = "test"
+version = "0.0.0"
+"#;
 
 /// Choose a random index based on the given probabilities.
 /// e.g. if `weights` has [10, 20, 20], there are 3 options,
@@ -68,7 +72,7 @@ pub fn raw_to_compile_unit(data: &[u8]) -> Result<CompileUnit> {
 /// Create a temporary Move file with the given code.
 // TODO: if on Linux, we can create in-memory file to reduce I/O
 fn create_tmp_move_file(code: String, name_hint: Option<&str>) -> (PathBuf, TempDir) {
-    let dir = tempdir().unwrap();
+    let dir: TempDir = tempdir().unwrap();
     let name = name_hint.unwrap_or("temp.move");
     let file_path = dir.path().join(name);
     {
@@ -78,19 +82,80 @@ fn create_tmp_move_file(code: String, name_hint: Option<&str>) -> (PathBuf, Temp
     (file_path, dir)
 }
 
-/// Compiles the given Move code using compiler v1.
-pub fn compile_modules(code: String) {
-    let (file_path, dir) = create_tmp_move_file(code, None);
-    let (_, _units) = MoveCompiler::from_files(
-        vec![file_path.to_str().unwrap().to_string()],
-        vec![],
-        move_stdlib::move_stdlib_named_addresses(),
-        Flags::empty().set_skip_attribute_checks(false),
-        KnownAttribute::get_all_attribute_names(),
-    )
-    .build_and_report()
-    .unwrap();
+/// Create a Move package with the given code and minimal Move.toml.
+pub fn create_move_package(code: String, output_dir: &Path) {
+    let source_dir = output_dir.join("sources");
+    fs::create_dir_all(&source_dir).expect("Failed to create package directory");
+
+    let move_toml_path = output_dir.join("Move.toml");
+    fs::write(move_toml_path, MOVE_TOML_TEMPLATE).expect("Failed to write Move.toml");
+
+    let move_path = source_dir.join("MoveSmith.move");
+    fs::write(move_path, code).expect("Failed to write the Move file");
+}
+
+fn create_compiler_config_v1() -> BuildConfig {
+    let mut config = BuildConfig::default();
+    // config.force_recompilation = true;
+    config.compiler_config.compiler_version = Some(CompilerVersion::V1);
+    config
+}
+
+fn create_compiler_config_v2() -> BuildConfig {
+    let mut config = BuildConfig::default();
+    // config.force_recompilation = true;
+    config.compiler_config.compiler_version = Some(CompilerVersion::V2_0);
+    config.compiler_config.language_version = Some(LanguageVersion::V2_0);
+    config
+}
+
+fn compile_with_config(package_path: &Path, config: BuildConfig, name: &str) -> bool {
+    match config.compile_package_no_exit(package_path, &mut stderr()) {
+        Ok(_) => {
+            info!("Successfully compiled the package with compiler {}", name);
+            true
+        },
+        Err(err) => {
+            error!(
+                "Failed to compile the package with compiler {}: {:?}",
+                name, err
+            );
+            false
+        },
+    }
+}
+
+/// Create a temporary Move package with the given code.
+pub fn create_tmp_move_package(code: String) -> (PathBuf, TempDir) {
+    let dir: TempDir = tempdir().unwrap();
+    let output_dir = dir.path().to_path_buf();
+    create_move_package(code, &output_dir);
+    (output_dir, dir)
+}
+
+/// Create a temporary package and compiler the given Move code.
+/// V1 and V2 can be enabled/disabled separately.
+pub fn compile_move_code(code: String, v1: bool, v2: bool) -> bool {
+    let (package_path, dir) = create_tmp_move_package(code.clone());
+    info!("created temp move package at {:?}", package_path);
+
+    let v1_result = if v1 {
+        let config = create_compiler_config_v1();
+        compile_with_config(&package_path, config, "v1")
+    } else {
+        true
+    };
+
+    let v2_result = if v2 {
+        let config = create_compiler_config_v2();
+        compile_with_config(&package_path, config, "v2")
+    } else {
+        true
+    };
+
     dir.close().unwrap();
+
+    v1_result == v2_result
 }
 
 /// Runs the given Move code as a transactional test.
@@ -155,6 +220,41 @@ fn process_transactional_test_result(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::panic;
+
+    const MOVE_CODE: &str = r#" //# publish
+module 0xCAFE::Module1 {
+    struct Struct3 has drop, copy {
+        var32: u16,
+        var33: u32,
+        var34: u8,
+        var35: u32,
+        var36: u32,
+    }
+
+    public fun function6(): Struct3 {
+        let var44: u16 =  21859u16;
+        let var45: u32 =  1399722001u32;
+        Struct3 {
+            var32: var44,
+            var33: var45,
+            var34: 154u8,
+            var35: var45,
+            var36: var45,
+        }
+    }
+}"#;
+
+    const MOVE_CODE_V1_ERR: &str = r#" //# publish
+module 0xCAFE::Module0 {
+    public fun function0<T0: drop, T1: drop + store, T2: copy + drop + store> (var0: T2): T2 {
+        if ((var0 == if (true)  { var0 } else { var0 }))  {
+        } else {
+            var0 = var0;
+        };
+        var0
+    }
+}"#;
 
     fn check_frequency(weights: &[u32], counts: &[u32], tolerance: f64) {
         let sum = weights.iter().sum::<u32>() as f64;
@@ -206,5 +306,21 @@ mod tests {
         }
         assert_eq!(counts[1], 0);
         check_frequency(&weights, &counts, 0.25);
+    }
+
+    #[test]
+    fn test_compile() {
+        let code = MOVE_CODE.to_string();
+        let result = compile_move_code(code, true, true);
+        assert!(result);
+    }
+
+    #[test]
+    fn test_compile_err() {
+        let code = MOVE_CODE_V1_ERR.to_string();
+
+        // Should not compile with V1
+        let result = panic::catch_unwind(|| compile_move_code(code.clone(), true, true));
+        assert!(result.is_err());
     }
 }

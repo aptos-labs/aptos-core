@@ -13,7 +13,7 @@ fn main() {
     let compile_unit = smith.get_compile_unit();
     let code = compile_unit.emit_code();
 
-    compile_modules(code.clone());
+    compile_move_code(code.clone(), true, true);
 
     println!("{}", code.clone());
 

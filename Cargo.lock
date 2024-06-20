@@ -11004,6 +11004,7 @@ dependencies = [
  "move-compiler",
  "move-compiler-v2",
  "move-model",
+ "move-package",
  "move-stdlib",
  "move-transactional-test-runner",
  "num-bigint 0.3.3",

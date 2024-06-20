@@ -14,8 +14,8 @@ libfuzzer-sys = { workspace = true }
 move-smith = { path = ".." }
 
 [[bin]]
-name = "compile_v1_only"
-path = "fuzz_targets/compile_v1_only.rs"
+name = "compile_only"
+path = "fuzz_targets/compile_only.rs"
 test = false
 doc = false
 bench = false

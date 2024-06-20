@@ -5,7 +5,7 @@
 
 use move_smith::{
     config::Config,
-    utils::{compile_modules, run_transactional_test},
+    utils::{compile_move_code, run_transactional_test},
 };
 use std::{fs, path::PathBuf};
 
@@ -21,9 +21,9 @@ fn main() {
     let code = fs::read_to_string(&file_path).unwrap();
     println!("Loaded code from file: {:?}", file_path);
 
-    println!("Compiling the Move code with V1");
-    compile_modules(code.clone());
-    println!("Successfully compiled with V1");
+    println!("Trying to the Move code with V1 and V2");
+    assert!(compile_move_code(code.clone(), true, true));
+    println!("Successfully compiled with V1 and V2");
 
     println!("Running the transactional test");
     run_transactional_test(code, &Config::default()).unwrap();

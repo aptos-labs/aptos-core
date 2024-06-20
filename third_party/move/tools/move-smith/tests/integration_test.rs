@@ -91,7 +91,7 @@ fn test_generation_and_compile() {
     let lines = compile_unit.emit_code();
     println!("{}", lines);
 
-    compile_modules(lines);
+    assert!(compile_move_code(lines, true, true));
 }
 
 #[test]
