@@ -7,6 +7,8 @@ use crate::{
     Signature, SigningKey, Uniform,
 };
 use rand_core::OsRng;
+use anyhow::anyhow;
+use std::error::Error;
 
 /// Tests that an individual signature share computed correctly on a message m passes verification on m.
 /// Tests that a signature share computed on a different message m' fails verification on m.
@@ -129,6 +131,8 @@ fn malleability() {
     let mut vec_6 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[6]); 
     let mut vec_7 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[7]); 
     let mut vector = vec!();
+    let mut dummy_vec: Vec<u8> = vec![0; 32];
+    vector.append(&mut dummy_vec);
     vector.append(&mut vec_0);
     vector.append(&mut vec_1); 
     vector.append(&mut vec_2);
@@ -137,11 +141,20 @@ fn malleability() {
     vector.append(&mut vec_5);
     vector.append(&mut vec_6);
     vector.append(&mut vec_7);
-    let mut dummy_vec: Vec<u8> = vec![0; 32];
-    vector.append(&mut dummy_vec);
 
     //let sig: Signature = vector[..].try_from().unwrap();
-    let sig = ECDSASignature::try_from(&vector[..]);
+    let sig = ECDSASignature::try_from(&vector[..]).unwrap();
+    let res = sig
+        .verify_arbitrary_msg(message, &key_pair.public_key);
+    println!("res: {:?}", res);
+    let err = match res {
+        Ok(_v) => panic!(),
+        Err(v) => v, //assert_eq!(v.downcast().unwrap(), Err("Unable to verify signature.")),
+    };
+    println!("err: {:?}", err);
+    let downcast_err: Error = (err as anyhow::Error).downcast_ref().unwrap();
+    //assert_eq!(res, anyhow!(Err("Unable to verify signature.")));
+    assert!(false);
 }
 
 /// Test deserialization_failures
