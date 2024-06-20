@@ -73,7 +73,15 @@ use num::ToPrimitive;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
-    any::{Any, TypeId}, backtrace::{Backtrace, BacktraceStatus}, cell::{Ref, RefCell, RefMut}, cmp::Ordering, collections::{BTreeMap, BTreeSet, VecDeque}, ffi::OsStr, fmt::{self, Formatter, Write}, path::Path, rc::Rc
+    any::{Any, TypeId},
+    backtrace::{Backtrace, BacktraceStatus},
+    cell::{Ref, RefCell, RefMut},
+    cmp::Ordering,
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    ffi::OsStr,
+    fmt::{self, Formatter, Write},
+    path::Path,
+    rc::Rc,
 };
 
 // =================================================================================================
@@ -2749,17 +2757,33 @@ impl<'env> ModuleEnv<'env> {
     /// whose public(package) functions are called in the current module.
     pub fn need_to_be_friended_by(&self) -> BTreeSet<ModuleId> {
         let mut deps = BTreeSet::new();
+        if self.is_script_module() {
+            return deps;
+        }
         for fun_env in self.get_functions() {
             let called_funs = fun_env.get_called_functions().expect("called functions");
             for fun in called_funs {
                 let mod_id = fun.module_id;
+                if self.get_id() == mod_id {
+                    // no need to friend self
+                    continue;
+                }
                 let mod_env = self.env.get_module(mod_id);
-                if mod_env.is_target() && !mod_env.is_script_module() && mod_env.get_function(fun.id).has_package_visibility() && self.in_same_package(&mod_env) {
+                let fun_env = mod_env.get_function(fun.id);
+                if fun_env.has_package_visibility() && self.can_call_package_fun_in(&mod_env) {
                     deps.insert(mod_id);
                 }
             }
         }
         deps
+    }
+
+    /// Returns true if functions in the current module can call a public(package) function in the given module.
+    pub fn can_call_package_fun_in(&self, other: &Self) -> bool {
+        !self.is_script_module()
+            && !other.is_script_module()
+            && self.in_same_package(other)
+            && self.self_address() == other.self_address()
     }
 
     /// Returns true if the given module is a transitive dependency of this one. The
