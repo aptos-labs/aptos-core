@@ -656,8 +656,8 @@ function install_xsltproc {
 
 function install_nodejs {
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    # install via nodesource: https://github.com/nodesource/distributions/issues/1709#issuecomment-1788473588
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR_VERSION.x nodistro main" | "${PRE_COMMAND[@]}" tee /etc/apt/sources.list.d/nodesource.list
+    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_VERSION}.x" -o nodesource_setup.sh
+    "${PRE_COMMAND[@]}" -E bash nodesource_setup.sh
   fi
   install_pkg nodejs "$PACKAGE_MANAGER"
   install_pkg npm "$PACKAGE_MANAGER"
