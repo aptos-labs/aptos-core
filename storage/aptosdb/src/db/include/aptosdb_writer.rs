@@ -203,21 +203,14 @@ impl DbWriter for AptosDB {
     /// Revert a commit.
     fn revert_commit(
         &self,
-        version_to_revert: Version,
-        latest_version: Version,
-        new_root_hash: HashValue,
         ledger_info_with_sigs: &LedgerInfoWithSignatures,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["revert_commit"])
             .start_timer();
 
-        let target_version = version_to_revert.checked_sub(1).expect("cannot revert genesis");
-
-        ensure!(
-            ledger_info_with_sigs.ledger_info().version() == target_version,
-            "LedgerInfo is not for version {}", target_version,
-        );
+        let latest_version = self.get_latest_version()?;
+        let target_version = ledger_info_with_sigs.ledger_info().version();
 
         // Revert the ledger commit progress
         let ledger_batch = SchemaBatch::new();
@@ -247,18 +240,20 @@ impl DbWriter for AptosDB {
             .write_schemas(batch)?;
 
         // Revert the transaction info
+        // FIXME: need to delete the range to current latest?
         let batch = SchemaBatch::new();
         self.ledger_db
             .transaction_info_db()
-            .delete_transaction_info(version_to_revert, &batch)?;
+            .delete_transaction_info(target_version + 1, &batch)?;
         let batch = SchemaBatch::new();
         self.ledger_db.transaction_info_db().write_schemas(batch)?;
 
         // Revert the events
+        // FIXME: need to delete the range to current latest?
         let batch = SchemaBatch::new();
         self.ledger_db
             .event_db()
-            .delete_events(version_to_revert, &batch)?;
+            .delete_events(target_version + 1, &batch)?;
         self.ledger_db.event_db().write_schemas(batch)?;
 
         // Revert the transaction auxiliary data
@@ -281,9 +276,10 @@ impl DbWriter for AptosDB {
         // Revert the state kv and ledger metadata
         self.state_store
             .state_kv_db
-            .revert_state_kv_and_ledger_metadata(version_to_revert)?;
+            .revert_state_kv_and_ledger_metadata(target_version)?;
 
         // Update the provided ledger info
+        let new_root_hash = ledger_info_with_sigs.commit_info().executed_state_id();
         self.commit_ledger_info(
             target_version,
             new_root_hash,
