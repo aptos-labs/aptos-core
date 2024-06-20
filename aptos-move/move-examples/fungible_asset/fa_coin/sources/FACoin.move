@@ -159,7 +159,7 @@ module FACoin::fa_coin {
         fungible_asset::set_frozen_flag(transfer_ref, wallet, false);
     }
 
-    /// Pause or unpause the FA coin. This checks that the caller is the pauser.
+    /// Pause or unpause the transfer of FA coin. This checks that the caller is the pauser.
     public entry fun set_pause(pauser: &signer, paused: bool) acquires State {
         let asset = get_metadata();
         assert!(object::is_owner(asset, signer::address_of(pauser)), error::permission_denied(ENOT_OWNER));
