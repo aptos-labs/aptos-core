@@ -9,20 +9,24 @@ module 0xcafe::simple_token {
     use std::signer;
     use std::string;
 
-    public fun initialize(account: &signer, constructor_ref: &ConstructorRef) {
+    public fun initialize(
+        account: &signer, constructor_ref: &ConstructorRef
+    ) {
         assert!(signer::address_of(account) == @0xcafe, 1);
 
-        let withdraw = function_info::new_function_info(
-            account,
-            string::utf8(b"simple_token"),
-            string::utf8(b"withdraw"),
-        );
+        let withdraw =
+            function_info::new_function_info(
+                account,
+                string::utf8(b"simple_token"),
+                string::utf8(b"withdraw"),
+            );
 
-        let deposit = function_info::new_function_info(
-            account,
-            string::utf8(b"simple_token"),
-            string::utf8(b"deposit"),
-        );
+        let deposit =
+            function_info::new_function_info(
+                account,
+                string::utf8(b"simple_token"),
+                string::utf8(b"deposit"),
+            );
 
         dispatchable_fungible_asset::register_dispatch_functions(
             constructor_ref,

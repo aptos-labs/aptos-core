@@ -211,7 +211,9 @@ Creates a new royalty, verifying that it is a valid percentage
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_create">create</a>(numerator: u64, denominator: u64, payee_address: <b>address</b>): <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_create">create</a>(
+    numerator: u64, denominator: u64, payee_address: <b>address</b>
+): <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
     <b>assert</b>!(denominator != 0, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="royalty.md#0x4_royalty_EROYALTY_DENOMINATOR_IS_ZERO">EROYALTY_DENOMINATOR_IS_ZERO</a>));
     <b>assert</b>!(<a href="royalty.md#0x4_royalty_numerator">numerator</a> &lt;= denominator, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="royalty.md#0x4_royalty_EROYALTY_EXCEEDS_MAXIMUM">EROYALTY_EXCEEDS_MAXIMUM</a>));
 

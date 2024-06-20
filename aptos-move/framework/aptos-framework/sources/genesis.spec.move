@@ -164,7 +164,9 @@ spec aptos_framework::genesis {
     }
 
     spec schema CompareTimeRequires {
-        let staking_rewards_config = global<staking_config::StakingRewardsConfig>(@aptos_framework);
+        let staking_rewards_config = global<staking_config::StakingRewardsConfig>(
+            @aptos_framework
+        );
         requires staking_rewards_config.last_rewards_rate_period_start_in_secs <= timestamp::spec_now_seconds();
     }
 }

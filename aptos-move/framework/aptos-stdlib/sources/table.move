@@ -15,9 +15,7 @@ module aptos_std::table {
 
     /// Create a new Table.
     public fun new<K: copy + drop, V: store>(): Table<K, V> {
-        Table {
-            handle: new_table_handle<K, V>(),
-        }
+        Table { handle: new_table_handle<K, V>(), }
     }
 
     /// Add a new entry to the table. Aborts if an entry for this
@@ -35,10 +33,11 @@ module aptos_std::table {
 
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Returns specified default value if there is no entry for `key`.
-    public fun borrow_with_default<K: copy + drop, V>(table: &Table<K, V>, key: K, default: &V): &V {
-        if (!contains(table, copy key)) {
-            default
-        } else {
+    public fun borrow_with_default<K: copy + drop, V>(
+        table: &Table<K, V>, key: K, default: &V
+    ): &V {
+        if (!contains(table, copy key)) { default }
+        else {
             borrow(table, copy key)
         }
     }
@@ -51,7 +50,9 @@ module aptos_std::table {
 
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Insert the pair (`key`, `default`) first if there is no entry for `key`.
-    public fun borrow_mut_with_default<K: copy + drop, V: drop>(table: &mut Table<K, V>, key: K, default: V): &mut V {
+    public fun borrow_mut_with_default<K: copy + drop, V: drop>(
+        table: &mut Table<K, V>, key: K, default: V
+    ): &mut V {
         if (!contains(table, copy key)) {
             add(table, copy key, default)
         };
@@ -60,7 +61,9 @@ module aptos_std::table {
 
     /// Insert the pair (`key`, `value`) if there is no entry for `key`.
     /// update the value of the entry for `key` to `value` otherwise
-    public fun upsert<K: copy + drop, V: drop>(table: &mut Table<K, V>, key: K, value: V) {
+    public fun upsert<K: copy + drop, V: drop>(
+        table: &mut Table<K, V>, key: K, value: V
+    ) {
         if (!contains(table, copy key)) {
             add(table, copy key, value)
         } else {
@@ -121,7 +124,7 @@ module aptos_std::table {
         add(&mut t, key, 1);
         assert!(*borrow_with_default(&t, key, &12) == 1, error_code);
 
-        move_to(&account, TableHolder{ t });
+        move_to(&account, TableHolder { t });
     }
 
     // ======================================================================================================

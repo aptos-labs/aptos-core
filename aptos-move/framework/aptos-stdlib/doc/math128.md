@@ -230,9 +230,8 @@ Return the value of n raised to power e
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_pow">pow</a>(n: u128, e: u128): u128 {
-    <b>if</b> (e == 0) {
-        1
-    } <b>else</b> {
+    <b>if</b> (e == 0) { 1 }
+    <b>else</b> {
         <b>let</b> p = 1;
         <b>while</b> (e &gt; 1) {
             <b>if</b> (e % 2 == 1) {
@@ -317,10 +316,13 @@ Returns floor(log2(x))
         x = (x * x) &gt;&gt; 32;
         // x is now in [1, 4)
         // <b>if</b> x in [2, 4) then log x = 1 + log (x / 2)
-        <b>if</b> (x &gt;= (2 &lt;&lt; 32)) { frac = frac + delta; x = x &gt;&gt; 1; };
+        <b>if</b> (x &gt;= (2 &lt;&lt; 32)) {
+            frac = frac + delta;
+            x = x &gt;&gt; 1;
+        };
         delta = delta &gt;&gt; 1;
     };
-    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a> (((integer_part <b>as</b> u64) &lt;&lt; 32) + frac)
+    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a>(((integer_part <b>as</b> u64) &lt;&lt; 32) + frac)
 }
 </code></pre>
 
@@ -359,10 +361,13 @@ Returns floor(log2(x))
         x = (x * x) &gt;&gt; 63;
         // x is now in [1, 4)
         // <b>if</b> x in [2, 4) then log x = 1 + log (x / 2)
-        <b>if</b> (x &gt;= (2 &lt;&lt; 63)) { frac = frac + delta; x = x &gt;&gt; 1; };
+        <b>if</b> (x &gt;= (2 &lt;&lt; 63)) {
+            frac = frac + delta;
+            x = x &gt;&gt; 1;
+        };
         delta = delta &gt;&gt; 1;
     };
-    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a> (((integer_part <b>as</b> u128) &lt;&lt; 64) + frac)
+    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a>(((integer_part <b>as</b> u128) &lt;&lt; 64) + frac)
 }
 </code></pre>
 
@@ -432,8 +437,7 @@ Returns square root of x, precisely floor(sqrt(x))
         // Inline functions cannot take constants, <b>as</b> then every <b>module</b> using it needs the constant
         <b>assert</b>!(y != 0, std::error::invalid_argument(4));
         0
-    }
-    <b>else</b> (x - 1) / y + 1
+    } <b>else</b> (x - 1) / y + 1
 }
 </code></pre>
 
@@ -513,7 +517,7 @@ Returns square root of x, precisely floor(sqrt(x))
 
 <pre><code><b>requires</b> (lower &lt;= upper);
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> (lower &lt;=x && x &lt;= upper) ==&gt; result == x;
+<b>ensures</b> (lower &lt;= x && x &lt;= upper) ==&gt; result == x;
 <b>ensures</b> (x &lt; lower) ==&gt; result == lower;
 <b>ensures</b> (upper &lt; x) ==&gt; result == upper;
 </code></pre>
@@ -552,7 +556,7 @@ Returns square root of x, precisely floor(sqrt(x))
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] x == 0;
 <b>ensures</b> [abstract] <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(2, result) &lt;= x;
-<b>ensures</b> [abstract] x &lt; <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(2, result+1);
+<b>ensures</b> [abstract] x &lt; <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(2, result + 1);
 </code></pre>
 
 
@@ -571,7 +575,7 @@ Returns square root of x, precisely floor(sqrt(x))
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] x &gt; 0 ==&gt; result * result &lt;= x;
-<b>ensures</b> [abstract] x &gt; 0 ==&gt; x &lt; (result+1) * (result+1);
+<b>ensures</b> [abstract] x &gt; 0 ==&gt; x &lt; (result + 1) * (result + 1);
 </code></pre>
 
 
@@ -581,11 +585,9 @@ Returns square root of x, precisely floor(sqrt(x))
 
 
 <pre><code><b>fun</b> <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(n: u128, e: u128): u128 {
-   <b>if</b> (e == 0) {
-       1
-   }
+   <b>if</b> (e == 0) { 1 }
    <b>else</b> {
-       n * <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(n, e-1)
+       n * <a href="math128.md#0x1_math128_spec_pow">spec_pow</a>(n, e - 1)
    }
 }
 </code></pre>

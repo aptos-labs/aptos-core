@@ -320,11 +320,12 @@ dynamically assgined by the contract code.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_new_with_config">new_with_config</a>&lt;K: <b>copy</b> + drop + store, V: store&gt;(
-    num_initial_buckets: u64,
-    split_load_threshold: u8,
-    target_bucket_size: u64
+    num_initial_buckets: u64, split_load_threshold: u8, target_bucket_size: u64
 ): <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt; {
-    <b>assert</b>!(split_load_threshold &lt;= 100, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EINVALID_LOAD_THRESHOLD_PERCENT">EINVALID_LOAD_THRESHOLD_PERCENT</a>));
+    <b>assert</b>!(
+        split_load_threshold &lt;= 100,
+        <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EINVALID_LOAD_THRESHOLD_PERCENT">EINVALID_LOAD_THRESHOLD_PERCENT</a>),
+    );
     <b>let</b> buckets = <a href="table_with_length.md#0x1_table_with_length_new">table_with_length::new</a>();
     <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> buckets, 0, <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>());
     <b>let</b> <a href="table.md#0x1_table">table</a> = <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a> {
@@ -333,7 +334,8 @@ dynamically assgined by the contract code.
         level: 0,
         size: 0,
         // The default split load threshold is 75%.
-        split_load_threshold: <b>if</b> (split_load_threshold == 0) { 75 } <b>else</b> { split_load_threshold },
+        split_load_threshold: <b>if</b> (split_load_threshold == 0) { 75 }
+        <b>else</b> { split_load_threshold },
         target_bucket_size,
     };
     // The default number of initial buckets is 2.
@@ -376,7 +378,14 @@ Aborts if it's not empty.
         <a href="../../move-stdlib/doc/vector.md#0x1_vector_destroy_empty">vector::destroy_empty</a>(<a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, i));
         i = i + 1;
     };
-    <b>let</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a> { buckets, num_buckets: _, level: _, size: _, split_load_threshold: _, target_bucket_size: _ } = <a href="table.md#0x1_table">table</a>;
+    <b>let</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a> {
+        buckets,
+        num_buckets: _,
+        level: _,
+        size: _,
+        split_load_threshold: _,
+        target_bucket_size: _
+    } = <a href="table.md#0x1_table">table</a>;
     <a href="table_with_length.md#0x1_table_with_length_destroy_empty">table_with_length::destroy_empty</a>(buckets);
 }
 </code></pre>
@@ -469,15 +478,26 @@ Note: This method may occasionally cost much more gas when triggering bucket spl
     <b>let</b> index = <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>);
     <b>let</b> bucket = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, index);
     // We set a per-bucket limit here <b>with</b> a upper bound (10000) that nobody should normally reach.
-    <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bucket) &lt;= 10000, <a href="../../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="smart_table.md#0x1_smart_table_EEXCEED_MAX_BUCKET_SIZE">EEXCEED_MAX_BUCKET_SIZE</a>));
-    <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_all">vector::all</a>(bucket, | entry | {
-        <b>let</b> e: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = entry;
-        &e.key != &key
-    }), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EALREADY_EXIST">EALREADY_EXIST</a>));
+    <b>assert</b>!(
+        <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bucket) &lt;= 10000,
+        <a href="../../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="smart_table.md#0x1_smart_table_EEXCEED_MAX_BUCKET_SIZE">EEXCEED_MAX_BUCKET_SIZE</a>),
+    );
+    <b>assert</b>!(
+        <a href="../../move-stdlib/doc/vector.md#0x1_vector_all">vector::all</a>(
+            bucket,
+            |entry| {
+                <b>let</b> e: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = entry;
+                &e.key != &key
+            },
+        ),
+        <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EALREADY_EXIST">EALREADY_EXIST</a>),
+    );
     <b>let</b> e = <a href="smart_table.md#0x1_smart_table_Entry">Entry</a> { <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>, key, value };
     <b>if</b> (<a href="table.md#0x1_table">table</a>.target_bucket_size == 0) {
         <b>let</b> estimated_entry_size = max(size_of_val(&e), 1);
-        <a href="table.md#0x1_table">table</a>.target_bucket_size = max(1024 /* free_write_quota */ / estimated_entry_size, 1);
+        <a href="table.md#0x1_table">table</a>.target_bucket_size = max(
+            1024 /* free_write_quota */ / estimated_entry_size, 1
+        );
     };
     <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(bucket, e);
     <a href="table.md#0x1_table">table</a>.size = <a href="table.md#0x1_table">table</a>.size + 1;
@@ -508,8 +528,13 @@ Add multiple key/value pairs to the smart table. The keys must not already exist
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_add_all">add_all</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, keys: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;) {
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_zip">vector::zip</a>(keys, values, |key, value| { <a href="smart_table.md#0x1_smart_table_add">add</a>(<a href="table.md#0x1_table">table</a>, key, value); });
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_add_all">add_all</a>&lt;K, V&gt;(
+    <a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, keys: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;
+) {
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_zip">vector::zip</a>(keys, values,
+        |key, value| {
+            <a href="smart_table.md#0x1_smart_table_add">add</a>(<a href="table.md#0x1_table">table</a>, key, value);
+        });
 }
 </code></pre>
 
@@ -532,14 +557,18 @@ Add multiple key/value pairs to the smart table. The keys must not already exist
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_unzip_entries">unzip_entries</a>&lt;K: <b>copy</b>, V: <b>copy</b>&gt;(entries: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt;&gt;): (<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;) {
+<pre><code>inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_unzip_entries">unzip_entries</a>&lt;K: <b>copy</b>, V: <b>copy</b>&gt;(entries: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt;&gt;)
+    : (<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;) {
     <b>let</b> keys = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> values = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(entries, |e|{
-        <b>let</b> entry: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = e;
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> keys, entry.key);
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> values, entry.value);
-    });
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(
+        entries,
+        |e| {
+            <b>let</b> entry: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = e;
+            <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> keys, entry.key);
+            <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> values, entry.value);
+        },
+    );
     (keys, values)
 }
 </code></pre>
@@ -572,7 +601,9 @@ Disclaimer: This function may be costly as the smart table may be huge in size. 
     <b>let</b> i = 0;
     <b>let</b> res = <a href="simple_map.md#0x1_simple_map_new">simple_map::new</a>&lt;K, V&gt;();
     <b>while</b> (i &lt; <a href="table.md#0x1_table">table</a>.num_buckets) {
-        <b>let</b> (keys, values) = <a href="smart_table.md#0x1_smart_table_unzip_entries">unzip_entries</a>(<a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&<a href="table.md#0x1_table">table</a>.buckets, i));
+        <b>let</b> (keys, values) = <a href="smart_table.md#0x1_smart_table_unzip_entries">unzip_entries</a>(
+            <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&<a href="table.md#0x1_table">table</a>.buckets, i)
+        );
         <a href="simple_map.md#0x1_simple_map_add_all">simple_map::add_all</a>(&<b>mut</b> res, keys, values);
         i = i + 1;
     };
@@ -648,11 +679,7 @@ pagination is complete. For an example, see <code>test_keys()</code>.
     starting_bucket_index: u64,
     starting_vector_index: u64,
     num_keys_to_get: u64,
-): (
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;,
-    Option&lt;u64&gt;,
-    Option&lt;u64&gt;,
-) {
+): (<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, Option&lt;u64&gt;, Option&lt;u64&gt;,) {
     <b>let</b> num_buckets = table_ref.num_buckets;
     <b>let</b> buckets_ref = &table_ref.buckets;
     <b>assert</b>!(starting_bucket_index &lt; num_buckets, <a href="smart_table.md#0x1_smart_table_EINVALID_BUCKET_INDEX">EINVALID_BUCKET_INDEX</a>);
@@ -665,11 +692,14 @@ pagination is complete. For an example, see <code>test_keys()</code>.
         // starting iteration at the beginning of an empty bucket since buckets are never
         // destroyed, only emptied.
         starting_vector_index &lt; bucket_length || starting_vector_index == 0,
-        <a href="smart_table.md#0x1_smart_table_EINVALID_VECTOR_INDEX">EINVALID_VECTOR_INDEX</a>
+        <a href="smart_table.md#0x1_smart_table_EINVALID_VECTOR_INDEX">EINVALID_VECTOR_INDEX</a>,
     );
     <b>let</b> keys = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    <b>if</b> (num_keys_to_get == 0) <b>return</b>
-        (keys, <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(starting_bucket_index), <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(starting_vector_index));
+    <b>if</b> (num_keys_to_get == 0)
+        <b>return</b> (
+            keys, <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(starting_bucket_index),
+            <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(starting_vector_index)
+        );
     for (bucket_index in starting_bucket_index..num_buckets) {
         bucket_ref = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(buckets_ref, bucket_index);
         bucket_length = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bucket_ref);
@@ -682,9 +712,7 @@ pagination is complete. For an example, see <code>test_keys()</code>.
                     bucket_index = bucket_index + 1;
                     <b>if</b> (<a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a> &lt; num_buckets) {
                         (keys, <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(bucket_index), <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(0))
-                    } <b>else</b> {
-                        (keys, <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
-                    }
+                    } <b>else</b> { (keys, <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()) }
                 } <b>else</b> {
                     (keys, <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(bucket_index), <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(vector_index))
                 }
@@ -719,7 +747,7 @@ Decide which is the next bucket to split and split it into two with the elements
 <pre><code><b>fun</b> <a href="smart_table.md#0x1_smart_table_split_one_bucket">split_one_bucket</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;) {
     <b>let</b> new_bucket_index = <a href="table.md#0x1_table">table</a>.num_buckets;
     // the next bucket <b>to</b> split is num_bucket without the most significant bit.
-    <b>let</b> to_split = new_bucket_index ^ (1 &lt;&lt; <a href="table.md#0x1_table">table</a>.level);
+    <b>let</b> to_split = new_bucket_index ^(1 &lt;&lt; <a href="table.md#0x1_table">table</a>.level);
     <a href="table.md#0x1_table">table</a>.num_buckets = new_bucket_index + 1;
     // <b>if</b> the whole level is splitted once, bump the level.
     <b>if</b> (to_split + 1 == 1 &lt;&lt; <a href="table.md#0x1_table">table</a>.level) {
@@ -727,10 +755,13 @@ Decide which is the next bucket to split and split it into two with the elements
     };
     <b>let</b> old_bucket = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, to_split);
     // partition the bucket, [0..p) stays in <b>old</b> bucket, [p..len) goes <b>to</b> new bucket
-    <b>let</b> p = <a href="../../move-stdlib/doc/vector.md#0x1_vector_partition">vector::partition</a>(old_bucket, |e| {
-        <b>let</b> entry: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = e; // Explicit type <b>to</b> satisfy compiler
-        <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, entry.<a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>) != new_bucket_index
-    });
+    <b>let</b> p = <a href="../../move-stdlib/doc/vector.md#0x1_vector_partition">vector::partition</a>(
+        old_bucket,
+        |e| {
+            <b>let</b> entry: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = e; // Explicit type <b>to</b> satisfy compiler
+            <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, entry.<a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>) != new_bucket_index
+        },
+    );
     <b>let</b> new_bucket = <a href="../../move-stdlib/doc/vector.md#0x1_vector_trim_reverse">vector::trim_reverse</a>(old_bucket, p);
     <a href="table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, new_bucket_index, new_bucket);
 }
@@ -762,8 +793,7 @@ bucket index compared to the index of the next bucket to split.
     <b>let</b> index = <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> % (1 &lt;&lt; (level + 1));
     <b>if</b> (index &lt; num_buckets) {
         // in existing bucket
-        index
-    } <b>else</b> {
+        index } <b>else</b> {
         // in unsplitted bucket
         index % (1 &lt;&lt; level)
     }
@@ -792,14 +822,15 @@ Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow">borrow</a>&lt;K: drop, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, key: K): &V {
-    <b>let</b> index = <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, sip_hash_from_value(&key));
+    <b>let</b> index =
+        <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, sip_hash_from_value(&key));
     <b>let</b> bucket = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&<a href="table.md#0x1_table">table</a>.buckets, index);
     <b>let</b> i = 0;
     <b>let</b> len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bucket);
     <b>while</b> (i &lt; len) {
         <b>let</b> entry = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(bucket, i);
         <b>if</b> (&entry.key == &key) {
-            <b>return</b> &entry.value
+            <b>return</b>&entry.value
         };
         i = i + 1;
     };
@@ -828,10 +859,11 @@ Returns specified default value if there is no entry for <code>key</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_with_default">borrow_with_default</a>&lt;K: <b>copy</b> + drop, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, key: K, default: &V): &V {
-    <b>if</b> (!<a href="smart_table.md#0x1_smart_table_contains">contains</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key)) {
-        default
-    } <b>else</b> {
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_with_default">borrow_with_default</a>&lt;K: <b>copy</b> + drop, V&gt;(
+    <a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, key: K, default: &V
+): &V {
+    <b>if</b> (!<a href="smart_table.md#0x1_smart_table_contains">contains</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key)) { default }
+    <b>else</b> {
         <a href="smart_table.md#0x1_smart_table_borrow">borrow</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key)
     }
 }
@@ -859,14 +891,15 @@ Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_mut">borrow_mut</a>&lt;K: drop, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, key: K): &<b>mut</b> V {
-    <b>let</b> index = <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, sip_hash_from_value(&key));
+    <b>let</b> index =
+        <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, sip_hash_from_value(&key));
     <b>let</b> bucket = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, index);
     <b>let</b> i = 0;
     <b>let</b> len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bucket);
     <b>while</b> (i &lt; len) {
         <b>let</b> entry = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(bucket, i);
         <b>if</b> (&entry.key == &key) {
-            <b>return</b> &<b>mut</b> entry.value
+            <b>return</b>&<b>mut</b> entry.value
         };
         i = i + 1;
     };
@@ -896,8 +929,7 @@ Insert the pair (<code>key</code>, <code>default</code>) first if there is no en
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_mut_with_default">borrow_mut_with_default</a>&lt;K: <b>copy</b> + drop, V: drop&gt;(
-    <a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;,
-    key: K,
+    <a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, key: K,
     default: V
 ): &<b>mut</b> V {
     <b>if</b> (!<a href="smart_table.md#0x1_smart_table_contains">contains</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key)) {
@@ -931,10 +963,13 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
     <b>let</b> <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> = sip_hash_from_value(&key);
     <b>let</b> index = <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>);
     <b>let</b> bucket = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(&<a href="table.md#0x1_table">table</a>.buckets, index);
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_any">vector::any</a>(bucket, | entry | {
-        <b>let</b> e: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = entry;
-        e.<a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> == <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> && &e.key == &key
-    })
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_any">vector::any</a>(
+        bucket,
+        |entry| {
+            <b>let</b> e: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = entry;
+            e.<a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> == <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> && &e.key == &key
+        },
+    )
 }
 </code></pre>
 
@@ -960,7 +995,8 @@ Aborts if there is no entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_remove">remove</a>&lt;K: <b>copy</b> + drop, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, key: K): V {
-    <b>let</b> index = <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, sip_hash_from_value(&key));
+    <b>let</b> index =
+        <a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, sip_hash_from_value(&key));
     <b>let</b> bucket = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets, index);
     <b>let</b> i = 0;
     <b>let</b> len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bucket);
@@ -998,7 +1034,9 @@ update the value of the entry for <code>key</code> to <code>value</code> otherwi
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_upsert">upsert</a>&lt;K: <b>copy</b> + drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, key: K, value: V) {
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_upsert">upsert</a>&lt;K: <b>copy</b> + drop, V: drop&gt;(
+    <a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, key: K, value: V
+) {
     <b>if</b> (!<a href="smart_table.md#0x1_smart_table_contains">contains</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key)) {
         <a href="smart_table.md#0x1_smart_table_add">add</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key, value)
     } <b>else</b> {
@@ -1078,10 +1116,12 @@ Update <code>split_load_threshold</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_update_split_load_threshold">update_split_load_threshold</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, split_load_threshold: u8) {
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_update_split_load_threshold">update_split_load_threshold</a>&lt;K, V&gt;(
+    <a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, split_load_threshold: u8
+) {
     <b>assert</b>!(
         split_load_threshold &lt;= 100 && split_load_threshold &gt; 0,
-        <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EINVALID_LOAD_THRESHOLD_PERCENT">EINVALID_LOAD_THRESHOLD_PERCENT</a>)
+        <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EINVALID_LOAD_THRESHOLD_PERCENT">EINVALID_LOAD_THRESHOLD_PERCENT</a>),
     );
     <a href="table.md#0x1_table">table</a>.split_load_threshold = split_load_threshold;
 }
@@ -1107,8 +1147,12 @@ Update <code>target_bucket_size</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_update_target_bucket_size">update_target_bucket_size</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, target_bucket_size: u64) {
-    <b>assert</b>!(target_bucket_size &gt; 0, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EINVALID_TARGET_BUCKET_SIZE">EINVALID_TARGET_BUCKET_SIZE</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_update_target_bucket_size">update_target_bucket_size</a>&lt;K, V&gt;(
+    <a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, target_bucket_size: u64
+) {
+    <b>assert</b>!(
+        target_bucket_size &gt; 0, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EINVALID_TARGET_BUCKET_SIZE">EINVALID_TARGET_BUCKET_SIZE</a>)
+    );
     <a href="table.md#0x1_table">table</a>.target_bucket_size = target_bucket_size;
 }
 </code></pre>
@@ -1133,15 +1177,19 @@ Apply the function to a reference of each key-value pair in the table.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_ref">for_each_ref</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, f: |&K, &V|) {
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_ref">for_each_ref</a>&lt;K, V&gt;(
+    <a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, f: |&K, &V|
+) {
     <b>let</b> i = 0;
     <b>while</b> (i &lt; aptos_std::smart_table::num_buckets(<a href="table.md#0x1_table">table</a>)) {
         <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(
-            aptos_std::table_with_length::borrow(aptos_std::smart_table::borrow_buckets(<a href="table.md#0x1_table">table</a>), i),
+            aptos_std::table_with_length::borrow(
+                aptos_std::smart_table::borrow_buckets(<a href="table.md#0x1_table">table</a>), i
+            ),
             |elem| {
                 <b>let</b> (key, value) = aptos_std::smart_table::borrow_kv(elem);
                 f(key, value)
-            }
+            },
         );
         i = i + 1;
     }
@@ -1168,15 +1216,19 @@ Apply the function to a mutable reference of each key-value pair in the table.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_mut">for_each_mut</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, f: |&K, &<b>mut</b> V|) {
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_mut">for_each_mut</a>&lt;K, V&gt;(
+    <a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, f: |&K, &<b>mut</b> V|
+) {
     <b>let</b> i = 0;
     <b>while</b> (i &lt; aptos_std::smart_table::num_buckets(<a href="table.md#0x1_table">table</a>)) {
         <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each_mut">vector::for_each_mut</a>(
-            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(aptos_std::smart_table::borrow_buckets_mut(<a href="table.md#0x1_table">table</a>), i),
+            <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(
+                aptos_std::smart_table::borrow_buckets_mut(<a href="table.md#0x1_table">table</a>), i
+            ),
             |elem| {
                 <b>let</b> (key, value) = aptos_std::smart_table::borrow_kv_mut(elem);
                 f(key, value)
-            }
+            },
         );
         i = i + 1;
     };
@@ -1204,8 +1256,7 @@ Map the function over the references of key-value pairs in the table without mod
 
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="smart_table.md#0x1_smart_table_map_ref">map_ref</a>&lt;K: <b>copy</b> + drop + store, V1, V2: store&gt;(
-    <a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V1&gt;,
-    f: |&V1|V2
+    <a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V1&gt;, f: |&V1| V2
 ): <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V2&gt; {
     <b>let</b> new_table = <a href="smart_table.md#0x1_smart_table_new">new</a>&lt;K, V2&gt;();
     <a href="smart_table.md#0x1_smart_table_for_each_ref">for_each_ref</a>(<a href="table.md#0x1_table">table</a>, |key, value| <a href="smart_table.md#0x1_smart_table_add">add</a>(&<b>mut</b> new_table, *key, f(value)));
@@ -1235,15 +1286,20 @@ Return true if any key-value pair in the table satisfies the predicate.
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="any.md#0x1_any">any</a>&lt;K, V&gt;(
     <a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;,
-    p: |&K, &V|bool
+    p: |&K, &V| bool
 ): bool {
     <b>let</b> found = <b>false</b>;
     <b>let</b> i = 0;
     <b>while</b> (i &lt; aptos_std::smart_table::num_buckets(<a href="table.md#0x1_table">table</a>)) {
-        found = <a href="../../move-stdlib/doc/vector.md#0x1_vector_any">vector::any</a>(<a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(aptos_std::smart_table::borrow_buckets(<a href="table.md#0x1_table">table</a>), i), |elem| {
-            <b>let</b> (key, value) = aptos_std::smart_table::borrow_kv(elem);
-            p(key, value)
-        });
+        found = <a href="../../move-stdlib/doc/vector.md#0x1_vector_any">vector::any</a>(
+            <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(
+                aptos_std::smart_table::borrow_buckets(<a href="table.md#0x1_table">table</a>), i
+            ),
+            |elem| {
+                <b>let</b> (key, value) = aptos_std::smart_table::borrow_kv(elem);
+                p(key, value)
+            },
+        );
         <b>if</b> (found) <b>break</b>;
         i = i + 1;
     };
@@ -1342,7 +1398,8 @@ Return true if any key-value pair in the table satisfies the predicate.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_buckets">borrow_buckets</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;): &TableWithLength&lt;u64, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt;&gt;&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_buckets">borrow_buckets</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;)
+    : &TableWithLength&lt;u64, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt;&gt;&gt; {
     &<a href="table.md#0x1_table">table</a>.buckets
 }
 </code></pre>
@@ -1366,7 +1423,8 @@ Return true if any key-value pair in the table satisfies the predicate.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_buckets_mut">borrow_buckets_mut</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;): &<b>mut</b> TableWithLength&lt;u64, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt;&gt;&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_borrow_buckets_mut">borrow_buckets_mut</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;)
+    : &<b>mut</b> TableWithLength&lt;u64, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt;&gt;&gt; {
     &<b>mut</b> <a href="table.md#0x1_table">table</a>.buckets
 }
 </code></pre>
@@ -1446,7 +1504,7 @@ Return true if any key-value pair in the table satisfies the predicate.
     map_spec_set = spec_set,
     map_spec_del = spec_remove,
     map_spec_len = spec_len,
-map_spec_has_key = spec_contains;
+    map_spec_has_key = spec_contains;
 </code></pre>
 
 

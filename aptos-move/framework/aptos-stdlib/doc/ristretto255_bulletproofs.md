@@ -157,9 +157,7 @@ the zkcrypto's <code>bulletproofs</code> library (https://docs.rs/bulletproofs/4
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_range_proof_from_bytes">range_proof_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_RangeProof">RangeProof</a> {
-    <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_RangeProof">RangeProof</a> {
-        bytes
-    }
+    <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_RangeProof">RangeProof</a> { bytes }
 }
 </code></pre>
 
@@ -214,15 +212,21 @@ WARNING: The DST check is VERY important for security as it prevents proofs comp
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_verify_range_proof_pedersen">verify_range_proof_pedersen</a>(com: &pedersen::Commitment, proof: &<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_RangeProof">RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool {
-    <b>assert</b>!(<a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_verify_range_proof_pedersen">verify_range_proof_pedersen</a>(
+    com: &pedersen::Commitment, proof: &<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_RangeProof">RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+): bool {
+    <b>assert</b>!(
+        <a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>(),
+        <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>),
+    );
 
     <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(
         <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&pedersen::commitment_as_compressed_point(com)),
-        &<a href="ristretto255.md#0x1_ristretto255_basepoint">ristretto255::basepoint</a>(), &<a href="ristretto255.md#0x1_ristretto255_hash_to_point_base">ristretto255::hash_to_point_base</a>(),
+        &<a href="ristretto255.md#0x1_ristretto255_basepoint">ristretto255::basepoint</a>(),
+        &<a href="ristretto255.md#0x1_ristretto255_hash_to_point_base">ristretto255::hash_to_point_base</a>(),
         proof.bytes,
         num_bits,
-        dst
+        dst,
     )
 }
 </code></pre>
@@ -250,15 +254,24 @@ for some randomness <code>r</code>) satisfies <code>v</code> in <code>[0, 2^num_
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_verify_range_proof">verify_range_proof</a>(
     com: &RistrettoPoint,
-    val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
-    proof: &<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_RangeProof">RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
-{
-    <b>assert</b>!(<a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>));
+    val_base: &RistrettoPoint,
+    rand_base: &RistrettoPoint,
+    proof: &<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_RangeProof">RangeProof</a>,
+    num_bits: u64,
+    dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+): bool {
+    <b>assert</b>!(
+        <a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>(),
+        <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>),
+    );
 
     <a href="ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(
         <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(com)),
-        val_base, rand_base,
-        proof.bytes, num_bits, dst
+        val_base,
+        rand_base,
+        proof.bytes,
+        num_bits,
+        dst,
     )
 }
 </code></pre>
@@ -291,7 +304,8 @@ Aborts with <code><a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argu
     rand_base: &RistrettoPoint,
     proof: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     num_bits: u64,
-    dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+    dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+): bool;
 </code></pre>
 
 

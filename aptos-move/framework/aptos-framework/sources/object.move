@@ -90,7 +90,8 @@ module aptos_framework::object {
     const OBJECT_FROM_SEED_ADDRESS_SCHEME: u8 = 0xFE;
 
     /// Address where unwanted objects can be forcefully transferred to.
-    const BURN_ADDRESS: address = @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+    const BURN_ADDRESS: address =
+        @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The core of the object model that defines ownership, transferability, and events.
@@ -216,7 +217,9 @@ module aptos_framework::object {
     native fun create_user_derived_object_address_impl(source: address, derive_from: address): address;
 
     /// Derives an object address from the source address and an object: sha3_256([source | object addr | 0xFC]).
-    public fun create_user_derived_object_address(source: address, derive_from: address): address {
+    public fun create_user_derived_object_address(
+        source: address, derive_from: address
+    ): address {
         if (std::features::object_native_derived_address_enabled()) {
             create_user_derived_object_address_impl(source, derive_from)
         } else {
@@ -228,7 +231,9 @@ module aptos_framework::object {
     }
 
     /// Derives an object from an Account GUID.
-    public fun create_guid_object_address(source: address, creation_num: u64): address {
+    public fun create_guid_object_address(
+        source: address, creation_num: u64
+    ): address {
         let id = guid::create_id(source, creation_num);
         let bytes = bcs::to_bytes(&id);
         vector::push_back(&mut bytes, OBJECT_FROM_GUID_ADDRESS_SCHEME);
@@ -257,8 +262,11 @@ module aptos_framework::object {
 
     /// Create a new object whose address is derived based on the creator account address and another object.
     /// Derivde objects, similar to named objects, cannot be deleted.
-    public(friend) fun create_user_derived_object(creator_address: address, derive_ref: &DeriveRef): ConstructorRef {
-        let obj_addr = create_user_derived_object_address(creator_address, derive_ref.self);
+    public(friend) fun create_user_derived_object(
+        creator_address: address, derive_ref: &DeriveRef
+    ): ConstructorRef {
+        let obj_addr =
+            create_user_derived_object_address(creator_address, derive_ref.self);
         create_object_internal(creator_address, obj_addr, false)
     }
 
@@ -279,8 +287,7 @@ module aptos_framework::object {
 
     /// Create a sticky object at a specific address. Only used by aptos_framework::coin.
     public(friend) fun create_sticky_object_at_address(
-        owner_address: address,
-        object_address: address,
+        owner_address: address, object_address: address,
     ): ConstructorRef {
         create_object_internal(owner_address, object_address, false)
     }
@@ -309,7 +316,9 @@ module aptos_framework::object {
         create_object_from_guid(signer::address_of(creator), guid)
     }
 
-    fun create_object_from_guid(creator_address: address, guid: guid::GUID): ConstructorRef {
+    fun create_object_from_guid(
+        creator_address: address, guid: guid::GUID
+    ): ConstructorRef {
         let bytes = bcs::to_bytes(&guid);
         vector::push_back(&mut bytes, OBJECT_FROM_GUID_ADDRESS_SCHEME);
         let obj_addr = from_bcs::to_address(hash::sha3_256(bytes));
@@ -354,7 +363,10 @@ module aptos_framework::object {
 
     /// Generates the TransferRef, which can be used to manage object transfers.
     public fun generate_transfer_ref(ref: &ConstructorRef): TransferRef {
-        assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
+        assert!(
+            !exists<Untransferable>(ref.self),
+            error::permission_denied(EOBJECT_NOT_TRANSFERRABLE),
+        );
         TransferRef { self: ref.self }
     }
 
@@ -393,9 +405,7 @@ module aptos_framework::object {
     }
 
     /// Generate a new event handle.
-    public fun new_event_handle<T: drop + store>(
-        object: &signer,
-    ): event::EventHandle<T> acquires ObjectCore {
+    public fun new_event_handle<T: drop + store>(object: &signer,): event::EventHandle<T> acquires ObjectCore {
         event::new_event_handle(create_guid(object))
     }
 
@@ -422,7 +432,7 @@ module aptos_framework::object {
         } = object_core;
 
         if (exists<Untransferable>(ref.self)) {
-          let Untransferable {} = move_from<Untransferable>(ref.self);
+            let Untransferable {} = move_from<Untransferable>(ref.self);
         };
 
         event::destroy_handle(transfer_events);
@@ -458,7 +468,10 @@ module aptos_framework::object {
 
     /// Enable direct transfer.
     public fun enable_ungated_transfer(ref: &TransferRef) acquires ObjectCore {
-        assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
+        assert!(
+            !exists<Untransferable>(ref.self),
+            error::permission_denied(EOBJECT_NOT_TRANSFERRABLE),
+        );
         let object = borrow_global_mut<ObjectCore>(ref.self);
         object.allow_ungated_transfer = true;
     }
@@ -466,17 +479,20 @@ module aptos_framework::object {
     /// Create a LinearTransferRef for a one-time transfer. This requires that the owner at the
     /// time of generation is the owner at the time of transferring.
     public fun generate_linear_transfer_ref(ref: &TransferRef): LinearTransferRef acquires ObjectCore {
-        assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
+        assert!(
+            !exists<Untransferable>(ref.self),
+            error::permission_denied(EOBJECT_NOT_TRANSFERRABLE),
+        );
         let owner = owner(Object<ObjectCore> { inner: ref.self });
-        LinearTransferRef {
-            self: ref.self,
-            owner,
-        }
+        LinearTransferRef { self: ref.self, owner, }
     }
 
     /// Transfer to the destination address using a LinearTransferRef.
     public fun transfer_with_ref(ref: LinearTransferRef, to: address) acquires ObjectCore, TombStone {
-        assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
+        assert!(
+            !exists<Untransferable>(ref.self),
+            error::permission_denied(EOBJECT_NOT_TRANSFERRABLE),
+        );
 
         // Undo soft burn if present as we don't want the original owner to be able to reclaim by calling unburn later.
         if (exists<TombStone>(ref.self)) {
@@ -490,20 +506,12 @@ module aptos_framework::object {
         );
         if (std::features::module_event_migration_enabled()) {
             event::emit(
-                Transfer {
-                    object: ref.self,
-                    from: object.owner,
-                    to,
-                },
+                Transfer { object: ref.self, from: object.owner, to, },
             );
         };
         event::emit_event(
             &mut object.transfer_events,
-            TransferEvent {
-                object: ref.self,
-                from: object.owner,
-                to,
-            },
+            TransferEvent { object: ref.self, from: object.owner, to, },
         );
         object.owner = to;
     }
@@ -546,20 +554,12 @@ module aptos_framework::object {
         if (object_core.owner != to) {
             if (std::features::module_event_migration_enabled()) {
                 event::emit(
-                    Transfer {
-                        object,
-                        from: object_core.owner,
-                        to,
-                    },
+                    Transfer { object, from: object_core.owner, to, },
                 );
             };
             event::emit_event(
                 &mut object_core.transfer_events,
-                TransferEvent {
-                    object,
-                    from: object_core.owner,
-                    to,
-                },
+                TransferEvent { object, from: object_core.owner, to, },
             );
             object_core.owner = to;
         };
@@ -577,7 +577,9 @@ module aptos_framework::object {
     /// This checks that the destination address is eventually owned by the owner and that each
     /// object between the two allows for ungated transfers. Note, this is limited to a depth of 8
     /// objects may have cyclic dependencies.
-    fun verify_ungated_and_descendant(owner: address, destination: address) acquires ObjectCore {
+    fun verify_ungated_and_descendant(
+        owner: address, destination: address
+    ) acquires ObjectCore {
         let current_address = destination;
         assert!(
             exists<ObjectCore>(current_address),
@@ -615,7 +617,9 @@ module aptos_framework::object {
     /// Original owners can reclaim burnt objects any time in the future by calling unburn.
     public entry fun burn<T: key>(owner: &signer, object: Object<T>) acquires ObjectCore {
         let original_owner = signer::address_of(owner);
-        assert!(is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
+        assert!(
+            is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER)
+        );
         let object_addr = object.inner;
         move_to(&create_signer(object_addr), TombStone { original_owner });
         transfer_raw_inner(object_addr, BURN_ADDRESS);
@@ -623,14 +627,20 @@ module aptos_framework::object {
 
     /// Allow origin owners to reclaim any objects they previous burnt.
     public entry fun unburn<T: key>(
-        original_owner: &signer,
-        object: Object<T>,
+        original_owner: &signer, object: Object<T>,
     ) acquires TombStone, ObjectCore {
         let object_addr = object.inner;
-        assert!(exists<TombStone>(object_addr), error::invalid_argument(EOBJECT_NOT_BURNT));
+        assert!(
+            exists<TombStone>(object_addr), error::invalid_argument(EOBJECT_NOT_BURNT)
+        );
 
-        let TombStone { original_owner: original_owner_addr } = move_from<TombStone>(object_addr);
-        assert!(original_owner_addr == signer::address_of(original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
+        let TombStone { original_owner: original_owner_addr } = move_from<TombStone>(
+            object_addr
+        );
+        assert!(
+            original_owner_addr == signer::address_of(original_owner),
+            error::permission_denied(ENOT_OBJECT_OWNER),
+        );
         transfer_raw_inner(object_addr, original_owner_addr);
     }
 
@@ -839,7 +849,8 @@ module aptos_framework::object {
         std::vector::push_back(&mut bytes, 0);
         std::vector::push_back(&mut bytes, 0);
         std::vector::push_back(&mut bytes, DERIVE_AUID_ADDRESS_SCHEME);
-        let auid2 = aptos_framework::from_bcs::to_address(std::hash::sha3_256(bytes));
+        let auid2 =
+            aptos_framework::from_bcs::to_address(std::hash::sha3_256(bytes));
         assert!(auid1 == auid2, 0);
     }
 
@@ -914,7 +925,9 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 131078, location = Self)]
-    fun test_exceeding_maximum_object_nesting_owns_should_fail(creator: &signer) acquires ObjectCore {
+    fun test_exceeding_maximum_object_nesting_owns_should_fail(
+        creator: &signer
+    ) acquires ObjectCore {
         let obj1 = create_simple_object(creator, b"1");
         let obj2 = create_simple_object(creator, b"2");
         let obj3 = create_simple_object(creator, b"3");
@@ -949,7 +962,9 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 131078, location = Self)]
-    fun test_exceeding_maximum_object_nesting_transfer_should_fail(creator: &signer) acquires ObjectCore {
+    fun test_exceeding_maximum_object_nesting_transfer_should_fail(
+        creator: &signer
+    ) acquires ObjectCore {
         let obj1 = create_simple_object(creator, b"1");
         let obj2 = create_simple_object(creator, b"2");
         let obj3 = create_simple_object(creator, b"3");
@@ -1003,7 +1018,9 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 327689, location = Self)]
-    fun test_untransferable_direct_ownership_gen_transfer_ref(creator: &signer) acquires ObjectCore {
+    fun test_untransferable_direct_ownership_gen_transfer_ref(
+        creator: &signer
+    ) acquires ObjectCore {
         let (hero_constructor_ref, _) = create_hero(creator);
         set_untransferable(&hero_constructor_ref);
         generate_transfer_ref(&hero_constructor_ref);
@@ -1011,7 +1028,9 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 327689, location = Self)]
-    fun test_untransferable_direct_ownership_gen_linear_transfer_ref(creator: &signer) acquires ObjectCore {
+    fun test_untransferable_direct_ownership_gen_linear_transfer_ref(
+        creator: &signer
+    ) acquires ObjectCore {
         let (hero_constructor_ref, _) = create_hero(creator);
         let transfer_ref = generate_transfer_ref(&hero_constructor_ref);
         set_untransferable(&hero_constructor_ref);
@@ -1020,7 +1039,9 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 327689, location = Self)]
-    fun test_untransferable_direct_ownership_with_linear_transfer_ref(creator: &signer) acquires ObjectCore, TombStone {
+    fun test_untransferable_direct_ownership_with_linear_transfer_ref(
+        creator: &signer
+    ) acquires ObjectCore, TombStone {
         let (hero_constructor_ref, _) = create_hero(creator);
         let transfer_ref = generate_transfer_ref(&hero_constructor_ref);
         let linear_transfer_ref = generate_linear_transfer_ref(&transfer_ref);
@@ -1040,7 +1061,9 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 327689, location = Self)]
-    fun test_untransferable_indirect_ownership_gen_transfer_ref(creator: &signer) acquires ObjectCore {
+    fun test_untransferable_indirect_ownership_gen_transfer_ref(
+        creator: &signer
+    ) acquires ObjectCore {
         let (_, hero) = create_hero(creator);
         let (weapon_constructor_ref, weapon) = create_weapon(creator);
         transfer_to_object(creator, weapon, hero);
@@ -1050,7 +1073,9 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 327689, location = Self)]
-    fun test_untransferable_indirect_ownership_gen_linear_transfer_ref(creator: &signer) acquires ObjectCore {
+    fun test_untransferable_indirect_ownership_gen_linear_transfer_ref(
+        creator: &signer
+    ) acquires ObjectCore {
         let (_, hero) = create_hero(creator);
         let (weapon_constructor_ref, weapon) = create_weapon(creator);
         transfer_to_object(creator, weapon, hero);
@@ -1061,7 +1086,9 @@ module aptos_framework::object {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 327689, location = Self)]
-    fun test_untransferable_indirect_ownership_with_linear_transfer_ref(creator: &signer) acquires ObjectCore, TombStone {
+    fun test_untransferable_indirect_ownership_with_linear_transfer_ref(
+        creator: &signer
+    ) acquires ObjectCore, TombStone {
         let (_, hero) = create_hero(creator);
         let (weapon_constructor_ref, weapon) = create_weapon(creator);
         transfer_to_object(creator, weapon, hero);

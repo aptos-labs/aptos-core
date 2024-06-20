@@ -15,7 +15,11 @@ module aptos_framework::randomness_api_v0_config {
     }
 
     /// Only used in genesis.
-    fun initialize(framework: &signer, required_amount: RequiredGasDeposit, allow_custom_max_gas_flag: AllowCustomMaxGasFlag) {
+    fun initialize(
+        framework: &signer,
+        required_amount: RequiredGasDeposit,
+        allow_custom_max_gas_flag: AllowCustomMaxGasFlag
+    ) {
         system_addresses::assert_aptos_framework(framework);
         chain_status::assert_genesis();
         move_to(framework, required_amount);
@@ -23,15 +27,19 @@ module aptos_framework::randomness_api_v0_config {
     }
 
     /// This can be called by on-chain governance to update `RequiredGasDeposit` for the next epoch.
-    public fun set_for_next_epoch(framework: &signer, gas_amount: Option<u64>) {
+    public fun set_for_next_epoch(
+        framework: &signer, gas_amount: Option<u64>
+    ) {
         system_addresses::assert_aptos_framework(framework);
         config_buffer::upsert(RequiredGasDeposit { gas_amount });
     }
 
     /// This can be called by on-chain governance to update `AllowCustomMaxGasFlag` for the next epoch.
-    public fun set_allow_max_gas_flag_for_next_epoch(framework: &signer, value: bool) {
+    public fun set_allow_max_gas_flag_for_next_epoch(
+        framework: &signer, value: bool
+    ) {
         system_addresses::assert_aptos_framework(framework);
-        config_buffer::upsert(AllowCustomMaxGasFlag { value } );
+        config_buffer::upsert(AllowCustomMaxGasFlag { value });
     }
 
     /// Only used in reconfigurations to apply the pending `RequiredGasDeposit`, if there is any.

@@ -158,17 +158,13 @@ Creates a new function info from names.
 ): <a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a> {
     <b>assert</b>!(
         <a href="function_info.md#0x1_function_info_is_identifier">is_identifier</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&module_name)),
-        <a href="function_info.md#0x1_function_info_EINVALID_IDENTIFIER">EINVALID_IDENTIFIER</a>
+        <a href="function_info.md#0x1_function_info_EINVALID_IDENTIFIER">EINVALID_IDENTIFIER</a>,
     );
     <b>assert</b>!(
         <a href="function_info.md#0x1_function_info_is_identifier">is_identifier</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&function_name)),
-        <a href="function_info.md#0x1_function_info_EINVALID_IDENTIFIER">EINVALID_IDENTIFIER</a>
+        <a href="function_info.md#0x1_function_info_EINVALID_IDENTIFIER">EINVALID_IDENTIFIER</a>,
     );
-    <a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a> {
-        module_address,
-        module_name,
-        function_name,
-    }
+    <a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a> { module_address, module_name, function_name, }
 }
 </code></pre>
 
@@ -202,12 +198,11 @@ dispatch_target also needs to be public so the type signature will remain unchan
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">check_dispatch_type_compatibility</a>(
-    framework_function: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>,
-    dispatch_target: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>,
+    framework_function: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>, dispatch_target: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>,
 ): bool {
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="function_info.md#0x1_function_info_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="function_info.md#0x1_function_info_ENOT_ACTIVATED">ENOT_ACTIVATED</a>),
     );
     <a href="function_info.md#0x1_function_info_load_function_impl">load_function_impl</a>(dispatch_target);
     <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility_impl">check_dispatch_type_compatibility_impl</a>(framework_function, dispatch_target)

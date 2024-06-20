@@ -97,15 +97,18 @@ module aptos_framework::object_code_deployment {
 
         event::emit(Publish { object_address: signer::address_of(code_signer), });
 
-        move_to(code_signer, ManagingRefs {
-            extend_ref: object::generate_extend_ref(constructor_ref),
-        });
+        move_to(
+            code_signer,
+            ManagingRefs { extend_ref: object::generate_extend_ref(constructor_ref), },
+        );
     }
 
     inline fun object_seed(publisher: address): vector<u8> {
         let sequence_number = account::get_sequence_number(publisher) + 1;
         let seeds = vector[];
-        vector::append(&mut seeds, bcs::to_bytes(&OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR));
+        vector::append(
+            &mut seeds, bcs::to_bytes(&OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR)
+        );
         vector::append(&mut seeds, bcs::to_bytes(&sequence_number));
         seeds
     }
@@ -127,7 +130,10 @@ module aptos_framework::object_code_deployment {
         );
 
         let code_object_address = object::object_address(&code_object);
-        assert!(exists<ManagingRefs>(code_object_address), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
+        assert!(
+            exists<ManagingRefs>(code_object_address),
+            error::not_found(ECODE_OBJECT_DOES_NOT_EXIST),
+        );
 
         let extend_ref = &borrow_global<ManagingRefs>(code_object_address).extend_ref;
         let code_signer = &object::generate_signer_for_extending(extend_ref);
@@ -139,7 +145,9 @@ module aptos_framework::object_code_deployment {
     /// Make an existing upgradable package immutable. Once this is called, the package cannot be made upgradable again.
     /// Each `code_object` should only have one package, as one package is deployed per object in this module.
     /// Requires the `publisher` to be the owner of the `code_object`.
-    public entry fun freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) {
+    public entry fun freeze_code_object(
+        publisher: &signer, code_object: Object<PackageRegistry>
+    ) {
         code::freeze_code_object(publisher, code_object);
 
         event::emit(Freeze { object_address: object::object_address(&code_object), });

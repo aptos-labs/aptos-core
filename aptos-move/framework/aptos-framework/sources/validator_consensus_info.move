@@ -9,20 +9,13 @@ module aptos_framework::validator_consensus_info {
 
     /// Create a default `ValidatorConsensusInfo` object. Value may be invalid. Only for place holding prupose.
     public fun default(): ValidatorConsensusInfo {
-        ValidatorConsensusInfo {
-            addr: @vm,
-            pk_bytes: vector[],
-            voting_power: 0,
-        }
+        ValidatorConsensusInfo { addr: @vm, pk_bytes: vector[], voting_power: 0, }
     }
 
     /// Create a `ValidatorConsensusInfo` object.
-    public fun new(addr: address, pk_bytes: vector<u8>, voting_power: u64): ValidatorConsensusInfo {
-        ValidatorConsensusInfo {
-            addr,
-            pk_bytes,
-            voting_power,
-        }
+    public fun new(addr: address, pk_bytes: vector<u8>, voting_power: u64)
+        : ValidatorConsensusInfo {
+        ValidatorConsensusInfo { addr, pk_bytes, voting_power, }
     }
 
     /// Get `ValidatorConsensusInfo.addr`.

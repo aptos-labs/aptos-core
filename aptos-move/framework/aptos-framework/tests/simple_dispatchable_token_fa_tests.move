@@ -1,9 +1,27 @@
 #[test_only]
 module aptos_framework::simple_token_fa_tests {
     use aptos_framework::fungible_asset::{
-        amount, balance, burn, destroy_zero, extract, create_test_token, init_test_metadata,
-        supply, create_store, create_test_store, remove_store, deposit_with_ref, mint, mint_to, merge,
-        set_frozen_flag, is_frozen, transfer_with_ref, upgrade_to_concurrent, Metadata, TestToken
+        amount,
+        balance,
+        burn,
+        destroy_zero,
+        extract,
+        create_test_token,
+        init_test_metadata,
+        supply,
+        create_store,
+        create_test_store,
+        remove_store,
+        deposit_with_ref,
+        mint,
+        mint_to,
+        merge,
+        set_frozen_flag,
+        is_frozen,
+        transfer_with_ref,
+        upgrade_to_concurrent,
+        Metadata,
+        TestToken
     };
     use aptos_framework::object;
     use 0xcafe::simple_token;
@@ -24,8 +42,7 @@ module aptos_framework::simple_token_fa_tests {
 
     #[test(creator = @0xcafe, aaron = @0xface)]
     fun test_transfer_with_ref(
-        creator: &signer,
-        aaron: &signer,
+        creator: &signer, aaron: &signer,
     ) {
         let (creator_ref, test_token) = create_test_token(creator);
         let (mint_ref, transfer_ref, _burn_ref) = init_test_metadata(&creator_ref);
@@ -58,16 +75,14 @@ module aptos_framework::simple_token_fa_tests {
         assert!(amount(&cash) == 80, 2);
         let more_cash = extract(&mut fa, 20);
         destroy_zero(fa);
-        merge(&mut cash,
-         more_cash);
+        merge(&mut cash, more_cash);
         assert!(amount(&cash) == 100, 3);
         burn(&burn_ref, cash);
     }
 
     #[test(fx = @aptos_framework, creator = @0xcafe)]
     fun test_fungible_asset_upgrade(
-        fx: &signer,
-        creator: &signer
+        fx: &signer, creator: &signer
     ) {
         let feature = features::get_concurrent_fungible_assets_feature();
         features::change_feature_flags_for_testing(fx, vector[], vector[feature]);
@@ -97,9 +112,7 @@ module aptos_framework::simple_token_fa_tests {
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::fungible_asset)]
-    fun test_mint_to_frozen(
-        creator: &signer
-    ) {
+    fun test_mint_to_frozen(creator: &signer) {
         let (creator_ref, test_token) = create_test_token(creator);
         let (mint_ref, transfer_ref, _burn_ref) = init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(test_token);

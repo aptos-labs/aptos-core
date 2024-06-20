@@ -127,11 +127,13 @@ The maximum allowed bitvector size
     <b>assert</b>!(<a href="bit_vector.md#0x1_bit_vector_length">length</a> &lt; <a href="bit_vector.md#0x1_bit_vector_MAX_SIZE">MAX_SIZE</a>, <a href="bit_vector.md#0x1_bit_vector_ELENGTH">ELENGTH</a>);
     <b>let</b> counter = 0;
     <b>let</b> bit_field = <a href="vector.md#0x1_vector_empty">vector::empty</a>();
-    <b>while</b> ({<b>spec</b> {
-        <b>invariant</b> counter &lt;= length;
-        <b>invariant</b> len(bit_field) == counter;
-    };
-        (counter &lt; length)}) {
+    <b>while</b> ({
+            <b>spec</b> {
+                <b>invariant</b> counter &lt;= length;
+                <b>invariant</b> len(bit_field) == counter;
+            };
+            (counter &lt; length)
+        }) {
         <a href="vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> bit_field, <b>false</b>);
         counter = counter + 1;
     };
@@ -140,10 +142,7 @@ The maximum allowed bitvector size
         <b>assert</b> len(bit_field) == length;
     };
 
-    <a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a> {
-        length,
-        bit_field,
-    }
+    <a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a> { length, bit_field, }
 }
 </code></pre>
 
@@ -224,9 +223,12 @@ bitvector's length the bitvector will be zeroed out.
 
 <pre><code><b>public</b> <b>fun</b> <a href="bit_vector.md#0x1_bit_vector_shift_left">shift_left</a>(bitvector: &<b>mut</b> <a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a>, amount: u64) {
     <b>if</b> (amount &gt;= bitvector.length) {
-        <a href="vector.md#0x1_vector_for_each_mut">vector::for_each_mut</a>(&<b>mut</b> bitvector.bit_field, |elem| {
-            *elem = <b>false</b>;
-        });
+        <a href="vector.md#0x1_vector_for_each_mut">vector::for_each_mut</a>(
+            &<b>mut</b> bitvector.bit_field,
+            |elem| {
+                *elem = <b>false</b>;
+            },
+        );
     } <b>else</b> {
         <b>let</b> i = amount;
 
@@ -320,21 +322,27 @@ sequence, then <code>0</code> is returned.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bit_vector.md#0x1_bit_vector_longest_set_sequence_starting_at">longest_set_sequence_starting_at</a>(bitvector: &<a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a>, start_index: u64): u64 {
+<pre><code><b>public</b> <b>fun</b> <a href="bit_vector.md#0x1_bit_vector_longest_set_sequence_starting_at">longest_set_sequence_starting_at</a>(
+    bitvector: &<a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a>, start_index: u64
+): u64 {
     <b>assert</b>!(start_index &lt; bitvector.length, <a href="bit_vector.md#0x1_bit_vector_EINDEX">EINDEX</a>);
     <b>let</b> index = start_index;
 
     // Find the greatest index in the <a href="vector.md#0x1_vector">vector</a> such that all indices less than it are set.
     <b>while</b> ({
-        <b>spec</b> {
-            <b>invariant</b> index &gt;= start_index;
-            <b>invariant</b> index == start_index || <a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(bitvector, index - 1);
-            <b>invariant</b> index == start_index || index - 1 &lt; <a href="vector.md#0x1_vector_length">vector::length</a>(bitvector.bit_field);
-            <b>invariant</b> <b>forall</b> j in start_index..index: <a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(bitvector, j);
-            <b>invariant</b> <b>forall</b> j in start_index..index: j &lt; <a href="vector.md#0x1_vector_length">vector::length</a>(bitvector.bit_field);
-        };
-        index &lt; bitvector.length
-    }) {
+            <b>spec</b> {
+                <b>invariant</b> index &gt;= start_index;
+                <b>invariant</b> index == start_index || <a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(bitvector, index - 1);
+                <b>invariant</b> index == start_index || index - 1 &lt; <a href="vector.md#0x1_vector_length">vector::length</a>(
+                    bitvector.bit_field
+                );
+                <b>invariant</b> <b>forall</b> j in start_index..index: <a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(bitvector, j);
+                <b>invariant</b> <b>forall</b> j in start_index..index: j &lt; <a href="vector.md#0x1_vector_length">vector::length</a>(
+                    bitvector.bit_field
+                );
+            };
+            index &lt; bitvector.length
+        }) {
         <b>if</b> (!<a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(bitvector, index)) <b>break</b>;
         index = index + 1;
     };
@@ -363,18 +371,21 @@ sequence, then <code>0</code> is returned.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bit_vector.md#0x1_bit_vector_shift_left_for_verification_only">shift_left_for_verification_only</a>(bitvector: &<b>mut</b> <a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a>, amount: u64) {
+<pre><code><b>public</b> <b>fun</b> <a href="bit_vector.md#0x1_bit_vector_shift_left_for_verification_only">shift_left_for_verification_only</a>(
+    bitvector: &<b>mut</b> <a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a>, amount: u64
+) {
     <b>if</b> (amount &gt;= bitvector.length) {
         <b>let</b> len = <a href="vector.md#0x1_vector_length">vector::length</a>(&bitvector.bit_field);
         <b>let</b> i = 0;
         <b>while</b> ({
-            <b>spec</b> {
-                <b>invariant</b> len == bitvector.length;
-                <b>invariant</b> <b>forall</b> k in 0..i: !bitvector.bit_field[k];
-                <b>invariant</b> <b>forall</b> k in i..bitvector.length: bitvector.bit_field[k] == <b>old</b>(bitvector).bit_field[k];
-            };
-            i &lt; len
-        }) {
+                <b>spec</b> {
+                    <b>invariant</b> len == bitvector.length;
+                    <b>invariant</b> <b>forall</b> k in 0..i: !bitvector.bit_field[k];
+                    <b>invariant</b> <b>forall</b> k in i..bitvector.length: bitvector.bit_field[k] ==
+                         <b>old</b>(bitvector).bit_field[k];
+                };
+                i &lt; len
+            }) {
             <b>let</b> elem = <a href="vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> bitvector.bit_field, i);
             *elem = <b>false</b>;
             i = i + 1;
@@ -383,31 +394,36 @@ sequence, then <code>0</code> is returned.
         <b>let</b> i = amount;
 
         <b>while</b> ({
-            <b>spec</b> {
-                <b>invariant</b> i &gt;= amount;
-                <b>invariant</b> bitvector.length == <b>old</b>(bitvector).length;
-                <b>invariant</b> <b>forall</b> j in amount..i: <b>old</b>(bitvector).bit_field[j] == bitvector.bit_field[j - amount];
-                <b>invariant</b> <b>forall</b> j in (i-amount)..bitvector.length : <b>old</b>(bitvector).bit_field[j] == bitvector.bit_field[j];
-                <b>invariant</b> <b>forall</b> k in 0..i-amount: bitvector.bit_field[k] == <b>old</b>(bitvector).bit_field[k + amount];
-            };
-            i &lt; bitvector.length
-        }) {
+                <b>spec</b> {
+                    <b>invariant</b> i &gt;= amount;
+                    <b>invariant</b> bitvector.length == <b>old</b>(bitvector).length;
+                    <b>invariant</b> <b>forall</b> j in amount..i: <b>old</b>(bitvector).bit_field[j] == bitvector
+                        .bit_field[j - amount];
+                    <b>invariant</b> <b>forall</b> j in (i - amount)..bitvector.length: <b>old</b>(
+                        bitvector
+                    ).bit_field[j] == bitvector.bit_field[j];
+                    <b>invariant</b> <b>forall</b> k in 0..i - amount: bitvector.bit_field[k] == <b>old</b>(
+                        bitvector
+                    ).bit_field[k + amount];
+                };
+                i &lt; bitvector.length
+            }) {
             <b>if</b> (<a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(bitvector, i)) <a href="bit_vector.md#0x1_bit_vector_set">set</a>(bitvector, i - amount)
             <b>else</b> <a href="bit_vector.md#0x1_bit_vector_unset">unset</a>(bitvector, i - amount);
             i = i + 1;
         };
 
-
         i = bitvector.length - amount;
 
         <b>while</b> ({
-            <b>spec</b> {
-                <b>invariant</b> <b>forall</b> j in bitvector.length - amount..i: !bitvector.bit_field[j];
-                <b>invariant</b> <b>forall</b> k in 0..bitvector.length - amount: bitvector.bit_field[k] == <b>old</b>(bitvector).bit_field[k + amount];
-                <b>invariant</b> i &gt;= bitvector.length - amount;
-            };
-            i &lt; bitvector.length
-        }) {
+                <b>spec</b> {
+                    <b>invariant</b> <b>forall</b> j in bitvector.length - amount..i: !bitvector.bit_field[j];
+                    <b>invariant</b> <b>forall</b> k in 0..bitvector.length - amount: bitvector.bit_field[k] ==
+                         <b>old</b>(bitvector).bit_field[k + amount];
+                    <b>invariant</b> i &gt;= bitvector.length - amount;
+                };
+                i &lt; bitvector.length
+            }) {
             <a href="bit_vector.md#0x1_bit_vector_unset">unset</a>(bitvector, i);
             i = i + 1;
         }
@@ -598,9 +614,8 @@ sequence, then <code>0</code> is returned.
 
 
 <pre><code><b>fun</b> <a href="bit_vector.md#0x1_bit_vector_spec_is_index_set">spec_is_index_set</a>(bitvector: <a href="bit_vector.md#0x1_bit_vector_BitVector">BitVector</a>, bit_index: u64): bool {
-   <b>if</b> (bit_index &gt;= <a href="bit_vector.md#0x1_bit_vector_length">length</a>(bitvector)) {
-       <b>false</b>
-   } <b>else</b> {
+   <b>if</b> (bit_index &gt;= <a href="bit_vector.md#0x1_bit_vector_length">length</a>(bitvector)) { <b>false</b> }
+   <b>else</b> {
        bitvector.bit_field[bit_index]
    }
 }
@@ -638,11 +653,18 @@ sequence, then <code>0</code> is returned.
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> amount &gt;= bitvector.length ==&gt; (<b>forall</b> k in 0..bitvector.length: !bitvector.bit_field[k]);
+<b>ensures</b> amount &gt;= bitvector.length ==&gt;
+    (<b>forall</b> k in 0..bitvector.length: !bitvector.bit_field[k]);
 <b>ensures</b> amount &lt; bitvector.length ==&gt;
-    (<b>forall</b> i in bitvector.length - amount..bitvector.length: !bitvector.bit_field[i]);
+    (
+        <b>forall</b> i in bitvector.length - amount..bitvector.length: !bitvector.bit_field[i]
+    );
 <b>ensures</b> amount &lt; bitvector.length ==&gt;
-    (<b>forall</b> i in 0..bitvector.length - amount: bitvector.bit_field[i] == <b>old</b>(bitvector).bit_field[i + amount]);
+    (
+        <b>forall</b> i in 0..bitvector.length - amount: bitvector.bit_field[i] == <b>old</b>(
+            bitvector
+        ).bit_field[i + amount]
+    );
 </code></pre>
 
 

@@ -251,7 +251,9 @@ When inline_capacity = 0, SmartVector degrades to a wrapper of BigVector.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_empty_with_config">empty_with_config</a>&lt;T: store&gt;(inline_capacity: u64, bucket_size: u64): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_empty_with_config">empty_with_config</a>&lt;T: store&gt;(
+    inline_capacity: u64, bucket_size: u64
+): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt; {
     <b>assert</b>!(bucket_size &gt; 0, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_vector.md#0x1_smart_vector_EZERO_BUCKET_SIZE">EZERO_BUCKET_SIZE</a>));
     <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a> {
         inline_vec: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
@@ -458,7 +460,9 @@ Disclaimer: This function may be costly. Use it at your own discretion.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_append">append</a>&lt;T: store&gt;(lhs: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, other: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;) {
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_append">append</a>&lt;T: store&gt;(
+    lhs: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, other: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;
+) {
     <b>let</b> other_len = <a href="smart_vector.md#0x1_smart_vector_length">length</a>(&other);
     <b>let</b> half_other_len = other_len / 2;
     <b>let</b> i = 0;
@@ -495,7 +499,10 @@ Add multiple values to the vector at once.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_add_all">add_all</a>&lt;T: store&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, vals: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;T&gt;) {
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(vals, |val| { <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>(v, val); })
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(vals,
+        |val| {
+            <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>(v, val);
+        })
 }
 </code></pre>
 
@@ -556,21 +563,23 @@ This operation will cost more gas when it adds new bucket.
     <b>let</b> len = <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v);
     <b>let</b> inline_len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&v.inline_vec);
     <b>if</b> (len == inline_len) {
-        <b>let</b> bucket_size = <b>if</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&v.inline_capacity)) {
-            <b>if</b> (len &lt; *<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&v.inline_capacity)) {
-                <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> v.inline_vec, val);
-                <b>return</b>
+        <b>let</b> bucket_size =
+            <b>if</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&v.inline_capacity)) {
+                <b>if</b> (len &lt; *<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&v.inline_capacity)) {
+                    <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> v.inline_vec, val);
+                    <b>return</b>
+                };
+                *<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&v.bucket_size)
+            } <b>else</b> {
+                <b>let</b> val_size = size_of_val(&val);
+                <b>if</b> (val_size * (inline_len + 1) &lt; 150 /* magic number */) {
+                    <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> v.inline_vec, val);
+                    <b>return</b>
+                };
+                <b>let</b> estimated_avg_size =
+                    max((size_of_val(&v.inline_vec) + val_size) / (inline_len + 1), 1);
+                max(1024 /* free_write_quota */ / estimated_avg_size, 1)
             };
-            *<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&v.bucket_size)
-        } <b>else</b> {
-            <b>let</b> val_size = size_of_val(&val);
-            <b>if</b> (val_size * (inline_len + 1) &lt; 150 /* magic number */) {
-                <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> v.inline_vec, val);
-                <b>return</b>
-            };
-            <b>let</b> estimated_avg_size = max((size_of_val(&v.inline_vec) + val_size) / (inline_len + 1), 1);
-            max(1024 /* free_write_quota */ / estimated_avg_size, 1)
-        };
         <a href="../../move-stdlib/doc/option.md#0x1_option_fill">option::fill</a>(&<b>mut</b> v.big_vec, <a href="big_vector.md#0x1_big_vector_empty">big_vector::empty</a>(bucket_size));
     };
     <a href="big_vector.md#0x1_big_vector_push_back">big_vector::push_back</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(&<b>mut</b> v.big_vec), val);
@@ -740,7 +749,9 @@ for v.
     <b>assert</b>!(j &lt; len, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_vector.md#0x1_smart_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>));
     <b>let</b> inline_len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&v.inline_vec);
     <b>if</b> (i &gt;= inline_len) {
-        <a href="big_vector.md#0x1_big_vector_swap">big_vector::swap</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(&<b>mut</b> v.big_vec), i - inline_len, j - inline_len);
+        <a href="big_vector.md#0x1_big_vector_swap">big_vector::swap</a>(
+            <a href="../../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(&<b>mut</b> v.big_vec), i - inline_len, j - inline_len
+        );
     } <b>else</b> <b>if</b> (j &lt; inline_len) {
         <a href="../../move-stdlib/doc/vector.md#0x1_vector_swap">vector::swap</a>(&<b>mut</b> v.inline_vec, i, j);
     } <b>else</b> {
@@ -833,14 +844,11 @@ Disclaimer: This function may be costly. Use it at your own discretion.
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_index_of">index_of</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, val: &T): (bool, u64) {
     <b>let</b> (found, i) = <a href="../../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(&v.inline_vec, val);
-    <b>if</b> (found) {
-        (<b>true</b>, i)
-    } <b>else</b> <b>if</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&v.big_vec)) {
+    <b>if</b> (found) { (<b>true</b>, i) }
+    <b>else</b> <b>if</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&v.big_vec)) {
         <b>let</b> (found, i) = <a href="big_vector.md#0x1_big_vector_index_of">big_vector::index_of</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&v.big_vec), val);
         (found, i + <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&v.inline_vec))
-    } <b>else</b> {
-        (<b>false</b>, 0)
-    }
+    } <b>else</b> { (<b>false</b>, 0) }
 }
 </code></pre>
 
@@ -893,9 +901,8 @@ Return the length of the vector.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_length">length</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;): u64 {
-    <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&v.inline_vec) + <b>if</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&v.big_vec)) {
-        0
-    } <b>else</b> {
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&v.inline_vec) + <b>if</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&v.big_vec)) { 0 }
+    <b>else</b> {
         <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&v.big_vec))
     }
 }
@@ -1092,7 +1099,9 @@ Apply the function to a mutable reference of each T in the vector with its index
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_enumerate_mut">enumerate_mut</a>&lt;T&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, f: |u64, &<b>mut</b> T|) {
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_enumerate_mut">enumerate_mut</a>&lt;T&gt;(
+    v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, f: |u64, &<b>mut</b> T|
+) {
     <b>let</b> i = 0;
     <b>let</b> len = <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v);
     <b>while</b> (i &lt; len) {
@@ -1126,7 +1135,7 @@ Fold the function over the Ts. For example, <code><a href="smart_vector.md#0x1_s
 <pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_fold">fold</a>&lt;Accumulator, T: store&gt;(
     v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;,
     init: Accumulator,
-    f: |Accumulator, T|Accumulator
+    f: |Accumulator, T| Accumulator
 ): Accumulator {
     <b>let</b> accu = init;
     aptos_std::smart_vector::for_each(v, |elem| accu = f(accu, elem));
@@ -1158,7 +1167,7 @@ Fold right like fold above but working right to left. For example, <code><a href
 <pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_foldr">foldr</a>&lt;Accumulator, T&gt;(
     v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;,
     init: Accumulator,
-    f: |T, Accumulator|Accumulator
+    f: |T, Accumulator| Accumulator
 ): Accumulator {
     <b>let</b> accu = init;
     aptos_std::smart_vector::for_each_reverse(v, |elem| accu = f(elem, accu));
@@ -1188,11 +1197,12 @@ original vector.
 
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_map_ref">map_ref</a>&lt;T1, T2: store&gt;(
-    v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;,
-    f: |&T1|T2
+    v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;, f: |&T1| T2
 ): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt; {
     <b>let</b> result = aptos_std::smart_vector::new&lt;T2&gt;();
-    aptos_std::smart_vector::for_each_ref(v, |elem| aptos_std::smart_vector::push_back(&<b>mut</b> result, f(elem)));
+    aptos_std::smart_vector::for_each_ref(
+        v, |elem| aptos_std::smart_vector::push_back(&<b>mut</b> result, f(elem))
+    );
     result
 }
 </code></pre>
@@ -1218,8 +1228,7 @@ Map the function over the Ts of the vector, producing a new vector.
 
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_map">map</a>&lt;T1: store, T2: store&gt;(
-    v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;,
-    f: |T1|T2
+    v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;, f: |T1| T2
 ): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt; {
     <b>let</b> result = aptos_std::smart_vector::new&lt;T2&gt;();
     aptos_std::smart_vector::for_each(v, |elem| <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>(&<b>mut</b> result, f(elem)));
@@ -1248,13 +1257,15 @@ Filter the vector using the boolean function, removing all Ts for which <code>p(
 
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_filter">filter</a>&lt;T: store + drop&gt;(
-    v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;,
-    p: |&T|bool
+    v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, p: |&T| bool
 ): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt; {
     <b>let</b> result = aptos_std::smart_vector::new&lt;T&gt;();
-    aptos_std::smart_vector::for_each(v, |elem| {
-        <b>if</b> (p(&elem)) aptos_std::smart_vector::push_back(&<b>mut</b> result, elem);
-    });
+    aptos_std::smart_vector::for_each(
+        v,
+        |elem| {
+            <b>if</b> (p(&elem)) aptos_std::smart_vector::push_back(&<b>mut</b> result, elem);
+        },
+    );
     result
 }
 </code></pre>
@@ -1278,7 +1289,9 @@ Filter the vector using the boolean function, removing all Ts for which <code>p(
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip">zip</a>&lt;T1: store, T2: store&gt;(v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;, v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt;, f: |T1, T2|) {
+<pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip">zip</a>&lt;T1: store, T2: store&gt;(
+    v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;, v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt;, f: |T1, T2|
+) {
     // We need <b>to</b> reverse the vectors <b>to</b> consume it efficiently
     aptos_std::smart_vector::reverse(&<b>mut</b> v1);
     aptos_std::smart_vector::reverse(&<b>mut</b> v2);
@@ -1317,7 +1330,10 @@ This errors out if the vectors are not of the same length.
     // due <b>to</b> how inline functions work.
     <b>assert</b>!(len == aptos_std::smart_vector::length(&v2), 0x20005);
     <b>while</b> (len &gt; 0) {
-        f(aptos_std::smart_vector::pop_back(&<b>mut</b> v1), aptos_std::smart_vector::pop_back(&<b>mut</b> v2));
+        f(
+            aptos_std::smart_vector::pop_back(&<b>mut</b> v1),
+            aptos_std::smart_vector::pop_back(&<b>mut</b> v2),
+        );
         len = len - 1;
     };
     aptos_std::smart_vector::destroy_empty(v1);
@@ -1357,7 +1373,10 @@ This errors out if the vectors are not of the same length.
     <b>assert</b>!(len == aptos_std::smart_vector::length(v2), 0x20005);
     <b>let</b> i = 0;
     <b>while</b> (i &lt; len) {
-        f(aptos_std::smart_vector::borrow(v1, i), aptos_std::smart_vector::borrow(v2, i));
+        f(
+            aptos_std::smart_vector::borrow(v1, i),
+            aptos_std::smart_vector::borrow(v2, i),
+        );
         i = i + 1
     }
 }
@@ -1395,7 +1414,10 @@ This errors out if the vectors are not of the same length.
     // due <b>to</b> how inline functions work.
     <b>assert</b>!(len == aptos_std::smart_vector::length(v2), 0x20005);
     <b>while</b> (i &lt; len) {
-        f(aptos_std::smart_vector::borrow_mut(v1, i), aptos_std::smart_vector::borrow_mut(v2, i));
+        f(
+            aptos_std::smart_vector::borrow_mut(v1, i),
+            aptos_std::smart_vector::borrow_mut(v2, i),
+        );
         i = i + 1
     }
 }
@@ -1424,11 +1446,14 @@ Map the function over the element pairs of the two vectors, producing a new vect
 <pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_map">zip_map</a>&lt;T1: store, T2: store, NewT: store&gt;(
     v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;,
     v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt;,
-    f: |T1, T2|NewT
+    f: |T1, T2| NewT
 ): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;NewT&gt; {
     // We can't <b>use</b> the constant <a href="smart_vector.md#0x1_smart_vector_ESMART_VECTORS_LENGTH_MISMATCH">ESMART_VECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
     // due <b>to</b> how inline functions work.
-    <b>assert</b>!(aptos_std::smart_vector::length(&v1) == aptos_std::smart_vector::length(&v2), 0x20005);
+    <b>assert</b>!(
+        aptos_std::smart_vector::length(&v1) == aptos_std::smart_vector::length(&v2),
+        0x20005,
+    );
 
     <b>let</b> result = aptos_std::smart_vector::new&lt;NewT&gt;();
     aptos_std::smart_vector::zip(v1, v2, |e1, e2| <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>(&<b>mut</b> result, f(e1, e2)));
@@ -1460,14 +1485,19 @@ values without modifying the original vectors.
 <pre><code><b>public</b> inline <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_map_ref">zip_map_ref</a>&lt;T1, T2, NewT: store&gt;(
     v1: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T1&gt;,
     v2: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T2&gt;,
-    f: |&T1, &T2|NewT
+    f: |&T1, &T2| NewT
 ): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;NewT&gt; {
     // We can't <b>use</b> the constant <a href="smart_vector.md#0x1_smart_vector_ESMART_VECTORS_LENGTH_MISMATCH">ESMART_VECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
     // due <b>to</b> how inline functions work.
-    <b>assert</b>!(aptos_std::smart_vector::length(v1) == aptos_std::smart_vector::length(v2), 0x20005);
+    <b>assert</b>!(
+        aptos_std::smart_vector::length(v1) == aptos_std::smart_vector::length(v2),
+        0x20005,
+    );
 
     <b>let</b> result = aptos_std::smart_vector::new&lt;NewT&gt;();
-    aptos_std::smart_vector::zip_ref(v1, v2, |e1, e2| <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>(&<b>mut</b> result, f(e1, e2)));
+    aptos_std::smart_vector::zip_ref(
+        v1, v2, |e1, e2| <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>(&<b>mut</b> result, f(e1, e2))
+    );
     result
 }
 </code></pre>
@@ -1520,12 +1550,17 @@ values without modifying the original vectors.
 
 
 
-<pre><code><b>invariant</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(bucket_size)
-    || (<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(bucket_size) && <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(bucket_size) != 0);
-<b>invariant</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(inline_capacity)
-    || (len(inline_vec) &lt;= <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(inline_capacity));
-<b>invariant</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(inline_capacity) && <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(bucket_size))
-    || (<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(inline_capacity) && <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(bucket_size));
+<pre><code><b>invariant</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(bucket_size) || (
+    <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(bucket_size) && <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(bucket_size) != 0
+);
+<b>invariant</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(inline_capacity) || (
+    len(inline_vec) &lt;= <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(inline_capacity)
+);
+<b>invariant</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(inline_capacity)
+    && <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(bucket_size)) || (
+    <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(inline_capacity)
+    && <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(bucket_size)
+);
 </code></pre>
 
 
@@ -1575,8 +1610,7 @@ values without modifying the original vectors.
 
 
 <pre><code><b>aborts_if</b> !(<a href="smart_vector.md#0x1_smart_vector_is_empty">is_empty</a>(v));
-<b>aborts_if</b> len(v.inline_vec) != 0
-    || <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec);
+<b>aborts_if</b> len(v.inline_vec) != 0 || <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec);
 </code></pre>
 
 
@@ -1593,9 +1627,10 @@ values without modifying the original vectors.
 
 
 <pre><code><b>aborts_if</b> i &gt;= <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v);
-<b>aborts_if</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec) && (
-    (len(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>&lt;T&gt;(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec))) &gt; MAX_U64
-);
+<b>aborts_if</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec)
+    && (
+        (len(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>&lt;T&gt;(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec))) &gt; MAX_U64
+    );
 </code></pre>
 
 
@@ -1644,13 +1679,14 @@ values without modifying the original vectors.
 
 
 <pre><code><b>pragma</b> verify_duration_estimate = 120;
-<b>aborts_if</b>  <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec)
-    &&
-    (<a href="table_with_length.md#0x1_table_with_length_spec_len">table_with_length::spec_len</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec).buckets) == 0);
-<b>aborts_if</b> <a href="smart_vector.md#0x1_smart_vector_is_empty">is_empty</a>(v);
 <b>aborts_if</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec) && (
-    (len(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>&lt;T&gt;(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec))) &gt; MAX_U64
+    <a href="table_with_length.md#0x1_table_with_length_spec_len">table_with_length::spec_len</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec).buckets) == 0
 );
+<b>aborts_if</b> <a href="smart_vector.md#0x1_smart_vector_is_empty">is_empty</a>(v);
+<b>aborts_if</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec)
+    && (
+        (len(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>&lt;T&gt;(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec))) &gt; MAX_U64
+    );
 <b>ensures</b> <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v) == <a href="smart_vector.md#0x1_smart_vector_length">length</a>(<b>old</b>(v)) - 1;
 </code></pre>
 
@@ -1685,9 +1721,10 @@ values without modifying the original vectors.
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>aborts_if</b> i &gt;= <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v);
-<b>aborts_if</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec) && (
-    (len(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>&lt;T&gt;(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec))) &gt; MAX_U64
-);
+<b>aborts_if</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec)
+    && (
+        (len(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>&lt;T&gt;(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec))) &gt; MAX_U64
+    );
 <b>ensures</b> <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v) == <a href="smart_vector.md#0x1_smart_vector_length">length</a>(<b>old</b>(v)) - 1;
 </code></pre>
 
@@ -1720,7 +1757,8 @@ values without modifying the original vectors.
 
 
 
-<pre><code><b>aborts_if</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec) && len(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(v.big_vec)) &gt; MAX_U64;
+<pre><code><b>aborts_if</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec)
+    && len(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(v.big_vec)) &gt; MAX_U64;
 </code></pre>
 
 

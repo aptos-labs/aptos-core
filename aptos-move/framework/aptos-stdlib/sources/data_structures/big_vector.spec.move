@@ -10,31 +10,40 @@ spec aptos_std::big_vector {
         invariant end_index <= spec_table_len(buckets) * bucket_size;
 
         // ensure all buckets except last has `bucket_size`
-        invariant spec_table_len(buckets) == 0
-            || (forall i in 0..spec_table_len(buckets)-1: len(table_with_length::spec_get(buckets, i)) == bucket_size);
+        invariant spec_table_len(buckets) == 0 || (
+            forall i in 0..spec_table_len(buckets) - 1: len(
+                table_with_length::spec_get(buckets, i)
+            ) == bucket_size
+        );
         // ensure last bucket doesn't have more than `bucket_size` elements
-        invariant spec_table_len(buckets) == 0
-            || len(table_with_length::spec_get(buckets, spec_table_len(buckets) -1 )) <= bucket_size;
+        invariant spec_table_len(buckets) == 0 || len(
+            table_with_length::spec_get(buckets, spec_table_len(buckets) - 1)
+        ) <= bucket_size;
         // ensure each table entry exists due to a bad spec in `Table::spec_get`
         invariant forall i in 0..spec_table_len(buckets): spec_table_contains(buckets, i);
         // ensure correct number of buckets
         invariant spec_table_len(buckets) == (end_index + bucket_size - 1) / bucket_size;
         // ensure bucket lengths add up to `end_index`
-        invariant (spec_table_len(buckets) == 0 && end_index == 0)
-            || (spec_table_len(buckets) != 0 && ((spec_table_len(buckets) - 1) * bucket_size) + (len(table_with_length::spec_get(buckets, spec_table_len(buckets) - 1))) == end_index);
+        invariant (spec_table_len(buckets) == 0
+            && end_index == 0) || (
+            spec_table_len(buckets) != 0
+            && ((spec_table_len(buckets) - 1) * bucket_size) + (
+                len(table_with_length::spec_get(buckets, spec_table_len(buckets) - 1))
+            ) == end_index
+        );
         // ensures that no out-of-bound buckets exist
-        invariant forall i: u64 where i >= spec_table_len(buckets):  {
+        invariant forall i: u64 where i >= spec_table_len(buckets): {
             !spec_table_contains(buckets, i)
         };
         // ensures that all buckets exist
-        invariant forall i: u64 where i < spec_table_len(buckets):  {
+        invariant forall i: u64 where i < spec_table_len(buckets): {
             spec_table_contains(buckets, i)
         };
         // ensures that the last bucket is non-empty
-        invariant spec_table_len(buckets) == 0
-            || (len(table_with_length::spec_get(buckets, spec_table_len(buckets) - 1)) > 0);
+        invariant spec_table_len(buckets) == 0 || (
+            len(table_with_length::spec_get(buckets, spec_table_len(buckets) - 1)) > 0
+        );
     }
-
 
     // -----------------------
     // Function specifications
@@ -71,8 +80,8 @@ spec aptos_std::big_vector {
         include PushbackAbortsIf<T>;
         ensures length(v) == length(old(v)) + 1;
         ensures v.end_index == old(v.end_index) + 1;
-        ensures spec_at(v, v.end_index-1) == val;
-        ensures forall i in 0..v.end_index-1: spec_at(v, i) == spec_at(old(v), i);
+        ensures spec_at(v, v.end_index - 1) == val;
+        ensures forall i in 0..v.end_index - 1: spec_at(v, i) == spec_at(old(v), i);
         ensures v.bucket_size == old(v).bucket_size;
     }
 
@@ -86,7 +95,7 @@ spec aptos_std::big_vector {
     spec pop_back<T>(v: &mut BigVector<T>): T {
         aborts_if is_empty(v);
         ensures length(v) == length(old(v)) - 1;
-        ensures result == old(spec_at(v, v.end_index-1));
+        ensures result == old(spec_at(v, v.end_index - 1));
         ensures forall i in 0..v.end_index: spec_at(v, i) == spec_at(old(v), i);
     }
 
@@ -103,25 +112,25 @@ spec aptos_std::big_vector {
         ensures length(v) == length(old(v));
         ensures spec_at(v, i) == spec_at(old(v), j);
         ensures spec_at(v, j) == spec_at(old(v), i);
-        ensures forall idx in 0..length(v)
-            where idx != i && idx != j:
-            spec_at(v, idx) == spec_at(old(v), idx);
+        ensures forall idx in 0..length(v) where idx != i && idx != j: spec_at(v, idx) == spec_at(
+            old(v), idx
+        );
     }
 
     spec append<T: store>(lhs: &mut BigVector<T>, other: BigVector<T>) {
-        pragma verify=false;
+        pragma verify = false;
     }
 
     spec remove<T>(v: &mut BigVector<T>, i: u64): T {
-        pragma verify=false;
+        pragma verify = false;
     }
 
     spec reverse<T>(v: &mut BigVector<T>) {
-        pragma verify=false;
+        pragma verify = false;
     }
 
     spec index_of<T>(v: &BigVector<T>, val: &T): (bool, u64) {
-        pragma verify=false;
+        pragma verify = false;
     }
 
     // ---------------------

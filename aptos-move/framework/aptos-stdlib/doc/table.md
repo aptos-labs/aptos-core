@@ -121,9 +121,7 @@ Create a new Table.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_new">new</a>&lt;K: <b>copy</b> + drop, V: store&gt;(): <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt; {
-    <a href="table.md#0x1_table_Table">Table</a> {
-        handle: <a href="table.md#0x1_table_new_table_handle">new_table_handle</a>&lt;K, V&gt;(),
-    }
+    <a href="table.md#0x1_table_Table">Table</a> { handle: <a href="table.md#0x1_table_new_table_handle">new_table_handle</a>&lt;K, V&gt;(), }
 }
 </code></pre>
 
@@ -201,10 +199,11 @@ Returns specified default value if there is no entry for <code>key</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_with_default">borrow_with_default</a>&lt;K: <b>copy</b> + drop, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K, default: &V): &V {
-    <b>if</b> (!<a href="table.md#0x1_table_contains">contains</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key)) {
-        default
-    } <b>else</b> {
+<pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_with_default">borrow_with_default</a>&lt;K: <b>copy</b> + drop, V&gt;(
+    <a href="table.md#0x1_table">table</a>: &<a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K, default: &V
+): &V {
+    <b>if</b> (!<a href="table.md#0x1_table_contains">contains</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key)) { default }
+    <b>else</b> {
         <a href="table.md#0x1_table_borrow">borrow</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key)
     }
 }
@@ -257,7 +256,9 @@ Insert the pair (<code>key</code>, <code>default</code>) first if there is no en
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_mut_with_default">borrow_mut_with_default</a>&lt;K: <b>copy</b> + drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K, default: V): &<b>mut</b> V {
+<pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_mut_with_default">borrow_mut_with_default</a>&lt;K: <b>copy</b> + drop, V: drop&gt;(
+    <a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K, default: V
+): &<b>mut</b> V {
     <b>if</b> (!<a href="table.md#0x1_table_contains">contains</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key)) {
         <a href="table.md#0x1_table_add">add</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key, default)
     };
@@ -286,7 +287,9 @@ update the value of the entry for <code>key</code> to <code>value</code> otherwi
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_upsert">upsert</a>&lt;K: <b>copy</b> + drop, V: drop&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K, value: V) {
+<pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_upsert">upsert</a>&lt;K: <b>copy</b> + drop, V: drop&gt;(
+    <a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K, value: V
+) {
     <b>if</b> (!<a href="table.md#0x1_table_contains">contains</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key)) {
         <a href="table.md#0x1_table_add">add</a>(<a href="table.md#0x1_table">table</a>, <b>copy</b> key, value)
     } <b>else</b> {
@@ -558,6 +561,42 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 ## Specification
 
 
+
+<a id="0x1_table_spec_contains"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_contains">spec_contains</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): bool;
+</code></pre>
+
+
+
+
+<a id="0x1_table_spec_remove"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_remove">spec_remove</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_table_spec_set"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_set">spec_set</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K, v: V): <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_table_spec_get"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): V;
+</code></pre>
+
+
+
 <a id="@Specification_0_Table"></a>
 
 ### Struct `Table`
@@ -592,7 +631,8 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
     map_spec_get = spec_get,
     map_spec_set = spec_set,
     map_spec_del = spec_remove,
-    map_spec_has_key = spec_contains;
+    map_spec_has_key =
+     spec_contains;
 </code></pre>
 
 
@@ -721,42 +761,6 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 <pre><code><b>pragma</b> intrinsic;
-</code></pre>
-
-
-
-
-<a id="0x1_table_spec_contains"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_contains">spec_contains</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): bool;
-</code></pre>
-
-
-
-
-<a id="0x1_table_spec_remove"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_remove">spec_remove</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;;
-</code></pre>
-
-
-
-
-<a id="0x1_table_spec_set"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_set">spec_set</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K, v: V): <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;;
-</code></pre>
-
-
-
-
-<a id="0x1_table_spec_get"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="table.md#0x1_table_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, k: K): V;
 </code></pre>
 
 

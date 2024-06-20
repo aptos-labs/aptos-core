@@ -401,9 +401,11 @@ Token offer doesn't exist
         <a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a> {
             pending_claims: <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenOfferId">TokenOfferId</a>, Token&gt;(),
             offer_events: <a href="../../aptos-framework/doc/account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a>&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>),
-            cancel_offer_events: <a href="../../aptos-framework/doc/account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a>&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>),
+            cancel_offer_events: <a href="../../aptos-framework/doc/account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a>&gt;(
+                <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>
+            ),
             claim_events: <a href="../../aptos-framework/doc/account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a>&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>),
-        }
+        },
     )
 }
 </code></pre>
@@ -428,10 +430,7 @@ Token offer doesn't exist
 
 
 <pre><code><b>fun</b> <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(to_addr: <b>address</b>, token_id: TokenId): <a href="token_transfers.md#0x3_token_transfers_TokenOfferId">TokenOfferId</a> {
-    <a href="token_transfers.md#0x3_token_transfers_TokenOfferId">TokenOfferId</a> {
-        to_addr,
-        token_id
-    }
+    <a href="token_transfers.md#0x3_token_transfers_TokenOfferId">TokenOfferId</a> { to_addr, token_id }
 }
 </code></pre>
 
@@ -463,7 +462,8 @@ Token offer doesn't exist
     property_version: u64,
     amount: u64,
 ) <b>acquires</b> <a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a> {
-    <b>let</b> token_id = <a href="token.md#0x3_token_create_token_id_raw">token::create_token_id_raw</a>(creator, collection, name, property_version);
+    <b>let</b> token_id =
+        <a href="token.md#0x3_token_create_token_id_raw">token::create_token_id_raw</a>(creator, collection, name, property_version);
     <a href="token_transfers.md#0x3_token_transfers_offer">offer</a>(&sender, receiver, token_id, amount);
 }
 </code></pre>
@@ -498,8 +498,7 @@ Token offer doesn't exist
         <a href="token_transfers.md#0x3_token_transfers_initialize_token_transfers">initialize_token_transfers</a>(sender)
     };
 
-    <b>let</b> pending_claims =
-        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).pending_claims;
+    <b>let</b> pending_claims = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).pending_claims;
     <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(receiver, token_id);
     <b>let</b> <a href="token.md#0x3_token">token</a> = <a href="token.md#0x3_token_withdraw_token">token::withdraw_token</a>(sender, token_id, amount);
     <b>if</b> (!<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(pending_claims, token_offer_id)) {
@@ -511,20 +510,12 @@ Token offer doesn't exist
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="token_transfers.md#0x3_token_transfers_TokenOffer">TokenOffer</a> {
-                to_address: receiver,
-                token_id,
-                amount,
-            }
+            <a href="token_transfers.md#0x3_token_transfers_TokenOffer">TokenOffer</a> { to_address: receiver, token_id, amount, },
         )
     };
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a>&gt;(
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).offer_events,
-        <a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a> {
-            to_address: receiver,
-            token_id,
-            amount,
-        },
+        <a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a> { to_address: receiver, token_id, amount, },
     );
 }
 </code></pre>
@@ -556,7 +547,8 @@ Token offer doesn't exist
     name: String,
     property_version: u64,
 ) <b>acquires</b> <a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a> {
-    <b>let</b> token_id = <a href="token.md#0x3_token_create_token_id_raw">token::create_token_id_raw</a>(creator, collection, name, property_version);
+    <b>let</b> token_id =
+        <a href="token.md#0x3_token_create_token_id_raw">token::create_token_id_raw</a>(creator, collection, name, property_version);
     <a href="token_transfers.md#0x3_token_transfers_claim">claim</a>(&receiver, sender, token_id);
 }
 </code></pre>
@@ -586,30 +578,24 @@ Token offer doesn't exist
     token_id: TokenId,
 ) <b>acquires</b> <a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender), <a href="token_transfers.md#0x3_token_transfers_ETOKEN_OFFER_NOT_EXIST">ETOKEN_OFFER_NOT_EXIST</a>);
-    <b>let</b> pending_claims =
-        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender).pending_claims;
+    <b>let</b> pending_claims = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender).pending_claims;
     <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver), token_id);
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(pending_claims, token_offer_id), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token_transfers.md#0x3_token_transfers_ETOKEN_OFFER_NOT_EXIST">ETOKEN_OFFER_NOT_EXIST</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(pending_claims, token_offer_id),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token_transfers.md#0x3_token_transfers_ETOKEN_OFFER_NOT_EXIST">ETOKEN_OFFER_NOT_EXIST</a>),
+    );
     <b>let</b> tokens = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(pending_claims, token_offer_id);
     <b>let</b> amount = <a href="token.md#0x3_token_get_token_amount">token::get_token_amount</a>(&tokens);
     <a href="token.md#0x3_token_deposit_token">token::deposit_token</a>(receiver, tokens);
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="token_transfers.md#0x3_token_transfers_TokenClaim">TokenClaim</a> {
-                to_address: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver),
-                token_id,
-                amount,
-            }
+            <a href="token_transfers.md#0x3_token_transfers_TokenClaim">TokenClaim</a> { to_address: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver), token_id, amount, },
         )
     };
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a>&gt;(
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender).claim_events,
-        <a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a> {
-            to_address: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver),
-            token_id,
-            amount,
-        },
+        <a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a> { to_address: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver), token_id, amount, },
     );
 }
 </code></pre>
@@ -641,7 +627,8 @@ Token offer doesn't exist
     name: String,
     property_version: u64,
 ) <b>acquires</b> <a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a> {
-    <b>let</b> token_id = <a href="token.md#0x3_token_create_token_id_raw">token::create_token_id_raw</a>(creator, collection, name, property_version);
+    <b>let</b> token_id =
+        <a href="token.md#0x3_token_create_token_id_raw">token::create_token_id_raw</a>(creator, collection, name, property_version);
     <a href="token_transfers.md#0x3_token_transfers_cancel_offer">cancel_offer</a>(&sender, receiver, token_id);
 }
 </code></pre>
@@ -673,28 +660,19 @@ Token offer doesn't exist
     <b>let</b> sender_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
     <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(receiver, token_id);
     <b>assert</b>!(<b>exists</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr), <a href="token_transfers.md#0x3_token_transfers_ETOKEN_OFFER_NOT_EXIST">ETOKEN_OFFER_NOT_EXIST</a>);
-    <b>let</b> pending_claims =
-        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).pending_claims;
+    <b>let</b> pending_claims = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).pending_claims;
     <b>let</b> <a href="token.md#0x3_token">token</a> = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(pending_claims, token_offer_id);
     <b>let</b> amount = <a href="token.md#0x3_token_get_token_amount">token::get_token_amount</a>(&<a href="token.md#0x3_token">token</a>);
     <a href="token.md#0x3_token_deposit_token">token::deposit_token</a>(sender, <a href="token.md#0x3_token">token</a>);
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="token_transfers.md#0x3_token_transfers_TokenCancelOffer">TokenCancelOffer</a> {
-                to_address: receiver,
-                token_id,
-                amount,
-            },
+            <a href="token_transfers.md#0x3_token_transfers_TokenCancelOffer">TokenCancelOffer</a> { to_address: receiver, token_id, amount, },
         )
     };
     <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a>&gt;(
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).cancel_offer_events,
-        <a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a> {
-            to_address: receiver,
-            token_id,
-            amount,
-        },
+        <a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a> { to_address: receiver, token_id, amount, },
     );
 }
 </code></pre>
@@ -777,7 +755,9 @@ Abort according to the code
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-<b>let</b> token_id = <a href="token.md#0x3_token_create_token_id_raw">token::create_token_id_raw</a>(creator, collection, name, property_version);
+<b>let</b> token_id = <a href="token.md#0x3_token_create_token_id_raw">token::create_token_id_raw</a>(
+    creator, collection, name, property_version
+);
 </code></pre>
 
 
@@ -795,7 +775,8 @@ Abort according to the code
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>let</b> sender_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
-<b>include</b> !<b>exists</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr) ==&gt; <a href="token_transfers.md#0x3_token_transfers_InitializeTokenTransfersAbortsIf">InitializeTokenTransfersAbortsIf</a>{<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> : sender};
+<b>include</b> !<b>exists</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr) ==&gt;
+    <a href="token_transfers.md#0x3_token_transfers_InitializeTokenTransfersAbortsIf">InitializeTokenTransfersAbortsIf</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: sender };
 <b>let</b> pending_claims = <b>global</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).pending_claims;
 <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(receiver, token_id);
 <b>let</b> tokens = <b>global</b>&lt;TokenStore&gt;(sender_addr).tokens;
@@ -806,7 +787,9 @@ Abort according to the code
 <b>aborts_if</b> !<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_claims, token_offer_id);
 <b>let</b> a = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_claims, token_offer_id);
 <b>let</b> dst_token = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pending_claims, token_offer_id);
-<b>aborts_if</b> dst_token.amount + <a href="token_transfers.md#0x3_token_transfers_spce_get">spce_get</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), token_id, amount) &gt; MAX_U64;
+<b>aborts_if</b> dst_token.amount + <a href="token_transfers.md#0x3_token_transfers_spce_get">spce_get</a>(
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), token_id, amount
+) &gt; MAX_U64;
 </code></pre>
 
 
@@ -816,18 +799,13 @@ Get the amount from sender token
 <a id="0x3_token_transfers_spce_get"></a>
 
 
-<pre><code><b>fun</b> <a href="token_transfers.md#0x3_token_transfers_spce_get">spce_get</a>(
-   account_addr: <b>address</b>,
-   id: TokenId,
-   amount: u64
-): u64 {
+<pre><code><b>fun</b> <a href="token_transfers.md#0x3_token_transfers_spce_get">spce_get</a>(account_addr: <b>address</b>, id: TokenId, amount: u64): u64 {
    <b>use</b> aptos_token::token::{TokenStore};
    <b>use</b> aptos_std::table::{<b>Self</b>};
    <b>let</b> tokens = <b>global</b>&lt;TokenStore&gt;(account_addr).tokens;
    <b>let</b> balance = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(tokens, id).amount;
-   <b>if</b> (balance &gt; amount) {
-       amount
-   } <b>else</b> {
+   <b>if</b> (balance &gt; amount) { amount }
+   <b>else</b> {
        <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(tokens, id).amount
    }
 }
@@ -847,13 +825,15 @@ Get the amount from sender token
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>let</b> token_id = <a href="token.md#0x3_token_create_token_id_raw">token::create_token_id_raw</a>(creator, collection, name, property_version);
+<b>let</b> token_id = <a href="token.md#0x3_token_create_token_id_raw">token::create_token_id_raw</a>(
+    creator, collection, name, property_version
+);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender);
 <b>let</b> pending_claims = <b>global</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender).pending_claims;
 <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver), token_id);
 <b>aborts_if</b> !<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_claims, token_offer_id);
 <b>let</b> tokens = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pending_claims, token_offer_id);
-<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a>{<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: receiver };
+<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: receiver };
 <b>let</b> account_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver);
 <b>let</b> <a href="token.md#0x3_token">token</a> = tokens;
 <b>let</b> token_store = <b>global</b>&lt;TokenStore&gt;(account_addr);
@@ -881,7 +861,7 @@ Get the amount from sender token
 <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver), token_id);
 <b>aborts_if</b> !<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_claims, token_offer_id);
 <b>let</b> tokens = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pending_claims, token_offer_id);
-<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a>{<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: receiver };
+<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: receiver };
 <b>let</b> account_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver);
 <b>let</b> <a href="token.md#0x3_token">token</a> = tokens;
 <b>let</b> token_store = <b>global</b>&lt;TokenStore&gt;(account_addr);
@@ -904,13 +884,15 @@ Get the amount from sender token
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>let</b> token_id = <a href="token.md#0x3_token_create_token_id_raw">token::create_token_id_raw</a>(creator, collection, name, property_version);
+<b>let</b> token_id = <a href="token.md#0x3_token_create_token_id_raw">token::create_token_id_raw</a>(
+    creator, collection, name, property_version
+);
 <b>let</b> sender_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr);
 <b>let</b> pending_claims = <b>global</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).pending_claims;
 <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(receiver, token_id);
 <b>aborts_if</b> !<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_claims, token_offer_id);
-<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a>{<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: sender };
+<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: sender };
 <b>let</b> dst_token = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pending_claims, token_offer_id);
 <b>let</b> account_addr = sender_addr;
 <b>let</b> <a href="token.md#0x3_token">token</a> = dst_token;
@@ -939,7 +921,7 @@ Get the amount from sender token
 <b>let</b> pending_claims = <b>global</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).pending_claims;
 <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(receiver, token_id);
 <b>aborts_if</b> !<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_claims, token_offer_id);
-<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a>{<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: sender };
+<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: sender };
 <b>let</b> dst_token = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pending_claims, token_offer_id);
 <b>let</b> account_addr = sender_addr;
 <b>let</b> <a href="token.md#0x3_token">token</a> = dst_token;

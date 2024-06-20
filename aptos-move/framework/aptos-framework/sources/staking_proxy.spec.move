@@ -62,12 +62,16 @@ spec aptos_framework::staking_proxy {
         include SetStakePoolVoterAbortsIf;
     }
 
-    spec set_vesting_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
+    spec set_vesting_contract_operator(
+        owner: &signer, old_operator: address, new_operator: address
+    ) {
         // TODO: Can't verify `update_voter` in while loop.
         pragma verify = false;
     }
 
-    spec set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
+    spec set_staking_contract_operator(
+        owner: &signer, old_operator: address, new_operator: address
+    ) {
         pragma aborts_if_is_partial;
         pragma verify = false;
         // TODO: Verify timeout and can't verify `staking_contract::switch_operator`.
@@ -85,11 +89,14 @@ spec aptos_framework::staking_proxy {
 
         let owner_address = signer::address_of(owner);
         let store = global<Store>(owner_address);
-        let staking_contract_exists = exists<Store>(owner_address) && simple_map::spec_contains_key(store.staking_contracts, old_operator);
-        aborts_if staking_contract_exists && simple_map::spec_contains_key(store.staking_contracts, new_operator);
+        let staking_contract_exists = exists<Store>(owner_address)
+            && simple_map::spec_contains_key(store.staking_contracts, old_operator);
+        aborts_if staking_contract_exists
+            && simple_map::spec_contains_key(store.staking_contracts, new_operator);
 
         let post post_store = global<Store>(owner_address);
-        ensures staking_contract_exists ==> !simple_map::spec_contains_key(post_store.staking_contracts, old_operator);
+        ensures staking_contract_exists ==>
+            !simple_map::spec_contains_key(post_store.staking_contracts, old_operator);
 
         let staking_contract = simple_map::spec_get(store.staking_contracts, old_operator);
         let stake_pool = global<stake::StakePool>(staking_contract.pool_address);
@@ -97,20 +104,29 @@ spec aptos_framework::staking_proxy {
         let pending_active = coin::value(stake_pool.pending_active);
         let total_active_stake = active + pending_active;
         let accumulated_rewards = total_active_stake - staking_contract.principal;
-        let commission_amount = accumulated_rewards * staking_contract.commission_percentage / 100;
-        aborts_if staking_contract_exists && !exists<stake::StakePool>(staking_contract.pool_address);
+        let commission_amount = accumulated_rewards * staking_contract.commission_percentage
+            / 100;
+        aborts_if staking_contract_exists && !exists<stake::StakePool>(
+            staking_contract.pool_address
+        );
         // the following property caused timeout
         ensures staking_contract_exists ==>
-            simple_map::spec_get(post_store.staking_contracts, new_operator).principal == total_active_stake - commission_amount;
+            simple_map::spec_get(post_store.staking_contracts, new_operator).principal == total_active_stake
+                - commission_amount;
 
         let pool_address = staking_contract.owner_cap.pool_address;
         let current_commission_percentage = staking_contract.commission_percentage;
-        aborts_if staking_contract_exists && commission_amount != 0 && !exists<stake::StakePool>(pool_address);
-        ensures staking_contract_exists && commission_amount != 0 ==>
-            global<stake::StakePool>(pool_address).operator_address == new_operator
-            && simple_map::spec_get(post_store.staking_contracts, new_operator).commission_percentage == current_commission_percentage;
+        aborts_if staking_contract_exists
+            && commission_amount != 0
+            && !exists<stake::StakePool>(pool_address);
+        ensures staking_contract_exists
+            && commission_amount != 0 ==>
+            global<stake::StakePool>(pool_address).operator_address == new_operator && simple_map::spec_get(
+                post_store.staking_contracts, new_operator
+            ).commission_percentage == current_commission_percentage;
 
-        ensures staking_contract_exists ==> simple_map::spec_contains_key(post_store.staking_contracts, new_operator);
+        ensures staking_contract_exists ==>
+            simple_map::spec_contains_key(post_store.staking_contracts, new_operator);
     }
 
     spec set_vesting_contract_voter(owner: &signer, operator: address, new_voter: address) {
@@ -131,8 +147,13 @@ spec aptos_framework::staking_proxy {
         let owner_address = signer::address_of(owner);
         let ownership_cap = borrow_global<stake::OwnerCapability>(owner_address);
         let pool_address = ownership_cap.pool_address;
-        aborts_if stake::stake_pool_exists(owner_address) && !(exists<stake::OwnerCapability>(owner_address) && stake::stake_pool_exists(pool_address));
-        ensures stake::stake_pool_exists(owner_address) ==> global<stake::StakePool>(pool_address).operator_address == new_operator;
+        aborts_if stake::stake_pool_exists(owner_address)
+            && !(
+                exists<stake::OwnerCapability>(owner_address)
+                && stake::stake_pool_exists(pool_address)
+            );
+        ensures stake::stake_pool_exists(owner_address) ==>
+            global<stake::StakePool>(pool_address).operator_address == new_operator;
     }
 
     spec set_staking_contract_voter(owner: &signer, operator: address, new_voter: address) {
@@ -152,16 +173,20 @@ spec aptos_framework::staking_proxy {
         let owner_address = signer::address_of(owner);
         let staker = owner_address;
         let store = global<Store>(staker);
-        let staking_contract_exists = exists<Store>(staker) && simple_map::spec_contains_key(store.staking_contracts, operator);
+        let staking_contract_exists = exists<Store>(staker) && simple_map::spec_contains_key(
+            store.staking_contracts, operator
+        );
         let staker_address = owner_address;
         let staking_contract = simple_map::spec_get(store.staking_contracts, operator);
         let pool_address = staking_contract.pool_address;
         let pool_address1 = staking_contract.owner_cap.pool_address;
 
         aborts_if staking_contract_exists && !exists<stake::StakePool>(pool_address);
-        aborts_if staking_contract_exists && !exists<stake::StakePool>(staking_contract.owner_cap.pool_address);
+        aborts_if staking_contract_exists
+            && !exists<stake::StakePool>(staking_contract.owner_cap.pool_address);
 
-        ensures staking_contract_exists ==> global<stake::StakePool>(pool_address1).delegated_voter == new_voter;
+        ensures staking_contract_exists ==>
+            global<stake::StakePool>(pool_address1).delegated_voter == new_voter;
     }
 
     spec set_stake_pool_voter(owner: &signer, new_voter: address) {
@@ -175,7 +200,12 @@ spec aptos_framework::staking_proxy {
         let owner_address = signer::address_of(owner);
         let ownership_cap = global<stake::OwnerCapability>(owner_address);
         let pool_address = ownership_cap.pool_address;
-        aborts_if stake::stake_pool_exists(owner_address) && !(exists<stake::OwnerCapability>(owner_address) && stake::stake_pool_exists(pool_address));
-        ensures stake::stake_pool_exists(owner_address) ==> global<stake::StakePool>(pool_address).delegated_voter == new_voter;
+        aborts_if stake::stake_pool_exists(owner_address)
+            && !(
+                exists<stake::OwnerCapability>(owner_address)
+                && stake::stake_pool_exists(pool_address)
+            );
+        ensures stake::stake_pool_exists(owner_address) ==>
+            global<stake::StakePool>(pool_address).delegated_voter == new_voter;
     }
 }

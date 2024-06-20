@@ -258,7 +258,9 @@ Provides a framework for comparing two elements
 
 
 
-<pre><code><b>invariant</b> inner == <a href="comparator.md#0x1_comparator_EQUAL">EQUAL</a> || inner == <a href="comparator.md#0x1_comparator_SMALLER">SMALLER</a> || inner == <a href="comparator.md#0x1_comparator_GREATER">GREATER</a>;
+<pre><code><b>invariant</b> inner == <a href="comparator.md#0x1_comparator_EQUAL">EQUAL</a>
+    || inner == <a href="comparator.md#0x1_comparator_SMALLER">SMALLER</a>
+    || inner == <a href="comparator.md#0x1_comparator_GREATER">GREATER</a>;
 </code></pre>
 
 
@@ -360,26 +362,30 @@ Provides a framework for comparing two elements
 <b>aborts_if</b> <b>false</b>;
 <b>let</b> left_length = len(left);
 <b>let</b> right_length = len(right);
-<b>ensures</b> (result.inner == <a href="comparator.md#0x1_comparator_EQUAL">EQUAL</a>) ==&gt; (
-    (left_length == right_length) &&
-        (<b>forall</b> i: u64 <b>where</b> i &lt; left_length: left[i] == right[i])
-);
-<b>ensures</b> (result.inner == <a href="comparator.md#0x1_comparator_SMALLER">SMALLER</a>) ==&gt; (
-    (<b>exists</b> i: u64 <b>where</b> i &lt; left_length:
-        (i &lt; right_length) &&
-            (left[i] &lt; right[i]) &&
-            (<b>forall</b> j: u64 <b>where</b> j &lt; i: left[j] == right[j])
-    ) ||
-        (left_length &lt; right_length)
-);
-<b>ensures</b> (result.inner == <a href="comparator.md#0x1_comparator_GREATER">GREATER</a>) ==&gt; (
-    (<b>exists</b> i: u64 <b>where</b> i &lt; left_length:
-        (i &lt; right_length) &&
-            (left[i] &gt; right[i]) &&
-            (<b>forall</b> j: u64 <b>where</b> j &lt; i: left[j] == right[j])
-    ) ||
-        (left_length &gt; right_length)
-);
+<b>ensures</b> (result.inner == <a href="comparator.md#0x1_comparator_EQUAL">EQUAL</a>) ==&gt;
+    (
+        (left_length == right_length) && (
+            <b>forall</b> i: u64 <b>where</b> i &lt; left_length: left[i] == right[i]
+        )
+    );
+<b>ensures</b> (result.inner == <a href="comparator.md#0x1_comparator_SMALLER">SMALLER</a>) ==&gt;
+    (
+        (
+            <b>exists</b> i: u64 <b>where</b> i &lt; left_length: (i &lt; right_length)
+            && (left[i] &lt; right[i])
+            && (<b>forall</b> j: u64 <b>where</b> j &lt; i: left[j] == right[j])
+        )
+        || (left_length &lt; right_length)
+    );
+<b>ensures</b> (result.inner == <a href="comparator.md#0x1_comparator_GREATER">GREATER</a>) ==&gt;
+    (
+        (
+            <b>exists</b> i: u64 <b>where</b> i &lt; left_length: (i &lt; right_length)
+            && (left[i] &gt; right[i])
+            && (<b>forall</b> j: u64 <b>where</b> j &lt; i: left[j] == right[j])
+        )
+        || (left_length &gt; right_length)
+    );
 <b>ensures</b> [abstract] result == <a href="comparator.md#0x1_comparator_spec_compare_u8_vector">spec_compare_u8_vector</a>(left, right);
 </code></pre>
 
