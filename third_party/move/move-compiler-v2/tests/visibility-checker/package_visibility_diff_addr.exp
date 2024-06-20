@@ -1,10 +1,28 @@
 
 Diagnostics:
-error: friend modules of `0x42::A` must have the same address, but the declared friend module `0x43::B` has a different address
-  ┌─ tests/visibility-checker/package_visibility_diff_addr.move:1:1
-  │
-1 │ ╭ module 0x42::A {
-2 │ │     fun foo() {}
-3 │ │     public(package) fun bar() {}
-4 │ │ }
-  │ ╰─^
+error: public(package) function `0x42::A::bar` cannot be called from function `0x43::B::foo` because they are from different addresses
+   ┌─ tests/visibility-checker/package_visibility_diff_addr.move:3:25
+   │
+ 3 │     public(package) fun bar() {}
+   │                         ^^^ callee
+   ·
+10 │         A::bar()
+   │         -------- called here
+
+error: public(package) function `0x42::A::bar` cannot be called from function `0x43::B::bar` because they are from different addresses
+   ┌─ tests/visibility-checker/package_visibility_diff_addr.move:3:25
+   │
+ 3 │     public(package) fun bar() {}
+   │                         ^^^ callee
+   ·
+14 │         A::bar()
+   │         -------- called here
+
+error: public(package) function `0x42::A::bar` cannot be called from function `0x43::B::baz` because they are from different addresses
+   ┌─ tests/visibility-checker/package_visibility_diff_addr.move:3:25
+   │
+ 3 │     public(package) fun bar() {}
+   │                         ^^^ callee
+   ·
+18 │         A::bar()
+   │         -------- called here
