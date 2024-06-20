@@ -3,12 +3,13 @@
 
 use aptos_config::network_id::PeerNetworkId;
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
+    register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramVec,
+    IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
-/// The special label TOTAL_COUNT stores the sum of all values in the counter
-pub const TOTAL_COUNT_LABEL: &str = "TOTAL_COUNT";
+// Useful metric labels
+pub const CREATED_SUBSCRIPTION_LABEL: &str = "created_subscription";
 
 /// Counter for tracking sent direct send messages by the network client
 pub static DIRECT_SEND_SENT_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -20,12 +21,32 @@ pub static DIRECT_SEND_SENT_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for tracking received direct send messages by the network client
+pub static DIRECT_SEND_RECEIVED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "consensus_observer_network_client_direct_send_received_messages",
+        "Counters related to received direct send messages for the network client",
+        &["message_type", "network_id"]
+    )
+    .unwrap()
+});
+
 /// Counter for tracking direct send message errors by the network client
 pub static DIRECT_SEND_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "consensus_observer_network_client_direct_send_errors",
         "Counters related to direct send message errors for the network client",
         &["error_type", "network_id"]
+    )
+    .unwrap()
+});
+
+/// Counter for tracking the number of active subscriptions for the consensus observer
+pub static NUM_ACTIVE_SUBSCRIPTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "consensus_observer_active_subscriptions",
+        "Guage related to active subscriptions for the consensus observer",
+        &["network_id"]
     )
     .unwrap()
 });
@@ -80,6 +101,26 @@ pub static RPC_REQUEST_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for tracking created subscriptions for the consensus observer
+pub static CREATED_SUBSCRIPTIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "consensus_observer_created_subscriptions",
+        "Counters for created subscriptions for consensus observer",
+        &["creation_label", "network_id"]
+    )
+    .unwrap()
+});
+
+/// Counter for tracking terminated subscriptions for the consensus observer
+pub static TERMINATED_SUBSCRIPTIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "consensus_observer_terminated_subscriptions",
+        "Counters for terminated subscriptions for consensus observer",
+        &["termination_label", "network_id"]
+    )
+    .unwrap()
+});
+
 /// Increments the given request counter with the provided values
 pub fn increment_request_counter(
     counter: &Lazy<IntCounterVec>,
@@ -89,9 +130,6 @@ pub fn increment_request_counter(
     let network_id = peer_network_id.network_id();
     counter
         .with_label_values(&[label, network_id.as_str()])
-        .inc();
-    counter
-        .with_label_values(&[TOTAL_COUNT_LABEL, network_id.as_str()])
         .inc();
 }
 
@@ -106,4 +144,10 @@ pub fn observe_value_with_label(
     histogram
         .with_label_values(&[request_label, network_id.as_str()])
         .observe(value)
+}
+
+/// Sets the gauge with the specific label and value
+pub fn set_gauge(counter: &Lazy<IntGaugeVec>, peer_network_id: &PeerNetworkId, value: i64) {
+    let network_id = peer_network_id.network_id();
+    counter.with_label_values(&[network_id.as_str()]).set(value);
 }
