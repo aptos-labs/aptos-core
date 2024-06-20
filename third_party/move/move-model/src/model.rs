@@ -2657,7 +2657,7 @@ impl<'env> ModuleEnv<'env> {
         self.data.name.is_script()
     }
 
-    /// Returns true of this module is target of compilation. A non-target module is
+    /// Returns true if this module is target of compilation. A non-target module is
     /// a dependency only but not explicitly requested to process.
     pub fn is_target(&self) -> bool {
         let file_id = self.data.loc.file_id;
