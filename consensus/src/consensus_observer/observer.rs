@@ -3,7 +3,9 @@
 
 use crate::{
     consensus_observer::{
+        error::Error,
         logging::{LogEntry, LogSchema},
+        metrics,
         network_client::ConsensusObserverClient,
         network_events::{ConsensusObserverNetworkEvents, NetworkMessage, ResponseSender},
         network_message::{
@@ -166,28 +168,51 @@ impl ConsensusObserver {
         debug!(LogSchema::new(LogEntry::ConsensusObserver)
             .message("Checking consensus observer progress!"));
 
-        // Get the peer ID of the currently active subscription
+        // Get the peer ID of the currently active subscription (if any)
         let active_subscription_peer = self
             .active_observer_subscription
             .as_ref()
             .map(|subscription| subscription.get_peer_network_id());
 
         // If we have an active subscription, verify that the subscription
-        // is still healthy. If not, the subscription will be terminated.
-        if active_subscription_peer.is_some() {
-            self.check_active_subscription().await;
+        // is still healthy. If not, the subscription should be terminated.
+        if let Some(active_subscription_peer) = active_subscription_peer {
+            if let Err(error) = self.check_active_subscription().await {
+                // Log the subscription termination
+                warn!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Terminating subscription to peer: {:?}! Error: {:?}",
+                        active_subscription_peer, error
+                    ))
+                );
+
+                // Unsubscribe from the peer
+                self.unsubscribe_from_peer(active_subscription_peer);
+
+                // Update the subscription termination metrics
+                self.update_subscription_termination_metrics(active_subscription_peer, error);
+            }
         }
 
-        // If we no longer have an active subscription, select a new peer to subscribe to
+        // If we don't have a subscription, we should select a new peer to
+        // subscribe to. If we had a previous subscription, it should be
+        // excluded from the selection process.
         if self.active_observer_subscription.is_none() {
+            // Create a new observer subscription
             self.create_new_observer_subscription(active_subscription_peer)
                 .await;
+
+            // If we successfully created a new subscription, update the subscription creation metrics
+            if let Some(active_subscription) = &self.active_observer_subscription {
+                self.update_subscription_creation_metrics(
+                    active_subscription.get_peer_network_id(),
+                );
+            }
         }
     }
 
-    /// Checks if the active subscription is still healthy. If not,
-    /// the subscription is removed and the peer is notified.
-    async fn check_active_subscription(&mut self) {
+    /// Checks if the active subscription is still healthy. If not, an error is returned.
+    async fn check_active_subscription(&mut self) -> Result<(), Error> {
         let active_observer_subscription = self.active_observer_subscription.take();
         if let Some(mut active_subscription) = active_observer_subscription {
             // Check if the peer for the subscription is still connected
@@ -200,66 +225,28 @@ impl ConsensusObserver {
 
             // Verify the peer is still connected
             if !peer_still_connected {
-                // Log the disconnection and terminate the subscription
-                warn!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "The peer is no longer connected! Terminating subscription: {:?}!",
-                        peer_network_id
-                    ))
-                );
-                self.unsubscribe_from_peer(peer_network_id);
-                return;
+                return Err(Error::SubscriptionDisconnected(
+                    "The peer is no longer connected!".to_string(),
+                ));
             }
 
             // Verify the subscription has not timed out
-            if let Err(error) = active_subscription.check_subscription_timeout() {
-                // Log the timeout and terminate the subscription
-                warn!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "The subscription has timed out with peer: {:?}! Error: {:?}",
-                        peer_network_id, error
-                    ))
-                );
-                self.unsubscribe_from_peer(peer_network_id);
-                return;
-            }
+            active_subscription.check_subscription_timeout()?;
 
             // Verify that the DB is continuing to sync and commit new data.
             // Note: we should only do this if we're not waiting for state sync.
-            if self.sync_handle.is_none() {
-                if let Err(error) = active_subscription.check_syncing_progress() {
-                    // Log the error and terminate the subscription
-                    warn!(
-                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "The observer is not making syncing progress with peer: {:?}! Error: {:?}",
-                            peer_network_id, error
-                        ))
-                    );
-                    self.unsubscribe_from_peer(peer_network_id);
-                    return;
-                }
-            }
+            active_subscription.check_syncing_progress()?;
 
             // Verify that the subscription peer is optimal
             if let Some(peers_and_metadata) = self.get_connected_peers_and_metadata() {
-                if let Err(error) =
-                    active_subscription.check_subscription_peer_optimality(peers_and_metadata)
-                {
-                    // Log the error and terminate the subscription
-                    warn!(
-                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "The subscription peer is no longer optimal: {:?}! Error: {:?}",
-                            peer_network_id, error
-                        ))
-                    );
-                    self.unsubscribe_from_peer(peer_network_id);
-                    return;
-                }
+                active_subscription.check_subscription_peer_optimality(peers_and_metadata)?;
             }
 
             // The subscription seems healthy, we can keep it
             self.active_observer_subscription = Some(active_subscription);
         }
+
+        Ok(())
     }
 
     /// Creates and returns a commit callback (to be called after the execution pipeline)
@@ -571,6 +558,13 @@ impl ConsensusObserver {
             );
         };
 
+        // Increment the received message counter
+        metrics::increment_request_counter(
+            &metrics::DIRECT_SEND_RECEIVED_MESSAGES,
+            message.get_label(),
+            &peer_network_id,
+        );
+
         // Process the message based on the type
         match message {
             ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
@@ -807,6 +801,36 @@ impl ConsensusObserver {
                 },
             }
         });
+    }
+
+    /// Updates the subscription creation metrics for the given peer
+    fn update_subscription_creation_metrics(&self, peer_network_id: PeerNetworkId) {
+        // Set the number of active subscriptions
+        metrics::set_gauge(&metrics::NUM_ACTIVE_SUBSCRIPTIONS, &peer_network_id, 1);
+
+        // Update the number of created subscriptions
+        metrics::increment_request_counter(
+            &metrics::CREATED_SUBSCRIPTIONS,
+            metrics::CREATED_SUBSCRIPTION_LABEL,
+            &peer_network_id,
+        );
+    }
+
+    /// Updates the subscription termination metrics for the given peer
+    fn update_subscription_termination_metrics(
+        &self,
+        peer_network_id: PeerNetworkId,
+        error: Error,
+    ) {
+        // Reset the number of active subscriptions
+        metrics::set_gauge(&metrics::NUM_ACTIVE_SUBSCRIPTIONS, &peer_network_id, 0);
+
+        // Update the number of terminated subscriptions
+        metrics::increment_request_counter(
+            &metrics::TERMINATED_SUBSCRIPTIONS,
+            error.get_label(),
+            &peer_network_id,
+        );
     }
 
     /// Waits for a new epoch to start
