@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    secp256k1_ecdsa::{self, PrivateKey, PublicKey, Signature as ECDSASignature},
-    test_utils::KeyPair,
-    Signature, SigningKey, Uniform,
+    secp256k1_ecdsa::{self, PrivateKey, PublicKey, Signature as ECDSASignature}, test_utils::KeyPair, CryptoMaterialError, Signature, SigningKey, Uniform
 };
 use rand_core::OsRng;
 use anyhow::anyhow;
@@ -151,8 +149,13 @@ fn malleability() {
         Ok(_v) => panic!(),
         Err(v) => v, //assert_eq!(v.downcast().unwrap(), Err("Unable to verify signature.")),
     };
+    //let downcast_err : Option<String> = err.downcast_ref();
     println!("err: {:?}", err);
-    let downcast_err: Error = (err as anyhow::Error).downcast_ref().unwrap();
+    /*match err.downcast() {
+        CryptoMaterialError(_) => panic!(),
+        _ => panic!(),
+    };*/
+    //let downcast_err: dyn Error = (err as anyhow::Error).downcast::<dyn Error>().unwrap();
     //assert_eq!(res, anyhow!(Err("Unable to verify signature.")));
     assert!(false);
 }
