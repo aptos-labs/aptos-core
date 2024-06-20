@@ -21,14 +21,18 @@ use crate::{
     ast::*,
     codegen::CodeGenerator,
     config::Config,
-    names::{Identifier, IdentifierPool, IdentifierType as IDType, Scope, ROOT_SCOPE},
-    types::{Ability, Type, TypeParameter, TypePool},
+    env::Env,
+    names::{Identifier, IdentifierType as IDType, Scope, ROOT_SCOPE},
+    types::{Ability, Type, TypeParameter},
     utils::choose_idx_weighted,
 };
 use arbitrary::{Arbitrary, Result, Unstructured};
 use log::{trace, warn};
 use num_bigint::BigUint;
-use std::{cell::RefCell, collections::BTreeSet};
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    collections::BTreeSet,
+};
 
 /// Keeps track of the generation state.
 pub struct MoveSmith {
@@ -43,11 +47,7 @@ pub struct MoveSmith {
     function_signatures: RefCell<Vec<FunctionSignature>>,
 
     // Bookkeeping
-    id_pool: RefCell<IdentifierPool>,
-    type_pool: RefCell<TypePool>,
-    expr_depth: RefCell<usize>,
-    expr_depth_stack: RefCell<Vec<usize>>,
-    type_depth: RefCell<usize>,
+    env: RefCell<Env>,
 }
 
 impl Default for MoveSmith {
@@ -60,18 +60,23 @@ impl Default for MoveSmith {
 impl MoveSmith {
     /// Create a new MoveSmith instance with the given configuration.
     pub fn new(config: Config) -> Self {
+        let env = Env::new(&config);
         Self {
             config: RefCell::new(config),
             modules: Vec::new(),
             script: None,
             runs: RefCell::new(Vec::new()),
             function_signatures: RefCell::new(Vec::new()),
-            id_pool: RefCell::new(IdentifierPool::new()),
-            type_pool: RefCell::new(TypePool::new()),
-            expr_depth: RefCell::new(0),
-            expr_depth_stack: RefCell::new(Vec::new()),
-            type_depth: RefCell::new(0),
+            env: RefCell::new(env),
         }
+    }
+
+    fn env(&self) -> Ref<Env> {
+        self.env.borrow()
+    }
+
+    fn env_mut(&self) -> RefMut<Env> {
+        self.env.borrow_mut()
     }
 
     /// Get the generated compile unit.
@@ -135,7 +140,7 @@ impl MoveSmith {
                 None,
                 false,
             )?;
-            call.name = self.id_pool.borrow().flatten_access(&call.name);
+            call.name = self.env().id_pool.flatten_access(&call.name);
             script.main.push(call);
         }
 
@@ -155,8 +160,8 @@ impl MoveSmith {
 
         // Generate a struct with all abilities to avoid having no type to choose for some type parameters
         let (struct_name, _) = self.get_next_identifier(IDType::Struct, &scope);
-        self.type_pool
-            .borrow_mut()
+        self.env_mut()
+            .type_pool
             .register_type(Type::Struct(struct_name.clone()));
         structs.push(RefCell::new(StructDefinition {
             name: struct_name,
@@ -180,8 +185,8 @@ impl MoveSmith {
     /// Fill in the skeletons
     fn fill_module(&self, u: &mut Unstructured, module: &RefCell<Module>) -> Result<()> {
         let scope = self
+            .env()
             .id_pool
-            .borrow()
             .get_scope_for_children(&module.borrow().name);
         // Struct fields
         for s in module.borrow().structs.iter() {
@@ -199,8 +204,7 @@ impl MoveSmith {
         trace!("Generating runners for module: {:?}", module.borrow().name);
         // For runners, we don't want complex expressions to reduce input
         // consumption and to avoid wasting mutation
-        let old_depth = *self.expr_depth.borrow();
-        self.config.borrow_mut().max_expr_depth = 0;
+        self.env_mut().set_max_expr_depth(0);
 
         let mut all_runners = Vec::new();
         for f in module.borrow().functions.iter() {
@@ -208,12 +212,12 @@ impl MoveSmith {
         }
 
         // Reset the expression depth because we will also genereate other modules
-        self.config.borrow_mut().max_expr_depth = old_depth;
+        self.env_mut().reset_max_expr_depth();
 
         // Insert the runners to the module and add run tasks to the whole compile unit
         // Each task is simply the flat name of the runner function
         for r in all_runners.into_iter() {
-            let module_flat = self.id_pool.borrow().flatten_access(&module.borrow().name);
+            let module_flat = self.env().id_pool.flatten_access(&module.borrow().name);
             let run_flat = Identifier(format!("{}::{}", module_flat.0, r.signature.name.0));
             self.runs.borrow_mut().push(run_flat);
             module.borrow_mut().functions.push(RefCell::new(r));
@@ -302,8 +306,8 @@ impl MoveSmith {
             abilities.push(ability_choices.remove(idx));
         }
 
-        self.type_pool
-            .borrow_mut()
+        self.env_mut()
+            .type_pool
             .register_type(Type::Struct(name.clone()));
         Ok(StructDefinition {
             name,
@@ -343,7 +347,7 @@ impl MoveSmith {
                 }
             };
             // Keeps track of the type of the field
-            self.type_pool.borrow_mut().insert_mapping(&name, &typ);
+            self.env_mut().type_pool.insert_mapping(&name, &typ);
             st.borrow_mut().fields.push((name, typ));
         }
         Ok(())
@@ -360,7 +364,9 @@ impl MoveSmith {
         scope: &Scope,
         parent_struct_id: &Identifier,
     ) -> Vec<StructDefinition> {
-        let ids = self.get_filtered_identifiers(None, Some(IDType::Struct), Some(scope));
+        let ids = self
+            .env()
+            .get_identifiers(None, Some(IDType::Struct), Some(scope));
         ids.iter()
             .filter_map(|s| {
                 let struct_def = self.get_struct_definition_with_identifier(s).unwrap();
@@ -440,8 +446,8 @@ impl MoveSmith {
     /// Fill in the function body and return statement.
     fn fill_function(&self, u: &mut Unstructured, function: &RefCell<Function>) -> Result<()> {
         let scope = self
+            .env()
             .id_pool
-            .borrow()
             .get_scope_for_children(&function.borrow().signature.name);
         let signature = function.borrow().signature.clone();
         trace!(
@@ -488,7 +494,7 @@ impl MoveSmith {
             // TODO: should remove this after visibility check is implemented
             // TODO: structs should be allowed for non-public functions
             let typ = self.get_random_type(u, parent_scope, true, false, true, false)?;
-            self.type_pool.borrow_mut().insert_mapping(&name, &typ);
+            self.env_mut().type_pool.insert_mapping(&name, &typ);
             parameters.push((name, typ));
         }
 
@@ -506,7 +512,7 @@ impl MoveSmith {
         if let Some(ret_ty @ Type::TypeParameter(_)) = &return_type {
             if !parameters.iter().any(|(_, param_ty)| param_ty == ret_ty) {
                 let (name, _) = self.get_next_identifier(IDType::Var, parent_scope);
-                self.type_pool.borrow_mut().insert_mapping(&name, ret_ty);
+                self.env_mut().type_pool.insert_mapping(&name, ret_ty);
                 parameters.push((name, ret_ty.clone()));
             }
         }
@@ -560,14 +566,12 @@ impl MoveSmith {
         let type_for_tp = Type::TypeParameter(tp.clone());
 
         // Register the type parameter so that its siblings can reference it
-        self.type_pool
-            .borrow_mut()
-            .register_type(type_for_tp.clone());
+        self.env_mut().type_pool.register_type(type_for_tp.clone());
 
         // Links the type parameter to its name so that later we can
         // retrieve the type from the name
-        self.type_pool
-            .borrow_mut()
+        self.env_mut()
+            .type_pool
             .insert_mapping(&type_for_tp.get_name(), &type_for_tp);
 
         Ok(tp)
@@ -584,12 +588,12 @@ impl MoveSmith {
         trace!(
             "Generating block with parent scope: {:?}, depth: {}",
             parent_scope,
-            *self.expr_depth.borrow()
+            self.env().curr_expr_depth()
         );
         let (_, block_scope) = self.get_next_identifier(IDType::Block, parent_scope);
         trace!("Created block scope: {:?}", block_scope);
 
-        let reach_limit = (*self.expr_depth.borrow() + 1) >= self.config.borrow().max_expr_depth;
+        let reach_limit = self.env().will_reached_expr_depth_limit(1);
         let stmts = if reach_limit {
             warn!("Max expr depth will be reached in this block, skipping generating body");
             Vec::new()
@@ -614,7 +618,9 @@ impl MoveSmith {
         parent_scope: &Scope,
         typ: &Type,
     ) -> Result<Expression> {
-        let ids = self.get_filtered_identifiers(Some(typ), Some(IDType::Var), Some(parent_scope));
+        let ids = self
+            .env()
+            .get_identifiers(Some(typ), Some(IDType::Var), Some(parent_scope));
         match ids.is_empty() {
             true => {
                 let expr = self.generate_expression_of_type(u, parent_scope, typ, true, true)?;
@@ -663,12 +669,14 @@ impl MoveSmith {
         parent_scope: &Scope,
     ) -> Result<Option<Assignment>> {
         trace!("Generating assignment");
-        let idents = self.get_filtered_identifiers(None, Some(IDType::Var), Some(parent_scope));
+        let idents = self
+            .env()
+            .get_identifiers(None, Some(IDType::Var), Some(parent_scope));
         if idents.is_empty() {
             return Ok(None);
         }
         let ident = u.choose(&idents)?.clone();
-        let typ = self.type_pool.borrow().get_type(&ident).unwrap();
+        let typ = self.env().type_pool.get_type(&ident).unwrap();
         let expr = self.generate_expression_of_type(u, parent_scope, &typ, true, true)?;
         Ok(Some(Assignment {
             name: ident,
@@ -694,7 +702,7 @@ impl MoveSmith {
         // TODO: disabled declaration without value for now, need to keep track of initialization
         let value = Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?);
         // Keeps track of the type of the newly created variable
-        self.type_pool.borrow_mut().insert_mapping(&name, &typ);
+        self.env_mut().type_pool.insert_mapping(&name, &typ);
         Ok(Declaration { typ, name, value })
     }
 
@@ -711,14 +719,14 @@ impl MoveSmith {
         trace!("Generating expression from scope: {:?}", parent_scope);
         // Increment the expression depth
         // Reached the maximum depth, generate a dummy number literal
-        if *self.expr_depth.borrow() >= self.config.borrow().max_expr_depth {
+        if self.env().reached_expr_depth_limit() {
             warn!("Max expr depth reached in scope: {:?}", parent_scope);
             return Ok(Expression::NumberLiteral(
                 self.generate_number_literal(u, None, None, None)?,
             ));
         }
 
-        self.increase_expr_depth(u);
+        self.env_mut().increase_expr_depth(u);
 
         // If no function is callable, then skip generating function calls.
         let func_call_weight = match self.get_callable_functions(parent_scope).is_empty() {
@@ -728,7 +736,8 @@ impl MoveSmith {
 
         // Check if there are any assignable variables in the current scope
         let assign_weight = match self
-            .get_filtered_identifiers(None, Some(IDType::Var), Some(parent_scope))
+            .env()
+            .get_identifiers(None, Some(IDType::Var), Some(parent_scope))
             .is_empty()
         {
             true => 0,
@@ -789,7 +798,7 @@ impl MoveSmith {
         };
 
         // Decrement the expression depth
-        self.decrease_expr_depth();
+        self.env_mut().decrease_expr_depth();
         Ok(expr)
     }
 
@@ -809,7 +818,7 @@ impl MoveSmith {
             return None;
         }
 
-        *self.type_depth.borrow_mut() += 1;
+        self.env_mut().increase_type_depth(u);
 
         let concretized = match typ {
             Type::TypeParameter(tp) => {
@@ -818,7 +827,7 @@ impl MoveSmith {
             _ => panic!("{:?} cannot be concretized.", typ),
         };
 
-        *self.type_depth.borrow_mut() -= 1;
+        self.env_mut().decrease_type_depth();
         Some(concretized)
     }
 
@@ -877,8 +886,8 @@ impl MoveSmith {
             Type::TypeParameter(_) => {
                 // Check if the type parameter is define in parent scope
                 let tp_scope = self
+                    .env()
                     .id_pool
-                    .borrow()
                     .get_parent_scope_of(&typ.get_name())
                     .unwrap();
                 let calling_func_scope = parent_scope.remove_hidden_scopes();
@@ -911,7 +920,7 @@ impl MoveSmith {
         // for the given type parameter.
         // If so, directly use the concrete type.
         let concrete_type = if let Type::TypeParameter(_) = typ {
-            self.type_pool.borrow().get_concrete_type(&typ.get_name())
+            self.env().type_pool.get_concrete_type(&typ.get_name())
         } else {
             None
         };
@@ -979,7 +988,8 @@ impl MoveSmith {
         // Access identifier with the given type
         if allow_var {
             let idents =
-                self.get_filtered_identifiers(Some(typ), Some(IDType::Var), Some(parent_scope));
+                self.env()
+                    .get_identifiers(Some(typ), Some(IDType::Var), Some(parent_scope));
 
             // TODO: select from many?
             if !idents.is_empty() {
@@ -993,11 +1003,11 @@ impl MoveSmith {
         // Now we have collected all candidate expressions that do not require recursion
         // We can perform the expr_depth check here
         assert!(!default_choices.is_empty());
-        if *self.expr_depth.borrow() >= self.config.borrow().max_expr_depth {
+        if self.env().reached_expr_depth_limit() {
             warn!("Max expr depth reached while gen expr of type: {:?}", typ);
             return Ok(u.choose(&default_choices)?.clone());
         }
-        self.increase_expr_depth(u);
+        self.env_mut().increase_expr_depth(u);
 
         let callables: Vec<FunctionSignature> = self
             .get_callable_functions(parent_scope)
@@ -1052,7 +1062,7 @@ impl MoveSmith {
         };
 
         // Decrement the expression depth
-        self.decrease_expr_depth();
+        self.env_mut().decrease_expr_depth();
 
         let use_choice = match choices.is_empty() {
             true => default_choices,
@@ -1395,8 +1405,8 @@ impl MoveSmith {
                     .unwrap_or(typ_param.clone()),
             };
             // Keep track of the concrete types we decided here
-            self.type_pool
-                .borrow_mut()
+            self.env_mut()
+                .type_pool
                 .register_concrete_type(&typ_param.get_name(), &concrete_type);
             type_args.push(concrete_type);
         }
@@ -1410,8 +1420,8 @@ impl MoveSmith {
         // Done using the concrete types, unregister
         for tp in func.type_parameters.iter() {
             let typ_param = Type::TypeParameter(tp.clone());
-            self.type_pool
-                .borrow_mut()
+            self.env_mut()
+                .type_pool
                 .unregister_concrete_type(&typ_param.get_name());
         }
 
@@ -1500,7 +1510,9 @@ impl MoveSmith {
         // Choose struct types in scope
         // Every struct has the same weight
         if allow_struct {
-            let struct_ids = self.get_filtered_identifiers(None, Some(IDType::Struct), Some(scope));
+            let struct_ids = self
+                .env()
+                .get_identifiers(None, Some(IDType::Struct), Some(scope));
             let structs = struct_ids
                 .iter()
                 .map(|id: &Identifier| (Type::Struct(id.clone()), 1))
@@ -1515,9 +1527,10 @@ impl MoveSmith {
         // Every type parameter has the same weight
         if allow_type_param {
             let mut params = self
-                .get_filtered_identifiers(None, Some(IDType::TypeParameter), Some(scope))
+                .env()
+                .get_identifiers(None, Some(IDType::TypeParameter), Some(scope))
                 .into_iter()
-                .map(|id| self.type_pool.borrow().get_type(&id).unwrap())
+                .map(|id| self.env().type_pool.get_type(&id).unwrap())
                 .collect::<Vec<Type>>();
 
             if only_instantiatable {
@@ -1547,9 +1560,10 @@ impl MoveSmith {
     // For each type, checks if there is an accessible variable in `scope` that has the type
     fn filter_instantiatable_types(&self, scope: &Scope, types: Vec<Type>) -> Vec<Type> {
         let instantiatables = self
-            .get_filtered_identifiers(None, Some(IDType::Var), Some(scope))
+            .env()
+            .get_identifiers(None, Some(IDType::Var), Some(scope))
             .into_iter()
-            .filter_map(|id| self.type_pool.borrow().get_type(&id))
+            .filter_map(|id| self.env().type_pool.get_type(&id))
             .collect::<BTreeSet<Type>>();
 
         types
@@ -1573,50 +1587,11 @@ impl MoveSmith {
     fn get_callable_functions(&self, scope: &Scope) -> Vec<FunctionSignature> {
         let mut callable = Vec::new();
         for f in self.function_signatures.borrow().iter() {
-            if self.id_pool.borrow().is_id_in_scope(&f.name, scope) {
+            if self.env().id_pool.is_id_in_scope(&f.name, scope) {
                 callable.push(f.clone());
             }
         }
         callable
-    }
-
-    /// Filter identifiers based on the given type, identifier type, and scope.
-    fn get_filtered_identifiers(
-        &self,
-        typ: Option<&Type>,
-        ident_type: Option<IDType>,
-        scope: Option<&Scope>,
-    ) -> Vec<Identifier> {
-        // Filter based on the IDType
-        let all_ident = match ident_type {
-            Some(t) => self.id_pool.borrow().get_identifiers_of_ident_type(t),
-            None => self.id_pool.borrow().get_all_identifiers(),
-        };
-
-        // Filter based on Scope
-        let ident_in_scope = match scope {
-            Some(s) => self
-                .id_pool
-                .borrow()
-                .filter_identifier_in_scope(&all_ident, s),
-            None => all_ident,
-        };
-
-        // Filter based on Type
-        let type_matched = match typ {
-            Some(t) => self
-                .type_pool
-                .borrow()
-                .filter_identifier_with_type(t, ident_in_scope),
-            None => ident_in_scope,
-        };
-
-        // Filter out the identifiers that do not have a type
-        // i.e. the one just declared but the RHS of assign is not finished yet
-        type_matched
-            .into_iter()
-            .filter(|id| self.type_pool.borrow().get_type(id).is_some())
-            .collect()
     }
 
     /// Finds all registered types that contains all the required abilities
@@ -1627,8 +1602,8 @@ impl MoveSmith {
         only_instantiatable: bool,
     ) -> Vec<Type> {
         let types = self
+            .env()
             .type_pool
-            .borrow()
             .get_all_types()
             .iter()
             .filter(|t| match t.is_num_or_bool() {
@@ -1639,7 +1614,7 @@ impl MoveSmith {
                         Type::TypeParameter(tp) => &tp.name,
                         _ => panic!("Invalid type"),
                     };
-                    self.id_pool.borrow().is_id_in_scope(id, parent_scope)
+                    self.env().id_pool.is_id_in_scope(id, parent_scope)
                 },
             })
             .filter(|t| {
@@ -1656,6 +1631,7 @@ impl MoveSmith {
 
     /// Get the possible abilities of a struct type.
     /// Only give the upper bound of possible abilities.
+    /// TODO: this should belong to the type.rs or somewhere else
     pub fn derive_abilities_of_type(&self, typ: &Type) -> Vec<Ability> {
         match typ {
             Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::U128 | Type::U256 | Type::Bool => {
@@ -1674,30 +1650,8 @@ impl MoveSmith {
 
     /// Helper to get the next identifier.
     fn get_next_identifier(&self, ident_type: IDType, parent_scope: &Scope) -> (Identifier, Scope) {
-        self.id_pool
-            .borrow_mut()
+        self.env_mut()
+            .id_pool
             .next_identifier(ident_type, parent_scope)
-    }
-
-    /// Randomly choose a number of depth to increase the expression depth.
-    /// This allows us to end early in some cases.
-    fn increase_expr_depth(&self, u: &mut Unstructured) {
-        let inc = u.choose(&[1, 2, 3]).unwrap();
-        *self.expr_depth.borrow_mut() += *inc;
-        self.expr_depth_stack.borrow_mut().push(*inc);
-        trace!(
-            "Increment expr by {} depth to: {}",
-            *inc,
-            *self.expr_depth.borrow()
-        );
-    }
-
-    /// Decrease the expression depth by the last increased amount.
-    /// This should be called after `increase_expr_depth` and
-    /// they should always be in pairs.
-    fn decrease_expr_depth(&self) {
-        let dec = self.expr_depth_stack.borrow_mut().pop().unwrap();
-        *self.expr_depth.borrow_mut() -= dec;
-        trace!("Decrement expr depth to: {}", *self.expr_depth.borrow());
     }
 }

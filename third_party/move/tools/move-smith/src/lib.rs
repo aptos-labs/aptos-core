@@ -6,6 +6,7 @@
 pub mod ast;
 pub mod codegen;
 pub mod config;
+pub mod env;
 pub mod move_smith;
 pub mod names;
 pub mod types;
