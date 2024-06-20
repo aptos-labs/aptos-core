@@ -212,20 +212,21 @@ impl DbWriter for AptosDB {
         let latest_version = self.get_latest_version()?;
         let target_version = ledger_info_with_sigs.ledger_info().version();
 
-        // Revert the ledger commit progress
         let ledger_batch = SchemaBatch::new();
+
+        // Revert the ledger commit progress
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::LedgerCommitProgress,
             &DbMetadataValue::Version(target_version),
         )?;
-        self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
 
         // Revert the overall commit progress
-        let ledger_batch = SchemaBatch::new();
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
             &DbMetadataValue::Version(target_version),
         )?;
+
+        // Write ledger metadata db changes
         self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
 
         let temp_position = Position::from_postorder_index(latest_version)?;
