@@ -237,10 +237,7 @@ impl CustomModulesDelegationGeneratorCreator {
         info!("Creating {} publisher accounts", requests_create.len());
         // all publishers are created from root account, split it up.
         for req_chunk in requests_create.chunks(100) {
-            txn_executor
-                .execute_transactions(req_chunk)
-                .await
-                .unwrap();
+            txn_executor.execute_transactions(req_chunk).await.unwrap();
         }
 
         info!("Publishing {} packages", requests_publish.len());
