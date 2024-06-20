@@ -580,13 +580,10 @@ pub trait DbWriter: Send + Sync {
         unimplemented!()
     }
 
-    /// Revert a commit.
+    /// Revert to committed state referred to with the ledger information.
     fn revert_commit(
         &self,
-        version_to_revert: Version,
-        latest_version: Version,
-        new_root_hash: HashValue,
-        ledger_info_with_sigs: LedgerInfoWithSignatures,
+        ledger_info_with_sigs: &LedgerInfoWithSignatures,
     ) -> Result<()> {
         unimplemented!()
     }

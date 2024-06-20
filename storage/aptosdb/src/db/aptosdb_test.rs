@@ -246,7 +246,7 @@ fn create_signed_transaction(gas_unit_price: u64) -> SignedTransaction {
 }
 
 #[test]
-fn test_revert_last_commit() {
+fn test_revert_single_commit() {
     aptos_logger::Logger::new().init();
 
     let tmp_dir = TempPath::new();
@@ -276,25 +276,13 @@ fn test_revert_last_commit() {
     assert_eq!(db.get_latest_version().unwrap(), expected_version);
 
     // Get the latest ledger info before revert
-    let latest_ledger_info_before_revert = db.get_latest_ledger_info().unwrap();
-    let root_hash = db
-        .get_latest_ledger_info()
-        .unwrap()
-        .ledger_info()
-        .commit_info()
-        .executed_state_id();
+    let latest_ledger_info_before_revert = blocks[1].1.clone();
+    let version_to_revert_to = latest_ledger_info_before_revert.commit_info().version();
 
     // Revert the last commit
-    db.revert_commit(
-        db.get_latest_version().unwrap(),
-        db.get_latest_version().unwrap(), // In this case the last commit and version to commit are same
-        root_hash,                        // the hash is also the lastest
-        latest_ledger_info_before_revert,
-    )
-    .unwrap();
+    db.revert_commit(&latest_ledger_info_before_revert).unwrap();
 
-    let exepcted_version = cur_ver - 2;
-    assert_eq!(db.get_latest_version().unwrap(), exepcted_version);
+    assert_eq!(db.get_latest_version().unwrap(), version_to_revert_to);
 }
 
 #[test]
@@ -313,7 +301,6 @@ fn test_revert_nth_commit() {
 
     #[derive(Debug)]
     struct Commit {
-        hash: HashValue,
         info: LedgerInfoWithSignatures,
         first_version: Version,
     }
@@ -323,7 +310,6 @@ fn test_revert_nth_commit() {
     let mut blockheight = 0;
 
     for (txns_to_commit, ledger_info_with_sigs) in &blocks {
-        println!("Blockheight: {}", blockheight);
         let first_version = cur_ver;
         update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
         db.save_transactions_for_test(
@@ -339,7 +325,6 @@ fn test_revert_nth_commit() {
         committed_blocks.insert(
             blockheight,
             Commit {
-                hash: ledger_info_with_sigs.commit_info().executed_state_id(),
                 info: ledger_info_with_sigs.clone(),
                 first_version,
             },
@@ -356,59 +341,14 @@ fn test_revert_nth_commit() {
     // Get the 3rd block back from the latest block
     let revert_block_num = blockheight - 3;
     let revert = committed_blocks.get(&revert_block_num).unwrap();
+    let pre_revert_ledger_info = committed_blocks[&(revert_block_num - 1)].info.clone();
 
     // Get the version to revert to
-    let version_to_revert = revert.first_version - 1;
+    let version_to_revert = revert.first_version;
 
-    db.revert_commit(
-        version_to_revert,
-        db.get_latest_version().unwrap(),
-        revert.hash.clone(),
-        revert.info.clone(),
-    )
-    .unwrap();
+    db.revert_commit(&pre_revert_ledger_info).unwrap();
 
     assert_eq!(db.get_latest_version().unwrap(), version_to_revert - 1);
-}
-
-#[test]
-fn test_revert_commit_should_fail_with_wrong_hash() {
-    aptos_logger::Logger::new().init();
-
-    let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
-
-    let mut cur_ver: Version = 0;
-    let mut in_memory_state = db.buffered_state().lock().current_state().clone();
-    let _ancestor = in_memory_state.base.clone();
-    let mut val_generator = ValueGenerator::new();
-    let blocks = val_generator.generate(arb_blocks_to_commit());
-    for (txns_to_commit, ledger_info_with_sigs) in &blocks {
-        update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
-        db.save_transactions_for_test(
-            txns_to_commit,
-            cur_ver, /* first_version */
-            cur_ver.checked_sub(1),
-            Some(ledger_info_with_sigs),
-            true, /* sync_commit */
-            in_memory_state.clone(),
-        )
-        .unwrap();
-        cur_ver += txns_to_commit.len() as u64;
-    }
-
-    // Get the latest ledger info before revert
-    let latest_ledger_info_before_revert = db.get_latest_ledger_info().unwrap();
-    let last_committed_version = latest_ledger_info_before_revert.ledger_info().version();
-
-    // Revert the last commit
-    let result = db.revert_commit(
-        last_committed_version,
-        last_committed_version.clone(), // In this case the last commit and version to commit are the same
-        HashValue::random(),            // A wrong hash
-        latest_ledger_info_before_revert,
-    );
-    assert!(result.is_err());
 }
 
 pub fn test_state_merkle_pruning_impl(
