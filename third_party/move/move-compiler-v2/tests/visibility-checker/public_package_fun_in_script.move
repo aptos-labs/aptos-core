@@ -1,3 +1,3 @@
 script {
-	public(package) fun main() {}
+    public(package) fun main() {}
 }

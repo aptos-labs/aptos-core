@@ -7,14 +7,14 @@ module 0x43::B {
     use 0x42::A;
 
     public(package) fun foo() {
-		A::bar()
-	}
+        A::bar()
+    }
 
     public fun bar() {
-		A::bar()
-	}
+        A::bar()
+    }
 
     fun baz() {
-		A::bar()
-	}
+        A::bar()
+    }
 }
