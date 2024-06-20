@@ -206,16 +206,24 @@ impl DbWriter for AptosDB {
         version_to_revert: Version,
         latest_version: Version,
         new_root_hash: HashValue,
-        ledger_info_with_sigs: LedgerInfoWithSignatures,
+        ledger_info_with_sigs: &LedgerInfoWithSignatures,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["revert_commit"])
             .start_timer();
+
+        let target_version = version_to_revert.checked_sub(1).expect("cannot revert genesis");
+
+        ensure!(
+            ledger_info_with_sigs.ledger_info().version() == target_version,
+            "LedgerInfo is not for version {}", target_version,
+        );
+
         // Revert the ledger commit progress
         let ledger_batch = SchemaBatch::new();
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::LedgerCommitProgress,
-            &DbMetadataValue::Version(version_to_revert - 1),
+            &DbMetadataValue::Version(target_version),
         )?;
         self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
 
@@ -223,7 +231,7 @@ impl DbWriter for AptosDB {
         let ledger_batch = SchemaBatch::new();
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
-            &DbMetadataValue::Version(version_to_revert - 1),
+            &DbMetadataValue::Version(target_version),
         )?;
         self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
 
@@ -233,7 +241,7 @@ impl DbWriter for AptosDB {
         let batch = SchemaBatch::new();
         self.ledger_db
             .transaction_accumulator_db()
-            .revert_transaction_accumulator(version_to_revert - 1, &batch, temp_position)?;
+            .revert_transaction_accumulator(target_version, &batch, temp_position)?;
         self.ledger_db
             .transaction_accumulator_db()
             .write_schemas(batch)?;
@@ -255,7 +263,7 @@ impl DbWriter for AptosDB {
 
         // Revert the transaction auxiliary data
         let batch = SchemaBatch::new();
-        TransactionAuxiliaryDataDb::prune(version_to_revert - 1, latest_version, &batch)?;
+        TransactionAuxiliaryDataDb::prune(target_version, latest_version, &batch)?;
         let batch = SchemaBatch::new();
         self.ledger_db
             .transaction_auxiliary_data_db()
@@ -263,9 +271,9 @@ impl DbWriter for AptosDB {
 
         // Revert the write set
         let batch = SchemaBatch::new();
-        WriteSetDb::prune(version_to_revert - 1, latest_version, &batch)?;
+        WriteSetDb::prune(target_version, latest_version, &batch)?;
         self.ledger_db.transaction_db().prune_transactions(
-            version_to_revert - 1,
+            target_version,
             latest_version,
             &batch,
         )?;
@@ -275,25 +283,9 @@ impl DbWriter for AptosDB {
             .state_kv_db
             .revert_state_kv_and_ledger_metadata(version_to_revert)?;
 
-        // Get the epoch of the version_to_revert
-        let target_epoch = self.ledger_db.metadata_db().get_epoch(version_to_revert)?;
-
-        // Set the epoch to the target epoch
-        ledger_info_with_sigs
-            .ledger_info()
-            .commit_info()
-            .to_owned()
-            .set_epoch(target_epoch);
-
-        //Set the Version
-        ledger_info_with_sigs
-            .ledger_info()
-            .to_owned()
-            .set_version(version_to_revert - 1);
-
-        // Update the latest ledger info if provided
+        // Update the provided ledger info
         self.commit_ledger_info(
-            version_to_revert - 1,
+            target_version,
             new_root_hash,
             Some(&ledger_info_with_sigs),
         )?;
