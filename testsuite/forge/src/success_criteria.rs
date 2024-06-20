@@ -164,8 +164,8 @@ pub struct SuccessCriteria {
     latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
     check_no_restarts: bool,
     check_no_errors: bool,
-    max_expired_tps: Option<usize>,
-    max_failed_submission_tps: Option<usize>,
+    max_expired_tps: Option<f64>,
+    max_failed_submission_tps: Option<f64>,
     wait_for_all_nodes_to_catchup: Option<Duration>,
     // Maximum amount of CPU cores and memory bytes used by the nodes.
     system_metrics_threshold: Option<SystemMetricsThreshold>,
@@ -198,12 +198,12 @@ impl SuccessCriteria {
         self
     }
 
-    pub fn add_max_expired_tps(mut self, max_expired_tps: usize) -> Self {
+    pub fn add_max_expired_tps(mut self, max_expired_tps: f64) -> Self {
         self.max_expired_tps = Some(max_expired_tps);
         self
     }
 
-    pub fn add_max_failed_submission_tps(mut self, max_failed_submission_tps: usize) -> Self {
+    pub fn add_max_failed_submission_tps(mut self, max_failed_submission_tps: f64) -> Self {
         self.max_failed_submission_tps = Some(max_failed_submission_tps);
         self
     }
@@ -469,14 +469,14 @@ impl SuccessCriteriaChecker {
     }
 
     fn check_max_value(
-        max_config: Option<usize>,
+        max_config: Option<f64>,
         stats_rate: &TxnStatsRate,
         value: f64,
         value_desc: &str,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
         if let Some(max) = max_config {
-            if value > max as f64 {
+            if value > max {
                 bail!(
                     "{} requirement{} failed. {} TPS: average {}, maximum requirement {}. Full stats: {}",
                     value_desc,
@@ -500,8 +500,8 @@ impl SuccessCriteriaChecker {
 
     pub fn check_throughput(
         min_avg_tps: usize,
-        max_expired_config: Option<usize>,
-        max_failed_submission_config: Option<usize>,
+        max_expired_config: Option<f64>,
+        max_failed_submission_config: Option<f64>,
         stats_rate: &TxnStatsRate,
         traffic_name_addition: &String,
     ) -> anyhow::Result<()> {

@@ -29,7 +29,7 @@ pub mod validator_reboot_stress_test;
 use anyhow::Context;
 use aptos_forge::{
     prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown},
-    EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
+    EmitJob, EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
     TestReport, TxnEmitter, TxnStats, Version,
 };
 use aptos_logger::info;
@@ -184,6 +184,7 @@ impl NetworkTest for dyn NetworkLoadTest {
             WARMUP_DURATION_FRACTION,
             COOLDOWN_DURATION_FRACTION,
             rng,
+            None,
         )?;
 
         let phased = stats_by_phase.len() > 1;
@@ -251,6 +252,7 @@ impl dyn NetworkLoadTest {
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
         rng: StdRng,
+        mut synchronized_with_job: Option<&mut EmitJob>,
     ) -> Result<Vec<LoadTestPhaseStats>> {
         let destination = self.setup(ctx).context("setup NetworkLoadTest")?;
         let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm());
@@ -291,6 +293,10 @@ impl dyn NetworkLoadTest {
         job = rt.block_on(job.periodic_stat_forward(warmup_duration, 60));
         info!("{}s warmup finished", warmup_duration.as_secs());
 
+        if let Some(job) = synchronized_with_job.as_mut() {
+            job.start_next_phase()
+        }
+
         let mut phase_timing = Vec::new();
         let mut phase_start_network_state = Vec::new();
         let test_start = Instant::now();
@@ -322,6 +328,9 @@ impl dyn NetworkLoadTest {
 
         phase_start_network_state.push(rt.block_on(NetworkState::new(&clients)));
         job.start_next_phase();
+        if let Some(job) = synchronized_with_job.as_mut() {
+            job.start_next_phase()
+        }
         let cooldown_start = Instant::now();
 
         let cooldown_used = cooldown_start.elapsed();
