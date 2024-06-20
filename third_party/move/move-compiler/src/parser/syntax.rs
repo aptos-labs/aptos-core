@@ -585,7 +585,10 @@ fn parse_visibility(context: &mut Context) -> Result<Visibility, Box<Diagnostic>
         None => Visibility::Public(loc),
         Some((Tok::Script, _)) => Visibility::Script(loc),
         Some((Tok::Friend, _)) => Visibility::Friend(loc),
-        Some((Tok::Identifier, "package")) => Visibility::Package(loc),
+        Some((Tok::Identifier, "package")) => {
+            require_move_2(context, loc, "public(package) visibility");
+            Visibility::Package(loc)
+        },
         _ => {
             let msg = format!(
                 "Invalid visibility modifier. Consider removing it or using '{}', '{}', or '{}'",
