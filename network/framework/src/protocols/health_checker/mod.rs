@@ -165,6 +165,8 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
         let mut connection_events =
             tokio_stream::wrappers::ReceiverStream::new(connection_events).fuse();
 
+        let self_network_id = self.network_context.network_id();
+
         loop {
             futures::select! {
                 maybe_event = self.network_interface.next() => {
@@ -207,15 +209,19 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                 }
                 conn_event = connection_events.select_next_some() => {
                     match conn_event {
-                        ConnectionNotification::NewPeer(metadata, _network_id) => {
-                            self.network_interface.create_peer_and_health_data(
-                                metadata.remote_peer_id, self.round
-                            );
+                        ConnectionNotification::NewPeer(metadata, network_id) => {
+                            if network_id == self_network_id {
+                                self.network_interface.create_peer_and_health_data(
+                                    metadata.remote_peer_id, self.round
+                                );
+                            }
                         }
-                        ConnectionNotification::LostPeer(metadata, _network_id) => {
-                            self.network_interface.remove_peer_and_health_data(
-                                &metadata.remote_peer_id
-                            );
+                        ConnectionNotification::LostPeer(metadata, network_id) => {
+                            if network_id == self_network_id {
+                                self.network_interface.remove_peer_and_health_data(
+                                    &metadata.remote_peer_id
+                                );
+                            }
                         }
                     }
                 }
