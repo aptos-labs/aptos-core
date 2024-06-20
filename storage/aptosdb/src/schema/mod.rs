@@ -12,8 +12,6 @@ pub(crate) mod db_metadata;
 pub(crate) mod epoch_by_version;
 pub(crate) mod event;
 pub(crate) mod event_accumulator;
-pub(crate) mod event_by_key;
-pub(crate) mod event_by_version;
 pub(crate) mod jellyfish_merkle_node;
 pub(crate) mod ledger_info;
 pub(crate) mod stale_node_index;
@@ -26,7 +24,6 @@ pub(crate) mod state_value_index;
 pub(crate) mod transaction;
 pub(crate) mod transaction_accumulator;
 pub(crate) mod transaction_auxiliary_data;
-pub(crate) mod transaction_by_account;
 pub(crate) mod transaction_by_hash;
 pub(crate) mod transaction_info;
 pub(crate) mod version_data;
@@ -94,8 +91,6 @@ pub mod fuzzing {
             assert_no_panic_decoding::<super::epoch_by_version::EpochByVersionSchema>(data);
             assert_no_panic_decoding::<super::event::EventSchema>(data);
             assert_no_panic_decoding::<super::event_accumulator::EventAccumulatorSchema>(data);
-            assert_no_panic_decoding::<super::event_by_key::EventByKeySchema>(data);
-            assert_no_panic_decoding::<super::event_by_version::EventByVersionSchema>(data);
             assert_no_panic_decoding::<super::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
                 data,
             );
@@ -117,9 +112,6 @@ pub mod fuzzing {
             assert_no_panic_decoding::<
                 super::transaction_auxiliary_data::TransactionAuxiliaryDataSchema,
             >(data);
-            assert_no_panic_decoding::<super::transaction_by_account::TransactionByAccountSchema>(
-                data,
-            );
             assert_no_panic_decoding::<super::transaction_by_hash::TransactionByHashSchema>(data);
             assert_no_panic_decoding::<super::transaction_info::TransactionInfoSchema>(data);
             assert_no_panic_decoding::<super::version_data::VersionDataSchema>(data);

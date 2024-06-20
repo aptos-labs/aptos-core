@@ -4,8 +4,8 @@
 
 use crate::{
     transaction::{
-        DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
-        MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
+        BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem,
+        DeletedTableData, MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
         UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
@@ -18,7 +18,6 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_logger::{sample, sample::SampleRate};
 use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_storage_interface::DbReader;
@@ -26,14 +25,15 @@ use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
     contract_event::{ContractEvent, EventWithVersion},
+    indexer::indexer_db_reader::IndexerReader,
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
         table::{TableHandle, TableInfo},
         StateView,
     },
     transaction::{
-        EntryFunction, ExecutionStatus, Multisig, RawTransaction, Script, SignedTransaction,
-        TransactionAuxiliaryData,
+        BlockEndInfo, BlockEpiloguePayload, EntryFunction, ExecutionStatus, Multisig,
+        RawTransaction, Script, SignedTransaction, TransactionAuxiliaryData,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -66,19 +66,19 @@ const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
 pub struct MoveConverter<'a, S> {
     inner: AptosValueAnnotator<'a, S>,
     db: Arc<dyn DbReader>,
-    table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    indexer_reader: Option<Arc<dyn IndexerReader>>,
 }
 
 impl<'a, S: StateView> MoveConverter<'a, S> {
     pub fn new(
         inner: &'a S,
         db: Arc<dyn DbReader>,
-        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+        indexer_reader: Option<Arc<dyn IndexerReader>>,
     ) -> Self {
         Self {
             inner: AptosValueAnnotator::new(inner),
             db,
-            table_info_reader,
+            indexer_reader,
         }
     }
 
@@ -179,8 +179,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         use aptos_types::transaction::Transaction::*;
         let aux_data = self
             .db
-            .get_transaction_auxiliary_data_by_version(data.version)
-            .ok();
+            .get_transaction_auxiliary_data_by_version(data.version)?;
         let info = self.into_transaction_info(
             data.version,
             &data.info,
@@ -200,11 +199,33 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             BlockMetadata(txn) => (&txn, info, events).into(),
             BlockMetadataExt(txn) => (&txn, info, events).into(),
-            // TODO [fix] Create separate transaction type for API
-            StateCheckpoint(_) | BlockEpilogue { .. } => {
+            StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),
+                })
+            },
+            BlockEpilogue(block_epilogue_payload) => {
+                Transaction::BlockEpilogueTransaction(BlockEpilogueTransaction {
+                    info,
+                    timestamp: timestamp.into(),
+                    block_end_info: match block_epilogue_payload {
+                        BlockEpiloguePayload::V0 {
+                            block_end_info:
+                                BlockEndInfo::V0 {
+                                    block_gas_limit_reached,
+                                    block_output_limit_reached,
+                                    block_effective_block_gas_units,
+                                    block_approx_output_size,
+                                },
+                            ..
+                        } => Some(crate::transaction::BlockEndInfo {
+                            block_gas_limit_reached,
+                            block_output_limit_reached,
+                            block_effective_block_gas_units,
+                            block_approx_output_size,
+                        }),
+                    },
                 })
             },
             ValidatorTransaction(_txn) => (info, events, timestamp).into(),
@@ -547,7 +568,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             .signature
             .clone()
             .ok_or_else(|| format_err!("missing signature"))?;
-        Ok(SignedTransaction::new_with_authenticator(
+        Ok(SignedTransaction::new_signed_transaction(
             self.try_into_raw_transaction(txn, chain_id)?,
             signature.try_into()?,
         ))
@@ -558,7 +579,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         submit_transaction_request: SubmitTransactionRequest,
         chain_id: ChainId,
     ) -> Result<SignedTransaction> {
-        Ok(SignedTransaction::new_with_authenticator(
+        Ok(SignedTransaction::new_signed_transaction(
             self.try_into_raw_transaction_poem(
                 submit_transaction_request.user_transaction_request,
                 chain_id,
@@ -961,9 +982,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     }
 
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
-        if let Some(table_info_reader) = self.table_info_reader.as_ref() {
-            // Attempt to get table_info from the table_info_reader if it exists
-            Ok(table_info_reader.get_table_info(handle)?)
+        if let Some(indexer_reader) = self.indexer_reader.as_ref() {
+            // Attempt to get table_info from the indexer_reader if it exists
+            Ok(indexer_reader.get_table_info(handle)?)
         } else if self.db.indexer_enabled() {
             // Attempt to get table_info from the db if indexer is enabled
             Ok(Some(self.db.get_table_info(handle)?))
@@ -1067,7 +1088,7 @@ pub trait AsConverter<R> {
     fn as_converter(
         &self,
         db: Arc<dyn DbReader>,
-        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+        indexer_reader: Option<Arc<dyn IndexerReader>>,
     ) -> MoveConverter<R>;
 }
 
@@ -1075,9 +1096,9 @@ impl<R: StateView> AsConverter<R> for R {
     fn as_converter(
         &self,
         db: Arc<dyn DbReader>,
-        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+        indexer_reader: Option<Arc<dyn IndexerReader>>,
     ) -> MoveConverter<R> {
-        MoveConverter::new(self, db, table_info_reader)
+        MoveConverter::new(self, db, indexer_reader)
     }
 }
 

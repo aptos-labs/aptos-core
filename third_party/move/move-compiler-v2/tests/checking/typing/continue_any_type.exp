@@ -4,7 +4,7 @@ module 0x8675309::M {
         dummy_field: bool,
     }
     private fun foo(c: M::Coin) {
-        M::Coin{ dummy_field: _ }: M::Coin = c;
+        M::Coin{ dummy_field: _ } = c;
         Tuple()
     }
     private fun t0() {

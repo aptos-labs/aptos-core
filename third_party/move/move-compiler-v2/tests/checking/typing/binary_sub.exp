@@ -16,7 +16,7 @@ module 0x8675309::M {
         Sub<u64>(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
         Sub<u64>(Sub<u64>(Sub<u64>(1, select M::R.f<M::R>(r)), select M::R.f<M::R>(r)), 0);
         {
-          let M::R{ f: _ }: M::R = r;
+          let M::R{ f: _ } = r;
           Tuple()
         }
     }

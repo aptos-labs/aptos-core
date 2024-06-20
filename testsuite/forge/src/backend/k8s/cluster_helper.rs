@@ -161,13 +161,13 @@ async fn wait_nodes_stateful_set(
 }
 
 /// Deletes a collection of resources in k8s as part of aptos-node
-async fn delete_k8s_collection<T: kube::Resource>(
+async fn delete_k8s_collection<T>(
     api: Api<T>,
     name: &'static str,
     label_selector: &str,
 ) -> Result<()>
 where
-    T: Clone + DeserializeOwned + Debug,
+    T: kube::Resource + Clone + DeserializeOwned + Debug,
     <T as kube::Resource>::DynamicType: Default,
 {
     match api

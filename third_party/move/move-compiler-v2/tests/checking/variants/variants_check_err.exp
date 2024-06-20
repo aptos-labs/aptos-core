@@ -1,0 +1,45 @@
+
+Diagnostics:
+error: variant `Rgb` not declared in `m::Color`
+   ┌─ tests/checking/variants/variants_check_err.move:15:13
+   │
+15 │             Color::Rgb{red, green, blue} => false,
+   │             ^^^^^^^^^^
+
+error: variants not allowed in this context
+   ┌─ tests/checking/variants/variants_check_err.move:21:41
+   │
+21 │     fun missplaced_variant(self: Color::Red): bool {
+   │                                         ^^^
+
+error: variants not allowed in this context
+   ┌─ tests/checking/variants/variants_check_err.move:22:39
+   │
+22 │         0x815::m::missplaced_variant::Red();
+   │                                       ^^^
+
+error: variants not allowed in this context
+   ┌─ tests/checking/variants/variants_check_err.move:26:36
+   │
+26 │     fun missing_field(self: Color::Red): bool {
+   │                                    ^^^
+
+error: missing field `blue`
+   ┌─ tests/checking/variants/variants_check_err.move:28:13
+   │
+28 │             Color::RGB{red, green} => false,
+   │             ^^^^^^^^^^^^^^^^^^^^^^
+
+error: field `black` not declared in `m::Color`
+   ┌─ tests/checking/variants/variants_check_err.move:34:42
+   │
+34 │             Color::RGB{red, green, blue, black} => false,
+   │                                          ^^^^^
+
+error: field `red` not declared in all variants of `Color`
+   ┌─ tests/checking/variants/variants_check_err.move:39:9
+   │
+39 │         self.red
+   │         ^^^^
+   │
+   = field must be declared in all variants of `Color` to be accessible without match expression

@@ -1268,9 +1268,9 @@ impl FakeExecutor {
 }
 
 pub fn assert_outputs_equal(
-    txns_output_1: &Vec<TransactionOutput>,
+    txns_output_1: &[TransactionOutput],
     name1: &str,
-    txns_output_2: &Vec<TransactionOutput>,
+    txns_output_2: &[TransactionOutput],
     name2: &str,
 ) {
     assert_eq!(
