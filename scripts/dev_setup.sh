@@ -16,6 +16,7 @@
 # fast fail.
 set -eo pipefail
 
+NODE_MAJOR_VERSION=20
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
 KUBECTL_VERSION=1.18.6
@@ -656,8 +657,7 @@ function install_xsltproc {
 function install_nodejs {
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
     # install via nodesource: https://github.com/nodesource/distributions/issues/1709#issuecomment-1788473588
-    NODE_MAJOR=18
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | "${PRE_COMMAND[@]}" tee /etc/apt/sources.list.d/nodesource.list
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR_VERSION.x nodistro main" | "${PRE_COMMAND[@]}" tee /etc/apt/sources.list.d/nodesource.list
   fi
   install_pkg nodejs "$PACKAGE_MANAGER"
   install_pkg npm "$PACKAGE_MANAGER"
