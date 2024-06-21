@@ -21,8 +21,10 @@ pub enum AptosDbError {
     /// Other non-classified error.
     #[error("AptosDB Other Error: {0}")]
     Other(String),
+    #[error("AptosDB RocksDb Error: {0}")]
+    RocksDbIncompleteResult(String),
     #[error("AptosDB RocksDB Error: {0}")]
-    RocksDbError(String),
+    OtherRocksDbError(String),
     #[error("AptosDB bcs Error: {0}")]
     BcsError(String),
     #[error("AptosDB IO Error: {0}")]
@@ -42,12 +44,6 @@ impl From<anyhow::Error> for AptosDbError {
 impl From<bcs::Error> for AptosDbError {
     fn from(error: bcs::Error) -> Self {
         Self::BcsError(format!("{}", error))
-    }
-}
-
-impl From<rocksdb::Error> for AptosDbError {
-    fn from(error: rocksdb::Error) -> Self {
-        Self::RocksDbError(format!("{}", error))
     }
 }
 

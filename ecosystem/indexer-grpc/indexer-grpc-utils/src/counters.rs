@@ -58,6 +58,8 @@ pub enum IndexerGrpcStep {
     TableInfoProcessedBatch,
     // [Indexer Table Info] Processed transactions from fullnode
     TableInfoProcessed,
+    // [Indexer Indices] Processed transactions from AptosDB
+    InternalIndexerDBProcessed,
 }
 
 impl IndexerGrpcStep {
@@ -91,6 +93,7 @@ impl IndexerGrpcStep {
             // Table info service steps
             IndexerGrpcStep::TableInfoProcessedBatch => "1",
             IndexerGrpcStep::TableInfoProcessed => "2",
+            IndexerGrpcStep::InternalIndexerDBProcessed => "1",
         }
     }
 
@@ -135,6 +138,9 @@ impl IndexerGrpcStep {
             }
             IndexerGrpcStep::TableInfoProcessed => {
                 "[Indexer Table Info] Processed successfully"
+            }
+            IndexerGrpcStep::InternalIndexerDBProcessed => {
+                "[Indexer DB indices] Processed successfully"
             }
         }
     }
@@ -278,8 +284,11 @@ pub fn log_grpc_step(
             duration_in_secs,
             size_in_bytes,
             // Request metadata variables
-            request_identifier = &request_metadata.request_identifier,
             processor_name = &request_metadata.processor_name,
+            request_identifier_type = &request_metadata.request_identifier_type,
+            request_identifier = &request_metadata.request_identifier,
+            request_email = &request_metadata.request_email,
+            request_application_name = &request_metadata.request_application_name,
             connection_id = &request_metadata.request_connection_id,
             service_type,
             step = step.get_step(),

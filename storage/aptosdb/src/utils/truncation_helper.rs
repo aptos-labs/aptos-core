@@ -4,7 +4,6 @@
 #![allow(dead_code)]
 
 use crate::{
-    common::NUM_STATE_SHARDS,
     ledger_db::{LedgerDb, LedgerDbSchemaBatches},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -31,7 +30,7 @@ use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{
     schema::{Schema, SeekKeyCodec},
-    ReadOptions, SchemaBatch, DB,
+    SchemaBatch, DB,
 };
 use aptos_storage_interface::Result;
 use aptos_types::{proof::position::Position, transaction::Version};
@@ -76,14 +75,16 @@ pub(crate) fn truncate_state_kv_db(
     target_version: Version,
     batch_size: usize,
 ) -> Result<()> {
-    let status = StatusLine::new(Progress::new(target_version));
+    assert!(batch_size > 0);
+    let status = StatusLine::new(Progress::new("Truncating State KV DB", target_version));
+    status.set_current_version(current_version);
 
     let mut current_version = current_version;
     // current_version can be the same with target_version while there is data written to the db before
     // the progress is recorded -- we need to run the truncate for at least one batch
     loop {
         let target_version_for_this_batch = std::cmp::max(
-            current_version.wrapping_sub(batch_size as Version),
+            current_version.saturating_sub(batch_size as Version),
             target_version,
         );
         // By writing the progress first, we still maintain that it is less than or equal to the
@@ -109,7 +110,7 @@ pub(crate) fn truncate_state_kv_db_shards(
     state_kv_db: &StateKvDb,
     target_version: Version,
 ) -> Result<()> {
-    (0..NUM_STATE_SHARDS)
+    (0..state_kv_db.hack_num_real_shards())
         .into_par_iter()
         .try_for_each(|shard_id| {
             truncate_state_kv_db_single_shard(state_kv_db, shard_id as u8, target_version)
@@ -130,7 +131,8 @@ pub(crate) fn truncate_state_merkle_db(
     state_merkle_db: &StateMerkleDb,
     target_version: Version,
 ) -> Result<()> {
-    let status = StatusLine::new(Progress::new(target_version));
+    let status = StatusLine::new(Progress::new("Truncating State Merkle DB.", target_version));
+
     loop {
         let current_version = get_current_version_in_state_merkle_db(state_merkle_db)?
             .expect("Current version of state merkle db must exist.");
@@ -164,7 +166,7 @@ pub(crate) fn truncate_state_merkle_db_shards(
     state_merkle_db: &StateMerkleDb,
     target_version: Version,
 ) -> Result<()> {
-    (0..NUM_STATE_SHARDS)
+    (0..state_merkle_db.hack_num_real_shards())
         .into_par_iter()
         .try_for_each(|shard_id| {
             truncate_state_merkle_db_single_shard(state_merkle_db, shard_id as u8, target_version)
@@ -197,7 +199,7 @@ pub(crate) fn find_closest_node_version_at_or_before(
 ) -> Result<Option<Version>> {
     let mut iter = state_merkle_db
         .metadata_db()
-        .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+        .rev_iter::<JellyfishMerkleNodeSchema>()?;
     iter.seek_for_prev(&NodeKey::new_empty_path(version))?;
     Ok(iter.next().transpose()?.map(|item| item.0.version()))
 }
@@ -211,8 +213,7 @@ fn truncate_transaction_accumulator(
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let mut iter =
-        transaction_accumulator_db.iter::<TransactionAccumulatorSchema>(ReadOptions::default())?;
+    let mut iter = transaction_accumulator_db.iter::<TransactionAccumulatorSchema>()?;
     iter.seek_to_last();
     let (position, _) = iter.next().transpose()?.unwrap();
     let num_frozen_nodes = position.to_postorder_index() + 1;
@@ -302,7 +303,7 @@ fn delete_per_epoch_data(
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let mut iter = ledger_db.iter::<LedgerInfoSchema>(ReadOptions::default())?;
+    let mut iter = ledger_db.iter::<LedgerInfoSchema>()?;
     iter.seek_to_last();
     if let Some((epoch, ledger_info)) = iter.next().transpose()? {
         let version = ledger_info.commit_info().version();
@@ -316,7 +317,7 @@ fn delete_per_epoch_data(
         }
     }
 
-    let mut iter = ledger_db.iter::<EpochByVersionSchema>(ReadOptions::default())?;
+    let mut iter = ledger_db.iter::<EpochByVersionSchema>()?;
     iter.seek(&start_version)?;
 
     for item in iter {
@@ -370,7 +371,7 @@ fn delete_per_version_data_impl<S>(
 where
     S: Schema<Key = Version>,
 {
-    let mut iter = ledger_db.iter::<S>(ReadOptions::default())?;
+    let mut iter = ledger_db.iter::<S>()?;
     iter.seek_to_last();
     if let Some((lastest_version, _)) = iter.next().transpose()? {
         if lastest_version >= start_version {
@@ -413,7 +414,7 @@ fn delete_state_value_and_index(
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
+    let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>()?;
     iter.seek(&start_version)?;
 
     for item in iter {
@@ -434,7 +435,7 @@ where
     S: Schema<Key = StaleNodeIndex>,
     Version: SeekKeyCodec<S>,
 {
-    let mut iter = db.iter::<S>(ReadOptions::default())?;
+    let mut iter = db.iter::<S>()?;
     iter.seek(&version)?;
     for item in iter {
         let (index, _) = item?;
@@ -455,7 +456,7 @@ fn delete_nodes_and_stale_indices_at_or_after_version(
         db, version, batch,
     )?;
 
-    let mut iter = db.iter::<JellyfishMerkleNodeSchema>(ReadOptions::default())?;
+    let mut iter = db.iter::<JellyfishMerkleNodeSchema>()?;
     iter.seek(&NodeKey::new_empty_path(version))?;
     for item in iter {
         let (key, _) = item?;
@@ -466,13 +467,15 @@ fn delete_nodes_and_stale_indices_at_or_after_version(
 }
 
 struct Progress {
+    message: &'static str,
     current_version: AtomicU64,
     target_version: Version,
 }
 
 impl Progress {
-    pub fn new(target_version: Version) -> Self {
+    pub fn new(message: &'static str, target_version: Version) -> Self {
         Self {
+            message,
             current_version: 0.into(),
             target_version,
         }
@@ -488,7 +491,8 @@ impl Display for Progress {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "current: {}, target: {}",
+            "{}: current: {}, target: {}",
+            self.message,
             self.current_version.load(Ordering::Relaxed),
             self.target_version
         )

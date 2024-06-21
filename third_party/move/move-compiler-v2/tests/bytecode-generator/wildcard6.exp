@@ -4,7 +4,7 @@ module 0xc0ffee::m {
         {
           let x: u64 = 40;
           {
-            let (y: u64, _): (u64, u64) = Tuple(Move(x), x);
+            let (y: u64, _: u64): (u64, u64) = Tuple(Move(x), x);
             y
           }
         }

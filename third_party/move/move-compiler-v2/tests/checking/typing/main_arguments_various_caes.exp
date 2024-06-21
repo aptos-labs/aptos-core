@@ -10,7 +10,7 @@ module 0x42::M {
         dummy_field: bool,
     }
     public fun eat(r: M::R) {
-        M::R{ dummy_field: _ }: M::R = r
+        M::R{ dummy_field: _ } = r
     }
 } // end 0x42::M
 module <SELF>_0 {

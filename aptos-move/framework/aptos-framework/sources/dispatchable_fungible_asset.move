@@ -66,6 +66,7 @@ module aptos_framework::dispatchable_fungible_asset {
         store: Object<T>,
         amount: u64,
     ): FungibleAsset acquires TransferRefStore {
+        fungible_asset::withdraw_sanity_check(owner, store, false);
         let func_opt = fungible_asset::withdraw_dispatch_function(store);
         if (option::is_some(&func_opt)) {
             assert!(
@@ -85,7 +86,7 @@ module aptos_framework::dispatchable_fungible_asset {
             assert!(amount <= start_balance - end_balance, error::aborted(EAMOUNT_MISMATCH));
             fa
         } else {
-            fungible_asset::withdraw_non_dispatch(owner, store, amount)
+            fungible_asset::withdraw_internal(object::object_address(&store), amount)
         }
     }
 
@@ -93,6 +94,7 @@ module aptos_framework::dispatchable_fungible_asset {
     ///
     /// The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires TransferRefStore {
+        fungible_asset::deposit_sanity_check(store, false);
         let func_opt = fungible_asset::deposit_dispatch_function(store);
         if (option::is_some(&func_opt)) {
             assert!(
@@ -108,7 +110,7 @@ module aptos_framework::dispatchable_fungible_asset {
                 func
             )
         } else {
-            fungible_asset::deposit_non_dispatch(store, fa)
+            fungible_asset::deposit_internal(object::object_address(&store), fa)
         }
     }
 

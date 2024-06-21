@@ -128,7 +128,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      IMAGE_TAG: 01b24e7e3548382dd25440b39a0438a993387f12 #aptos-node-v1.11 with randomness disabled in genesis
+      IMAGE_TAG: f648076a280621dbfd4e73b1ca83e3a3f52878ed #aptos-node-v1.15.0
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
       FORGE_RUNNER_DURATION_SECS: 7200 # Run for 2 hours
       FORGE_TEST_SUITE: framework_upgrade
@@ -136,7 +136,7 @@ jobs:
 
   run-forge-realistic-env-max-load-long:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-framework-upgrade-test] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-framework-upgrade-test ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -148,7 +148,7 @@ jobs:
 
   run-forge-realistic-env-load-sweep:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-realistic-env-max-load-long] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-realistic-env-max-load-long ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -160,7 +160,7 @@ jobs:
 
   run-forge-realistic-env-workload-sweep:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-realistic-env-load-sweep] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-realistic-env-load-sweep ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -172,7 +172,7 @@ jobs:
 
   run-forge-realistic-env-graceful-overload:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-realistic-env-workload-sweep] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-realistic-env-workload-sweep ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -184,7 +184,7 @@ jobs:
 
   run-forge-realistic-network-tuned-for-throughput:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-realistic-env-graceful-overload] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-realistic-env-graceful-overload ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -199,7 +199,7 @@ jobs:
 
   run-forge-consensus-stress-test:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-realistic-network-tuned-for-throughput] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-realistic-network-tuned-for-throughput ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -211,7 +211,7 @@ jobs:
 
   run-forge-workload-mix-test:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-consensus-stress-test] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-consensus-stress-test ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -223,7 +223,7 @@ jobs:
 
   run-forge-single-vfn-perf:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-workload-mix-test] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-workload-mix-test ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -233,22 +233,9 @@ jobs:
       FORGE_TEST_SUITE: single_vfn_perf
       POST_TO_SLACK: true
 
-  run-forge-haproxy:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-single-vfn-perf] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-haproxy-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
-      FORGE_RUNNER_DURATION_SECS: 600 # Run for 10 minutes
-      FORGE_ENABLE_HAPROXY: true
-      FORGE_TEST_SUITE: realistic_env_max_load
-      POST_TO_SLACK: true
-
   run-forge-fullnode-reboot-stress-test:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-haproxy] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-single-vfn-perf ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -262,7 +249,7 @@ jobs:
 
   run-forge-compat:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-fullnode-reboot-stress-test] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-fullnode-reboot-stress-test ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -270,7 +257,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 300 # Run for 5 minutes
       # This will upgrade from testnet branch to the latest main
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: 01b24e7e3548382dd25440b39a0438a993387f12 #aptos-node-v1.11 with randomness disabled in genesis
+      IMAGE_TAG: f648076a280621dbfd4e73b1ca83e3a3f52878ed #aptos-node-v1.15.0
       GIT_SHA: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }} # this is the git ref to checkout
       POST_TO_SLACK: true
 
@@ -278,7 +265,7 @@ jobs:
 
   run-forge-changing-working-quorum-test:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-compat] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-compat ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -291,7 +278,7 @@ jobs:
 
   run-forge-changing-working-quorum-test-high-load:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-changing-working-quorum-test] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-changing-working-quorum-test ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -305,7 +292,7 @@ jobs:
   # Measures PFN latencies with a constant TPS (with a realistic environment)
   run-forge-pfn-const-tps-realistic-env:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-changing-working-quorum-test-high-load] # Only run after the previous job completes
+    needs: [ determine-test-metadata, run-forge-changing-working-quorum-test-high-load ] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:

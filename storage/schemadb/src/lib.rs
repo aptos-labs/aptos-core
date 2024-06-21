@@ -32,9 +32,10 @@ use crate::{
 use anyhow::format_err;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_storage_interface::Result as DbResult;
+use aptos_storage_interface::{AptosDbError, Result as DbResult};
 use iterator::{ScanDirection, SchemaIterator};
 use rand::Rng;
+use rocksdb::ErrorKind;
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
 pub use rocksdb::{
     BlockBasedOptions, Cache, ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions,
@@ -160,7 +161,8 @@ impl DB {
             .collect::<Vec<_>>();
         let all_cfds = cfds.into_iter().chain(unrecognized_cfds);
 
-        let inner = rocksdb::DB::open_cf_descriptors(db_opts, path.de_unc(), all_cfds)?;
+        let inner =
+            rocksdb::DB::open_cf_descriptors(db_opts, path.de_unc(), all_cfds).into_db_res()?;
         Ok(Self::log_construct(name, inner))
     }
 
@@ -175,7 +177,8 @@ impl DB {
     ) -> DbResult<DB> {
         let error_if_log_file_exists = false;
         let inner =
-            rocksdb::DB::open_cf_for_read_only(opts, path.de_unc(), cfs, error_if_log_file_exists)?;
+            rocksdb::DB::open_cf_for_read_only(opts, path.de_unc(), cfs, error_if_log_file_exists)
+                .into_db_res()?;
 
         Ok(Self::log_construct(name, inner))
     }
@@ -192,7 +195,8 @@ impl DB {
             primary_path.de_unc(),
             secondary_path.de_unc(),
             cfs,
-        )?;
+        )
+        .into_db_res()?;
         Ok(Self::log_construct(name, inner))
     }
 
@@ -213,7 +217,7 @@ impl DB {
         let k = <S::Key as KeyCodec<S>>::encode_key(schema_key)?;
         let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
 
-        let result = self.inner.get_cf(cf_handle, k)?;
+        let result = self.inner.get_cf(cf_handle, k).into_db_res()?;
         APTOS_SCHEMADB_GET_BYTES
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .observe(result.as_ref().map_or(0.0, |v| v.len() as f64));
@@ -232,6 +236,14 @@ impl DB {
         self.write_schemas(batch)
     }
 
+    /// Deletes a single record.
+    pub fn delete<S: Schema>(&self, key: &S::Key) -> DbResult<()> {
+        // Not necessary to use a batch, but we'd like a central place to bump counters.
+        let batch = SchemaBatch::new();
+        batch.delete::<S>(key)?;
+        self.write_schemas(batch)
+    }
+
     fn iter_with_direction<S: Schema>(
         &self,
         opts: ReadOptions,
@@ -245,12 +257,22 @@ impl DB {
     }
 
     /// Returns a forward [`SchemaIterator`] on a certain schema.
-    pub fn iter<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
+    pub fn iter<S: Schema>(&self) -> DbResult<SchemaIterator<S>> {
+        self.iter_with_opts(ReadOptions::default())
+    }
+
+    /// Returns a forward [`SchemaIterator`] on a certain schema, with non-default ReadOptions
+    pub fn iter_with_opts<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
         self.iter_with_direction::<S>(opts, ScanDirection::Forward)
     }
 
     /// Returns a backward [`SchemaIterator`] on a certain schema.
-    pub fn rev_iter<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
+    pub fn rev_iter<S: Schema>(&self) -> DbResult<SchemaIterator<S>> {
+        self.rev_iter_with_opts(ReadOptions::default())
+    }
+
+    /// Returns a backward [`SchemaIterator`] on a certain schema, with non-default ReadOptions
+    pub fn rev_iter_with_opts<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
         self.iter_with_direction::<S>(opts, ScanDirection::Backward)
     }
 
@@ -284,7 +306,9 @@ impl DB {
         }
         let serialized_size = db_batch.size_in_bytes();
 
-        self.inner.write_opt(db_batch, &default_write_options())?;
+        self.inner
+            .write_opt(db_batch, &default_write_options())
+            .into_db_res()?;
 
         // Bump counters only after DB write succeeds.
         if sampled_kv_bytes {
@@ -328,12 +352,15 @@ impl DB {
     /// Flushes memtable data. This is only used for testing `get_approximate_sizes_cf` in unit
     /// tests.
     pub fn flush_cf(&self, cf_name: &str) -> DbResult<()> {
-        Ok(self.inner.flush_cf(self.get_cf_handle(cf_name)?)?)
+        self.inner
+            .flush_cf(self.get_cf_handle(cf_name)?)
+            .into_db_res()
     }
 
     pub fn get_property(&self, cf_name: &str, property_name: &str) -> DbResult<u64> {
         self.inner
-            .property_int_value_cf(self.get_cf_handle(cf_name)?, property_name)?
+            .property_int_value_cf(self.get_cf_handle(cf_name)?, property_name)
+            .into_db_res()?
             .ok_or_else(|| {
                 aptos_storage_interface::AptosDbError::Other(
                     format!(
@@ -347,7 +374,10 @@ impl DB {
 
     /// Creates new physical DB checkpoint in directory specified by `path`.
     pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> DbResult<()> {
-        rocksdb::checkpoint::Checkpoint::new(&self.inner)?.create_checkpoint(path)?;
+        rocksdb::checkpoint::Checkpoint::new(&self.inner)
+            .into_db_res()?
+            .create_checkpoint(path)
+            .into_db_res()?;
         Ok(())
     }
 }
@@ -375,3 +405,34 @@ trait DeUnc: AsRef<Path> {
 }
 
 impl<T> DeUnc for T where T: AsRef<Path> {}
+
+fn to_db_err(rocksdb_err: rocksdb::Error) -> AptosDbError {
+    match rocksdb_err.kind() {
+        ErrorKind::Incomplete => AptosDbError::RocksDbIncompleteResult(rocksdb_err.to_string()),
+        ErrorKind::NotFound
+        | ErrorKind::Corruption
+        | ErrorKind::NotSupported
+        | ErrorKind::InvalidArgument
+        | ErrorKind::IOError
+        | ErrorKind::MergeInProgress
+        | ErrorKind::ShutdownInProgress
+        | ErrorKind::TimedOut
+        | ErrorKind::Aborted
+        | ErrorKind::Busy
+        | ErrorKind::Expired
+        | ErrorKind::TryAgain
+        | ErrorKind::CompactionTooLarge
+        | ErrorKind::ColumnFamilyDropped
+        | ErrorKind::Unknown => AptosDbError::OtherRocksDbError(rocksdb_err.to_string()),
+    }
+}
+
+trait IntoDbResult<T> {
+    fn into_db_res(self) -> DbResult<T>;
+}
+
+impl<T> IntoDbResult<T> for Result<T, rocksdb::Error> {
+    fn into_db_res(self) -> DbResult<T> {
+        self.map_err(to_db_err)
+    }
+}

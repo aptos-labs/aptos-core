@@ -327,6 +327,7 @@ impl<'env> Generator<'env> {
     fn gen(&mut self, targets: Vec<TempIndex>, exp: &Exp) {
         match exp.as_ref() {
             ExpData::Invalid(id) => self.internal_error(*id, "invalid expression"),
+            ExpData::Match(id, ..) => self.internal_error(*id, "match not yet implemented"),
             ExpData::Temporary(id, temp) => self.gen_temporary(targets, *id, *temp),
             ExpData::Value(id, val) => self.gen_value(targets, *id, val),
             ExpData::LocalVar(id, name) => self.gen_local(targets, *id, *name),
@@ -596,7 +597,10 @@ impl<'env> Generator<'env> {
                     }
                 }
             },
-            Operation::Pack(mid, sid) => {
+            Operation::Pack(_, _, Some(_)) => {
+                self.internal_error(id, "variants not yet implemented")
+            },
+            Operation::Pack(mid, sid, None) => {
                 let inst = self.env().get_node_instantiation(id);
                 self.gen_op_call(targets, id, BytecodeOperation::Pack(*mid, *sid, inst), args)
             },
@@ -816,7 +820,7 @@ impl<'env> Generator<'env> {
         op: BytecodeOperation,
         args: &[Exp],
     ) {
-        let arg_temps = self.gen_arg_list(args, false);
+        let arg_temps = self.gen_arg_list(args);
         self.emit_with(id, |attr| {
             Bytecode::Call(attr, targets, op, arg_temps, None)
         })
@@ -886,7 +890,7 @@ impl<'env> Generator<'env> {
             .zip(param_types)
             .map(|(e, t)| self.maybe_convert(e, &t))
             .collect::<Vec<_>>();
-        let args = self.gen_arg_list(&args, true);
+        let args = self.gen_arg_list(&args);
         self.emit_with(id, |attr| {
             Bytecode::Call(
                 attr,
@@ -920,15 +924,11 @@ impl<'env> Generator<'env> {
     }
 
     /// Generate the code for a list of arguments.
-    /// If `force_l2r_eval` is true, the arguments are forced to be evaluated in left-to-right order.
-    fn gen_arg_list(&mut self, exps: &[Exp], force_l2r_eval: bool) -> Vec<TempIndex> {
+    /// Note that the arguments are evaluated in left-to-right order.
+    fn gen_arg_list(&mut self, exps: &[Exp]) -> Vec<TempIndex> {
         // If all args are side-effect free, we don't need to force temporary generation
         // to get left-to-right evaluation.
-        let with_forced_temp = if exps.iter().all(is_definitely_pure) {
-            false
-        } else {
-            force_l2r_eval
-        };
+        let with_forced_temp = !exps.iter().all(is_definitely_pure);
         let len = exps.len();
         // Generate code with (potentially) forced creation of temporaries for all except last arg.
         let mut args = exps
@@ -1285,7 +1285,10 @@ impl<'env> Generator<'env> {
                     Bytecode::Assign(attr, local, arg, AssignKind::Inferred)
                 })
             },
-            Pattern::Struct(id, str, args) => {
+            Pattern::Struct(id, _, Some(_), _) => {
+                self.internal_error(*id, "variants not yet implemented")
+            },
+            Pattern::Struct(id, str, None, args) => {
                 let (temps, cont_assigns) = self.flatten_patterns(args, next_scope);
                 let ty = self.temp_type(arg);
                 if ty.is_reference() {
@@ -1390,12 +1393,7 @@ impl<'env> Generator<'env> {
             .into_iter()
             .map(|p| p.0)
             .collect::<Vec<_>>();
-        let mut rhs_vars = rhs
-            .used_temporaries_with_types(self.env())
-            .into_iter()
-            .map(|t| param_symbols[t.0])
-            .collect::<BTreeSet<_>>();
-        rhs_vars.append(&mut rhs.free_vars());
+        let rhs_vars = rhs.free_vars_and_used_params(&param_symbols);
         lhs_vars.intersection(&rhs_vars).next().is_some()
     }
 }

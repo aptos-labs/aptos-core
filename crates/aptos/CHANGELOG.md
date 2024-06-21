@@ -3,6 +3,22 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Add balance command to easily get account balances for APT currently
+
+## [3.4.1] - 2024/05/31
+- Upgraded indexer processors for localnet from ca60e51b53c3be6f9517de7c73d4711e9c1f7236 to 5244b84fa5ed872e5280dc8df032d744d62ad29d. Upgraded Hasura metadata accordingly.
+
+## [3.4.0] - 2024/05/30
+- Adds a check for safe usage of randomness features. Public functions are not allowed to call randomness features unless explicitly allowed via attribute `#[lint::allow_unsafe_randomness]`.
+- The Move syntax now supports structured attribute names, as in `#[attribute_area::attribute_name]`.
+- Upgraded indexer processors for localnet from a11f0b6532349aa6b9a80c9a1d77524f02d8a013 to ca60e51b53c3be6f9517de7c73d4711e9c1f7236. Upgraded Hasura metadata accordingly.
+
+## [3.3.1] - 2024/05/21
+- Fixed incompatibility bug that broken local simulation and gas profiling.
+
+## [3.3.0] - 2024/05/03
+- **Breaking Change** Update View functions to use BCS for submission.  Allows for all arguments to be supported in view functions.  Note some input arguments that were previously inputted as strings may be handled differently.
+- [Early beta release of the Move compiler v2](https://aptos.dev/move/compiler_v2/) is now accessible through the CLI. We now allow specifying the Move compiler version and the Move language version via the CLI.
 
 ## [3.2.0] - 2024/03/29
 - Renamed `run-local-testnet` to `run-localnet`. `run-local-testnet` is still supported for backwards compatibility.

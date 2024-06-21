@@ -18,7 +18,7 @@ use once_cell::sync::Lazy;
 use petgraph::{algo::astar as petgraph_astar, graphmap::DiGraphMap};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt,
+    fmt::{self, Debug},
     hash::Hash,
     string::ToString,
     sync::atomic::{AtomicUsize, Ordering as AtomicOrdering},
@@ -161,7 +161,10 @@ impl NamedAddressMaps {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PackagePaths<Path: Into<Symbol> = Symbol, NamedAddress: Into<Symbol> = Symbol> {
+pub struct PackagePaths<
+    Path: Into<Symbol> + Debug = Symbol,
+    NamedAddress: Into<Symbol> + Debug = Symbol,
+> {
     pub name: Option<Symbol>,
     pub paths: Vec<Path>,
     pub named_address_map: BTreeMap<NamedAddress, NumericalAddress>,
@@ -172,6 +175,31 @@ pub struct IndexedPackagePath {
     pub package: Option<Symbol>,
     pub path: Symbol,
     pub named_address_map: NamedAddressMapIndex,
+}
+
+// Convenient helper functions for dealing with PackagePaths
+pub fn string_vec_to_symbol_vec(string_vec: &[String]) -> Vec<Symbol> {
+    string_vec
+        .iter()
+        .map(|s| Symbol::from(s.as_str()))
+        .collect()
+}
+
+pub fn string_map_to_symbol_map<T: Clone>(string_map: &BTreeMap<String, T>) -> BTreeMap<Symbol, T> {
+    string_map
+        .iter()
+        .map(|(s, v)| (Symbol::from(s.as_str()), v.clone()))
+        .collect()
+}
+
+pub fn string_packagepath_to_symbol_packagepath<T: Clone>(
+    input: &PackagePaths<String, String>,
+) -> PackagePaths {
+    PackagePaths {
+        name: input.name,
+        paths: string_vec_to_symbol_vec(&input.paths),
+        named_address_map: string_map_to_symbol_map(&input.named_address_map),
+    }
 }
 
 pub type AttributeDeriver = dyn Fn(&mut CompilationEnv, &mut ModuleDefinition);
@@ -378,9 +406,13 @@ pub struct Flags {
     #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
     warn_unused: bool,
 
-    /// Support v2 syntax (up to expansion phase)
-    #[clap(long = cli::V2_FLAG)]
-    v2: bool,
+    /// Support Move 2 language features (up to expansion phase)
+    #[clap(long = cli::LANG_V2_FLAG)]
+    lang_v2: bool,
+
+    /// Support compiler v2 (up to expansion phase)
+    #[clap(long = cli::COMPILER_V2_FLAG)]
+    compiler_v2: bool,
 
     /// Block v1 runs past expansion phase
     #[clap(long = MOVE_COMPILER_BLOCK_V1_FLAG, default_value=bool_to_str(get_move_compiler_block_v1_from_env()))]
@@ -401,7 +433,8 @@ impl Flags {
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
             warn_unused: false,
-            v2: false,
+            lang_v2: false,
+            compiler_v2: false,
             block_v1_compiler: get_move_compiler_block_v1_from_env(),
         }
     }
@@ -436,7 +469,7 @@ impl Flags {
             verify: true,
             shadow: true, // allows overlapping between sources and deps
             keep_testing_functions: true,
-            v2: true,
+            lang_v2: true,
             ..Self::empty()
         }
     }
@@ -549,12 +582,26 @@ impl Flags {
         self.debug
     }
 
-    pub fn v2(&self) -> bool {
-        self.v2
+    pub fn lang_v2(&self) -> bool {
+        self.lang_v2
     }
 
-    pub fn set_v2(self, v2: bool) -> Self {
-        Self { v2, ..self }
+    pub fn set_lang_v2(self, v2: bool) -> Self {
+        Self {
+            lang_v2: v2,
+            ..self
+        }
+    }
+
+    pub fn compiler_v2(&self) -> bool {
+        self.compiler_v2
+    }
+
+    pub fn set_compiler_v2(self, v2: bool) -> Self {
+        Self {
+            compiler_v2: v2,
+            ..self
+        }
     }
 }
 

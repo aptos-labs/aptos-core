@@ -32,13 +32,13 @@ error[E04009]: expected specific type
 
 task 1 'publish'. lines 10-22:
 Error: error[E03009]: unbound variable
-   ┌─ TEMPFILE:14:9
+   ┌─ TEMPFILE1:14:9
    │
 14 │         invalid<R>(@0x41)
    │         ^^^^^^^ Invalid function usage. Unbound variable 'invalid'
 
 error[E04005]: expected a single type
-   ┌─ TEMPFILE:18:9
+   ┌─ TEMPFILE1:18:9
    │
 13 │     public inline fun my_borrow() {
    │                       --------- Expected a single type, but found expression list type: '()'
@@ -47,7 +47,7 @@ error[E04005]: expected a single type
    │         ^^^^^^^^^^^ Invalid dot access
 
 error[E04009]: expected specific type
-   ┌─ TEMPFILE:18:9
+   ┌─ TEMPFILE1:18:9
    │
 13 │     public inline fun my_borrow() {
    │                       --------- Expected a struct type in the current module but got: '()'
@@ -59,15 +59,15 @@ error[E04009]: expected specific type
 
 task 2 'run'. lines 24-30:
 Error: error[E03002]: unbound module
-   ┌─ TEMPFILE:26:9
+   ┌─ TEMPFILE2:26:9
    │
 26 │     use 0x42::M;
    │         ^^^^^^^ Invalid 'use'. Unbound module: '0x42::M'
 
 error[E03002]: unbound module
-   ┌─ TEMPFILE:28:9
+   ┌─ TEMPFILE2:28:9
    │
 28 │         M::test_resource(&account)
-   │         ^ Unbound module alias 'M'
+   │         ^ Unbound module or type alias 'M'
 
 

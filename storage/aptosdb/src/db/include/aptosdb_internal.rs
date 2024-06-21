@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_storage_interface::block_info::BlockInfo;
+
 impl AptosDB {
     fn new_with_dbs(
         ledger_db: LedgerDb,
@@ -108,7 +110,7 @@ impl AptosDB {
         rocksdb_config: RocksdbConfig,
     ) -> Result<()> {
         let indexer = Indexer::open(&db_root_path, rocksdb_config)?;
-        let ledger_next_version = self.get_latest_version().map_or(0, |v| v + 1);
+        let ledger_next_version = self.get_synced_version().map_or(0, |v| v + 1);
         info!(
             indexer_next_version = indexer.next_version(),
             ledger_next_version = ledger_next_version,
@@ -120,8 +122,7 @@ impl AptosDB {
             let db: Arc<dyn DbReader> = self.state_store.clone();
 
             let state_view = db.state_view_at_version(Some(ledger_next_version - 1))?;
-            let resolver = state_view.as_move_resolver();
-            let annotator = MoveValueAnnotator::new(&resolver);
+            let annotator = AptosValueAnnotator::new(&state_view);
 
             const BATCH_SIZE: Version = 10000;
             let mut next_version = indexer.next_version();
@@ -215,6 +216,96 @@ impl AptosDB {
         );
         Ok(())
     }
+
+    fn get_raw_block_info_by_height(&self, block_height: u64) -> Result<BlockInfo> {
+        if !self.skip_index_and_usage {
+            let (first_version, new_block_event) = self.event_store.get_event_by_key(
+                &new_block_event_key(),
+                block_height,
+                self.get_synced_version()?,
+            )?;
+            let new_block_event = bcs::from_bytes(new_block_event.event_data())?;
+            Ok(BlockInfo::from_new_block_event(
+                first_version,
+                &new_block_event,
+            ))
+        } else {
+            Ok(self
+                .ledger_db
+                .metadata_db()
+                .get_block_info(block_height)?
+                .ok_or(AptosDbError::NotFound(format!(
+                    "BlockInfo not found at height {block_height}"
+                )))?)
+        }
+    }
+
+    fn get_raw_block_info_by_version(
+        &self,
+        version: Version,
+    ) -> Result<(u64 /* block_height */, BlockInfo)> {
+        let synced_version = self.get_synced_version()?;
+        ensure!(
+            version <= synced_version,
+            "Requested version {version} > synced version {synced_version}",
+        );
+
+        if !self.skip_index_and_usage {
+            let (first_version, event_index, block_height) = self
+                .event_store
+                .lookup_event_before_or_at_version(&new_block_event_key(), version)?
+                .ok_or_else(|| AptosDbError::NotFound("NewBlockEvent".to_string()))?;
+            let new_block_event = self
+                .event_store
+                .get_event_by_version_and_index(first_version, event_index)?;
+            let new_block_event = bcs::from_bytes(new_block_event.event_data())?;
+            Ok((
+                block_height,
+                BlockInfo::from_new_block_event(first_version, &new_block_event),
+            ))
+        } else {
+            let block_height = self
+                .ledger_db
+                .metadata_db()
+                .get_block_height_by_version(version)?;
+
+            let block_info = self.get_raw_block_info_by_height(block_height)?;
+            Ok((block_height, block_info))
+        }
+    }
+
+    fn to_api_block_info(
+        &self,
+        block_height: u64,
+        block_info: BlockInfo,
+    ) -> Result<(Version, Version, NewBlockEvent)> {
+        // N.b. Must use committed_version because if synced version is used, we won't be able
+        // to tell the end of the latest block.
+        let committed_version = self.get_latest_ledger_info_version()?;
+        ensure!(
+            block_info.first_version() <= committed_version,
+            "block first version {} > committed version {committed_version}",
+            block_info.first_version(),
+        );
+
+        // TODO(grao): Consider return BlockInfo instead of NewBlockEvent.
+        let new_block_event = self
+            .ledger_db
+            .event_db()
+            .expect_new_block_event(block_info.first_version())?;
+
+        let last_version = match self.get_raw_block_info_by_height(block_height + 1) {
+            Ok(next_block_info) => next_block_info.first_version() - 1,
+            Err(AptosDbError::NotFound(..)) => committed_version,
+            Err(err) => return Err(err),
+        };
+
+        Ok((
+            block_info.first_version(),
+            last_version,
+            bcs::from_bytes(new_block_event.event_data())?,
+        ))
+    }
 }
 
 impl Debug for AptosDB {
@@ -232,7 +323,7 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
 }
 
 thread_local! {
-    static ENTERED_GAUGED_API: Cell<bool> = Cell::new(false);
+    static ENTERED_GAUGED_API: Cell<bool> = const { Cell::new(false) };
 }
 
 fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>

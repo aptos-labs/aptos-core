@@ -1,0 +1,41 @@
+
+Diagnostics:
+error: function acquires global `A::T1` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_3.move:9:9
+   │
+ 7 │         let x = borrow_global_mut<T1>(signer::address_of(account));
+   │                 -------------------------------------------------- previous mutable global borrow
+ 8 │         let y = get_v(x);
+   │                 -------- used by mutable call result
+ 9 │         acquires_t1(account);
+   │         ^^^^^^^^^^^^^^^^^^^^ function called here
+   ·
+34 │     fun acquires_t1(account: &signer) acquires T1 {
+   │                                                --- access declared here
+
+error: function acquires global `A::T1` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_3.move:18:9
+   │
+15 │         let x = borrow_global_mut<T1>(signer::address_of(account));
+   │                 -------------------------------------------------- previous mutable global borrow
+16 │         let y = get_v(x);
+   │                 -------- used by mutable call result
+17 │         acquires_t2(account);
+18 │         acquires_t1(account);
+   │         ^^^^^^^^^^^^^^^^^^^^ function called here
+   ·
+34 │     fun acquires_t1(account: &signer) acquires T1 {
+   │                                                --- access declared here
+
+error: function acquires global `A::T1` which is currently mutably borrowed
+   ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_acquires_invalid_3.move:25:9
+   │
+23 │         let x = borrow_global_mut<T1>(signer::address_of(account));
+   │                 -------------------------------------------------- previous mutable global borrow
+24 │         let y = get_v(x);
+   │                 -------- used by mutable call result
+25 │         acquires_t1(account);
+   │         ^^^^^^^^^^^^^^^^^^^^ function called here
+   ·
+34 │     fun acquires_t1(account: &signer) acquires T1 {
+   │                                                --- access declared here

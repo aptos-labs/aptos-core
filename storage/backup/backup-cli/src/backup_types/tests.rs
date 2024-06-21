@@ -41,7 +41,7 @@ struct TestData {
 
 fn test_data_strategy() -> impl Strategy<Value = TestData> {
     let db = test_execution_with_storage_impl();
-    let latest_ver = db.get_latest_version().unwrap();
+    let latest_ver = db.get_synced_version().unwrap();
 
     let latest_epoch_state = db.get_latest_epoch_state().unwrap();
     let epoch_ending_lis = db
@@ -88,6 +88,7 @@ fn test_end_to_end_impl(d: TestData) {
     // Backup
     let global_backup_opt = GlobalBackupOpt {
         max_chunk_size: 2048,
+        concurrent_data_requests: 2,
     };
     let state_snapshot_manifest = d.state_snapshot_epoch.map(|epoch| {
         rt.block_on(

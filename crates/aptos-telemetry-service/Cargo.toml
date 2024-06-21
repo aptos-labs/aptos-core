@@ -47,6 +47,9 @@ url = { workspace = true }
 uuid = { workspace = true }
 warp = { workspace = true }
 
+[features]
+bigquery_integration_tests = []
+
 [dev-dependencies]
 claims = { workspace = true }
 httpmock = { workspace = true }

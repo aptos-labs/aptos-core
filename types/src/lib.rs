@@ -20,6 +20,7 @@ pub mod event;
 pub mod executable;
 pub mod fee_statement;
 pub mod governance;
+pub mod indexer;
 pub mod jwks;
 pub mod ledger_info;
 pub mod mempool_status;
@@ -66,3 +67,4 @@ pub mod keyless;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;
+pub mod vm;

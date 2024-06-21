@@ -4,22 +4,12 @@
 use move_core_types::account_address::AccountAddress;
 use move_model::{code_writer::CodeWriter, emit, emitln};
 
-pub(crate) fn generate_blob(writer: &CodeWriter, data: &[u8]) {
-    emitln!(writer, "vector[");
-    writer.indent();
-    for (i, b) in data.iter().enumerate() {
-        if i % 20 == 0 {
-            if i > 0 {
-                emitln!(writer);
-            }
-        } else {
-            emit!(writer, " ");
-        }
-        emit!(writer, "{},", b);
+pub(crate) fn generate_blob_as_hex_string(writer: &CodeWriter, data: &[u8]) {
+    emit!(writer, "x\"");
+    for b in data.iter() {
+        emit!(writer, "{:02x}", b);
     }
-    emitln!(writer);
-    writer.unindent();
-    emit!(writer, "]")
+    emit!(writer, "\"");
 }
 
 pub(crate) fn generate_next_execution_hash_blob(
@@ -43,11 +33,8 @@ pub(crate) fn generate_next_execution_hash_blob(
         writer.indent();
         emitln!(writer, "proposal_id,");
         emitln!(writer, "@{},", for_address);
-        emit!(writer, "vector[");
-        for b in next_execution_hash.iter() {
-            emit!(writer, "{}u8,", b);
-        }
-        emitln!(writer, "],");
+        generate_blob_as_hex_string(writer, &next_execution_hash);
+        emit!(writer, ",");
         writer.unindent();
         emitln!(writer, ");");
     }

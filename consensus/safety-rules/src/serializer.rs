@@ -5,6 +5,8 @@
 use crate::{counters, logging::LogEntry, ConsensusState, Error, SafetyRules, TSafetyRules};
 use aptos_consensus_types::{
     block_data::BlockData,
+    order_vote::OrderVote,
+    order_vote_proposal::OrderVoteProposal,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::VoteProposal,
@@ -28,6 +30,7 @@ pub enum SafetyRulesInput {
         Box<Option<TwoChainTimeoutCertificate>>,
     ),
     ConstructAndSignVoteTwoChain(Box<VoteProposal>, Box<Option<TwoChainTimeoutCertificate>>),
+    ConstructAndSignOrderVote(Box<OrderVoteProposal>),
     SignCommitVote(Box<LedgerInfoWithSignatures>, Box<LedgerInfo>),
 }
 
@@ -64,6 +67,11 @@ impl SerializerService {
                     ),
                 )
             },
+            SafetyRulesInput::ConstructAndSignOrderVote(order_vote_proposal) => serde_json::to_vec(
+                &self
+                    .internal
+                    .construct_and_sign_order_vote(&order_vote_proposal),
+            ),
             SafetyRulesInput::SignCommitVote(ledger_info, new_ledger_info) => serde_json::to_vec(
                 &self
                     .internal
@@ -138,6 +146,18 @@ impl TSafetyRules for SerializerClient {
             Box::new(vote_proposal.clone()),
             Box::new(timeout_cert.cloned()),
         ))?;
+        serde_json::from_slice(&response)?
+    }
+
+    fn construct_and_sign_order_vote(
+        &mut self,
+        order_vote_proposal: &OrderVoteProposal,
+    ) -> Result<OrderVote, Error> {
+        let _timer =
+            counters::start_timer("external", LogEntry::ConstructAndSignOrderVote.as_str());
+        let response = self.request(SafetyRulesInput::ConstructAndSignOrderVote(Box::new(
+            order_vote_proposal.clone(),
+        )))?;
         serde_json::from_slice(&response)?
     }
 

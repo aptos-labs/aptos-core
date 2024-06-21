@@ -11,7 +11,7 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use aptos_logger::info;
-use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::transaction::{Transaction, Version};
 use std::sync::Arc;
@@ -86,7 +86,7 @@ impl TransactionPruner {
         let mut iter = self
             .ledger_db
             .transaction_db_raw()
-            .iter::<TransactionSchema>(ReadOptions::default())?;
+            .iter::<TransactionSchema>()?;
         iter.seek(&start)?;
 
         // The capacity is capped by the max number of txns we prune in a single batch. It's a

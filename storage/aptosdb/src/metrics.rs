@@ -229,3 +229,13 @@ pub(crate) static BACKUP_STATE_SNAPSHOT_LEAF_IDX: Lazy<IntGauge> = Lazy::new(|| 
     )
     .unwrap()
 });
+
+pub static BACKUP_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_backup_handler_timers_seconds",
+        "Various timers for performance analysis.",
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
+    )
+    .unwrap()
+});
