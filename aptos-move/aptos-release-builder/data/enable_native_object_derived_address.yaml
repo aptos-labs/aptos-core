@@ -11,4 +11,4 @@ proposals:
     update_sequence:
       - FeatureFlag:
           enabled:
-            - OBJECT_NATIVE_DERIVED_ADDRESS
+            - object_native_derived_address

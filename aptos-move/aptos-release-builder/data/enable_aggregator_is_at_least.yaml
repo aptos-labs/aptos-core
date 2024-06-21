@@ -11,4 +11,4 @@ proposals:
     update_sequence:
       - FeatureFlag:
           enabled:
-            - AGGREGATOR_V2_IS_AT_LEAST_API
+            - aggregator_v2_is_at_least_api
