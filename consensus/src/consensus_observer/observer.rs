@@ -383,6 +383,26 @@ impl ConsensusObserver {
         );
     }
 
+    /// Finalizes the ordered block by sending it to the execution pipeline
+    async fn finalize_ordered_block(
+        &mut self,
+        blocks: &[Arc<PipelinedBlock>],
+        ordered_proof: LedgerInfoWithSignatures,
+    ) {
+        if let Err(error) = self
+            .execution_client
+            .finalize_order(blocks, ordered_proof, self.create_commit_callback())
+            .await
+        {
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to finalize ordered block! Error: {:?}",
+                    error
+                ))
+            );
+        }
+    }
+
     /// Forwards the commit decision to the execution pipeline
     fn forward_commit_decision(&self, decision: CommitDecision) {
         // Create a dummy RPC message
@@ -394,9 +414,17 @@ impl ConsensusObserver {
         };
 
         // Send the message to the execution client
-        self.execution_client
+        if let Err(error) = self
+            .execution_client
             .send_commit_msg(AccountAddress::ONE, commit_request)
-            .unwrap()
+        {
+            error!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to send commit decision to the execution pipeline! Error: {:?}",
+                    error
+                ))
+            )
+        };
     }
 
     /// Returns the last known block
@@ -655,10 +683,9 @@ impl ConsensusObserver {
                         ordered_proof.commit_info()
                     ))
                 );
-                self.execution_client
-                    .finalize_order(&blocks, ordered_proof, self.create_commit_callback())
-                    .await
-                    .unwrap();
+
+                // Finalize the ordered block
+                self.finalize_ordered_block(&blocks, ordered_proof).await;
             }
         } else {
             warn!(
@@ -741,14 +768,7 @@ impl ConsensusObserver {
             } = ordered_block;
 
             // Finalize the ordered block
-            self.execution_client
-                .finalize_order(
-                    &blocks,
-                    ordered_proof.clone(),
-                    self.create_commit_callback(),
-                )
-                .await
-                .unwrap();
+            self.finalize_ordered_block(&blocks, ordered_proof).await;
 
             // If a commit decision is available, forward it to the execution pipeline
             if let Some(commit_decision) = commit_decision {
@@ -1144,14 +1164,29 @@ fn sync_to_commit_decision(
     let (abort_handle, abort_registration) = AbortHandle::new_pair();
     tokio::spawn(Abortable::new(
         async move {
-            execution_client
+            // Sync to the commit decision
+            if let Err(error) = execution_client
                 .clone()
                 .sync_to(commit_decision.ledger_info().clone())
                 .await
-                .unwrap(); // todo: handle error
-            sync_notification_sender
-                .send((decision_epoch, decision_round))
-                .unwrap();
+            {
+                warn!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Failed to sync to commit decision: {:?}! Error: {:?}",
+                        commit_decision, error
+                    ))
+                );
+            }
+
+            // Notify the consensus observer that the sync is complete
+            if let Err(error) = sync_notification_sender.send((decision_epoch, decision_round)) {
+                error!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Failed to send sync notification for decision epoch: {:?}, round: {:?}! Error: {:?}",
+                        decision_epoch, decision_round, error
+                    ))
+                );
+            }
         },
         abort_registration,
     ));
