@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::test::CliTestFramework;
+use aptos::{common::types::GasOptions, test::CliTestFramework};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -16,7 +16,7 @@ use aptos_types::{
     jwks::{
         jwk::{JWKMoveStruct, JWK},
         rsa::RSA_JWK,
-        AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
+        secure_test_rsa_jwk, AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
     },
     keyless::{
         get_public_inputs_hash,
@@ -156,7 +156,7 @@ async fn test_keyless_secure_test_jwk_initialized_at_genesis() {
         entries: vec![ProviderJWKs {
             issuer: iss.into_bytes(),
             version: 0,
-            jwks: vec![JWKMoveStruct::from(RSA_JWK::secure_test_jwk())],
+            jwks: vec![secure_test_rsa_jwk().into()],
         }],
     };
     assert_eq!(expected_providers_jwks, patched_jwks.jwks);
@@ -495,7 +495,15 @@ fun main(core_resources: &signer) {{
 "#,
         KEYLESS_ACCOUNT_MODULE_NAME, KEYLESS_ACCOUNT_MODULE_NAME
     );
-    let txn_summary = cli.run_script(root_idx, &script).await.unwrap();
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(2000000),
+        expiration_secs: 60,
+    };
+    let txn_summary = cli
+        .run_script_with_gas_options(root_idx, &script, Some(gas_options))
+        .await
+        .unwrap();
     debug!("txn_summary={:?}", txn_summary);
 
     // Increment sequence number as we ran a governance proposal
@@ -596,7 +604,15 @@ fun main(core_resources: &signer) {{
         hex::encode(training_wheels_pk.to_bytes())
     );
 
-    let txn_summary = cli.run_script(root_idx, &script).await.unwrap();
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(2000000),
+        expiration_secs: 60,
+    };
+    let txn_summary = cli
+        .run_script_with_gas_options(root_idx, &script, Some(gas_options))
+        .await
+        .unwrap();
     debug!("txn_summary={:?}", txn_summary);
 
     info!("Use resource API to check the patch result.");
@@ -680,7 +696,15 @@ script {{
     )
     .await;
 
-    let txn_summary = cli.run_script(root_idx, &script).await.unwrap();
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(2000000),
+        expiration_secs: 60,
+    };
+    let txn_summary = cli
+        .run_script_with_gas_options(root_idx, &script, Some(gas_options))
+        .await
+        .unwrap();
     debug!("txn_summary={:?}", txn_summary);
 
     // Increment sequence number as we ran a governance proposal

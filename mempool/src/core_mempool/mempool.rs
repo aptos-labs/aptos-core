@@ -459,15 +459,13 @@ impl Mempool {
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
+        before: Option<Instant>,
     ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
-        self.transactions.read_timeline(timeline_id, count)
+        self.transactions.read_timeline(timeline_id, count, before)
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive).
-    pub(crate) fn timeline_range(
-        &self,
-        start_end_pairs: &Vec<(u64, u64)>,
-    ) -> Vec<SignedTransaction> {
+    pub(crate) fn timeline_range(&self, start_end_pairs: &[(u64, u64)]) -> Vec<SignedTransaction> {
         self.transactions.timeline_range(start_end_pairs)
     }
 

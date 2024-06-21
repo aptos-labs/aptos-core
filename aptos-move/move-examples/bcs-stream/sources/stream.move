@@ -243,6 +243,15 @@ module bcs_stream::bcs_stream {
         res
     }
 
+    /// Deserializes a `u256` value from the stream.
+    public entry fun deserialize_u256_entry(data: vector<u8>, cursor: u64) {
+        let stream = BCSStream {
+            data: data,
+            cur: cursor,
+        };
+        deserialize_u256(&mut stream);
+    }
+
     /// Deserializes an array of BCS deserializable elements from the stream.
     /// First, reads the length of the vector, which is in uleb128 format.
     /// After determining the length, it then reads the contents of the vector.

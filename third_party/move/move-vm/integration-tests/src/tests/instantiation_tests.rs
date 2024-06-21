@@ -4,9 +4,8 @@
 use move_binary_format::file_format::{
     AbilitySet, AddressIdentifierIndex, Bytecode::*, CodeUnit, CompiledModule, FieldDefinition,
     FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
-    ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, SignatureToken::*,
-    StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter,
-    TypeSignature,
+    ModuleHandleIndex, Signature, SignatureIndex, SignatureToken::*, StructDefinition,
+    StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter, TypeSignature,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -15,14 +14,18 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
-use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    move_vm::MoveVM,
+};
+use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::gas::UnmeteredGasMeter;
 
 #[test]
 fn instantiation_err() {
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
 
-    let mut big_ty = SignatureToken::TypeParameter(0);
+    let mut big_ty = TypeParameter(0);
 
     const N: usize = 7;
     for _ in 0..2 {
@@ -109,7 +112,7 @@ fn instantiation_err() {
     let traversal_storage = TraversalStorage::new();
 
     session
-        .publish_module(mod_bytes, addr, &mut GasStatus::new_unmetered())
+        .publish_module(mod_bytes, addr, &mut UnmeteredGasMeter)
         .expect("Module must publish");
 
     let mut ty_arg = TypeTag::U128;
@@ -119,16 +122,18 @@ fn instantiation_err() {
             address: addr,
             module: Identifier::new("m").unwrap(),
             name: Identifier::new("s").unwrap(),
-            type_params: vec![ty_arg; N],
+            type_args: vec![ty_arg; N],
         }));
     }
 
+    let res = session.load_function(&cm.self_id(), ident_str!("f"), &[ty_arg]);
+    assert!(res.is_ok());
+    let function = res.unwrap();
+
     let err = session.execute_entry_function(
-        &cm.self_id(),
-        ident_str!("f"),
-        vec![ty_arg],
+        function,
         Vec::<Vec<u8>>::new(),
-        &mut GasStatus::new_unmetered(),
+        &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
     );
     assert!(err.is_err(), "Instantiation must fail at runtime");

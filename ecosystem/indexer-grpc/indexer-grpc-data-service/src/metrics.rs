@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_gauge_vec, register_histogram_vec, register_int_counter_vec, register_int_gauge_vec,
-    GaugeVec, HistogramVec, IntCounterVec, IntGaugeVec,
+    register_gauge_vec, register_int_counter_vec, register_int_gauge_vec, GaugeVec, IntCounterVec,
+    IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -11,21 +11,33 @@ use once_cell::sync::Lazy;
 // application ID, a globally unique ID.
 
 /// Latest processed transaction version.
-pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static LATEST_PROCESSED_VERSION_PER_PROCESSOR: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "indexer_grpc_data_service_with_user_latest_processed_version",
         "Latest processed transaction version",
-        &["identifier", "processor"],
+        &[
+            "identifier_type",
+            "identifier",
+            "email",
+            "application_name",
+            "processor"
+        ],
     )
     .unwrap()
 });
 
 /// Number of transactions that served by data service.
-pub static PROCESSED_VERSIONS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static PROCESSED_VERSIONS_COUNT_PER_PROCESSOR: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "indexer_grpc_data_service_with_user_processed_versions",
         "Number of transactions that have been processed by data service",
-        &["identifier", "processor"],
+        &[
+            "identifier_type",
+            "identifier",
+            "email",
+            "application_name",
+            "processor"
+        ],
     )
     .unwrap()
 });
@@ -41,31 +53,17 @@ pub static ERROR_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 });
 
 /// Data latency for data service based on latest processed transaction based on selected processor.
-pub static PROCESSED_LATENCY_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+pub static PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(
         "indexer_grpc_data_service_with_user_latest_data_latency_in_secs",
         "Latency of data service based on latest processed transaction",
-        &["identifier", "processor"],
-    )
-    .unwrap()
-});
-
-/// Data latency for data service based on latest processed transaction for all processors.
-pub static PROCESSED_LATENCY_IN_SECS_ALL: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "indexer_grpc_data_service_latest_data_latency_in_secs_all",
-        "Latency of data service based on latest processed transaction",
-        &[]
-    )
-    .unwrap()
-});
-
-/// Number of transactions in each batch that data service has processed.
-pub static PROCESSED_BATCH_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "indexer_grpc_data_service_with_user_processed_batch_size",
-        "Size of latest processed batch by data service",
-        &["identifier", "processor"],
+        &[
+            "identifier_type",
+            "identifier",
+            "email",
+            "application_name",
+            "processor"
+        ],
     )
     .unwrap()
 });
@@ -75,7 +73,13 @@ pub static CONNECTION_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "indexer_grpc_data_service_connection_count_v2",
         "Count of connections that data service has established",
-        &["identifier", "processor"],
+        &[
+            "identifier_type",
+            "identifier",
+            "email",
+            "application_name",
+            "processor"
+        ],
     )
     .unwrap()
 });
@@ -85,7 +89,13 @@ pub static SHORT_CONNECTION_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "indexer_grpc_data_service_short_connection_by_user_processor_count",
         "Count of the short connections; i.e., < 10 seconds",
-        &["identifier", "processor"],
+        &[
+            "identifier_type",
+            "identifier",
+            "email",
+            "application_name",
+            "processor"
+        ],
     )
     .unwrap()
 });
@@ -96,7 +106,13 @@ pub static BYTES_READY_TO_TRANSFER_FROM_SERVER: Lazy<IntCounterVec> = Lazy::new(
     register_int_counter_vec!(
         "indexer_grpc_data_service_bytes_ready_to_transfer_from_server",
         "Count of bytes ready to transfer to the client",
-        &["identifier", "processor"],
+        &[
+            "identifier_type",
+            "identifier",
+            "email",
+            "application_name",
+            "processor"
+        ],
     )
     .unwrap()
 });

@@ -71,7 +71,7 @@ impl<T: Default> MapByKeyId<T> {
 }
 
 impl ConflictKeyRegistry {
-    pub fn build<K: ConflictKey<Txn>, Txn>(txns: &[Txn]) -> Self
+    pub fn build<K, Txn>(txns: &[Txn]) -> Self
     where
         K: ConflictKey<Txn>,
     {

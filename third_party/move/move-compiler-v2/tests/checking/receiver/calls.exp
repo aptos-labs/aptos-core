@@ -3,6 +3,9 @@ module 0x42::m {
     struct S {
         x: u64,
     }
+    private inline fun inline_receiver_ref_mut(self: &mut m::S,y: u64): u64 {
+        Add<u64>(select m::S.x<&mut m::S>(self), y)
+    }
     private fun receiver(self: m::S,y: u64): u64 {
         Add<u64>(select m::S.x<m::S>(self), y)
     }

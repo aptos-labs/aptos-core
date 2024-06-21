@@ -34,12 +34,12 @@ use aptos_types::{
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
-        RawTransactionWithData, SignedTransaction, TransactionPayload, TransactionStatus,
+        RawTransactionWithData, SignedTransaction, TransactionPayload,
     },
     vm_status::StatusCode,
     APTOS_COIN_TYPE,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM, AptosVM};
+use aptos_vm::{AptosSimulationVM, AptosVM};
 use move_core_types::{ident_str, language_storage::ModuleId, vm_status::VMStatus};
 use poem_openapi::{
     param::{Path, Query},
@@ -891,15 +891,14 @@ impl TransactionsApi {
         match accept_type {
             AcceptType::Json => {
                 let state_view = self.context.latest_state_view_poem(ledger_info)?;
-                let resolver = state_view.as_move_resolver();
                 let transaction = match transaction_data {
                     TransactionData::OnChain(txn) => {
                         let timestamp =
                             self.context.get_block_timestamp(ledger_info, txn.version)?;
-                        resolver
+                        state_view
                             .as_converter(
                                 self.context.db.clone(),
-                                self.context.table_info_reader.clone(),
+                                self.context.indexer_reader.clone(),
                             )
                             .try_into_onchain_transaction(timestamp, txn)
                             .context("Failed to convert on chain transaction to Transaction")
@@ -911,11 +910,8 @@ impl TransactionsApi {
                                 )
                             })?
                     },
-                    TransactionData::Pending(txn) => resolver
-                        .as_converter(
-                            self.context.db.clone(),
-                            self.context.table_info_reader.clone(),
-                        )
+                    TransactionData::Pending(txn) => state_view
+                        .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
                         .try_into_pending_transaction(*txn)
                         .context("Failed to convert on pending transaction to Transaction")
                         .map_err(|err| {
@@ -1093,11 +1089,7 @@ impl TransactionsApi {
             SubmitTransactionPost::Json(data) => self
                 .context
                 .latest_state_view_poem(ledger_info)?
-                .as_move_resolver()
-                .as_converter(
-                    self.context.db.clone(),
-                    self.context.table_info_reader.clone(),
-                )
+                .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
                 .try_into_signed_transaction_poem(data.0, self.context.chain_id())
                 .context("Failed to create SignedTransaction from SubmitTransactionRequest")
                 .map_err(|err| {
@@ -1174,9 +1166,8 @@ impl TransactionsApi {
                 .into_iter()
                 .enumerate()
                 .map(|(index, txn)| {
-                    self.context
-                        .latest_state_view_poem(ledger_info)?.as_move_resolver()
-                        .as_converter(self.context.db.clone(), self.context.table_info_reader.clone())
+                    self.context.latest_state_view_poem(ledger_info)?
+                        .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
                         .try_into_signed_transaction_poem(txn, self.context.chain_id())
                         .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
                         .map_err(|err| {
@@ -1264,11 +1255,10 @@ impl TransactionsApi {
                                 ledger_info,
                             )
                         })?;
-                    let resolver = state_view.as_move_resolver();
 
                     // We provide the pending transaction so that users have the hash associated
-                    let pending_txn = resolver
-                            .as_converter(self.context.db.clone(), self.context.table_info_reader.clone())
+                    let pending_txn = state_view
+                            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
                             .try_into_pending_transaction_poem(txn)
                             .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
                             .map_err(|err| SubmitTransactionError::internal_with_code(
@@ -1380,11 +1370,7 @@ impl TransactionsApi {
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
-        let exe_status = match output.status().clone() {
-            TransactionStatus::Keep(exec_status) => exec_status,
-            TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
-            _ => ExecutionStatus::MiscellaneousError(None),
-        };
+        let exe_status = ExecutionStatus::convert_vm_status_for_simulation(vm_status.clone());
 
         let stats_key = match txn.payload() {
             TransactionPayload::Script(_) => {
@@ -1435,7 +1421,7 @@ impl TransactionsApi {
             changes: output.write_set().clone(),
         };
 
-        match accept_type {
+        let result = match accept_type {
             AcceptType::Json => {
                 let transactions = self
                     .context
@@ -1481,7 +1467,9 @@ impl TransactionsApi {
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((simulated_txn, &ledger_info, BasicResponseStatus::Ok))
             },
-        }
+        };
+
+        result.map(|r| r.with_gas_used(Some(output.gas_used())))
     }
 
     /// Encode message as BCS
@@ -1500,12 +1488,8 @@ impl TransactionsApi {
 
         let ledger_info = self.context.get_latest_ledger_info()?;
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let raw_txn: RawTransaction = resolver
-            .as_converter(
-                self.context.db.clone(),
-                self.context.table_info_reader.clone(),
-            )
+        let raw_txn: RawTransaction = state_view
+            .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")
             .map_err(|err| {
@@ -1564,7 +1548,7 @@ fn override_gas_parameters(
     );
 
     // TODO: Check that signature is null, this would just be helpful for downstream use
-    SignedTransaction::new_with_authenticator(raw_txn, signed_txn.authenticator())
+    SignedTransaction::new_signed_transaction(raw_txn, signed_txn.authenticator())
 }
 
 enum GetByVersionResponse {

@@ -14,8 +14,7 @@ use aptos_crypto::{
 };
 use aptos_framework::{ReleaseBundle, ReleasePackage};
 use aptos_gas_schedule::{
-    AptosGasParameters, InitialGasSchedule, MiscGasParameters, NativeGasParameters,
-    ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
+    AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
@@ -23,7 +22,7 @@ use aptos_types::{
     contract_event::{ContractEvent, ContractEventV1},
     jwks::{
         patch::{PatchJWKMoveStruct, PatchUpsertJWK},
-        rsa::RSA_JWK,
+        secure_test_rsa_jwk,
     },
     keyless::{
         self, test_utils::get_sample_iss, Groth16VerificationKey, DEVNET_VERIFICATION_KEY,
@@ -31,10 +30,10 @@ use aptos_types::{
     },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        randomness_api_v0_config::RequiredGasDeposit, FeatureFlag, Features, GasScheduleV2,
-        OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
-        OnChainRandomnessConfig, RandomnessConfigMoveStruct, TimedFeaturesBuilder,
-        APTOS_MAX_KNOWN_VERSION,
+        randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
+        FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
+        TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::TransactionWrite,
@@ -130,9 +129,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     }
     let data_cache = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        Ok(&AptosGasParameters::zeros()),
         ChainId::test().id(),
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
@@ -248,9 +246,8 @@ pub fn encode_genesis_change_set(
     }
     let data_cache = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        Ok(&AptosGasParameters::zeros()),
         ChainId::test().id(),
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
@@ -532,6 +529,7 @@ fn initialize_randomness_api_v0_config(session: &mut SessionExt) {
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
             RequiredGasDeposit::default_for_genesis().as_move_value(),
+            AllowCustomMaxGasFlag::default_for_genesis().as_move_value(),
         ]),
     );
 }
@@ -668,7 +666,7 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
 
         let patch: PatchJWKMoveStruct = PatchUpsertJWK {
             issuer: get_sample_iss(),
-            jwk: RSA_JWK::secure_test_jwk().into(),
+            jwk: secure_test_rsa_jwk().into(),
         }
         .into();
         exec_function(
@@ -1085,9 +1083,8 @@ pub fn test_genesis_module_publishing() {
     let data_cache = state_view.as_move_resolver();
 
     let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        Ok(&AptosGasParameters::zeros()),
         ChainId::test().id(),
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),

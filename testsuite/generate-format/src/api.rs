@@ -20,7 +20,10 @@ use aptos_types::{
         state_value::{PersistedStateValueMetadata, StateValueMetadata},
     },
     transaction,
-    transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator},
+    transaction::{
+        authenticator::{AccountAuthenticator, TransactionAuthenticator},
+        block_epilogue::BlockEpiloguePayload,
+    },
     validator_txn::ValidatorTransaction,
     vm_status::AbortLocation,
     write_set,
@@ -102,10 +105,12 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
     tracer.trace_type::<ValidatorTransaction>(&samples)?;
     tracer.trace_type::<BlockMetadataExt>(&samples)?;
+    tracer.trace_type::<BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
+    tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<transaction::ExecutionStatus>(&samples)?;
     tracer.trace_type::<TransactionAuthenticator>(&samples)?;

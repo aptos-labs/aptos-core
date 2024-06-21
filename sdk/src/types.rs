@@ -494,8 +494,8 @@ impl EphemeralKeyPair {
         )?;
 
         Ok(Self {
-            private_key: private_key.clone(),
-            public_key: EphemeralPublicKey::ed25519(private_key.public_key()),
+            private_key,
+            public_key: epk,
             nonce,
             expiry_date_secs,
             blinder,

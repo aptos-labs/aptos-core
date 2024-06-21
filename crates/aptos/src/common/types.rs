@@ -53,6 +53,7 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_package::source_package::std_lib::StdVersion;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -1048,6 +1049,10 @@ pub struct MovePackageDir {
     #[clap(long, value_parser = crate::common::utils::parse_map::<String, AccountAddressWrapper>, default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
 
+    /// Override the standard library version by mainnet/testnet/devnet
+    #[clap(long, value_parser)]
+    pub override_std: Option<StdVersion>,
+
     /// Skip pulling the latest git dependencies
     ///
     /// If you don't have a network connection, the compiler may fail due
@@ -1088,6 +1093,7 @@ impl MovePackageDir {
             package_dir: Some(package_dir),
             output_dir: None,
             named_addresses: Default::default(),
+            override_std: None,
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
             compiler_version: None,
@@ -1335,6 +1341,18 @@ impl From<&Transaction> for TransactionSummary {
                 sequence_number: None,
             },
             Transaction::StateCheckpointTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                timestamp_us: Some(txn.timestamp.0),
+                sender: None,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sequence_number: None,
+            },
+            Transaction::BlockEpilogueTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
                 success: Some(txn.info.success),
                 version: Some(txn.info.version.0),

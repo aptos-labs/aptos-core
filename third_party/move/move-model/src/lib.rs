@@ -44,6 +44,7 @@ use move_ir_types::location::sp;
 use move_symbol_pool::Symbol as MoveSymbol;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
+    fmt::Debug,
     rc::Rc,
 };
 
@@ -75,10 +76,13 @@ pub struct PackageInfo {
     pub address_map: BTreeMap<String, NumericalAddress>,
 }
 
-/// Builds the Move model for the v2 compiler. This builds the model, compiling both code
-/// and specs from sources into typed-checked AST. No bytecode is attached to the model.
-/// This currently uses the v1 compiler as the parser (up to expansion AST), after that
-/// a new type checker.
+/// Builds the Move model for the v2 compiler. This builds the model, compiling both code and specs
+/// from sources into typed-checked AST. No bytecode is attached to the model.  This currently uses
+/// the v1 compiler as the parser (up to expansion AST), after that a new type checker.
+///
+/// Note that `source` and  `source_deps` are either Move files or package subdirectories which
+/// contain Move files, all of which should be compiled (not the root of a package, but the
+/// `sources`, `scripts`, and/or `tests`, depending on compilation mode.
 pub fn run_model_builder_in_compiler_mode(
     source: PackageInfo,
     source_deps: PackageInfo,
@@ -107,7 +111,9 @@ pub fn run_model_builder_in_compiler_mode(
         },
         Flags::model_compilation()
             .set_skip_attribute_checks(skip_attribute_checks)
-            .set_keep_testing_functions(compile_test_code),
+            .set_keep_testing_functions(compile_test_code)
+            .set_lang_v2(language_version != LanguageVersion::V1)
+            .set_compiler_v2(true),
         known_attributes,
     )
 }
@@ -117,8 +123,8 @@ pub fn run_model_builder_in_compiler_mode(
 
 /// Build the move model with default compilation flags and custom options.
 pub fn run_model_builder_with_options<
-    Paths: Into<MoveSymbol> + Clone,
-    NamedAddress: Into<MoveSymbol> + Clone,
+    Paths: Into<MoveSymbol> + Clone + Debug,
+    NamedAddress: Into<MoveSymbol> + Clone + Debug,
 >(
     move_sources: Vec<PackagePaths<Paths, NamedAddress>>,
     move_deps: Vec<PackagePaths<Paths, NamedAddress>>,
@@ -141,8 +147,8 @@ pub fn run_model_builder_with_options<
 
 /// Build the move model with custom compilation flags and custom options
 pub fn run_model_builder_with_options_and_compilation_flags<
-    Paths: Into<MoveSymbol> + Clone,
-    NamedAddress: Into<MoveSymbol> + Clone,
+    Paths: Into<MoveSymbol> + Clone + Debug,
+    NamedAddress: Into<MoveSymbol> + Clone + Debug,
 >(
     move_sources_targets: Vec<PackagePaths<Paths, NamedAddress>>,
     move_sources_deps: Vec<PackagePaths<Paths, NamedAddress>>,
@@ -170,6 +176,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
                 .to_owned()
         })
         .collect();
+
     // Step 1: parse the program to get comments and a separation of targets and dependencies.
     let (files, comments_and_compiler_res) =
         Compiler::from_package_paths(move_sources, deps, flags, known_attributes)
@@ -725,7 +732,7 @@ fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut 
                 // Convert the script into a module.
                 let address = E::Address::Numerical(
                     None,
-                    sp(expanded_script.loc, NumericalAddress::DEFAULT_ERROR_ADDRESS),
+                    sp(expanded_script.loc, NumericalAddress::MAX_ADDRESS),
                 );
                 let ident = sp(
                     expanded_script.loc,
@@ -1024,7 +1031,7 @@ fn downgrade_type_inlining_to_expansion(ty: &N::Type) -> E::Type {
                     E::Type_::Apply(sp(ty.loc, access), rewritten_args)
                 },
                 N::TypeName_::ModuleType(module_ident, struct_name) => {
-                    let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0);
+                    let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0, None);
                     E::Type_::Apply(sp(struct_name.loc(), access), rewritten_args)
                 },
                 N::TypeName_::Multiple(size) => {
@@ -1056,7 +1063,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
         UnannotatedExp_::Constant(module_ident_opt, name) => {
             let access = match module_ident_opt {
                 None => E::ModuleAccess_::Name(name.0),
-                Some(module_ident) => E::ModuleAccess_::ModuleAccess(*module_ident, name.0),
+                Some(module_ident) => E::ModuleAccess_::ModuleAccess(*module_ident, name.0, None),
             };
             Exp_::Name(sp(name.loc(), access), None)
         },
@@ -1071,7 +1078,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
                 parameter_types: _,
                 acquires: _,
             } = call.as_ref();
-            let access = E::ModuleAccess_::ModuleAccess(*module, name.0);
+            let access = E::ModuleAccess_::ModuleAccess(*module, name.0, None);
             let rewritten_arguments = match downgrade_exp_inlining_to_expansion(arguments).value {
                 Exp_::Unit { .. } => vec![],
                 Exp_::ExpList(exps) => exps,
@@ -1187,7 +1194,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
         ),
 
         UnannotatedExp_::Pack(module_ident, struct_name, ty_args, fields) => {
-            let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0);
+            let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0, None);
             let rewritten_ty_args = ty_args
                 .iter()
                 .map(downgrade_type_inlining_to_expansion)
@@ -1278,7 +1285,7 @@ fn downgrade_lvalue_inlining_to_expansion(val: &T::LValue) -> E::LValue {
         },
         T::LValue_::Unpack(module_ident, struct_name, ty_args, fields)
         | T::LValue_::BorrowUnpack(_, module_ident, struct_name, ty_args, fields) => {
-            let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0);
+            let access = E::ModuleAccess_::ModuleAccess(*module_ident, struct_name.0, None);
             let rewritten_ty_args: Vec<_> = ty_args
                 .iter()
                 .map(downgrade_type_inlining_to_expansion)

@@ -4,7 +4,7 @@
 
 use anyhow::format_err;
 use aptos_crypto::HashValue;
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
@@ -111,9 +111,8 @@ where
 {
     let resolver = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
-        NativeGasParameters::zeros(),
-        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        Ok(&AptosGasParameters::zeros()),
         chain_id,
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),

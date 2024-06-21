@@ -19,6 +19,25 @@ module 0xc0ffee::m {
           i
         }
     }
+    private inline fun foo(): u64 {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, 10) {
+              i: u64 = Add<u64>(i, 1);
+              if Eq<u64>(i, 5) {
+                break;
+                Tuple()
+              } else {
+                Tuple()
+              }
+            } else {
+              break
+            }
+          };
+          i
+        }
+    }
 } // end 0xc0ffee::m
 
 

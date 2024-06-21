@@ -708,7 +708,7 @@ impl<'a> FunctionGenerator<'a> {
             U256(n) => self.emit(FF::Bytecode::LdU256(
                 move_core_types::u256::U256::from_le_bytes(&n.to_le_bytes()),
             )),
-            Vector(vec) if Self::vector_is_empty_or_contains_empty_vector(vec) => {
+            Vector(vec) if vec.is_empty() => {
                 self.gen_vector_load_push(ctx, vec, dest_type);
             },
             _ => {
@@ -720,20 +720,7 @@ impl<'a> FunctionGenerator<'a> {
         }
     }
 
-    fn vector_is_empty_or_contains_empty_vector(cons: &Vec<Constant>) -> bool {
-        cons.is_empty()
-            || cons.iter().any(|cons| match cons {
-                Constant::Vector(vec) => Self::vector_is_empty_or_contains_empty_vector(vec),
-                _ => false,
-            })
-    }
-
-    fn gen_vector_load_push(
-        &mut self,
-        ctx: &BytecodeContext,
-        vec: &Vec<Constant>,
-        vec_type: &Type,
-    ) {
+    fn gen_vector_load_push(&mut self, ctx: &BytecodeContext, vec: &[Constant], vec_type: &Type) {
         let fun_ctx = ctx.fun_ctx;
         let elem_type = if let Type::Vector(el) = vec_type {
             el.as_ref().clone()

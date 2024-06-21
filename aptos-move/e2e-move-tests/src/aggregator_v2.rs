@@ -129,7 +129,7 @@ impl ElementType {
                 address: AccountAddress::ONE,
                 module: ident_str!("string").to_owned(),
                 name: ident_str!("String").to_owned(),
-                type_params: vec![],
+                type_args: vec![],
             })),
         }
     }
@@ -369,6 +369,19 @@ impl AggV2TestHarness {
 
     pub fn add_sub(&mut self, agg_loc: &AggregatorLocation, a: u128, b: u128) -> SignedTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::add_sub", agg_loc, &[a, b])
+    }
+
+    pub fn add_if_at_least(
+        &mut self,
+        agg_loc: &AggregatorLocation,
+        min_value: u128,
+        delta: u128,
+    ) -> SignedTransaction {
+        self.create_entry_agg_func_with_args(
+            "0x1::aggregator_v2_test::add_if_at_least",
+            agg_loc,
+            &[min_value, delta],
+        )
     }
 
     pub fn add_delete(&mut self, agg_loc: &AggregatorLocation, value: u128) -> SignedTransaction {

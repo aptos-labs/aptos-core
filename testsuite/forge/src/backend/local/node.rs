@@ -121,7 +121,6 @@ impl LocalNode {
         // Ensure log file exists
         let log_file = OpenOptions::new()
             .create(true)
-            .write(true)
             .append(true)
             .open(self.log_path())?;
 
@@ -366,6 +365,10 @@ impl Node for LocalNode {
     // local node does not need to expose metric end point
     fn expose_metric(&self) -> Result<u64> {
         Ok(0)
+    }
+
+    fn service_name(&self) -> Option<String> {
+        None
     }
 }
 

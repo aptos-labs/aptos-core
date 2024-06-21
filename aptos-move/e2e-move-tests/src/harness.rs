@@ -194,11 +194,12 @@ impl MoveHarness {
 
     /// Runs a signed transaction. On success, applies the write set.
     pub fn run_raw(&mut self, txn: SignedTransaction) -> TransactionOutput {
-        let output = self.executor.execute_transaction(txn);
+        let mut output = self.executor.execute_transaction(txn);
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
             self.executor.append_events(output.events().to_vec());
         }
+        output.fill_error_status();
         output
     }
 
@@ -236,11 +237,12 @@ impl MoveHarness {
         &mut self,
         txn_block: Vec<SignedTransaction>,
     ) -> Vec<TransactionOutput> {
-        let result = assert_ok!(self.executor.execute_block(txn_block));
-        for output in &result {
+        let mut result = assert_ok!(self.executor.execute_block(txn_block));
+        for output in &mut result {
             if matches!(output.status(), TransactionStatus::Keep(_)) {
                 self.executor.apply_write_set(output.write_set());
             }
+            output.fill_error_status();
         }
         result
     }
@@ -906,7 +908,7 @@ impl MoveHarness {
         let gas_schedule: GasScheduleV2 = self.get_gas_schedule();
         let feature_version = gas_schedule.feature_version;
         let params = AptosGasParameters::from_on_chain_gas_schedule(
-            &gas_schedule.to_btree_map(),
+            &gas_schedule.into_btree_map(),
             feature_version,
         )
         .unwrap();
@@ -967,7 +969,11 @@ impl MoveHarness {
                 offset,
                 txns.len()
             );
-            let outputs = harness.run_block_get_output(txns);
+            let mut outputs = harness.run_block_get_output(txns);
+            let _ = outputs
+                .iter_mut()
+                .map(|t| t.fill_error_status())
+                .collect::<Vec<_>>();
             for (idx, (error, output)) in errors.into_iter().zip(outputs.iter()).enumerate() {
                 if error == SUCCESS {
                     assert_success!(

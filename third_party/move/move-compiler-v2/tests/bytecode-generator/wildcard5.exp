@@ -8,7 +8,7 @@ module 0xc0ffee::m {
         {
           let s: m::S = pack m::S(3, 4);
           {
-            let m::S{ x: _, y: _ }: m::S = s;
+            let m::S{ x: _, y: _ } = s;
             Tuple()
           }
         }
