@@ -13,8 +13,9 @@ use aptos_protos::{
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
+use aptos_transaction_filter::BooleanTransactionFilter;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 use tonic::{codec::CompressionEncoding, transport::Server};
 
 pub const SERVER_NAME: &str = "idxdatasvc";
@@ -69,9 +70,18 @@ pub struct IndexerGrpcDataServiceConfig {
     pub enable_cache_compression: bool,
     #[serde(default)]
     pub in_memory_cache_config: InMemoryCacheConfig,
-    /// Sender addresses to ignore. Transactions from these addresses will not be indexed.
-    #[serde(default = "IndexerGrpcDataServiceConfig::default_sender_addresses_to_ignore")]
-    pub sender_addresses_to_ignore: Vec<String>,
+    /// Any transaction that matches this filter will be stripped. This means we remove
+    /// the payload, signature, events, and writesets from it before sending it
+    /// downstream. This should only be used in an emergency situation, e.g. when txns
+    /// related to a certain module are too large and are causing issues for the data
+    /// service. Learn more here:
+    ///
+    /// https://www.notion.so/aptoslabs/Runbook-c006a37259394ac2ba904d6b54d180fa?pvs=4#171c210964ec42a89574fc80154f9e85
+    ///
+    /// Generally you will want to start with this with an OR, and then list out
+    /// separate filters that describe each type of txn we want to strip.
+    #[serde(default = "IndexerGrpcDataServiceConfig::default_txns_to_strip_filter")]
+    pub txns_to_strip_filter: BooleanTransactionFilter,
 }
 
 impl IndexerGrpcDataServiceConfig {
@@ -84,7 +94,7 @@ impl IndexerGrpcDataServiceConfig {
         redis_read_replica_address: RedisUrl,
         enable_cache_compression: bool,
         in_memory_cache_config: InMemoryCacheConfig,
-        sender_addresses_to_ignore: Vec<String>,
+        txns_to_strip_filter: BooleanTransactionFilter,
     ) -> Self {
         Self {
             data_service_grpc_tls_config,
@@ -97,7 +107,7 @@ impl IndexerGrpcDataServiceConfig {
             redis_read_replica_address,
             enable_cache_compression,
             in_memory_cache_config,
-            sender_addresses_to_ignore,
+            txns_to_strip_filter,
         }
     }
 
@@ -109,8 +119,9 @@ impl IndexerGrpcDataServiceConfig {
         false
     }
 
-    pub const fn default_sender_addresses_to_ignore() -> Vec<String> {
-        vec![]
+    pub fn default_txns_to_strip_filter() -> BooleanTransactionFilter {
+        // This filter matches no txns.
+        BooleanTransactionFilter::new_or(vec![])
     }
 }
 
@@ -170,10 +181,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             self.redis_read_replica_address.clone(),
             self.file_store_config.clone(),
             self.data_service_response_channel_size,
-            self.sender_addresses_to_ignore
-                .clone()
-                .into_iter()
-                .collect::<HashSet<_>>(),
+            self.txns_to_strip_filter.clone(),
             cache_storage_format,
             Arc::new(in_memory_cache),
         )?;
