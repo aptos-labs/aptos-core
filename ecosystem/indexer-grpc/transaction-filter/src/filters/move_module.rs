@@ -9,6 +9,17 @@ use anyhow::anyhow;
 use aptos_protos::transaction::v1::MoveStructTag;
 use serde::{Deserialize, Serialize};
 
+/// Example:
+/// ```
+/// use aptos_transaction_filter::MoveStructTagFilterBuilder;
+///
+/// let filter = MoveStructTagFilterBuilder::default()
+///   .address("0x0000000000000000000000000000000000000000000000000000000000000004")
+///   .module("aptos_token")
+///   .name("Token")
+///   .build()
+///   .unwrap();
+/// ```
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 #[derive(derive_builder::Builder)]

@@ -9,6 +9,21 @@ use anyhow::Error;
 use aptos_protos::transaction::v1::{move_type::Content, Event};
 use serde::{Deserialize, Serialize};
 
+/// Example:
+/// ```
+/// use aptos_transaction_filter::{EventFilterBuilder, MoveStructTagFilterBuilder};
+///
+/// let move_struct_tag_filter = MoveStructTagFilterBuilder::default()
+///   .address("0x0077")
+///   .module("roulette")
+///   .name("spin")
+///   .build()
+///   .unwrap();
+/// let filter = EventFilterBuilder::default()
+///   .struct_type(move_struct_tag_filter)
+///   .build()
+///   .unwrap();
+/// ```
 #[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 #[derive(derive_builder::Builder)]

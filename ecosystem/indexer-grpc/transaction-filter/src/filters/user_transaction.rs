@@ -14,6 +14,14 @@ use serde::{Deserialize, Serialize};
 
 /// We use this for UserTransactions.
 /// We support UserPayload and MultisigPayload
+///
+/// Example:
+/// ```
+/// use aptos_transaction_filter::UserTransactionFilterBuilder;
+///
+/// let address = "0x806b27f3d7824a1d78c4291b6d0371aa693437f9eb3393c6440519c0ffaa627f";
+/// let filter = UserTransactionFilterBuilder::default().sender(address).build().unwrap();
+/// ```
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 #[derive(derive_builder::Builder)]
@@ -72,6 +80,17 @@ impl Filterable<Transaction> for UserTransactionFilter {
     }
 }
 
+/// Example:
+/// ```
+/// use aptos_transaction_filter::EntryFunctionFilterBuilder;
+///
+/// let filter = EntryFunctionFilterBuilder::default()
+///   .address("0x0000000000000000000000000000000000000000000000000000000000000001")
+///   .module("coin")
+///   .function("transfer")
+///   .build()
+///   .unwrap();
+/// ```
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 #[derive(derive_builder::Builder)]
@@ -116,6 +135,21 @@ impl Filterable<EntryFunctionId> for EntryFunctionFilter {
     }
 }
 
+/// Example:
+/// ```
+/// use aptos_transaction_filter::{EntryFunctionFilterBuilder, UserTransactionPayloadFilterBuilder};
+///
+/// let entry_function_filter = EntryFunctionFilterBuilder::default()
+///   .address("0x0000000000000000000000000000000000000000000000000000000000000001")
+///   .module("coin")
+///   .function("transfer")
+///   .build()
+///   .unwrap();
+/// let filter = UserTransactionPayloadFilterBuilder::default()
+///   .function(entry_function_filter)
+///   .build()
+///   .unwrap();
+/// ```
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 #[derive(derive_builder::Builder)]

@@ -292,12 +292,15 @@ mod test {
     use crate::{
         filters::{
             event::EventFilterBuilder, move_module::MoveStructTagFilterBuilder,
-            user_transaction::EntryFunctionFilter, TransactionRootFilterBuilder,
-            UserTransactionFilterBuilder, UserTransactionPayloadFilterBuilder,
+            /*user_transaction::EntryFunctionFilter,*/ TransactionRootFilterBuilder,
+            UserTransactionFilterBuilder, /*UserTransactionPayloadFilterBuilder,*/
         },
-        test_lib::load_graffio_fixture,
+        /*test_lib::load_graffio_fixture,*/
     };
 
+    // Disabled for now while we investigate an issue with lz4 in aptos-core:
+    // https://aptos-org.slack.com/archives/C04PF1X2UKY/p1718995777239809?thread_ts=1718969817.705389&cid=C04PF1X2UKY
+    /*
     #[test]
     pub fn test_query_parsing() {
         let trf = TransactionRootFilter {
@@ -338,7 +341,7 @@ mod test {
         let query = trf_or_utf.and(ef);
 
         println!(
-            "JSON RESULT: \n {}",
+            "JSON RESULT (QUERY 1):\n {}",
             serde_json::to_string_pretty(&query).unwrap()
         );
 
@@ -383,10 +386,11 @@ mod test {
 
         let query = BooleanTransactionFilter::from(ef_econia).or(ef_aries);
         println!(
-            "JSON RESULT: \n {}",
+            "JSON RESULT (QUERY 2):\n {}",
             serde_json::to_string_pretty(&query).unwrap()
         );
     }
+    */
 
     #[test]
     fn test_serialization() {
