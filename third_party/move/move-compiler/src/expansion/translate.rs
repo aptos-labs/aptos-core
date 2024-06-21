@@ -2301,7 +2301,8 @@ fn name_access_chain(
         },
         (_, PN::Two(sp!(_, LN::Name(n1)), n2)) => {
             if let Some((mident, mem)) = context.aliases.member_alias_get(&n1).filter(|_| {
-                is_valid_struct_constant_or_schema_name(n1.value.as_str())
+                context.env.flags().lang_v2()
+                    && is_valid_struct_constant_or_schema_name(n1.value.as_str())
                     && is_valid_struct_constant_or_schema_name(n2.value.as_str())
             }) {
                 // n1 is interpreted as a type and n2 as a variant in the type
