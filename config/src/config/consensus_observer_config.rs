@@ -8,6 +8,11 @@ use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
+// Useful constants for enabling consensus observer on different node types
+const ENABLE_ON_VALIDATORS: bool = false;
+const ENABLE_ON_VALIDATOR_FULLNODES: bool = false;
+const ENABLE_ON_PUBLIC_FULLNODES: bool = false;
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConsensusObserverConfig {
@@ -23,6 +28,8 @@ pub struct ConsensusObserverConfig {
     /// Maximum timeout (in milliseconds) we'll wait for the synced version to
     /// increase before terminating the active subscription.
     pub max_synced_version_timeout_ms: u64,
+    /// Interval (in milliseconds) to check the optimality of the subscribed peers
+    pub peer_optimality_check_interval_ms: u64,
     /// Interval (in milliseconds) to check progress of the consensus observer
     pub progress_check_interval_ms: u64,
     /// Timeout (in milliseconds) for network RPC requests
@@ -37,6 +44,7 @@ impl Default for ConsensusObserverConfig {
             max_network_channel_size: 1000,
             max_subscription_timeout_ms: 30_000,   // 30 seconds
             max_synced_version_timeout_ms: 60_000, // 60 seconds
+            peer_optimality_check_interval_ms: 300_000, // 5 minutes
             progress_check_interval_ms: 5_000,     // 5 seconds
             request_timeout_ms: 10_000,            // 10 seconds
         }
@@ -52,13 +60,49 @@ impl ConsensusObserverConfig {
 
 impl ConfigOptimizer for ConsensusObserverConfig {
     fn optimize(
-        _node_config: &mut NodeConfig,
-        _local_config_yaml: &Value,
-        _node_type: NodeType,
+        node_config: &mut NodeConfig,
+        local_config_yaml: &Value,
+        node_type: NodeType,
         _chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
-        // TODO: use me to enable consensus observer for
-        // validators and VFNs in controlled environments.
-        Ok(false)
+        let consensus_observer_config = &mut node_config.consensus_observer;
+        let local_observer_config_yaml = &local_config_yaml["consensus_observer"];
+
+        // Check if the observer configs are manually set in the local config.
+        // If they are, we don't want to override them.
+        let observer_manually_set = !local_observer_config_yaml["observer_enabled"].is_null();
+        let publisher_manually_set = !local_observer_config_yaml["publisher_enabled"].is_null();
+
+        // Enable the consensus observer and publisher based on the node type
+        let mut modified_config = false;
+        match node_type {
+            NodeType::Validator => {
+                if ENABLE_ON_VALIDATORS && !publisher_manually_set {
+                    // Only enable the publisher for validators
+                    consensus_observer_config.publisher_enabled = true;
+                    modified_config = true;
+                }
+            },
+            NodeType::ValidatorFullnode => {
+                if ENABLE_ON_VALIDATOR_FULLNODES
+                    && !observer_manually_set
+                    && !publisher_manually_set
+                {
+                    // Enable both the observer and the publisher for VFNs
+                    consensus_observer_config.observer_enabled = true;
+                    consensus_observer_config.publisher_enabled = true;
+                    modified_config = true;
+                }
+            },
+            NodeType::PublicFullnode => {
+                if ENABLE_ON_PUBLIC_FULLNODES && !observer_manually_set {
+                    // Only enable the observer for PFNs
+                    consensus_observer_config.observer_enabled = true;
+                    modified_config = true;
+                }
+            },
+        }
+
+        Ok(modified_config)
     }
 }

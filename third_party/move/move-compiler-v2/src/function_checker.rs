@@ -127,7 +127,7 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                             &struct_env.module_env,
                         );
                     },
-                    Operation::Pack(mid, sid) => {
+                    Operation::Pack(mid, sid, _) => {
                         if *mid != caller_module_id {
                             let qualified_struct_id = mid.qualified(*sid);
                             let struct_env = env.get_struct(qualified_struct_id);
@@ -147,7 +147,7 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                 | ExpData::Block(_, pat, _, _)
                 | ExpData::Lambda(_, pat, _) => {
                     pat.visit_pre_post(&mut |_, pat| {
-                        if let Pattern::Struct(id, str, _) = pat {
+                        if let Pattern::Struct(id, str, _, _) = pat {
                             let module_id = str.module_id;
                             if module_id != caller_module_id {
                                 let struct_env = env.get_struct(str.to_qualified_id());
