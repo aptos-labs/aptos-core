@@ -176,9 +176,9 @@ impl ProofCoordinator {
         signed_batch_info: &SignedBatchInfo,
     ) -> Result<(), SignedBatchInfoError> {
         // Check if the signed digest corresponding to our batch
-        if signed_batch_info.author() != self.peer_id {
-            return Err(SignedBatchInfoError::WrongAuthor);
-        }
+        // if signed_batch_info.author() != self.peer_id {
+        //     return Err(SignedBatchInfoError::WrongAuthor);
+        // }
         let batch_author = self
             .batch_reader
             .exists(signed_batch_info.digest())
@@ -331,7 +331,8 @@ impl ProofCoordinator {
                             }
                         },
                         ProofCoordinatorCommand::AppendSignature(signed_batch_infos) => {
-                            let mut proofs = vec![];
+                            let mut my_proofs = vec![];
+                            let mut other_proofs = vec![];
                             for signed_batch_info in signed_batch_infos.take().into_iter() {
                                 let peer_id = signed_batch_info.signer();
                                 let digest = *signed_batch_info.digest();
@@ -344,7 +345,11 @@ impl ProofCoordinator {
                                                 digest = digest,
                                                 batch_id = batch_id.id,
                                             );
-                                            proofs.push(proof);
+                                            if proof.author() == self.peer_id {
+                                                my_proofs.push(proof);
+                                            } else {
+                                                other_proofs.push(proof);
+                                            }
                                         }
                                     },
                                     Err(e) => {
@@ -357,12 +362,15 @@ impl ProofCoordinator {
                                     },
                                 }
                             }
-                            if !proofs.is_empty() {
+                            if !my_proofs.is_empty() {
                                 if self.broadcast_proofs {
-                                    network_sender.broadcast_proof_of_store_msg(proofs).await;
+                                    network_sender.broadcast_proof_of_store_msg(my_proofs).await;
                                 } else {
-                                    network_sender.send_proof_of_store_msg_to_self(proofs).await;
+                                    network_sender.send_proof_of_store_msg_to_self(my_proofs).await;
                                 }
+                            }
+                            if !other_proofs.is_empty() {
+                                network_sender.send_proof_of_store_msg_to_self(other_proofs).await;
                             }
                         },
                     }

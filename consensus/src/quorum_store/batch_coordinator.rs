@@ -73,7 +73,7 @@ impl BatchCoordinator {
         let network_sender = self.network_sender.clone();
         let sender_to_proof_manager = self.sender_to_proof_manager.clone();
         tokio::spawn(async move {
-            let peer_id = persist_requests[0].author();
+            // let peer_id = persist_requests[0].author();
             let batches = persist_requests
                 .iter()
                 .map(|persisted_value| persisted_value.batch_info().clone())
@@ -81,7 +81,8 @@ impl BatchCoordinator {
             let signed_batch_infos = batch_store.persist(persist_requests);
             if !signed_batch_infos.is_empty() {
                 network_sender
-                    .send_signed_batch_info_msg(signed_batch_infos, vec![peer_id])
+                    // .send_signed_batch_info_msg(signed_batch_infos, vec![peer_id])
+                    .broadcast_signed_batch_info_msg(signed_batch_infos)
                     .await;
             }
             let _ = sender_to_proof_manager
