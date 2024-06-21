@@ -6,6 +6,15 @@ use anyhow::Error;
 use aptos_protos::transaction::v1::{transaction::TransactionType, Transaction};
 use serde::{Deserialize, Serialize};
 
+/// Example:
+/// ```
+/// use aptos_transaction_filter::TransactionRootFilterBuilder;
+///
+/// let filter = TransactionRootFilterBuilder::default()
+///   .success(true)
+///   .build()
+///   .unwrap();
+/// ```
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 #[derive(derive_builder::Builder)]
