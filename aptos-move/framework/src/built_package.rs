@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    docgen::DocgenOptions,
+    docgen::{get_docgen_output_dir, DocgenOptions},
     extended_checks,
     natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy},
     zip_metadata, zip_metadata_str, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
@@ -161,12 +161,15 @@ pub fn build_model(
     let compiler_version = compiler_version.unwrap_or_default();
     let language_version = language_version.unwrap_or_default();
     compiler_version.check_language_support(language_version)?;
-    build_config.move_model_for_package(package_path, ModelConfig {
-        target_filter,
-        all_files_as_targets: false,
-        compiler_version,
-        language_version,
-    })
+    build_config.move_model_for_package(
+        package_path,
+        ModelConfig {
+            target_filter,
+            all_files_as_targets: false,
+            compiler_version,
+            language_version,
+        },
+    )
 }
 
 impl BuiltPackage {
@@ -248,7 +251,7 @@ impl BuiltPackage {
                         .unwrap()
                         .parent()
                         .unwrap()
-                        .join("doc")
+                        .join(get_docgen_output_dir())
                         .display()
                         .to_string()
                 })

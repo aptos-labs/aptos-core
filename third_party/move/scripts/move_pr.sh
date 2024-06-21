@@ -176,6 +176,16 @@ if [ ! -z "$TEST" ]; then
   )
 fi
 
+if [ ! -z "$COMPILER_V2_TEST" ]; then
+  echo "*************** [move-pr] Running integration tests with compiler v2"
+  (
+    cd $BASE
+    MVC_DOCGEN_OUTPUT_DIR=tests/compiler-v2-doc \
+       MOVE_COMPILER_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS \
+       $MOVE_CRATES_V2_ENV_DEPENDENT
+  )
+fi
+
 if [ ! -z "$INTEGRATION_TEST" ]; then
   echo "*************** [move-pr] Running integration tests"
   (
@@ -184,22 +194,6 @@ if [ ! -z "$INTEGRATION_TEST" ]; then
        $MOVE_CRATES $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi
-
-if [ ! -z "$COMPILER_V2_TEST" ]; then
-  echo "*************** [move-pr] Running integration tests with compiler v2"
-  (
-    cd $BASE
-    # Need to ensure that aptos-cached-packages is build without the v2 flag,
-    # to avoid regenerating incompatible markdown docs. We really need to
-    # first build and then test the exact same package set, otherwise
-    # rebuild will be triggered via feature unification.
-    MOVE_COMPILER_V2=false cargo build $CARGO_OP_PARAMS \
-     $MOVE_CRATES_V2_ENV_DEPENDENT
-    MOVE_COMPILER_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS \
-     $MOVE_CRATES_V2_ENV_DEPENDENT
-  )
-fi
-
 
 if [ ! -z "$GIT_CHECKS" ]; then
    echo "*************** [move-pr] Running git checks"
