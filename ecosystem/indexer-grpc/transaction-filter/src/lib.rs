@@ -6,8 +6,9 @@ pub mod errors;
 pub mod filters;
 pub mod traits;
 
-// re-export for convenience
+// Re-exports for convenience.
 pub use boolean_transaction_filter::BooleanTransactionFilter;
+pub use filters::*;
 pub use traits::Filterable;
 
 #[cfg(test)]
