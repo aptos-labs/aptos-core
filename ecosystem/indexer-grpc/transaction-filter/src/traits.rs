@@ -18,18 +18,17 @@ where
     /// The actual public API is via `is_valid` which will call `validate_state` and return an error if it fails, but annotated with the filter type/path
     fn validate_state(&self) -> Result<(), FilterError>;
 
-    /**
-     * This is a convenience method to allow for the error to be annotated with the filter type/path at each level
-     * This is the public API for checking the validity of a filter!
-     * Example output looks like:
-     * ```text
-     *   FilterError: This is a test error!.
-     *   Trace Path:
-     *   transaction_filter::traits::test::InnerStruct:   {"a":"test"}
-     *   core::option::Option<transaction_filter::traits::test::InnerStruct>:   {"a":"test"}
-     *   transaction_filter::traits::test::OuterStruct:   {"inner":{"a":"test"}}
-     *  ```
-     **/
+    /// This is a convenience method to allow for the error to be annotated with the filter type/path at each level
+    /// This is the public API for checking the validity of a filter!
+    /// Example output looks like:
+    /// ```text
+    /// FilterError: This is a test error!.
+    /// Trace Path:
+    /// transaction_filter::traits::test::InnerStruct:   {"a":"test"}
+    /// core::option::Option<transaction_filter::traits::test::InnerStruct>:   {"a":"test"}
+    /// transaction_filter::traits::test::OuterStruct:   {"inner":{"a":"test"}}
+    ///  ```
+    ///
     #[inline]
     fn is_valid(&self) -> Result<(), FilterError> {
         // T
@@ -79,7 +78,7 @@ where
     }
 }
 
-/// This allows for Option<Filterable> to always return true: i.e if the filter is None, then all items are allowed.
+/// This allows for `Option<Filterable>` to always return true: i.e if the filter is None, then all items are allowed.
 impl<T, F> Filterable<T> for Option<F>
 where
     F: Filterable<T>,

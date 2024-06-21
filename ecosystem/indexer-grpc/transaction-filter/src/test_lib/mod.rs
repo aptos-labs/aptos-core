@@ -33,7 +33,6 @@ pub fn load_random_april_3mb_fixture() -> TransactionsInStorage {
     decompress_fixture(data)
 }
 
-#[allow(dead_code)]
 pub fn load_graffio_fixture() -> TransactionsInStorage {
     let data = include_bytes!(
         "../../fixtures/compressed_files_lz4_f3d880d9700c70d71fefe71aa9218aa9_301616000.pb.lz4"
