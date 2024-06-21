@@ -8,7 +8,7 @@ use std::ops::{self, Add, AddAssign};
 
 /// Type for bit representation during conversion. Represents bits using strings, for easy
 /// manipulation:
-/// ```
+/// ```ignore
 /// use prover_service::input_processing::bits::Bits;
 /// let b = Bits::raw("00001111");
 /// assert_eq!(b.as_bytes().unwrap()[0], 15u8);
