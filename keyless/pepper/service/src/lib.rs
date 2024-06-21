@@ -29,6 +29,7 @@ use jsonwebtoken::{Algorithm::RS256, Validation};
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
+use firestore::FirestoreDb;
 use uuid::Uuid;
 
 pub mod about;
@@ -198,10 +199,12 @@ fn process_common(
     .map_err(|e| BadRequest(format!("JWT signature verification failed: {e}")))?;
 
     // If the pepper request is at V1, is from an account manager, and has a target aud specified, compute the pepper for the target aud.
+    let mut aud_overridden = false;
     let mut final_aud = claims.claims.aud.clone();
     if ACCOUNT_MANAGERS.contains(&(claims.claims.iss.clone(), claims.claims.aud.clone())) {
         if let Some(aud) = aud {
             final_aud = aud;
+            aud_overridden = true;
         }
     };
 
@@ -211,14 +214,18 @@ fn process_common(
         uid_val,
         aud: final_aud,
     };
-    info!(
-        session_id = session_id,
-        iss = input.iss,
-        aud = input.aud,
-        uid_val = input.uid_val,
-        uid_key = input.uid_key,
-        "PepperInput is available."
-    );
+
+    if !aud_overridden {
+        info!(
+            session_id = session_id,
+            iss = input.iss,
+            aud = input.aud,
+            uid_val = input.uid_val,
+            uid_key = input.uid_key,
+            "PepperInput is available."
+        );
+    }
+
     let input_bytes = bcs::to_bytes(&input).unwrap();
     let (pepper_base, vuf_proof) = vuf::bls12381_g1_bls::Bls12381G1Bls::eval(&VUF_SK, &input_bytes)
         .map_err(|e| InternalError(format!("bls12381_g1_bls eval error: {e}")))?;

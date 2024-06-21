@@ -6,7 +6,7 @@ use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 pub mod jwt;
 pub mod vuf;
-
+pub mod aud_db;
 /// Custom serialization function to convert Vec<u8> into a hex string.
 fn serialize_bytes_to_hex<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
 where

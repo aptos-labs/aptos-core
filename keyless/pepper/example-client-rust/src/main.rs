@@ -14,6 +14,8 @@ use aptos_types::{
 use ark_serialize::CanonicalDeserialize;
 use reqwest::StatusCode;
 use std::{fs, io::stdin};
+use firestore::{FirestoreDb, paths};
+use aptos_keyless_pepper_common::aud_db::AudDbEntry;
 
 const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImUxYjkzYzY0MDE0NGI4NGJkMDViZjI5NmQ2NzI2MmI2YmM2MWE0ODciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTE2Mjc3NzI0NjA3NTIzNDIzMTIiLCJhdF9oYXNoIjoiaG5OWHFJVTZ3dWFPYlVqR05lRVhGQSIsIm5vbmNlIjoiNzQyMDQxODMxNDYwMDk1MDM0MTU3NzQ0MzEzMzY0MTU4OTk0NzYwNTExMjc1MDEwNDIyNjY5MDY3NTc3OTY3NTIyNDAwNjA0OTI0NCIsIm5hbWUiOiJPbGl2ZXIgSGUiLCJnaXZlbl9uYW1lIjoiT2xpdmVyIiwiZmFtaWx5X25hbWUiOiJIZSIsImlhdCI6MTcxNDQ0MTc4MywiZXhwIjoxNzE0NDQ1MzgzfQ.iNeVzp4BTQj2I_WH6UaUOfUBV4Q_wUriV7jWkh1fUqTPSs30jMMSjEDZml8lQ_NUIpivnGvfEHt_rF9rlrsuRur9pTVKRRKhJUNf5avrAujvLzrz-bwdgKXtTY_nmYisNNNQwmFIVP004ICois4DHD7EmO8PI88CzSzdDbl9qAIoxOP3JRKRwU05wK5qkGz6FpYzTYiG50lQCybSzzUN5Lws49ANCAOZiROG5lmszOW41mAbFSd6MUX469uvyMA2ZZ5av9ArKricHJPutGtLoOSWpzKQ_mlCzofVs5tHoMhGgcOFKuhnEVdY4J7TdcV6pZv9Ih5F8MX3-Wz9Iz9O4w";
 
@@ -63,6 +65,17 @@ fn get_jwt_or_path() -> String {
 
 #[tokio::main]
 async fn main() {
+    let project_id = std::env::var("AUD_DB_PROJECT_ID").unwrap();
+    let db = FirestoreDb::new(project_id.as_str()).await.unwrap();
+    let entry = AudDbEntry {
+        iss: "iss1".to_string(),
+        aud: "aud2".to_string(),
+        uid_key: "sub".to_string(),
+        uid_val: "sub3".to_string(),
+        last_request_unix_ms: 99999,
+    };
+    let doc_id = entry.document_id();
+    db.fluent().update().fields(paths!(AudDbEntry::{iss, aud, uid_key, uid_val, last_request_unix_ms})).in_col("accounts").document_id(&doc_id).object(&entry).execute::<AudDbEntry>().await.unwrap();
     println!();
     println!("Starting an interaction with aptos-oidb-pepper-service.");
     let url = get_pepper_service_url();

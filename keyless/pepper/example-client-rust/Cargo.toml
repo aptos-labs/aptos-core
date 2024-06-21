@@ -19,6 +19,7 @@ aptos-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-serialize = { workspace = true }
 bcs = { workspace = true }
+firestore = { workspace = true }
 hex = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }

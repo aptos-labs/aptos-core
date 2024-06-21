@@ -2415,6 +2415,7 @@ dependencies = [
  "serde",
  "serde-big-array",
  "sha2 0.10.8",
+ "sha3 0.9.1",
 ]
 
 [[package]]
@@ -2427,6 +2428,7 @@ dependencies = [
  "ark-bls12-381",
  "ark-serialize",
  "bcs 0.1.4",
+ "firestore",
  "hex",
  "reqwest",
  "serde_json",
@@ -2451,6 +2453,7 @@ dependencies = [
  "ark-serialize",
  "bcs 0.1.4",
  "dashmap",
+ "firestore",
  "hex",
  "hyper",
  "jsonwebtoken 8.3.0",
@@ -6228,6 +6231,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
+name = "convert_case"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "cookie"
 version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6916,7 +6928,7 @@ version = "0.99.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fb810d30a7c1953f91334de7244731fc3f3c10d7fe163338a35b9f640960321"
 dependencies = [
- "convert_case",
+ "convert_case 0.4.0",
  "proc-macro2",
  "quote",
  "rustc_version",
@@ -7809,6 +7821,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fcfdc7a0362c9f4444381a9e697c79d435fe65b52a37466fc2c1184cee9edc6"
 
 [[package]]
+name = "firestore"
+version = "0.42.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00bd798d0f3ed4d311c032374fbed2010f99eea98c49efff12252653a73eef23"
+dependencies = [
+ "async-trait",
+ "backoff",
+ "chrono",
+ "futures",
+ "gcloud-sdk 0.24.7",
+ "hex",
+ "hyper",
+ "rand 0.8.5",
+ "rsb_derive",
+ "rvstruct",
+ "serde",
+ "struct-path",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
 name = "fixed"
 version = "1.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8180,6 +8215,34 @@ dependencies = [
  "serde_json",
  "tokio",
  "tonic 0.9.2",
+ "tower",
+ "tower-layer",
+ "tower-util",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "gcloud-sdk"
+version = "0.24.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa57d45d9a9778e0bf38deb6a4c9dbe293fa021d0b70b126b5dc593979b08569"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "futures",
+ "gcemeta",
+ "hyper",
+ "jsonwebtoken 9.3.0",
+ "once_cell",
+ "prost 0.12.3",
+ "prost-types 0.12.3",
+ "reqwest",
+ "secret-vault-value",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tonic 0.11.0",
  "tower",
  "tower-layer",
  "tower-util",
@@ -9544,6 +9607,21 @@ dependencies = [
  "base64 0.21.6",
  "pem 1.1.1",
  "ring 0.16.20",
+ "serde",
+ "serde_json",
+ "simple_asn1 0.6.2",
+]
+
+[[package]]
+name = "jsonwebtoken"
+version = "9.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9ae10193d25051e74945f1ea2d0b42e03cc3b890f7e4cc5faa44997d808193f"
+dependencies = [
+ "base64 0.21.6",
+ "js-sys",
+ "pem 3.0.4",
+ "ring 0.17.7",
  "serde",
  "serde_json",
  "simple_asn1 0.6.2",
@@ -12075,6 +12153,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pem"
+version = "3.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e459365e590736a54c3fa561947c84837534b8e9af6fc5bf781307e82658fae"
+dependencies = [
+ "base64 0.22.1",
+ "serde",
+]
+
+[[package]]
 name = "pem-rfc7468"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12835,7 +12923,7 @@ dependencies = [
  "field_count",
  "futures",
  "futures-util",
- "gcloud-sdk",
+ "gcloud-sdk 0.20.7",
  "google-cloud-googleapis",
  "google-cloud-pubsub",
  "hex",
@@ -13483,6 +13571,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "rustls 0.21.10",
+ "rustls-native-certs 0.6.3",
  "rustls-pemfile 1.0.4",
  "serde",
  "serde_json",
@@ -13693,6 +13782,17 @@ dependencies = [
  "spki 0.7.3",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "rsb_derive"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2c53e42fccdc5f1172e099785fe78f89bc0c1e657d0c2ef591efbfac427e9a4"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -13975,6 +14075,26 @@ dependencies = [
  "quick-error",
  "tempfile",
  "wait-timeout",
+]
+
+[[package]]
+name = "rvs_derive"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e1fa12378eb54f3d4f2db8dcdbe33af610b7e7d001961c1055858282ecef2a5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "rvstruct"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5107860ec34506b64cf3680458074eac5c2c564f7ccc140918bbcd1714fd8d5d"
+dependencies = [
+ "rvs_derive",
 ]
 
 [[package]]
@@ -14973,6 +15093,15 @@ name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
+
+[[package]]
+name = "struct-path"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "899edf28cf7320503eda593b4bbce1bc5e9533501a11d45537e2c5be90128fc7"
+dependencies = [
+ "convert_case 0.6.0",
+]
 
 [[package]]
 name = "structopt"
