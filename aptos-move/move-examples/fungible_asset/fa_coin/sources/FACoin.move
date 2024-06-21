@@ -60,12 +60,12 @@ module FACoin::fa_coin {
 
         // Create a global state to pause the FA coin and move to Metadata object.
         move_to(
-            &metadata_object_signer, 
+            &metadata_object_signer,
             State { paused: false, }
         );
 
         // Override the deposit and withdraw functions which mean overriding transfer.
-        // This ensures all transfer will call withdraw and deposit functions in this module 
+        // This ensures all transfer will call withdraw and deposit functions in this module
         // and perform the necessary checks.
         // This is OPTIONAL. It is an advanced feature and we don't NEED a global state to pause the FA coin.
         let deposit = function_info::new_function_info(
