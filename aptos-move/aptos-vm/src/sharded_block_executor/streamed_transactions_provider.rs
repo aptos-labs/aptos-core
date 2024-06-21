@@ -75,7 +75,7 @@ impl TxnProvider<SignatureVerifiedTransaction> for BlockingTransactionsProvider 
     fn get_txn(&self, idx: usize) -> Arc<SignatureVerifiedTransaction> {
         let (lock, cvar) = &self.txns[idx];
         let timer = REMOTE_EXECUTOR_TIMER_V2
-            .with_label_values(&[&SHARD_ID.get().unwrap().to_string(), "get_state_value"])
+            .with_label_values(&[&SHARD_ID.get().unwrap().to_string(), "get_txn_avg_waiting_time"])
             .start_timer();
         let mut status = lock.lock().unwrap();
         while let CommandValue::Waiting = *status {
