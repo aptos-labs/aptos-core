@@ -33,62 +33,62 @@ The `TransactionFilterBuilder` is a more ergonomic way to build a filter, and is
 performance, assuming this is being done infrequently.
 
 ```
-  use transaction_filter::filters::EventFilterBuilder;
+use transaction_filter::filters::EventFilterBuilder;
 
-  let ef = EventFilterBuilder::default()
-      .data("spins")
-      .struct_type(
-          MoveStructTagFilterBuilder::default()
-              .address("0x0077")
-              .module("roulette")
-              .name("spin")
-              .build()?,
-      )
-      .build()?;
+let ef = EventFilterBuilder::default()
+  .data("spins")
+  .struct_type(
+    MoveStructTagFilterBuilder::default()
+      .address("0x0077")
+      .module("roulette")
+      .name("spin")
+      .build()?,
+  )
+  .build()?;
 ```
 
 The `TransactionFilter` struct is also available, but requires direct construction of the structs.
 
 ```
-  use transaction_filter::filters::EventFilter;
+use transaction_filter::filters::EventFilter;
 
-  let ef = EventFilter {
-      data: Some("spins".into()),
-      struct_type: Some(MoveStructTagFilter {
-          address: Some("0x0077".into()),
-          module: Some("roulette".into()),
-          name: Some("spin".into()),
-      }),
-  };
+let ef = EventFilter {
+  data: Some("spins".into()),
+  struct_type: Some(MoveStructTagFilter {
+    address: Some("0x0077".into()),
+    module: Some("roulette".into()),
+    name: Some("spin".into()),
+  }),
+};
 ```
 
 Once you have some filters built, you can combine them with the boolean operators `and`, `or`, and `not`.
 
 ```
-   let trf = TransactionRootFilterBuilder::default()
-      .success(true).build()?;
-     
-   let utf = UserTransactionFilterBuilder::default()
-      .sender("0x0011".into()).build()?;
-   
-   let ef = EventFilterBuilder::default()
-      .struct_type(
-          MoveStructTagFilterBuilder::default()
-              .address("0x0077")
-              .module("roulette")
-              .name("spin")
-              .build()?,
-      )
-      .build()?;
-   
-   // Combine filters using logical operators!
-   // (trf OR utf)
-   let trf_or_utf = BooleanTransactionFilter::from(trf).or(utf);
-   // ((trf OR utf) AND ef)
-   let query = trf_or_utf.and(ef);
-    
-   let transactions: Vec<Transaction> = transaction_stream.next().await;
-   let filtered_transactions = query.filter_vec(transactions);
+let trf = TransactionRootFilterBuilder::default()
+  .success(true).build()?;
+
+let utf = UserTransactionFilterBuilder::default()
+  .sender("0x0011".into()).build()?;
+
+let ef = EventFilterBuilder::default()
+  .struct_type(
+    MoveStructTagFilterBuilder::default()
+      .address("0x0077")
+      .module("roulette")
+      .name("spin")
+      .build()?,
+  )
+  .build()?;
+
+// Combine filters using logical operators!
+// (trf OR utf)
+let trf_or_utf = BooleanTransactionFilter::from(trf).or(utf);
+// ((trf OR utf) AND ef)
+let query = trf_or_utf.and(ef);
+
+let transactions: Vec<Transaction> = transaction_stream.next().await;
+let filtered_transactions = query.filter_vec(transactions);
 ```
 
 ## API & Serialization

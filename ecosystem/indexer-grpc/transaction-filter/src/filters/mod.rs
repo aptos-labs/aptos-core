@@ -13,6 +13,7 @@ pub use event::EventFilterBuilder;
 pub use move_module::{MoveStructTagFilter, MoveStructTagFilterBuilder};
 pub use transaction_root::{TransactionRootFilter, TransactionRootFilterBuilder};
 pub use user_transaction::{
-    UserTransactionFilter, UserTransactionFilterBuilder, UserTransactionPayloadFilter,
+    EntryFunctionFilter, EntryFunctionFilterBuilder, UserTransactionFilter,
+    UserTransactionFilterBuilder, UserTransactionPayloadFilter,
     UserTransactionPayloadFilterBuilder,
 };
