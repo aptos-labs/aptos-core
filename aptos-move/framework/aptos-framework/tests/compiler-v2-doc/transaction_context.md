@@ -58,10 +58,10 @@
     -  [Function `multisig_payload_internal`](#@Specification_1_multisig_payload_internal)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features">0x1::features</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string">0x1::string</a>;
+<pre><code><b>use</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string">0x1::string</a>;
 </code></pre>
 
 
@@ -119,25 +119,25 @@ Represents the entry function payload.
 
 </dd>
 <dt>
-<code>module_name: <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a></code>
+<code>module_name: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>function_name: <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a></code>
+<code>function_name: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>ty_args_names: <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>&gt;</code>
+<code>ty_args_names: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>args: <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
+<code>args: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
 
@@ -171,7 +171,7 @@ Represents the multisig payload.
 
 </dd>
 <dt>
-<code>entry_function_payload: <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;</code>
+<code>entry_function_payload: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;</code>
 </dt>
 <dd>
 
@@ -213,7 +213,7 @@ Transaction context is only available in the user transaction prologue, executio
 Returns the transaction hash of the current transaction.
 
 
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -222,7 +222,7 @@ Returns the transaction hash of the current transaction.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -238,7 +238,7 @@ Internally calls the private function <code>get_txn_hash</code>.
 This function is created for to feature gate the <code>get_txn_hash</code> function.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">get_transaction_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">get_transaction_hash</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -247,7 +247,7 @@ This function is created for to feature gate the <code>get_txn_hash</code> funct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">get_transaction_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">get_transaction_hash</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>()
 }
 </code></pre>
@@ -319,7 +319,7 @@ created for to feature gate the <code>generate_unique_address</code> function.
 Returns the script hash of the current entry function.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -328,7 +328,7 @@ Returns the script hash of the current entry function.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -406,7 +406,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_sender">sender</a>(): <b>address</b> {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     <a href="transaction_context.md#0x1_transaction_context_sender_internal">sender_internal</a>()
 }
 </code></pre>
@@ -446,7 +446,7 @@ If the current transaction has no secondary signers, this function returns an em
 This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers">secondary_signers</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers">secondary_signers</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
 </code></pre>
 
 
@@ -455,8 +455,8 @@ This function aborts if called outside of the transaction prologue, execution, o
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers">secondary_signers</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers">secondary_signers</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; {
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>()
 }
 </code></pre>
@@ -471,7 +471,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 
 
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
 </code></pre>
 
 
@@ -480,7 +480,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;;
 </code></pre>
 
 
@@ -507,7 +507,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_payer">gas_payer</a>(): <b>address</b> {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     <a href="transaction_context.md#0x1_transaction_context_gas_payer_internal">gas_payer_internal</a>()
 }
 </code></pre>
@@ -556,7 +556,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_max_gas_amount">max_gas_amount</a>(): u64 {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     <a href="transaction_context.md#0x1_transaction_context_max_gas_amount_internal">max_gas_amount_internal</a>()
 }
 </code></pre>
@@ -605,7 +605,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_unit_price">gas_unit_price</a>(): u64 {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     <a href="transaction_context.md#0x1_transaction_context_gas_unit_price_internal">gas_unit_price_internal</a>()
 }
 </code></pre>
@@ -654,7 +654,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="chain_id.md#0x1_chain_id">chain_id</a>(): u8 {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     <a href="transaction_context.md#0x1_transaction_context_chain_id_internal">chain_id_internal</a>()
 }
 </code></pre>
@@ -693,7 +693,7 @@ Returns the entry function payload if the current transaction has such a payload
 This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_entry_function_payload">entry_function_payload</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_entry_function_payload">entry_function_payload</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;
 </code></pre>
 
 
@@ -703,7 +703,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_entry_function_payload">entry_function_payload</a>(): Option&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>&gt; {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     <a href="transaction_context.md#0x1_transaction_context_entry_function_payload_internal">entry_function_payload_internal</a>()
 }
 </code></pre>
@@ -718,7 +718,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 
 
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_entry_function_payload_internal">entry_function_payload_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_entry_function_payload_internal">entry_function_payload_internal</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;
 </code></pre>
 
 
@@ -751,7 +751,7 @@ Returns the account address of the entry function payload.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_account_address">account_address</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>): <b>address</b> {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     payload.account_address
 }
 </code></pre>
@@ -767,7 +767,7 @@ Returns the account address of the entry function payload.
 Returns the module name of the entry function payload.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_module_name">module_name</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_module_name">module_name</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -777,7 +777,7 @@ Returns the module name of the entry function payload.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_module_name">module_name</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>): String {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     payload.module_name
 }
 </code></pre>
@@ -793,7 +793,7 @@ Returns the module name of the entry function payload.
 Returns the function name of the entry function payload.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_function_name">function_name</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_function_name">function_name</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -803,7 +803,7 @@ Returns the function name of the entry function payload.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_function_name">function_name</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>): String {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     payload.function_name
 }
 </code></pre>
@@ -819,7 +819,7 @@ Returns the function name of the entry function payload.
 Returns the type arguments names of the entry function payload.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_type_arg_names">type_arg_names</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_type_arg_names">type_arg_names</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_String">string::String</a>&gt;
 </code></pre>
 
 
@@ -828,8 +828,8 @@ Returns the type arguments names of the entry function payload.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_type_arg_names">type_arg_names</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;String&gt; {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_type_arg_names">type_arg_names</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;String&gt; {
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     payload.ty_args_names
 }
 </code></pre>
@@ -845,7 +845,7 @@ Returns the type arguments names of the entry function payload.
 Returns the arguments of the entry function payload.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_args">args</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_args">args</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
 </code></pre>
 
 
@@ -854,8 +854,8 @@ Returns the arguments of the entry function payload.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_args">args</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_args">args</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; {
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     payload.args
 }
 </code></pre>
@@ -872,7 +872,7 @@ Returns the multisig payload if the current transaction has such a payload. Othe
 This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_payload">multisig_payload</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_payload">multisig_payload</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>&gt;
 </code></pre>
 
 
@@ -882,7 +882,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_payload">multisig_payload</a>(): Option&lt;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">MultisigPayload</a>&gt; {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     <a href="transaction_context.md#0x1_transaction_context_multisig_payload_internal">multisig_payload_internal</a>()
 }
 </code></pre>
@@ -897,7 +897,7 @@ This function aborts if called outside of the transaction prologue, execution, o
 
 
 
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_payload_internal">multisig_payload_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>&gt;
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_payload_internal">multisig_payload_internal</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>&gt;
 </code></pre>
 
 
@@ -930,7 +930,7 @@ Returns the multisig account address of the multisig payload.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_address">multisig_address</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">MultisigPayload</a>): <b>address</b> {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     payload.multisig_address
 }
 </code></pre>
@@ -946,7 +946,7 @@ Returns the multisig account address of the multisig payload.
 Returns the inner entry function payload of the multisig payload.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_inner_entry_function_payload">inner_entry_function_payload</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_inner_entry_function_payload">inner_entry_function_payload</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;
 </code></pre>
 
 
@@ -956,7 +956,7 @@ Returns the inner entry function payload of the multisig payload.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_inner_entry_function_payload">inner_entry_function_payload</a>(payload: &<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">MultisigPayload</a>): Option&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">EntryFunctionPayload</a>&gt; {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
     payload.entry_function_payload
 }
 </code></pre>
@@ -975,7 +975,7 @@ Returns the inner entry function payload of the multisig payload.
 ### Function `get_txn_hash`
 
 
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -992,7 +992,7 @@ Returns the inner entry function payload of the multisig payload.
 <a id="0x1_transaction_context_spec_get_txn_hash"></a>
 
 
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">spec_get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">spec_get_txn_hash</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -1002,7 +1002,7 @@ Returns the inner entry function payload of the multisig payload.
 ### Function `get_transaction_hash`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">get_transaction_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">get_transaction_hash</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -1066,7 +1066,7 @@ Returns the inner entry function payload of the multisig payload.
 ### Function `get_script_hash`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_script_hash">get_script_hash</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -1136,7 +1136,7 @@ Returns the inner entry function payload of the multisig payload.
 <a id="0x1_transaction_context_spec_get_script_hash"></a>
 
 
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_script_hash">spec_get_script_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_script_hash">spec_get_script_hash</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -1179,7 +1179,7 @@ Returns the inner entry function payload of the multisig payload.
 ### Function `secondary_signers_internal`
 
 
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
 </code></pre>
 
 
@@ -1259,7 +1259,7 @@ Returns the inner entry function payload of the multisig payload.
 ### Function `entry_function_payload_internal`
 
 
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_entry_function_payload_internal">entry_function_payload_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_entry_function_payload_internal">entry_function_payload_internal</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_EntryFunctionPayload">transaction_context::EntryFunctionPayload</a>&gt;
 </code></pre>
 
 
@@ -1275,7 +1275,7 @@ Returns the inner entry function payload of the multisig payload.
 ### Function `multisig_payload_internal`
 
 
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_payload_internal">multisig_payload_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>&gt;
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_multisig_payload_internal">multisig_payload_internal</a>(): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="transaction_context.md#0x1_transaction_context_MultisigPayload">transaction_context::MultisigPayload</a>&gt;
 </code></pre>
 
 

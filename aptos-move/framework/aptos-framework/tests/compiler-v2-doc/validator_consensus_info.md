@@ -43,7 +43,7 @@ Information about a validator that participates consensus.
 
 </dd>
 <dt>
-<code>pk_bytes: <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>pk_bytes: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -78,7 +78,7 @@ Create a default <code><a href="validator_consensus_info.md#0x1_validator_consen
 <pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_default">default</a>(): <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a> {
     <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a> {
         addr: @vm,
-        pk_bytes: <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>[],
+        pk_bytes: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>[],
         voting_power: 0,
     }
 }
@@ -95,7 +95,7 @@ Create a default <code><a href="validator_consensus_info.md#0x1_validator_consen
 Create a <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a></code> object.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_new">new</a>(addr: <b>address</b>, pk_bytes: <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, voting_power: u64): <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>
+<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_new">new</a>(addr: <b>address</b>, pk_bytes: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, voting_power: u64): <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>
 </code></pre>
 
 
@@ -104,7 +104,7 @@ Create a <code><a href="validator_consensus_info.md#0x1_validator_consensus_info
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_new">new</a>(addr: <b>address</b>, pk_bytes: <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, voting_power: u64): <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_new">new</a>(addr: <b>address</b>, pk_bytes: <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, voting_power: u64): <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a> {
     <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a> {
         addr,
         pk_bytes,
@@ -149,7 +149,7 @@ Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_Vali
 Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a>.pk_bytes</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_get_pk_bytes">get_pk_bytes</a>(vci: &<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_get_pk_bytes">get_pk_bytes</a>(vci: &<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -158,7 +158,7 @@ Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_Vali
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_get_pk_bytes">get_pk_bytes</a>(vci: &<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_get_pk_bytes">get_pk_bytes</a>(vci: &<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a>): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     vci.pk_bytes
 }
 </code></pre>
