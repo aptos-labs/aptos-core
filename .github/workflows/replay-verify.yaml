@@ -23,7 +23,7 @@ on:
       - ".github/workflows/replay-verify.yaml"
       - "testsuite/replay_verify.py"
   schedule:
-    - cron: "0 22 * * 0,2,4"
+    - cron: "0 22 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs
 
 # cancel redundant builds
 concurrency:
