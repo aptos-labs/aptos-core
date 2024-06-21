@@ -116,3 +116,30 @@ pub static BYTES_READY_TO_TRANSFER_FROM_SERVER: Lazy<IntCounterVec> = Lazy::new(
     )
     .unwrap()
 });
+
+/// Size of the data service grpc stream sender channel.
+pub static GRPC_STREAM_RESPONSE_CHANNEL_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "data_service_grpc_stream_thread_channel_size",
+        "Size of the data service grpc stream sender thread channel",
+        &[
+            "start_version",
+            "connection_id",
+        ],
+    )
+    .unwrap()
+});
+
+
+/// byte size for transactions fetched from data store: in-memory, redis, or file store.
+pub static GRPC_STREAM_DATA_BYTES_PER_SOURCE: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "data_service_grpc_stream_data_bytes_per_source",
+        "size of the bytes for the transactions fetched from the data source",
+        &[
+            "connection_id",
+            "data_source",
+        ],
+    )
+    .unwrap()
+});
