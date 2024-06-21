@@ -1,6 +1,0 @@
-warning[W09001]: unused alias
-  ┌─ tests/move_check/expansion/use_struct_overlap_with_module.move:7:14
-  │
-7 │     use 0x2::X::{Self, S as X};
-  │              ^ Unused 'use' of alias 'X'. Consider removing it
-
