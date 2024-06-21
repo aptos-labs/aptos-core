@@ -251,7 +251,7 @@ impl Signature {
         &self,
         message: &libsecp256k1::Message,
         public_key: &libsecp256k1::PublicKey,
-    ) -> Result<()> {
+    ) -> Result<(), CryptoMaterialError> {
         println!("s: {:?}", self.0.clone());
         println!("is equal to half order floor: {}", self.s_equal_half_order_floor());
         // Prevent malleability attacks, low order only. The library only signs in low
@@ -260,14 +260,15 @@ impl Signature {
         // However, it incorrectly returns true when s = floor(n/2), despite the fact that
         // floor(n/2) < n/2. We special case this.
         if self.0.s.is_high() && !self.s_equal_half_order_floor() {
-            Err(anyhow!(CryptoMaterialError::CanonicalRepresentationError))
+            Err(CryptoMaterialError::CanonicalRepresentationError)
         } else if libsecp256k1::verify(message, &self.0, public_key) {
             Ok(())
         } else {
             /*if self.s_equal_half_order_floor() {
                 return Err(anyhow!(CryptoMaterialError::CanonicalRepresentationError));
             }*/
-            Err(anyhow!("Unable to verify signature."))
+            Err(CryptoMaterialError::ValidationError)
+            //Err(anyhow!("Unable to verify signature."))
         }
     }
 }
@@ -314,12 +315,12 @@ impl traits::Signature for Signature {
     type SigningKeyMaterial = PrivateKey;
     type VerifyingKeyMaterial = PublicKey;
 
-    fn verify<T: CryptoHash + Serialize>(&self, message: &T, public_key: &PublicKey) -> Result<()> {
+    fn verify<T: CryptoHash + Serialize>(&self, message: &T, public_key: &PublicKey) -> Result<(), CryptoMaterialError> {
         let message = bytes_to_message(&traits::signing_message(message)?)?;
         self.verify(&message, &public_key.0)
     }
 
-    fn verify_arbitrary_msg(&self, message: &[u8], public_key: &PublicKey) -> Result<()> {
+    fn verify_arbitrary_msg(&self, message: &[u8], public_key: &PublicKey) -> Result<(), CryptoMaterialError> {
         let message = bytes_to_message(message)?;
         self.verify(&message, &public_key.0)
     }
