@@ -4055,8 +4055,7 @@ Add new owners, remove owners to remove, update signatures required.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(creator);
-<b>let</b> owner_nonce = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(creator).sequence_number;
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(creator) && !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_lite_account_enabled">features::spec_lite_account_enabled</a>();
 </code></pre>
 
 

@@ -38,6 +38,7 @@
 -  [Function `signer_capability_offer`](#0x1_lite_account_signer_capability_offer)
 -  [Function `set_rotation_capability_offer`](#0x1_lite_account_set_rotation_capability_offer)
 -  [Function `set_signer_capability_offer`](#0x1_lite_account_set_signer_capability_offer)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -1204,6 +1205,24 @@ Methods only for compatibility with account module.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_lite_account_spec_native_authenticator"></a>
+
+
+<pre><code><b>fun</b> <a href="lite_account.md#0x1_lite_account_spec_native_authenticator">spec_native_authenticator</a>(addr: <b>address</b>): Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -207,8 +207,7 @@ spec aptos_framework::multisig_account {
     }
 
     spec get_next_multisig_account_address(creator: address): address {
-        aborts_if !exists<account::Account>(creator);
-        let owner_nonce = global<account::Account>(creator).sequence_number;
+        aborts_if !exists<account::Account>(creator) && !features::spec_lite_account_enabled();
     }
 
     spec last_resolved_sequence_number(multisig_account: address): u64 {

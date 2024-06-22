@@ -17,6 +17,7 @@ The <code><a href="function_info.md#0x1_function_info">function_info</a></code> 
 -  [Function `load_function_impl`](#0x1_function_info_load_function_impl)
 -  [Specification](#@Specification_1)
     -  [Function `check_dispatch_type_compatibility_impl`](#@Specification_1_check_dispatch_type_compatibility_impl)
+    -  [Function `is_identifier`](#@Specification_1_is_identifier)
     -  [Function `load_function_impl`](#@Specification_1_load_function_impl)
 
 
@@ -334,6 +335,22 @@ if such module isn't accessed previously in the transaction.
 
 
 <pre><code><b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility_impl">check_dispatch_type_compatibility_impl</a>(lhs: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, r: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_identifier"></a>
+
+### Function `is_identifier`
+
+
+<pre><code><b>fun</b> <a href="function_info.md#0x1_function_info_is_identifier">is_identifier</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 </code></pre>
 
 
