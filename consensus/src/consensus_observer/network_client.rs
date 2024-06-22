@@ -45,7 +45,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
     ) -> Result<(), Error> {
         // Increment the message counter
         metrics::increment_request_counter(
-            &metrics::DIRECT_SEND_SENT_MESSAGES,
+            &metrics::PUBLISHER_SENT_MESSAGES,
             message_label,
             peer_network_id,
         );
@@ -73,7 +73,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
 
             // Update the direct send error metrics
             metrics::increment_request_counter(
-                &metrics::DIRECT_SEND_ERRORS,
+                &metrics::PUBLISHER_SENT_MESSAGE_ERRORS,
                 error.get_label(),
                 peer_network_id,
             );
@@ -124,7 +124,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
 
                 // Update the direct send error metrics
                 metrics::increment_request_counter(
-                    &metrics::DIRECT_SEND_ERRORS,
+                    &metrics::PUBLISHER_SENT_MESSAGE_ERRORS,
                     error.get_label(),
                     peer_network_id,
                 );
@@ -146,7 +146,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
 
         // Increment the request counter
         metrics::increment_request_counter(
-            &metrics::RPC_SENT_REQUESTS,
+            &metrics::OBSERVER_SENT_REQUESTS,
             request.get_label(),
             peer_network_id,
         );
@@ -173,7 +173,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
             Ok(consensus_observer_response) => {
                 // Update the RPC success metrics
                 metrics::increment_request_counter(
-                    &metrics::RPC_SUCCESS_RESPONSES,
+                    &metrics::OBSERVER_RECEIVED_MESSAGE_RESPONSES,
                     request_label,
                     peer_network_id,
                 );
@@ -191,7 +191,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
 
                 // Update the RPC error metrics
                 metrics::increment_request_counter(
-                    &metrics::RPC_ERROR_RESPONSES,
+                    &metrics::OBSERVER_SENT_MESSAGE_ERRORS,
                     error.get_label(),
                     peer_network_id,
                 );
@@ -228,7 +228,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
 
         // Update the RPC request metrics
         metrics::observe_value_with_label(
-            &metrics::RPC_REQUEST_LATENCIES,
+            &metrics::OBSERVER_REQUEST_LATENCIES,
             request_label,
             &peer_network_id,
             request_duration_secs,
