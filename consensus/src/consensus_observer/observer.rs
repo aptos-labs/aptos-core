@@ -603,7 +603,7 @@ impl ConsensusObserver {
 
         // Increment the received message counter
         metrics::increment_request_counter(
-            &metrics::DIRECT_SEND_RECEIVED_MESSAGES,
+            &metrics::OBSERVER_RECEIVED_MESSAGES,
             message.get_label(),
             &peer_network_id,
         );
@@ -852,11 +852,15 @@ impl ConsensusObserver {
     /// Updates the subscription creation metrics for the given peer
     fn update_subscription_creation_metrics(&self, peer_network_id: PeerNetworkId) {
         // Set the number of active subscriptions
-        metrics::set_gauge(&metrics::NUM_ACTIVE_SUBSCRIPTIONS, &peer_network_id, 1);
+        metrics::set_gauge(
+            &metrics::OBSERVER_NUM_ACTIVE_SUBSCRIPTIONS,
+            &peer_network_id.network_id(),
+            1,
+        );
 
         // Update the number of created subscriptions
         metrics::increment_request_counter(
-            &metrics::CREATED_SUBSCRIPTIONS,
+            &metrics::OBSERVER_CREATED_SUBSCRIPTIONS,
             metrics::CREATED_SUBSCRIPTION_LABEL,
             &peer_network_id,
         );
@@ -869,11 +873,15 @@ impl ConsensusObserver {
         error: Error,
     ) {
         // Reset the number of active subscriptions
-        metrics::set_gauge(&metrics::NUM_ACTIVE_SUBSCRIPTIONS, &peer_network_id, 0);
+        metrics::set_gauge(
+            &metrics::OBSERVER_NUM_ACTIVE_SUBSCRIPTIONS,
+            &peer_network_id.network_id(),
+            0,
+        );
 
         // Update the number of terminated subscriptions
         metrics::increment_request_counter(
-            &metrics::TERMINATED_SUBSCRIPTIONS,
+            &metrics::OBSERVER_TERMINATED_SUBSCRIPTIONS,
             error.get_label(),
             &peer_network_id,
         );

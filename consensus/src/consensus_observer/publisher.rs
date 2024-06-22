@@ -3,6 +3,7 @@
 
 use crate::consensus_observer::{
     logging::{LogEntry, LogEvent, LogSchema},
+    metrics,
     network_client::ConsensusObserverClient,
     network_events::ResponseSender,
     network_message::{
@@ -102,6 +103,23 @@ impl ConsensusPublisher {
                     peer_network_id
                 )));
         }
+
+        // Update the number of active subscribers for each network
+        let active_subscribers = self.active_subscribers.read().clone();
+        for network_id in peers_and_metadata.get_registered_networks() {
+            // Calculate the number of active subscribers for the network
+            let num_active_subscribers = active_subscribers
+                .iter()
+                .filter(|peer_network_id| peer_network_id.network_id() == network_id)
+                .count() as i64;
+
+            // Update the active subscriber metric
+            metrics::set_gauge(
+                &metrics::PUBLISHER_NUM_ACTIVE_SUBSCRIBERS,
+                &network_id,
+                num_active_subscribers,
+            );
+        }
     }
 
     /// Returns a copy of the consensus observer client
@@ -118,6 +136,14 @@ impl ConsensusPublisher {
         request: ConsensusObserverRequest,
         response_sender: ResponseSender,
     ) {
+        // Update the RPC request counter
+        metrics::increment_request_counter(
+            &metrics::PUBLISHER_RECEIVED_REQUESTS,
+            request.get_label(),
+            peer_network_id,
+        );
+
+        // Handle the request
         match request {
             ConsensusObserverRequest::Subscribe => {
                 // Add the peer to the set of active subscribers
