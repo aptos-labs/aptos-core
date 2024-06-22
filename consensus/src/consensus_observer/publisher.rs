@@ -122,6 +122,11 @@ impl ConsensusPublisher {
         }
     }
 
+    /// Returns a clone of the currently active subscribers
+    pub fn get_active_subscribers(&self) -> HashSet<PeerNetworkId> {
+        self.active_subscribers.read().clone()
+    }
+
     /// Returns a copy of the consensus observer client
     pub fn get_consensus_observer_client(
         &self,

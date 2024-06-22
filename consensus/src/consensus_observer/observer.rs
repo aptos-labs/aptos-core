@@ -778,8 +778,10 @@ impl ConsensusObserver {
     }
 
     /// Produces a list of sorted peers to service our subscription request. Peers
-    /// are prioritized by validator distance and latency. If `previous_subscription_peer`
-    /// is provided, it will be excluded from the selection process.
+    /// are prioritized by validator distance and latency.
+    /// Note: if `previous_subscription_peer` is provided, it will be excluded
+    /// from the selection process. Likewise, all peers currently subscribed to us
+    /// will be excluded from the selection process.
     fn sort_peers_for_subscription(
         &mut self,
         previous_subscription_peer: Option<PeerNetworkId>,
@@ -788,6 +790,13 @@ impl ConsensusObserver {
             // Remove the previous subscription peer (if provided)
             if let Some(previous_subscription_peer) = previous_subscription_peer {
                 let _ = peers_and_metadata.remove(&previous_subscription_peer);
+            }
+
+            // Remove any peers that are currently subscribed to us
+            if let Some(consensus_publisher) = &self.consensus_publisher {
+                for peer_network_id in consensus_publisher.get_active_subscribers() {
+                    let _ = peers_and_metadata.remove(&peer_network_id);
+                }
             }
 
             // Sort the peers by validator distance and latency

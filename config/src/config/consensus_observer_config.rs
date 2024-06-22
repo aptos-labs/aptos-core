@@ -52,7 +52,7 @@ impl Default for ConsensusObserverConfig {
             garbage_collection_interval_ms: 60_000,            // 60 seconds
             max_subscription_timeout_ms: 30_000,               // 30 seconds
             max_synced_version_timeout_ms: 60_000,             // 60 seconds
-            peer_optimality_check_interval_ms: 300_000,        // 5 minutes
+            peer_optimality_check_interval_ms: 60_000,         // 60 seconds
             progress_check_interval_ms: 5_000,                 // 5 seconds
         }
     }
