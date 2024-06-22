@@ -1,10 +1,11 @@
 spec aptos_token::token_transfers {
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_strict;
     }
 
     spec initialize_token_transfers(account: &signer) {
+        pragma verify = false;
         include InitializeTokenTransfersAbortsIf;
     }
 

@@ -312,6 +312,22 @@ module aptos_framework::transaction_validation {
             //     invariant forall j in 0..i:
             //         secondary_signer_public_key_hashes[j] == account::get_authentication_key(secondary_signer_addresses[j]) ||
             //             (features::spec_simulation_enhancement_enabled() && is_simulation && vector::is_empty(secondary_signer_public_key_hashes[j]));
+            //         account::account_resource_exists_at(secondary_signer_addresses[j])
+            //         && secondary_signer_public_key_hashes[j]
+            //             == account::get_authentication_key(secondary_signer_addresses[j])
+            //             || features::lite_account_enabled() && lite_account::using_native_authenticator(
+            //             secondary_signer_addresses[j]
+            //         ) && option::spec_some(secondary_signer_public_key_hashes[j]) == lite_account::native_authenticator(
+            //         account::exists_at(secondary_signer_addresses[j])
+            //         && secondary_signer_public_key_hashes[j]
+            //             == account::spec_get_authentication_key(secondary_signer_addresses[j])
+            //             || features::spec_lite_account_enabled() && lite_account::using_native_authenticator(
+            //             secondary_signer_addresses[j]
+            //         ) && option::spec_some(
+            //             secondary_signer_public_key_hashes[j]
+            //         ) == lite_account::spec_native_authenticator(
+            //             secondary_signer_addresses[j]
+            //         );
             // };
             (i < num_secondary_signers)
         }) {

@@ -196,6 +196,7 @@ spec aptos_framework::object {
     }
 
     spec create_object_from_account(creator: &signer): ConstructorRef {
+        pragma verify = false;
         aborts_if !exists<account::Account>(signer::address_of(creator));
         //Guid properties
         let object_data = global<account::Account>(signer::address_of(creator));

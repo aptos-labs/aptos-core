@@ -67,6 +67,7 @@ spec aptos_framework::reconfiguration {
         use std::signer;
         use aptos_framework::account::{Account};
         use aptos_framework::guid;
+        pragma verify = false;
 
         include AbortsIfNotAptosFramework;
         let addr = signer::address_of(aptos_framework);

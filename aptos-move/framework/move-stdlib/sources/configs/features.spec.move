@@ -74,6 +74,16 @@ spec std::features {
         spec_is_enabled(MODULE_EVENT)
     }
 
+    spec fun spec_lite_account_enabled(): bool {
+        spec_is_enabled(LITE_ACCOUNT)
+    }
+
+    spec lite_account_enabled {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_lite_account_enabled();
+    }
+
     spec periodical_reward_rate_decrease_enabled {
         pragma opaque;
         aborts_if [abstract] false;

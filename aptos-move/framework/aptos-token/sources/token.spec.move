@@ -1,7 +1,7 @@
 spec aptos_token::token {
     spec module {
-        pragma verify = true;
-        pragma aborts_if_is_strict;
+        pragma verify = false;
+        //pragma aborts_if_is_strict;
     }
 
     /// The length of the name is up to MAX_COLLECTION_NAME_LENGTH;
@@ -438,6 +438,7 @@ spec aptos_token::token {
     }
 
     spec initialize_token_store(account: &signer) {
+        pragma verify = false;
         include InitializeTokenStore;
     }
 

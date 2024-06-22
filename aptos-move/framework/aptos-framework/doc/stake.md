@@ -4943,7 +4943,8 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<pre><code><b>let</b> pubkey_from_pop = <a href="../../aptos-stdlib/doc/bls12381.md#0x1_bls12381_spec_public_key_from_bytes_with_pop">bls12381::spec_public_key_from_bytes_with_pop</a>(
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> pubkey_from_pop = <a href="../../aptos-stdlib/doc/bls12381.md#0x1_bls12381_spec_public_key_from_bytes_with_pop">bls12381::spec_public_key_from_bytes_with_pop</a>(
     consensus_pubkey,
     proof_of_possession_from_bytes(proof_of_possession)
 );

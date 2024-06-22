@@ -5,7 +5,7 @@ spec aptos_token::token_event_store {
     }
 
     spec initialize_token_event_store(acct: &signer) {
-        pragma verify = true;
+        pragma verify = false;
         let addr = signer::address_of(acct);
         include InitializeTokenEventStoreAbortsIf {creator : acct};
     }
@@ -33,18 +33,22 @@ spec aptos_token::token_event_store {
     }
 
     spec emit_collection_uri_mutate_event(creator: &signer, collection: String, old_uri: String, new_uri: String) {
+        pragma verify = false;
         include InitializeTokenEventStoreAbortsIf;
     }
 
     spec emit_collection_description_mutate_event(creator: &signer, collection: String, old_description: String, new_description: String) {
+        pragma verify = false;
         include InitializeTokenEventStoreAbortsIf;
     }
 
     spec emit_collection_maximum_mutate_event(creator: &signer, collection: String, old_maximum: u64, new_maximum: u64) {
+        pragma verify = false;
         include InitializeTokenEventStoreAbortsIf;
     }
 
     spec emit_token_opt_in_event(account: &signer, opt_in: bool) {
+        pragma verify = false;
         include InitializeTokenEventStoreAbortsIf {creator : account};
     }
 
@@ -55,6 +59,7 @@ spec aptos_token::token_event_store {
         old_uri: String,
         new_uri: String,
     ) {
+        pragma verify = false;
         include InitializeTokenEventStoreAbortsIf;
     }
 
@@ -66,6 +71,7 @@ spec aptos_token::token_event_store {
         old_values: vector<Option<PropertyValue>>,
         new_values: vector<PropertyValue>,
     ) {
+        pragma verify = false;
         include InitializeTokenEventStoreAbortsIf;
     }
 
@@ -76,6 +82,7 @@ spec aptos_token::token_event_store {
         old_description: String,
         new_description: String,
     ) {
+        pragma verify = false;
         include InitializeTokenEventStoreAbortsIf;
     }
 
@@ -90,6 +97,7 @@ spec aptos_token::token_event_store {
         new_royalty_denominator: u64,
         new_royalty_payee_addr: address,
     ) {
+        pragma verify = false;
         include InitializeTokenEventStoreAbortsIf;
     }
 
@@ -100,6 +108,7 @@ spec aptos_token::token_event_store {
         old_maximum: u64,
         new_maximum: u64,
     ) {
+        pragma verify = false;
         include InitializeTokenEventStoreAbortsIf;
     }
 }

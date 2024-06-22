@@ -7,6 +7,10 @@ spec aptos_framework::function_info {
         pragma opaque;
     }
 
+    spec is_identifier {
+        pragma opaque;
+    }
+
     spec load_function_impl{
         pragma opaque;
     }

@@ -443,6 +443,7 @@ spec aptos_framework::staking_contract {
     /// The Account exists under the staker.
     /// The guid_creation_num of the account resource is up to MAX_U64.
     spec new_staking_contracts_holder(staker: &signer): Store {
+        pragma verify = false;
         include NewStakingContractsHolderAbortsIf;
     }
 

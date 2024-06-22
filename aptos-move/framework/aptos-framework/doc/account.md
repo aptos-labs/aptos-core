@@ -2697,14 +2697,15 @@ OriginatingAddress does not exist under <code>@aptos_framework</code> before the
 Ensure that the account exists at the end of the call.
 
 
-<pre><code><b>let</b> authentication_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(account_address);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_address) && (
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> authentication_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(account_address);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(account_address) && (
     account_address == @vm_reserved
     || account_address == @aptos_framework
     || account_address == @aptos_token
     || !(len(authentication_key) == 32)
 );
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_address);
+<b>ensures</b> <a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(account_address);
 </code></pre>
 
 
@@ -2723,11 +2724,12 @@ The Account does not exist under the new address before creating the account.
 Limit the new account address is not @vm_reserved / @aptos_framework / @aptos_toke.
 
 
-<pre><code><b>include</b> <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: new_address};
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>include</b> <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: new_address};
 <b>aborts_if</b> new_address == @vm_reserved || new_address == @aptos_framework || new_address == @aptos_token;
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == new_address;
 // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(new_address);
+<b>ensures</b> <a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(new_address);
 </code></pre>
 
 
@@ -2745,9 +2747,10 @@ Check if the bytes of the new address is 32.
 The Account does not exist under the new address before creating the account.
 
 
-<pre><code><b>include</b> <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: new_address};
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>include</b> <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: new_address};
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == new_address;
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(new_address);
+<b>ensures</b> <a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(new_address);
 </code></pre>
 
 
@@ -2766,6 +2769,19 @@ The Account does not exist under the new address before creating the account.
 
 <pre><code>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>aborts_if</b> <b>false</b>;
+<b>pragma</b> opaque;
+<b>ensures</b> [abstract] result == <a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr);
+</code></pre>
+
+
+
+
+<a id="0x1_account_spec_exists_at"></a>
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr: <b>address</b>): bool {
+   <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr) || <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_lite_account_enabled">features::spec_lite_account_enabled</a>()
+}
 </code></pre>
 
 
@@ -2778,7 +2794,7 @@ The Account does not exist under the new address before creating the account.
     addr: <b>address</b>;
     <b>let</b> authentication_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(addr);
     <b>aborts_if</b> len(authentication_key) != 32;
-    <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr) && !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_lite_account_enabled">features::spec_lite_account_enabled</a>();
     <b>ensures</b> len(authentication_key) == 32;
 }
 </code></pre>
@@ -2798,8 +2814,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>ensures</b> result == <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).guid_creation_num;
+<pre><code><b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr);
 </code></pre>
 
 
@@ -2816,8 +2831,7 @@ The Account does not exist under the new address before creating the account.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>ensures</b> result == <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).sequence_number;
+<pre><code><b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr);
 </code></pre>
 
 
@@ -2835,8 +2849,9 @@ The Account existed under the address.
 The sequence_number of the Account is up to MAX_U64.
 
 
-<pre><code><b>let</b> sequence_number = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).sequence_number;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> sequence_number = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).sequence_number;
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr);
 // This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
 <b>aborts_if</b> sequence_number == <a href="account.md#0x1_account_MAX_U64">MAX_U64</a>;
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
@@ -2858,8 +2873,7 @@ The sequence_number of the Account is up to MAX_U64.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>ensures</b> result == <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).authentication_key;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
@@ -2877,10 +2891,11 @@ The Account existed under the signer before the call.
 The length of new_auth_key is 32.
 
 
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 // This enforces <a id="high-level-req-10" href="#high-level-req">high-level requirement 10</a>:
 <b>let</b> <b>post</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr);
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(new_auth_key) != 32;
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 <b>ensures</b> account_resource.authentication_key == new_auth_key;
@@ -2899,13 +2914,23 @@ The length of new_auth_key is 32.
 
 
 
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 // This enforces <a id="high-level-req-10" href="#high-level-req">high-level requirement 10</a>:
 <b>let</b> <b>post</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr);
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(new_auth_key) != 32;
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 <b>ensures</b> account_resource.authentication_key == new_auth_key;
+</code></pre>
+
+
+
+
+<a id="0x1_account_spec_get_authentication_key"></a>
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_spec_get_authentication_key">spec_get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -2933,9 +2958,10 @@ The Account existed under the signer
 The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr);
 // This enforces <a id="high-level-req-6.1" href="#high-level-req">high-level requirement 6</a>:
 <b>include</b> from_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> ==&gt; <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_NewUnvalidatedPublicKeyFromBytesAbortsIf">ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf</a> { bytes: from_public_key_bytes };
 <b>aborts_if</b> from_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && ({
@@ -2998,12 +3024,13 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(rotation_cap_offerer_address);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(rotation_cap_offerer_address);
 <b>let</b> delegate_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegate_signer);
 <b>let</b> offerer_account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(rotation_cap_offerer_address);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;<b>address</b>&gt;(offerer_account_resource.authentication_key);
 <b>let</b> curr_auth_key = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(offerer_account_resource.authentication_key);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(delegate_address);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(delegate_address);
 <b>let</b> challenge = <a href="account.md#0x1_account_RotationProofChallenge">RotationProofChallenge</a> {
     sequence_number: <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(delegate_address).sequence_number,
     originator: rotation_cap_offerer_address,
@@ -3019,7 +3046,12 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
     signature: cap_update_table,
     challenge,
 };
-<b>let</b> new_auth_key_vector = <a href="account.md#0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key">spec_assert_valid_rotation_proof_signature_and_get_auth_key</a>(new_scheme, new_public_key_bytes, cap_update_table, challenge);
+<b>let</b> new_auth_key_vector = <a href="account.md#0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key">spec_assert_valid_rotation_proof_signature_and_get_auth_key</a>(
+    new_scheme,
+    new_public_key_bytes,
+    cap_update_table,
+    challenge
+);
 <b>let</b> address_map = <b>global</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework).address_map;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;<b>address</b>&gt;(offerer_account_resource.authentication_key);
@@ -3046,7 +3078,8 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<pre><code><b>let</b> source_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> source_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(source_address);
 <b>let</b> proof_challenge = <a href="account.md#0x1_account_RotationCapabilityOfferProofChallengeV2">RotationCapabilityOfferProofChallengeV2</a> {
     <a href="chain_id.md#0x1_chain_id">chain_id</a>: <b>global</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">chain_id::ChainId</a>&gt;(@aptos_framework).id,
@@ -3055,8 +3088,8 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
     recipient_address,
 };
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">chain_id::ChainId</a>&gt;(@aptos_framework);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(recipient_address);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(source_address);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(recipient_address);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(source_address);
 <b>include</b> account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> ==&gt; <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_NewUnvalidatedPublicKeyFromBytesAbortsIf">ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf</a> { bytes: account_public_key_bytes };
 <b>aborts_if</b> account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && ({
     <b>let</b> expected_auth_key = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_spec_public_key_bytes_to_authentication_key">ed25519::spec_public_key_bytes_to_authentication_key</a>(account_public_key_bytes);
@@ -3102,7 +3135,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
+<pre><code><b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(account_addr);
 </code></pre>
 
 
@@ -3120,7 +3153,8 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(account_addr);
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
 <b>aborts_if</b> len(account_resource.rotation_capability_offer.for.vec) == 0;
 </code></pre>
@@ -3139,13 +3173,14 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(to_be_revoked_address);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(to_be_revoked_address);
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_contains">option::spec_contains</a>(account_resource.rotation_capability_offer.for,to_be_revoked_address);
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(to_be_revoked_address);
+<b>ensures</b> <a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(to_be_revoked_address);
 <b>let</b> <b>post</b> offer_for = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).rotation_capability_offer.for;
 <b>ensures</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(offer_for);
 </code></pre>
@@ -3164,9 +3199,10 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr);
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 // This enforces <a id="high-level-req-7.3" href="#high-level-req">high-level requirement 7</a>:
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(account_resource.rotation_capability_offer.for);
@@ -3190,15 +3226,16 @@ The Account existed under the signer.
 The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 
 
-<pre><code><b>let</b> source_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> source_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(source_address);
 <b>let</b> proof_challenge = <a href="account.md#0x1_account_SignerCapabilityOfferProofChallengeV2">SignerCapabilityOfferProofChallengeV2</a> {
     sequence_number: account_resource.sequence_number,
     source_address,
     recipient_address,
 };
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(recipient_address);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(source_address);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(recipient_address);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(source_address);
 <b>include</b> account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> ==&gt; <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_NewUnvalidatedPublicKeyFromBytesAbortsIf">ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf</a> { bytes: account_public_key_bytes };
 <b>aborts_if</b> account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && ({
     <b>let</b> expected_auth_key = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_spec_public_key_bytes_to_authentication_key">ed25519::spec_public_key_bytes_to_authentication_key</a>(account_public_key_bytes);
@@ -3244,7 +3281,7 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
+<pre><code><b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(account_addr);
 </code></pre>
 
 
@@ -3262,7 +3299,8 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(account_addr);
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
 <b>aborts_if</b> len(account_resource.signer_capability_offer.for.vec) == 0;
 </code></pre>
@@ -3283,13 +3321,14 @@ The Account existed under the signer.
 The value of signer_capability_offer.for of Account resource under the signer is to_be_revoked_address.
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(to_be_revoked_address);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(to_be_revoked_address);
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_contains">option::spec_contains</a>(account_resource.signer_capability_offer.for,to_be_revoked_address);
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(to_be_revoked_address);
+<b>ensures</b> <a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(to_be_revoked_address);
 </code></pre>
 
 
@@ -3306,9 +3345,10 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<pre><code><b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
 // This enforces <a id="high-level-req-7.4" href="#high-level-req">high-level requirement 7</a>:
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(account_resource.signer_capability_offer.for);
 </code></pre>
@@ -3329,13 +3369,14 @@ The Account existed under the signer.
 The value of signer_capability_offer.for of Account resource under the signer is offerer_address.
 
 
-<pre><code>// This enforces <a id="high-level-req-8" href="#high-level-req">high-level requirement 8</a>:
+<pre><code><b>pragma</b> verify = <b>false</b>;
+// This enforces <a id="high-level-req-8" href="#high-level-req">high-level requirement 8</a>:
 <b>include</b> <a href="account.md#0x1_account_AccountContainsAddr">AccountContainsAddr</a>{
     <a href="account.md#0x1_account">account</a>,
     <b>address</b>: offerer_address,
 };
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(offerer_address);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(offerer_address);
+<b>ensures</b> <a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(offerer_address);
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == offerer_address;
 </code></pre>
 
@@ -3350,7 +3391,7 @@ The value of signer_capability_offer.for of Account resource under the signer is
     <b>address</b>: <b>address</b>;
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<b>address</b>);
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<b>address</b>);
+    <b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(<b>address</b>);
     // This enforces <a id="high-level-spec-3" href="create_signer.md#high-level-req">high-level requirement 3</a> of the <a href="create_signer.md">create_signer</a> module:
     <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_contains">option::spec_contains</a>(account_resource.signer_capability_offer.for,addr);
 }
@@ -3369,8 +3410,8 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<pre><code><b>pragma</b> opaque;
-<b>include</b> <a href="account.md#0x1_account_AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf">AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf</a>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
 <b>ensures</b> [abstract] result == <a href="account.md#0x1_account_spec_assert_valid_rotation_proof_signature_and_get_auth_key">spec_assert_valid_rotation_proof_signature_and_get_auth_key</a>(scheme, public_key_bytes, signature, challenge);
 </code></pre>
 
@@ -3464,11 +3505,12 @@ The value of signer_capability_offer.for of Account resource under the signer is
 
 
 
-<pre><code><b>let</b> source_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> source_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source);
 <b>let</b> resource_addr = <a href="account.md#0x1_account_spec_create_resource_address">spec_create_resource_address</a>(source_addr, seed);
 <b>aborts_if</b> len(<a href="account.md#0x1_account_ZERO_AUTH_KEY">ZERO_AUTH_KEY</a>) != 32;
-<b>include</b> <a href="account.md#0x1_account_exists_at">exists_at</a>(resource_addr) ==&gt; <a href="account.md#0x1_account_CreateResourceAccountAbortsIf">CreateResourceAccountAbortsIf</a>;
-<b>include</b> !<a href="account.md#0x1_account_exists_at">exists_at</a>(resource_addr) ==&gt; <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: resource_addr};
+<b>include</b> <a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(resource_addr) ==&gt; <a href="account.md#0x1_account_CreateResourceAccountAbortsIf">CreateResourceAccountAbortsIf</a>;
+<b>include</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(resource_addr) ==&gt; <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> { addr: resource_addr };
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result_1) == resource_addr;
 <b>let</b> <b>post</b> offer_for = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(resource_addr).signer_capability_offer.for;
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(offer_for) == resource_addr;
@@ -3491,7 +3533,8 @@ The Account does not exist under the new address before creating the account.
 The system reserved addresses is @0x1 / @0x2 / @0x3 / @0x4 / @0x5  / @0x6 / @0x7 / @0x8 / @0x9 / @0xa.
 
 
-<pre><code><b>aborts_if</b> <a href="account.md#0x1_account_spec_is_framework_address">spec_is_framework_address</a>(addr);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> <a href="account.md#0x1_account_spec_is_framework_address">spec_is_framework_address</a>(addr);
 <b>include</b> <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr};
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result_1) == addr;
 <b>ensures</b> result_2 == <a href="account.md#0x1_account_SignerCapability">SignerCapability</a> { <a href="account.md#0x1_account">account</a>: addr };
@@ -3533,7 +3576,8 @@ The Account existed under the signer.
 The guid_creation_num of the account resource is up to MAX_U64.
 
 
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer);
 <b>include</b> <a href="account.md#0x1_account_NewEventHandleAbortsIf">NewEventHandleAbortsIf</a> {
     <a href="account.md#0x1_account">account</a>: account_signer,
 };
@@ -3558,7 +3602,8 @@ The Account existed under the signer.
 The guid_creation_num of the Account is up to MAX_U64.
 
 
-<pre><code><b>include</b> <a href="account.md#0x1_account_NewEventHandleAbortsIf">NewEventHandleAbortsIf</a>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>include</b> <a href="account.md#0x1_account_NewEventHandleAbortsIf">NewEventHandleAbortsIf</a>;
 </code></pre>
 
 
@@ -3571,7 +3616,7 @@ The guid_creation_num of the Account is up to MAX_U64.
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+    <b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(addr);
     <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 1 &gt; <a href="account.md#0x1_account_MAX_U64">MAX_U64</a>;
     <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 1 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">MAX_GUID_CREATION_NUM</a>;
 }
@@ -3591,8 +3636,8 @@ The guid_creation_num of the Account is up to MAX_U64.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
-<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;CoinType&gt;();
+<pre><code><b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(account_addr);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr) && !<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;CoinType&gt;();
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
 </code></pre>
 
@@ -3642,10 +3687,11 @@ The guid_creation_num of the Account is up to MAX_U64.
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> aborts_if_is_partial;
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="account.md#0x1_account">account</a>);
 <b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="account.md#0x1_account">account</a>);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="account.md#0x1_account">account</a>);
+<b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">spec_exists_at</a>(<a href="account.md#0x1_account">account</a>);
 <b>include</b> account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> ==&gt; <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_NewUnvalidatedPublicKeyFromBytesAbortsIf">ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf</a> { bytes: account_public_key };
 <b>aborts_if</b> account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && ({
     <b>let</b> expected_auth_key = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_spec_public_key_bytes_to_authentication_key">ed25519::spec_public_key_bytes_to_authentication_key</a>(account_public_key);

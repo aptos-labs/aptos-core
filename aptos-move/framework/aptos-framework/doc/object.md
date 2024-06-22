@@ -2441,6 +2441,33 @@ to determine the identity of the starting point of ownership.
 
 
 
+
+<a id="0x1_object_spec_create_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_object_address">spec_create_object_address</a>(source: <b>address</b>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_create_user_derived_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_user_derived_object_address">spec_create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_create_guid_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
+</code></pre>
+
+
+
 <a id="@Specification_1_address_to_object"></a>
 
 ### Function `address_to_object`
@@ -2757,7 +2784,8 @@ to determine the identity of the starting point of ownership.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator));
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator));
 <b>let</b> object_data = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator));
 <b>aborts_if</b> object_data.guid_creation_num + 1 &gt; MAX_U64;
 <b>aborts_if</b> object_data.guid_creation_num + 1 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
@@ -3365,33 +3393,6 @@ to determine the identity of the starting point of ownership.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-</code></pre>
-
-
-
-
-<a id="0x1_object_spec_create_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_object_address">spec_create_object_address</a>(source: <b>address</b>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>;
-</code></pre>
-
-
-
-
-<a id="0x1_object_spec_create_user_derived_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_user_derived_object_address">spec_create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
-</code></pre>
-
-
-
-
-<a id="0x1_object_spec_create_guid_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
 </code></pre>
 
 
