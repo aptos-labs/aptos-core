@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: resource indexing can only applied to a resource type (a struct type which has key ability)
+  ┌─ tests/ability-check/index_ability_err_2.move:9:17
+  │
+9 │         let _ = X<bool>[addr];
+  │                 ^^^^^^^^^^^^^

@@ -2,7 +2,7 @@ module 0x42::test {
 
     struct R has key, drop { value: bool }
 
-    spec schema Test {
+    spec schema UNUSED_Test {
     }
 
     fun test_no_ref_for_resource() acquires R {
@@ -11,12 +11,12 @@ module 0x42::test {
     }
 
     fun test_no_schema() {
-        Test[@0x1];
+        UNUSED_Test[@0x1];
     }
 
     fun test_no_schema_ref() {
         use 0x42::test;
-        &test::Test[@0x1];
+        &test::UNUSED_Test[@0x1];
     }
 
 }
