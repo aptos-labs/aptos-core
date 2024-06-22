@@ -8,13 +8,12 @@ module 0x42::test {
 
     fun test_resource_1() acquires R {
         use 0x42::test;
-        assert!((&test::R[@0x1]).value == true, 0);
+        assert!((test::R[@0x1]).value == true, 0);
     }
 
     fun test_resource_2() acquires R {
-        let x = &mut 0x42::test::R[@0x1];
-        x.value = false;
-        assert!((&R[@0x1]).value == false, 1);
+        0x42::test::R[@0x1].value = false;
+        assert!(R[@0x1].value == false, 1);
     }
 
     struct X<M> has copy, drop, store {
@@ -36,14 +35,14 @@ module 0x42::test {
 
     fun test_resource_3() {
         use 0x42::test;
-        assert!((&test::Y<X<bool>>[@0x1]).field.value == true, 0);
+        assert!(test::Y<X<bool>>[@0x1].field.value == true, 0);
     }
 
     fun test_resource_4() {
         let addr = @0x1;
         let y = &mut 0x42::test ::Y<X<bool>> [addr];
         y.field.value = false;
-        assert!((&Y<X<bool>>[addr]) .field.value == false, 1);
+        assert!(Y<X<bool>>[addr].field.value == false, 1);
     }
 
     fun test_vector() {
@@ -68,8 +67,8 @@ module 0x42::test {
             field: x2
         };
         let v = vector[y1, y2];
-        assert!((&v[0]).field.value == true, 0);
-        assert!((&v[1]).field.value == false, 0);
+        assert!(v[0].field.value == true, 0);
+        assert!(v[1].field.value == false, 0);
     }
 
     fun test_vector_borrow_mut() {
@@ -86,12 +85,12 @@ module 0x42::test {
             field: x2
         };
         let v = vector[y1, y2];
-        assert!((&v[0]).field.value == true, 0);
-        assert!((&v[1]).field.value == false, 0);
-        (&mut v[0]).field.value = false;
-        (&mut v[1]).field.value = true;
-        assert!((&v[0]).field.value == false, 0);
-        assert!((&v[1]).field.value == true, 0);
+        assert!(v[0].field.value == true, 0);
+        assert!(v[1].field.value == false, 0);
+        v[0].field.value = false;
+        v[1].field.value = true;
+        assert!(v[0].field.value == false, 0);
+        assert!(v[1].field.value == true, 0);
     }
 
 

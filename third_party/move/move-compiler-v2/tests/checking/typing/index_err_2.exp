@@ -1,7 +1,7 @@
 
 Diagnostics:
-error: cannot pass `&X<integer>` to a function which expects argument of type `&vector<_>`
+error: expected `vector<struct{value}>` but found a value of type `X<integer>`
    ┌─ tests/checking/typing/index_err_2.move:11:17
    │
 11 │         assert!(x[0].value == 2, 0);
-   │                 ^^^^
+   │                 ^
