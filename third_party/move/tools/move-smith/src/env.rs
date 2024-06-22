@@ -5,16 +5,19 @@
 
 use crate::{
     config::Config,
-    names::{Identifier, IdentifierPool, IdentifierType as IDType, Scope},
+    names::{Identifier, IdentifierKind as IDKind, IdentifierPool, Scope},
     types::{Type, TypePool},
 };
 use arbitrary::Unstructured;
 use log::trace;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Default)]
 pub struct Env {
     pub id_pool: IdentifierPool,
     pub type_pool: TypePool,
+
+    pub live_vars: LiveVarPool,
 
     /// For controlling the depth of the generated expressions/types
     max_expr_depth: usize,
@@ -27,12 +30,75 @@ pub struct Env {
     type_depth_history: Vec<usize>,
 }
 
+/// Keep track of if a variable is still alive within a certain scope
+///
+/// If a variable might be dead, it is dead.
+/// e.g. if a variable is consumer in one branch of an ITE, it is considered used.
+#[derive(Debug, Default)]
+pub struct LiveVarPool {
+    scopes: BTreeMap<Scope, BTreeSet<Identifier>>,
+}
+
+impl LiveVarPool {
+    /// Create am empty LiveVarPool
+    pub fn new() -> Self {
+        Self {
+            scopes: BTreeMap::new(),
+        }
+    }
+
+    /// Check if an identifier is still alive in any parent scope
+    pub fn is_live(&self, scope: &Scope, id: &Identifier) -> bool {
+        scope
+            .ancestors()
+            .iter()
+            .rev()
+            .any(|s| self.is_live_curr(s, id))
+    }
+
+    /// Check if an identifier is still alive strictly in the given scope
+    pub fn is_live_curr(&self, scope: &Scope, id: &Identifier) -> bool {
+        self.scopes.get(scope).map_or(false, |s| s.contains(id))
+    }
+
+    /// Filter out non-live identifiers
+    pub fn filter_live_vars(&self, scope: &Scope, ids: Vec<Identifier>) -> Vec<Identifier> {
+        ids.into_iter()
+            .filter(|id| self.is_live(scope, id))
+            .collect()
+    }
+
+    /// Mark an identifier as alive in the given scope and all its parent scopes
+    pub fn mark_alive(&mut self, scope: &Scope, id: &Identifier) {
+        let live_vars = self.scopes.entry(scope.clone()).or_default();
+        live_vars.insert(id.clone());
+    }
+
+    /// Mark an identifier as dead
+    pub fn mark_dead(&mut self, scope: &Scope, id: &Identifier) {
+        // To mark an identifier as dead, we assume it's already in the live set.
+        // If not, it's probably a bug so we panic on unwrap.
+        let live_vars = self.scopes.get_mut(scope).unwrap();
+        live_vars.remove(id);
+    }
+
+    // pub fn merge_live_vars(&mut self, parent: &Scope, left: &Scope, right: &Scope) {
+    //     let left_live_vars = self.scopes.get(left).unwrap();
+    //     let right_live_vars = self.scopes.get(right).unwrap();
+    //     let parent_live_vars = self.scopes.entry(parent.clone()).or_insert(BTreeSet::new());
+    //     parent_live_vars.extend(left_live_vars.iter());
+    //     parent_live_vars.extend(right_live_vars.iter());
+    // }
+}
+
 impl Env {
     /// Create a new environment with the given configuration
     pub fn new(config: &Config) -> Self {
         Self {
             id_pool: IdentifierPool::new(),
             type_pool: TypePool::new(),
+
+            live_vars: LiveVarPool::new(),
 
             max_expr_depth: config.max_expr_depth,
             max_expr_depth_history: vec![],
@@ -50,12 +116,12 @@ impl Env {
     pub fn get_identifiers(
         &self,
         typ: Option<&Type>,
-        ident_type: Option<IDType>,
+        ident_kind: Option<IDKind>,
         scope: Option<&Scope>,
     ) -> Vec<Identifier> {
-        // Filter based on the IDType
-        let all_ident = match ident_type {
-            Some(t) => self.id_pool.get_identifiers_of_ident_type(t),
+        // Filter based on the IDKind
+        let all_ident = match ident_kind {
+            Some(t) => self.id_pool.get_identifiers_of_ident_kind(t),
             None => self.id_pool.get_all_identifiers(),
         };
 
@@ -77,8 +143,14 @@ impl Env {
         // i.e. the one just declared but the RHS of assign is not finished yet
         type_matched
             .into_iter()
-            .filter(|id| self.type_pool.get_type(id).is_some())
+            .filter(|id: &Identifier| self.type_pool.get_type(id).is_some())
             .collect()
+    }
+
+    ///
+    pub fn live_variables(&self, scope: &Scope, typ: Option<&Type>) -> Vec<Identifier> {
+        let ids = self.get_identifiers(typ, Some(IDKind::Var), Some(scope));
+        self.live_vars.filter_live_vars(scope, ids)
     }
 
     /// Return whether the current expression depth has reached the limit

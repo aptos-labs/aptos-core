@@ -22,7 +22,7 @@ use crate::{
     codegen::CodeGenerator,
     config::Config,
     env::Env,
-    names::{Identifier, IdentifierType as IDType, Scope, ROOT_SCOPE},
+    names::{Identifier, IdentifierKind as IDKinds, Scope, ROOT_SCOPE},
     types::{Ability, Type, TypeParameter},
     utils::choose_idx_weighted,
 };
@@ -150,7 +150,7 @@ impl MoveSmith {
     /// Generate a module skeleton with only struct and function skeletions.
     fn generate_module_skeleton(&self, u: &mut Unstructured) -> Result<Module> {
         let hardcoded_address = Scope(Some("0xCAFE".to_string()));
-        let (name, scope) = self.get_next_identifier(IDType::Module, &hardcoded_address);
+        let (name, scope) = self.get_next_identifier(IDKinds::Module, &hardcoded_address);
 
         // Struct names
         let mut structs = Vec::new();
@@ -159,7 +159,7 @@ impl MoveSmith {
         }
 
         // Generate a struct with all abilities to avoid having no type to choose for some type parameters
-        let (struct_name, _) = self.get_next_identifier(IDType::Struct, &scope);
+        let (struct_name, _) = self.get_next_identifier(IDKinds::Struct, &scope);
         self.env_mut()
             .type_pool
             .register_type(Type::Struct(struct_name.clone()));
@@ -218,7 +218,9 @@ impl MoveSmith {
         // Each task is simply the flat name of the runner function
         for r in all_runners.into_iter() {
             let module_flat = self.env().id_pool.flatten_access(&module.borrow().name);
-            let run_flat = Identifier(format!("{}::{}", module_flat.0, r.signature.name.0));
+
+            let runner_name = format!("{}::{}", module_flat.name, r.signature.name.name);
+            let run_flat = Identifier::new(runner_name, IDKinds::Function);
             self.runs.borrow_mut().push(run_flat);
             module.borrow_mut().functions.push(RefCell::new(r));
         }
@@ -275,7 +277,10 @@ impl MoveSmith {
             let runner = Function {
                 signature: FunctionSignature {
                     type_parameters: Vec::new(),
-                    name: Identifier(format!("{}_runner_{}", signature.name.0, i)),
+                    name: Identifier::new(
+                        format!("{}_runner_{}", signature.name.name, i),
+                        IDKinds::Function,
+                    ),
                     parameters: Vec::new(),
                     return_type: new_ret,
                 },
@@ -293,7 +298,7 @@ impl MoveSmith {
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<StructDefinition> {
-        let (name, _) = self.get_next_identifier(IDType::Struct, parent_scope);
+        let (name, _) = self.get_next_identifier(IDKinds::Struct, parent_scope);
 
         let mut ability_choices = vec![Ability::Store, Ability::Key];
         // TODO: Drop is added for all struct to avoid E05001 for now
@@ -325,7 +330,7 @@ impl MoveSmith {
     ) -> Result<()> {
         let struct_scope = st.borrow().name.to_scope();
         for _ in 0..u.int_in_range(0..=self.config.borrow().max_num_fields_in_struct)? {
-            let (name, _) = self.get_next_identifier(IDType::Var, &struct_scope);
+            let (name, _) = self.get_next_identifier(IDKinds::Var, &struct_scope);
 
             let typ = loop {
                 match u.int_in_range(0..=2)? {
@@ -366,7 +371,7 @@ impl MoveSmith {
     ) -> Vec<StructDefinition> {
         let ids = self
             .env()
-            .get_identifiers(None, Some(IDType::Struct), Some(scope));
+            .get_identifiers(None, Some(IDKinds::Struct), Some(scope));
         ids.iter()
             .filter_map(|s| {
                 let struct_def = self.get_struct_definition_with_identifier(s).unwrap();
@@ -425,7 +430,7 @@ impl MoveSmith {
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Function> {
-        let (name, scope) = self.get_next_identifier(IDType::Function, parent_scope);
+        let (name, scope) = self.get_next_identifier(IDKinds::Function, parent_scope);
         let signature: FunctionSignature = self.generate_function_signature(u, &scope, name)?;
 
         // Keep track of the function signature separately so that we don't have
@@ -454,6 +459,13 @@ impl MoveSmith {
             "Creating block for the body of function: {:?}",
             signature.name
         );
+
+        // Before generating the function body,
+        // we need to make sure that the arguments are alive
+        for (arg, _) in signature.parameters.iter() {
+            self.env_mut().live_vars.mark_alive(&scope, arg);
+        }
+
         let body = self.generate_block(u, &scope, None, signature.return_type.clone())?;
         function.borrow_mut().body = Some(body);
         Ok(())
@@ -487,7 +499,7 @@ impl MoveSmith {
         let num_params = u.int_in_range(0..=self.config.borrow().max_num_params_in_func)?;
         let mut parameters = Vec::new();
         for _ in 0..num_params {
-            let (name, _) = self.get_next_identifier(IDType::Var, parent_scope);
+            let (name, _) = self.get_next_identifier(IDKinds::Var, parent_scope);
 
             // TODO: currently struct is not allowed in signature because script
             // TODO: cannot create structs
@@ -511,7 +523,7 @@ impl MoveSmith {
         // something to return
         if let Some(ret_ty @ Type::TypeParameter(_)) = &return_type {
             if !parameters.iter().any(|(_, param_ty)| param_ty == ret_ty) {
-                let (name, _) = self.get_next_identifier(IDType::Var, parent_scope);
+                let (name, _) = self.get_next_identifier(IDKinds::Var, parent_scope);
                 self.env_mut().type_pool.insert_mapping(&name, ret_ty);
                 parameters.push((name, ret_ty.clone()));
             }
@@ -536,7 +548,7 @@ impl MoveSmith {
         include: Option<Vec<Ability>>,
         exclude: Option<Vec<Ability>>,
     ) -> Result<TypeParameter> {
-        let (name, _) = self.get_next_identifier(IDType::TypeParameter, parent_scope);
+        let (name, _) = self.get_next_identifier(IDKinds::TypeParameter, parent_scope);
 
         let is_phantom = match allow_phantom {
             true => bool::arbitrary(u)?,
@@ -590,7 +602,7 @@ impl MoveSmith {
             parent_scope,
             self.env().curr_expr_depth()
         );
-        let (_, block_scope) = self.get_next_identifier(IDType::Block, parent_scope);
+        let (_, block_scope) = self.get_next_identifier(IDKinds::Block, parent_scope);
         trace!("Created block scope: {:?}", block_scope);
 
         let reach_limit = self.env().will_reached_expr_depth_limit(1);
@@ -618,18 +630,10 @@ impl MoveSmith {
         parent_scope: &Scope,
         typ: &Type,
     ) -> Result<Expression> {
-        let ids = self
-            .env()
-            .get_identifiers(Some(typ), Some(IDType::Var), Some(parent_scope));
-        match ids.is_empty() {
-            true => {
-                let expr = self.generate_expression_of_type(u, parent_scope, typ, true, true)?;
-                Ok(expr)
-            },
-            false => {
-                let ident = u.choose(&ids)?.clone();
-                Ok(Expression::Variable(ident))
-            },
+        let var_acc = self.generate_varible_access(u, parent_scope, false, Some(typ))?;
+        match var_acc {
+            Some(va) => Ok(Expression::Variable(va)),
+            None => Ok(self.generate_expression_of_type(u, parent_scope, typ, true, true)?),
         }
     }
 
@@ -671,7 +675,7 @@ impl MoveSmith {
         trace!("Generating assignment");
         let idents = self
             .env()
-            .get_identifiers(None, Some(IDType::Var), Some(parent_scope));
+            .get_identifiers(None, Some(IDKinds::Var), Some(parent_scope));
         if idents.is_empty() {
             return Ok(None);
         }
@@ -690,7 +694,10 @@ impl MoveSmith {
         u: &mut Unstructured,
         parent_scope: &Scope,
     ) -> Result<Declaration> {
-        let (name, _) = self.get_next_identifier(IDType::Var, parent_scope);
+        let (name, _) = self.get_next_identifier(IDKinds::Var, parent_scope);
+
+        // Mark newly created variable as alive
+        self.env_mut().live_vars.mark_alive(parent_scope, &name);
 
         // TODO: we should not omit type parameter as we can call a function to get an object of that type
         let typ = self.get_random_type(u, parent_scope, true, true, false, false)?;
@@ -737,7 +744,7 @@ impl MoveSmith {
         // Check if there are any assignable variables in the current scope
         let assign_weight = match self
             .env()
-            .get_identifiers(None, Some(IDType::Var), Some(parent_scope))
+            .get_identifiers(None, Some(IDKinds::Var), Some(parent_scope))
             .is_empty()
         {
             true => 0,
@@ -987,14 +994,9 @@ impl MoveSmith {
 
         // Access identifier with the given type
         if allow_var {
-            let idents =
-                self.env()
-                    .get_identifiers(Some(typ), Some(IDType::Var), Some(parent_scope));
-
-            // TODO: select from many?
-            if !idents.is_empty() {
-                let candidate = u.choose(&idents)?.clone();
-                let expr = Expression::Variable(candidate);
+            let var_acc = self.generate_varible_access(u, parent_scope, true, Some(typ));
+            if let Some(va) = var_acc? {
+                let expr = Expression::Variable(va);
                 default_choices.push(expr.clone());
                 choices.push(expr);
             }
@@ -1069,6 +1071,34 @@ impl MoveSmith {
             false => choices,
         };
         Ok(u.choose(&use_choice)?.clone())
+    }
+
+    /// Generate a valid varibale access
+    /// If `typ` is given, the chosen varibale will have the same type.
+    fn generate_varible_access(
+        &self,
+        u: &mut Unstructured,
+        parent_scope: &Scope,
+        allow_copy: bool,
+        typ: Option<&Type>,
+    ) -> Result<Option<VariableAccess>> {
+        let idents = self.env().live_variables(parent_scope, typ);
+        // No live variable to use in the scope
+        // TODO: consider generate a declaration with assignment here?
+        if idents.is_empty() {
+            return Ok(None);
+        }
+
+        let chosen = u.choose(&idents)?.clone();
+        let abilities = self.derive_abilities_of_var(&chosen);
+
+        // Randomly choose to explicitly copy or not
+        let copy = if allow_copy && abilities.contains(&Ability::Copy) {
+            bool::arbitrary(u)?
+        } else {
+            false
+        };
+        Ok(Some(VariableAccess { name: chosen, copy }))
     }
 
     /// Generate an If expression
@@ -1512,7 +1542,7 @@ impl MoveSmith {
         if allow_struct {
             let struct_ids = self
                 .env()
-                .get_identifiers(None, Some(IDType::Struct), Some(scope));
+                .get_identifiers(None, Some(IDKinds::Struct), Some(scope));
             let structs = struct_ids
                 .iter()
                 .map(|id: &Identifier| (Type::Struct(id.clone()), 1))
@@ -1528,7 +1558,7 @@ impl MoveSmith {
         if allow_type_param {
             let mut params = self
                 .env()
-                .get_identifiers(None, Some(IDType::TypeParameter), Some(scope))
+                .get_identifiers(None, Some(IDKinds::TypeParameter), Some(scope))
                 .into_iter()
                 .map(|id| self.env().type_pool.get_type(&id).unwrap())
                 .collect::<Vec<Type>>();
@@ -1561,7 +1591,7 @@ impl MoveSmith {
     fn filter_instantiatable_types(&self, scope: &Scope, types: Vec<Type>) -> Vec<Type> {
         let instantiatables = self
             .env()
-            .get_identifiers(None, Some(IDType::Var), Some(scope))
+            .get_identifiers(None, Some(IDKinds::Var), Some(scope))
             .into_iter()
             .filter_map(|id| self.env().type_pool.get_type(&id))
             .collect::<BTreeSet<Type>>();
@@ -1632,7 +1662,7 @@ impl MoveSmith {
     /// Get the possible abilities of a struct type.
     /// Only give the upper bound of possible abilities.
     /// TODO: this should belong to the type.rs or somewhere else
-    pub fn derive_abilities_of_type(&self, typ: &Type) -> Vec<Ability> {
+    fn derive_abilities_of_type(&self, typ: &Type) -> Vec<Ability> {
         match typ {
             Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::U128 | Type::U256 | Type::Bool => {
                 Vec::from(Ability::PRIMITIVES)
@@ -1648,8 +1678,18 @@ impl MoveSmith {
         }
     }
 
+    /// Helper to
+    fn derive_abilities_of_var(&self, var: &Identifier) -> Vec<Ability> {
+        let typ = self.env().type_pool.get_type(var).unwrap();
+        self.derive_abilities_of_type(&typ)
+    }
+
     /// Helper to get the next identifier.
-    fn get_next_identifier(&self, ident_type: IDType, parent_scope: &Scope) -> (Identifier, Scope) {
+    fn get_next_identifier(
+        &self,
+        ident_type: IDKinds,
+        parent_scope: &Scope,
+    ) -> (Identifier, Scope) {
         self.env_mut()
             .id_pool
             .next_identifier(ident_type, parent_scope)

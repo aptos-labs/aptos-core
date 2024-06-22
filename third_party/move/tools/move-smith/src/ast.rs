@@ -126,7 +126,7 @@ pub struct Declaration {
 #[derive(Debug, Clone)]
 pub enum Expression {
     NumberLiteral(NumberLiteral),
-    Variable(Identifier),
+    Variable(VariableAccess),
     Boolean(bool),
     FunctionCall(FunctionCall),
     StructInitialization(StructInitialization),
@@ -134,6 +134,13 @@ pub enum Expression {
     Assign(Box<Assignment>),
     BinaryOperation(Box<BinaryOperation>),
     IfElse(Box<IfExpr>),
+}
+
+/// Represents a variable access
+#[derive(Debug, Clone)]
+pub struct VariableAccess {
+    pub name: Identifier,
+    pub copy: bool,
 }
 
 // If Expression

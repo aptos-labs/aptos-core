@@ -4,7 +4,7 @@
 //! Custom data structures for Move types.
 //! Manages typing information during generation.
 
-use crate::names::Identifier;
+use crate::names::{Identifier, IdentifierKind as IDKind};
 use std::collections::BTreeMap;
 
 /// Collection of Move types.
@@ -81,18 +81,20 @@ impl Type {
     /// from the IdentifierPool.
     pub fn get_name(&self) -> Identifier {
         match self {
-            Type::U8 => Identifier("U8".to_string()),
-            Type::U16 => Identifier("U16".to_string()),
-            Type::U32 => Identifier("U32".to_string()),
-            Type::U64 => Identifier("U64".to_string()),
-            Type::U128 => Identifier("U128".to_string()),
-            Type::U256 => Identifier("U256".to_string()),
-            Type::Bool => Identifier("Bool".to_string()),
-            Type::Address => Identifier("Address".to_string()),
-            Type::Signer => Identifier("Signer".to_string()),
-            Type::Vector(t) => Identifier(format!("Vector<{}>", t.get_name().0)),
-            Type::Ref(t) => Identifier(format!("&{}", t.get_name().0)),
-            Type::MutRef(t) => Identifier(format!("&mut {}", t.get_name().0)),
+            Type::U8 => Identifier::new_str("U8", IDKind::Type),
+            Type::U16 => Identifier::new_str("U16", IDKind::Type),
+            Type::U32 => Identifier::new_str("U32", IDKind::Type),
+            Type::U64 => Identifier::new_str("U64", IDKind::Type),
+            Type::U128 => Identifier::new_str("U128", IDKind::Type),
+            Type::U256 => Identifier::new_str("U256", IDKind::Type),
+            Type::Bool => Identifier::new_str("Bool", IDKind::Type),
+            Type::Address => Identifier::new_str("Address", IDKind::Type),
+            Type::Signer => Identifier::new_str("Signer", IDKind::Type),
+            Type::Vector(t) => {
+                Identifier::new(format!("Vector<{}>", t.get_name().name), IDKind::Type)
+            },
+            Type::Ref(t) => Identifier::new(format!("&{}", t.get_name().name), IDKind::Type),
+            Type::MutRef(t) => Identifier::new(format!("&mut {}", t.get_name().name), IDKind::Type),
             Type::Struct(id) => id.clone(),
             Type::Function(id) => id.clone(),
             Type::TypeParameter(tp) => tp.name.clone(),

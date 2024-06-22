@@ -3,21 +3,27 @@
 
 use arbitrary::Unstructured;
 use move_smith::{
-    ast::*, codegen::*, config::*, move_smith::*, names::Identifier, types::*, utils::*,
+    ast::*,
+    codegen::*,
+    config::*,
+    move_smith::*,
+    names::{Identifier, IdentifierKind as IDKind},
+    types::*,
+    utils::*,
 };
 use num_bigint::BigUint;
 use std::cell::RefCell;
 
 fn simple_module() -> Module {
     Module {
-        name: Identifier(String::from("SimpleModule")),
+        name: Identifier::new_str("SimpleModule", IDKind::Module),
         functions: vec![RefCell::new(Function {
             signature: FunctionSignature {
                 type_parameters: Vec::new(),
-                name: Identifier(String::from("fun1")),
+                name: Identifier::new_str("fun1", IDKind::Function),
                 parameters: vec![
-                    (Identifier(String::from("param1")), Type::U64),
-                    (Identifier(String::from("param2")), Type::U8),
+                    (Identifier::new_str("param1", IDKind::Var), Type::U64),
+                    (Identifier::new_str("param2", IDKind::Var), Type::U8),
                 ],
                 return_type: Some(Type::U32),
             },
@@ -40,7 +46,7 @@ fn simple_module() -> Module {
 fn simple_script() -> Script {
     Script {
         main: vec![FunctionCall {
-            name: Identifier(String::from("0xCAFE::SimpleModule::fun1")),
+            name: Identifier::new_str("0xCAFE::SimpleModule::fun1", IDKind::Function),
             type_args: vec![],
             args: vec![
                 Expression::NumberLiteral(NumberLiteral {

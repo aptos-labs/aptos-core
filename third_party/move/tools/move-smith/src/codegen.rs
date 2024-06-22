@@ -3,7 +3,7 @@
 
 use crate::{
     ast::*,
-    names::Identifier,
+    names::{Identifier, IdentifierKind as IDKind},
     types::{Ability, Type, TypeParameter},
 };
 use std::vec;
@@ -64,7 +64,7 @@ fn append_block(program: &mut Vec<String>, mut block: Vec<String>, indentation: 
 
 impl CodeGenerator for Identifier {
     fn emit_code_lines(&self) -> Vec<String> {
-        vec![self.0.clone()]
+        vec![self.name.clone()]
     }
 }
 
@@ -81,7 +81,7 @@ impl CodeGenerator for CompileUnit {
         }
 
         for r in &self.runs {
-            code.push(format!("//# run {}\n", r.0));
+            code.push(format!("//# run {}\n", r.name));
         }
 
         code
@@ -94,7 +94,7 @@ impl CodeGenerator for Script {
         let mut code = vec!["//# run".to_string(), "script {".to_string()];
         let main = Function {
             signature: FunctionSignature {
-                name: Identifier("main".to_string()),
+                name: Identifier::new_str("main", IDKind::Function),
                 parameters: Vec::new(),
                 type_parameters: Vec::new(),
                 return_type: None,
@@ -341,6 +341,16 @@ impl CodeGenerator for Expression {
             Expression::BinaryOperation(binop) => binop.emit_code_lines(),
             Expression::IfElse(if_expr) => if_expr.emit_code_lines(),
         }
+    }
+}
+
+impl CodeGenerator for VariableAccess {
+    fn emit_code_lines(&self) -> Vec<String> {
+        let copy = match self.copy {
+            true => "copy ",
+            false => "",
+        };
+        vec![format!("{}{}", copy, self.name.emit_code())]
     }
 }
 
