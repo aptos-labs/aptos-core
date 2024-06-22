@@ -143,6 +143,25 @@ impl Mempool {
                 .consensus_pulled_counter
                 .fetch_add(1, Ordering::Relaxed);
             Self::log_txn_latency(insertion_info, bucket, counters::CONSENSUS_PULLED_LABEL);
+            if let Some(prioritized_time) = insertion_info.priority_index_inserted_time {
+                if let Ok(time_delta) = SystemTime::now().duration_since(prioritized_time) {
+                    counters::core_mempool_txn_commit_latency(
+                        counters::CONSENSUS_PULLED_FROM_PRIORITY_INDEX_INSERTED_LABEL,
+                        insertion_info.submitted_by_label(),
+                        bucket,
+                        time_delta,
+                    );
+                }
+                if let Ok(time_delta) = prioritized_time.duration_since(insertion_info.insertion_time)
+                {
+                    counters::core_mempool_txn_commit_latency(
+                        counters::INSERTED_TO_PRIORITY_INDEX_LABEL,
+                        insertion_info.submitted_by_label(),
+                        bucket,
+                        time_delta,
+                    );
+                }
+            }
             counters::CORE_MEMPOOL_TXN_CONSENSUS_PULLED.observe((prev_count + 1) as f64);
         }
     }

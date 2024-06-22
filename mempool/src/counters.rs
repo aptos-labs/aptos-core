@@ -30,6 +30,9 @@ pub const COMMIT_REJECTED_DUPLICATE_LABEL: &str = "commit_rejected_duplicate";
 pub const COMMIT_IGNORED_LABEL: &str = "commit_ignored";
 pub const CONSENSUS_READY_LABEL: &str = "consensus_ready";
 pub const CONSENSUS_PULLED_LABEL: &str = "consensus_pulled";
+pub const CONSENSUS_PULLED_FROM_PRIORITY_INDEX_INSERTED_LABEL: &str =
+    "consensus_pulled_from_priority_index_inserted";
+pub const INSERTED_TO_PRIORITY_INDEX_LABEL: &str = "inserted_to_priority_index";
 pub const BROADCAST_READY_LABEL: &str = "broadcast_ready";
 pub const BROADCAST_BATCHED_LABEL: &str = "broadcast_batched";
 pub const PARKED_TIME_LABEL: &str = "parked_time";

@@ -112,6 +112,7 @@ pub enum SubmittedBy {
 pub struct InsertionInfo {
     pub insertion_time: SystemTime,
     pub ready_time: SystemTime,
+    pub priority_index_inserted_time: Option<SystemTime>,
     pub park_time: Option<SystemTime>,
     pub submitted_by: SubmittedBy,
     pub consensus_pulled_counter: Arc<AtomicUsize>,
@@ -133,6 +134,7 @@ impl InsertionInfo {
         Self {
             insertion_time,
             ready_time: insertion_time,
+            priority_index_inserted_time: None,
             park_time: None,
             submitted_by,
             consensus_pulled_counter: Arc::new(AtomicUsize::new(0)),

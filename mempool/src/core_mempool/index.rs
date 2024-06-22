@@ -43,8 +43,10 @@ impl PriorityIndex {
         }
     }
 
-    pub(crate) fn insert(&mut self, txn: &MempoolTransaction) {
-        self.data.insert(self.make_key(txn));
+    pub(crate) fn insert(&mut self, txn: &mut MempoolTransaction) {
+        if self.data.insert(self.make_key(txn)) {
+            txn.insertion_info.priority_index_inserted_time = Some(SystemTime::now());
+        }
     }
 
     pub(crate) fn remove(&mut self, txn: &MempoolTransaction) {
