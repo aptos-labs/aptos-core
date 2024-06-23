@@ -176,7 +176,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         timestamp: u64,
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
-        use aptos_types::transaction::Transaction::*;
+        use aptos_types::transaction::Transaction::{
+            BlockEpilogue, BlockMetadata, BlockMetadataExt, GenesisTransaction, StateCheckpoint,
+            UserTransaction,
+        };
         let aux_data = self
             .db
             .get_transaction_auxiliary_data_by_version(data.version)?;
@@ -228,7 +231,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     },
                 })
             },
-            ValidatorTransaction(_txn) => (info, events, timestamp).into(),
+            aptos_types::transaction::Transaction::ValidatorTransaction(txn) => {
+                Transaction::ValidatorTransaction((txn, info, events, timestamp).into())
+            },
         })
     }
 
