@@ -147,7 +147,7 @@ fn malleability() {
     println!("res: {:?}", res);
     let err = match res {
         Ok(_v) => panic!(),
-        Err(v) => v, //assert_eq!(v.downcast().unwrap(), Err("Unable to verify signature.")),
+        Err(v) => v.to_string(), //assert_eq!(v.downcast().unwrap(), Err("Unable to verify signature.")),
     };
     //let downcast_err : Option<String> = err.downcast_ref();
     println!("err: {:?}", err);
@@ -157,7 +157,8 @@ fn malleability() {
     };*/
     //let downcast_err: dyn Error = (err as anyhow::Error).downcast::<dyn Error>().unwrap();
     //assert_eq!(res, anyhow!(Err("Unable to verify signature.")));
-    assert!(false);
+    //assert!(false);
+    assert_eq!(err, "Unable to verify signature.");
 }
 
 /// Test deserialization_failures
