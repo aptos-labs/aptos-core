@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    secp256k1_ecdsa::{self, PrivateKey, PublicKey, Signature as ECDSASignature}, test_utils::KeyPair, CryptoMaterialError, Signature, SigningKey, Uniform
+    secp256k1_ecdsa::{self, PrivateKey, PublicKey, Signature as ECDSASignature}, test_utils::KeyPair, Signature, SigningKey, Uniform
 };
 use rand_core::OsRng;
-use anyhow::anyhow;
-use std::error::Error;
 
 /// Tests that an individual signature share computed correctly on a message m passes verification on m.
 /// Tests that a signature share computed on a different message m' fails verification on m.
@@ -89,7 +87,6 @@ fn from_u32_be(val: u32) -> Vec<u8> {
 /// Tests malleability
 #[test]
 fn malleability() {
-    println!("running mal test");
     let mut rng = OsRng;
     let message = b"Hello world";
     let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
@@ -119,6 +116,8 @@ fn malleability() {
         .verify_arbitrary_msg(message, &key_pair.public_key)
         .unwrap_err();
 
+    // Test that floor(n/2) where n is the scalar field order does not fail verification due to
+    // malleability checks, as floor(n/2) < n/2
     const SECP256K1_HALF_ORDER_FLOOR: [u32; 8] = [0x681B20A0, 0xDFE92F46, 0x57A4501D, 0x5D576E73, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF];
     let mut vec_0 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[0]);
     let mut vec_1 = from_u32_be(SECP256K1_HALF_ORDER_FLOOR[1]); 
@@ -140,24 +139,13 @@ fn malleability() {
     vector.append(&mut vec_6);
     vector.append(&mut vec_7);
 
-    //let sig: Signature = vector[..].try_from().unwrap();
     let sig = ECDSASignature::try_from(&vector[..]).unwrap();
     let res = sig
         .verify_arbitrary_msg(message, &key_pair.public_key);
-    println!("res: {:?}", res);
     let err = match res {
         Ok(_v) => panic!(),
-        Err(v) => v.to_string(), //assert_eq!(v.downcast().unwrap(), Err("Unable to verify signature.")),
+        Err(v) => v.to_string(),
     };
-    //let downcast_err : Option<String> = err.downcast_ref();
-    println!("err: {:?}", err);
-    /*match err.downcast() {
-        CryptoMaterialError(_) => panic!(),
-        _ => panic!(),
-    };*/
-    //let downcast_err: dyn Error = (err as anyhow::Error).downcast::<dyn Error>().unwrap();
-    //assert_eq!(res, anyhow!(Err("Unable to verify signature.")));
-    //assert!(false);
     assert_eq!(err, "Unable to verify signature.");
 }
 

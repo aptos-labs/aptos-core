@@ -200,17 +200,10 @@ pub struct Signature(pub(crate) libsecp256k1::Signature);
 const SECP256K1_HALF_ORDER_FLOOR: [u32; 8] = [0x681B20A0, 0xDFE92F46, 0x57A4501D, 0x5D576E73, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x7FFFFFFF];
 
 fn as_u32_be(vec: &[u8; 4]) -> u32 {
-    println!("vec: {:?}", vec);
-    //assert!(vec.len() == 4);
     let i1 = (vec[0] as u32) << 24;
     let i2 = (vec[1] as u32) << 16;
     let i3 = (vec[2] as u32) << 8;
     let i4 = (vec[3] as u32) << 0;
-    /*((array[0] as u32) << 24) +
-    ((array[1] as u32) << 16) +
-    ((array[2] as u32) <<  8) +
-    ((array[3] as u32) <<  0)*/
-    println!("as_u32_be: {}, {}, {}, {}", i1, i2, i3, i4);
     i1 + i2 + i3 + i4
 }
 
@@ -225,9 +218,7 @@ impl Signature {
     // secp256k1
     fn s_equal_half_order_floor(&self) -> bool {
         let s_bytes = self.0.s.b32();
-        println!("in s_equal_half_order_floor: {:?}", s_bytes);
         let s_limb_0 = as_u32_be(&s_bytes[0..4].try_into().unwrap());
-        println!("did first as_u32_be");
         let s_limb_1 = as_u32_be(&s_bytes[4..8].try_into().unwrap());
         let s_limb_2 = as_u32_be(&s_bytes[8..12].try_into().unwrap());
         let s_limb_3 = as_u32_be(&s_bytes[12..16].try_into().unwrap());
@@ -235,8 +226,6 @@ impl Signature {
         let s_limb_5 = as_u32_be(&s_bytes[20..24].try_into().unwrap());
         let s_limb_6 = as_u32_be(&s_bytes[24..28].try_into().unwrap());
         let s_limb_7 = as_u32_be(&s_bytes[28..32].try_into().unwrap());
-        println!("s_limb_0: {}", s_limb_0);
-        println!("SECP256K1_HALF_ORDER_FLOOR: {:?}", SECP256K1_HALF_ORDER_FLOOR);
         s_limb_0 == SECP256K1_HALF_ORDER_FLOOR[0]
             && s_limb_1 == SECP256K1_HALF_ORDER_FLOOR[1]
             && s_limb_2 == SECP256K1_HALF_ORDER_FLOOR[2]
@@ -252,8 +241,6 @@ impl Signature {
         message: &libsecp256k1::Message,
         public_key: &libsecp256k1::PublicKey,
     ) -> Result<()> {
-        println!("s: {:?}", self.0.clone());
-        println!("is equal to half order floor: {}", self.s_equal_half_order_floor());
         // Prevent malleability attacks, low order only. The library only signs in low
         // order, so this was done intentionally.
         // The underlying secp256k1 library has a bug - `is_high` should check whether s > n/2.
@@ -264,10 +251,6 @@ impl Signature {
         } else if libsecp256k1::verify(message, &self.0, public_key) {
             Ok(())
         } else {
-            /*if self.s_equal_half_order_floor() {
-                return Err(anyhow!(CryptoMaterialError::CanonicalRepresentationError));
-            }*/
-            //Err(CryptoMaterialError::ValidationError)
             Err(anyhow!("Unable to verify signature."))
         }
     }
@@ -285,7 +268,6 @@ impl TryFrom<&[u8]> for Signature {
     type Error = CryptoMaterialError;
 
     fn try_from(bytes: &[u8]) -> std::result::Result<Signature, CryptoMaterialError> {
-        println!("in try from");
         match libsecp256k1::Signature::parse_standard_slice(bytes) {
             Ok(signature) => Ok(Signature(signature)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
