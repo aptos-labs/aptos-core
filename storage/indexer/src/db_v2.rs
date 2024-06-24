@@ -5,7 +5,7 @@
 /// At the end of the migration to migrate table info mapping
 /// from storage critical path to indexer, the other file will be removed
 /// and this file will be moved to /ecosystem/indexer-grpc/indexer-grpc-table-info.
-use crate::{
+use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue},
     schema::{indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema},
 };

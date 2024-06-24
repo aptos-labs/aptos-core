@@ -29,6 +29,8 @@ module std::features {
 
     const EINVALID_FEATURE: u64 = 1;
     const EAPI_DISABLED: u64 = 2;
+    /// Deployed to production, and disabling is deprecated.
+    const EFEATURE_CANNOT_BE_DISABLED: u64 = 3;
 
     // --------------------------------------------------------------------------------------------
     // Code Publishing
@@ -222,10 +224,12 @@ module std::features {
     /// Lifetime: transient
     const APTOS_UNIQUE_IDENTIFIERS: u64 = 23;
 
-    public fun get_auids(): u64 { APTOS_UNIQUE_IDENTIFIERS }
+    public fun get_auids(): u64 {
+        error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+     }
 
-    public fun auids_enabled(): bool acquires Features {
-        is_enabled(APTOS_UNIQUE_IDENTIFIERS)
+    public fun auids_enabled(): bool {
+        true
     }
 
     /// Whether the Bulletproofs zero-knowledge range proof module is enabled, and the related native function is
@@ -264,15 +268,12 @@ module std::features {
     /// Lifetime: transient
     const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
 
-    /// Whether the Aggregator V2 API feature is enabled.
-    /// Once enabled, the functions from aggregator_v2.move will be available for use.
-    /// Lifetime: transient
-    const AGGREGATOR_V2_API: u64 = 30;
+    public fun get_aggregator_v2_api_feature(): u64 {
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+    }
 
-    public fun get_aggregator_v2_api_feature(): u64 { AGGREGATOR_V2_API }
-
-    public fun aggregator_v2_api_enabled(): bool acquires Features {
-        is_enabled(AGGREGATOR_V2_API)
+    public fun aggregator_v2_api_enabled(): bool {
+        true
     }
 
     #[deprecated]
@@ -303,31 +304,22 @@ module std::features {
 
     const FEE_PAYER_ACCOUNT_OPTIONAL: u64 = 35;
 
-    /// Whether the Aggregator V2 delayed fields feature is enabled.
-    /// Once enabled, Aggregator V2 functions become parallel.
-    /// Lifetime: transient
-    const AGGREGATOR_V2_DELAYED_FIELDS: u64 = 36;
+    public fun get_concurrent_token_v2_feature(): u64 {
+        error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+    }
 
-    /// Whether enable TokenV2 collection creation and Fungible Asset creation
-    /// to create higher throughput concurrent variants.
-    /// Lifetime: transient
-    const CONCURRENT_TOKEN_V2: u64 = 37;
-
-    public fun get_concurrent_token_v2_feature(): u64 { CONCURRENT_TOKEN_V2 }
-
-    public fun concurrent_token_v2_enabled(): bool acquires Features {
-        // concurrent token v2 cannot be used if aggregator v2 api is not enabled.
-        is_enabled(CONCURRENT_TOKEN_V2) && aggregator_v2_api_enabled()
+    public fun concurrent_token_v2_enabled(): bool {
+        true
     }
 
     #[deprecated]
     public fun get_concurrent_assets_feature(): u64 {
-        abort error::invalid_argument(EINVALID_FEATURE)
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
     }
 
     #[deprecated]
     public fun concurrent_assets_enabled(): bool {
-        abort error::invalid_argument(EINVALID_FEATURE)
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
     }
 
     const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
@@ -415,8 +407,7 @@ module std::features {
     public fun get_concurrent_fungible_assets_feature(): u64 { CONCURRENT_FUNGIBLE_ASSETS }
 
     public fun concurrent_fungible_assets_enabled(): bool acquires Features {
-        // concurrent fungible assets cannot be used if aggregator v2 api is not enabled.
-        is_enabled(CONCURRENT_FUNGIBLE_ASSETS) && aggregator_v2_api_enabled()
+        is_enabled(CONCURRENT_FUNGIBLE_ASSETS)
     }
 
     /// Whether deploying to objects is enabled.
@@ -577,6 +568,18 @@ module std::features {
 
     public fun default_to_concurrent_fungible_balance_enabled(): bool acquires Features {
         is_enabled(DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE)
+    }
+
+    /// Whether the multisig v2 fix is enabled. Once enabled, the multisig transaction execution will explicitly
+    /// abort if the provided payload does not match the payload stored on-chain.
+    ///
+    /// Lifetime: transient
+    const ABORT_IF_MULTISIG_PAYLOAD_MISMATCH: u64 = 70;
+
+    public fun get_abort_if_multisig_payload_mismatch_feature(): u64 { ABORT_IF_MULTISIG_PAYLOAD_MISMATCH }
+
+    public fun abort_if_multisig_payload_mismatch_enabled(): bool acquires Features {
+        is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
     // ============================================================================================

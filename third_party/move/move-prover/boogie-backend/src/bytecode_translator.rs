@@ -1119,6 +1119,13 @@ impl<'env> FunctionTranslator<'env> {
             Call(_, dests, oper, srcs, aa) => {
                 use Operation::*;
                 match oper {
+                    TestVariant(..)
+                    | PackVariant(..)
+                    | UnpackVariant(..)
+                    | BorrowFieldVariant(..) => {
+                        let loc = self.fun_target.get_bytecode_loc(attr_id);
+                        self.parent.env.error(&loc, "variants not yet implemented")
+                    },
                     FreezeRef(_) => unreachable!(),
                     UnpackRef | UnpackRefDeep | PackRef | PackRefDeep => {
                         // No effect

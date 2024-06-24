@@ -86,6 +86,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .factor(rb_config.backoff_policy_factor)
             .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
         let reliable_broadcast = Arc::new(ReliableBroadcast::new(
+            author,
             epoch_state.verifier.get_ordered_account_addresses(),
             network_sender.clone(),
             rb_backoff_policy,
@@ -283,7 +284,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     "[RandManager] Start broadcasting share request for {}",
                     targets.len(),
                 );
-                rb.multicast(request, aggregate_state, targets).await;
+                rb.multicast(request, aggregate_state, targets)
+                    .await
+                    .expect("Broadcast cannot fail");
                 info!(
                     epoch = epoch,
                     round = round,
@@ -319,7 +322,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             info!(LogSchema::new(LogEvent::BroadcastAugData)
                 .author(*data.author())
                 .epoch(data.epoch()));
-            let certified_data = rb.broadcast(data, aug_ack).await;
+            let certified_data = rb.broadcast(data, aug_ack).await.expect("cannot fail");
             info!("[RandManager] Finish broadcasting aug data");
             certified_data
         };
@@ -329,7 +332,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 .author(*certified_data.author())
                 .epoch(certified_data.epoch()));
             info!("[RandManager] Start broadcasting certified aug data");
-            rb2.broadcast(certified_data, ack_state).await;
+            rb2.broadcast(certified_data, ack_state)
+                .await
+                .expect("Broadcast cannot fail");
             info!("[RandManager] Finish broadcasting certified aug data");
         });
         let (abort_handle, abort_registration) = AbortHandle::new_pair();

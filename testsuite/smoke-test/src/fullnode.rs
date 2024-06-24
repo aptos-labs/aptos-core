@@ -2,9 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    smoke_test_environment::new_local_swarm_with_aptos, test_utils::MAX_HEALTHY_WAIT_SECS,
-};
+use crate::{smoke_test_environment::new_local_swarm_with_aptos, utils::MAX_HEALTHY_WAIT_SECS};
 use anyhow::bail;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::{NodeConfig, OverrideNodeConfig};

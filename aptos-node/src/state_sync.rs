@@ -46,6 +46,7 @@ pub fn create_event_subscription_service(
     EventSubscriptionService,
     ReconfigNotificationListener<DbBackedOnChainConfig>,
     Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
+    Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
     Option<(
         ReconfigNotificationListener<DbBackedOnChainConfig>,
         EventNotificationListener,
@@ -64,10 +65,20 @@ pub fn create_event_subscription_service(
         .subscribe_to_reconfigurations()
         .expect("Mempool must subscribe to reconfigurations");
 
-    // Create a reconfiguration subscription for consensus (if this is a validator)
-    let consensus_reconfig_subscription = if node_config.base.role.is_validator()
-        || node_config.state_sync.state_sync_driver.observer_enabled
-    {
+    // Create a reconfiguration subscription for consensus observer (if enabled)
+    let consensus_observer_reconfig_subscription =
+        if node_config.consensus_observer.observer_enabled {
+            Some(
+                event_subscription_service
+                    .subscribe_to_reconfigurations()
+                    .expect("Consensus observer must subscribe to reconfigurations"),
+            )
+        } else {
+            None
+        };
+
+    // Create a reconfiguration subscription for consensus
+    let consensus_reconfig_subscription = if node_config.base.role.is_validator() {
         Some(
             event_subscription_service
                 .subscribe_to_reconfigurations()
@@ -77,6 +88,7 @@ pub fn create_event_subscription_service(
         None
     };
 
+    // Create reconfiguration subscriptions for DKG
     let dkg_subscriptions = if node_config.base.role.is_validator() {
         let reconfig_events = event_subscription_service
             .subscribe_to_reconfigurations()
@@ -89,6 +101,7 @@ pub fn create_event_subscription_service(
         None
     };
 
+    // Create reconfiguration subscriptions for JWK consensus
     let jwk_consensus_subscriptions = if node_config.base.role.is_validator() {
         let reconfig_events = event_subscription_service
             .subscribe_to_reconfigurations()
@@ -104,6 +117,7 @@ pub fn create_event_subscription_service(
     (
         event_subscription_service,
         mempool_reconfig_subscription,
+        consensus_observer_reconfig_subscription,
         consensus_reconfig_subscription,
         dkg_subscriptions,
         jwk_consensus_subscriptions,

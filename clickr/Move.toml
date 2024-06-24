@@ -1,9 +1,0 @@
-[package]
-name = "clickr"
-version = "1.0.0"
-
-[addresses]
-clickr = "0x2c63ea53fe519ef5a997682584791d01060dd1614a804a49ae57b312a3a34aec"
-
-[dependencies]
-AptosFramework = { local = "../aptos-move/framework/aptos-framework" }

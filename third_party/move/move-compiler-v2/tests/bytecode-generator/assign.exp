@@ -16,7 +16,7 @@ module 0x42::assign {
         Tuple()
     }
     private fun assign_pattern(s: assign::S,f: u64,h: u64): u64 {
-        assign::S{ f: f: u64, g: assign::T{ h: h: u64 } }: assign::S = s;
+        assign::S{ f, g: assign::T{ h } } = s;
         Add<u64>(f, h)
     }
     private fun assign_struct(s: &mut assign::S) {

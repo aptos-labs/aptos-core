@@ -331,6 +331,16 @@ impl FieldId {
     pub fn symbol(self) -> Symbol {
         self.0
     }
+
+    /// Makes a variant field name unique to a given struct.
+    /// TODO: Consider making FieldId containing two symbols, but this can be a breaking change
+    ///   to public APIs.
+    pub fn make_variant_field_id_str(
+        variant_name: impl AsRef<str>,
+        field_name: impl AsRef<str>,
+    ) -> String {
+        format!("{}.{}", variant_name.as_ref(), field_name.as_ref())
+    }
 }
 
 impl SpecFunId {
@@ -1249,12 +1259,14 @@ impl GlobalEnv {
                 reported_ordering
             }
         });
-        for (diag, reported) in self
-            .diags
-            .borrow_mut()
-            .iter_mut()
-            .filter(|(d, reported)| !reported && filter(d))
-        {
+        for (diag, reported) in self.diags.borrow_mut().iter_mut().filter(|(d, reported)| {
+            !reported
+                && filter(d)
+                && (d.severity >= Severity::Error
+                    || d.labels
+                        .iter()
+                        .any(|label| self.file_id_is_primary_target.contains(&label.file_id)))
+        }) {
             if !*reported {
                 // Avoid showing the same message twice. This can happen e.g. because of
                 // duplication of expressions via schema inclusion.
@@ -1614,6 +1626,8 @@ impl GlobalEnv {
             name: field_name,
             loc: loc.clone(),
             offset: 0,
+            variant: None,
+            common_for_variants: false,
             ty,
         });
         StructData {
@@ -1625,6 +1639,7 @@ impl GlobalEnv {
             abilities: AbilitySet::ALL,
             spec_var_opt: Some(var_id),
             field_data,
+            variants: None,
             spec: RefCell::new(Spec::default()),
         }
     }
@@ -2308,15 +2323,30 @@ impl GlobalEnv {
                 emitln!(writer, "{}", self.display(&*module_spec));
             }
             for str in module.get_structs() {
-                emitln!(writer, "struct {} {{", str.get_name().display(spool));
-                writer.indent();
-                for fld in str.get_fields() {
-                    emitln!(
-                        writer,
-                        "{}: {},",
-                        fld.get_name().display(spool),
-                        fld.get_type().display(tctx)
-                    );
+                if str.has_variants() {
+                    emitln!(writer, "enum {} {{", str.get_name().display(spool));
+                    writer.indent();
+                    for variant in str.get_variants() {
+                        emit!(writer, "{}", variant.display(spool));
+                        let fields = str.get_fields_of_variant(variant).collect_vec();
+                        if !fields.is_empty() {
+                            emitln!(writer, " {");
+                            writer.indent();
+                            for fld in fields {
+                                emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                            }
+                            writer.unindent();
+                            emitln!(writer, "}")
+                        } else {
+                            emitln!(writer, ",")
+                        }
+                    }
+                } else {
+                    emitln!(writer, "struct {} {{", str.get_name().display(spool));
+                    writer.indent();
+                    for fld in str.get_fields() {
+                        emitln!(writer, "{},", self.dump_field(tctx, &fld))
+                    }
                 }
                 writer.unindent();
                 emitln!(writer, "}");
@@ -2352,6 +2382,14 @@ impl GlobalEnv {
             emitln!(writer, "}} // end {}", module.get_full_name_str())
         }
         writer.extract_result()
+    }
+
+    fn dump_field(&self, tctx: &TypeDisplayContext, fld: &FieldEnv) -> String {
+        format!(
+            "{}: {}",
+            fld.get_name().display(tctx.env.symbol_pool()),
+            fld.get_type().display(tctx)
+        )
     }
 
     pub fn dump_fun(&self, fun: &FunctionEnv) -> String {
@@ -3211,8 +3249,19 @@ pub struct StructData {
     /// Field definitions.
     pub(crate) field_data: BTreeMap<FieldId, FieldData>,
 
+    /// If this structure has variants (i.e. is an `enum`), information about the
+    /// names of the variants and the location of their declaration. The fields
+    /// of variants can be identified via the variant name in `FieldData`.
+    pub(crate) variants: Option<BTreeMap<Symbol, StructVariant>>,
+
     /// Associated specification.
     pub(crate) spec: RefCell<Spec>,
+}
+
+#[derive(Debug)]
+pub(crate) struct StructVariant {
+    pub(crate) loc: Loc,
+    pub(crate) attributes: Vec<Attribute>,
 }
 
 #[derive(Debug, Clone)]
@@ -3362,11 +3411,62 @@ impl<'env> StructEnv<'env> {
         self.get_abilities().has_key()
     }
 
-    /// Get an iterator for the fields, ordered by offset.
+    /// Returns true if the struct has variants.
+    pub fn has_variants(&self) -> bool {
+        self.data.variants.is_some()
+    }
+
+    /// Returns an iteration of the variant names in the struct.
+    pub fn get_variants(&self) -> impl Iterator<Item = Symbol> + 'env {
+        self.data
+            .variants
+            .as_ref()
+            .expect("struct has variants")
+            .keys()
+            .cloned()
+    }
+
+    /// Returns the location of the variant.
+    pub fn get_variant_loc(&self, variant: Symbol) -> &Loc {
+        self.data
+            .variants
+            .as_ref()
+            .and_then(|vars| vars.get(&variant).map(|v| &v.loc))
+            .expect("variant defined")
+    }
+
+    /// Returns the attributes of the variant.
+    pub fn get_variant_attributes(&self, variant: Symbol) -> &[Attribute] {
+        self.data
+            .variants
+            .as_ref()
+            .and_then(|vars| vars.get(&variant).map(|v| v.attributes.as_slice()))
+            .expect("variant defined")
+    }
+
+    /// Get an iterator for the fields, ordered by offset. Notice if the struct has
+    /// variants, all fields of all variants are returned.
     pub fn get_fields(&'env self) -> impl Iterator<Item = FieldEnv<'env>> {
+        self.get_fields_optional_variant(None)
+    }
+
+    /// Get fields of a particular variant.
+    pub fn get_fields_of_variant(
+        &'env self,
+        variant: Symbol,
+    ) -> impl Iterator<Item = FieldEnv<'env>> {
+        self.get_fields_optional_variant(Some(variant))
+    }
+
+    /// Get fields of a particular variant.
+    pub fn get_fields_optional_variant(
+        &'env self,
+        variant: Option<Symbol>,
+    ) -> impl Iterator<Item = FieldEnv<'env>> {
         self.data
             .field_data
             .values()
+            .filter(|data| data.common_for_variants || variant.is_none() || data.variant == variant)
             .sorted_by_key(|data| data.offset)
             .map(move |data| FieldEnv {
                 struct_env: self.clone(),
@@ -3374,7 +3474,8 @@ impl<'env> StructEnv<'env> {
             })
     }
 
-    /// Return the number of fields in the struct.
+    /// Return the number of fields in the struct. Notice of the struct has variants, this
+    /// includes the sum of all fields in all variants.
     pub fn get_field_count(&self) -> usize {
         self.data.field_data.len()
     }
@@ -3462,7 +3563,7 @@ impl<'env> StructEnv<'env> {
 // =================================================================================================
 /// # Field Environment
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FieldData {
     /// The name of this field.
     pub name: Symbol,
@@ -3472,6 +3573,12 @@ pub struct FieldData {
 
     /// The offset of this field.
     pub offset: usize,
+
+    /// If the field is associated with a variant, the name of that variant.
+    pub variant: Option<Symbol>,
+
+    /// Whether the field is common between all variants
+    pub common_for_variants: bool,
 
     /// The type of this field.
     pub ty: Type,

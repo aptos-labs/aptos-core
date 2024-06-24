@@ -237,6 +237,7 @@ fn get_distance_and_latency_for_peer(
         let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
         let distance = peer_monitoring_metadata
             .latest_network_info_response
+            .as_ref()
             .map(|response| response.distance_from_validators);
         let latency = peer_monitoring_metadata.average_ping_latency_secs;
 

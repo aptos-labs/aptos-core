@@ -38,9 +38,7 @@ impl Cmd {
         let db = Arc::new(self.db_dir.open_state_merkle_db()?);
 
         let root_version = {
-            let mut iter = db
-                .metadata_db()
-                .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+            let mut iter = db.metadata_db().rev_iter::<JellyfishMerkleNodeSchema>()?;
             iter.seek_for_prev(&NodeKey::new_empty_path(self.before_version - 1))?;
             iter.next().transpose()?.unwrap().0.version()
         };
