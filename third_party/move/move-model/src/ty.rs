@@ -806,6 +806,15 @@ impl Type {
         matches!(self, Type::Reference(_, _))
     }
 
+    /// If this is a reference, return the kind of the reference, otherwise None.
+    pub fn ref_kind(&self) -> Option<ReferenceKind> {
+        if let Type::Reference(kind, _) = self {
+            Some(*kind)
+        } else {
+            None
+        }
+    }
+
     /// Determines whether this is a mutable reference.
     pub fn is_mutable_reference(&self) -> bool {
         matches!(self, Type::Reference(ReferenceKind::Mutable, _))
@@ -819,6 +828,11 @@ impl Type {
     /// Determines whether this type is a struct.
     pub fn is_struct(&self) -> bool {
         matches!(self, Type::Struct(..))
+    }
+
+    /// Determines whether this is a variant struct
+    pub fn is_variant_struct(&self, env: &GlobalEnv) -> bool {
+        self.is_struct() && self.get_struct(env).expect("struct").0.has_variants()
     }
 
     /// Determines whether this is the error type.
@@ -1418,8 +1432,13 @@ pub trait AbilityContext {
 
 /// A trait to provide context information for unification.
 pub trait UnificationContext: AbilityContext {
-    /// Get the field map for a struct, with field types instantiated.
-    fn get_struct_field_map(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type>;
+    /// Get the field map for a struct, with field types instantiated. Also returns a boolean
+    /// whether the struct has variants, and therefore the returned fields are those common
+    /// between variants.
+    fn get_struct_field_map(
+        &self,
+        id: &QualifiedInstId<StructId>,
+    ) -> (BTreeMap<Symbol, Type>, bool);
 
     /// For a given type, return a receiver style function of the given name, if available.
     /// If the function is generic it will be instantiated with fresh type variables.
@@ -1461,8 +1480,11 @@ impl ReceiverFunctionInstance {
 pub struct NoUnificationContext;
 
 impl UnificationContext for NoUnificationContext {
-    fn get_struct_field_map(&self, _id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
-        BTreeMap::new()
+    fn get_struct_field_map(
+        &self,
+        _id: &QualifiedInstId<StructId>,
+    ) -> (BTreeMap<Symbol, Type>, bool) {
+        (BTreeMap::new(), false)
     }
 
     fn get_receiver_function(
@@ -1673,7 +1695,7 @@ impl Substitution {
                     .map(|_| ())
                     .map_err(|e| e.redirect(loc.clone())),
                 (Constraint::SomeStruct(constr_field_map), Type::Struct(mid, sid, inst)) => {
-                    let field_map =
+                    let (field_map, _) =
                         context.get_struct_field_map(&mid.qualified_inst(*sid, inst.clone()));
                     // The actual struct must have all the fields in the constraint, with same
                     // type.
@@ -2837,12 +2859,16 @@ impl TypeUnificationError {
                     Constraint::SomeReference(ty) => {
                         error_context.expected_reference(display_context, ty)
                     },
-                    Constraint::SomeStruct(field_map) => Self::message_for_struct(
-                        unification_context,
-                        display_context,
-                        field_map,
-                        ty,
-                    ),
+                    Constraint::SomeStruct(field_map) => {
+                        let (main_msg, mut special_hints) = Self::message_for_struct(
+                            unification_context,
+                            display_context,
+                            field_map,
+                            ty,
+                        );
+                        hints.append(&mut special_hints);
+                        main_msg
+                    },
                     Constraint::SomeReceiverFunction(name, ..) => {
                         format!(
                             "undeclared receiver function `{}` for type `{}`",
@@ -2916,10 +2942,11 @@ impl TypeUnificationError {
         display_context: &TypeDisplayContext,
         field_map: &BTreeMap<Symbol, Type>,
         ty: &Type,
-    ) -> String {
+    ) -> (String, Vec<String>) {
+        let mut hints = vec![];
         // Determine why this constraint did not match for better error message
-        if let Type::Struct(mid, sid, inst) = ty {
-            let actual_field_map =
+        let msg = if let Type::Struct(mid, sid, inst) = ty {
+            let (actual_field_map, has_variants) =
                 unification_context.get_struct_field_map(&mid.qualified_inst(*sid, inst.clone()));
             let missing_fields = field_map
                 .keys()
@@ -2929,10 +2956,19 @@ impl TypeUnificationError {
                 // Primary error is missing fields
                 let fields =
                     Self::print_fields(display_context.env, missing_fields.into_iter().cloned());
+                let str = ty.display(display_context);
+                if has_variants {
+                    hints.push(format!("field must be declared in all variants of `{}` to be accessible without match expression", str))
+                }
                 format!(
-                    "{} not declared in struct `{}`",
+                    "{} not declared in {} `{}`",
                     fields,
-                    ty.display(display_context)
+                    if has_variants {
+                        "all variants of"
+                    } else {
+                        "struct"
+                    },
+                    str
                 )
             } else {
                 // Primary error is a type mismatch
@@ -2967,7 +3003,8 @@ impl TypeUnificationError {
                 },
                 ty.display(display_context)
             )
-        }
+        };
+        (msg, hints)
     }
 
     fn print_fields(env: &GlobalEnv, names: impl Iterator<Item = Symbol>) -> String {
