@@ -42,6 +42,7 @@ use std::{
 
 pub mod analyzed_transaction;
 pub mod authenticator;
+pub mod block_epilogue;
 mod block_output;
 mod change_set;
 mod module;
@@ -51,6 +52,7 @@ pub mod signature_verified_transaction;
 pub mod user_transaction_context;
 pub mod webauthn;
 
+pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
@@ -565,19 +567,14 @@ impl SignedTransaction {
         fee_payer_address: AccountAddress,
         fee_payer_signer: AccountAuthenticator,
     ) -> Self {
-        SignedTransaction {
-            raw_txn,
-            authenticator: TransactionAuthenticator::fee_payer(
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-                fee_payer_address,
-                fee_payer_signer,
-            ),
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
+        let authenticator = TransactionAuthenticator::fee_payer(
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+            fee_payer_address,
+            fee_payer_signer,
+        );
+        Self::new_signed_transaction(raw_txn, authenticator)
     }
 
     pub fn new_multisig(
@@ -586,13 +583,7 @@ impl SignedTransaction {
         signature: MultiEd25519Signature,
     ) -> SignedTransaction {
         let authenticator = TransactionAuthenticator::multi_ed25519(public_key, signature);
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
+        Self::new_signed_transaction(raw_txn, authenticator)
     }
 
     pub fn new_multi_agent(
@@ -601,17 +592,12 @@ impl SignedTransaction {
         secondary_signer_addresses: Vec<AccountAddress>,
         secondary_signers: Vec<AccountAuthenticator>,
     ) -> Self {
-        SignedTransaction {
-            raw_txn,
-            authenticator: TransactionAuthenticator::multi_agent(
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-            ),
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
+        let authenticator = TransactionAuthenticator::multi_agent(
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+        );
+        Self::new_signed_transaction(raw_txn, authenticator)
     }
 
     pub fn new_secp256k1_ecdsa(
@@ -619,19 +605,11 @@ impl SignedTransaction {
         public_key: secp256k1_ecdsa::PublicKey,
         signature: secp256k1_ecdsa::Signature,
     ) -> SignedTransaction {
-        let authenticator = TransactionAuthenticator::single_sender(
-            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-                AnyPublicKey::secp256k1_ecdsa(public_key),
-                AnySignature::secp256k1_ecdsa(signature),
-            )),
-        );
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::secp256k1_ecdsa(public_key),
+            AnySignature::secp256k1_ecdsa(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
     }
 
     pub fn new_keyless(
@@ -639,45 +617,21 @@ impl SignedTransaction {
         public_key: KeylessPublicKey,
         signature: KeylessSignature,
     ) -> SignedTransaction {
-        let authenticator = TransactionAuthenticator::single_sender(
-            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-                AnyPublicKey::keyless(public_key),
-                AnySignature::keyless(signature),
-            )),
-        );
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::keyless(public_key),
+            AnySignature::keyless(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
     }
 
     pub fn new_single_sender(
         raw_txn: RawTransaction,
         authenticator: AccountAuthenticator,
     ) -> SignedTransaction {
-        SignedTransaction {
+        Self::new_signed_transaction(
             raw_txn,
-            authenticator: TransactionAuthenticator::single_sender(authenticator),
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
-    }
-
-    pub fn new_with_authenticator(
-        raw_txn: RawTransaction,
-        authenticator: TransactionAuthenticator,
-    ) -> Self {
-        Self {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-            committed_hash: OnceCell::new(),
-        }
+            TransactionAuthenticator::single_sender(authenticator),
+        )
     }
 
     pub fn authenticator(&self) -> TransactionAuthenticator {
@@ -1490,7 +1444,7 @@ impl TransactionInfoV0 {
         self.state_change_hash
     }
 
-    pub fn is_state_checkpoint(&self) -> bool {
+    pub fn has_state_checkpoint_hash(&self) -> bool {
         self.state_checkpoint_hash().is_some()
     }
 
@@ -1605,8 +1559,8 @@ impl TransactionToCommit {
         &self.transaction_info
     }
 
-    pub fn is_state_checkpoint(&self) -> bool {
-        self.transaction_info().is_state_checkpoint()
+    pub fn has_state_checkpoint_hash(&self) -> bool {
+        self.transaction_info().has_state_checkpoint_hash()
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -1993,6 +1947,12 @@ pub enum Transaction {
     /// Transaction to update the block metadata resource at the beginning of a block,
     /// when on-chain randomness is enabled.
     BlockMetadataExt(BlockMetadataExt),
+
+    /// Transaction to let the executor update the global state tree and record the root hash
+    /// in the TransactionInfo
+    /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
+    /// Replaces StateCheckpoint, with optionally having more data.
+    BlockEpilogue(BlockEpiloguePayload),
 }
 
 impl From<BlockMetadataExt> for Transaction {
@@ -2039,7 +1999,8 @@ impl Transaction {
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadata(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
-            Transaction::ValidatorTransaction(_) => "validator_transaction",
+            Transaction::BlockEpilogue(_) => "block_epilogue",
+            Transaction::ValidatorTransaction(vt) => vt.type_name(),
             Transaction::BlockMetadataExt(_) => "block_metadata_ext",
         }
     }
@@ -2047,6 +2008,17 @@ impl Transaction {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy() -> Self {
         Transaction::StateCheckpoint(HashValue::zero())
+    }
+
+    pub fn is_non_reconfig_block_ending(&self) -> bool {
+        match self {
+            Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_) => true,
+            Transaction::UserTransaction(_)
+            | Transaction::GenesisTransaction(_)
+            | Transaction::BlockMetadata(_)
+            | Transaction::BlockMetadataExt(_)
+            | Transaction::ValidatorTransaction(_) => false,
+        }
     }
 }
 

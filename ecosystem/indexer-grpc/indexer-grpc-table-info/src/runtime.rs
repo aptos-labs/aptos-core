@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::table_info_service::TableInfoService;
+use crate::{
+    internal_indexer_db_service::InternalIndexerDBService, table_info_service::TableInfoService,
+};
 use aptos_api::context::Context;
 use aptos_config::config::NodeConfig;
-use aptos_db_indexer::{db_ops::open_db, db_v2::IndexerAsyncV2};
+use aptos_db_indexer::{db_indexer::DBIndexer, db_ops::open_db, db_v2::IndexerAsyncV2};
 use aptos_mempool::MempoolClientSender;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::chain_id::ChainId;
@@ -12,6 +14,25 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 const INDEX_ASYNC_V2_DB_NAME: &str = "index_indexer_async_v2_db";
+
+pub fn bootstrap_internal_indexer_db(
+    config: &NodeConfig,
+    db_rw: DbReaderWriter,
+) -> Option<(Runtime, Arc<DBIndexer>)> {
+    if !(config.indexer_db_config.enable_event() || config.indexer_db_config.enable_transaction()) {
+        return None;
+    }
+    let runtime = aptos_runtimes::spawn_named_runtime("index-db".to_string(), None);
+    // Set up db config and open up the db initially to read metadata
+    let mut indexer_service = InternalIndexerDBService::new(db_rw.reader, config);
+    let db_indexer = indexer_service.get_db_indexer();
+    // Spawn task for db indexer
+    runtime.spawn(async move {
+        indexer_service.run().await;
+    });
+
+    Some((runtime, db_indexer))
+}
 
 /// Creates a runtime which creates a thread pool which sets up fullnode indexer table info service
 /// Returns corresponding Tokio runtime

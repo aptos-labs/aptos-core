@@ -518,9 +518,10 @@ impl<'a> AptosTestAdapter<'a> {
         let sig_verified_block = into_signature_verified_block(txn_block);
         let onchain_config = BlockExecutorConfigFromOnchain {
             // TODO fetch values from state?
+            // Or should we just use execute_block_no_limit ?
             block_gas_limit_type: BlockGasLimitType::Limit(30000),
         };
-        let mut outputs =
+        let (mut outputs, _) =
             AptosVM::execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?
                 .into_inner();
 
@@ -805,10 +806,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         // TODO: Do we still need this?
         let _private_key = match (extra_args.private_key, named_addr_opt) {
             (Some(private_key), _) => self.resolve_private_key(&private_key),
-            (None, Some(named_addr)) => match self
-                .private_key_mapping
-                .get(&named_addr.as_str().to_string())
-            {
+            (None, Some(named_addr)) => match self.private_key_mapping.get(named_addr.as_str()) {
                 Some(private_key) => private_key.clone(),
                 None => panic_missing_private_key_named("publish", named_addr.as_str()),
             },

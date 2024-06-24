@@ -219,11 +219,6 @@ async function main() {
   // dry run
   console.log(`INFO: dry run: ${parsedArgs.DRY_RUN}`);
 
-  // Assert if we have a release version that the version matches the cargo version
-  if (isReleaseImage(parsedArgs.IMAGE_TAG_PREFIX)) {
-    assertTagMatchesSourceVersion(parsedArgs.IMAGE_TAG_PREFIX);
-  }
-
   // get the appropriate release group based on the image tag prefix
   const imageReleaseGroup = getImageReleaseGroupByImageTagPrefix(parsedArgs.IMAGE_TAG_PREFIX);
   console.log(`INFO: image release group: ${imageReleaseGroup}`);

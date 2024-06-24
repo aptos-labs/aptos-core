@@ -8,7 +8,7 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_consensus::{
-    consensus_observer, consensus_observer::network::ObserverMessage,
+    consensus_observer, consensus_observer::network_message::ConsensusObserverMessage,
     network_interface::ConsensusMsg,
 };
 use aptos_dkg_runtime::DKGMessage;
@@ -171,7 +171,7 @@ pub fn consensus_observer_network_configuration(
     node_config: &NodeConfig,
 ) -> NetworkApplicationConfig {
     let direct_send_protocols = vec![ProtocolId::ConsensusObserver];
-    let rpc_protocols = vec![];
+    let rpc_protocols = vec![ProtocolId::ConsensusObserverRpc];
     let max_network_channel_size = node_config.consensus_observer.max_network_channel_size as usize;
 
     let network_client_config =
@@ -251,7 +251,7 @@ pub fn setup_networks_and_get_interfaces(
 ) -> (
     Vec<Runtime>,
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
-    Option<ApplicationNetworkInterfaces<ObserverMessage>>,
+    Option<ApplicationNetworkInterfaces<ConsensusObserverMessage>>,
     Option<ApplicationNetworkInterfaces<DKGMessage>>,
     Option<ApplicationNetworkInterfaces<JWKConsensusMsg>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,
@@ -265,7 +265,7 @@ pub fn setup_networks_and_get_interfaces(
     let mut network_runtimes = vec![];
     let mut consensus_network_handle = None;
     let mut consensus_observer_network_handles: Option<
-        Vec<ApplicationNetworkHandle<ObserverMessage>>,
+        Vec<ApplicationNetworkHandle<ConsensusObserverMessage>>,
     > = None;
     let mut dkg_network_handle = None;
     let mut jwk_consensus_network_handle = None;
@@ -302,7 +302,7 @@ pub fn setup_networks_and_get_interfaces(
                     network_id,
                     &network_config,
                     consensus_network_configuration(node_config),
-                    false,
+                    true,
                 );
                 consensus_network_handle = Some(network_handle);
             }
@@ -315,7 +315,7 @@ pub fn setup_networks_and_get_interfaces(
                     network_id,
                     &network_config,
                     dkg_network_configuration(node_config),
-                    false,
+                    true,
                 );
                 dkg_network_handle = Some(network_handle);
             }
@@ -328,21 +328,24 @@ pub fn setup_networks_and_get_interfaces(
                     network_id,
                     &network_config,
                     jwk_consensus_network_configuration(node_config),
-                    false,
+                    true,
                 );
                 jwk_consensus_network_handle = Some(network_handle);
             }
         }
 
         // Register consensus observer (both client and server) with the network
-        if node_config.consensus_observer.is_enabled() {
+        if node_config
+            .consensus_observer
+            .is_observer_or_publisher_enabled()
+        {
             // Create the network handle for this network type
             let network_handle = register_client_and_service_with_network(
                 &mut network_builder,
                 network_id,
                 &network_config,
                 consensus_observer_network_configuration(node_config),
-                true,
+                false,
             );
 
             // Add the network handle to the set of handles
@@ -361,7 +364,7 @@ pub fn setup_networks_and_get_interfaces(
             network_id,
             &network_config,
             mempool_network_configuration(node_config),
-            false,
+            true,
         );
         mempool_network_handles.push(mempool_network_handle);
 
@@ -371,7 +374,7 @@ pub fn setup_networks_and_get_interfaces(
             network_id,
             &network_config,
             peer_monitoring_network_configuration(node_config),
-            false,
+            true,
         );
         peer_monitoring_service_network_handles.push(peer_monitoring_service_network_handle);
 
@@ -381,7 +384,7 @@ pub fn setup_networks_and_get_interfaces(
             network_id,
             &network_config,
             storage_service_network_configuration(node_config),
-            false,
+            true,
         );
         storage_service_network_handles.push(storage_service_network_handle);
 
@@ -392,7 +395,7 @@ pub fn setup_networks_and_get_interfaces(
                 network_id,
                 &network_config,
                 app_config,
-                false,
+                true,
             );
             netbench_handles.push(netbench_handle);
         }
@@ -468,21 +471,19 @@ fn create_network_runtime(network_config: &NetworkConfig) -> Runtime {
 
 /// Registers a new application client and service with the network
 fn register_client_and_service_with_network<
-    T: Serialize + for<'de> Deserialize<'de> + Send + 'static,
+    T: Serialize + for<'de> Deserialize<'de> + Send + Sync + 'static,
 >(
     network_builder: &mut NetworkBuilder,
     network_id: NetworkId,
     network_config: &NetworkConfig,
     application_config: NetworkApplicationConfig,
-    no_parallel: bool,
+    allow_out_of_order_delivery: bool,
 ) -> ApplicationNetworkHandle<T> {
-    let max_parallel_deserialization_tasks = if no_parallel {
-        None
-    } else {
-        network_config.max_parallel_deserialization_tasks
-    };
-    let (network_sender, network_events) = network_builder
-        .add_client_and_service(&application_config, max_parallel_deserialization_tasks);
+    let (network_sender, network_events) = network_builder.add_client_and_service(
+        &application_config,
+        network_config.max_parallel_deserialization_tasks,
+        allow_out_of_order_delivery,
+    );
     ApplicationNetworkHandle {
         network_id,
         network_sender,
@@ -495,7 +496,9 @@ fn register_client_and_service_with_network<
 fn transform_network_handles_into_interfaces(
     node_config: &NodeConfig,
     consensus_network_handle: Option<ApplicationNetworkHandle<ConsensusMsg>>,
-    consensus_observer_network_handles: Option<Vec<ApplicationNetworkHandle<ObserverMessage>>>,
+    consensus_observer_network_handles: Option<
+        Vec<ApplicationNetworkHandle<ConsensusObserverMessage>>,
+    >,
     dkg_network_handle: Option<ApplicationNetworkHandle<DKGMessage>>,
     jwk_consensus_network_handle: Option<ApplicationNetworkHandle<JWKConsensusMsg>>,
     mempool_network_handles: Vec<ApplicationNetworkHandle<MempoolSyncMsg>>,
@@ -506,7 +509,7 @@ fn transform_network_handles_into_interfaces(
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
-    Option<ApplicationNetworkInterfaces<ObserverMessage>>,
+    Option<ApplicationNetworkInterfaces<ConsensusObserverMessage>>,
     Option<ApplicationNetworkInterfaces<DKGMessage>>,
     Option<ApplicationNetworkInterfaces<JWKConsensusMsg>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,

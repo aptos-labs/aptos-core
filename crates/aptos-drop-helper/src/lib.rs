@@ -10,3 +10,9 @@ mod metrics;
 
 pub static DEFAULT_DROPPER: Lazy<AsyncConcurrentDropper> =
     Lazy::new(|| AsyncConcurrentDropper::new("default", 32, 8));
+
+/// Arc<T: ArcAsyncDrop> will be `Send + 'static`, which is requried to be able to drop Arc<T>
+/// in another thread
+pub trait ArcAsyncDrop: Send + Sync + 'static {}
+
+impl<T: Send + Sync + 'static> ArcAsyncDrop for T {}

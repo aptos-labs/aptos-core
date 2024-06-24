@@ -30,7 +30,7 @@ use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{
     schema::{Schema, SeekKeyCodec},
-    ReadOptions, SchemaBatch, DB,
+    SchemaBatch, DB,
 };
 use aptos_storage_interface::Result;
 use aptos_types::{proof::position::Position, transaction::Version};
@@ -199,7 +199,7 @@ pub(crate) fn find_closest_node_version_at_or_before(
 ) -> Result<Option<Version>> {
     let mut iter = state_merkle_db
         .metadata_db()
-        .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+        .rev_iter::<JellyfishMerkleNodeSchema>()?;
     iter.seek_for_prev(&NodeKey::new_empty_path(version))?;
     Ok(iter.next().transpose()?.map(|item| item.0.version()))
 }
@@ -213,8 +213,7 @@ fn truncate_transaction_accumulator(
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let mut iter =
-        transaction_accumulator_db.iter::<TransactionAccumulatorSchema>(ReadOptions::default())?;
+    let mut iter = transaction_accumulator_db.iter::<TransactionAccumulatorSchema>()?;
     iter.seek_to_last();
     let (position, _) = iter.next().transpose()?.unwrap();
     let num_frozen_nodes = position.to_postorder_index() + 1;
@@ -304,7 +303,7 @@ fn delete_per_epoch_data(
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let mut iter = ledger_db.iter::<LedgerInfoSchema>(ReadOptions::default())?;
+    let mut iter = ledger_db.iter::<LedgerInfoSchema>()?;
     iter.seek_to_last();
     if let Some((epoch, ledger_info)) = iter.next().transpose()? {
         let version = ledger_info.commit_info().version();
@@ -318,7 +317,7 @@ fn delete_per_epoch_data(
         }
     }
 
-    let mut iter = ledger_db.iter::<EpochByVersionSchema>(ReadOptions::default())?;
+    let mut iter = ledger_db.iter::<EpochByVersionSchema>()?;
     iter.seek(&start_version)?;
 
     for item in iter {
@@ -372,7 +371,7 @@ fn delete_per_version_data_impl<S>(
 where
     S: Schema<Key = Version>,
 {
-    let mut iter = ledger_db.iter::<S>(ReadOptions::default())?;
+    let mut iter = ledger_db.iter::<S>()?;
     iter.seek_to_last();
     if let Some((lastest_version, _)) = iter.next().transpose()? {
         if lastest_version >= start_version {
@@ -415,7 +414,7 @@ fn delete_state_value_and_index(
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
+    let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>()?;
     iter.seek(&start_version)?;
 
     for item in iter {
@@ -436,7 +435,7 @@ where
     S: Schema<Key = StaleNodeIndex>,
     Version: SeekKeyCodec<S>,
 {
-    let mut iter = db.iter::<S>(ReadOptions::default())?;
+    let mut iter = db.iter::<S>()?;
     iter.seek(&version)?;
     for item in iter {
         let (index, _) = item?;
@@ -457,7 +456,7 @@ fn delete_nodes_and_stale_indices_at_or_after_version(
         db, version, batch,
     )?;
 
-    let mut iter = db.iter::<JellyfishMerkleNodeSchema>(ReadOptions::default())?;
+    let mut iter = db.iter::<JellyfishMerkleNodeSchema>()?;
     iter.seek(&NodeKey::new_empty_path(version))?;
     for item in iter {
         let (key, _) = item?;

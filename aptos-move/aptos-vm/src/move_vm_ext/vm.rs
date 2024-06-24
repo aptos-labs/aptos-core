@@ -7,7 +7,9 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{
+    AptosGasParameters, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
@@ -15,8 +17,11 @@ use aptos_types::{
     transaction::user_transaction_context::UserTransactionContext,
     vm::configs::aptos_prod_vm_config,
 };
-use aptos_vm_types::{environment::Environment, storage::change_set_configs::ChangeSetConfigs};
-use move_vm_runtime::move_vm::MoveVM;
+use aptos_vm_types::{
+    environment::{aptos_default_ty_builder, aptos_prod_ty_builder, Environment},
+    storage::change_set_configs::ChangeSetConfigs,
+};
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
 use std::{ops::Deref, sync::Arc};
 
 /// MoveVM wrapper which is used to run genesis initializations. Designed as a
@@ -41,6 +46,7 @@ impl GenesisMoveVM {
             &features,
             &timed_features,
             delayed_field_optimization_enabled,
+            aptos_default_ty_builder(&features),
         );
 
         // All genesis sessions run with unmetered gas meter, and here we set
@@ -95,9 +101,8 @@ pub struct MoveVmExt {
 
 impl MoveVmExt {
     fn new_impl<F>(
-        native_gas_params: NativeGasParameters,
-        misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
+        gas_params: Result<&AptosGasParameters, &String>,
         env: Arc<Environment>,
         gas_hook: Option<F>,
         resolver: &impl AptosMoveResolver,
@@ -105,10 +110,34 @@ impl MoveVmExt {
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
     {
+        // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
+        //            This only happens in a edge case that is probably related to write set transactions or genesis,
+        //            which logically speaking, shouldn't be handled by the VM at all.
+        //            We should clean up the logic here once we get that refactored.
+        let (native_gas_params, misc_gas_params, ty_builder) = match gas_params {
+            Ok(gas_params) => {
+                let ty_builder =
+                    aptos_prod_ty_builder(&env.features, gas_feature_version, gas_params);
+                (
+                    gas_params.natives.clone(),
+                    gas_params.vm.misc.clone(),
+                    ty_builder,
+                )
+            },
+            Err(_) => {
+                let ty_builder = aptos_default_ty_builder(&env.features);
+                (
+                    NativeGasParameters::zeros(),
+                    MiscGasParameters::zeros(),
+                    ty_builder,
+                )
+            },
+        };
+
         let mut builder = SafeNativeBuilder::new(
             gas_feature_version,
-            native_gas_params.clone(),
-            misc_gas_params.clone(),
+            native_gas_params,
+            misc_gas_params,
             env.timed_features.clone(),
             env.features.clone(),
         );
@@ -116,10 +145,24 @@ impl MoveVmExt {
             builder.set_gas_hook(hook);
         }
 
+        // TODO(George): Move gas configs to environment to avoid this clone!
+        let vm_config = VMConfig {
+            verifier_config: env.vm_config.verifier_config.clone(),
+            deserializer_config: env.vm_config.deserializer_config.clone(),
+            paranoid_type_checks: env.vm_config.paranoid_type_checks,
+            check_invariant_in_swap_loc: env.vm_config.check_invariant_in_swap_loc,
+            max_value_nest_depth: env.vm_config.max_value_nest_depth,
+            type_max_cost: env.vm_config.type_max_cost,
+            type_base_cost: env.vm_config.type_base_cost,
+            type_byte_cost: env.vm_config.type_byte_cost,
+            delayed_field_optimization_enabled: env.vm_config.delayed_field_optimization_enabled,
+            ty_builder,
+        };
+
         Self {
             inner: WarmVmCache::get_warm_vm(
                 builder,
-                env.vm_config.clone(),
+                vm_config,
                 resolver,
                 env.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
             )
@@ -129,16 +172,14 @@ impl MoveVmExt {
     }
 
     pub fn new(
-        native_gas_params: NativeGasParameters,
-        misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
+        gas_params: Result<&AptosGasParameters, &String>,
         env: Arc<Environment>,
         resolver: &impl AptosMoveResolver,
     ) -> Self {
         Self::new_impl::<fn(DynamicExpression)>(
-            native_gas_params,
-            misc_gas_params,
             gas_feature_version,
+            gas_params,
             env,
             None,
             resolver,
@@ -146,9 +187,8 @@ impl MoveVmExt {
     }
 
     pub fn new_with_gas_hook<F>(
-        native_gas_params: NativeGasParameters,
-        misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
+        gas_params: Result<&AptosGasParameters, &String>,
         env: Arc<Environment>,
         gas_hook: Option<F>,
         resolver: &impl AptosMoveResolver,
@@ -156,14 +196,7 @@ impl MoveVmExt {
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
     {
-        Self::new_impl(
-            native_gas_params,
-            misc_gas_params,
-            gas_feature_version,
-            env,
-            gas_hook,
-            resolver,
-        )
+        Self::new_impl(gas_feature_version, gas_params, env, gas_hook, resolver)
     }
 
     pub fn new_session<'r, R: AptosMoveResolver>(

@@ -22,6 +22,8 @@ aptos-logger = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }
+bytes = { workspace = true }
+claims = { workspace = true }
 futures = { workspace = true }
 futures-channel = { workspace = true }
 tokio = { workspace = true }

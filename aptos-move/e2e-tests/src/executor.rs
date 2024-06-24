@@ -20,10 +20,7 @@ use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_gas_schedule::{
-    AptosGasParameters, InitialGasSchedule, MiscGasParameters, NativeGasParameters,
-    LATEST_GAS_FEATURE_VERSION,
-};
+use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_types::{
     account_config::{
@@ -124,8 +121,7 @@ pub struct FakeExecutor {
     executed_output: Option<GoldenOutputs>,
     trace_dir: Option<PathBuf>,
     rng: KeyGen,
-    /// If set, determines whether to execute a comparison test with the parallel
-    /// block executor.
+    /// If set, determines whether to execute a comparison test with the parallel block executor.
     /// If not set, environment variable E2E_PARALLEL_EXEC must be set
     /// s.t. the comparison test is executed (BothComparison).
     executor_mode: Option<ExecutorMode>,
@@ -875,9 +871,8 @@ impl FakeExecutor {
         };
 
         let vm = MoveVmExt::new(
-            gas_params.natives.clone(),
-            gas_params.vm.misc.clone(),
             LATEST_GAS_FEATURE_VERSION,
+            Ok(&gas_params),
             self.env.clone(),
             &resolver,
         );
@@ -983,9 +978,8 @@ impl FakeExecutor {
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new_with_gas_hook(
-                NativeGasParameters::zeros(),
-                MiscGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
+                Ok(&AptosGasParameters::zeros()),
                 self.env.clone(),
                 Some(move |expression| {
                     a2.lock().unwrap().push(expression);
@@ -1053,9 +1047,8 @@ impl FakeExecutor {
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
-                NativeGasParameters::zeros(),
-                MiscGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
+                Ok(&AptosGasParameters::zeros()),
                 self.env.clone(),
                 &resolver,
             );
@@ -1109,13 +1102,8 @@ impl FakeExecutor {
         state_view: &impl AptosMoveResolver,
         features: Features,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-        let (
-            gas_params_res,
-            storage_gas_params,
-            native_gas_params,
-            misc_gas_params,
-            gas_feature_version,
-        ) = get_gas_parameters(&features, state_view);
+        let (gas_params, storage_gas_params, gas_feature_version) =
+            get_gas_parameters(&features, state_view);
 
         let gas_params = gas_params_res.unwrap();
         let mut gas_meter = make_prod_gas_meter(
@@ -1134,9 +1122,8 @@ impl FakeExecutor {
             .with_features_for_testing(features);
 
         let vm = MoveVmExt::new(
-            native_gas_params,
-            misc_gas_params,
             LATEST_GAS_FEATURE_VERSION,
+            gas_params.as_ref(),
             env,
             state_view,
         );
@@ -1151,6 +1138,14 @@ impl FakeExecutor {
             &func,
             are_struct_constructors_enabled,
         )?;
+
+        let mut gas_meter = make_prod_gas_meter(
+            gas_feature_version,
+            gas_params.unwrap().clone().vm,
+            storage_gas_params.unwrap(),
+            false,
+            10_000_000_000_000.into(),
+        );
 
         let storage = TraversalStorage::new();
         session
@@ -1186,9 +1181,8 @@ impl FakeExecutor {
 
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
-            NativeGasParameters::zeros(),
-            MiscGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
+            Ok(&AptosGasParameters::zeros()),
             self.env.clone(),
             &resolver,
         );
@@ -1237,9 +1231,9 @@ impl FakeExecutor {
 }
 
 pub fn assert_outputs_equal(
-    txns_output_1: &Vec<TransactionOutput>,
+    txns_output_1: &[TransactionOutput],
     name1: &str,
-    txns_output_2: &Vec<TransactionOutput>,
+    txns_output_2: &[TransactionOutput],
     name2: &str,
 ) {
     assert_eq!(

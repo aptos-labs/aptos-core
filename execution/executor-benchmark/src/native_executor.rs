@@ -426,6 +426,7 @@ impl TransactionBlockExecutor for NativeExecutor {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
+            block_end_info: None,
         })
     }
 }

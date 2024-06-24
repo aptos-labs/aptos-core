@@ -3,7 +3,7 @@
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
-    test_utils::{MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS},
+    utils::{MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS},
 };
 use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_forge::{NodeExt, Swarm};

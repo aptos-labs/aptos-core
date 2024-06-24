@@ -206,7 +206,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let id = module.self_id();
         let sender = *id.address();
         let verbose = extra_args.verbose;
-        match self.perform_session_action(gas_budget, |session, gas_status| {
+        let result = self.perform_session_action(gas_budget, |session, gas_status| {
             let compat = Compatibility::new(
                 !extra_args.skip_check_struct_and_pub_function_linking,
                 !extra_args.skip_check_struct_layout,
@@ -219,7 +219,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 gas_status,
                 compat,
             )
-        }) {
+        });
+        match result {
             Ok(()) => Ok((None, module)),
             Err(vm_error) => Err(anyhow!(
                 "Unable to publish module '{}'. Got VMError: {}",

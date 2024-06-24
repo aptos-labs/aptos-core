@@ -27,6 +27,7 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
     executable::{ExecutableTestType, ModulePath},
+    state_store::state_value::StateValueMetadata,
 };
 use claims::assert_matches;
 use fail::FailScenario;
@@ -69,6 +70,7 @@ fn resource_group_bcs_fallback() {
         MockIncarnation::new(vec![KeyType::<u32>(1, false)], vec![], vec![], vec![], 10);
     group_incarnation.group_writes.push((
         KeyType::<u32>(100, false),
+        StateValueMetadata::none(),
         HashMap::from([(101, ValueType::from_value(vec![5], true))]),
     ));
     let t_2 = MockTransaction::from_behavior(group_incarnation);
