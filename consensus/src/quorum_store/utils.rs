@@ -464,9 +464,9 @@ impl ProofQueue {
                 "cur_txns: {}, remaining_proofs: {:?}",
                 cur_txns, remaining_proofs
             );
-            counters::NUM_PROOFS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION
+            counters::NUM_PROOFS_IN_PROOF_QUEUE_AFTER_PULL
                 .observe(num_proofs_remaining_after_pull as f64);
-            counters::NUM_TXNS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION
+            counters::NUM_TXNS_IN_PROOF_QUEUE_AFTER_PULL
                 .observe(num_txns_remaining_after_pull as f64);
 
             // Stable sort, so the order of proofs within an author will not change.
@@ -522,7 +522,7 @@ impl ProofQueue {
         counters::NUM_LOCAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_local_txns as f64);
         counters::NUM_LOCAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_local_proofs as f64);
         let remaining_txns_without_duplicates = self.remaining_txns_without_duplicates();
-        counters::NUM_TOTAL_TXNS_LEFT_ON_UPDATE_WITHOUT_DUPLICATES
+        counters::NUM_UNIQUE_TOTAL_TXNS_LEFT_ON_UPDATE
             .observe(remaining_txns_without_duplicates as f64);
         //count the number of transactions with more than one batches
         counters::TXNS_WITH_DUPLICATE_BATCHES.set(

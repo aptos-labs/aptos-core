@@ -733,9 +733,9 @@ pub static NUM_BLOCKS_IN_PIPELINE: Lazy<IntGaugeVec> = Lazy::new(|| {
 //     .unwrap()
 // });
 
-const NUM_CONSENSUS_TRANSACTIONS_BUCKETS: [f64; 21] = [
-    5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 200.0, 400.0, 800.0, 1200.0, 1400.0, 1500.0, 1600.0,
-    1700.0, 1800.0, 1900.0, 2500.0, 3300.0, 4000.0, 5000.0, 6500.0,
+const NUM_CONSENSUS_TRANSACTIONS_BUCKETS: [f64; 24] = [
+    5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 200.0, 400.0, 800.0, 1200.0, 1800.0, 2500.0, 3300.0,
+    4000.0, 5000.0, 6500.0, 8000.0, 10000.0, 12500.0, 15000.0, 18000.0, 21000.0, 25000.0, 30000.0,
 ];
 
 /// Histogram for the number of txns per (committed) blocks.
