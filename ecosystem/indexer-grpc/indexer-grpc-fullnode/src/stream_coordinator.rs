@@ -408,8 +408,9 @@ impl IndexerStreamCoordinator {
                             bet.info.epoch = Some(epoch_bcs);
                         },
                         APITransaction::ValidatorTransaction(ref mut vt) => {
-                            vt.info.block_height = Some(block_height_bcs);
-                            vt.info.epoch = Some(epoch_bcs);
+                            let info = vt.transaction_info_mut();
+                            info.block_height = Some(block_height_bcs);
+                            info.epoch = Some(epoch_bcs);
                         },
                     };
                     txn
