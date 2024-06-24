@@ -275,7 +275,6 @@ impl Filterable<Transaction> for APIFilter {
                         TxnData::StateCheckpoint(_) => return false,
                         TxnData::User(u) => &u.events,
                         TxnData::Validator(_) => return false,
-                        TxnData::BlockEpilogue(_) => return false,
                     };
                     events_filter.is_allowed_vec(events)
                 } else {
