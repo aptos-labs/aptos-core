@@ -199,19 +199,19 @@ impl TransactionStore {
     //         .unwrap_or_default()
     // }
 
-    // pub(crate) fn total_num_transactions_excluding(
-    //     &self,
-    //     excluded_transactions: &[TransactionSummary],
-    // ) -> u64 {
-    //     self.transactions
-    //         .values()
-    //         .map(|txns| {
-    //             txns.iter()
-    //                 .filter(|(_, txn)| !excluded_transactions.contains(&TxnPointer::from(*txn)))
-    //                 .count() as u64
-    //         })
-    //         .sum()
-    // }
+    pub(crate) fn total_num_transactions_excluding(
+        &self,
+        excluded_transactions: &[TransactionSummary],
+    ) -> u64 {
+        self.transactions
+            .values()
+            .map(|txns| {
+                txns.iter()
+                    .filter(|(_, txn)| !excluded_transactions.contains(&TxnPointer::from(*txn)))
+                    .count() as u64
+            })
+            .sum()
+    }
 
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
     pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
