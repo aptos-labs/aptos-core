@@ -127,7 +127,7 @@ fn common<F: Fn(&mut Vec<u64>, &mut Vec<u64>, &mut Vec<u64>)>(
     }
 }
 
-fn flip_random_bit(limbs: &mut Vec<u64>) {
+fn flip_random_bit(limbs: &mut [u64]) {
     let mut rng = thread_rng();
     let limb_idx = rng.gen_range(0, limbs.len());
     let bit_idx = rng.gen_range(0, 64);

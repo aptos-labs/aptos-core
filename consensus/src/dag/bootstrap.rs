@@ -566,6 +566,7 @@ impl DagBootstrapper {
             .factor(rb_config.backoff_policy_factor)
             .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
         let rb = Arc::new(ReliableBroadcast::new(
+            self.self_peer,
             validators.clone(),
             self.rb_network_sender.clone(),
             rb_backoff_policy,
