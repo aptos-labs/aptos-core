@@ -26,7 +26,7 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
         resolver: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,
         storage_refund: Fee,
-    ) -> Result<Self, VMStatus> {
+    ) -> Self {
         let session_id = SessionId::epilogue_meta(txn_meta);
         let session = RespawnedSession::spawn(
             vm,
@@ -34,12 +34,12 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
             resolver,
             previous_session_change_set,
             Some(txn_meta.as_user_transaction_context()),
-        )?;
+        );
 
-        Ok(Self {
+        Self {
             session,
             storage_refund,
-        })
+        }
     }
 
     pub fn get_storage_fee_refund(&self) -> Fee {

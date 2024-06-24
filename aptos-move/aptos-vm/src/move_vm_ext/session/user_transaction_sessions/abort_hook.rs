@@ -23,7 +23,7 @@ impl<'r, 'l> AbortHookSession<'r, 'l> {
         txn_meta: &'l TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         prologue_change_set: VMChangeSet,
-    ) -> Result<Self, VMStatus> {
+    ) -> Self {
         let session_id = SessionId::run_on_abort(txn_meta);
 
         let session = RespawnedSession::spawn(
@@ -32,9 +32,9 @@ impl<'r, 'l> AbortHookSession<'r, 'l> {
             resolver,
             prologue_change_set,
             Some(txn_meta.as_user_transaction_context()),
-        )?;
+        );
 
-        Ok(Self { session })
+        Self { session }
     }
 
     pub fn finish(self, change_set_configs: &ChangeSetConfigs) -> Result<VMChangeSet, VMStatus> {

@@ -27,7 +27,7 @@ impl<'r, 'l> PrologueSession<'r, 'l> {
         vm: &'l AptosVM,
         txn_meta: &'m TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
-    ) -> Result<Self, VMStatus> {
+    ) -> Self {
         let session_id = SessionId::prologue_meta(txn_meta);
         let session = RespawnedSession::spawn(
             vm,
@@ -35,9 +35,9 @@ impl<'r, 'l> PrologueSession<'r, 'l> {
             resolver,
             VMChangeSet::empty(),
             Some(txn_meta.as_user_transaction_context()),
-        )?;
+        );
 
-        Ok(Self { session })
+        Self { session }
     }
 
     pub fn into_user_session(
@@ -64,7 +64,7 @@ impl<'r, 'l> PrologueSession<'r, 'l> {
 
             Ok((
                 change_set.clone(),
-                UserSession::new(vm, txn_meta, resolver, change_set)?,
+                UserSession::new(vm, txn_meta, resolver, change_set),
             ))
         } else {
             Ok((
