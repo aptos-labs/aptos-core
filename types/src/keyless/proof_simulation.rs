@@ -54,7 +54,56 @@ pub struct ProvingKeyWithTrapdoor<E: Pairing> {
     pub g2: E::G2Affine,
 }
 
-impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> {
+impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> 
+{
+    fn circuit_agnostic_specific_setup_with_trapdoor<R: RngCore>(
+        rng: &mut R,
+        num_public_inputs: u32,
+    ) -> Result<(ProvingKeyWithTrapdoor<E>, VerifyingKey<E>), SynthesisError> {
+        let alpha = E::ScalarField::rand(rng); 
+        let beta = E::ScalarField::rand(rng);
+        let gamma = E::ScalarField::rand(rng);
+        let delta = E::ScalarField::rand(rng);
+        let g1_generator = E::G1::rand(rng);
+        let g2_generator = E::G2::rand(rng);
+        let alpha_g1 = g1_generator * alpha;
+        let beta_g2 = g2_generator * beta;
+        let gamma_g2 = g2_generator * gamma;
+        let delta_g2 = g2_generator * delta;
+
+        let mut gamma_abc_g1 = Vec::new();
+
+        for _i in 0..num_public_inputs {
+            let a = E::ScalarField::rand(rng);
+            let b = E::ScalarField::rand(rng);
+            let c = E::ScalarField::rand(rng);
+            let mut acc = alpha * a + beta * b + c;
+            acc = acc * gamma.inverse().unwrap();
+            let gamma_abc_g1_i = g1_generator * acc;
+            gamma_abc_g1.push(gamma_abc_g1_i.into_affine());
+        };
+
+        let vk = VerifyingKey {
+            alpha_g1: alpha_g1.into_affine(),
+            beta_g2: beta_g2.into_affine(),
+            gamma_g2: gamma_g2.into_affine(),
+            delta_g2: delta_g2.into_affine(),
+            gamma_abc_g1: gamma_abc_g1.clone(),
+        };
+
+        let pk = ProvingKeyWithTrapdoor {
+            gamma_abc_g1: gamma_abc_g1.clone(),
+            alpha,
+            beta,
+            delta,
+            gamma,
+            g1: g1_generator.into_affine(),
+            g2: g2_generator.into_affine(),
+        };
+
+        Ok((pk, vk))
+    }
+
     fn circuit_specific_setup_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>(
         circuit: C,
         rng: &mut R,
