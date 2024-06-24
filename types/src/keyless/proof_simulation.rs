@@ -199,7 +199,7 @@ fn test_prove_and_verify<E>(n_iters: usize)
 where
     E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>, G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>, G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>, <E as Pairing>::ScalarField: From<i32>
 {
-        let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998]; 
+    let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998]; 
     let public_input = ark_ff::BigInt::new(public_input_values);
     let public_input = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(public_input).unwrap();
 
