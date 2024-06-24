@@ -82,7 +82,7 @@ module 0xcafe::deflation_token_tests {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 0x1001C, location = aptos_framework::fungible_asset)]
+    #[expected_failure(abort_code = 0x1001D, location = aptos_framework::fungible_asset)]
     fun test_deflation_fa_deposit(
         creator: &signer,
     ) {
@@ -106,7 +106,7 @@ module 0xcafe::deflation_token_tests {
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    #[expected_failure(abort_code = 0x1001C, location = aptos_framework::fungible_asset)]
+    #[expected_failure(abort_code = 0x1001D, location = aptos_framework::fungible_asset)]
     fun test_deflation_fa_withdraw(
         creator: &signer,
         aaron: &signer,
@@ -133,7 +133,7 @@ module 0xcafe::deflation_token_tests {
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    #[expected_failure(abort_code = 0x8001D, location = aptos_framework::fungible_asset)]
+    #[expected_failure(abort_code = 0x8001E, location = aptos_framework::fungible_asset)]
     fun test_double_init(
         creator: &signer,
     ) {
@@ -292,7 +292,7 @@ module 0xcafe::deflation_token_tests {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code=0x6001E, location = aptos_framework::fungible_asset)]
+    #[expected_failure(abort_code=0x6001F, location = aptos_framework::fungible_asset)]
     fun test_register_on_non_metadata_object(
         creator: &signer,
     ) {
