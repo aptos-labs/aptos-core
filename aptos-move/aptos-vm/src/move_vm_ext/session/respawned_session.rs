@@ -40,21 +40,21 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         base: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,
         user_transaction_context_opt: Option<UserTransactionContext>,
-    ) -> Result<Self, VMStatus> {
+    ) -> Self {
         let executor_view = ExecutorViewWithChangeSet::new(
             base.as_executor_view(),
             base.as_resource_group_view(),
             previous_session_change_set,
         );
 
-        Ok(RespawnedSessionBuilder {
+        RespawnedSessionBuilder {
             executor_view,
             resolver_builder: |executor_view| vm.as_move_resolver_with_group_view(executor_view),
             session_builder: |resolver| {
                 Some(vm.new_session(resolver, session_id, user_transaction_context_opt))
             },
         }
-        .build())
+        .build()
     }
 
     pub fn execute<T, E>(

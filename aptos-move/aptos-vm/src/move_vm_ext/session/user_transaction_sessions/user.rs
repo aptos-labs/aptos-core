@@ -23,7 +23,7 @@ impl<'r, 'l> UserSession<'r, 'l> {
         txn_meta: &'l TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         prologue_change_set: VMChangeSet,
-    ) -> Result<Self, VMStatus> {
+    ) -> Self {
         let session_id = SessionId::txn_meta(txn_meta);
 
         let session = RespawnedSession::spawn(
@@ -32,9 +32,9 @@ impl<'r, 'l> UserSession<'r, 'l> {
             resolver,
             prologue_change_set,
             Some(txn_meta.as_user_transaction_context()),
-        )?;
+        );
 
-        Ok(Self { session })
+        Self { session }
     }
 
     pub fn legacy_inherit_prologue_session(prologue_session: RespawnedSession<'r, 'l>) -> Self {

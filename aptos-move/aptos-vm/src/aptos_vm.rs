@@ -140,32 +140,14 @@ macro_rules! unwrap_or_discard {
 
 pub(crate) fn get_system_transaction_output(
     session: SessionExt,
-    fee_statement: FeeStatement,
-    status: ExecutionStatus,
     change_set_configs: &ChangeSetConfigs,
-) -> Result<VMOutput, VMStatus> {
-    get_transaction_output(
-        session,
-        fee_statement,
-        status,
-        change_set_configs,
-        TransactionAuxiliaryData::default(),
-    )
-}
-
-pub(crate) fn get_transaction_output(
-    session: SessionExt,
-    fee_statement: FeeStatement,
-    status: ExecutionStatus,
-    change_set_configs: &ChangeSetConfigs,
-    auxiliary_data: TransactionAuxiliaryData,
 ) -> Result<VMOutput, VMStatus> {
     let change_set = session.finish(change_set_configs)?;
     Ok(VMOutput::new(
         change_set,
-        fee_statement,
-        TransactionStatus::Keep(status),
-        auxiliary_data,
+        FeeStatement::zero(),
+        TransactionStatus::Keep(ExecutionStatus::Success),
+        TransactionAuxiliaryData::default(),
     ))
 }
 
@@ -514,7 +496,7 @@ impl AptosVM {
 
         if is_account_init_for_sponsored_transaction {
             let mut abort_hook_session =
-                AbortHookSession::new(self, txn_data, resolver, prologue_change_set)?;
+                AbortHookSession::new(self, txn_data, resolver, prologue_change_set);
             // Abort information is injected using the user defined error in the Move contract.
             let status = self.inject_abort_info_if_available(status);
 
@@ -589,7 +571,7 @@ impl AptosVM {
                 resolver,
                 change_set,
                 ZERO_STORAGE_REFUND.into(),
-            )?;
+            );
 
             epilogue_session.execute(|session| {
                 transaction_validation::run_failure_epilogue(
@@ -612,7 +594,7 @@ impl AptosVM {
                 resolver,
                 prologue_change_set,
                 ZERO_STORAGE_REFUND.into(),
-            )?;
+            );
 
             let status = self.inject_abort_info_if_available(status);
 
@@ -907,7 +889,13 @@ impl AptosVM {
             self.charge_change_set(&mut change_set, gas_meter, txn_data, resolver)?;
 
         // TODO[agg_v1](fix): Charge for aggregator writes
-        EpilogueSession::new(self, txn_data, resolver, change_set, storage_refund)
+        Ok(EpilogueSession::new(
+            self,
+            txn_data,
+            resolver,
+            change_set,
+            storage_refund,
+        ))
     }
 
     fn simulate_multisig_transaction<'a, 'r, 'l>(
@@ -1254,7 +1242,7 @@ impl AptosVM {
             resolver,
             prologue_change_set.clone(),
             0.into(),
-        )?;
+        );
         let execution_error = ExecutionError::try_from(execution_error)
             .map_err(|_| VMStatus::error(StatusCode::UNREACHABLE, None))?;
         // Serialization is not expected to fail so we're using invariant_violation error here.
@@ -1637,9 +1625,7 @@ impl AptosVM {
         let mut traversal_context = TraversalContext::new(&traversal_storage);
 
         // Revalidate the transaction.
-        let mut prologue_session =
-            unwrap_or_discard!(PrologueSession::new(self, &txn_data, resolver));
-
+        let mut prologue_session = PrologueSession::new(self, &txn_data, resolver);
         let exec_result = prologue_session.execute(|session| {
             self.validate_signed_transaction(
                 session,
@@ -1974,7 +1960,7 @@ impl AptosVM {
         let output = VMOutput::new(
             change_set,
             FeeStatement::zero(),
-            TransactionStatus::from_executed_vm_status(VMStatus::Executed),
+            TransactionStatus::Keep(ExecutionStatus::Success),
             TransactionAuxiliaryData::default(),
         );
         Ok((VMStatus::Executed, output))
@@ -2018,8 +2004,6 @@ impl AptosVM {
 
         let output = get_system_transaction_output(
             session,
-            FeeStatement::zero(),
-            ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))
@@ -2099,8 +2083,6 @@ impl AptosVM {
 
         let output = get_system_transaction_output(
             session,
-            FeeStatement::zero(),
-            ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))
