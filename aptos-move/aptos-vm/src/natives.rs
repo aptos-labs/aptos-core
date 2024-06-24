@@ -159,6 +159,7 @@ pub fn aptos_natives(
         misc_gas_params,
         timed_features,
         features,
+        None,
     );
 
     aptos_natives_with_builder(&mut builder)

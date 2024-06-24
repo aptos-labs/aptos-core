@@ -240,7 +240,7 @@ impl AptosVM {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
         let (gas_params, storage_gas_params, gas_feature_version) =
-            get_gas_parameters(&env.features, state_view);
+            get_gas_parameters(env.features(), state_view);
 
         let resolver = state_view.as_move_resolver();
         let move_vm = MoveVmExt::new(gas_feature_version, gas_params.as_ref(), env, &resolver);
@@ -275,22 +275,22 @@ impl AptosVM {
 
     #[inline(always)]
     fn features(&self) -> &Features {
-        &self.move_vm.env.features
+        self.move_vm.env.features()
     }
 
     #[inline(always)]
     fn timed_features(&self) -> &TimedFeatures {
-        &self.move_vm.env.timed_features
+        self.move_vm.env.timed_features()
     }
 
     #[inline(always)]
     fn deserializer_config(&self) -> &DeserializerConfig {
-        &self.move_vm.env.vm_config.deserializer_config
+        &self.move_vm.env.vm_config().deserializer_config
     }
 
     #[inline(always)]
-    fn chain_id(&self) -> &ChainId {
-        &self.move_vm.env.chain_id
+    fn chain_id(&self) -> ChainId {
+        self.move_vm.env.chain_id()
     }
 
     /// Sets execution concurrency level when invoked the first time.

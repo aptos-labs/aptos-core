@@ -44,13 +44,12 @@ pub fn aptos_default_ty_builder(features: &Features) -> TypeBuilder {
 /// A runtime environment which can be used for VM initialization and more.
 #[derive(Clone)]
 pub struct Environment {
-    pub chain_id: ChainId,
+    chain_id: ChainId,
 
-    // Note: if features and timed features change, VM config needs re-initialization.
-    pub features: Features,
-    pub timed_features: TimedFeatures,
+    features: Features,
+    timed_features: TimedFeatures,
 
-    pub vm_config: VMConfig,
+    vm_config: VMConfig,
 }
 
 impl Environment {
@@ -107,6 +106,26 @@ impl Environment {
         self
     }
 
+    #[inline]
+    pub fn chain_id(&self) -> ChainId {
+        self.chain_id
+    }
+
+    #[inline]
+    pub fn features(&self) -> &Features {
+        &self.features
+    }
+
+    #[inline]
+    pub fn timed_features(&self) -> &TimedFeatures {
+        &self.timed_features
+    }
+
+    #[inline]
+    pub fn vm_config(&self) -> &VMConfig {
+        &self.vm_config
+    }
+
     fn initialize(
         features: Features,
         timed_features: TimedFeatures,
@@ -139,10 +158,10 @@ pub mod test {
     use aptos_language_e2e_tests::data_store::FakeDataStore;
 
     #[test]
-    fn test_environment() {
+    fn test_new_environment() {
         // This creates an empty state.
         let state_view = FakeDataStore::default();
-        let mut env = Environment::new(&state_view);
+        let env = Environment::new(&state_view);
 
         // Check default values.
         assert_eq!(&env.features, &Features::default());
@@ -151,5 +170,19 @@ pub mod test {
 
         let env = env.try_enable_delayed_field_optimization();
         assert!(env.vm_config.delayed_field_optimization_enabled);
+    }
+
+    #[test]
+    fn test_environment_for_testing() {
+        let env = Environment::testing(ChainId::new(55));
+
+        assert_eq!(&env.features, &Features::default());
+        assert_eq!(env.chain_id.id(), 55);
+        assert!(!env.vm_config.delayed_field_optimization_enabled);
+
+        let expected_timed_features = TimedFeaturesBuilder::enable_all()
+            .with_override_profile(TimedFeatureOverride::Testing)
+            .build();
+        assert_eq!(&env.timed_features, &expected_timed_features);
     }
 }

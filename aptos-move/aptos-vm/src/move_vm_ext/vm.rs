@@ -57,6 +57,7 @@ impl GenesisMoveVM {
             MiscGasParameters::zeros(),
             timed_features.clone(),
             features.clone(),
+            None,
         );
 
         let vm = MoveVM::new_with_config(
@@ -100,16 +101,13 @@ pub struct MoveVmExt {
 }
 
 impl MoveVmExt {
-    fn new_impl<F>(
+    fn new_impl(
         gas_feature_version: u64,
         gas_params: Result<&AptosGasParameters, &String>,
         env: Arc<Environment>,
-        gas_hook: Option<F>,
+        gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
         resolver: &impl AptosMoveResolver,
-    ) -> Self
-    where
-        F: Fn(DynamicExpression) + Send + Sync + 'static,
-    {
+    ) -> Self {
         // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
         //            This only happens in a edge case that is probably related to write set transactions or genesis,
         //            which logically speaking, shouldn't be handled by the VM at all.
@@ -117,7 +115,7 @@ impl MoveVmExt {
         let (native_gas_params, misc_gas_params, ty_builder) = match gas_params {
             Ok(gas_params) => {
                 let ty_builder =
-                    aptos_prod_ty_builder(&env.features, gas_feature_version, gas_params);
+                    aptos_prod_ty_builder(env.features(), gas_feature_version, gas_params);
                 (
                     gas_params.natives.clone(),
                     gas_params.vm.misc.clone(),
@@ -125,7 +123,7 @@ impl MoveVmExt {
                 )
             },
             Err(_) => {
-                let ty_builder = aptos_default_ty_builder(&env.features);
+                let ty_builder = aptos_default_ty_builder(env.features());
                 (
                     NativeGasParameters::zeros(),
                     MiscGasParameters::zeros(),
@@ -134,28 +132,26 @@ impl MoveVmExt {
             },
         };
 
-        let mut builder = SafeNativeBuilder::new(
+        let builder = SafeNativeBuilder::new(
             gas_feature_version,
             native_gas_params,
             misc_gas_params,
-            env.timed_features.clone(),
-            env.features.clone(),
+            env.timed_features().clone(),
+            env.features().clone(),
+            gas_hook,
         );
-        if let Some(hook) = gas_hook {
-            builder.set_gas_hook(hook);
-        }
 
         // TODO(George): Move gas configs to environment to avoid this clone!
         let vm_config = VMConfig {
-            verifier_config: env.vm_config.verifier_config.clone(),
-            deserializer_config: env.vm_config.deserializer_config.clone(),
-            paranoid_type_checks: env.vm_config.paranoid_type_checks,
-            check_invariant_in_swap_loc: env.vm_config.check_invariant_in_swap_loc,
-            max_value_nest_depth: env.vm_config.max_value_nest_depth,
-            type_max_cost: env.vm_config.type_max_cost,
-            type_base_cost: env.vm_config.type_base_cost,
-            type_byte_cost: env.vm_config.type_byte_cost,
-            delayed_field_optimization_enabled: env.vm_config.delayed_field_optimization_enabled,
+            verifier_config: env.vm_config().verifier_config.clone(),
+            deserializer_config: env.vm_config().deserializer_config.clone(),
+            paranoid_type_checks: env.vm_config().paranoid_type_checks,
+            check_invariant_in_swap_loc: env.vm_config().check_invariant_in_swap_loc,
+            max_value_nest_depth: env.vm_config().max_value_nest_depth,
+            type_max_cost: env.vm_config().type_max_cost,
+            type_base_cost: env.vm_config().type_base_cost,
+            type_byte_cost: env.vm_config().type_byte_cost,
+            delayed_field_optimization_enabled: env.vm_config().delayed_field_optimization_enabled,
             ty_builder,
         };
 
@@ -164,7 +160,7 @@ impl MoveVmExt {
                 builder,
                 vm_config,
                 resolver,
-                env.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
+                env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
             )
             .expect("should be able to create Move VM; check if there are duplicated natives"),
             env,
@@ -177,25 +173,16 @@ impl MoveVmExt {
         env: Arc<Environment>,
         resolver: &impl AptosMoveResolver,
     ) -> Self {
-        Self::new_impl::<fn(DynamicExpression)>(
-            gas_feature_version,
-            gas_params,
-            env,
-            None,
-            resolver,
-        )
+        Self::new_impl(gas_feature_version, gas_params, env, None, resolver)
     }
 
-    pub fn new_with_gas_hook<F>(
+    pub fn new_with_gas_hook(
         gas_feature_version: u64,
         gas_params: Result<&AptosGasParameters, &String>,
         env: Arc<Environment>,
-        gas_hook: Option<F>,
+        gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
         resolver: &impl AptosMoveResolver,
-    ) -> Self
-    where
-        F: Fn(DynamicExpression) + Send + Sync + 'static,
-    {
+    ) -> Self {
         Self::new_impl(gas_feature_version, gas_params, env, gas_hook, resolver)
     }
 
@@ -208,8 +195,8 @@ impl MoveVmExt {
         SessionExt::new(
             session_id,
             &self.inner,
-            self.env.chain_id,
-            &self.env.features,
+            self.env.chain_id(),
+            self.env.features(),
             maybe_user_transaction_context,
             resolver,
         )

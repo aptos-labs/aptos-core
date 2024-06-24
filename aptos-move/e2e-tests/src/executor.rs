@@ -981,9 +981,9 @@ impl FakeExecutor {
                 LATEST_GAS_FEATURE_VERSION,
                 Ok(&AptosGasParameters::zeros()),
                 self.env.clone(),
-                Some(move |expression| {
+                Some(Arc::new(move |expression| {
                     a2.lock().unwrap().push(expression);
-                }),
+                })),
                 &resolver,
             );
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
@@ -1104,15 +1104,6 @@ impl FakeExecutor {
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let (gas_params, storage_gas_params, gas_feature_version) =
             get_gas_parameters(&features, state_view);
-
-        let gas_params = gas_params_res.unwrap();
-        let mut gas_meter = make_prod_gas_meter(
-            gas_feature_version,
-            gas_params.clone().vm,
-            storage_gas_params.unwrap(),
-            false,
-            10_000_000_000_000.into(),
-        );
 
         let are_struct_constructors_enabled = features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let env = self
