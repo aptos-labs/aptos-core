@@ -164,10 +164,10 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> {
 /// WARNING: The files referenced in this function are not present in this repo and msut be added
 /// manually
 #[allow(dead_code)]
-fn generate_keys_and_inputs<E: Pairing>() {
+fn generate_keys_and_inputs<E: Pairing>(wasm_file_path: String, r1cs_file_path: String) {
     let cfg = CircomConfig::<E>::new(
-        "./circuit-files/keyless_main.wasm",
-        "./circuit-files/keyless_main.r1cs",
+        wasm_file_path,
+        r1cs_file_path,
     ).unwrap();
     let mut builder = CircomBuilder::new(cfg);
     let mut input_file = File::open("./circuit-files/keyless_input.json").unwrap();
