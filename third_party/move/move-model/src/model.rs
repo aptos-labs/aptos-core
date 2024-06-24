@@ -3466,7 +3466,7 @@ impl<'env> StructEnv<'env> {
         self.data
             .field_data
             .values()
-            .filter(|data| data.common_for_variants || data.variant == variant)
+            .filter(|data| data.common_for_variants || variant.is_none() || data.variant == variant)
             .sorted_by_key(|data| data.offset)
             .map(move |data| FieldEnv {
                 struct_env: self.clone(),

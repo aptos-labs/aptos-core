@@ -161,6 +161,7 @@ pub enum Operation {
     Exists(ModuleId, StructId, Vec<Type>),
 
     // Variants
+    // Below the `Symbol` is the name of the variant.
     TestVariant(ModuleId, StructId, Symbol, Vec<Type>),
     PackVariant(ModuleId, StructId, Symbol, Vec<Type>),
     UnpackVariant(ModuleId, StructId, Symbol, Vec<Type>),

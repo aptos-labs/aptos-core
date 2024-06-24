@@ -12,6 +12,12 @@ module 0xc0ffee::m {
             y: u64,
         }
     }
+    enum Option {
+        None,
+        Some {
+            value: #0,
+        }
+    }
     enum Outer {
         None,
         One {
@@ -40,6 +46,42 @@ module 0xc0ffee::m {
           }
           _: &m::Inner => {
             false
+          }
+        }
+
+    }
+    public fun is_some<A>(x: &m::Option<#0>): bool {
+        match (x) {
+          m::Option::None<A> => {
+            false
+          }
+          m::Option::Some<A>{ value: _ } => {
+            true
+          }
+        }
+
+    }
+    public fun is_some_dropped<A>(x: m::Option<#0>): bool {
+        match (x) {
+          m::Option::None<A> => {
+            false
+          }
+          _: m::Option<A> => {
+            true
+          }
+        }
+
+    }
+    public fun is_some_specialized(x: &m::Option<m::Option<u64>>): bool {
+        match (x) {
+          m::Option::None<m::Option<u64>> => {
+            false
+          }
+          m::Option::Some<m::Option<u64>>{ value: m::Option::None<u64> } => {
+            false
+          }
+          m::Option::Some<m::Option<u64>>{ value: m::Option::Some<u64>{ value: _ } } => {
+            true
           }
         }
 
@@ -164,6 +206,96 @@ public fun m::is_inner1($t0: &m::Inner): bool {
  11: abort($t4)
  12: label L0
  13: return $t1
+}
+
+
+[variant baseline]
+public fun m::is_some<#0>($t0: &m::Option<#0>): bool {
+     var $t1: bool
+     var $t2: bool
+     var $t3: u64
+  0: $t2 := test_variant m::Option<#0>::None($t0)
+  1: if ($t2) goto 2 else goto 5
+  2: label L2
+  3: $t1 := false
+  4: goto 14
+  5: label L1
+  6: $t2 := test_variant m::Option<#0>::Some($t0)
+  7: if ($t2) goto 8 else goto 11
+  8: label L4
+  9: $t1 := true
+ 10: goto 14
+ 11: label L3
+ 12: $t3 := 15621340914461310977
+ 13: abort($t3)
+ 14: label L0
+ 15: return $t1
+}
+
+
+[variant baseline]
+public fun m::is_some_dropped<#0>($t0: m::Option<#0>): bool {
+     var $t1: bool
+     var $t2: &m::Option<#0>
+     var $t3: bool
+     var $t4: m::Option<#0>
+     var $t5: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := test_variant m::Option<#0>::None($t2)
+  2: if ($t3) goto 3 else goto 7
+  3: label L2
+  4: unpack_variant m::Option<#0>::None($t0)
+  5: $t1 := false
+  6: goto 14
+  7: label L1
+  8: $t4 := infer($t0)
+  9: $t1 := true
+ 10: goto 14
+ 11: label L3
+ 12: $t5 := 15621340914461310977
+ 13: abort($t5)
+ 14: label L0
+ 15: return $t1
+}
+
+
+[variant baseline]
+public fun m::is_some_specialized($t0: &m::Option<m::Option<u64>>): bool {
+     var $t1: bool
+     var $t2: bool
+     var $t3: &m::Option<u64>
+     var $t4: &m::Option<u64>
+     var $t5: u64
+  0: $t2 := test_variant m::Option<m::Option<u64>>::None($t0)
+  1: if ($t2) goto 2 else goto 5
+  2: label L2
+  3: $t1 := false
+  4: goto 28
+  5: label L1
+  6: $t2 := test_variant m::Option<m::Option<u64>>::Some($t0)
+  7: if ($t2) goto 8 else goto 15
+  8: label L4
+  9: $t3 := borrow_field_variant<m::Option<m::Option<u64>>::Some>.value($t0)
+ 10: $t2 := test_variant m::Option<u64>::None($t3)
+ 11: if ($t2) goto 12 else goto 15
+ 12: label L5
+ 13: $t1 := false
+ 14: goto 28
+ 15: label L3
+ 16: $t2 := test_variant m::Option<m::Option<u64>>::Some($t0)
+ 17: if ($t2) goto 18 else goto 25
+ 18: label L7
+ 19: $t4 := borrow_field_variant<m::Option<m::Option<u64>>::Some>.value($t0)
+ 20: $t2 := test_variant m::Option<u64>::Some($t4)
+ 21: if ($t2) goto 22 else goto 25
+ 22: label L8
+ 23: $t1 := true
+ 24: goto 28
+ 25: label L6
+ 26: $t5 := 15621340914461310977
+ 27: abort($t5)
+ 28: label L0
+ 29: return $t1
 }
 
 
@@ -420,3 +552,21 @@ bug: file format generator: variants not yet implemented
    │
 67 │     public fun outer_value_with_cond_ref(o: &Outer): bool {
    │                ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+bug: file format generator: variants not yet implemented
+   ┌─ tests/bytecode-generator/matching_ok.move:82:16
+   │
+82 │     public fun is_some<A>(x: &Option<A>): bool {
+   │                ^^^^^^^
+
+bug: file format generator: variants not yet implemented
+   ┌─ tests/bytecode-generator/matching_ok.move:89:16
+   │
+89 │     public fun is_some_specialized(x: &Option<Option<u64>>): bool {
+   │                ^^^^^^^^^^^^^^^^^^^
+
+bug: file format generator: variants not yet implemented
+   ┌─ tests/bytecode-generator/matching_ok.move:97:16
+   │
+97 │     public fun is_some_dropped<A:drop>(x: Option<A>): bool {
+   │                ^^^^^^^^^^^^^^^

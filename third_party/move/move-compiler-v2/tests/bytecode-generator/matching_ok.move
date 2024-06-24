@@ -72,4 +72,32 @@ module 0xc0ffee::m {
             Two{i, b: _} => i.is_inner1()
         }
     }
+
+    /// Matching with abilities and generics
+    enum Option<A> has drop {
+        None,
+        Some{value: A}
+    }
+
+    public fun is_some<A>(x: &Option<A>): bool {
+        match (x) {
+            None => false,
+            Some{value: _} => true
+        }
+    }
+
+    public fun is_some_specialized(x: &Option<Option<u64>>): bool {
+        match (x) {
+            None => false,
+            Some{value: Option::None} => false,
+            Some{value: Option::Some{value: _}} => true,
+        }
+    }
+
+    public fun is_some_dropped<A:drop>(x: Option<A>): bool {
+        match (x) {
+            None => false,
+            _ => true
+        }
+    }
 }

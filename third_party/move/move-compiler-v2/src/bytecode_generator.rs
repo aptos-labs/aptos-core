@@ -1004,7 +1004,7 @@ impl<'env> Generator<'env> {
     // the expression is not a tuple, a singleton vector will be returned. This
     // reflects the current special semantics of tuples in Move which cannot be
     // nested.
-    fn gen_tuple(&mut self, exp: &Exp, with_force_temp: bool) -> Vec<TempIndex> {
+    fn gen_tuple(&mut self, exp: &Exp, with_forced_temp: bool) -> Vec<TempIndex> {
         if let ExpData::Call(_, Operation::Tuple, args) = exp.as_ref() {
             args.iter().map(|arg| self.gen_arg(arg, false)).collect()
         } else {
@@ -1019,7 +1019,7 @@ impl<'env> Generator<'env> {
                 self.gen(temps.clone(), exp);
                 temps
             } else {
-                vec![self.gen_arg(exp, with_force_temp)]
+                vec![self.gen_arg(exp, with_forced_temp)]
             }
         }
     }
@@ -1218,7 +1218,7 @@ impl<'env> Generator<'env> {
 /// Consider `let s = S{x: C{y}}; match (s) { S{C{y}}} if p(&y) => y, t => t }`. In order
 /// to check whether the match is true, the value in `s` must not be moved until the match
 /// is decided, while still being able to look at sub-fields and evaluate predicates.
-/// Therefore, the match need to evaluated first using a reference to `s`. We call this
+/// Therefore, the match needs to evaluated first using a reference to `s`. We call this
 /// _probing_ of a match.
 ///
 /// The type `MatchMode` is used to describe in which mode matching is performed.
@@ -1857,7 +1857,8 @@ impl<'env> Generator<'env> {
 /// which show the counterexamples of missed patterns, but only up to the shape as the user
 /// has inspected values via patterns. For example, if the user has written `R{S{_}, _}`
 /// the counter example should not contain irrelevant other parts of the value (as e.g.
-/// in `R{T{x:_}, S}`). Moreover, missing patterns which can never be matched should
+/// in `R{T{x:_}, S}`). Moreover, patterns which can never be matched because there is
+/// a previous pattern which captures all covered values, should
 /// be reported, as dead code analysis will not determine this without flow dependent
 /// analysis.
 ///
@@ -1878,6 +1879,7 @@ impl<'env> Generator<'env> {
 enum ValueShape {
     Any,
     Tuple(Vec<ValueShape>),
+    // Struct(struct_id, optional_variant, argument_shapes)
     Struct(QualifiedId<StructId>, Option<Symbol>, Vec<ValueShape>),
 }
 
@@ -1958,13 +1960,19 @@ impl ValueShape {
                 .map(Tuple)
                 .collect(),
             Struct(sid, variant, args) => {
-                let derived = Self::possible_values_product(env, args)
-                    .map(|new_args| Struct(*sid, *variant, new_args));
+                let derived = if args.is_empty() {
+                    vec![Struct(*sid, *variant, vec![])]
+                } else {
+                    Self::possible_values_product(env, args)
+                        .map(|new_args| Struct(*sid, *variant, new_args))
+                        .collect_vec()
+                };
                 if let Some(v) = variant {
                     // If this is a variant pattern, need to add all _other_ variants to
                     // explore for completeness.
                     let struct_env = env.get_struct(*sid);
                     derived
+                        .into_iter()
                         .chain(
                             struct_env
                                 .get_variants()
@@ -1981,7 +1989,7 @@ impl ValueShape {
                         )
                         .collect()
                 } else {
-                    derived.collect()
+                    derived
                 }
             },
         }
