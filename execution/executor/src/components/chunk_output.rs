@@ -98,6 +98,9 @@ impl ChunkOutput {
 
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
+            let _timer = TIMER
+                .with_label_values(&["flatten_transactions"])
+                .start_timer();
             let transactions_clone = (*transactions_arc_clone).clone();
             let flattened_txns = PartitionedTransactions::flatten(transactions_clone)
                 .into_iter()
