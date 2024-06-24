@@ -70,10 +70,6 @@ pub async fn test_consensus_fault_tolerance(
     // Can allow us to better see if state would've gotten resolved by itself, etc.
     raise_check_error_at_the_end: bool,
 ) -> Result<()> {
-    // let validator_clients = {
-    //     swarm.read().await.get_validator_clients_with_names()
-    // };
-
     async fn get_all_states(validator_clients: &[(String, RestClient)]) -> Vec<NodeState> {
         join_all(
             validator_clients
@@ -146,7 +142,6 @@ pub async fn test_consensus_fault_tolerance(
         }
 
         if new_epoch_on_cycle {
-            // swarm.read().await.aptos_public_info().reconfig().await;
             public_info.reconfig().await;
         }
     }

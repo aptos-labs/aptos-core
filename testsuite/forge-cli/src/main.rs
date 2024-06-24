@@ -279,13 +279,7 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::parse();
-    let duration = if args.suite == "compat" {
-        // TODO: if this needs to be more perminent than hacking into this branch, edit
-        // .github/workflows/docker-build-test.yaml
-        Duration::from_secs(30 * 60)
-    } else {
-        Duration::from_secs(args.duration_secs as u64)
-    };
+    let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;

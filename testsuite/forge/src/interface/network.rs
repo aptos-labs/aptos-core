@@ -83,10 +83,6 @@ impl<'t> NetworkContext<'t> {
         }
     }
 
-    // pub fn swarm(&mut self) -> &mut dyn Swarm {
-    //     self.swarm
-    // }
-
     pub fn core(&mut self) -> &mut CoreContext {
         &mut self.core
     }

@@ -46,25 +46,10 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
         if accounts_to_use.is_empty() {
             return Vec::new();
         }
-        // Wrap LocalAccount in Arc+Mutex
-        // let account_arcs : Vec<Arc<LocalAccount>> = accounts_to_use.into_iter().map(Arc::new).collect();
-        // get txns
         let txns = accounts_to_use
             .iter()
             .flat_map(|account| self.generator.generate_transactions(account, 1))
             .collect();
-        // let txns = accounts_to_use
-        //     .iter_mut()
-        //     .flat_map(|account| {
-        //
-        //         self.generator.generate_transactions(account, 1)
-        //     })
-        //     .collect();
-
-        // back to plain LocalAccount, add to accounts
-        // let accounts_to_use = account_arcs.into_iter().map(|account| {
-        //     Arc::into_inner(account).unwrap()
-        // }).collect();
         if let Some(destination_accounts_pool) = &self.destination_accounts_pool {
             destination_accounts_pool.add_to_pool(accounts_to_use);
         }
