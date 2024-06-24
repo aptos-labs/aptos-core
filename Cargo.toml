@@ -637,6 +637,7 @@ neptune = { version = "13.0.0", default_features = false }
 ntest = "0.9.0"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
+num-bigint-v4 = { package = "num-bigint", version = "0.4.5" }
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-integer = "0.1.42"

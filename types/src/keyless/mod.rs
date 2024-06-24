@@ -178,7 +178,7 @@ impl Pepper {
 
     // Used for testing. #[cfg(test)] doesn't seem to allow for use in smoke tests.
     pub fn from_number(num: u128) -> Self {
-        let big_int = num_bigint::BigUint::from(num);
+        let big_int = num_bigint_v4::BigUint::from(num);
         let bytes: Vec<u8> = big_int.to_bytes_le();
         let mut extended_bytes = [0u8; Self::NUM_BYTES];
         extended_bytes[..bytes.len()].copy_from_slice(&bytes);
