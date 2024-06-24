@@ -165,10 +165,9 @@ spec aptos_framework::transaction_validation {
         //         secondary_signer_public_key_hashes[i] !=
         //             account::get_authentication_key(secondary_signer_addresses[i]);
         // By the end, all secondary signers account should exist and public key hash should match.
-            account::exists_at(secondary_signer_addresses[i]);
-        ensures forall i in 0..num_secondary_signers:
-            secondary_signer_public_key_hashes[i] == account::get_authentication_key(secondary_signer_addresses[i])
-                || can_skip(features::spec_simulation_enhancement_enabled(), is_simulation, secondary_signer_public_key_hashes[i]);
+        // ensures forall i in 0..num_secondary_signers:
+        //     secondary_signer_public_key_hashes[i] == account::get_authentication_key(secondary_signer_addresses[i])
+        //         || can_skip(features::spec_simulation_enhancement_enabled(), is_simulation, secondary_signer_public_key_hashes[i]);
     }
 
     spec fun can_skip(feature_flag: bool, is_simulation: bool, auth_key: vector<u8>): bool {

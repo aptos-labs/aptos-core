@@ -93,12 +93,12 @@ module aptos_framework::transaction_validation {
 
         if (
             transaction_sender == gas_payer
-                || (account::account_resource_exists_at(transaction_sender) || features::lite_account_enabled())
+                || account::account_resource_exists_at(transaction_sender) || features::lite_account_enabled()
                 || !features::sponsored_automatic_account_creation_enabled()
                 || txn_sequence_number > 0
         ) {
             let account_sequence_number =
-                if (account::exists_at(transaction_sender)) {
+                if (account::account_resource_exists_at(transaction_sender)) {
                     if (!features::transaction_simulation_enhancement_enabled() ||
                         !skip_auth_key_check(is_simulation, &txn_authentication_key)) {
                         assert!(
@@ -333,10 +333,9 @@ module aptos_framework::transaction_validation {
         }) {
             let secondary_address = *vector::borrow(&secondary_signer_addresses, i);
             let signer_public_key_hash = *vector::borrow(&secondary_signer_public_key_hashes, i);
-
             if (!features::transaction_simulation_enhancement_enabled() ||
                 !skip_auth_key_check(is_simulation, &signer_public_key_hash)) {
-                if (account::exists_at(secondary_address)) {
+                if (account::account_resource_exists_at(secondary_address)) {
                     assert!(
                         signer_public_key_hash == account::get_authentication_key(secondary_address),
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
@@ -383,7 +382,7 @@ module aptos_framework::transaction_validation {
             false,
         );
         multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes, false);
-        if (account::exists_at(fee_payer_address)) {
+        if (account::account_resource_exists_at(fee_payer_address)) {
             assert!(
                 fee_payer_public_key_hash == account::get_authentication_key(fee_payer_address),
                 error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
@@ -554,11 +553,11 @@ module aptos_framework::transaction_validation {
 
         // Increment sequence number
         let addr = signer::address_of(&account);
-        if (account::account_resource_exists_at(addr)) {
+        if (!account::account_resource_exists_at(addr) && features::lite_account_enabled()) {
+            lite_account::increment_sequence_number(addr);
+        } else {
             // account v1
             account::increment_sequence_number(addr);
-        } else {
-            lite_account::increment_sequence_number(addr);
         }
     }
 

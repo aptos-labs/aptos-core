@@ -32,11 +32,11 @@ pub struct AccountResource {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct NativeAuthenticatorResource {
-    authentication_key: Vec<u8>,
+    authentication_key: Option<Vec<u8>>,
 }
 
-impl From<Vec<u8>> for NativeAuthenticatorResource {
-    fn from(authentication_key: Vec<u8>) -> Self {
+impl From<Option<Vec<u8>>> for NativeAuthenticatorResource {
+    fn from(authentication_key: Option<Vec<u8>>) -> Self {
         Self { authentication_key }
     }
 }
@@ -70,10 +70,10 @@ impl LiteAccountGroup {
     }
 
     /// Return the authentication_key field for the given Account
-    pub fn authentication_key(&self) -> &[u8] {
+    pub fn authentication_key(&self) -> Option<&Vec<u8>> {
         match &self.authenticator {
             Authenticator::Native(native_authenticator) => {
-                native_authenticator.authentication_key.as_slice()
+                native_authenticator.authentication_key.as_ref()
             },
             _ => unreachable!(),
         }
