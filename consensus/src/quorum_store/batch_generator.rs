@@ -475,7 +475,7 @@ impl BatchGenerator {
 
                         last_pulled_num_txns = batches.iter().map(|b| b.batch_info().num_txns()).sum();
                         counters::LAST_PULLED_NUM_TXNS.observe(last_pulled_num_txns as f64);
-                        
+
                         if !batches.is_empty() {
                             last_non_empty_pull = tick_start;
 

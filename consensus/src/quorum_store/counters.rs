@@ -53,8 +53,8 @@ static PROOF_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
 
 // Histogram buckets that expand DEFAULT_BUCKETS with more granularity between 0-150 ms
 const QUORUM_STORE_SMALL_LATENCY_BUCKETS: &[f64] = &[
-    0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12,
-    0.13, 0.14, 0.15, 0.2,
+    0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1,
+    0.11, 0.12, 0.13, 0.14, 0.15, 0.2,
 ];
 
 /// Counter for tracking latency of quorum store processing requests from consensus
@@ -84,7 +84,6 @@ pub static MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
         .unwrap(),
     )
 });
-
 
 pub static NUM_PROOFS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION: Lazy<Histogram> = Lazy::new(
     || {
@@ -775,7 +774,7 @@ pub static QS_SINCE_LAST_NON_EMPTY_PULL_TIME: Lazy<DurationHistogram> = Lazy::ne
             "quorum_store_since_last_non_empty_pull_ms",
             "Histogram of the time since last non-empty pull time",
         )
-        .unwrap()
+        .unwrap(),
     )
 });
 
@@ -787,7 +786,6 @@ pub static LAST_PULLED_NUM_TXNS: Lazy<Histogram> = Lazy::new(|| {
     )
     .unwrap()
 });
-
 
 /// Histogram of the time durations for empty batch creation.
 pub static EMPTY_BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {

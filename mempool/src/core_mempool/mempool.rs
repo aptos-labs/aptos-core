@@ -152,7 +152,8 @@ impl Mempool {
                         time_delta,
                     );
                 }
-                if let Ok(time_delta) = prioritized_time.duration_since(insertion_info.insertion_time)
+                if let Ok(time_delta) =
+                    prioritized_time.duration_since(insertion_info.insertion_time)
                 {
                     counters::core_mempool_txn_commit_latency(
                         counters::INSERTED_TO_PRIORITY_INDEX_LABEL,
@@ -540,7 +541,7 @@ impl Mempool {
     //     if self.transactions.total_num_transactions()
     //         != (block.len() + skipped.len() + exclude_transactions.len()) as u64
     //     {
-    //         info!("Total_num_transactions = {}, block len = {}, skipped len = {},  excluded transactions = {}, difference = {}", 
+    //         info!("Total_num_transactions = {}, block len = {}, skipped len = {},  excluded transactions = {}, difference = {}",
     //             self.transactions.total_num_transactions(), block.len(), skipped.len(), exclude_transactions.len(),
     //             (self.transactions.total_num_transactions() as i64 - (block.len()  + skipped.len() + exclude_transactions.len()) as i64)
     //         );
@@ -626,7 +627,6 @@ impl Mempool {
     //     block
     // }
 
-
     #[allow(clippy::explicit_counter_loop)]
     pub(crate) fn get_batch(
         &self,
@@ -638,6 +638,7 @@ impl Mempool {
         let start_time = Instant::now();
         let exclude_size = exclude_transactions.len();
         let mut inserted = HashSet::new();
+        let total_num_txns = self.transactions.total_num_transactions();
 
         let gas_end_time = start_time.elapsed();
 
@@ -783,6 +784,16 @@ impl Mempool {
                 0.0
             },
         );
+        // counters::MEMPOOL_GET_BATCH_FINAL_NUM_TXNS.observe(block.len() as f64);
+        // counters::MEMPOOL_GET_BATCH_FINAL_NUM_BYTES.observe(total_bytes as f64);
+        // counters::MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH.set(
+        //     if mempool_total_txns_excluding_progressing > (block.len() as u64) {
+        //         (mempool_total_txns_excluding_progressing - block.len() as u64) as i64
+        //     } else {
+        //         0
+        //     },
+        // );
+        info!("MempoolGetBatchRequest: Block size: {}, Block bytes: {}, return_non_full: {}, full_bytes: {}, block_len < max_txns: {}, block_cleared: {}, total_num_txns: {}, txns_walked: {}, excluded_txns: {}, num_txns - exlcuded: {}, txns_walked - excluded: {}, skipped: {}, actual_remaining_txns: {}, initial_picked_txns: {}", block.len(), total_bytes, return_non_full, full_bytes, (block.len() as u64) < max_txns, !return_non_full && !full_bytes && (block.len() as u64) < max_txns, total_num_txns, txn_walked, exclude_transactions.len(), total_num_txns - exclude_transactions.len() as u64, txn_walked - exclude_transactions.len(), skipped.len(), actual_remaining_txns, result_size);
 
         counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
         counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);

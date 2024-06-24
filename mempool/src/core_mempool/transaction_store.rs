@@ -185,12 +185,12 @@ impl TransactionStore {
         self.sequence_numbers.get(address)
     }
 
-    // pub(crate) fn total_num_transactions(&self) -> u64 {
-    //     self.transactions
-    //         .values()
-    //         .map(|txns| txns.len() as u64)
-    //         .sum()
-    // }
+    pub(crate) fn total_num_transactions(&self) -> u64 {
+        self.transactions
+            .values()
+            .map(|txns| txns.len() as u64)
+            .sum()
+    }
 
     // pub(crate) fn get_account_sequence_numbers(&self, address: &AccountAddress) -> HashSet<u64> {
     //     self.transactions

@@ -369,7 +369,7 @@ impl ProofQueue {
                 .observe(num_proofs_remaining_after_pull as f64);
             counters::NUM_TXNS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION
                 .observe(num_txns_remaining_after_pull as f64);
-            
+
             // Stable sort, so the order of proofs within an author will not change.
             ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
             (ret, !full)
