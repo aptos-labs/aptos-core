@@ -12,6 +12,7 @@ use move_binary_format::{
     compatibility::Compatibility, errors::VMResult, file_format::CompiledScript,
     file_format_common, CompiledModule,
 };
+use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
     address::ParsedAddress,
     env::{get_move_compiler_block_v1_from_env, get_move_compiler_v2_from_env, read_bool_env_var},
@@ -38,6 +39,7 @@ use move_resource_viewer::MoveValueAnnotator;
 use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
+    config::VMConfig,
     module_traversal::*,
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
@@ -368,12 +370,19 @@ impl<'a> SimpleVMTestAdapter<'a> {
         gas_budget: Option<u64>,
         f: impl FnOnce(&mut Session, &mut GasStatus) -> VMResult<Ret>,
     ) -> VMResult<Ret> {
-        // start session
-        let vm = MoveVM::new(move_stdlib::natives::all_natives(
-            STD_ADDR,
-            // TODO: come up with a suitable gas schedule
-            move_stdlib::natives::GasParameters::zeros(),
-        ));
+        let vm_config = VMConfig {
+            verifier_config: VerifierConfig::production(),
+            paranoid_type_checks: true,
+            ..VMConfig::default()
+        };
+        let vm = MoveVM::new_with_config(
+            move_stdlib::natives::all_natives(
+                STD_ADDR,
+                // TODO: come up with a suitable gas schedule
+                move_stdlib::natives::GasParameters::zeros(),
+            ),
+            vm_config,
+        );
         let (mut session, mut gas_status) = {
             let gas_status = get_gas_status(
                 &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
