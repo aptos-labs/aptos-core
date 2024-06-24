@@ -638,9 +638,9 @@ impl Mempool {
         let start_time = Instant::now();
         let exclude_size = exclude_transactions.len();
         let mut inserted = HashSet::new();
-        let total_num_txns = self.transactions.total_num_transactions();
+        // let total_num_txns = self.transactions.total_num_transactions();
 
-        let gas_end_time = start_time.elapsed();
+        let gas_end_time: Duration = start_time.elapsed();
 
         let mut result = vec![];
         // Helper DS. Helps to mitigate scenarios where account submits several transactions
@@ -793,7 +793,8 @@ impl Mempool {
         //         0
         //     },
         // );
-        info!("MempoolGetBatchRequest: Block size: {}, Block bytes: {}, return_non_full: {}, full_bytes: {}, block_len < max_txns: {}, block_cleared: {}, total_num_txns: {}, txns_walked: {}, excluded_txns: {}, num_txns - exlcuded: {}, txns_walked - excluded: {}, skipped: {}, actual_remaining_txns: {}, initial_picked_txns: {}", block.len(), total_bytes, return_non_full, full_bytes, (block.len() as u64) < max_txns, !return_non_full && !full_bytes && (block.len() as u64) < max_txns, total_num_txns, txn_walked, exclude_transactions.len(), total_num_txns - exclude_transactions.len() as u64, txn_walked - exclude_transactions.len(), skipped.len(), actual_remaining_txns, result_size);
+        // info!("MempoolGetBatchRequest: Block size: {}, Block bytes: {}, return_non_full: {}, full_bytes: {}, block_len < max_txns: {}, block_cleared: {}, total_num_txns: {}, txns_walked: {}, excluded_txns: {}, num_txns - exlcuded: {}, txns_walked - excluded: {}, skipped: {}, actual_remaining_txns: {}, initial_picked_txns: {}", block.len(), total_bytes, return_non_full, full_bytes, (block.len() as u64) < max_txns, !return_non_full && !full_bytes && (block.len() as u64) < max_txns, total_num_txns, txn_walked, exclude_transactions.len(), total_num_txns - exclude_transactions.len() as u64, txn_walked - exclude_transactions.len(), skipped.len(), actual_remaining_txns, result_size);
+        info!("MempoolGetBatchRequest: Block size: {}, Block bytes: {}, return_non_full: {}, full_bytes: {}, block_len < max_txns: {}, block_cleared: {}, txns_walked: {}, excluded_txns: {}, txns_walked - excluded: {}, skipped: {}, actual_remaining_txns: {}, initial_picked_txns: {}", block.len(), total_bytes, return_non_full, full_bytes, (block.len() as u64) < max_txns, !return_non_full && !full_bytes && (block.len() as u64) < max_txns, txn_walked, exclude_transactions.len(), txn_walked - exclude_transactions.len(), skipped.len(), actual_remaining_txns, result_size);
 
         counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
         counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);
