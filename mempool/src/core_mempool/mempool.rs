@@ -652,6 +652,9 @@ impl Mempool {
         let mut skipped = HashSet::new();
         let mut total_bytes = 0;
         let mut txn_walked = 0usize;
+        let mut txns_not_excluded: usize = 0;
+        let mut initially_skipped = 0usize;
+        let mut result_pushed: usize = 0;
         // iterate over the queue of transactions based on gas price
         'main: for txn in self.transactions.iter_queue() {
             txn_walked += 1;
@@ -661,6 +664,7 @@ impl Mempool {
             if exclude_transactions.contains_key(&txn_ptr) {
                 continue;
             }
+            txns_not_excluded += 1;
             let tx_seq = txn.sequence_number.transaction_sequence_number;
             let txn_in_sequence = tx_seq > 0
                 && Self::txn_was_chosen(txn.address, tx_seq - 1, &inserted, &exclude_transactions);
@@ -670,6 +674,7 @@ impl Mempool {
             if txn_in_sequence || account_sequence_number == Some(&tx_seq) {
                 inserted.insert((txn.address, tx_seq));
                 result.push((txn.address, tx_seq));
+                result_pushed += 1;
                 if (result.len() as u64) == max_txns {
                     break;
                 }
@@ -680,6 +685,7 @@ impl Mempool {
                 while skipped.contains(&skipped_txn) {
                     inserted.insert(skipped_txn);
                     result.push(skipped_txn);
+                    result_pushed += 1;
                     skipped.remove(&skipped_txn);
                     if (result.len() as u64) == max_txns {
                         break 'main;
@@ -688,10 +694,12 @@ impl Mempool {
                 }
             } else {
                 skipped.insert((txn.address, tx_seq));
+                initially_skipped += 1;
             }
         }
         counters::MEMPOOL_SKIPPED_TXNS.set(skipped.len() as i64);
         let result_size = result.len();
+        let inserted_size = inserted.len();
         let result_end_time = start_time.elapsed();
         let result_time = result_end_time.saturating_sub(gas_end_time);
 
@@ -795,7 +803,7 @@ impl Mempool {
         //     },
         // );
 
-        info!("MempoolGetBatchRequest: Block size: {}, Block bytes: {}, return_non_full: {}, full_bytes: {}, block_len < max_txns: {}, block_cleared: {}, total_num_txns: {}, txns_walked: {}, excluded_txns: {}, skipped: {}, actual_remaining_txns: {}, initial_picked_txns: {}", block.len(), total_bytes, return_non_full, full_bytes, (block.len() as u64) < max_txns, !return_non_full && !full_bytes && (block.len() as u64) < max_txns, total_num_txns, txn_walked, exclude_transactions.len(),  skipped.len(), actual_remaining_txns, result_size);
+        info!("MempoolGetBatchRequest: Block size: {}, Block bytes: {}, return_non_full: {}, full_bytes: {}, block_len < max_txns: {}, block_cleared: {}, total_num_txns: {}, txns_walked: {}, excluded_txns: {}, skipped: {}, actual_remaining_txns: {}, initial_picked_txns: {}, txns_not_excluded: {}, inserted_size: {}, initially_skipped: {}, result_pushed: {}", block.len(), total_bytes, return_non_full, full_bytes, (block.len() as u64) < max_txns, !return_non_full && !full_bytes && (block.len() as u64) < max_txns, total_num_txns, txn_walked, exclude_transactions.len(),  skipped.len(), actual_remaining_txns, result_size, txns_not_excluded, inserted_size, initially_skipped, result_pushed);
         // info!("MempoolGetBatchRequest: Block size: {}, Block bytes: {}, return_non_full: {}, full_bytes: {}, block_len < max_txns: {}, block_cleared: {}, txns_walked: {}, excluded_txns: {}, txns_walked - excluded: {}, skipped: {}, actual_remaining_txns: {}, initial_picked_txns: {}", block.len(), total_bytes, return_non_full, full_bytes, (block.len() as u64) < max_txns, !return_non_full && !full_bytes && (block.len() as u64) < max_txns, txn_walked, exclude_transactions.len(), txn_walked - exclude_transactions.len(), skipped.len(), actual_remaining_txns, result_size);
         // info!("MempoolGetBatchRequest: Block size: {}, Block bytes: {}, return_non_full: {}, full_bytes: {}, block_len < max_txns: {}, block_cleared: {}, total_num_txns: {}, txns_walked: {}, excluded_txns: {}, num_txns - exlcuded: {}, txns_walked - excluded: {}, skipped: {}, initial_picked_txns: {}", block.len(), total_bytes, return_non_full, full_bytes, (block.len() as u64) < max_txns, !return_non_full && !full_bytes && (block.len() as u64) < max_txns, total_num_txns, txn_walked, exclude_transactions.len(), total_num_txns - exclude_transactions.len() as u64, txn_walked - exclude_transactions.len(), skipped.len(), result_size);
 
