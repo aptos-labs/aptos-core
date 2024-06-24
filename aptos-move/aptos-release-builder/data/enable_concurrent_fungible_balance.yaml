@@ -11,4 +11,4 @@ proposals:
     update_sequence:
       - FeatureFlag:
           enabled:
-            - CONCURRENT_FUNGIBLE_BALANCE
+            - concurrent_fungible_balance
