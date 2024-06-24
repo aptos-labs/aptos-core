@@ -310,3 +310,288 @@ fn spawn_message_serializer_and_sender(
             .await;
     });
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use aptos_config::network_id::NetworkId;
+    use aptos_consensus_types::pipeline::commit_decision::CommitDecision;
+    use aptos_crypto::HashValue;
+    use aptos_network::{
+        application::{metadata::ConnectionState, storage::PeersAndMetadata},
+        transport::ConnectionMetadata,
+    };
+    use aptos_types::{
+        aggregate_signature::AggregateSignature,
+        block_info::BlockInfo,
+        ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+        PeerId,
+    };
+    use futures::FutureExt;
+    use maplit::hashmap;
+    use tokio_stream::StreamExt;
+
+    #[test]
+    pub fn test_garbage_collect_subscriptions() {
+        // Create a network client
+        let network_id = NetworkId::Public;
+        let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
+        let network_client =
+            NetworkClient::new(vec![], vec![], hashmap![], peers_and_metadata.clone());
+
+        // Create a consensus publisher
+        let (consensus_publisher, _) =
+            ConsensusPublisher::new(network_client, ConsensusObserverConfig::default());
+
+        // Add a peer to the peers and metadata
+        let peer_network_id_1 = PeerNetworkId::new(network_id, PeerId::random());
+        let connection_metadata = ConnectionMetadata::mock(peer_network_id_1.peer_id());
+        peers_and_metadata
+            .insert_connection_metadata(peer_network_id_1, connection_metadata)
+            .unwrap();
+
+        // Add the peer to the active subscribers
+        process_subscription_for_peer(&consensus_publisher, &peer_network_id_1);
+
+        // Garbage collect the subscriptions and verify that the peer is still an active subscriber
+        consensus_publisher.garbage_collect_subscriptions();
+        verify_active_subscribers(&consensus_publisher, 1, vec![&peer_network_id_1], vec![]);
+
+        // Add another peer to the active subscribers
+        let peer_network_id_2 = PeerNetworkId::new(network_id, PeerId::random());
+        process_subscription_for_peer(&consensus_publisher, &peer_network_id_2);
+
+        // Garbage collect the subscriptions and verify that the second peer
+        // is removed but not the first (we have no metadata for the second peer).
+        consensus_publisher.garbage_collect_subscriptions();
+        verify_active_subscribers(&consensus_publisher, 1, vec![&peer_network_id_1], vec![
+            &peer_network_id_2,
+        ]);
+
+        // Add another peer to the peers and metadata
+        let peer_network_id_3 = PeerNetworkId::new(network_id, PeerId::random());
+        let connection_metadata = ConnectionMetadata::mock(peer_network_id_3.peer_id());
+        peers_and_metadata
+            .insert_connection_metadata(peer_network_id_3, connection_metadata)
+            .unwrap();
+
+        // Add the peer to the active subscribers
+        process_subscription_for_peer(&consensus_publisher, &peer_network_id_3);
+
+        // Garbage collect the subscriptions and verify that both peers are active
+        consensus_publisher.garbage_collect_subscriptions();
+        verify_active_subscribers(
+            &consensus_publisher,
+            2,
+            vec![&peer_network_id_1, &peer_network_id_3],
+            vec![],
+        );
+
+        // Update the connection state for the first peer (to disconnected)
+        peers_and_metadata
+            .update_connection_state(peer_network_id_1, ConnectionState::Disconnected)
+            .unwrap();
+
+        // Garbage collect the subscriptions and verify that the first peer is removed
+        consensus_publisher.garbage_collect_subscriptions();
+        verify_active_subscribers(&consensus_publisher, 1, vec![&peer_network_id_3], vec![
+            &peer_network_id_1,
+        ]);
+    }
+
+    #[test]
+    fn test_handle_subscription_request() {
+        // Create a network client
+        let network_id = NetworkId::Public;
+        let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
+        let network_client =
+            NetworkClient::new(vec![], vec![], hashmap![], peers_and_metadata.clone());
+
+        // Create a consensus publisher
+        let (consensus_publisher, _) =
+            ConsensusPublisher::new(network_client, ConsensusObserverConfig::default());
+
+        // Subscribe a new peer to consensus updates and verify the subscription
+        let peer_network_id_1 = PeerNetworkId::new(network_id, PeerId::random());
+        process_subscription_for_peer(&consensus_publisher, &peer_network_id_1);
+        verify_active_subscribers(&consensus_publisher, 1, vec![&peer_network_id_1], vec![]);
+
+        // Subscribe the same peer again and verify that the subscription is still active
+        process_subscription_for_peer(&consensus_publisher, &peer_network_id_1);
+        verify_active_subscribers(&consensus_publisher, 1, vec![&peer_network_id_1], vec![]);
+
+        // Subscribe another peer to consensus updates and verify the subscription
+        let peer_network_id_2 = PeerNetworkId::new(network_id, PeerId::random());
+        process_subscription_for_peer(&consensus_publisher, &peer_network_id_2);
+        verify_active_subscribers(
+            &consensus_publisher,
+            2,
+            vec![&peer_network_id_1, &peer_network_id_2],
+            vec![],
+        );
+
+        // Unsubscribe the first peer from consensus updates and verify the unsubscription
+        process_unsubscription_for_peer(&consensus_publisher, &peer_network_id_1);
+        verify_active_subscribers(&consensus_publisher, 1, vec![&peer_network_id_2], vec![
+            &peer_network_id_1,
+        ]);
+
+        // Unsubscribe the first peer again and verify that the subscription is removed
+        process_unsubscription_for_peer(&consensus_publisher, &peer_network_id_1);
+        verify_active_subscribers(&consensus_publisher, 1, vec![&peer_network_id_2], vec![
+            &peer_network_id_1,
+        ]);
+
+        // Unsubscribe the second peer and verify that the subscription is removed
+        process_unsubscription_for_peer(&consensus_publisher, &peer_network_id_2);
+        verify_active_subscribers(&consensus_publisher, 0, vec![], vec![
+            &peer_network_id_1,
+            &peer_network_id_2,
+        ]);
+    }
+
+    #[tokio::test]
+    async fn test_publish_message() {
+        // Create a network client
+        let network_id = NetworkId::Public;
+        let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
+        let network_client =
+            NetworkClient::new(vec![], vec![], hashmap![], peers_and_metadata.clone());
+
+        // Create a consensus publisher
+        let (consensus_publisher, mut outbound_message_receiver) =
+            ConsensusPublisher::new(network_client, ConsensusObserverConfig::default());
+
+        // Subscribe a new peer to consensus updates
+        let peer_network_id_1 = PeerNetworkId::new(network_id, PeerId::random());
+        process_subscription_for_peer(&consensus_publisher, &peer_network_id_1);
+
+        // Publish a message to the active subscribers
+        let ordered_block_message = ConsensusObserverMessage::new_ordered_block_message(
+            vec![],
+            LedgerInfoWithSignatures::new(
+                LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
+                AggregateSignature::empty(),
+            ),
+        );
+        consensus_publisher
+            .publish_message(ordered_block_message.clone())
+            .await;
+
+        // Verify that the message was sent to the outbound message receiver
+        let (peer_network_id, message) = outbound_message_receiver.next().await.unwrap();
+        assert_eq!(peer_network_id, peer_network_id_1);
+        assert_eq!(message, ordered_block_message);
+
+        // Add several peers to the active subscribers
+        let mut additional_peer_network_ids = vec![];
+        for _ in 0..10 {
+            let peer_network_id = PeerNetworkId::new(network_id, PeerId::random());
+            process_subscription_for_peer(&consensus_publisher, &peer_network_id);
+            additional_peer_network_ids.push(peer_network_id);
+        }
+
+        // Publish a message to the active subscribers
+        let block_payload_message = ConsensusObserverMessage::new_block_payload_message(
+            BlockInfo::empty(),
+            vec![],
+            Some(10),
+        );
+        consensus_publisher
+            .publish_message(block_payload_message.clone())
+            .await;
+
+        // Verify that the message was sent to all active subscribers
+        let num_expected_messages = additional_peer_network_ids.len() + 1;
+        for _ in 0..num_expected_messages {
+            let (peer_network_id, message) = outbound_message_receiver.next().await.unwrap();
+            assert!(
+                additional_peer_network_ids.contains(&peer_network_id)
+                    || peer_network_id == peer_network_id_1
+            );
+            assert_eq!(message, block_payload_message);
+        }
+
+        // Unsubscribe the first peer from consensus updates
+        process_unsubscription_for_peer(&consensus_publisher, &peer_network_id_1);
+
+        // Publish another message to the active subscribers
+        let commit_decision_message = ConsensusObserverMessage::new_commit_decision_message(
+            CommitDecision::new(LedgerInfoWithSignatures::new(
+                LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
+                AggregateSignature::empty(),
+            )),
+        );
+        consensus_publisher
+            .publish_message(commit_decision_message.clone())
+            .await;
+
+        // Verify that the message was sent to all active subscribers except the first peer
+        for _ in 0..additional_peer_network_ids.len() {
+            let (peer_network_id, message) = outbound_message_receiver.next().await.unwrap();
+            assert!(additional_peer_network_ids.contains(&peer_network_id));
+            assert_eq!(message, commit_decision_message);
+        }
+
+        // Unsubscribe the remaining peers from consensus updates
+        for peer_network_id in additional_peer_network_ids {
+            process_unsubscription_for_peer(&consensus_publisher, &peer_network_id);
+        }
+
+        // Publish another message to the active subscribers
+        let block_payload_message =
+            ConsensusObserverMessage::new_block_payload_message(BlockInfo::empty(), vec![], None);
+        consensus_publisher
+            .publish_message(block_payload_message.clone())
+            .await;
+
+        // Verify that no messages were sent to the outbound message receiver
+        assert!(outbound_message_receiver.next().now_or_never().is_none());
+    }
+
+    /// Processes a subscription request for the given peer
+    fn process_subscription_for_peer(
+        consensus_publisher: &ConsensusPublisher,
+        peer_network_id: &PeerNetworkId,
+    ) {
+        consensus_publisher.handle_subscription_request(
+            peer_network_id,
+            ConsensusObserverRequest::Subscribe,
+            ResponseSender::new_for_test(),
+        );
+    }
+
+    /// Processes an unsubscription request for the given peer
+    fn process_unsubscription_for_peer(
+        consensus_publisher: &ConsensusPublisher,
+        peer_network_id: &PeerNetworkId,
+    ) {
+        consensus_publisher.handle_subscription_request(
+            peer_network_id,
+            ConsensusObserverRequest::Unsubscribe,
+            ResponseSender::new_for_test(),
+        );
+    }
+
+    /// Verifies the active subscribers has the expected size and contains the expected peers
+    fn verify_active_subscribers(
+        consensus_publisher: &ConsensusPublisher,
+        expected_size: usize,
+        expected_peers: Vec<&PeerNetworkId>,
+        unexpected_peers: Vec<&PeerNetworkId>,
+    ) {
+        // Verify the number of active subscribers
+        let active_subscribers = consensus_publisher.get_active_subscribers();
+        assert_eq!(active_subscribers.len(), expected_size);
+
+        // Verify that the active subscribers contains the expected peers
+        for peer_network_id in expected_peers {
+            assert!(active_subscribers.contains(peer_network_id));
+        }
+
+        // Verify that the active subscribers does not contain the unexpected peers
+        for peer_network_id in unexpected_peers {
+            assert!(!active_subscribers.contains(peer_network_id));
+        }
+    }
+}
