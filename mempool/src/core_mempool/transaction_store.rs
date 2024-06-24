@@ -28,7 +28,7 @@ use aptos_types::{
 };
 use std::{
     cmp::max,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     mem::size_of,
     ops::Bound,
     time::{Duration, Instant, SystemTime},
@@ -192,12 +192,12 @@ impl TransactionStore {
             .sum()
     }
 
-    // pub(crate) fn get_account_sequence_numbers(&self, address: &AccountAddress) -> HashSet<u64> {
-    //     self.transactions
-    //         .get(address)
-    //         .map(|txns| txns.keys().copied().collect())
-    //         .unwrap_or_default()
-    // }
+    pub(crate) fn get_account_sequence_numbers(&self, address: &AccountAddress) -> HashSet<u64> {
+        self.transactions
+            .get(address)
+            .map(|txns| txns.keys().copied().collect())
+            .unwrap_or_default()
+    }
 
     pub(crate) fn total_num_transactions_excluding(
         &self,

@@ -697,7 +697,10 @@ impl Mempool {
                 initially_skipped += 1;
             }
         }
-        counters::MEMPOOL_SKIPPED_TXNS.set(skipped.len() as i64);
+        counters::MEMPOOL_SKIPPED_TXNS.observe(skipped.len() as f64);
+        for txn in &skipped {
+            info!("Skipped txn: {:?}, account sequence number: {:?}, existing sequence numbers: {:?}, was_chosen: {}", txn, self.transactions.get_sequence_number(&txn.0), self.transactions.get_account_sequence_numbers(&txn.0), Self::txn_was_chosen(txn.0, txn.1 - 1, &inserted, &exclude_transactions));
+        }
         let result_size = result.len();
         let inserted_size = inserted.len();
         let result_end_time = start_time.elapsed();

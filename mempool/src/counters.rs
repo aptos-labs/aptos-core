@@ -212,10 +212,11 @@ pub static MEMPOOL_GET_BATCH_INITIAL_NUM_TXNS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static MEMPOOL_SKIPPED_TXNS: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+pub static MEMPOOL_SKIPPED_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
         "aptos_mempool_skipped_txns",
-        "Number of txns skipped in mempool due to being duplicates or gas upgrades"
+        "Number of txns skipped in mempool due to being duplicates or gas upgrades",
+        TRANSACTION_COUNT_BUCKETS.to_vec()
     )
     .unwrap()
 });
