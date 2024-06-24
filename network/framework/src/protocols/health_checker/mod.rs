@@ -47,6 +47,7 @@ use futures::{
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tokio::time::timeout;
 
 pub mod builder;
 mod interface;
@@ -339,10 +340,11 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                     );
                     let peer_network_id =
                         PeerNetworkId::new(self.network_context.network_id(), peer_id);
-                    if let Err(err) = self
-                        .network_interface
-                        .disconnect_peer(peer_network_id)
-                        .await
+                    if let Err(err) = timeout(
+                        Duration::from_millis(50),
+                        self.network_interface.disconnect_peer(peer_network_id),
+                    )
+                    .await
                     {
                         warn!(
                             NetworkSchema::new(&self.network_context)
