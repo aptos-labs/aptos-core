@@ -38,12 +38,12 @@ impl UnusedAssignmentChecker {
             if !dst_name.starts_with('_') && live_after.get(&dst).is_none() {
                 let loc = target.get_bytecode_loc(id);
                 target
-					.global_env()
-					.diag(
-						Severity::Warning,
-						&loc,
-						&format!("Unused assignment to `{}`. Consider removing or prefixing with an underscore: `_{}`", dst_name, dst_name)
-					);
+                    .global_env()
+                    .diag(
+                        Severity::Warning,
+                        &loc,
+                        &format!("Unused assignment to `{}`. Consider removing or prefixing with an underscore: `_{}`", dst_name, dst_name)
+                    );
             }
         }
     }
