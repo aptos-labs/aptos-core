@@ -423,6 +423,7 @@ where
             return Ok(self.clone());
         }
 
+        /*
         let inc_hash_diff = updates
             .par_iter()
             .fold(
@@ -452,6 +453,8 @@ where
             );
         let mut inc_hash = self.smt.inner.root().inc_hash.clone();
         inc_hash.union(&inc_hash_diff);
+         */
+        let inc_hash = self.smt.inner.root().inc_hash.clone();
 
         let content = self
             .smt
