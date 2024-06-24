@@ -137,31 +137,31 @@ module aptos_framework::staking_config {
     #[view]
     /// Return the reward rate of this epoch as a tuple (numerator, denominator).
     public fun reward_rate(): (u64, u64) acquires StakingRewardsConfig, StakingConfig {
-        get_reward_rate(borrow_global<StakingConfig>(@aptos_framework))
+        get_reward_rate(&get())
     }
 
     #[view]
     /// Return the minimum and maximum amounts that a validator may stake as a tuple (minimum, maximum).
     public fun required_stake(): (u64, u64) acquires StakingConfig {
-        get_required_stake(borrow_global<StakingConfig>(@aptos_framework))
+        get_required_stake(&get())
     }
 
     #[view]
     /// Return the recurring lockup cycle for each validator.
     public fun recurring_lockup_duration_secs(): u64 acquires StakingConfig {
-        get_recurring_lockup_duration(borrow_global<StakingConfig>(@aptos_framework))
+        get_recurring_lockup_duration(&get())
     }
 
     #[view]
     /// Return whether validators are allowed to leave or join after genesis.
     public fun allow_validator_set_change(): bool acquires StakingConfig {
-        get_allow_validator_set_change(borrow_global<StakingConfig>(@aptos_framework))
+        get_allow_validator_set_change(&get())
     }
 
     #[view]
     /// Return the percent of total voting power allowed to join the validator set this epoch.
     public fun voting_power_increase_limit(): u64 acquires StakingConfig {
-        get_voting_power_increase_limit(borrow_global<StakingConfig>(@aptos_framework))
+        get_voting_power_increase_limit(&get())
     }
 
     #[view]
@@ -188,7 +188,7 @@ module aptos_framework::staking_config {
 
     #[view]
     /// Return the reward rate period start in seconds of this epoch.
-    public fun rewards_rate_period_start_in_secs(): (u64) acquires StakingRewardsConfig {
+    public fun rewards_rate_period_start_in_secs(): u64 acquires StakingRewardsConfig {
         if (features::periodical_reward_rate_decrease_enabled()) {
             borrow_global<StakingRewardsConfig>(@aptos_framework).rewards_rate_period_in_secs
         } else {
@@ -198,7 +198,7 @@ module aptos_framework::staking_config {
 
     #[view]
     /// Return the reward rate period start in seconds of the last epoch.
-    public fun last_rewards_rate_period_start_in_seconds(): (u64) acquires StakingRewardsConfig {
+    public fun last_rewards_rate_period_start_in_seconds(): u64 acquires StakingRewardsConfig {
         if (features::periodical_reward_rate_decrease_enabled()) {
             borrow_global<StakingRewardsConfig>(@aptos_framework).last_rewards_rate_period_start_in_secs
         } else {

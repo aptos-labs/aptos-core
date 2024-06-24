@@ -171,6 +171,41 @@ spec aptos_framework::staking_config {
             result_1 <= MAX_REWARDS_RATE && result_2 <= MAX_U64;
     }
 
+    spec last_rewards_rate_period_start_in_seconds(): u64 {
+        aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
+        aborts_if !features::spec_periodical_reward_rate_decrease_enabled();
+        include StakingRewardsConfigRequirement;
+    }
+
+    spec rewards_rate_decrease_rate(): (u64, u64) {
+        aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
+        aborts_if !features::spec_periodical_reward_rate_decrease_enabled();
+        include StakingRewardsConfigRequirement;
+
+    }
+
+    spec rewards_rate_period_start_in_secs(): u64 {
+        aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
+        aborts_if !features::spec_periodical_reward_rate_decrease_enabled();
+        include StakingRewardsConfigRequirement;
+    }
+
+    spec recurring_lockup_duration_secs(): u64 {
+        aborts_if !exists<StakingConfig>(@aptos_framework);
+    }
+
+    spec required_stake(): (u64, u64) {
+        aborts_if !exists<StakingConfig>(@aptos_framework);
+    }
+
+    spec allow_validator_set_change (): bool {
+        aborts_if !exists<StakingConfig>(@aptos_framework);
+    }
+
+    spec voting_power_increase_limit(): u64 {
+        aborts_if !exists<StakingConfig>(@aptos_framework);
+    }
+
     spec calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 {
         pragma verify_duration_estimate = 120;
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
