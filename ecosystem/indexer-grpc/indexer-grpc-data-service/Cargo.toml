@@ -19,6 +19,7 @@ aptos-indexer-grpc-utils = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
+aptos-transaction-filter = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
