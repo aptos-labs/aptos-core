@@ -111,6 +111,14 @@ impl ResponseSender {
         Self { response_tx }
     }
 
+    #[cfg(test)]
+    /// Creates a new response sender for testing purposes.
+    pub fn new_for_test() -> Self {
+        Self {
+            response_tx: oneshot::channel().0,
+        }
+    }
+
     /// Send the response to the pending RPC request
     pub fn send(self, response: ConsensusObserverResponse) {
         // Create and serialize the response message
