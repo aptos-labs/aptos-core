@@ -45,6 +45,8 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{info, warn};
 pub use move_binary_format::file_format::{AbilitySet, Visibility};
+#[allow(deprecated)]
+use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
@@ -53,7 +55,6 @@ use move_binary_format::{
         FunctionDefinitionIndex, FunctionHandleIndex, SignatureIndex, SignatureToken,
         StructDefinitionIndex,
     },
-    normalized::Type as MType,
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
 };
@@ -1998,6 +1999,7 @@ impl GlobalEnv {
     }
 
     /// Attempt to compute a struct type for (`mid`, `sid`, `ts`).
+    #[allow(deprecated)]
     pub fn get_struct_type(&self, mid: ModuleId, sid: StructId, ts: &[Type]) -> Option<MType> {
         let menv = self.get_module(mid);
         Some(MType::Struct {
