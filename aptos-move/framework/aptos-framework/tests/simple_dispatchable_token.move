@@ -29,6 +29,7 @@ module 0xcafe::simple_token {
             option::some(withdraw),
             option::some(deposit),
             option::none(),
+            option::none()
         );
     }
 

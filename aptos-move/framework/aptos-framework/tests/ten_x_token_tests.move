@@ -19,13 +19,17 @@ module aptos_framework::ten_x_token_tests {
         ten_x_token::initialize(creator, &creator_ref);
 
         assert!(fungible_asset::supply(metadata) == option::some(0), 1);
+        assert!(dispatchable_fungible_asset::derived_supply(metadata) == option::some(0), 2);
         // Mint
         let fa = fungible_asset::mint(&mint, 100);
-        assert!(fungible_asset::supply(metadata) == option::some(100), 2);
+        assert!(fungible_asset::supply(metadata) == option::some(100), 3);
         // Deposit will cause an re-entrant call into dispatchable_fungible_asset
         dispatchable_fungible_asset::deposit(creator_store, fa);
 
         // The derived value is 10x
-        assert!(dispatchable_fungible_asset::derived_balance(creator_store) == 1000, 5);
+        assert!(dispatchable_fungible_asset::derived_balance(creator_store) == 1000, 4);
+
+        // The derived supply is 10x
+        assert!(dispatchable_fungible_asset::derived_supply(metadata) == option::some(1000), 5);
     }
 }

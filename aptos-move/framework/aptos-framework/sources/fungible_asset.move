@@ -74,17 +74,19 @@ module aptos_framework::fungible_asset {
     const EDEPOSIT_FUNCTION_SIGNATURE_MISMATCH: u64 = 26;
     /// Provided derived_balance function type doesn't meet the signature requirement.
     const EDERIVED_BALANCE_FUNCTION_SIGNATURE_MISMATCH: u64 = 27;
+    /// Provided derived_supply function type doesn't meet the signature requirement.
+    const EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH: u64 = 28;
     /// Invalid withdraw/deposit on dispatchable token. The specified token has a dispatchable function hook.
     /// Need to invoke dispatchable_fungible_asset::withdraw/deposit to perform transfer.
-    const EINVALID_DISPATCHABLE_OPERATIONS: u64 = 28;
+    const EINVALID_DISPATCHABLE_OPERATIONS: u64 = 29;
     /// Trying to re-register dispatch hook on a fungible asset.
-    const EALREADY_REGISTERED: u64 = 29;
+    const EALREADY_REGISTERED: u64 = 30;
     /// Fungible metadata does not exist on this account.
-    const EFUNGIBLE_METADATA_EXISTENCE: u64 = 30;
+    const EFUNGIBLE_METADATA_EXISTENCE: u64 = 31;
     /// Cannot register dispatch hook for APT.
-    const EAPT_NOT_DISPATCHABLE: u64 = 31;
+    const EAPT_NOT_DISPATCHABLE: u64 = 32;
     /// Flag for Concurrent Supply not enabled
-    const ECONCURRENT_BALANCE_NOT_ENABLED: u64 = 32;
+    const ECONCURRENT_BALANCE_NOT_ENABLED: u64 = 33;
 
     //
     // Constants
@@ -150,6 +152,7 @@ module aptos_framework::fungible_asset {
 		withdraw_function: Option<FunctionInfo>,
 		deposit_function: Option<FunctionInfo>,
         derived_balance_function: Option<FunctionInfo>,
+        derived_supply_function: Option<FunctionInfo>
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -288,6 +291,7 @@ module aptos_framework::fungible_asset {
         withdraw_function: Option<FunctionInfo>,
         deposit_function: Option<FunctionInfo>,
         derived_balance_function: Option<FunctionInfo>,
+        derived_supply_function: Option<FunctionInfo>
     ) {
         // Verify that caller type matches callee type so wrongly typed function cannot be registered.
         option::for_each_ref(&withdraw_function, |withdraw_function| {
@@ -344,6 +348,24 @@ module aptos_framework::fungible_asset {
             );
         });
 
+        option::for_each_ref(&derived_supply_function, |supply_function| {
+            let dispatcher_derived_supply_function_info = function_info::new_function_info_from_address(
+                @aptos_framework,
+                string::utf8(b"dispatchable_fungible_asset"),
+                string::utf8(b"dispatchable_derived_supply"),
+            );
+            // Verify that caller type matches callee type so wrongly typed function cannot be registered.
+            assert!(
+                function_info::check_dispatch_type_compatibility(
+                    &dispatcher_derived_supply_function_info,
+                    supply_function
+                ),
+                error::invalid_argument(
+                    EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH
+                )
+            );
+        });
+
         // Cannot register hook for APT.
         assert!(
             object::address_from_constructor_ref(constructor_ref) != @aptos_fungible_asset,
@@ -375,6 +397,7 @@ module aptos_framework::fungible_asset {
                 withdraw_function,
                 deposit_function,
                 derived_balance_function,
+                derived_supply_function
             }
         );
     }
@@ -601,6 +624,15 @@ module aptos_framework::fungible_asset {
         let metadata_addr = object::object_address(&fa_store.metadata);
         if (exists<DispatchFunctionStore>(metadata_addr)) {
             borrow_global<DispatchFunctionStore>(metadata_addr).derived_balance_function
+        } else {
+            option::none()
+        }
+    }
+
+    public(friend) fun derived_supply_dispatch_function<T: key>(metadata: Object<T>): Option<FunctionInfo> acquires DispatchFunctionStore {
+        let metadata_addr = object::object_address(&metadata);
+        if (exists<DispatchFunctionStore>(metadata_addr)) {
+            borrow_global<DispatchFunctionStore>(metadata_addr).derived_supply_function
         } else {
             option::none()
         }
