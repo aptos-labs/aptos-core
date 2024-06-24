@@ -210,6 +210,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                 conn_event = connection_events.select_next_some() => {
                     match conn_event {
                         ConnectionNotification::NewPeer(metadata, network_id) => {
+                            // PeersAndMetadata is a global singleton across all networks; filter connect/disconnect events to the NetworkId that this HealthChecker instance is watching
                             if network_id == self_network_id {
                                 self.network_interface.create_peer_and_health_data(
                                     metadata.remote_peer_id, self.round
@@ -217,6 +218,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                             }
                         }
                         ConnectionNotification::LostPeer(metadata, network_id) => {
+                            // PeersAndMetadata is a global singleton across all networks; filter connect/disconnect events to the NetworkId that this HealthChecker instance is watching
                             if network_id == self_network_id {
                                 self.network_interface.remove_peer_and_health_data(
                                     &metadata.remote_peer_id
