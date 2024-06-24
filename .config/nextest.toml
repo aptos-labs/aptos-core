@@ -4,7 +4,7 @@ status-level = "skip"
 # Show output for all tests as soon as they fail and at the end of the test run.
 failure-output = "immediate-final"
 # Cancel test run on the first failure. Accounts for retries.
-fail-fast = true
+# fail-fast = true
 
 junit = { path = "junit.xml" }
 
@@ -23,7 +23,7 @@ terminate-after = 1
 # like profile.ci
 status-level = "skip"
 failure-output = "immediate-final"
-fail-fast = true
+# fail-fast = true
 # different than ci
 test-threads = 6
 retries = 3
