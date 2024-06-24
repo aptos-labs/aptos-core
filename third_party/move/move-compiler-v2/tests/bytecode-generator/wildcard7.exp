@@ -49,4 +49,4 @@ error: cannot move local `x` since it is still in use
 5 │         let y = move x;
   │                 ^^^^^^ attempted to move here
 6 │         let (_, q) = (x, z);
-  │             ------ used here
+  │              - used here

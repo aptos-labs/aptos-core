@@ -806,6 +806,15 @@ impl Type {
         matches!(self, Type::Reference(_, _))
     }
 
+    /// If this is a reference, return the kind of the reference, otherwise None.
+    pub fn ref_kind(&self) -> Option<ReferenceKind> {
+        if let Type::Reference(kind, _) = self {
+            Some(*kind)
+        } else {
+            None
+        }
+    }
+
     /// Determines whether this is a mutable reference.
     pub fn is_mutable_reference(&self) -> bool {
         matches!(self, Type::Reference(ReferenceKind::Mutable, _))

@@ -3447,14 +3447,7 @@ impl<'env> StructEnv<'env> {
     /// Get an iterator for the fields, ordered by offset. Notice if the struct has
     /// variants, all fields of all variants are returned.
     pub fn get_fields(&'env self) -> impl Iterator<Item = FieldEnv<'env>> {
-        self.data
-            .field_data
-            .values()
-            .sorted_by_key(|data| data.offset)
-            .map(move |data| FieldEnv {
-                struct_env: self.clone(),
-                data,
-            })
+        self.get_fields_optional_variant(None)
     }
 
     /// Get fields of a particular variant.
@@ -3462,10 +3455,18 @@ impl<'env> StructEnv<'env> {
         &'env self,
         variant: Symbol,
     ) -> impl Iterator<Item = FieldEnv<'env>> {
+        self.get_fields_optional_variant(Some(variant))
+    }
+
+    /// Get fields of a particular variant.
+    pub fn get_fields_optional_variant(
+        &'env self,
+        variant: Option<Symbol>,
+    ) -> impl Iterator<Item = FieldEnv<'env>> {
         self.data
             .field_data
             .values()
-            .filter(|data| data.common_for_variants || data.variant == Some(variant))
+            .filter(|data| data.common_for_variants || variant.is_none() || data.variant == variant)
             .sorted_by_key(|data| data.offset)
             .map(move |data| FieldEnv {
                 struct_env: self.clone(),
