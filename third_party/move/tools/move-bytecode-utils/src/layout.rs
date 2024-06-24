@@ -2,6 +2,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(deprecated)]
+
 use crate::compiled_module_viewer::CompiledModuleView;
 use anyhow::{anyhow, bail};
 use move_binary_format::{
@@ -196,6 +198,7 @@ impl<'a, T: CompiledModuleView> SerdeLayoutBuilder<'a, T> {
                     declaring_module.borrow().name()
                 )
             });
+        #[allow(deprecated)]
         let normalized_struct = Struct::new(declaring_module.borrow(), def).1;
         assert_eq!(
             normalized_struct.type_parameters.len(),

@@ -2,6 +2,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(deprecated)]
+
 use crate::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{AbilitySet, StructTypeParameter, Visibility},

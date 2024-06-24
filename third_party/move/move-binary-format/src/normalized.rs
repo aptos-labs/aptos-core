@@ -2,6 +2,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(deprecated)]
+
 use crate::{
     access::ModuleAccess,
     file_format::{
@@ -28,6 +30,7 @@ use std::collections::BTreeMap;
 /// A normalized version of `SignatureToken`, a type expression appearing in struct or function
 /// declarations. Unlike `SignatureToken`s, `normalized::Type`s from different modules can safely be
 /// compared.
+#[deprecated = "Normalized types are known to have serious performance issues and should be avoided for new use cases."]
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Type {
     #[serde(rename = "bool")]
@@ -66,6 +69,7 @@ pub enum Type {
 /// metadata that it is ignored by the VM. The reason: names are important to clients. We would
 /// want a change from `Account { bal: u64, seq: u64 }` to `Account { seq: u64, bal: u64 }` to be
 /// marked as incompatible. Not safe to compare without an enclosing `Struct`.
+#[deprecated = "Normalized types are known to have serious performance issues and should be avoided for new use cases."]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Field {
     pub name: Identifier,
@@ -74,6 +78,7 @@ pub struct Field {
 
 /// Normalized version of a `StructDefinition`. Not safe to compare without an associated
 /// `ModuleId` or `Module`.
+#[deprecated = "Normalized types are known to have serious performance issues and should be avoided for new use cases."]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Struct {
     pub abilities: AbilitySet,
@@ -83,6 +88,7 @@ pub struct Struct {
 
 /// Normalized version of a `FunctionDefinition`. Not safe to compare without an associated
 /// `ModuleId` or `Module`.
+#[deprecated = "Normalized types are known to have serious performance issues and should be avoided for new use cases."]
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Function {
     pub visibility: Visibility,
@@ -94,6 +100,7 @@ pub struct Function {
 
 /// Normalized version of a `CompiledModule`: its address, name, struct declarations, and public
 /// function declarations.
+#[deprecated = "Normalized types are known to have serious performance issues and should be avoided for new use cases."]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Module {
     pub file_format_version: u32,

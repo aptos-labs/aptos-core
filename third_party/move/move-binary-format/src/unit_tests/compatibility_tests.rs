@@ -5,6 +5,7 @@ use crate::{compatibility::Compatibility, file_format::*, normalized};
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use std::convert::TryFrom;
 
+#[allow(deprecated)]
 fn mk_module(vis: u8) -> normalized::Module {
     let (visibility, is_entry) = if vis == Visibility::DEPRECATED_SCRIPT {
         (Visibility::Public, true)
