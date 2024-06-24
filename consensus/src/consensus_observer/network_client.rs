@@ -14,6 +14,7 @@ use aptos_config::network_id::PeerNetworkId;
 use aptos_logger::{debug, warn};
 use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
 use aptos_time_service::{TimeService, TimeServiceTrait};
+use bytes::Bytes;
 use rand::Rng;
 use std::{sync::Arc, time::Duration};
 
@@ -35,14 +36,14 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
         }
     }
 
-    /// Sends a direct send message to a specific peer
-    pub fn send_message_to_peer(
+    /// Sends an already serialized (direct send) message to a specific peer
+    pub fn send_serialized_message_to_peer(
         &self,
         peer_network_id: &PeerNetworkId,
-        message: ConsensusObserverDirectSend,
+        message: Bytes,
+        message_label: &str,
     ) -> Result<(), Error> {
         // Increment the message counter
-        let message_label = message.get_label();
         metrics::increment_request_counter(
             &metrics::DIRECT_SEND_SENT_MESSAGES,
             message_label,
@@ -52,34 +53,84 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
         // Log the message being sent
         debug!(LogSchema::new(LogEntry::SendDirectSendMessage)
             .event(LogEvent::SendDirectSendMessage)
-            .message_content(&message.get_content())
-            .message_type(message.get_label())
+            .message_type(message_label)
             .peer(peer_network_id));
 
         // Send the message
         let result = self
             .network_client
-            .send_to_peer(
-                ConsensusObserverMessage::DirectSend(message),
-                *peer_network_id,
-            )
-            .map_err(|error| error.into());
+            .send_to_peer_raw(message, *peer_network_id)
+            .map_err(|error| Error::NetworkError(error.to_string()));
 
         // Process any error results
         if let Err(error) = result {
+            // Log the failed send
             warn!(LogSchema::new(LogEntry::SendDirectSendMessage)
                 .event(LogEvent::NetworkError)
                 .message_type(message_label)
                 .peer(peer_network_id)
-                .error(&error));
+                .message(&format!("Failed to send message: {:?}", error)));
+
+            // Update the direct send error metrics
             metrics::increment_request_counter(
                 &metrics::DIRECT_SEND_ERRORS,
                 error.get_label(),
                 peer_network_id,
             );
+
             Err(Error::NetworkError(error.to_string()))
         } else {
             Ok(())
+        }
+    }
+
+    /// Serializes the given message into bytes for the specified peer
+    pub fn serialize_message_for_peer(
+        &self,
+        peer_network_id: &PeerNetworkId,
+        message: ConsensusObserverDirectSend,
+    ) -> Result<Bytes, Error> {
+        // Serialize the message into bytes
+        let message_label = message.get_label();
+        let message = ConsensusObserverMessage::DirectSend(message);
+        let result = self
+            .network_client
+            .to_bytes_by_protocol(vec![*peer_network_id], message)
+            .map_err(|error| Error::NetworkError(error.to_string()));
+
+        // Process the serialization result
+        match result {
+            Ok(peer_to_serialized_bytes) => {
+                // Get the serialized bytes for the peer
+                let serialized_bytes =
+                    peer_to_serialized_bytes
+                        .get(peer_network_id)
+                        .ok_or_else(|| {
+                            Error::NetworkError(format!(
+                                "Failed to get serialized bytes for peer: {:?}!",
+                                peer_network_id
+                            ))
+                        })?;
+
+                Ok(serialized_bytes.clone())
+            },
+            Err(error) => {
+                // Log the serialization error
+                warn!(LogSchema::new(LogEntry::SendDirectSendMessage)
+                    .event(LogEvent::NetworkError)
+                    .message_type(message_label)
+                    .peer(peer_network_id)
+                    .message(&format!("Failed to serialize message: {:?}", error)));
+
+                // Update the direct send error metrics
+                metrics::increment_request_counter(
+                    &metrics::DIRECT_SEND_ERRORS,
+                    error.get_label(),
+                    peer_network_id,
+                );
+
+                Err(Error::NetworkError(error.to_string()))
+            },
         }
     }
 

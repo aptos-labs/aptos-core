@@ -215,7 +215,7 @@ impl PayloadManager {
                     block_transaction_payload.transactions.clone(),
                     block_transaction_payload.limit,
                 );
-                consensus_publisher.publish_message(message);
+                consensus_publisher.publish_message(message).await;
             }
             return Ok((
                 block_transaction_payload.transactions,
@@ -354,7 +354,7 @@ impl PayloadManager {
                 result.0.clone(),
                 result.1,
             );
-            consensus_publisher.publish_message(message);
+            consensus_publisher.publish_message(message).await;
         }
         Ok(result)
     }

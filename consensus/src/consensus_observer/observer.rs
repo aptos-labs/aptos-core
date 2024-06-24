@@ -93,7 +93,8 @@ pub struct ConsensusObserver {
     // The configuration of the consensus observer
     consensus_observer_config: ConsensusObserverConfig,
     // The consensus observer client to send network messages
-    consensus_observer_client: ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
+    consensus_observer_client:
+        Arc<ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>>,
 
     // The current epoch
     epoch: u64,
@@ -127,7 +128,9 @@ pub struct ConsensusObserver {
 impl ConsensusObserver {
     pub fn new(
         consensus_observer_config: ConsensusObserverConfig,
-        consensus_observer_client: ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
+        consensus_observer_client: Arc<
+            ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>,
+        >,
         db_reader: Arc<dyn DbReader>,
         execution_client: Arc<dyn TExecutionClient>,
         sync_notification_sender: UnboundedSender<(u64, Round)>,
@@ -188,29 +191,36 @@ impl ConsensusObserver {
         let active_observer_subscription = self.active_observer_subscription.take();
         if let Some(mut active_subscription) = active_observer_subscription {
             // Check if the peer for the subscription is still connected
-            let peer_still_connected =
-                self.get_connected_peers_and_metadata()
-                    .map_or(false, |peers_and_metadata| {
-                        peers_and_metadata.contains_key(&active_subscription.get_peer_network_id())
-                    });
+            let peer_network_id = active_subscription.get_peer_network_id();
+            let peer_still_connected = self
+                .get_connected_peers_and_metadata()
+                .map_or(false, |peers_and_metadata| {
+                    peers_and_metadata.contains_key(&peer_network_id)
+                });
 
             // Verify the peer is still connected
             if !peer_still_connected {
                 // Log the disconnection and terminate the subscription
                 warn!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "The peer is no longer connected! Terminating subscription: {}!",
-                        active_subscription.get_peer_network_id()
+                        "The peer is no longer connected! Terminating subscription: {:?}!",
+                        peer_network_id
                     ))
                 );
+                self.unsubscribe_from_peer(peer_network_id);
                 return;
             }
 
             // Verify the subscription has not timed out
             if let Err(error) = active_subscription.check_subscription_timeout() {
                 // Log the timeout and terminate the subscription
-                warn!(LogSchema::new(LogEntry::ConsensusObserver)
-                    .message(&format!("The subscription has timed out: {:?}", error)));
+                warn!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "The subscription has timed out with peer: {:?}! Error: {:?}",
+                        peer_network_id, error
+                    ))
+                );
+                self.unsubscribe_from_peer(peer_network_id);
                 return;
             }
 
@@ -221,10 +231,11 @@ impl ConsensusObserver {
                     // Log the error and terminate the subscription
                     warn!(
                         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "The observer is not making syncing progress: {:?}",
-                            error
+                            "The observer is not making syncing progress with peer: {:?}! Error: {:?}",
+                            peer_network_id, error
                         ))
                     );
+                    self.unsubscribe_from_peer(peer_network_id);
                     return;
                 }
             }
@@ -237,10 +248,11 @@ impl ConsensusObserver {
                     // Log the error and terminate the subscription
                     warn!(
                         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                            "The subscription peer is no longer optimal: {:?}",
-                            error
+                            "The subscription peer is no longer optimal: {:?}! Error: {:?}",
+                            peer_network_id, error
                         ))
                     );
+                    self.unsubscribe_from_peer(peer_network_id);
                     return;
                 }
             }
@@ -312,7 +324,7 @@ impl ConsensusObserver {
                 .send_rpc_request_to_peer(
                     selected_peer,
                     subscription_request,
-                    self.consensus_observer_config.request_timeout_ms,
+                    self.consensus_observer_config.network_request_timeout_ms,
                 )
                 .await;
 
@@ -746,6 +758,55 @@ impl ConsensusObserver {
         } else {
             None // No connected peers were found
         }
+    }
+
+    /// Unsubscribes from the given peer by sending an unsubscribe request
+    fn unsubscribe_from_peer(&self, peer_network_id: PeerNetworkId) {
+        // Send an unsubscribe request to the peer and process the response.
+        // Note: we execute this asynchronously, as we don't need to wait for the response.
+        let consensus_observer_client = self.consensus_observer_client.clone();
+        let consensus_observer_config = self.consensus_observer_config;
+        tokio::spawn(async move {
+            // Send the unsubscribe request to the peer
+            let unsubscribe_request = ConsensusObserverRequest::Unsubscribe;
+            let response = consensus_observer_client
+                .send_rpc_request_to_peer(
+                    &peer_network_id,
+                    unsubscribe_request,
+                    consensus_observer_config.network_request_timeout_ms,
+                )
+                .await;
+
+            // Process the response
+            match response {
+                Ok(ConsensusObserverResponse::UnsubscribeAck) => {
+                    info!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Successfully unsubscribed from peer: {}!",
+                            peer_network_id
+                        ))
+                    );
+                },
+                Ok(response) => {
+                    // We received an invalid response
+                    warn!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Got unexpected response type: {:?}",
+                            response.get_label()
+                        ))
+                    );
+                },
+                Err(error) => {
+                    // We encountered an error while sending the request
+                    error!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Failed to send unsubscribe request to peer: {}! Error: {:?}",
+                            peer_network_id, error
+                        ))
+                    );
+                },
+            }
+        });
     }
 
     /// Waits for a new epoch to start

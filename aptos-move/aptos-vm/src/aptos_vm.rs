@@ -447,6 +447,7 @@ impl AptosVM {
                 );
             }
         }
+
         let (txn_status, txn_aux_data) = TransactionStatus::from_vm_status(
             error_vm_status.clone(),
             self.features()

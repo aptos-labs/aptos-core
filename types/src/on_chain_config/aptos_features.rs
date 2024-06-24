@@ -243,12 +243,6 @@ impl Features {
             && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
     }
 
-    /// Whether the Aggregator V2 API feature is enabled.
-    /// Once enabled, the functions from aggregator_v2.move will be available for use.
-    pub fn is_aggregator_v2_api_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::AGGREGATOR_V2_API)
-    }
-
     /// Whether the Aggregator V2 delayed fields feature is enabled.
     /// Once enabled, Aggregator V2 functions become parallel.
     pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {

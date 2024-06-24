@@ -4,10 +4,12 @@
 use crate::{
     schema::{
         event::EventSchema, ledger_info::LedgerInfoSchema, state_value::StateValueSchema,
+        state_value_by_key_hash::StateValueByKeyHashSchema,
         state_value_index::StateValueIndexSchema,
     },
     state_kv_db::StateKvDb,
 };
+use aptos_crypto::hash::CryptoHash;
 use aptos_schemadb::{iterator::SchemaIterator, ReadOptions};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
@@ -219,10 +221,11 @@ impl<'a> PrefixedStateValueIterator<'a> {
                 // Seek to the next key - this can be done by seeking to the current key with version 0
                 iter.seek(&(state_key.clone(), 0))?;
 
+                // The kv db is sharded with state_key_hash
                 if let Some(state_value) = self
                     .db
                     .db_shard(state_key.get_shard_id())
-                    .get::<StateValueSchema>(&(state_key.clone(), version))?
+                    .get::<StateValueByKeyHashSchema>(&(state_key.hash(), version))?
                     .ok_or_else(|| {
                         AptosDbError::NotFound(format!(
                             "Key {state_key:?} is not found at version {version}.",
