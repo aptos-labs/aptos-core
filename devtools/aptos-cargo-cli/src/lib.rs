@@ -475,7 +475,7 @@ fn output_affected_packages(packages: Vec<String>) -> anyhow::Result<()> {
     if packages.is_empty() {
         println!("No packages were affected!");
     } else {
-        println!("Affected packages detected:");
+        println!("Affected packages detected ({:?} total):", packages.len());
         for package in packages {
             println!("\t{:?}", package)
         }

@@ -15,7 +15,7 @@ module 0x8675309::M {
               {
                 let _: &mut M::R = BorrowGlobal(Mutable)<M::R>(0x0);
                 {
-                  let M::R{ dummy_field: _ }: M::R = MoveFrom<M::R>(0x0);
+                  let M::R{ dummy_field: _ } = MoveFrom<M::R>(0x0);
                   Tuple()
                 }
               }

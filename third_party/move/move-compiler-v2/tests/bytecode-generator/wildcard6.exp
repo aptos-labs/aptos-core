@@ -4,7 +4,7 @@ module 0xc0ffee::m {
         {
           let x: u64 = 40;
           {
-            let (y: u64, _): (u64, u64) = Tuple(Move(x), x);
+            let (y: u64, _: u64): (u64, u64) = Tuple(Move(x), x);
             y
           }
         }
@@ -34,6 +34,6 @@ error: cannot move local `x` since it is still in use
   ┌─ tests/bytecode-generator/wildcard6.move:4:23
   │
 4 │         let (y, _) = (move x, x);
-  │             ------    ^^^^^^ attempted to move here
-  │             │
-  │             used here
+  │                 -     ^^^^^^ attempted to move here
+  │                 │
+  │                 used here

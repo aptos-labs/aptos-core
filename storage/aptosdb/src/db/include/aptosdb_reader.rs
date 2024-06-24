@@ -284,6 +284,7 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// TODO(bowu): Deprecate after internal index migration
     fn get_events(
         &self,
         event_key: &EventKey,
@@ -724,6 +725,19 @@ impl DbReader for AptosDB {
             self.state_store.get_usage(version)
         })
     }
+
+
+    fn get_event_by_version_and_index(
+        &self,
+        version: Version,
+        index: u64,
+    ) -> Result<ContractEvent> {
+        gauged_api("get_event_by_version_and_index", || {
+            self.error_if_ledger_pruned("Event", version)?;
+            self.event_store.get_event_by_version_and_index(version, index)
+        })
+
+    }
 }
 
 impl AptosDB {
@@ -829,6 +843,7 @@ impl AptosDB {
         })
     }
 
+    /// TODO(bowu): Deprecate after internal index migration
     fn get_events_by_event_key(
         &self,
         event_key: &EventKey,
