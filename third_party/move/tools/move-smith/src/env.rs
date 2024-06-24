@@ -75,11 +75,14 @@ impl LiveVarPool {
     }
 
     /// Mark an identifier as dead
-    pub fn mark_dead(&mut self, scope: &Scope, id: &Identifier) {
-        // To mark an identifier as dead, we assume it's already in the live set.
-        // If not, it's probably a bug so we panic on unwrap.
-        let live_vars = self.scopes.get_mut(scope).unwrap();
-        live_vars.remove(id);
+    pub fn mark_moved(&mut self, scope: &Scope, id: &Identifier) {
+        // The varibale is consumed at the given scope, but might be assigned
+        // (marked alive) at an earlier scope, so we need to check back.
+        scope.ancestors().iter().for_each(|s| {
+            if let Some(live_vars) = self.scopes.get_mut(s) {
+                live_vars.remove(id);
+            }
+        });
     }
 
     // pub fn merge_live_vars(&mut self, parent: &Scope, left: &Scope, right: &Scope) {

@@ -1098,6 +1098,11 @@ impl MoveSmith {
         } else {
             false
         };
+
+        if !copy {
+            self.env_mut().live_vars.mark_moved(parent_scope, &chosen);
+        }
+
         Ok(Some(VariableAccess { name: chosen, copy }))
     }
 
