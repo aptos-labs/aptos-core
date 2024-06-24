@@ -92,12 +92,12 @@ module aptos_framework::transaction_validation {
 
         if (
             transaction_sender == gas_payer
-                || (account::account_resource_exists_at(transaction_sender) || features::lite_account_enabled())
+                || account::account_resource_exists_at(transaction_sender) || features::lite_account_enabled()
                 || !features::sponsored_automatic_account_creation_enabled()
                 || txn_sequence_number > 0
         ) {
             let account_sequence_number =
-                if (account::exists_at(transaction_sender)) {
+                if (account::account_resource_exists_at(transaction_sender)) {
                     assert!(
                         txn_authentication_key == account::get_authentication_key(transaction_sender),
                         error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
@@ -232,14 +232,12 @@ module aptos_framework::transaction_validation {
             // spec {
             //     invariant i <= num_secondary_signers;
             //     invariant forall j in 0..i:
-<<<<<<< HEAD
             //         account::account_resource_exists_at(secondary_signer_addresses[j])
             //         && secondary_signer_public_key_hashes[j]
             //             == account::get_authentication_key(secondary_signer_addresses[j])
             //             || features::lite_account_enabled() && lite_account::using_native_authenticator(
             //             secondary_signer_addresses[j]
             //         ) && option::spec_some(secondary_signer_public_key_hashes[j]) == lite_account::native_authenticator(
-=======
             //         account::exists_at(secondary_signer_addresses[j])
             //         && secondary_signer_public_key_hashes[j]
             //             == account::spec_get_authentication_key(secondary_signer_addresses[j])
@@ -248,7 +246,6 @@ module aptos_framework::transaction_validation {
             //         ) && option::spec_some(
             //             secondary_signer_public_key_hashes[j]
             //         ) == lite_account::spec_native_authenticator(
->>>>>>> d39912bb0b (fix prover)
             //             secondary_signer_addresses[j]
             //         );
             // };
@@ -257,7 +254,7 @@ module aptos_framework::transaction_validation {
             let secondary_address = *vector::borrow(&secondary_signer_addresses, i);
             let signer_public_key_hash = *vector::borrow(&secondary_signer_public_key_hashes, i);
 
-            if (account::exists_at(secondary_address)) {
+            if (account::account_resource_exists_at(secondary_address)) {
                 assert!(
                     signer_public_key_hash == account::get_authentication_key(secondary_address),
                     error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
@@ -300,7 +297,7 @@ module aptos_framework::transaction_validation {
             chain_id,
         );
         multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes);
-        if (account::exists_at(fee_payer_address)) {
+        if (account::account_resource_exists_at(fee_payer_address)) {
             assert!(
                 fee_payer_public_key_hash == account::get_authentication_key(fee_payer_address),
                 error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
@@ -390,11 +387,11 @@ module aptos_framework::transaction_validation {
 
         // Increment sequence number
         let addr = signer::address_of(&account);
-        if (account::account_resource_exists_at(addr)) {
+        if (!account::account_resource_exists_at(addr) && features::lite_account_enabled()) {
+            lite_account::increment_sequence_number(addr);
+        } else {
             // account v1
             account::increment_sequence_number(addr);
-        } else {
-            lite_account::increment_sequence_number(addr);
         }
     }
 }
