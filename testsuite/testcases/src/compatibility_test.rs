@@ -9,7 +9,6 @@ use aptos_forge::{
     TxnStats, Version,
 };
 use aptos_logger::info;
-// use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_sdk::types::{LocalAccount, PeerId};
 use async_trait::async_trait;
 use rand::SeedableRng;
@@ -34,29 +33,6 @@ impl Test for SimpleValidatorUpgrade {
     }
 }
 
-#[cfg(unused)]
-async fn upgrade_task(
-    // ctx: &mut NetworkContext<'_>,
-    ctxa: NetworkContextSynchronizer<'_>,
-    validators_to_update: &[PeerId],
-    version: &Version,
-    wait_until_healthy: bool,
-    delay: Duration,
-    max_wait: Duration,
-    done: Arc<AtomicBool>,
-) -> Result<()> {
-    let result = batch_update_gradually(
-        ctxa,
-        validators_to_update,
-        version,
-        wait_until_healthy,
-        delay,
-        max_wait,
-    )
-    .await;
-    done.store(true, Ordering::Relaxed);
-    result
-}
 async fn stat_gather_task(
     emitter: TxnEmitter,
     emit_job_request: EmitJobRequest,
@@ -80,50 +56,6 @@ async fn stat_gather_task(
     }
     let statsum = upgrade_stats.into_iter().reduce(|a, b| &a + &b);
     Ok(statsum)
-}
-
-#[cfg(unused)]
-fn traffic_task(
-    ctxa: NetworkContextSynchronizer,
-    nodes: &[PeerId],
-    upgrade_done: Arc<AtomicBool>,
-) -> Result<Option<TxnStats>> {
-    let (emitter, emit_job_request, source_account) = {
-        let mut ctx_locker = ctxa.ctx.lock().unwrap();
-        let mut ctx = ctx_locker.deref_mut();
-        // spawn_generate_traffic_setup(ctx, nodes)?
-        let mut emit_job_request = ctx.emit_job.clone();
-        let rng = SeedableRng::from_rng(ctx.core().rng()).unwrap();
-        let swarm = ctx.swarm();
-        let client_timeout = Duration::from_secs(30);
-
-        let chain_info = swarm.chain_info();
-        let transaction_factory = TransactionFactory::new(chain_info.chain_id);
-        let emitter = TxnEmitter::new(transaction_factory, rng);
-
-        emit_job_request =
-            emit_job_request.rest_clients(swarm.get_clients_for_peers(nodes, client_timeout));
-        let source_account = chain_info.root_account.clone();
-        (emitter, emit_job_request, source_account)
-    };
-    // match create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng) {
-    //     Ok(parts) => parts,
-    //     Err(err) => {
-    //         stats_result = Err(err);
-    //         return;
-    //     }
-    // };
-    // let source_account = ctx.swarm().chain_info().root_account;
-    let traffic_runtime = traffic_emitter_runtime()?;
-    // let upgrade_joiner = handle.spawn(upgrade_task(ctx, validators_to_update, version, wait_until_healthy, delay, max_wait, upgrade_done.clone()));
-    let upgrade_traffic_chunk_duration = Duration::from_secs(15);
-    traffic_runtime.block_on(stat_gather_task(
-        emitter,
-        emit_job_request,
-        source_account,
-        upgrade_traffic_chunk_duration,
-        upgrade_done.clone(),
-    ))
 }
 
 fn upgrade_and_gather_stats(
@@ -261,8 +193,6 @@ impl NetworkTest for SimpleValidatorUpgrade {
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        // TODO: this is the "compat" test. Expand and refine to properly validate network2.
-        // TODO: Ensure sustained TPS during upgrade. Slower upgrade rollout.
         let mut first_batch = all_validators.clone();
         let second_batch = first_batch.split_off(first_batch.len() / 2);
         let first_node = first_batch.pop().unwrap();
@@ -291,7 +221,6 @@ impl NetworkTest for SimpleValidatorUpgrade {
         );
         info!("{}", msg);
         ctxa.report_text(msg).await;
-        // runtime.block_on(batch_update_gradually(ctx.swarm(), &[first_node], &new_version, upgrade_wait_for_healthy, upgrade_node_delay, upgrade_max_wait))?;
         let upgrade_stats = upgrade_and_gather_stats(
             ctxa.clone(),
             &[first_node],
@@ -345,7 +274,6 @@ impl NetworkTest for SimpleValidatorUpgrade {
                 &upgrade2_stats_sum,
             );
         }
-        // runtime.block_on(batch_update_gradually(ctxa.clone(), &first_batch, &new_version, upgrade_wait_for_healthy, upgrade_node_delay, upgrade_max_wait))?;
         {
             let mut ctx_locker = ctxa.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();
@@ -380,7 +308,6 @@ impl NetworkTest for SimpleValidatorUpgrade {
                 &upgrade3_stats_sum,
             );
         }
-        // runtime.block_on(batch_update_gradually(ctxa.clone(), &second_batch, &new_version, upgrade_wait_for_healthy, upgrade_node_delay, upgrade_max_wait))?;
         {
             let mut ctx_locker = ctxa.ctx.lock().await;
             let ctx = ctx_locker.deref_mut();

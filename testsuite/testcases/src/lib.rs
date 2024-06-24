@@ -85,7 +85,6 @@ async fn batch_update_gradually(
     delay: Duration,
     max_wait: Duration,
 ) -> Result<()> {
-    // let mut swarm = ctx.swarm();
     for validator in validators_to_update {
         info!("batch_update_gradually upgrade start: {}", validator);
         {
@@ -178,30 +177,6 @@ pub async fn generate_traffic(
         .await?;
 
     Ok(stats)
-}
-
-#[cfg(unused)]
-pub fn spawn_generate_traffic_setup<'a>(
-    ctx: &mut NetworkContext<'a>,
-    nodes: &[PeerId],
-) -> Result<(TxnEmitter, EmitJobRequest, &'a mut LocalAccount)> {
-    let emit_job_request = ctx.emit_job.clone();
-    let rng = SeedableRng::from_rng(ctx.core().rng())?;
-    let (emitter, emit_job_request) =
-        create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng)?;
-    let root_account = ctx.swarm().chain_info().root_account;
-    return Ok((emitter, emit_job_request, root_account));
-}
-
-#[cfg(unused)]
-pub fn spawn_generate_traffic(
-    emitter: TxnEmitter,
-    emit_job_request: EmitJobRequest,
-    root_account: &LocalAccount,
-    duration: Duration,
-    handle: Handle,
-) -> JoinHandle<Result<TxnStats>> {
-    handle.spawn(emitter.emit_txn_for(root_account, emit_job_request, duration))
 }
 
 pub enum LoadDestination {
