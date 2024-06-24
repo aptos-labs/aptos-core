@@ -699,7 +699,22 @@ impl Mempool {
         }
         counters::MEMPOOL_SKIPPED_TXNS.observe(skipped.len() as f64);
         for txn in &skipped {
-            info!("Skipped txn: {:?}, account sequence number: {:?}, existing sequence numbers: {:?}, was_chosen: {}", txn, self.transactions.get_sequence_number(&txn.0), self.transactions.get_account_sequence_numbers(&txn.0), Self::txn_was_chosen(txn.0, txn.1 - 1, &inserted, &exclude_transactions));
+            let account_exluded = if let Some(account_seq_num) =
+                self.transactions.get_sequence_number(&txn.0)
+            {
+                let min_inclusive = TxnPointer::new(txn.0, *account_seq_num, HashValue::zero());
+                let max_exclusive =
+                    TxnPointer::new(txn.0, account_seq_num.saturating_add(1), HashValue::zero());
+                Some(
+                    exclude_transactions
+                        .range(min_inclusive..max_exclusive)
+                        .next()
+                        .is_some(),
+                )
+            } else {
+                None
+            };
+            info!("Skipped txn: {:?}, account sequence number: {:?}, existing sequence numbers: {:?}, was_chosen: {}, account_sequence_number in excluded: {:?}", txn, self.transactions.get_sequence_number(&txn.0), self.transactions.get_account_sequence_numbers(&txn.0), Self::txn_was_chosen(txn.0, txn.1 - 1, &inserted, &exclude_transactions), account_exluded);
         }
         let result_size = result.len();
         let inserted_size = inserted.len();
