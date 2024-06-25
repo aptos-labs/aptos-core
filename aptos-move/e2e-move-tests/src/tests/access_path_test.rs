@@ -90,6 +90,10 @@ fn access_path_panic() {
                 ],
             }),
         }],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     };
 
     let mut module_bytes = vec![];

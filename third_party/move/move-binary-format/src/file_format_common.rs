@@ -50,8 +50,12 @@ pub const FUNCTION_HANDLE_INDEX_MAX: u64 = TABLE_INDEX_MAX;
 pub const FUNCTION_INST_INDEX_MAX: u64 = TABLE_INDEX_MAX;
 pub const FIELD_HANDLE_INDEX_MAX: u64 = TABLE_INDEX_MAX;
 pub const FIELD_INST_INDEX_MAX: u64 = TABLE_INDEX_MAX;
+pub const VARIANT_FIELD_HANDLE_INDEX_MAX: u64 = TABLE_INDEX_MAX;
+pub const VARIANT_FIELD_INST_INDEX_MAX: u64 = TABLE_INDEX_MAX;
 pub const STRUCT_DEF_INST_INDEX_MAX: u64 = TABLE_INDEX_MAX;
 pub const CONSTANT_INDEX_MAX: u64 = TABLE_INDEX_MAX;
+pub const STRUCT_VARIANT_HANDLE_INDEX_MAX: u64 = TABLE_INDEX_MAX;
+pub const STRUCT_VARIANT_INST_INDEX_MAX: u64 = TABLE_INDEX_MAX;
 
 pub const BYTECODE_COUNT_MAX: u64 = 65535;
 pub const BYTECODE_INDEX_MAX: u64 = 65535;
@@ -72,6 +76,8 @@ pub const ACQUIRES_COUNT_MAX: u64 = 255;
 
 pub const FIELD_COUNT_MAX: u64 = 255;
 pub const FIELD_OFFSET_MAX: u64 = 255;
+pub const VARIANT_COUNT_MAX: u64 = 1023;
+pub const VARIANT_OFFSET_MAX: u64 = 1023;
 
 pub const TYPE_PARAMETER_COUNT_MAX: u64 = 255;
 pub const TYPE_PARAMETER_INDEX_MAX: u64 = 65536;
@@ -84,6 +90,8 @@ pub const SIGNATURE_TOKEN_DEPTH_MAX: usize = 256;
 ///
 /// The binary contains a subset of those tables. A table specification is a tuple (table type,
 /// start offset, byte count) for a given table.
+///
+/// Notice there must not be more than `max(u8) - 1` tables.
 #[rustfmt::skip]
 #[allow(non_camel_case_types)]
 #[repr(u8)]
@@ -104,6 +112,10 @@ pub enum TableType {
     FIELD_INST              = 0xE,
     FRIEND_DECLS            = 0xF,
     METADATA                = 0x10,
+    VARIANT_FIELD_HANDLE    = 0x11,
+    VARIANT_FIELD_INST      = 0x12,
+    STRUCT_VARIANT_HANDLE   = 0x13,
+    STRUCT_VARIANT_INST     = 0x14,
 }
 
 /// Constants for signature blob values.
@@ -189,6 +201,7 @@ pub enum SerializedAddressSpecifier {
 pub enum SerializedNativeStructFlag {
     NATIVE                  = 0x1,
     DECLARED                = 0x2,
+    DECLARED_VARIANTS       = 0x3,
 }
 
 /// List of opcodes constants.
@@ -274,6 +287,17 @@ pub enum Opcodes {
     CAST_U16                    = 0x4B,
     CAST_U32                    = 0x4C,
     CAST_U256                   = 0x4D,
+    // Since v7
+    IMM_BORROW_VARIANT_FIELD    = 0x4E,
+    MUT_BORROW_VARIANT_FIELD    = 0x4F,
+    IMM_BORROW_VARIANT_FIELD_GENERIC    = 0x50,
+    MUT_BORROW_VARIANT_FIELD_GENERIC    = 0x51,
+    PACK_VARIANT                = 0x52,
+    PACK_VARIANT_GENERIC        = 0x53,
+    UNPACK_VARIANT              = 0x54,
+    UNPACK_VARIANT_GENERIC      = 0x55,
+    TEST_VARIANT                = 0x56,
+    TEST_VARIANT_GENERIC        = 0x57,
 }
 
 /// Upper limit on the binary size
@@ -576,10 +600,6 @@ pub(crate) mod versioned_data {
                 cursor: Cursor::new(&self.binary[start..end]),
             }
         }
-
-        pub fn slice(&self, start: usize, end: usize) -> &'a [u8] {
-            &self.binary[start..end]
-        }
     }
 
     impl<'a> VersionedCursor<'a> {
@@ -758,6 +778,17 @@ pub fn instruction_key(instruction: &Bytecode) -> u8 {
         CastU16 => Opcodes::CAST_U16,
         CastU32 => Opcodes::CAST_U32,
         CastU256 => Opcodes::CAST_U256,
+        // Since v7
+        ImmBorrowVariantField(_) => Opcodes::IMM_BORROW_VARIANT_FIELD,
+        ImmBorrowVariantFieldGeneric(_) => Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC,
+        MutBorrowVariantField(_) => Opcodes::MUT_BORROW_VARIANT_FIELD,
+        MutBorrowVariantFieldGeneric(_) => Opcodes::MUT_BORROW_VARIANT_FIELD_GENERIC,
+        PackVariant(_) => Opcodes::PACK_VARIANT,
+        PackVariantGeneric(_) => Opcodes::PACK_VARIANT_GENERIC,
+        UnpackVariant(_) => Opcodes::UNPACK_VARIANT,
+        UnpackVariantGeneric(_) => Opcodes::UNPACK_VARIANT_GENERIC,
+        TestVariant(_) => Opcodes::TEST_VARIANT,
+        TestVariantGeneric(_) => Opcodes::TEST_VARIANT_GENERIC,
     };
     opcode as u8
 }

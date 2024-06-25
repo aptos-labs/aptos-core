@@ -1389,6 +1389,18 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     None,
                 ))
             },
+            MoveBytecode::PackVariant(_)
+            | MoveBytecode::PackVariantGeneric(_)
+            | MoveBytecode::UnpackVariant(_)
+            | MoveBytecode::UnpackVariantGeneric(_)
+            | MoveBytecode::TestVariant(_)
+            | MoveBytecode::TestVariantGeneric(_)
+            | MoveBytecode::MutBorrowVariantField(_)
+            | MoveBytecode::MutBorrowVariantFieldGeneric(_)
+            | MoveBytecode::ImmBorrowVariantField(_)
+            | MoveBytecode::ImmBorrowVariantFieldGeneric(_) => {
+                panic!("stackless bytecode generator does not support variant structs yet")
+            },
         }
     }
 

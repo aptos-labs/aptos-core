@@ -13,9 +13,9 @@ use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     errors::{verification_error, Location, PartialVMResult, VMResult},
     file_format::{
-        CompiledModule, CompiledScript, Constant, FunctionHandle, FunctionHandleIndex,
-        FunctionInstantiation, ModuleHandle, Signature, StructFieldInformation, StructHandle,
-        StructHandleIndex, TableIndex,
+        CompiledModule, CompiledScript, Constant, FieldDefinition, FunctionHandle,
+        FunctionHandleIndex, FunctionInstantiation, ModuleHandle, Signature,
+        StructFieldInformation, StructHandle, StructHandleIndex, TableIndex,
     },
     IndexKind,
 };
@@ -47,7 +47,7 @@ impl<'a> DuplicationChecker<'a> {
         let checker = Self { module };
         checker.check_field_handles()?;
         checker.check_field_instantiations()?;
-        checker.check_function_defintions()?;
+        checker.check_function_definitions()?;
         checker.check_struct_definitions()?;
         checker.check_struct_instantiations()
     }
@@ -209,24 +209,24 @@ impl<'a> DuplicationChecker<'a> {
         }
         // Field names in structs must be unique
         for (struct_idx, struct_def) in self.module.struct_defs().iter().enumerate() {
-            let fields = match &struct_def.field_information {
+            match &struct_def.field_information {
                 StructFieldInformation::Native => continue,
-                StructFieldInformation::Declared(fields) => fields,
+                StructFieldInformation::Declared(fields) => {
+                    if fields.is_empty() {
+                        return Err(verification_error(
+                            StatusCode::ZERO_SIZED_STRUCT,
+                            IndexKind::StructDefinition,
+                            struct_idx as TableIndex,
+                        ));
+                    }
+                    Self::check_duplicate_fields(fields.iter())?
+                },
+                StructFieldInformation::DeclaredVariants(fields, variants) => {
+                    for variant in variants {
+                        Self::check_duplicate_fields(fields.iter().chain(variant.fields.iter()))?
+                    }
+                },
             };
-            if fields.is_empty() {
-                return Err(verification_error(
-                    StatusCode::ZERO_SIZED_STRUCT,
-                    IndexKind::StructDefinition,
-                    struct_idx as TableIndex,
-                ));
-            }
-            if let Some(idx) = Self::first_duplicate_element(fields.iter().map(|x| x.name)) {
-                return Err(verification_error(
-                    StatusCode::DUPLICATE_ELEMENT,
-                    IndexKind::FieldDefinition,
-                    idx,
-                ));
-            }
         }
         // Check that each struct definition is pointing to the self module
         if let Some(idx) = self.module.struct_defs().iter().position(|x| {
@@ -259,7 +259,21 @@ impl<'a> DuplicationChecker<'a> {
         Ok(())
     }
 
-    fn check_function_defintions(&self) -> PartialVMResult<()> {
+    fn check_duplicate_fields<'l>(
+        fields: impl Iterator<Item = &'l FieldDefinition>,
+    ) -> PartialVMResult<()> {
+        if let Some(idx) = Self::first_duplicate_element(fields.map(|x| x.name)) {
+            Err(verification_error(
+                StatusCode::DUPLICATE_ELEMENT,
+                IndexKind::FieldDefinition,
+                idx,
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn check_function_definitions(&self) -> PartialVMResult<()> {
         // FunctionDefinition - contained FunctionHandle defines uniqueness
         if let Some(idx) =
             Self::first_duplicate_element(self.module.function_defs().iter().map(|x| x.function))

@@ -673,6 +673,11 @@ pub fn script_into_module(compiled_script: CompiledScript, name: &str) -> Compil
 
         struct_defs: vec![],
         function_defs: vec![main_def],
+
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     };
     BoundsChecker::verify_module(&module).expect("invalid bounds in module");
     module

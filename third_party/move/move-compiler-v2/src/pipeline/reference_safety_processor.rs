@@ -120,6 +120,7 @@ use move_binary_format::{file_format, file_format::CodeOffset};
 use move_model::{
     ast::TempIndex,
     model::{FieldId, FunId, FunctionEnv, GlobalEnv, Loc, Parameter, QualifiedInstId, StructId},
+    symbol::Symbol,
     ty::Type,
 };
 use move_stackless_bytecode::{
@@ -1562,6 +1563,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     fn borrow_field(
         &mut self,
         struct_: QualifiedInstId<StructId>,
+        variant: Option<Symbol>,
         field_offs: &usize,
         dest: TempIndex,
         src: TempIndex,
@@ -1571,7 +1573,9 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         self.state.mark_derived_from(child, src);
         let loc = self.cur_loc();
         let struct_env = self.global_env().get_struct(struct_.to_qualified_id());
-        let field_id = struct_env.get_field_by_offset(*field_offs).get_id();
+        let field_id = struct_env
+            .get_field_by_offset_optional_variant(variant, *field_offs)
+            .get_id();
         let is_mut = self.ty(dest).is_mutable_reference();
         self.state.add_edge(
             label,
@@ -1999,6 +2003,17 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                         let (dest, src) = (dests[0], srcs[0]);
                         step.borrow_field(
                             mid.qualified_inst(*sid, inst.clone()),
+                            None,
+                            field_offs,
+                            dest,
+                            src,
+                        );
+                    },
+                    BorrowFieldVariant(mid, sid, variant, inst, field_offs) => {
+                        let (dest, src) = (dests[0], srcs[0]);
+                        step.borrow_field(
+                            mid.qualified_inst(*sid, inst.clone()),
+                            Some(*variant),
                             field_offs,
                             dest,
                             src,

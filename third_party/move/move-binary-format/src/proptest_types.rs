@@ -367,6 +367,10 @@ impl CompiledModuleStrategyGen {
                         struct_def_instantiations,
                         function_instantiations,
                         field_instantiations,
+                        variant_field_handles,
+                        variant_field_instantiations,
+                        struct_variant_handles,
+                        struct_variant_instantiations,
                     ) = state.return_tables();
 
                     // Build a compiled module
@@ -385,6 +389,11 @@ impl CompiledModuleStrategyGen {
 
                         struct_defs,
                         function_defs,
+
+                        variant_field_handles,
+                        variant_field_instantiations,
+                        struct_variant_handles,
+                        struct_variant_instantiations,
 
                         signatures,
 

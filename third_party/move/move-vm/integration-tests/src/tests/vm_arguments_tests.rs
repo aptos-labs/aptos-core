@@ -215,6 +215,10 @@ fn make_module_with_function(
                 code: vec![Bytecode::LdU64(0), Bytecode::Abort],
             }),
         }],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     };
     (module, function_name)
 }

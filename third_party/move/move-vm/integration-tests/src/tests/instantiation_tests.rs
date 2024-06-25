@@ -101,6 +101,10 @@ fn instantiation_err() {
                 ],
             }),
         }],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     };
 
     move_bytecode_verifier::verify_module(&cm).expect("verify failed");

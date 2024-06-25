@@ -6,11 +6,12 @@ use crate::{
         function_generator::FunctionGenerator, MAX_ADDRESS_COUNT, MAX_CONST_COUNT, MAX_FIELD_COUNT,
         MAX_FIELD_INST_COUNT, MAX_FUNCTION_COUNT, MAX_FUNCTION_INST_COUNT, MAX_IDENTIFIER_COUNT,
         MAX_MODULE_COUNT, MAX_SIGNATURE_COUNT, MAX_STRUCT_COUNT, MAX_STRUCT_DEF_COUNT,
-        MAX_STRUCT_DEF_INST_COUNT,
+        MAX_STRUCT_DEF_INST_COUNT, MAX_STRUCT_VARIANT_COUNT, MAX_STRUCT_VARIANT_INST_COUNT,
     },
     Experiment, Options,
 };
 use codespan_reporting::diagnostic::Severity;
+use itertools::Itertools;
 use move_binary_format::{
     file_format as FF,
     file_format::{AccessKind, FunctionHandle, ModuleHandle, StructDefinitionIndex, TableIndex},
@@ -77,6 +78,17 @@ pub struct ModuleGenerator {
     types_to_signature: BTreeMap<Vec<Type>, FF::SignatureIndex>,
     /// A mapping from constants sequences (with the corresponding type information) to pool indices.
     cons_to_idx: BTreeMap<(Constant, Type), FF::ConstantPoolIndex>,
+    variant_field_to_idx:
+        BTreeMap<(QualifiedId<StructId>, Symbol, usize), FF::VariantFieldHandleIndex>,
+    variant_field_inst_to_idx: BTreeMap<
+        (QualifiedId<StructId>, Symbol, usize, FF::SignatureIndex),
+        FF::VariantFieldInstantiationIndex,
+    >,
+    struct_variant_to_idx: BTreeMap<(QualifiedId<StructId>, Symbol), FF::StructVariantHandleIndex>,
+    struct_variant_inst_to_idx: BTreeMap<
+        (QualifiedId<StructId>, Symbol, FF::SignatureIndex),
+        FF::StructVariantInstantiationIndex,
+    >,
     /// The file-format module we are building.
     pub module: FF::CompiledModule,
     /// The source map for the module.
@@ -147,6 +159,10 @@ impl ModuleGenerator {
             field_inst_to_idx: Default::default(),
             types_to_signature: Default::default(),
             cons_to_idx: Default::default(),
+            variant_field_to_idx: Default::default(),
+            variant_field_inst_to_idx: Default::default(),
+            struct_variant_to_idx: Default::default(),
+            struct_variant_inst_to_idx: Default::default(),
             fun_inst_to_idx: Default::default(),
             main_handle: None,
             script_handle: None,
@@ -216,26 +232,62 @@ impl ModuleGenerator {
                 .expect(SOURCE_MAP_OK);
         }
         let struct_handle = self.struct_index(ctx, loc, struct_env);
-        let fields = struct_env.get_fields();
-        let field_information = FF::StructFieldInformation::Declared(
-            fields
-                .map(|f| {
-                    let field_loc = f.get_loc();
-                    self.source_map
-                        .add_struct_field_mapping(def_idx, ctx.env.to_ir_loc(field_loc))
-                        .expect(SOURCE_MAP_OK);
-                    let name = self.name_index(ctx, field_loc, f.get_name());
-                    let signature =
-                        FF::TypeSignature(self.signature_token(ctx, loc, &f.get_type()));
-                    FF::FieldDefinition { name, signature }
+        let field_information = if struct_env.has_variants() {
+            let variants = struct_env.get_variants().collect_vec();
+            // Extract common fields, can use any of the variants, which are known to be not
+            // empty.
+            let common_fields = struct_env
+                .get_fields_of_variant(variants[0])
+                .filter_map(|f| {
+                    if f.is_common_variant_field() {
+                        Some(self.field(ctx, def_idx, &f))
+                    } else {
+                        None
+                    }
                 })
-                .collect(),
-        );
+                .collect_vec();
+            let variants = variants
+                .into_iter()
+                .map(|v| FF::VariantDefinition {
+                    name: self.name_index(ctx, struct_env.get_variant_loc(v), v),
+                    fields: struct_env
+                        .get_fields_of_variant(v)
+                        .skip(common_fields.len())
+                        .map(|f| self.field(ctx, def_idx, &f))
+                        .collect_vec(),
+                })
+                .collect_vec();
+            FF::StructFieldInformation::DeclaredVariants(common_fields, variants)
+        } else {
+            let fields = struct_env.get_fields();
+            FF::StructFieldInformation::Declared(
+                fields.map(|f| self.field(ctx, def_idx, &f)).collect(),
+            )
+        };
         let def = FF::StructDefinition {
             struct_handle,
             field_information,
         };
         self.module.struct_defs.push(def)
+    }
+
+    fn field(
+        &mut self,
+        ctx: &ModuleContext,
+        struct_def_idx: StructDefinitionIndex,
+        field_env: &FieldEnv,
+    ) -> FF::FieldDefinition {
+        let field_loc = field_env.get_loc();
+        let variant_idx = field_env
+            .get_variant()
+            .and_then(|v| field_env.struct_env.get_variant_idx(v));
+        self.source_map
+            .add_struct_field_mapping(struct_def_idx, variant_idx, ctx.env.to_ir_loc(field_loc))
+            .expect(SOURCE_MAP_OK);
+        let name = self.name_index(ctx, field_loc, field_env.get_name());
+        let signature =
+            FF::TypeSignature(self.signature_token(ctx, field_loc, &field_env.get_type()));
+        FF::FieldDefinition { name, signature }
     }
 
     /// Obtains or creates an index for a signature, a sequence of types.
@@ -757,6 +809,139 @@ impl ModuleGenerator {
             });
         self.field_inst_to_idx.insert(key, field_inst_idx);
         field_inst_idx
+    }
+
+    /// Obtains or creates a variant field handle index.
+    pub fn variant_field_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        field_env: &FieldEnv,
+    ) -> FF::VariantFieldHandleIndex {
+        debug_assert!(
+            !field_env.is_common_variant_field() && field_env.get_variant().is_some(),
+            "expected a non-common variant field"
+        );
+        let variant = field_env.get_variant().expect("variannt");
+        let key = (
+            field_env.struct_env.get_qualified_id(),
+            variant,
+            field_env.get_offset(),
+        );
+        if let Some(idx) = self.variant_field_to_idx.get(&key) {
+            return *idx;
+        }
+        let field_idx = FF::VariantFieldHandleIndex(ctx.checked_bound(
+            loc,
+            self.module.variant_field_handles.len(),
+            MAX_FIELD_COUNT,
+            "variant field",
+        ));
+        let owner = self.struct_variant_index(ctx, loc, &field_env.struct_env, variant);
+        self.module
+            .variant_field_handles
+            .push(FF::VariantFieldHandle {
+                owner,
+                field: field_env.get_offset() as FF::MemberCount,
+            });
+        self.variant_field_to_idx.insert(key, field_idx);
+        field_idx
+    }
+
+    /// Obtains or creates a variant field instantiation handle index.
+    pub fn variant_field_inst_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        field_env: &FieldEnv,
+        inst: Vec<Type>,
+    ) -> FF::VariantFieldInstantiationIndex {
+        let variant = field_env.get_variant().expect("field variant");
+        let type_parameters = self.signature(ctx, loc, inst);
+        let key = (
+            field_env.struct_env.get_qualified_id(),
+            variant,
+            field_env.get_offset(),
+            type_parameters,
+        );
+        if let Some(idx) = self.variant_field_inst_to_idx.get(&key) {
+            return *idx;
+        }
+        let idx = FF::VariantFieldInstantiationIndex(ctx.checked_bound(
+            loc,
+            self.module.variant_field_instantiations.len(),
+            MAX_FIELD_INST_COUNT,
+            "variant field instantiation",
+        ));
+        let handle = self.variant_field_index(ctx, loc, field_env);
+        self.module
+            .variant_field_instantiations
+            .push(FF::VariantFieldInstantiation {
+                handle,
+                type_parameters,
+            });
+        self.variant_field_inst_to_idx.insert(key, idx);
+        idx
+    }
+
+    /// Obtains or creates a struct variant handle index.
+    pub fn struct_variant_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        struct_env: &StructEnv,
+        variant: Symbol,
+    ) -> FF::StructVariantHandleIndex {
+        let key = (struct_env.get_qualified_id(), variant);
+        if let Some(idx) = self.struct_variant_to_idx.get(&key) {
+            return *idx;
+        }
+        let idx = FF::StructVariantHandleIndex(ctx.checked_bound(
+            loc,
+            self.module.struct_variant_handles.len(),
+            MAX_STRUCT_VARIANT_COUNT,
+            "struct variant",
+        ));
+        let struct_index = self.struct_def_index(ctx, loc, struct_env);
+        self.module
+            .struct_variant_handles
+            .push(FF::StructVariantHandle {
+                struct_index,
+                variant: struct_env.get_variant_idx(variant).expect("variant idx"),
+            });
+        self.struct_variant_to_idx.insert(key, idx);
+        idx
+    }
+
+    /// Obtains or creates a struct variant instantiation index.
+    pub fn struct_variant_inst_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        struct_env: &StructEnv,
+        variant: Symbol,
+        inst: Vec<Type>,
+    ) -> FF::StructVariantInstantiationIndex {
+        let type_parameters = self.signature(ctx, loc, inst);
+        let key = (struct_env.get_qualified_id(), variant, type_parameters);
+        if let Some(idx) = self.struct_variant_inst_to_idx.get(&key) {
+            return *idx;
+        }
+        let idx = FF::StructVariantInstantiationIndex(ctx.checked_bound(
+            loc,
+            self.module.struct_variant_instantiations.len(),
+            MAX_STRUCT_VARIANT_INST_COUNT,
+            "struct variant instantiation",
+        ));
+        let handle = self.struct_variant_index(ctx, loc, struct_env, variant);
+        self.module
+            .struct_variant_instantiations
+            .push(FF::StructVariantInstantiation {
+                handle,
+                type_parameters,
+            });
+        self.struct_variant_inst_to_idx.insert(key, idx);
+        idx
     }
 
     /// Obtains or generates a constant index.

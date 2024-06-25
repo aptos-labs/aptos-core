@@ -368,7 +368,7 @@ pub enum BorrowEdge {
     /// Direct borrow.
     Direct,
     /// Field borrow with static offset.
-    Field(QualifiedInstId<StructId>, usize),
+    Field(QualifiedInstId<StructId>, Option<Symbol>, usize),
     /// Vector borrow with dynamic index.
     Index(IndexEdgeKind),
     /// Composed sequence of edges.
@@ -386,7 +386,9 @@ impl BorrowEdge {
 
     pub fn instantiate(&self, params: &[Type]) -> Self {
         match self {
-            Self::Field(qid, offset) => Self::Field(qid.instantiate_ref(params), *offset),
+            Self::Field(qid, variant, offset) => {
+                Self::Field(qid.instantiate_ref(params), *variant, *offset)
+            },
             Self::Hyper(edges) => {
                 let new_edges = edges.iter().map(|e| e.instantiate(params)).collect();
                 Self::Hyper(new_edges)
@@ -1168,7 +1170,8 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     .global_env()
                     .get_module(*mid)
                     .into_struct(*sid);
-                let field_env = struct_env.get_field_by_offset(*offset);
+                let field_env =
+                    struct_env.get_field_by_offset_optional_variant(Some(*variant), *offset);
                 write!(
                     f,
                     ".{}",
@@ -1436,9 +1439,9 @@ impl<'a> std::fmt::Display for BorrowEdgeDisplay<'a> {
         use BorrowEdge::*;
         let tctx = TypeDisplayContext::new(self.env);
         match self.edge {
-            Field(qid, field) => {
+            Field(qid, variant, field) => {
                 let struct_env = self.env.get_struct(qid.to_qualified_id());
-                let field_env = struct_env.get_field_by_offset(*field);
+                let field_env = struct_env.get_field_by_offset_optional_variant(*variant, *field);
                 let field_type = field_env.get_type().instantiate(&qid.inst);
                 write!(
                     f,

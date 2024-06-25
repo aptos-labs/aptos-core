@@ -54,6 +54,7 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
         max_dependency_depth: Some(256),
         max_push_size: Some(10000),
         max_struct_definitions: None,
+        max_struct_variants: None,
         max_fields_in_struct: None,
         max_function_definitions: None,
         max_back_edges_per_function: None,

@@ -51,6 +51,12 @@ pub enum IndexKind {
     CodeDefinition,
     TypeParameter,
     MemberCount,
+    // Since v7
+    VariantDefinition,
+    VariantFieldHandle,
+    VariantFieldInstantiation,
+    StructVariantHandle,
+    StructVariantInstantiation,
 }
 
 impl IndexKind {
@@ -77,6 +83,12 @@ impl IndexKind {
             CodeDefinition,
             TypeParameter,
             MemberCount,
+            // Since v7
+            VariantDefinition,
+            VariantFieldHandle,
+            VariantFieldInstantiation,
+            StructVariantHandle,
+            StructVariantInstantiation,
         ]
     }
 }
@@ -97,6 +109,7 @@ impl fmt::Display for IndexKind {
             StructDefinition => "struct definition",
             FunctionDefinition => "function definition",
             FieldDefinition => "field definition",
+            VariantDefinition => "variant definition",
             Signature => "signature",
             Identifier => "identifier",
             AddressIdentifier => "address identifier",
@@ -105,6 +118,10 @@ impl fmt::Display for IndexKind {
             CodeDefinition => "code definition pool",
             TypeParameter => "type parameter",
             MemberCount => "field offset",
+            VariantFieldHandle => "variant field handle",
+            VariantFieldInstantiation => "variant field instantiation",
+            StructVariantHandle => "struct variant handle",
+            StructVariantInstantiation => "struct variant instantiation",
         };
 
         f.write_str(desc)

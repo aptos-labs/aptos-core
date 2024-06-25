@@ -352,7 +352,9 @@ impl<'a, T: ModuleAccess> StructDefinitionView<'a, T> {
     pub fn is_native(&self) -> bool {
         match &self.struct_def.field_information {
             StructFieldInformation::Native => true,
-            StructFieldInformation::Declared { .. } => false,
+            StructFieldInformation::Declared(..) | StructFieldInformation::DeclaredVariants(..) => {
+                false
+            },
         }
     }
 
@@ -363,15 +365,19 @@ impl<'a, T: ModuleAccess> StructDefinitionView<'a, T> {
     pub fn fields(
         &self,
     ) -> Option<impl DoubleEndedIterator<Item = FieldDefinitionView<'a, T>> + Send> {
+        Some(self.fields_optional_variant(None))
+    }
+
+    pub fn fields_optional_variant(
+        &self,
+        variant: Option<VariantCount>,
+    ) -> impl DoubleEndedIterator<Item = FieldDefinitionView<'a, T>> + Send {
         let module = self.module;
-        match &self.struct_def.field_information {
-            StructFieldInformation::Native => None,
-            StructFieldInformation::Declared(fields) => Some(
-                fields
-                    .iter()
-                    .map(move |field_def| FieldDefinitionView::new(module, field_def)),
-            ),
-        }
+        self.struct_def
+            .field_information
+            .fields(variant)
+            .into_iter()
+            .map(move |field_def| FieldDefinitionView::new(module, field_def))
     }
 
     pub fn name(&self) -> &'a IdentStr {
@@ -729,3 +735,10 @@ impl_view_internals!(FieldDefinitionView, FieldDefinition, field_def);
 impl_view_internals!(TypeSignatureView, TypeSignature, type_signature);
 impl_view_internals!(SignatureView, Signature, signature);
 impl_view_internals!(SignatureTokenView, SignatureToken, token);
+
+/// A type represent eoither a FieldHandleIndex or a VariantFieldHandleIndex.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum FieldOrVariantIndex {
+    FieldIndex(FieldHandleIndex),
+    VariantFieldIndex(VariantFieldHandleIndex),
+}
