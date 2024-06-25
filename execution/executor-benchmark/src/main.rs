@@ -433,8 +433,25 @@ where
 }
 
 fn main() {
+    let opt = Opt::parse();
+    aptos_logger::Logger::new().init();
+    START_TIME.set(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64,
+    );
+    rayon::ThreadPoolBuilder::new()
+        .thread_name(|index| format!("rayon-global-{}", index))
+        .build_global()
+        .expect("Failed to build rayon global thread pool.");
+
+    aptos_node_resource_metrics::register_node_metrics_collector();
+    let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
+
+
     let (sendx, recvx) = std::sync::mpsc::channel();
-    let num_threads = 1000;
+    let num_threads = 10000;
     let thread_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .thread_name(|i| format!("thread-{}", i))
@@ -462,21 +479,6 @@ fn main() {
         }
     }
     println!("END of CPU test");
-    let opt = Opt::parse();
-    aptos_logger::Logger::new().init();
-    START_TIME.set(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64,
-    );
-    rayon::ThreadPoolBuilder::new()
-        .thread_name(|index| format!("rayon-global-{}", index))
-        .build_global()
-        .expect("Failed to build rayon global thread pool.");
-
-    aptos_node_resource_metrics::register_node_metrics_collector();
-    let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
 
     let execution_threads = opt.execution_threads();
     let execution_shards = opt.pipeline_opt.sharding_opt.num_executor_shards;
