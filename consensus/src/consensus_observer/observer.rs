@@ -41,6 +41,7 @@ use aptos_storage_interface::DbReader;
 use aptos_time_service::TimeService;
 use aptos_types::{
     block_info::{BlockInfo, Round},
+    epoch_change::Verifier,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
@@ -98,8 +99,8 @@ pub struct ConsensusObserver {
     consensus_observer_client:
         Arc<ConsensusObserverClient<NetworkClient<ConsensusObserverMessage>>>,
 
-    // The current epoch
-    epoch: u64,
+    // The current epoch state
+    epoch_state: Option<Arc<EpochState>>,
     // The latest ledger info (updated via a callback)
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
 
@@ -148,7 +149,7 @@ impl ConsensusObserver {
         Self {
             consensus_observer_config,
             consensus_observer_client,
-            epoch: root.commit_info().epoch(),
+            epoch_state: None,
             root: Arc::new(Mutex::new(root)),
             pending_blocks: Arc::new(Mutex::new(BTreeMap::new())),
             execution_client,
@@ -427,6 +428,13 @@ impl ConsensusObserver {
         };
     }
 
+    /// Returns the current epoch state, and panics if it is not set
+    fn get_epoch_state(&self) -> Arc<EpochState> {
+        self.epoch_state
+            .clone()
+            .expect("The epoch state is not set! This should never happen!")
+    }
+
     /// Returns the last known block
     fn get_last_block(&self) -> BlockInfo {
         if let Some((_, (last_blocks, _))) = self.pending_blocks.lock().last_key_value() {
@@ -495,17 +503,36 @@ impl ConsensusObserver {
 
     /// Processes the commit decision
     fn process_commit_decision(&mut self, commit_decision: CommitDecision) {
-        // Update the pending blocks with the commit decision
-        if self.process_commit_decision_for_pending_block(&commit_decision) {
-            return; // The commit decision was successfully processed
+        // If the commit decision is for the current epoch, verify and process it
+        let commit_decision_epoch = commit_decision.epoch();
+        if commit_decision_epoch == self.get_epoch_state().epoch {
+            // Verify the commit decision
+            if let Err(error) = self.verify_commit_decision(&commit_decision) {
+                warn!(
+                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                        "Failed to verify commit decision! Ignoring: {:?}, Error: {:?}",
+                        commit_decision.ledger_info().commit_info(),
+                        error
+                    ))
+                );
+                return;
+            }
+
+            // Update the pending blocks with the commit decision
+            if self.process_commit_decision_for_pending_block(&commit_decision) {
+                return; // The commit decision was successfully processed
+            }
         }
 
-        // Otherwise, check if we need to state sync (i.e., the
-        // commit decision is for a future epoch or round).
-        let decision_epoch = commit_decision.ledger_info().commit_info().epoch();
-        let decision_round = commit_decision.round();
+        // TODO: identify the best way to handle an invalid commit decision
+        // for a future epoch. In such cases, we currently rely on state sync.
+
+        // Otherwise, we failed to process the commit decision. If the commit
+        // is for a future epoch or round, we need to state sync.
+        let commit_decision_round = commit_decision.round();
         let last_block = self.get_last_block();
-        if decision_epoch > last_block.epoch() || decision_round > last_block.round() {
+        if commit_decision_epoch > last_block.epoch() || commit_decision_round > last_block.round()
+        {
             info!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                     "Started syncing to {}!",
@@ -520,8 +547,8 @@ impl ConsensusObserver {
             // Start the state sync process
             let abort_handle = sync_to_commit_decision(
                 commit_decision,
-                decision_epoch,
-                decision_round,
+                commit_decision_epoch,
+                commit_decision_round,
                 self.execution_client.clone(),
                 self.sync_notification_sender.clone(),
             );
@@ -529,8 +556,8 @@ impl ConsensusObserver {
         }
     }
 
-    /// Processes the commit decision for the pending block and returns iff
-    /// the commit decision was successfully processed.
+    /// Processes the commit decision for the pending block and returns true
+    /// iff the commit decision was successfully processed.
     fn process_commit_decision_for_pending_block(&self, commit_decision: &CommitDecision) -> bool {
         let mut pending_blocks = self.pending_blocks.lock();
         if let Some((ordered_blocks, pending_commit_decision)) =
@@ -650,16 +677,37 @@ impl ConsensusObserver {
             ordered_proof,
         } = ordered_block.clone();
 
-        // Verify that we have at least one ordered block
-        if blocks.is_empty() {
+        // Verify the ordered blocks before processing
+        if let Err(error) = self.verify_ordered_blocks(&blocks, &ordered_proof) {
             warn!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Received empty ordered block! Ignoring: {:?}",
-                    ordered_proof.commit_info()
+                    "Failed to verify ordered blocks! Ignoring: {:?}, Error: {:?}",
+                    ordered_proof.commit_info(),
+                    error
                 ))
             );
             return;
-        }
+        };
+
+        // If the ordered block is for the current epoch, verify the proof
+        let verified_ordered_proof =
+            if ordered_proof.commit_info().epoch() == self.get_epoch_state().epoch {
+                // Verify the ordered proof
+                if let Err(error) = self.verify_ordered_proof(&ordered_proof) {
+                    warn!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Failed to verify ordered proof! Ignoring: {:?}, Error: {:?}",
+                            ordered_proof.commit_info(),
+                            error
+                        ))
+                    );
+                    return;
+                }
+
+                true // We have verified the proof successfully
+            } else {
+                false // We cannot yet verify the proof
+            };
 
         // If the block is a child of our last block, we can insert it
         if self.get_last_block().id() == blocks.first().unwrap().parent_id() {
@@ -750,7 +798,7 @@ impl ConsensusObserver {
         }
 
         // If the epoch has changed, end the current epoch and start the new one
-        if epoch > self.epoch {
+        if epoch > self.get_epoch_state().epoch {
             self.execution_client.end_epoch().await;
             self.wait_for_epoch_start().await;
         }
@@ -896,6 +944,90 @@ impl ConsensusObserver {
         );
     }
 
+    /// Verifies the commit decision and returns an error if the decision is invalid
+    fn verify_commit_decision(&self, commit_decision: &CommitDecision) -> Result<(), Error> {
+        self.get_epoch_state()
+            .verify(commit_decision.ledger_info())
+            .map_err(|error| {
+                Error::InvalidMessageError(format!(
+                    "Failed to verify commit decision: {:?}, Error: {:?}",
+                    commit_decision.ledger_info().commit_info(),
+                    error
+                ))
+            })
+    }
+
+    /// Verifies the ordered blocks and returns an error if the data is invalid.
+    /// Note: this does not check the ordered proof.
+    fn verify_ordered_blocks(
+        &self,
+        blocks: &[Arc<PipelinedBlock>],
+        ordered_proof: &LedgerInfoWithSignatures,
+    ) -> Result<(), Error> {
+        // Verify that we have at least one ordered block
+        if blocks.is_empty() {
+            return Err(Error::InvalidMessageError(
+                "Received empty ordered block!".to_string(),
+            ));
+        }
+
+        // Verify that the ordered proof is valid against our epoch state
+        self.get_epoch_state()
+            .verify(ordered_proof)
+            .map_err(|error| {
+                Error::InvalidMessageError(format!(
+                    "Failed to verify ordered proof: {:?}, Error: {:?}",
+                    ordered_proof.commit_info(),
+                    error
+                ))
+            })?;
+
+        // Verify the last block ID matches the ordered proof block ID
+        if blocks.last().unwrap().id() != ordered_proof.commit_info().id() {
+            return Err(Error::InvalidMessageError(
+                format!(
+                    "Last ordered block ID does not match the ordered proof ID! Number of blocks: {:?}, Last ordered block ID: {:?}, Ordered proof ID: {:?}",
+                    blocks.len(),
+                    blocks.last().unwrap().id(),
+                    ordered_proof.commit_info().id()
+                )
+            ));
+        }
+
+        // Verify the blocks are correctly chained together (from the last block to the first)
+        let mut expected_parent_id = None;
+        for block in blocks.iter().rev() {
+            if let Some(expected_parent_id) = expected_parent_id {
+                if block.id() != expected_parent_id {
+                    return Err(Error::InvalidMessageError(
+                        format!(
+                            "Block parent ID does not match the expected parent ID! Block ID: {:?}, Expected parent ID: {:?}",
+                            block.id(),
+                            expected_parent_id
+                        )
+                    ));
+                }
+            }
+
+            expected_parent_id = Some(block.parent_id());
+        }
+
+        Ok(())
+    }
+
+    /// Verifies the ordered proof and returns an error if the proof is invalid
+    fn verify_ordered_proof(&self, ordered_proof: &LedgerInfoWithSignatures) -> Result<(), Error> {
+        self.get_epoch_state()
+            .verify(ordered_proof)
+            .map_err(|error| {
+                Error::InvalidMessageError(format!(
+                    "Failed to verify ordered proof: {:?}, Error: {:?}",
+                    ordered_proof.commit_info(),
+                    error
+                ))
+            })
+    }
+
     /// Waits for a new epoch to start
     async fn wait_for_epoch_start(&mut self) {
         // Extract the epoch state and on-chain configs
@@ -909,10 +1041,14 @@ impl ConsensusObserver {
             panic!("Reconfig events are required to wait for a new epoch to start! Something has gone wrong!")
         };
 
-        // Update the local epoch
-        self.epoch = epoch_state.epoch;
-        info!(LogSchema::new(LogEntry::ConsensusObserver)
-            .message(&format!("New epoch started: {}", self.epoch)));
+        // Update the local epoch state
+        self.epoch_state = Some(epoch_state.clone());
+        info!(
+            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                "New epoch started: {}. Updated the epoch state!",
+                epoch_state.epoch
+            ))
+        );
 
         // Create the payload manager
         let payload_manager = if consensus_config.quorum_store_enabled() {
