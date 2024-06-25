@@ -833,8 +833,8 @@ impl<'env> Docgen<'env> {
                     .unwrap_or_default();
                 let module_link = label_link.split('#').next().unwrap_or("").to_string();
                 let suffix = format!(
-                    " of the <a href=\"{}\">{}</a> module",
-                    module_link, module_name
+                    " of the {} module",
+                    self.create_link(&module_link, module_name)
                 );
                 (req_tag, module_link, suffix)
             } else {
@@ -849,10 +849,14 @@ impl<'env> Docgen<'env> {
                 .next()
                 .unwrap_or_default();
 
-            let href = format!("href=\"{}#high-level-req\"", module_link);
             let link = format!(
-                "<a id=\"{}\" {}>high-level requirement {}</a>{}",
-                req_tag, href, req_number, suffix
+                "### {}\n {}{}",
+                req_tag,
+                self.create_link(
+                    &format!("{}#high-level-req", module_link),
+                    &format!("high-level requirement {}", req_number)
+                ),
+                suffix
             );
             links.push(link);
         }
@@ -883,7 +887,7 @@ impl<'env> Docgen<'env> {
             let text = &caps[2];
 
             if tag.starts_with("http://") || tag.starts_with("https://") {
-                format!("<a href=\"{}\">{}</a>", tag, text)
+                self.create_link(tag, text)
             } else if tag.contains("::") {
                 let parts = tag.split("::").collect::<Vec<_>>();
                 if let Some(module_name) = parts.first() {
@@ -892,12 +896,12 @@ impl<'env> Docgen<'env> {
                         .unwrap_or_default();
                     let module_link = label_link.split('#').next().unwrap_or("").to_string();
                     let spec_tag = parts.get(1).unwrap_or(&"");
-                    format!("<a href=\"{}#{}\">{}</a>", module_link, spec_tag, text)
+                    self.create_link(&format!("{}#{}", module_link, spec_tag), text)
                 } else {
-                    format!("<a href=\"#t{}\">{}</a>", tag, text)
+                    self.create_link(&format!("#t{}", tag), text)
                 }
             } else {
-                format!("<a href=\"#{}\">{}</a>", tag, text)
+                self.create_link(&format!("#{}", tag), text)
             }
         })
         .to_string()
@@ -1788,12 +1792,17 @@ impl<'env> Docgen<'env> {
                     // consume the remaining '`'. Report an error if we find an unmatched '`'.
                     assert_eq!(chars.next(), Some('`'), "Missing backtick found in {} while generating documentation for the following text: \"{}\"", self.current_module.as_ref().unwrap().get_name().display_full(self.env), text);
 
-                    write!(
-                        &mut decorated_text,
-                        "<code>{}</code>",
-                        self.decorate_code(&code)
-                    )
-                    .unwrap()
+                    if self.options.is_mdx_compatible() {
+                        // Don't decorate code here if it's MDX
+                        write!(&mut decorated_text, "`{}`", code).unwrap()
+                    } else {
+                        write!(
+                            &mut decorated_text,
+                            "<code>{}</code>",
+                            self.decorate_code(&code)
+                        )
+                        .unwrap()
+                    }
                 }
             } else if self.options.is_mdx_compatible() {
                 if chr == '<' {
@@ -1836,14 +1845,29 @@ impl<'env> Docgen<'env> {
     /// insert style and links into the code.
     fn begin_code(&self) {
         emitln!(self.writer);
-        // If we newline after <pre><code>, an empty line will be created. So we don't.
-        // This, however, creates some ugliness with indented code.
-        emit!(self.writer, "<pre><code>");
+        if self.options.is_mdx_compatible() {
+            // For MDX, lets just depend on the basic markdown handling
+            let data = self.current_module.as_ref().unwrap();
+
+            // Currently, the syntax highlighting needs a move module to show up
+            emit!(
+                self.writer,
+                &format!("```move\nmodule {} {{\n", data.get_full_name_str())
+            );
+        } else {
+            // If we newline after <pre><code>, an empty line will be created. So we don't.
+            // This, however, creates some ugliness with indented code.
+            emit!(self.writer, "<pre><code>");
+        }
     }
 
     /// Ends a code block.
     fn end_code(&self) {
-        emitln!(self.writer, "</code></pre>\n");
+        if self.options.is_mdx_compatible() {
+            emit!(self.writer, "}\n```\n");
+        } else {
+            emitln!(self.writer, "</code></pre>\n");
+        }
         // Always be sure to have an empty line at the end of block.
         emitln!(self.writer);
     }
@@ -1851,7 +1875,11 @@ impl<'env> Docgen<'env> {
     /// Outputs decorated code text in context of a module.
     fn code_text(&self, code: &str) {
         if self.options.is_mdx_compatible() {
-            emit!(self.writer, "{}<br />", &self.decorate_code(code));
+            // Extra spacing is to continue with the tabbing, TODO make more adaptable
+            let code_lines = code.split('\n');
+            for line in code_lines {
+                emit!(self.writer, "    {}\n", &line);
+            }
         } else {
             emitln!(self.writer, &self.decorate_code(code));
         }
@@ -1908,8 +1936,8 @@ impl<'env> Docgen<'env> {
                         || BUILTINS.contains(&s)
                     {
                         format!("<b>{}</b>", &code[at + m.start()..at + m.end()])
-                    } else if let Some(label) = self.resolve_to_label(s, is_call) {
-                        format!("<a href=\"{}\">{}</a>", label, s)
+                    } else if let Some(ref label) = self.resolve_to_label(s, is_call) {
+                        self.create_link(label, s)
                     } else {
                         "".to_owned()
                     }
@@ -2209,5 +2237,13 @@ impl<'env> Docgen<'env> {
     /// Repeats a string n times.
     fn repeat_str(&self, s: &str, n: usize) -> String {
         (0..n).map(|_| s).collect::<String>()
+    }
+
+    fn create_link(&self, anchor: &str, label: &str) -> String {
+        if self.options.is_mdx_compatible() {
+            format!("[{}]({})", anchor, label)
+        } else {
+            format!("<a href=\"{}\">{}</a>", anchor, label)
+        }
     }
 }
