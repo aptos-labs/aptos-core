@@ -50,10 +50,11 @@ pub(crate) fn native_dispatch(
  **************************************************************************************************/
 pub fn make_all(
     builder: &SafeNativeBuilder,
-) -> impl Iterator<Item=(String, NativeFunction)> + '_ {
-    let natives = [
-        ("dispatchable_authenticate", native_dispatch as RawSafeNative),
-    ];
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
+    let natives = [(
+        "dispatchable_authenticate",
+        native_dispatch as RawSafeNative,
+    )];
 
     builder.make_named_natives(natives)
 }

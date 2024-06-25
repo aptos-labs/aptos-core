@@ -737,4 +737,8 @@ spec aptos_framework::account {
 
         aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
     }
+
+    spec migrate_to_lite_account(account: &signer) {
+        pragma verify = false;
+    }
 }

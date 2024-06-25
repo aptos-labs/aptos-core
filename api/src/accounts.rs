@@ -19,7 +19,7 @@ use aptos_api_types::{
     MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
 };
 use aptos_types::{
-    account_config::AccountResource,
+    account_config::{lite_account::LiteAccountGroup, AccountResource},
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
 };
@@ -31,7 +31,6 @@ use poem_openapi::{
     OpenApi,
 };
 use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
-use aptos_types::account_config::lite_account::LiteAccountGroup;
 
 /// API for accounts, their associated resources, and modules
 pub struct AccountsApi {
@@ -238,20 +237,23 @@ impl Account {
     /// * JSON: Return a JSON encoded version of [`AccountData`]
     /// * BCS: Return a BCS encoded version of [`AccountData`]
     pub fn account(self, accept_type: &AcceptType) -> BasicResultWith404<AccountData> {
-
         // Convert the AccountResource into the summary object AccountData
         // todo: fix the bcs encoded version.
         let (account_data, state_value) = match self.get_account_v1_resource() {
-            Ok(state_value) => (bcs::from_bytes::<AccountResource>(&state_value)
-                                    .context("Internal error deserializing response from DB")
-                                    .map_err(|err| {
-                                        BasicErrorWith404::internal_with_code(
-                                            err,
-                                            AptosErrorCode::InternalError,
-                                            &self.latest_ledger_info,
-                                        )
-                                    })?.into(), state_value),
-            Err(_e) => (self.get_account_v2_resource()?.into(), vec![])
+            Ok(state_value) => (
+                bcs::from_bytes::<AccountResource>(&state_value)
+                    .context("Internal error deserializing response from DB")
+                    .map_err(|err| {
+                        BasicErrorWith404::internal_with_code(
+                            err,
+                            AptosErrorCode::InternalError,
+                            &self.latest_ledger_info,
+                        )
+                    })?
+                    .into(),
+                state_value,
+            ),
+            Err(_e) => (self.get_account_v2_resource()?.into(), vec![]),
         };
 
         match accept_type {
@@ -299,7 +301,7 @@ impl Account {
             &self.latest_ledger_info,
         )?;
 
-        LiteAccountGroup::from_bytes(self.address.inner(), state_value.as_ref().map(|v| v.as_slice()))
+        LiteAccountGroup::from_bytes(self.address.inner(), state_value.as_deref())
             .context("Failed to deserialize Lite Account")
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(

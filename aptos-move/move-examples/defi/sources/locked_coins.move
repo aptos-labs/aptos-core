@@ -287,6 +287,8 @@ module defi::locked_coins {
             8,
             false,
         );
+        coin::create_coin_conversion_map(aptos_framework);
+        coin::create_pairing<AptosCoin>(aptos_framework);
         account::create_account_for_test(signer::address_of(sponsor));
         coin::register<AptosCoin>(sponsor);
         let coins = coin::mint<AptosCoin>(2000, &mint_cap);

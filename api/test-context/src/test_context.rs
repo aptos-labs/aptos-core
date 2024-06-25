@@ -669,7 +669,9 @@ impl TestContext {
                 .parse::<u64>()
                 .unwrap()
         } else {
-            let lite_account_resource = self.gen_resource(&account, "0x1::lite_account::Account").await;
+            let lite_account_resource = self
+                .gen_resource(&account, "0x1::lite_account::Account")
+                .await;
             lite_account_resource
                 .map(|x| {
                     x["data"]["sequence_number"]

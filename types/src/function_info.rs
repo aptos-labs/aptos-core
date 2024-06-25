@@ -1,13 +1,15 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fmt::{Display, Formatter};
+use crate::move_utils::as_move_value::AsMoveValue;
+use move_core_types::{
+    account_address::AccountAddress,
+    value::{MoveStruct, MoveValue},
+};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use move_core_types::account_address::AccountAddress;
-use move_core_types::value::{MoveStruct, MoveValue};
-use crate::move_utils::as_move_value::AsMoveValue;
+use std::fmt::{Display, Formatter};
 
 /// Reflection of aptos_framework::function_info::FunctionInfo
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug, Clone)]
@@ -30,7 +32,13 @@ impl FunctionInfo {
 
 impl Display for FunctionInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}::{}::{}", self.module_address.to_hex(), self.module_name, self.function_name)?;
+        write!(
+            f,
+            "{}::{}::{}",
+            self.module_address.to_hex(),
+            self.module_name,
+            self.function_name
+        )?;
         Ok(())
     }
 }

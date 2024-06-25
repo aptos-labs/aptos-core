@@ -5,16 +5,16 @@
 use crate::function_info::FunctionInfo;
 use anyhow::Result;
 use move_core_types::{
+    account_address::AccountAddress,
     ident_str,
     identifier::IdentStr,
+    language_storage::StructTag,
     move_resource::{MoveResource, MoveStructType},
 };
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::language_storage::StructTag;
 
 /// A Rust representation of an Account resource.
 /// This is not how the Account is represented in the VM but it's a convenient representation.
@@ -53,26 +53,35 @@ pub struct DispatchableAuthenticatorResource {
 
 impl LiteAccountGroup {
     /// Constructs an Account resource.
-    pub fn new(addr: AccountAddress, sequence_number: Option<u64>, auth_key: Option<Option<Vec<u8>>>, dispatchable_authenticator: Option<DispatchableAuthenticatorResource>) -> Self {
+    pub fn new(
+        addr: AccountAddress,
+        sequence_number: Option<u64>,
+        auth_key: Option<Option<Vec<u8>>>,
+        dispatchable_authenticator: Option<DispatchableAuthenticatorResource>,
+    ) -> Self {
         LiteAccountGroup {
             addr,
             account: sequence_number.map(|s| AccountResource { sequence_number: s }),
             native_authenticator: auth_key.map(|k| NativeAuthenticatorResource {
-                authentication_key: k
+                authentication_key: k,
             }),
-            dispatchable_authenticator
+            dispatchable_authenticator,
         }
     }
 
     /// Return the sequence_number field for the given Account
     pub fn sequence_number(&self) -> u64 {
-        if let Some(ar) = &self.account { ar.sequence_number } else { 0 }
+        if let Some(ar) = &self.account {
+            ar.sequence_number
+        } else {
+            0
+        }
     }
 
     /// Return the authentication_key field for the given Account
     pub fn authentication_key(&self) -> Option<&[u8]> {
         if let Some(na) = &self.native_authenticator {
-            na.authentication_key.as_ref().map(|v| v.as_slice())
+            na.authentication_key.as_deref()
         } else {
             Some(self.addr.as_ref())
         }
@@ -81,10 +90,7 @@ impl LiteAccountGroup {
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut group = BTreeMap::new();
         if let Some(ar) = &self.account {
-            group.insert(
-                AccountResource::struct_tag(),
-                bcs::to_bytes(ar).unwrap(),
-            );
+            group.insert(AccountResource::struct_tag(), bcs::to_bytes(ar).unwrap());
         }
         if let Some(na) = &self.native_authenticator {
             group.insert(
@@ -104,9 +110,18 @@ impl LiteAccountGroup {
     pub fn from_bytes(addr: &AccountAddress, value: Option<&[u8]>) -> Result<Self> {
         if let Some(value) = value {
             let group: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(value)?;
-            let account = group.get(&AccountResource::struct_tag()).map(|bytes| bcs::from_bytes::<AccountResource>(bytes.as_slice())).transpose()?;
-            let native_authenticator = group.get(&NativeAuthenticatorResource::struct_tag()).map(|bytes| bcs::from_bytes::<NativeAuthenticatorResource>(bytes.as_slice())).transpose()?;
-            let dispatchable_authenticator = group.get(&DispatchableAuthenticatorResource::struct_tag()).map(|bytes| bcs::from_bytes::<DispatchableAuthenticatorResource>(bytes.as_slice())).transpose()?;
+            let account = group
+                .get(&AccountResource::struct_tag())
+                .map(|bytes| bcs::from_bytes::<AccountResource>(bytes.as_slice()))
+                .transpose()?;
+            let native_authenticator = group
+                .get(&NativeAuthenticatorResource::struct_tag())
+                .map(|bytes| bcs::from_bytes::<NativeAuthenticatorResource>(bytes.as_slice()))
+                .transpose()?;
+            let dispatchable_authenticator = group
+                .get(&DispatchableAuthenticatorResource::struct_tag())
+                .map(|bytes| bcs::from_bytes::<DispatchableAuthenticatorResource>(bytes.as_slice()))
+                .transpose()?;
             Ok(Self {
                 addr: *addr,
                 account,

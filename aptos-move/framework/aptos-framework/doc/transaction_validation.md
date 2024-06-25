@@ -300,11 +300,7 @@ Only called during genesis to initialize system resources for this module.
 
     <b>if</b> (
         transaction_sender == gas_payer
-<<<<<<< HEAD
-            || (<a href="account.md#0x1_account_account_resource_exists_at">account::account_resource_exists_at</a>(transaction_sender) || <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_lite_account_enabled">features::lite_account_enabled</a>())
-=======
             || <a href="account.md#0x1_account_account_resource_exists_at">account::account_resource_exists_at</a>(transaction_sender) || <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_lite_account_enabled">features::lite_account_enabled</a>()
->>>>>>> d39912bb0b (fix prover)
             || !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_sponsored_automatic_account_creation_enabled">features::sponsored_automatic_account_creation_enabled</a>()
             || txn_sequence_number &gt; 0
     ) {
@@ -501,7 +497,6 @@ Only called during genesis to initialize system resources for this module.
 
     <b>let</b> i = 0;
     <b>while</b> ({
-<<<<<<< HEAD
         // <b>spec</b> {
         //     <b>invariant</b> i &lt;= num_secondary_signers;
         //     <b>invariant</b> <b>forall</b> j in 0..i:
@@ -511,25 +506,17 @@ Only called during genesis to initialize system resources for this module.
         //             || <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_lite_account_enabled">features::lite_account_enabled</a>() && <a href="lite_account.md#0x1_lite_account_using_native_authenticator">lite_account::using_native_authenticator</a>(
         //             secondary_signer_addresses[j]
         //         ) && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(secondary_signer_public_key_hashes[j]) == <a href="lite_account.md#0x1_lite_account_native_authenticator">lite_account::native_authenticator</a>(
+        //         <a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[j])
+        //         && secondary_signer_public_key_hashes[j]
+        //             == <a href="account.md#0x1_account_spec_get_authentication_key">account::spec_get_authentication_key</a>(secondary_signer_addresses[j])
+        //             || <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_lite_account_enabled">features::spec_lite_account_enabled</a>() && <a href="lite_account.md#0x1_lite_account_using_native_authenticator">lite_account::using_native_authenticator</a>(
+        //             secondary_signer_addresses[j]
+        //         ) && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(
+        //             secondary_signer_public_key_hashes[j]
+        //         ) == <a href="lite_account.md#0x1_lite_account_spec_native_authenticator">lite_account::spec_native_authenticator</a>(
         //             secondary_signer_addresses[j]
         //         );
         // };
-=======
-        <b>spec</b> {
-            <b>invariant</b> i &lt;= num_secondary_signers;
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                <a href="account.md#0x1_account_account_resource_exists_at">account::account_resource_exists_at</a>(secondary_signer_addresses[j])
-                    && secondary_signer_public_key_hashes[j]
-                    == <a href="account.md#0x1_account_spec_get_authentication_key">account::spec_get_authentication_key</a>(secondary_signer_addresses[j])
-                    || <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_lite_account_enabled">features::spec_lite_account_enabled</a>() && <a href="lite_account.md#0x1_lite_account_using_native_authenticator">lite_account::using_native_authenticator</a>(
-                    secondary_signer_addresses[j]
-                ) && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(
-                    secondary_signer_public_key_hashes[j]
-                ) == <a href="lite_account.md#0x1_lite_account_spec_native_authenticator">lite_account::spec_native_authenticator</a>(
-                    secondary_signer_addresses[j]
-                );
-        };
->>>>>>> d39912bb0b (fix prover)
         (i &lt; num_secondary_signers)
     }) {
         <b>let</b> secondary_address = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&secondary_signer_addresses, i);
@@ -840,16 +827,6 @@ Give some constraints that may abort according to the conditions.
     <b>let</b> transaction_sender = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
     <b>aborts_if</b> (
         !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
-<<<<<<< HEAD
-            || <a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender)
-            || transaction_sender == gas_payer
-            || txn_sequence_number &gt; 0
-    ) && (
-        !(txn_sequence_number &gt;= <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number)
-            || !(txn_authentication_key == <b>global</b>&lt;Account&gt;(transaction_sender).authentication_key)
-            || !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender)
-            || !(txn_sequence_number == <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number)
-=======
         || <a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(transaction_sender)
         || transaction_sender == gas_payer
         || txn_sequence_number &gt; 0
@@ -858,7 +835,6 @@ Give some constraints that may abort according to the conditions.
         || !(txn_authentication_key == <b>global</b>&lt;Account&gt;(transaction_sender).authentication_key)
         || !<a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(transaction_sender)
         || !(txn_sequence_number == <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number)
->>>>>>> d39912bb0b (fix prover)
     );
     <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
         && transaction_sender != gas_payer
@@ -922,18 +898,6 @@ Give some constraints that may abort according to the conditions.
     secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;;
     <b>let</b> num_secondary_signers = len(secondary_signer_addresses);
     <b>aborts_if</b> len(secondary_signer_public_key_hashes) != num_secondary_signers;
-<<<<<<< HEAD
-    // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-    <b>aborts_if</b> <b>exists</b> i in 0..num_secondary_signers:
-        !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[i])
-            || secondary_signer_public_key_hashes[i] !=
-            <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(secondary_signer_addresses[i]);
-    <b>ensures</b> <b>forall</b> i in 0..num_secondary_signers:
-        <a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[i])
-            && secondary_signer_public_key_hashes[i] ==
-            <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(secondary_signer_addresses[i]);
-=======
->>>>>>> d39912bb0b (fix prover)
 }
 </code></pre>
 

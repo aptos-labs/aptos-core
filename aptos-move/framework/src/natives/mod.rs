@@ -13,6 +13,7 @@ pub mod dispatchable_fungible_asset;
 pub mod event;
 pub mod function_info;
 pub mod hash;
+pub mod lite_account;
 pub mod object;
 pub mod object_code_deployment;
 pub mod randomness;
@@ -21,7 +22,6 @@ pub mod string_utils;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
-pub mod lite_account;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory, aggregator_v2};

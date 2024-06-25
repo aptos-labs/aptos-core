@@ -11,9 +11,12 @@ use aptos_crypto::{
 };
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
-use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
+use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_types::{
-    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
+    account_config::{
+        aptos_test_root_address, lite_account, lite_account::LiteAccountGroup, AccountResource,
+        CoinStoreResource, FungibleStoreResource, ObjectGroupResource,
+    },
     block_executor::config::BlockExecutorConfigFromOnchain,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -62,6 +65,7 @@ use move_transactional_test_runner::{
 };
 use move_vm_runtime::session::SerializedReturnValues;
 use once_cell::sync::Lazy;
+use serde::de::DeserializeOwned;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     convert::TryFrom,
@@ -71,8 +75,6 @@ use std::{
     sync::Arc,
 };
 use tempfile::NamedTempFile;
-use aptos_types::account_config::{FungibleStoreResource, lite_account, ObjectGroupResource};
-use aptos_types::account_config::lite_account::LiteAccountGroup;
 
 /**
  * Definitions
@@ -417,6 +419,54 @@ impl<'a> AptosTestAdapter<'a> {
         (addresses, private_keys)
     }
 
+    fn read_resource_group(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
+        self.storage
+            .get_state_value_bytes(&StateKey::resource_group(addr, &struct_tag))
+            .unwrap()
+            .map(|data| bcs::from_bytes(&data).unwrap())
+    }
+
+    pub fn read_resource_raw(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<Vec<u8>> {
+        self.storage
+            .get_state_value_bytes(&StateKey::resource(addr, &struct_tag).unwrap())
+            .unwrap()
+            .map(|b| b.to_vec())
+    }
+
+    pub fn read_resource<T: DeserializeOwned>(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<T> {
+        Some(
+            bcs::from_bytes::<T>(&self.read_resource_raw(addr, struct_tag)?).expect(
+                "serialization expected to succeed (Rust type incompatible with Move type?)",
+            ),
+        )
+    }
+
+    fn read_resource_from_resource_group<T: DeserializeOwned>(
+        &self,
+        addr: &AccountAddress,
+        resource_group: StructTag,
+        struct_tag: StructTag,
+    ) -> Option<T> {
+        if let Some(group) = self.read_resource_group(addr, resource_group) {
+            if let Some(data) = group.get(&struct_tag) {
+                return Some(bcs::from_bytes::<T>(data).unwrap());
+            }
+        }
+        None
+    }
+
     fn sequence_number(&self, addr: &AccountAddress) -> u64 {
         if let Some(acct_v1) =
             self.read_resource::<AccountResource>(addr, AccountResource::struct_tag())
@@ -428,8 +478,8 @@ impl<'a> AptosTestAdapter<'a> {
                 LiteAccountGroup::struct_tag(),
                 lite_account::AccountResource::struct_tag(),
             )
-                .unwrap()
-                .sequence_number
+            .unwrap_or_default()
+            .sequence_number
         }
     }
 
@@ -439,13 +489,13 @@ impl<'a> AptosTestAdapter<'a> {
             .map(|c| c.coin())
             .unwrap_or(0)
             + self
-            .read_resource_from_resource_group::<FungibleStoreResource>(
-                &aptos_types::account_config::fungible_store::primary_apt_store(*addr),
-                ObjectGroupResource::struct_tag(),
-                FungibleStoreResource::struct_tag(),
-            )
-            .map(|c| c.balance())
-            .unwrap_or(0)
+                .read_resource_from_resource_group::<FungibleStoreResource>(
+                    &aptos_types::account_config::fungible_store::primary_apt_store(*addr),
+                    ObjectGroupResource::struct_tag(),
+                    FungibleStoreResource::struct_tag(),
+                )
+                .map(|c| c.balance())
+                .unwrap_or(0)
     }
 
     /// Derive the default transaction parameters from the account and balance resources fetched
@@ -459,7 +509,7 @@ impl<'a> AptosTestAdapter<'a> {
         gas_unit_price: Option<u64>,
         max_gas_amount: Option<u64>,
     ) -> Result<TransactionParameters> {
-        let sequence_number = self.sequence_number(signer_addr);
+        let sequence_number = sequence_number.unwrap_or_else(|| self.sequence_number(signer_addr));
         let max_number_of_gas_units =
             TransactionGasParameters::initial().maximum_number_of_gas_units;
         let gas_unit_price = gas_unit_price.unwrap_or(1000);

@@ -71,16 +71,6 @@ spec aptos_framework::transaction_validation {
 
         aborts_if (
             !features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
-<<<<<<< HEAD
-                || account::exists_at(transaction_sender)
-                || transaction_sender == gas_payer
-                || txn_sequence_number > 0
-        ) && (
-            !(txn_sequence_number >= global<Account>(transaction_sender).sequence_number)
-                || !(txn_authentication_key == global<Account>(transaction_sender).authentication_key)
-                || !account::exists_at(transaction_sender)
-                || !(txn_sequence_number == global<Account>(transaction_sender).sequence_number)
-=======
             || account::spec_exists_at(transaction_sender)
             || transaction_sender == gas_payer
             || txn_sequence_number > 0
@@ -89,7 +79,6 @@ spec aptos_framework::transaction_validation {
             || !(txn_authentication_key == global<Account>(transaction_sender).authentication_key)
             || !account::spec_exists_at(transaction_sender)
             || !(txn_sequence_number == global<Account>(transaction_sender).sequence_number)
->>>>>>> d39912bb0b (fix prover)
         );
 
         aborts_if features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
@@ -157,17 +146,10 @@ spec aptos_framework::transaction_validation {
         //         account::spec_get_authentication_key(secondary_signer_addresses[i]);
 
         // By the end, all secondary signers account should exist and public key hash should match.
-<<<<<<< HEAD
-        ensures forall i in 0..num_secondary_signers:
-            account::exists_at(secondary_signer_addresses[i])
-                && secondary_signer_public_key_hashes[i] ==
-                account::get_authentication_key(secondary_signer_addresses[i]);
-=======
         // ensures forall i in 0..num_secondary_signers:
         //     account::spec_exists_at(secondary_signer_addresses[i])
         //         && secondary_signer_public_key_hashes[i] ==
         //         account::spec_get_authentication_key(secondary_signer_addresses[i]);
->>>>>>> d39912bb0b (fix prover)
     }
 
     spec multi_agent_common_prologue(
