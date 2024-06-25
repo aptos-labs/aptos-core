@@ -416,21 +416,10 @@ impl ParkingLotIndex {
         }
         txn.was_parked = true;
 
-        let sender = &txn.txn.sender();
-        let sequence_number = txn.txn.sequence_number();
-        let hash = txn.get_committed_hash();
-        match self.data.get_mut(sender) {
-            Some(txns) => {
-                txns.insert((sequence_number, hash));
-            },
-            None => {
-                let entry = [(sequence_number, hash)]
-                    .iter()
-                    .cloned()
-                    .collect::<BTreeSet<_>>();
-                self.data.insert(*sender, entry);
-            },
-        };
+        self.data
+            .entry(txn.txn.sender())
+            .or_default()
+            .insert((txn.txn.sequence_number(), txn.get_committed_hash()));
     }
 
     pub(crate) fn remove(&mut self, txn: &MempoolTransaction) {
