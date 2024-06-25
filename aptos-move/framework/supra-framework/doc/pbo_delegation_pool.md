@@ -1416,6 +1416,26 @@ Scaling factor of shares pools used within the delegation pool
 
 
 
+<a id="0x1_pbo_delegation_pool_ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL"></a>
+
+Active share is not the same in stake pool and delegation pool
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL">ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL</a>: u64 = 26;
+</code></pre>
+
+
+
+<a id="0x1_pbo_delegation_pool_BALANCE_BELOW_PRINCIPLE_STAKE"></a>
+
+Balance below principle stake after unlock
+
+
+<pre><code><b>const</b> <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_BALANCE_BELOW_PRINCIPLE_STAKE">BALANCE_BELOW_PRINCIPLE_STAKE</a>: u64 = 25;
+</code></pre>
+
+
+
 <a id="0x1_pbo_delegation_pool_COIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE"></a>
 
 Coin value is not the same with principle stake.
@@ -2168,14 +2188,14 @@ Ownership over setting the operator/voter is granted to <code>owner</code> who h
     <b>move_to</b>(owner, <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a> { pool_address });
 
     // Add <a href="stake.md#0x1_stake">stake</a> <b>to</b> each delegator
-    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&delegator_address) &gt; 0) {
+    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&delegator_address_copy) &gt; 0) {
         <b>let</b> delegator = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> delegator_address_copy);
         <b>let</b> <a href="stake.md#0x1_stake">stake</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> principle_stake_copy);
         <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_add_stake_initialization">add_stake_initialization</a>(delegator, pool_address, <a href="stake.md#0x1_stake">stake</a>);
     };
     <b>let</b> (active_stake, _, _, _)= <a href="stake.md#0x1_stake_get_stake">stake::get_stake</a>(pool_address);
     // fail <b>if</b> <a href="coin.md#0x1_coin">coin</a> in StakePool.active does not match <b>with</b> the balance in active_shares pool.
-    <b>assert</b>!( active_stake == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_total_coins">pool_u64::total_coins</a>(&<b>borrow_global</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).active_shares), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(0));
+    <b>assert</b>!( active_stake == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_total_coins">pool_u64::total_coins</a>(&<b>borrow_global</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address).active_shares), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL">ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL</a>));
     // All delegation pool enable partial governace <a href="voting.md#0x1_voting">voting</a> by default once the feature flag is enabled.
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_partial_governance_voting_enabled">features::partial_governance_voting_enabled</a>() && <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>()) {
         <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(pool_address);
@@ -3366,8 +3386,8 @@ at most how much active stake there is on the stake pool.
     <b>let</b> pool = <b>borrow_global_mut</b>&lt;<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
     <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
     // fail <b>if</b> the amount after withdraw is less than the principle <a href="stake.md#0x1_stake">stake</a> and the lockup time is not expired
-    <b>if</b> (pool.principle_lockup_time &gt; <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()) {
-        <b>assert</b>!(<a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_balance">pool_u64::balance</a>(&pool.active_shares,delegator_address) - amount &gt;= *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&pool.principle_stake, delegator_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(0));
+    <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(&pool.principle_stake, delegator_address) && pool.principle_lockup_time &gt; <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()) {
+        <b>assert</b>!(<a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_balance">pool_u64::balance</a>(&pool.active_shares,delegator_address) - amount &gt;= *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&pool.principle_stake, delegator_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_BALANCE_BELOW_PRINCIPLE_STAKE">BALANCE_BELOW_PRINCIPLE_STAKE</a>));
     };
     amount = <a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_coins_to_transfer_to_ensure_min_stake">coins_to_transfer_to_ensure_min_stake</a>(
         &pool.active_shares,
@@ -3389,6 +3409,8 @@ at most how much active stake there is on the stake pool.
             amount_unlocked: amount,
         },
     );
+    <b>let</b> (active_stake, _, pending_active, _)= <a href="stake.md#0x1_stake_get_stake">stake::get_stake</a>(pool_address);
+    <b>assert</b>!( active_stake + pending_active == <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_total_coins">pool_u64::total_coins</a>(&pool.active_shares), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="pbo_delegation_pool.md#0x1_pbo_delegation_pool_ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL">ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL</a>));
 }
 </code></pre>
 

@@ -245,6 +245,86 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
     },
 
+    /// Remove the committee from the store
+    CommitteeMapRemoveCommittee {
+        com_store_addr: AccountAddress,
+        id: u64,
+    },
+
+    /// Remove the committee in bulk
+    CommitteeMapRemoveCommitteeBulk {
+        com_store_addr: AccountAddress,
+        ids: Vec<u64>,
+    },
+
+    /// Remove the node from the committee
+    CommitteeMapRemoveCommitteeMember {
+        com_store_addr: AccountAddress,
+        id: u64,
+        node_address: AccountAddress,
+    },
+
+    /// Update the dkg flag
+    CommitteeMapUpdateDkgFlag {
+        com_store_addr: AccountAddress,
+        com_id: u64,
+        flag_value: bool,
+    },
+
+    /// This function is used to add a new committee to the store
+    CommitteeMapUpsertCommittee {
+        com_store_addr: AccountAddress,
+        id: u64,
+        node_addresses: Vec<AccountAddress>,
+        ip_public_address: Vec<Vec<u8>>,
+        node_public_key: Vec<Vec<u8>>,
+        network_public_key: Vec<Vec<u8>>,
+        cg_public_key: Vec<Vec<u8>>,
+        network_port: Vec<u16>,
+        rpc_port: Vec<u16>,
+        committee_type: u8,
+    },
+
+    /// Add the committee in bulk
+    CommitteeMapUpsertCommitteeBulk {
+        com_store_addr: AccountAddress,
+        ids: Vec<u64>,
+        node_addresses_bulk: Vec<Vec<AccountAddress>>,
+        ip_public_address_bulk: Vec<Vec<Vec<u8>>>,
+        node_public_key_bulk: Vec<Vec<Vec<u8>>>,
+        network_public_key_bulk: Vec<Vec<Vec<u8>>>,
+        cg_public_key_bulk: Vec<Vec<Vec<u8>>>,
+        network_port_bulk: Vec<Vec<u16>>,
+        rpc_por_bulkt: Vec<Vec<u16>>,
+        committee_types: Vec<u8>,
+    },
+
+    /// Upsert the node to the committee
+    CommitteeMapUpsertCommitteeMember {
+        com_store_addr: AccountAddress,
+        id: u64,
+        node_address: AccountAddress,
+        ip_public_address: Vec<u8>,
+        node_public_key: Vec<u8>,
+        network_public_key: Vec<u8>,
+        cg_public_key: Vec<u8>,
+        network_port: u16,
+        rpc_port: u16,
+    },
+
+    /// Upsert nodes to the committee
+    CommitteeMapUpsertCommitteeMemberBulk {
+        com_store_addr: AccountAddress,
+        ids: Vec<u64>,
+        node_addresses: Vec<AccountAddress>,
+        ip_public_address: Vec<Vec<u8>>,
+        node_public_key: Vec<Vec<u8>>,
+        network_public_key: Vec<Vec<u8>>,
+        cg_public_key: Vec<Vec<u8>>,
+        network_port: Vec<u16>,
+        rpc_port: Vec<u16>,
+    },
+
     /// Add `amount` of coins to the delegation pool `pool_address`.
     DelegationPoolAddStake {
         pool_address: AccountAddress,
@@ -1176,6 +1256,111 @@ impl EntryFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
+            CommitteeMapRemoveCommittee { com_store_addr, id } => {
+                committee_map_remove_committee(com_store_addr, id)
+            },
+            CommitteeMapRemoveCommitteeBulk {
+                com_store_addr,
+                ids,
+            } => committee_map_remove_committee_bulk(com_store_addr, ids),
+            CommitteeMapRemoveCommitteeMember {
+                com_store_addr,
+                id,
+                node_address,
+            } => committee_map_remove_committee_member(com_store_addr, id, node_address),
+            CommitteeMapUpdateDkgFlag {
+                com_store_addr,
+                com_id,
+                flag_value,
+            } => committee_map_update_dkg_flag(com_store_addr, com_id, flag_value),
+            CommitteeMapUpsertCommittee {
+                com_store_addr,
+                id,
+                node_addresses,
+                ip_public_address,
+                node_public_key,
+                network_public_key,
+                cg_public_key,
+                network_port,
+                rpc_port,
+                committee_type,
+            } => committee_map_upsert_committee(
+                com_store_addr,
+                id,
+                node_addresses,
+                ip_public_address,
+                node_public_key,
+                network_public_key,
+                cg_public_key,
+                network_port,
+                rpc_port,
+                committee_type,
+            ),
+            CommitteeMapUpsertCommitteeBulk {
+                com_store_addr,
+                ids,
+                node_addresses_bulk,
+                ip_public_address_bulk,
+                node_public_key_bulk,
+                network_public_key_bulk,
+                cg_public_key_bulk,
+                network_port_bulk,
+                rpc_por_bulkt,
+                committee_types,
+            } => committee_map_upsert_committee_bulk(
+                com_store_addr,
+                ids,
+                node_addresses_bulk,
+                ip_public_address_bulk,
+                node_public_key_bulk,
+                network_public_key_bulk,
+                cg_public_key_bulk,
+                network_port_bulk,
+                rpc_por_bulkt,
+                committee_types,
+            ),
+            CommitteeMapUpsertCommitteeMember {
+                com_store_addr,
+                id,
+                node_address,
+                ip_public_address,
+                node_public_key,
+                network_public_key,
+                cg_public_key,
+                network_port,
+                rpc_port,
+            } => committee_map_upsert_committee_member(
+                com_store_addr,
+                id,
+                node_address,
+                ip_public_address,
+                node_public_key,
+                network_public_key,
+                cg_public_key,
+                network_port,
+                rpc_port,
+            ),
+            CommitteeMapUpsertCommitteeMemberBulk {
+                com_store_addr,
+                ids,
+                node_addresses,
+                ip_public_address,
+                node_public_key,
+                network_public_key,
+                cg_public_key,
+                network_port,
+                rpc_port,
+            } => committee_map_upsert_committee_member_bulk(
+                com_store_addr,
+                ids,
+                node_addresses,
+                ip_public_address,
+                node_public_key,
+                network_public_key,
+                cg_public_key,
+                network_port,
+                rpc_port,
+            ),
             DelegationPoolAddStake {
                 pool_address,
                 amount,
@@ -2229,6 +2414,246 @@ pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("upgrade_supply").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+/// Remove the committee from the store
+pub fn committee_map_remove_committee(
+    com_store_addr: AccountAddress,
+    id: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("committee_map").to_owned(),
+        ),
+        ident_str!("remove_committee").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&com_store_addr).unwrap(),
+            bcs::to_bytes(&id).unwrap(),
+        ],
+    ))
+}
+
+/// Remove the committee in bulk
+pub fn committee_map_remove_committee_bulk(
+    com_store_addr: AccountAddress,
+    ids: Vec<u64>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("committee_map").to_owned(),
+        ),
+        ident_str!("remove_committee_bulk").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&com_store_addr).unwrap(),
+            bcs::to_bytes(&ids).unwrap(),
+        ],
+    ))
+}
+
+/// Remove the node from the committee
+pub fn committee_map_remove_committee_member(
+    com_store_addr: AccountAddress,
+    id: u64,
+    node_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("committee_map").to_owned(),
+        ),
+        ident_str!("remove_committee_member").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&com_store_addr).unwrap(),
+            bcs::to_bytes(&id).unwrap(),
+            bcs::to_bytes(&node_address).unwrap(),
+        ],
+    ))
+}
+
+/// Update the dkg flag
+pub fn committee_map_update_dkg_flag(
+    com_store_addr: AccountAddress,
+    com_id: u64,
+    flag_value: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("committee_map").to_owned(),
+        ),
+        ident_str!("update_dkg_flag").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&com_store_addr).unwrap(),
+            bcs::to_bytes(&com_id).unwrap(),
+            bcs::to_bytes(&flag_value).unwrap(),
+        ],
+    ))
+}
+
+/// This function is used to add a new committee to the store
+pub fn committee_map_upsert_committee(
+    com_store_addr: AccountAddress,
+    id: u64,
+    node_addresses: Vec<AccountAddress>,
+    ip_public_address: Vec<Vec<u8>>,
+    node_public_key: Vec<Vec<u8>>,
+    network_public_key: Vec<Vec<u8>>,
+    cg_public_key: Vec<Vec<u8>>,
+    network_port: Vec<u16>,
+    rpc_port: Vec<u16>,
+    committee_type: u8,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("committee_map").to_owned(),
+        ),
+        ident_str!("upsert_committee").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&com_store_addr).unwrap(),
+            bcs::to_bytes(&id).unwrap(),
+            bcs::to_bytes(&node_addresses).unwrap(),
+            bcs::to_bytes(&ip_public_address).unwrap(),
+            bcs::to_bytes(&node_public_key).unwrap(),
+            bcs::to_bytes(&network_public_key).unwrap(),
+            bcs::to_bytes(&cg_public_key).unwrap(),
+            bcs::to_bytes(&network_port).unwrap(),
+            bcs::to_bytes(&rpc_port).unwrap(),
+            bcs::to_bytes(&committee_type).unwrap(),
+        ],
+    ))
+}
+
+/// Add the committee in bulk
+pub fn committee_map_upsert_committee_bulk(
+    com_store_addr: AccountAddress,
+    ids: Vec<u64>,
+    node_addresses_bulk: Vec<Vec<AccountAddress>>,
+    ip_public_address_bulk: Vec<Vec<Vec<u8>>>,
+    node_public_key_bulk: Vec<Vec<Vec<u8>>>,
+    network_public_key_bulk: Vec<Vec<Vec<u8>>>,
+    cg_public_key_bulk: Vec<Vec<Vec<u8>>>,
+    network_port_bulk: Vec<Vec<u16>>,
+    rpc_por_bulkt: Vec<Vec<u16>>,
+    committee_types: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("committee_map").to_owned(),
+        ),
+        ident_str!("upsert_committee_bulk").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&com_store_addr).unwrap(),
+            bcs::to_bytes(&ids).unwrap(),
+            bcs::to_bytes(&node_addresses_bulk).unwrap(),
+            bcs::to_bytes(&ip_public_address_bulk).unwrap(),
+            bcs::to_bytes(&node_public_key_bulk).unwrap(),
+            bcs::to_bytes(&network_public_key_bulk).unwrap(),
+            bcs::to_bytes(&cg_public_key_bulk).unwrap(),
+            bcs::to_bytes(&network_port_bulk).unwrap(),
+            bcs::to_bytes(&rpc_por_bulkt).unwrap(),
+            bcs::to_bytes(&committee_types).unwrap(),
+        ],
+    ))
+}
+
+/// Upsert the node to the committee
+pub fn committee_map_upsert_committee_member(
+    com_store_addr: AccountAddress,
+    id: u64,
+    node_address: AccountAddress,
+    ip_public_address: Vec<u8>,
+    node_public_key: Vec<u8>,
+    network_public_key: Vec<u8>,
+    cg_public_key: Vec<u8>,
+    network_port: u16,
+    rpc_port: u16,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("committee_map").to_owned(),
+        ),
+        ident_str!("upsert_committee_member").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&com_store_addr).unwrap(),
+            bcs::to_bytes(&id).unwrap(),
+            bcs::to_bytes(&node_address).unwrap(),
+            bcs::to_bytes(&ip_public_address).unwrap(),
+            bcs::to_bytes(&node_public_key).unwrap(),
+            bcs::to_bytes(&network_public_key).unwrap(),
+            bcs::to_bytes(&cg_public_key).unwrap(),
+            bcs::to_bytes(&network_port).unwrap(),
+            bcs::to_bytes(&rpc_port).unwrap(),
+        ],
+    ))
+}
+
+/// Upsert nodes to the committee
+pub fn committee_map_upsert_committee_member_bulk(
+    com_store_addr: AccountAddress,
+    ids: Vec<u64>,
+    node_addresses: Vec<AccountAddress>,
+    ip_public_address: Vec<Vec<u8>>,
+    node_public_key: Vec<Vec<u8>>,
+    network_public_key: Vec<Vec<u8>>,
+    cg_public_key: Vec<Vec<u8>>,
+    network_port: Vec<u16>,
+    rpc_port: Vec<u16>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("committee_map").to_owned(),
+        ),
+        ident_str!("upsert_committee_member_bulk").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&com_store_addr).unwrap(),
+            bcs::to_bytes(&ids).unwrap(),
+            bcs::to_bytes(&node_addresses).unwrap(),
+            bcs::to_bytes(&ip_public_address).unwrap(),
+            bcs::to_bytes(&node_public_key).unwrap(),
+            bcs::to_bytes(&network_public_key).unwrap(),
+            bcs::to_bytes(&cg_public_key).unwrap(),
+            bcs::to_bytes(&network_port).unwrap(),
+            bcs::to_bytes(&rpc_port).unwrap(),
+        ],
     ))
 }
 
@@ -5028,6 +5453,142 @@ mod decoder {
         }
     }
 
+    pub fn committee_map_remove_committee(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CommitteeMapRemoveCommittee {
+                com_store_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                id: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn committee_map_remove_committee_bulk(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CommitteeMapRemoveCommitteeBulk {
+                com_store_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                ids: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn committee_map_remove_committee_member(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CommitteeMapRemoveCommitteeMember {
+                com_store_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                node_address: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn committee_map_update_dkg_flag(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CommitteeMapUpdateDkgFlag {
+                com_store_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                com_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                flag_value: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn committee_map_upsert_committee(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CommitteeMapUpsertCommittee {
+                com_store_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                node_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
+                ip_public_address: bcs::from_bytes(script.args().get(3)?).ok()?,
+                node_public_key: bcs::from_bytes(script.args().get(4)?).ok()?,
+                network_public_key: bcs::from_bytes(script.args().get(5)?).ok()?,
+                cg_public_key: bcs::from_bytes(script.args().get(6)?).ok()?,
+                network_port: bcs::from_bytes(script.args().get(7)?).ok()?,
+                rpc_port: bcs::from_bytes(script.args().get(8)?).ok()?,
+                committee_type: bcs::from_bytes(script.args().get(9)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn committee_map_upsert_committee_bulk(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CommitteeMapUpsertCommitteeBulk {
+                com_store_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                ids: bcs::from_bytes(script.args().get(1)?).ok()?,
+                node_addresses_bulk: bcs::from_bytes(script.args().get(2)?).ok()?,
+                ip_public_address_bulk: bcs::from_bytes(script.args().get(3)?).ok()?,
+                node_public_key_bulk: bcs::from_bytes(script.args().get(4)?).ok()?,
+                network_public_key_bulk: bcs::from_bytes(script.args().get(5)?).ok()?,
+                cg_public_key_bulk: bcs::from_bytes(script.args().get(6)?).ok()?,
+                network_port_bulk: bcs::from_bytes(script.args().get(7)?).ok()?,
+                rpc_por_bulkt: bcs::from_bytes(script.args().get(8)?).ok()?,
+                committee_types: bcs::from_bytes(script.args().get(9)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn committee_map_upsert_committee_member(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CommitteeMapUpsertCommitteeMember {
+                com_store_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                node_address: bcs::from_bytes(script.args().get(2)?).ok()?,
+                ip_public_address: bcs::from_bytes(script.args().get(3)?).ok()?,
+                node_public_key: bcs::from_bytes(script.args().get(4)?).ok()?,
+                network_public_key: bcs::from_bytes(script.args().get(5)?).ok()?,
+                cg_public_key: bcs::from_bytes(script.args().get(6)?).ok()?,
+                network_port: bcs::from_bytes(script.args().get(7)?).ok()?,
+                rpc_port: bcs::from_bytes(script.args().get(8)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn committee_map_upsert_committee_member_bulk(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CommitteeMapUpsertCommitteeMemberBulk {
+                com_store_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+                ids: bcs::from_bytes(script.args().get(1)?).ok()?,
+                node_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
+                ip_public_address: bcs::from_bytes(script.args().get(3)?).ok()?,
+                node_public_key: bcs::from_bytes(script.args().get(4)?).ok()?,
+                network_public_key: bcs::from_bytes(script.args().get(5)?).ok()?,
+                cg_public_key: bcs::from_bytes(script.args().get(6)?).ok()?,
+                network_port: bcs::from_bytes(script.args().get(7)?).ok()?,
+                rpc_port: bcs::from_bytes(script.args().get(8)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn delegation_pool_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolAddStake {
@@ -6613,6 +7174,38 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_upgrade_supply".to_string(),
             Box::new(decoder::coin_upgrade_supply),
+        );
+        map.insert(
+            "committee_map_remove_committee".to_string(),
+            Box::new(decoder::committee_map_remove_committee),
+        );
+        map.insert(
+            "committee_map_remove_committee_bulk".to_string(),
+            Box::new(decoder::committee_map_remove_committee_bulk),
+        );
+        map.insert(
+            "committee_map_remove_committee_member".to_string(),
+            Box::new(decoder::committee_map_remove_committee_member),
+        );
+        map.insert(
+            "committee_map_update_dkg_flag".to_string(),
+            Box::new(decoder::committee_map_update_dkg_flag),
+        );
+        map.insert(
+            "committee_map_upsert_committee".to_string(),
+            Box::new(decoder::committee_map_upsert_committee),
+        );
+        map.insert(
+            "committee_map_upsert_committee_bulk".to_string(),
+            Box::new(decoder::committee_map_upsert_committee_bulk),
+        );
+        map.insert(
+            "committee_map_upsert_committee_member".to_string(),
+            Box::new(decoder::committee_map_upsert_committee_member),
+        );
+        map.insert(
+            "committee_map_upsert_committee_member_bulk".to_string(),
+            Box::new(decoder::committee_map_upsert_committee_member_bulk),
         );
         map.insert(
             "delegation_pool_add_stake".to_string(),

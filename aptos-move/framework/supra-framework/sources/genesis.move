@@ -4,6 +4,8 @@ module supra_framework::genesis {
     use std::vector;
 
     use aptos_std::simple_map;
+    use supra_framework::delegation_pool;
+    use supra_framework::pbo_delegation_pool;
 
     use supra_framework::account;
     use supra_framework::aggregator_factory;
@@ -29,14 +31,43 @@ module supra_framework::genesis {
     use supra_framework::transaction_validation;
     use supra_framework::version;
     use supra_framework::vesting;
+	use supra_framework::vesting_without_staking;
 
-    const EDUPLICATE_ACCOUNT: u64 = 1;
+
+	const VESTING_CONTRACT_SEED: vector<u8> = b"VESTING_WIHOUT_STAKING_SEED";
+	
+	const EDUPLICATE_ACCOUNT: u64 = 1;
     const EACCOUNT_DOES_NOT_EXIST: u64 = 2;
+	const EVESTING_SCHEDULE_IS_ZERO: u64 = 3;
+	const ENUMERATOR_IS_ZERO: u64 = 4;
+	const ENO_SHAREHOLDERS: u64 = 5;
+	const EPERCENTAGE_INVALID: u64 = 6;
+	const ENUMERATOR_GREATER_THAN_DENOMINATOR: u64 = 7;
+	const EDENOMINATOR_IS_ZERO: u64 = 8;
+	const EACCOUNT_NOT_REGISTERED_FOR_COIN: u64 = 9;
+	
 
     struct AccountMap has drop {
         account_address: address,
         balance: u64,
     }
+
+	struct VestingPoolsMap has copy, drop {
+		// Address of the admin of the vesting pool
+		admin_address: address,
+		// Percentage of account balance should be put in vesting pool
+		vpool_locking_percentage : u8,
+		vesting_numerators : vector<u64>,
+		vesting_denominator : u64,
+		//Withdrawal address for the pool
+		withdrawal_address: address,
+		// Shareholders in the vesting pool
+		shareholders : vector<address>,
+		//Cliff duration in seconds
+		cliff_period_in_seconds: u64,
+		// Each vesting period duration in seconds
+		period_duration_in_seconds: u64,
+	}
 
     struct EmployeeAccountMap has copy, drop {
         accounts: vector<address>,
@@ -60,6 +91,19 @@ module supra_framework::genesis {
         validator_config: ValidatorConfiguration,
         commission_percentage: u64,
         join_during_genesis: bool,
+    }
+
+    struct DelegatorConfiguration has copy, drop {
+        owner_address: address,
+        delegation_pool_creation_seed: vector<u8>,
+        validator: ValidatorConfigurationWithCommission,
+        delegator_addresses: vector<address>,
+        delegator_stakes: vector<u64>,
+    }
+
+    struct PboDelegatorConfiguration has copy, drop {
+        delegator_config: DelegatorConfiguration,
+        principle_lockup_time: u64,
     }
 
     /// Genesis step 1: Initialize aptos framework account and core modules on chain.
@@ -357,6 +401,200 @@ module supra_framework::genesis {
         };
     }
 
+    fun create_delegation_pools(
+        delegator_configs: vector<DelegatorConfiguration>,
+    ) {
+		let unique_accounts: vector<address> = vector::empty();
+        vector::for_each_ref(&delegator_configs, |delegator_config| {
+            let delegator_config: &DelegatorConfiguration = delegator_config;
+			//Ensure that there is a unique owner_address for each pool
+			//This is needed otherwise move_to of DelegationPoolOwnership at owner_address would fail 
+			assert!(!vector::contains(&unique_accounts,&delegator_config.owner_address),
+				error::already_exists(EDUPLICATE_ACCOUNT));
+				vector::push_back(&mut unique_accounts,delegator_config.owner_address);
+            create_delegation_pool(delegator_config);
+        });
+    }
+
+    fun create_delegation_pool(
+        delegator_config: &DelegatorConfiguration,
+    ) {
+        let unique_accounts:vector<address> = vector::empty();
+        vector::for_each_ref(&delegator_config.delegator_addresses, |delegator_address| {
+            let delegator_address: &address = delegator_address;
+            assert!(
+                !vector::contains(&unique_accounts, delegator_address),
+                error::already_exists(EDUPLICATE_ACCOUNT),
+            );
+            vector::push_back(&mut unique_accounts, *delegator_address);
+        });
+        let owner_signer = create_signer(delegator_config.owner_address);
+        delegation_pool::initialize_delegation_pool(
+            &owner_signer,
+            delegator_config.validator.commission_percentage,
+            delegator_config.delegation_pool_creation_seed,
+        );
+        let pool_address = delegation_pool::get_owned_pool_address(delegator_config.owner_address);
+		delegation_pool::set_operator(&owner_signer,delegator_config.validator.validator_config.operator_address);
+		delegation_pool::set_delegated_voter(&owner_signer,delegator_config.validator.validator_config.voter_address);
+
+        let i = 0;
+        while (i < vector::length(&delegator_config.delegator_addresses)) {
+            let delegator_address = *vector::borrow(&delegator_config.delegator_addresses, i);
+            let delegator = &create_signer(delegator_address);
+            let delegator_stake = *vector::borrow(&delegator_config.delegator_stakes, i);
+            delegation_pool::add_stake(delegator, pool_address, delegator_stake);
+            i = i + 1;
+        };
+		
+		let validator = delegator_config.validator.validator_config;
+		assert_validator_addresses_check(&validator);
+
+        if (delegator_config.validator.join_during_genesis) {
+                initialize_validator(pool_address,&validator);
+            };
+
+    }
+
+    fun create_pbo_delegation_pools(
+        pbo_delegator_configs: vector<PboDelegatorConfiguration>,
+        delegation_percentage: u64,
+    ) {
+		let unique_accounts: vector<address> = vector::empty();
+        assert!(delegation_percentage > 0 && delegation_percentage <= 100, error::invalid_argument(EPERCENTAGE_INVALID));
+        vector::for_each_ref(&pbo_delegator_configs, |pbo_delegator_config| {
+            let pbo_delegator_config: &PboDelegatorConfiguration = pbo_delegator_config;
+			assert!(!vector::contains(&unique_accounts,&pbo_delegator_config.delegator_config.owner_address),
+				error::invalid_argument(EDUPLICATE_ACCOUNT));
+				vector::push_back(&mut unique_accounts,pbo_delegator_config.delegator_config.owner_address);
+            create_pbo_delegation_pool(pbo_delegator_config, delegation_percentage);
+        });
+    }
+
+    fun create_pbo_delegation_pool(
+        pbo_delegator_config: &PboDelegatorConfiguration,
+        delegation_percentage: u64,
+    ) {
+		assert!(delegation_percentage>0 && delegation_percentage<=100,error::invalid_argument(EPERCENTAGE_INVALID));
+        let unique_accounts:vector<address> = vector::empty();
+        vector::for_each_ref(&pbo_delegator_config.delegator_config.delegator_addresses, |delegator_address| {
+            let delegator_address: &address = delegator_address;
+            assert!(
+                !vector::contains(&unique_accounts, delegator_address),
+                error::already_exists(EDUPLICATE_ACCOUNT),
+            );
+            vector::push_back(&mut unique_accounts, *delegator_address);
+        });
+        let owner_signer = create_signer(pbo_delegator_config.delegator_config.owner_address);
+        // get a list of delegator addresses, withdraw the coin from them and merge them into a single account
+        let delegator_addresses = pbo_delegator_config.delegator_config.delegator_addresses;
+        let coinInitialization = coin::zero<SupraCoin>();
+        vector::for_each(delegator_addresses, |delegator_address| {
+            let delegator = &create_signer(delegator_address);
+            let total = coin::balance<SupraCoin>(delegator_address);
+            let withdraw_amount = total * delegation_percentage / 100;
+            let coins = coin::withdraw<SupraCoin>(delegator, withdraw_amount);
+            coin::merge(&mut coinInitialization, coins);
+        });
+        pbo_delegation_pool::initialize_delegation_pool(
+            &owner_signer,
+            pbo_delegator_config.delegator_config.validator.commission_percentage,
+            pbo_delegator_config.delegator_config.delegation_pool_creation_seed,
+            pbo_delegator_config.delegator_config.delegator_addresses,
+            pbo_delegator_config.delegator_config.delegator_stakes,
+            coinInitialization,
+            pbo_delegator_config.principle_lockup_time,
+        );
+
+        let pool_address = pbo_delegation_pool::get_owned_pool_address(pbo_delegator_config.delegator_config.owner_address);
+		let validator = pbo_delegator_config.delegator_config.validator.validator_config;
+		pbo_delegation_pool::set_operator(&owner_signer,validator.operator_address);
+		pbo_delegation_pool::set_delegated_voter(&owner_signer,validator.voter_address);
+		assert_validator_addresses_check(&validator);
+        
+		if (pbo_delegator_config.delegator_config.validator.join_during_genesis) {
+            initialize_validator(pool_address,&validator);
+        };
+    }
+
+	fun assert_validator_addresses_check(validator: &ValidatorConfiguration) {
+        assert!(
+            account::exists_at(validator.owner_address),
+            error::not_found(EACCOUNT_DOES_NOT_EXIST),
+        );
+        assert!(
+            account::exists_at(validator.operator_address),
+            error::not_found(EACCOUNT_DOES_NOT_EXIST),
+        );
+        assert!(
+            account::exists_at(validator.voter_address),
+            error::not_found(EACCOUNT_DOES_NOT_EXIST),
+        );
+	}
+
+    fun create_vesting_without_staking_pools(
+        vesting_pool_map : vector<VestingPoolsMap>
+    ) {
+        let unique_accounts: vector<address> = vector::empty();
+        vector::for_each_ref(&vesting_pool_map, |pool_config|{
+            let pool_config: &VestingPoolsMap = pool_config;
+            let schedule  = vector::empty();
+            let schedule_length = vector::length(&pool_config.vesting_numerators);
+            assert!(schedule_length > 0, error::invalid_argument(EVESTING_SCHEDULE_IS_ZERO));
+            assert!(pool_config.vesting_denominator > 0, error::invalid_argument(EDENOMINATOR_IS_ZERO));
+            assert!(pool_config.vpool_locking_percentage > 0 && pool_config.vpool_locking_percentage <=100 ,
+                error::invalid_argument(EPERCENTAGE_INVALID));
+            //check the sum of numerator are <= denominator.
+            let sum = vector::fold(pool_config.vesting_numerators,0,|acc, x| acc + x);
+            // Check that total of all fraction in `vesting_schedule` is not greater than 1
+            assert!(sum <= pool_config.vesting_denominator,
+                error::invalid_argument(ENUMERATOR_GREATER_THAN_DENOMINATOR));
+            //assert that withdrawal_address is registered to receive SupraCoin
+            assert!(coin::is_account_registered<SupraCoin>(pool_config.withdrawal_address), error::invalid_argument(EACCOUNT_NOT_REGISTERED_FOR_COIN));
+            //assertion on admin_address?
+            let admin = create_signer(pool_config.admin_address);
+
+            //Create the vesting schedule
+            let j=0;
+            while (j < schedule_length) {
+                let numerator = *vector::borrow(&pool_config.vesting_numerators,j);
+                assert!(numerator > 0, error::invalid_argument(ENUMERATOR_IS_ZERO));
+                let event = fixed_point32::create_from_rational(numerator,pool_config.vesting_denominator);
+                vector::push_back(&mut schedule,event);
+                j = j + 1;
+            };
+
+            let vesting_schedule = vesting_without_staking::create_vesting_schedule(
+                schedule,
+                timestamp::now_seconds() + pool_config.cliff_period_in_seconds,
+                pool_config.period_duration_in_seconds,
+            );
+
+            let buy_ins  = simple_map::create();
+            let num_shareholders = vector::length(&pool_config.shareholders);
+            assert!(num_shareholders > 0, error::invalid_argument(ENO_SHAREHOLDERS));
+            let j = 0;
+            while (j < num_shareholders) {
+                let shareholder = *vector::borrow(&pool_config.shareholders,j);
+                assert!(!vector::contains(&unique_accounts,&shareholder), error::already_exists(EDUPLICATE_ACCOUNT));
+                vector::push_back(&mut unique_accounts,shareholder);
+                let shareholder_signer = create_signer(shareholder);
+                let amount = coin::balance<SupraCoin>(shareholder);
+                let amount_to_extract = (amount * (pool_config.vpool_locking_percentage as u64)) / 100;
+                let coin_share = coin::withdraw<SupraCoin>(&shareholder_signer, amount_to_extract);
+                simple_map::add(&mut buy_ins,shareholder,coin_share);
+                j = j + 1;
+            };
+            vesting_without_staking::create_vesting_contract(
+                &admin,
+                buy_ins,
+                vesting_schedule,
+                pool_config.withdrawal_address,
+                VESTING_CONTRACT_SEED
+            );
+        });
+    }
+
     fun initialize_validator(pool_address: address, validator: &ValidatorConfiguration) {
         let operator = &create_signer(validator.operator_address);
 
@@ -437,6 +675,9 @@ module supra_framework::genesis {
     }
 
     #[test_only]
+    const ONE_APT: u64 = 100000000;
+
+    #[test_only]
     public fun setup() {
         initialize(
             x"000000000000000000", // empty gas schedule
@@ -446,7 +687,7 @@ module supra_framework::genesis {
             x"13",
             1,
             0,
-            1,
+            1000 * ONE_APT,
             1,
             true,
             1,
@@ -508,5 +749,308 @@ module supra_framework::genesis {
 
         create_account(supra_framework, addr0, 23456);
         assert!(coin::balance<SupraCoin>(addr0) == 12345, 2);
+    }
+
+	#[test_only]
+	use aptos_std::ed25519;
+	
+
+    #[test(supra_framework = @0x1)]
+    fun test_create_delegation_pool(supra_framework: &signer) {
+        setup();
+        initialize_supra_coin(supra_framework);
+        let owner = @0x121341;
+        create_account(supra_framework, owner, 0);
+		create_account(supra_framework,@0x121344,0);
+		let (_, pk_1) = stake::generate_identity();
+		let _pk_1 = ed25519::unvalidated_public_key_to_bytes(&pk_1);
+        let validator_config_commission = ValidatorConfigurationWithCommission{
+            validator_config: ValidatorConfiguration{
+                owner_address: @0x121342,
+                operator_address: @0x121343,
+                voter_address: @0x121344,
+                stake_amount: 100 * ONE_APT,
+                consensus_pubkey: _pk_1,
+                network_addresses: x"222222",
+                full_node_network_addresses: x"333333",
+            },
+            commission_percentage: 10,
+            join_during_genesis: true,
+        };
+        let delegation_pool_creation_seed = x"121341";
+        let delegator_addresses = vector[@0x121342, @0x121343];
+        let delegator_stakes = vector[100 * ONE_APT, 200 * ONE_APT];
+        let i = 0;
+        while (i < vector::length(&delegator_addresses)) {
+            create_account(supra_framework, *vector::borrow(&delegator_addresses, i), *vector::borrow(&delegator_stakes, i));
+            i = i + 1;
+        };
+        let delegator_config = DelegatorConfiguration{
+            owner_address: owner,
+            validator: validator_config_commission,
+            delegation_pool_creation_seed: delegation_pool_creation_seed,
+            delegator_addresses,
+            delegator_stakes
+        };
+        create_delegation_pool(&delegator_config);
+        let pool_address = delegation_pool::get_owned_pool_address(owner);
+        assert!(delegation_pool::delegation_pool_exists(pool_address), 0);
+        delegation_pool::assert_delegation(@0x121342, pool_address, 100 * ONE_APT, 0, 0);
+        delegation_pool::assert_delegation(@0x121343, pool_address, 200 * ONE_APT, 0, 0);
+    }
+
+    #[test(supra_framework = @0x1)]
+    fun test_create_delegation_pools(supra_framework: &signer) {
+        setup();
+        initialize_supra_coin(supra_framework);
+        let owner1 = @0x121341;
+        create_account(supra_framework, owner1, 0);
+
+		let (_, pk_1)=stake::generate_identity();
+		let (_, pk_2)=stake::generate_identity();
+		let _pk_1 = ed25519::unvalidated_public_key_to_bytes(&pk_1);
+		let _pk_2 = ed25519::unvalidated_public_key_to_bytes(&pk_2);
+        let validator_config_commission1 = ValidatorConfigurationWithCommission{
+            validator_config: ValidatorConfiguration{
+                owner_address: @0x121341,
+                operator_address: @0x121342,
+                voter_address: @0x121343,
+                stake_amount: 100 * ONE_APT,
+                consensus_pubkey: _pk_1,
+                network_addresses: x"222222",
+                full_node_network_addresses: x"333333",
+            },
+            commission_percentage: 10,
+            join_during_genesis: true,
+        };
+        let delegation_pool_creation_seed1 = x"121341";
+        let delegator_addresses1 = vector[@0x121342, @0x121343];
+        let delegator_stakes1 = vector[100 * ONE_APT, 200 * ONE_APT];
+        let i = 0;
+        while (i < vector::length(&delegator_addresses1)) {
+            create_account(supra_framework, *vector::borrow(&delegator_addresses1, i), *vector::borrow(&delegator_stakes1, i));
+            i = i + 1;
+        };
+        let delegator_config1 = DelegatorConfiguration{
+            owner_address: owner1,
+            validator: validator_config_commission1,
+            delegation_pool_creation_seed: delegation_pool_creation_seed1,
+            delegator_addresses: delegator_addresses1,
+            delegator_stakes: delegator_stakes1
+        };
+        let owner2 = @0x121344;
+        create_account(supra_framework, owner2, 0);
+        let validator_config_commission2 = ValidatorConfigurationWithCommission{
+            validator_config: ValidatorConfiguration{
+                owner_address: @0x121344,
+                operator_address: @0x121345,
+                voter_address: @0x121346,
+                stake_amount: 100 * ONE_APT,
+                consensus_pubkey: _pk_2,
+                network_addresses: x"222222",
+                full_node_network_addresses: x"333333",
+            },
+            commission_percentage: 20,
+            join_during_genesis: true,
+        };
+        let delegation_pool_creation_seed2 = x"121344";
+        let delegator_addresses2 = vector[@0x121345, @0x121346];
+        let delegator_stakes2 = vector[100 * ONE_APT, 200 * ONE_APT];
+        let i = 0;
+        while (i < vector::length(&delegator_addresses2)) {
+            create_account(supra_framework, *vector::borrow(&delegator_addresses2, i), *vector::borrow(&delegator_stakes2, i));
+            i = i + 1;
+        };
+        let delegator_config2 = DelegatorConfiguration{
+            owner_address: owner2,
+            validator: validator_config_commission2,
+            delegation_pool_creation_seed: delegation_pool_creation_seed2,
+            delegator_addresses: delegator_addresses2,
+            delegator_stakes: delegator_stakes2
+        };
+        let delegator_configs = vector[delegator_config1, delegator_config2];
+        create_delegation_pools(delegator_configs);
+        let pool_address1 = delegation_pool::get_owned_pool_address(owner1);
+        let pool_address2 = delegation_pool::get_owned_pool_address(owner2);
+        assert!(delegation_pool::delegation_pool_exists(pool_address1), 0);
+        assert!(delegation_pool::delegation_pool_exists(pool_address2), 1);
+    }
+
+    #[test(supra_framework = @0x1)]
+    fun test_create_pbo_delegation_pool(supra_framework: &signer) {
+        setup();
+        initialize_supra_coin(supra_framework);
+        let owner = @0x121341;
+		let (_, pk_1) = stake::generate_identity();
+		let _pk_1 = ed25519::unvalidated_public_key_to_bytes(&pk_1);
+        create_account(supra_framework, owner, 0);
+        let validator_config_commission = ValidatorConfigurationWithCommission{
+            validator_config: ValidatorConfiguration{
+                owner_address: @0x121341,
+                operator_address: @0x121342,
+                voter_address: @0x121343,
+                stake_amount: 0,
+                consensus_pubkey: _pk_1,
+                network_addresses: x"222222",
+                full_node_network_addresses: x"333333",
+            },
+            commission_percentage: 10,
+            join_during_genesis: true,
+        };
+        let delegation_pool_creation_seed = x"121341";
+        let delegator_addresses = vector[@0x121342, @0x121343];
+        let initial_balance = vector[100 * ONE_APT, 200 * ONE_APT];
+        let i = 0;
+        let delegation_percentage = 10;
+        let delegator_stakes : vector<u64> = vector::empty();
+        while (i < vector::length(&delegator_addresses)) {
+            create_account(supra_framework, *vector::borrow(&delegator_addresses, i), *vector::borrow(&initial_balance, i));
+            vector::push_back(&mut delegator_stakes, *vector::borrow(&initial_balance, i) * delegation_percentage / 100);
+            i = i + 1;
+        };
+        let principle_lockup_time = 100;
+        let pbo_delegator_config = PboDelegatorConfiguration{
+            delegator_config: DelegatorConfiguration{
+                owner_address: owner,
+                validator: validator_config_commission,
+                delegation_pool_creation_seed,
+                delegator_addresses,
+                delegator_stakes,
+            },
+            principle_lockup_time,
+        };
+        create_pbo_delegation_pool(&pbo_delegator_config, delegation_percentage);
+        let pool_address = pbo_delegation_pool::get_owned_pool_address(owner);
+        assert!(pbo_delegation_pool::delegation_pool_exists(pool_address), 0);
+    }
+
+    #[test(supra_framework = @0x1)]
+    fun test_create_pbo_delegation_pools(supra_framework: &signer) {
+        setup();
+        initialize_supra_coin(supra_framework);
+        let owner1 = @0x121341;
+		create_account(supra_framework,@0x121341,0);
+		let (_, pk_1)=stake::generate_identity();
+		let (_, pk_2)=stake::generate_identity();
+		let _pk_1 = ed25519::unvalidated_public_key_to_bytes(&pk_1);
+		let _pk_2 = ed25519::unvalidated_public_key_to_bytes(&pk_2);
+        let validator_config_commission1 = ValidatorConfigurationWithCommission{
+            validator_config: ValidatorConfiguration{
+                owner_address: @0x121341,
+                operator_address: @0x121342,
+                voter_address: @0x121343,
+                stake_amount: 100 * ONE_APT,
+                consensus_pubkey: _pk_1,
+                network_addresses: x"222222",
+                full_node_network_addresses: x"333333",
+            },
+            commission_percentage: 10,
+            join_during_genesis: true,
+        };
+        let delegation_pool_creation_seed1 = x"121341";
+        let delegator_address1 = vector[@0x121342, @0x121343];
+        let initial_balance1 = vector[100 * ONE_APT, 200 * ONE_APT];
+        let delegator_stakes1:vector<u64> = vector::empty();
+        let delegation_percentage: u64 = 10;
+        let i = 0;
+        while (i < vector::length(&delegator_address1)) {
+            create_account(supra_framework, *vector::borrow(&delegator_address1, i), *vector::borrow(&initial_balance1, i));
+            vector::push_back(&mut delegator_stakes1, *vector::borrow(&initial_balance1, i) * delegation_percentage / 100);
+            i = i + 1;
+        };
+        let principle_lockup_time1 = 100;
+        let pbo_delegator_config1 = PboDelegatorConfiguration{
+            delegator_config: DelegatorConfiguration{
+                owner_address: owner1,
+                validator: validator_config_commission1,
+                delegation_pool_creation_seed: delegation_pool_creation_seed1,
+                delegator_addresses: delegator_address1,
+                delegator_stakes: delegator_stakes1,
+            },
+            principle_lockup_time: principle_lockup_time1,
+        };
+
+        let owner2 = @0x121344;
+        create_account(supra_framework, owner2, 0);
+        let validator_config_commission2 = ValidatorConfigurationWithCommission{
+            validator_config: ValidatorConfiguration{
+                owner_address: @0x121344,
+                operator_address: @0x121345,
+                voter_address: @0x121346,
+                stake_amount: 100 * ONE_APT,
+                consensus_pubkey: _pk_2,
+                network_addresses: x"222222",
+                full_node_network_addresses: x"333333",
+            },
+            commission_percentage: 20,
+            join_during_genesis: true,
+        };
+        let delegation_pool_creation_seed2 = x"121344";
+        let delegator_address2 = vector[@0x121345, @0x121346];
+        let initial_balance2 = vector[300 * ONE_APT, 400 * ONE_APT];
+        let j = 0;
+        let delegator_stakes2:vector<u64> = vector::empty();
+        while (j < vector::length(&delegator_address2)) {
+			let bal = vector::borrow(&initial_balance2,j);
+            create_account(supra_framework, *vector::borrow(&delegator_address2, j), *bal);
+            vector::push_back(&mut delegator_stakes2, (*bal) * delegation_percentage / 100);
+            j = j + 1;
+        };
+        let principle_lockup_time2 = 200;
+        let pbo_delegator_config2 = PboDelegatorConfiguration{
+            delegator_config: DelegatorConfiguration{
+                owner_address: owner2,
+                validator: validator_config_commission2,
+                delegation_pool_creation_seed: delegation_pool_creation_seed2,
+                delegator_addresses: delegator_address2,
+                delegator_stakes: delegator_stakes2,
+            },
+            principle_lockup_time: principle_lockup_time2,
+        };
+        let pbo_delegator_configs = vector[pbo_delegator_config1, pbo_delegator_config2];
+        create_pbo_delegation_pools(pbo_delegator_configs, delegation_percentage);
+        let pool_address1 = pbo_delegation_pool::get_owned_pool_address(owner1);
+        let pool_address2 = pbo_delegation_pool::get_owned_pool_address(owner2);
+        assert!(pbo_delegation_pool::delegation_pool_exists(pool_address1), 0);
+        assert!(pbo_delegation_pool::delegation_pool_exists(pool_address2), 1);
+    }
+
+    #[test(supra_framework = @0x1)]
+    fun test_create_vesting_without_staking_pools(supra_framework: &signer) {
+        // use supra_framework::aptos_account::create_account;
+        setup();
+        initialize_supra_coin(supra_framework);
+        timestamp::set_time_has_started_for_testing(supra_framework);
+        stake::initialize_for_test(supra_framework);
+        let admin_address = @0x121341;
+        let vpool_locking_percentage = 10;
+        let vesting_numerators = vector[1, 2, 3];
+        let vesting_denominator = 6;
+        let withdrawal_address = @0x121342;
+        let shareholders = vector[@0x121343, @0x121344];
+        create_account(supra_framework, admin_address , 0);
+        create_account(supra_framework, withdrawal_address , 0);
+        vector::for_each_ref(&shareholders, |addr| {
+            let addr: address = *addr;
+            if (!account::exists_at(addr)) {
+                create_account(supra_framework, addr, 100 * ONE_APT);
+            };
+        });
+        let cliff_period_in_seconds = 100;
+        let period_duration_in_seconds = 200;
+        let pool_config = VestingPoolsMap{
+            admin_address: admin_address,
+            vpool_locking_percentage: vpool_locking_percentage,
+            vesting_numerators: vesting_numerators,
+            vesting_denominator: vesting_denominator,
+            withdrawal_address: withdrawal_address,
+            shareholders: shareholders,
+            cliff_period_in_seconds: cliff_period_in_seconds,
+            period_duration_in_seconds: period_duration_in_seconds,
+        };
+        let vesting_pool_map = vector[pool_config];
+        create_vesting_without_staking_pools(vesting_pool_map);
+        let vesting_contracts = vesting_without_staking::vesting_contracts(admin_address);
+        assert!(vector::length(&vesting_contracts) == 1, 0);
     }
 }
