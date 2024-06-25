@@ -73,7 +73,8 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         change_set_configs: &ChangeSetConfigs,
         assert_no_additional_creation: bool,
     ) -> Result<VMChangeSet, VMStatus> {
-        let additional_change_set = self.with_session_mut(|session| {
+        // FIXME(George): double check this
+        let (additional_change_set, _) = self.with_session_mut(|session| {
             unwrap_or_invariant_violation(
                 session.take(),
                 "VM session cannot be finished more than once.",

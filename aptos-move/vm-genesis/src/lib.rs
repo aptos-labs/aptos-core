@@ -53,7 +53,6 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -162,7 +161,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = vm.genesis_change_set_configs();
-    let mut change_set = session.finish(&configs).unwrap();
+    let (mut change_set, _) = session.finish(&configs).unwrap();
 
     // Publish the framework, using a different session id, in case both scripts create tables.
     let state_view = GenesisStateView::new();
@@ -172,7 +171,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     new_id[31] = 1;
     let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
     publish_framework(&mut session, framework);
-    let additional_change_set = session.finish(&configs).unwrap();
+    let (additional_change_set, module_write_set) = session.finish(&configs).unwrap();
     change_set
         .squash_additional_change_set(additional_change_set, &configs)
         .unwrap();
@@ -189,9 +188,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
 
-    // FIXME(George): Propagate published modules?
     let change_set = change_set
-        .try_into_storage_change_set(BTreeMap::new())
+        .try_into_storage_change_set(module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis");
     Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
 }
@@ -290,7 +288,7 @@ pub fn encode_genesis_change_set(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = vm.genesis_change_set_configs();
-    let mut change_set = session.finish(&configs).unwrap();
+    let (mut change_set, _) = session.finish(&configs).unwrap();
 
     let state_view = GenesisStateView::new();
     let resolver = state_view.as_move_resolver();
@@ -300,7 +298,7 @@ pub fn encode_genesis_change_set(
     new_id[31] = 1;
     let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
     publish_framework(&mut session, framework);
-    let additional_change_set = session.finish(&configs).unwrap();
+    let (additional_change_set, module_write_set) = session.finish(&configs).unwrap();
     change_set
         .squash_additional_change_set(additional_change_set, &configs)
         .unwrap();
@@ -318,9 +316,8 @@ pub fn encode_genesis_change_set(
         .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
 
-    // FIXME(George): Propagate published modules?
     change_set
-        .try_into_storage_change_set(BTreeMap::new())
+        .try_into_storage_change_set(module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis")
 }
 

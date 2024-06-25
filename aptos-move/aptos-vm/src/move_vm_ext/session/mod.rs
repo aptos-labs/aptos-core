@@ -21,7 +21,7 @@ use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     chain_id::ChainId, contract_event::ContractEvent, on_chain_config::Features,
     state_store::state_key::StateKey,
-    transaction::user_transaction_context::UserTransactionContext,
+    transaction::user_transaction_context::UserTransactionContext, write_set::WriteOp,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use bytes::Bytes;
@@ -112,7 +112,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
     }
 
-    pub fn finish(self, configs: &ChangeSetConfigs) -> VMResult<VMChangeSet> {
+    pub fn finish(
+        self,
+        configs: &ChangeSetConfigs,
+    ) -> VMResult<(VMChangeSet, BTreeMap<StateKey, WriteOp>)> {
         let move_vm = self.inner.get_move_vm();
 
         let resource_converter = |value: Value,
@@ -161,7 +164,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let woc = WriteOpConverter::new(self.resolver, self.is_storage_slot_metadata_enabled);
 
-        let change_set = Self::convert_change_set(
+        let (change_set, module_write_set) = Self::convert_change_set(
             &woc,
             change_set,
             resource_group_change_set,
@@ -172,7 +175,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         )
         .map_err(|e| e.finish(Location::Undefined))?;
 
-        Ok(change_set)
+        Ok((change_set, module_write_set))
     }
 
     pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
@@ -348,7 +351,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         Ok((change_set_filtered, resource_group_change_set))
     }
 
-    pub(crate) fn convert_change_set(
+    fn convert_change_set(
         woc: &WriteOpConverter,
         change_set: ChangeSet,
         resource_group_change_set: ResourceGroupChangeSet,
@@ -356,7 +359,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         configs: &ChangeSetConfigs,
-    ) -> PartialVMResult<VMChangeSet> {
+    ) -> PartialVMResult<(VMChangeSet, BTreeMap<StateKey, WriteOp>)> {
         let mut resource_write_set = BTreeMap::new();
         let mut resource_group_write_set = BTreeMap::new();
         let mut module_write_set = BTreeMap::new();
@@ -436,10 +439,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .filter(|(state_key, _)| !resource_group_write_set.contains_key(state_key))
             .collect();
 
-        VMChangeSet::new_expanded(
+        let change_set = VMChangeSet::new_expanded(
             resource_write_set,
             resource_group_write_set,
-            module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
             aggregator_change_set.delayed_field_changes,
@@ -447,7 +449,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             group_reads_needing_change,
             events,
             configs,
-        )
+        )?;
+        Ok((change_set, module_write_set))
     }
 }
 

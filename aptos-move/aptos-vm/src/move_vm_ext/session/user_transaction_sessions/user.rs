@@ -101,13 +101,14 @@ impl<'r, 'l> UserSession<'r, 'l> {
 
     pub fn finish(
         self,
+        module_write_set: BTreeMap<StateKey, WriteOp>,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         let Self { session } = self;
         let change_set = session.finish_with_squashed_change_set(change_set_configs, false)?;
         Ok(UserSessionChangeSet {
             change_set,
-            module_write_set: BTreeMap::new(),
+            module_write_set,
         })
     }
 }
