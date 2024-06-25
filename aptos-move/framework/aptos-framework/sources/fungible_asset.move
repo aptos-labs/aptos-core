@@ -182,8 +182,9 @@ module aptos_framework::fungible_asset {
         metadata: Object<Metadata>
     }
 
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// MutateMetadataRef can be used to directly modify the fungible asset's Metadata.
-    struct MutateMetadataRef has drop, store {
+    struct MutateMetadataRef has key, drop, store {
         metadata: Object<Metadata>
     }
 
@@ -645,7 +646,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// Get the underlying metadata object from the `MutateMetadataRef`.
-    public fun mutate_metadata_ref_metadata(ref: &MutateMetadataRef): Object<Metadata> {
+    public fun object_from_metadata_ref(ref: &MutateMetadataRef): Object<Metadata> {
         ref.metadata
     }
 
@@ -894,19 +895,19 @@ module aptos_framework::fungible_asset {
         let metadata_address = object::object_address(&metadata_ref.metadata);
         let mutable_metadata = borrow_global_mut<Metadata>(metadata_address);
 
-        if(option::is_some(&name)){
+        if (option::is_some(&name)){
             mutable_metadata.name = option::extract(&mut name);
         };
-        if(option::is_some(&symbol)){
+        if (option::is_some(&symbol)){
             mutable_metadata.symbol = option::extract(&mut symbol);
         };
-        if(option::is_some(&decimals)){
+        if (option::is_some(&decimals)){
             mutable_metadata.decimals = option::extract(&mut decimals);
         };
-        if(option::is_some(&icon_uri)){
+        if (option::is_some(&icon_uri)){
             mutable_metadata.icon_uri = option::extract(&mut icon_uri);
         };
-        if(option::is_some(&project_uri)){
+        if (option::is_some(&project_uri)){
             mutable_metadata.project_uri = option::extract(&mut project_uri);
         };
     }

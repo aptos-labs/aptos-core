@@ -18,7 +18,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Struct `MintRef`](#0x1_fungible_asset_MintRef)
 -  [Struct `TransferRef`](#0x1_fungible_asset_TransferRef)
 -  [Struct `BurnRef`](#0x1_fungible_asset_BurnRef)
--  [Struct `MutateMetadataRef`](#0x1_fungible_asset_MutateMetadataRef)
+-  [Resource `MutateMetadataRef`](#0x1_fungible_asset_MutateMetadataRef)
 -  [Struct `Deposit`](#0x1_fungible_asset_Deposit)
 -  [Struct `Withdraw`](#0x1_fungible_asset_Withdraw)
 -  [Struct `Frozen`](#0x1_fungible_asset_Frozen)
@@ -66,7 +66,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `mint_ref_metadata`](#0x1_fungible_asset_mint_ref_metadata)
 -  [Function `transfer_ref_metadata`](#0x1_fungible_asset_transfer_ref_metadata)
 -  [Function `burn_ref_metadata`](#0x1_fungible_asset_burn_ref_metadata)
--  [Function `mutate_metadata_ref_metadata`](#0x1_fungible_asset_mutate_metadata_ref_metadata)
+-  [Function `object_from_metadata_ref`](#0x1_fungible_asset_object_from_metadata_ref)
 -  [Function `transfer`](#0x1_fungible_asset_transfer)
 -  [Function `create_store`](#0x1_fungible_asset_create_store)
 -  [Function `remove_store`](#0x1_fungible_asset_remove_store)
@@ -501,12 +501,13 @@ BurnRef can be used to burn fungible assets from a given holder account.
 
 <a id="0x1_fungible_asset_MutateMetadataRef"></a>
 
-## Struct `MutateMetadataRef`
+## Resource `MutateMetadataRef`
 
 MutateMetadataRef can be used to directly modify the fungible asset's Metadata.
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_MutateMetadataRef">MutateMetadataRef</a> <b>has</b> drop, store
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_MutateMetadataRef">MutateMetadataRef</a> <b>has</b> drop, store, key
 </code></pre>
 
 
@@ -2344,14 +2345,14 @@ Get the underlying metadata object from the <code><a href="fungible_asset.md#0x1
 
 </details>
 
-<a id="0x1_fungible_asset_mutate_metadata_ref_metadata"></a>
+<a id="0x1_fungible_asset_object_from_metadata_ref"></a>
 
-## Function `mutate_metadata_ref_metadata`
+## Function `object_from_metadata_ref`
 
 Get the underlying metadata object from the <code><a href="fungible_asset.md#0x1_fungible_asset_MutateMetadataRef">MutateMetadataRef</a></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_mutate_metadata_ref_metadata">mutate_metadata_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_MutateMetadataRef">fungible_asset::MutateMetadataRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_object_from_metadata_ref">object_from_metadata_ref</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_MutateMetadataRef">fungible_asset::MutateMetadataRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
 </code></pre>
 
 
@@ -2360,7 +2361,7 @@ Get the underlying metadata object from the <code><a href="fungible_asset.md#0x1
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_mutate_metadata_ref_metadata">mutate_metadata_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_MutateMetadataRef">MutateMetadataRef</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_object_from_metadata_ref">object_from_metadata_ref</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_MutateMetadataRef">MutateMetadataRef</a>): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt; {
     ref.metadata
 }
 </code></pre>
@@ -3009,19 +3010,19 @@ Mutate specified fields of the fungible asset's <code><a href="fungible_asset.md
     <b>let</b> metadata_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata_ref.metadata);
     <b>let</b> mutable_metadata = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(metadata_address);
 
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&name)){
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&name)){
         mutable_metadata.name = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> name);
     };
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&symbol)){
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&symbol)){
         mutable_metadata.symbol = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> symbol);
     };
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&decimals)){
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&decimals)){
         mutable_metadata.decimals = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> decimals);
     };
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&icon_uri)){
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&icon_uri)){
         mutable_metadata.icon_uri = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> icon_uri);
     };
-    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&project_uri)){
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&project_uri)){
         mutable_metadata.project_uri = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> project_uri);
     };
 }
