@@ -70,7 +70,7 @@ use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     env,
     fs::{self, OpenOptions},
     io::Write,
@@ -1021,7 +1021,7 @@ impl FakeExecutor {
                 ))
                 .expect("Failed to generate txn effects");
             change_set
-                .try_into_storage_change_set()
+                .try_into_storage_change_set(BTreeMap::new())
                 .expect("Failed to convert to ChangeSet")
                 .into_inner()
         };
@@ -1077,7 +1077,7 @@ impl FakeExecutor {
                 ))
                 .expect("Failed to generate txn effects");
             change_set
-                .try_into_storage_change_set()
+                .try_into_storage_change_set(BTreeMap::new())
                 .expect("Failed to convert to ChangeSet")
                 .into_inner()
         };
@@ -1130,7 +1130,7 @@ impl FakeExecutor {
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
         let (write_set, events) = change_set
-            .try_into_storage_change_set()
+            .try_into_storage_change_set(BTreeMap::new())
             .expect("Failed to convert to ChangeSet")
             .into_inner();
         Ok((write_set, events))

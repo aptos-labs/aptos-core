@@ -53,6 +53,7 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -188,8 +189,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
 
+    // FIXME(George): Propagate published modules?
     let change_set = change_set
-        .try_into_storage_change_set()
+        .try_into_storage_change_set(BTreeMap::new())
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis");
     Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
 }
@@ -315,8 +317,10 @@ pub fn encode_genesis_change_set(
         .concrete_write_set_iter()
         .any(|(_, op)| op.expect("expect only concrete write ops").is_deletion()));
     verify_genesis_write_set(change_set.events());
+
+    // FIXME(George): Propagate published modules?
     change_set
-        .try_into_storage_change_set()
+        .try_into_storage_change_set(BTreeMap::new())
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis")
 }
 

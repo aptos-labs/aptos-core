@@ -240,7 +240,7 @@ impl VMChangeSet {
     pub fn try_from_storage_change_set_with_delayed_field_optimization_disabled(
         change_set: StorageChangeSet,
         configs: &ChangeSetConfigs,
-    ) -> VMResult<Self> {
+    ) -> VMResult<(Self, BTreeMap<StateKey, WriteOp>)> {
         let (write_set, events) = change_set.into_inner();
 
         // There should be no aggregator writes if we have a change set from
@@ -265,7 +265,7 @@ impl VMChangeSet {
         let events = events.into_iter().map(|event| (event, None)).collect();
         let change_set = Self {
             resource_write_set,
-            module_write_set,
+            module_write_set: BTreeMap::new(),
             delayed_field_change_set: BTreeMap::new(),
             aggregator_v1_write_set: BTreeMap::new(),
             aggregator_v1_delta_set: BTreeMap::new(),
@@ -274,14 +274,17 @@ impl VMChangeSet {
         configs
             .check_change_set(&change_set)
             .map_err(|e| e.finish(Location::Undefined))?;
-        Ok(change_set)
+        Ok((change_set, module_write_set))
     }
 
     /// Converts VM-native change set into its storage representation with fully
     /// serialized changes. The conversion fails if:
     /// - deltas are not materialized.
     /// - resource group writes are not (combined &) converted to resource writes.
-    pub fn try_into_storage_change_set(self) -> Result<StorageChangeSet, PanicError> {
+    pub fn try_into_storage_change_set(
+        self,
+        module_write_set: BTreeMap<StateKey, WriteOp>,
+    ) -> Result<StorageChangeSet, PanicError> {
         // Converting VMChangeSet into TransactionOutput (i.e. storage change set), can
         // be done here only if dynamic_change_set_optimizations have not been used/produced
         // data into the output.
@@ -290,7 +293,7 @@ impl VMChangeSet {
         // that knows how to deal with it.
         let Self {
             resource_write_set,
-            module_write_set,
+            module_write_set: _,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
             delayed_field_change_set,

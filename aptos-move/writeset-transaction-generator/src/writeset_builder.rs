@@ -23,6 +23,7 @@ use move_core_types::{
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
+use std::collections::BTreeMap;
 
 pub struct GenesisSession<'r, 'l>(SessionExt<'r, 'l>);
 
@@ -129,7 +130,11 @@ where
 
     // Genesis never produces the delta change set.
     assert!(change_set.aggregator_v1_delta_set().is_empty());
+
+    // FIXME(George): We need to refactor genesis because it is so special
+    //  and can directly publish modules, and use a single genesis session!
+
     change_set
-        .try_into_storage_change_set()
+        .try_into_storage_change_set(BTreeMap::new())
         .expect("Conversion from VMChangeSet into ChangeSet should always succeed")
 }
