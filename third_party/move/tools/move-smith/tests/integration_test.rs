@@ -19,7 +19,7 @@ fn simple_module() -> Module {
         name: Identifier::new_str("SimpleModule", IDKind::Module),
         functions: vec![RefCell::new(Function {
             signature: FunctionSignature {
-                type_parameters: Vec::new(),
+                type_parameters: TypeParameters::default(),
                 name: Identifier::new_str("fun1", IDKind::Function),
                 parameters: vec![
                     (Identifier::new_str("param1", IDKind::Var), Type::U64),
@@ -47,7 +47,7 @@ fn simple_script() -> Script {
     Script {
         main: vec![FunctionCall {
             name: Identifier::new_str("0xCAFE::SimpleModule::fun1", IDKind::Function),
-            type_args: vec![],
+            type_args: TypeArgs::default(),
             args: vec![
                 Expression::NumberLiteral(NumberLiteral {
                     value: BigUint::from(555u64),
@@ -98,6 +98,27 @@ fn test_generation_and_compile() {
     println!("{}", lines);
 
     assert!(compile_move_code(lines, true, true));
+}
+
+#[test]
+fn test_generation_and_check_compile() {
+    let raw_data = get_random_bytes(54321, 4096 * 3);
+    let mut u = Unstructured::new(&raw_data);
+    let mut smith = MoveSmith::default();
+    smith.generate(&mut u).unwrap();
+    let compile_unit = smith.get_compile_unit();
+    let code = compile_unit.emit_code();
+    println!("{}", code);
+
+    let (package_path, dir) = create_tmp_move_package(code.clone());
+    let config = create_compiler_config_v1();
+    let result = compile_with_config(&package_path, config, "v1");
+    assert!(result);
+
+    let config = create_compiler_config_v2();
+    let result = compile_with_config(&package_path, config, "v2");
+    assert!(result);
+    dir.close().unwrap();
 }
 
 #[test]

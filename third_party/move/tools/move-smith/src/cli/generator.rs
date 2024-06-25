@@ -44,6 +44,7 @@ fn main() {
     let mut rng = StdRng::seed_from_u64(args.seed);
 
     for i in 0..args.num_files {
+        println!("MoveSmith: generating file #{}", i);
         let mut buffer = vec![0u8; BUFFER_SIZE_PER_FILE];
         rng.fill(&mut buffer[..]);
         let module = match raw_to_compile_unit(&buffer) {

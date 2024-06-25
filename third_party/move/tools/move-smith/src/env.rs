@@ -9,7 +9,7 @@ use crate::{
     types::{Type, TypePool},
 };
 use arbitrary::Unstructured;
-use log::{info, trace};
+use log::trace;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Default)]

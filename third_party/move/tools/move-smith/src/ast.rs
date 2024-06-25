@@ -7,8 +7,9 @@
 //! parser's AST and we might be able to reuse the parser's AST directly.
 
 use crate::{
-    names::Identifier,
-    types::{Ability, Type, TypeParameter},
+    names::{Identifier, IdentifierKind as IDKind},
+    types::{Ability, HasType, Type, TypeArgs, TypeParameters},
+    CodeGenerator,
 };
 use arbitrary::Arbitrary;
 use num_bigint::BigUint;
@@ -73,7 +74,7 @@ pub struct Visibility {
 /// A function signature.
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
-    pub type_parameters: Vec<TypeParameter>,
+    pub type_parameters: TypeParameters,
     pub name: Identifier,
     pub parameters: Vec<(Identifier, Type)>,
     pub return_type: Option<Type>,
@@ -94,8 +95,14 @@ pub struct StructDefinition {
     pub name: Identifier,
     // pub attributes: Vec<Attributes>,
     pub abilities: Vec<Ability>,
-    // pub type_parameters: Vec<TypeParameter>,
+    pub type_parameters: TypeParameters,
     pub fields: Vec<(Identifier, Type)>,
+}
+
+impl HasType for StructDefinition {
+    fn get_type(&self) -> Type {
+        Type::new_struct(&self.name, Some(&self.type_parameters))
+    }
 }
 
 /// A statement in a function body.
@@ -108,6 +115,22 @@ pub enum Statement {
     // Continue,
     Decl(Declaration),
     Expr(Expression),
+}
+
+/// An inline struct initialization.
+#[derive(Debug, Clone)]
+pub struct StructPack {
+    pub name: Identifier,
+    pub type_args: TypeArgs,
+    pub fields: Vec<(Identifier, Expression)>,
+}
+
+impl HasType for StructPack {
+    fn get_type(&self) -> Type {
+        let name = format!("{}{}", self.name.inline(), self.type_args.inline());
+        let kind = IDKind::StructConcrete;
+        Type::new_concrete_struct(&Identifier::new(name, kind), Some(&self.type_args))
+    }
 }
 
 /// Declare a new variable.
@@ -129,7 +152,7 @@ pub enum Expression {
     Variable(VariableAccess),
     Boolean(bool),
     FunctionCall(FunctionCall),
-    StructInitialization(StructInitialization),
+    StructPack(StructPack),
     Block(Box<Block>),
     Assign(Box<Assignment>),
     BinaryOperation(Box<BinaryOperation>),
@@ -218,18 +241,11 @@ pub struct NumberLiteral {
     pub typ: Type,
 }
 
-/// An inline struct initialization.
-#[derive(Debug, Clone)]
-pub struct StructInitialization {
-    pub name: Identifier,
-    pub fields: Vec<(Identifier, Expression)>,
-}
-
 /// A function call.
 /// Currently the generated doesn't allow the argument to be another function call.
 #[derive(Debug, Clone)]
 pub struct FunctionCall {
     pub name: Identifier,
-    pub type_args: Vec<Type>,
+    pub type_args: TypeArgs,
     pub args: Vec<Expression>,
 }

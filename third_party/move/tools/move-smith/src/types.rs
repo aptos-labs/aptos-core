@@ -7,6 +7,10 @@
 use crate::names::{Identifier, IdentifierKind as IDKind};
 use std::collections::BTreeMap;
 
+pub trait HasType {
+    fn get_type(&self) -> Type;
+}
+
 /// Collection of Move types.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Type {
@@ -25,11 +29,52 @@ pub enum Type {
     Ref(Box<Type>),
     MutRef(Box<Type>),
     // Custom types
-    Struct(Identifier),
+    Struct(StructType),
+    StructConcrete(StructTypeConcrete),
     Function(Identifier),
 
     // Type Parameter
     TypeParameter(TypeParameter),
+}
+
+/// The type of a struct
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct StructType {
+    pub name: Identifier,
+    pub type_parameters: TypeParameters,
+}
+
+/// The concrete type of a generic struct
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct StructTypeConcrete {
+    pub name: Identifier,
+    pub type_args: TypeArgs,
+}
+/// A list of type parameters, used at struct or function definitions
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TypeParameters {
+    pub type_parameters: Vec<TypeParameter>,
+}
+
+impl TypeParameters {
+    pub fn find_idx_of_parameter(&self, param: &TypeParameter) -> usize {
+        self.type_parameters
+            .iter()
+            .position(|x| x.name == param.name)
+            .unwrap()
+    }
+}
+
+/// A list of type arguments, used at struct initialization or function calls
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TypeArgs {
+    pub type_args: Vec<Type>,
+}
+
+impl TypeArgs {
+    pub fn get_type_arg_at_idx(&self, idx: usize) -> Option<Type> {
+        self.type_args.get(idx).cloned()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -37,6 +82,22 @@ pub struct TypeParameter {
     pub name: Identifier,
     pub abilities: Vec<Ability>,
     pub is_phantom: bool,
+}
+
+impl Type {
+    pub fn new_struct(name: &Identifier, type_parameters: Option<&TypeParameters>) -> Self {
+        Type::Struct(StructType {
+            name: name.clone(),
+            type_parameters: type_parameters.cloned().unwrap_or_default(),
+        })
+    }
+
+    pub fn new_concrete_struct(name: &Identifier, type_args: Option<&TypeArgs>) -> Self {
+        Type::StructConcrete(StructTypeConcrete {
+            name: name.clone(),
+            type_args: type_args.cloned().unwrap_or_default(),
+        })
+    }
 }
 
 /// Abilities of a struct.
@@ -95,7 +156,8 @@ impl Type {
             },
             Type::Ref(t) => Identifier::new(format!("&{}", t.get_name().name), IDKind::Type),
             Type::MutRef(t) => Identifier::new(format!("&mut {}", t.get_name().name), IDKind::Type),
-            Type::Struct(id) => id.clone(),
+            Type::Struct(st) => st.name.clone(),
+            Type::StructConcrete(st) => st.name.clone(),
             Type::Function(id) => id.clone(),
             Type::TypeParameter(tp) => tp.name.clone(),
         }

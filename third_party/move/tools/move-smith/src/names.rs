@@ -42,6 +42,7 @@ impl Identifier {
 pub enum IdentifierKind {
     Var,
     Struct,
+    StructConcrete,
     Function,
     Module,
     Script,
@@ -72,7 +73,7 @@ impl IdentifierKind {
     pub fn get_kind_name(&self) -> String {
         match self {
             IdentifierKind::Var => "var",
-            IdentifierKind::Struct => "Struct",
+            IdentifierKind::StructConcrete | IdentifierKind::Struct => "Struct",
             IdentifierKind::Function => "function",
             IdentifierKind::Module => "Module",
             IdentifierKind::Script => "Script",

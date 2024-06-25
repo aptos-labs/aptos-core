@@ -94,14 +94,16 @@ pub fn create_move_package(code: String, output_dir: &Path) {
     fs::write(move_path, code).expect("Failed to write the Move file");
 }
 
-fn create_compiler_config_v1() -> BuildConfig {
+/// Create the build configuration for compiler V1
+pub fn create_compiler_config_v1() -> BuildConfig {
     let mut config = BuildConfig::default();
     // config.force_recompilation = true;
     config.compiler_config.compiler_version = Some(CompilerVersion::V1);
     config
 }
 
-fn create_compiler_config_v2() -> BuildConfig {
+/// Create the build configuration for compiler V2
+pub fn create_compiler_config_v2() -> BuildConfig {
     let mut config = BuildConfig::default();
     // config.force_recompilation = true;
     config.compiler_config.compiler_version = Some(CompilerVersion::V2_0);
@@ -109,7 +111,8 @@ fn create_compiler_config_v2() -> BuildConfig {
     config
 }
 
-fn compile_with_config(package_path: &Path, config: BuildConfig, name: &str) -> bool {
+/// Compile the Move package at the given path using the given compiler config.
+pub fn compile_with_config(package_path: &Path, config: BuildConfig, name: &str) -> bool {
     match config.compile_package_no_exit(package_path, &mut stderr()) {
         Ok(_) => {
             info!("Successfully compiled the package with compiler {}", name);

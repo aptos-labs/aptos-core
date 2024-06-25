@@ -4,7 +4,7 @@
 use crate::{
     ast::*,
     names::{Identifier, IdentifierKind as IDKind},
-    types::{Ability, Type, TypeParameter},
+    types::{Ability, StructTypeConcrete, Type, TypeArgs, TypeParameter, TypeParameters},
 };
 use std::vec;
 
@@ -96,7 +96,7 @@ impl CodeGenerator for Script {
             signature: FunctionSignature {
                 name: Identifier::new_str("main", IDKind::Function),
                 parameters: Vec::new(),
-                type_parameters: Vec::new(),
+                type_parameters: TypeParameters::default(),
                 return_type: None,
             },
             visibility: Visibility { public: false },
@@ -150,6 +150,7 @@ impl CodeGenerator for Module {
 
 impl CodeGenerator for StructDefinition {
     fn emit_code_lines(&self) -> Vec<String> {
+        let type_params = self.type_parameters.inline();
         let abilities = match self.abilities.len() {
             0 => "".to_string(),
             _ => {
@@ -163,7 +164,12 @@ impl CodeGenerator for StructDefinition {
                 format!("has {} ", abilities)
             },
         };
-        let mut code = vec![format!("struct {} {}{{", self.name.emit_code(), abilities)];
+        let mut code = vec![format!(
+            "struct {}{} {}{{",
+            self.name.emit_code(),
+            type_params,
+            abilities
+        )];
 
         let mut fields_code = Vec::new();
         for (field_name, field_type) in &self.fields {
@@ -241,20 +247,7 @@ impl CodeGenerator for Function {
             ""
         };
 
-        let type_params = match self.signature.type_parameters.is_empty() {
-            true => "".to_string(),
-            false => {
-                format!(
-                    "<{}> ",
-                    self.signature
-                        .type_parameters
-                        .iter()
-                        .map(|tp| tp.inline())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                )
-            },
-        };
+        let type_params = self.signature.type_parameters.inline();
 
         let mut code = vec![format!(
             "{}fun {}{}({}){}",
@@ -335,7 +328,7 @@ impl CodeGenerator for Expression {
             Expression::Variable(ident) => ident.emit_code_lines(),
             Expression::Boolean(b) => vec![b.to_string()],
             Expression::FunctionCall(c) => c.emit_code_lines(),
-            Expression::StructInitialization(s) => s.emit_code_lines(),
+            Expression::StructPack(s) => s.emit_code_lines(),
             Expression::Block(block) => block.emit_code_lines(),
             Expression::Assign(assignment) => assignment.emit_code_lines(),
             Expression::BinaryOperation(binop) => binop.emit_code_lines(),
@@ -397,9 +390,10 @@ impl CodeGenerator for Assignment {
     }
 }
 
-impl CodeGenerator for StructInitialization {
+impl CodeGenerator for StructPack {
     fn emit_code_lines(&self) -> Vec<String> {
-        let mut code = vec![format!("{}", self.name.emit_code())];
+        let type_args = self.type_args.inline();
+        let mut code = vec![format!("{}{}", self.name.emit_code(), type_args)];
         if self.fields.is_empty() {
             code.last_mut().unwrap().push_str(" {}");
             return code;
@@ -425,19 +419,7 @@ impl CodeGenerator for StructInitialization {
 
 impl CodeGenerator for FunctionCall {
     fn emit_code_lines(&self) -> Vec<String> {
-        let type_args = match self.type_args.is_empty() {
-            true => "".to_string(),
-            false => {
-                format!(
-                    "<{}>",
-                    self.type_args
-                        .iter()
-                        .map(|t| t.inline())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                )
-            },
-        };
+        let type_args = self.type_args.inline();
         let mut code = vec![format!("{}{}(", self.name.emit_code(), type_args)];
         if self.args.is_empty() {
             code.last_mut().unwrap().push(')');
@@ -452,6 +434,38 @@ impl CodeGenerator for FunctionCall {
         append_code_lines_with_indentation(&mut code, args, INDENTATION_SIZE);
         code.push(")".to_string());
         code
+    }
+}
+
+impl CodeGenerator for TypeParameters {
+    fn emit_code_lines(&self) -> Vec<String> {
+        if self.type_parameters.is_empty() {
+            return vec!["".to_string()];
+        }
+
+        let params = self
+            .type_parameters
+            .iter()
+            .map(|tp| tp.inline())
+            .collect::<Vec<String>>()
+            .join(", ");
+        vec![format!("<{}>", params)]
+    }
+}
+
+impl CodeGenerator for TypeArgs {
+    fn emit_code_lines(&self) -> Vec<String> {
+        if self.type_args.is_empty() {
+            return vec!["".to_string()];
+        }
+
+        let args = self
+            .type_args
+            .iter()
+            .map(|t| t.inline())
+            .collect::<Vec<String>>()
+            .join(", ");
+        vec![format!("<{}>", args)]
     }
 }
 
@@ -522,9 +536,17 @@ impl CodeGenerator for Type {
             T::U128 => "u128".to_string(),
             T::U256 => "u256".to_string(),
             T::Bool => "bool".to_string(),
-            T::Struct(id) => id.inline(),
+            T::Struct(st) => st.name.inline(),
+            T::StructConcrete(st) => st.inline(),
             T::TypeParameter(tp) => tp.name.inline(),
             _ => unimplemented!(),
         }]
+    }
+}
+
+impl CodeGenerator for StructTypeConcrete {
+    fn emit_code_lines(&self) -> Vec<String> {
+        let type_args = self.type_args.inline();
+        vec![format!("{}{}", self.name.emit_code(), type_args)]
     }
 }
