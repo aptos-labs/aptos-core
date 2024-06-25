@@ -28,7 +28,9 @@ use aptos_storage_interface::{
 use aptos_types::{
     access_path::{AccessPath, Path},
     account_address::AccountAddress,
-    account_config::{AccountResource, NewBlockEvent},
+    account_config::{
+        lite_account, lite_account::LiteAccountGroup, AccountResource, NewBlockEvent,
+    },
     block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     contract_event::EventWithVersion,
@@ -50,7 +52,7 @@ use mini_moka::sync::Cache;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
-    move_resource::MoveResource,
+    move_resource::{MoveResource, MoveStructType},
 };
 use serde::Serialize;
 use std::{
@@ -63,9 +65,6 @@ use std::{
     },
     time::Instant,
 };
-use aptos_types::account_config::lite_account;
-use aptos_types::account_config::lite_account::LiteAccountGroup;
-use move_core_types::move_resource::MoveStructType;
 
 // Context holds application scope context
 #[derive(Clone)]
@@ -369,12 +368,17 @@ impl Context {
         version: Version,
         resource_group_tag: &StructTag,
     ) -> Result<Option<T>> {
-        let bytes_opt = self.get_state_value(&StateKey::resource_group(&address, resource_group_tag), version)?;
+        let bytes_opt = self.get_state_value(
+            &StateKey::resource_group(&address, resource_group_tag),
+            version,
+        )?;
         let group: Option<BTreeMap<StructTag, Vec<u8>>> = bytes_opt
             .map(|bytes| bcs::from_bytes(&bytes))
             .transpose()
             .map_err(|err| anyhow!(format!("Failed to deserialize resource group: {}", err)))?;
-        Ok(group.map(|g| g.get(&T::struct_tag()).map(|b| bcs::from_bytes(&b))).flatten().transpose()?)
+        Ok(group
+            .and_then(|g| g.get(&T::struct_tag()).map(|b| bcs::from_bytes(b)))
+            .transpose()?)
     }
 
     pub fn get_resource_poem<T: MoveResource, E: InternalError>(
@@ -857,21 +861,21 @@ impl Context {
     ) -> Result<Vec<TransactionOnChainData>, E> {
         let start_seq_number = if let Some(start_seq_number) = start_seq_number {
             start_seq_number
-        } else if let Ok(account_v1) =
-            self.expect_resource_poem::<AccountResource, E>(
-                address,
-                ledger_info.version(),
-                ledger_info,
-            ) {
-            account_v1.sequence_number()
-                .saturating_sub(limit as u64)
+        } else if let Ok(account_v1) = self.expect_resource_poem::<AccountResource, E>(
+            address,
+            ledger_info.version(),
+            ledger_info,
+        ) {
+            account_v1.sequence_number().saturating_sub(limit as u64)
         } else {
             self.expect_resource_from_group_poem::<lite_account::AccountResource, E>(
                 address,
                 ledger_info.version(),
                 &LiteAccountGroup::struct_tag(),
                 ledger_info,
-            )?.sequence_number.saturating_sub(limit as u64)
+            )?
+            .sequence_number
+            .saturating_sub(limit as u64)
         };
 
         let txns_res = if !db_sharding_enabled(&self.node_config) {

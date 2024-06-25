@@ -299,7 +299,7 @@ impl TransactionBuilder {
             self.sequence_number.expect("sequence number not set"),
             self.program.clone().expect("transaction payload not set"),
             self.max_gas_amount.unwrap_or(gas_costs::TXN_RESERVED),
-            self.gas_unit_price.unwrap_or(1),
+            self.gas_unit_price.unwrap_or(0),
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
             self.chain_id.unwrap_or_else(ChainId::test), //ChainId::test(),
         )
@@ -599,7 +599,7 @@ impl LiteAccountData {
                 addr,
                 Some(sequence_number),
                 Some(Some(auth_key)),
-                None
+                None,
             ),
             fungible_store: FungibleStoreResource::new(AccountAddress::TEN, balance, false),
         }

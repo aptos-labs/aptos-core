@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_language_e2e_tests::{
-    account::Account, common_transactions::create_account_txn, current_function_name,
+    account::Account, common_transactions::peer_to_peer_txn, current_function_name,
     executor::FakeExecutor,
 };
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
@@ -18,8 +18,7 @@ fn create_account() {
     let new_account = executor.create_raw_account();
 
     // define the arguments to the create account transaction
-    let initial_amount = 0;
-    let txn = create_account_txn(&sender, &new_account, 0);
+    let txn = peer_to_peer_txn(&sender, &new_account, 0, 100, 0);
 
     // execute transaction
     let output = executor.execute_transaction(txn);
@@ -31,12 +30,12 @@ fn create_account() {
 
     // check that numbers in stored DB are correct
     let updated_sender = executor
-        .read_account_resource(&sender)
+        .read_lite_account_resource(&sender)
         .expect("sender must exist");
 
     let updated_receiver_balance = executor
-        .read_coin_store_resource(&new_account)
+        .read_fungible_store_resource(&new_account)
         .expect("receiver balance must exist");
-    assert_eq!(initial_amount, updated_receiver_balance.coin());
-    assert_eq!(1, updated_sender.sequence_number());
+    assert_eq!(100, updated_receiver_balance.balance());
+    assert_eq!(1, updated_sender.sequence_number);
 }

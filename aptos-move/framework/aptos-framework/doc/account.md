@@ -70,6 +70,7 @@
     -  [Function `get_sequence_number`](#@Specification_1_get_sequence_number)
     -  [Function `increment_sequence_number`](#@Specification_1_increment_sequence_number)
     -  [Function `get_authentication_key`](#@Specification_1_get_authentication_key)
+    -  [Function `migrate_to_lite_account`](#@Specification_1_migrate_to_lite_account)
     -  [Function `rotate_authentication_key_internal`](#@Specification_1_rotate_authentication_key_internal)
     -  [Function `rotate_authentication_key_call`](#@Specification_1_rotate_authentication_key_call)
     -  [Function `rotate_authentication_key`](#@Specification_1_rotate_authentication_key)
@@ -2970,6 +2971,22 @@ The sequence_number of the Account is up to MAX_U64.
 
 <pre><code>#[view]
 <b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_migrate_to_lite_account"></a>
+
+### Function `migrate_to_lite_account`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_migrate_to_lite_account">migrate_to_lite_account</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 

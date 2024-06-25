@@ -19,7 +19,10 @@ async fn test_get_account_resource() {
     context.commit_block(&vec![txn1]).await;
     let root = context.root_account().await;
     let resp = context
-        .get(&get_account_resource(&root.address().to_standard_string(), "0x1::lite_account::Account"))
+        .get(&get_account_resource(
+            &root.address().to_standard_string(),
+            "0x1::lite_account::Account",
+        ))
         .await;
     context.check_golden_output(resp);
 }

@@ -21,7 +21,7 @@ pub fn find_value(val: &Value, filter: for<'r> fn(&'r &Value) -> bool) -> Option
             }
             Some(resource.clone())
         },
-        None => None
+        None => None,
     }
 }
 

@@ -919,7 +919,7 @@ module listing_tests {
     }
 
     #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
-    #[expected_failure(abort_code = 0x10006, location = aptos_framework::coin)]
+    #[expected_failure(abort_code = 0x10004, location = aptos_framework::fungible_asset)]
     fun test_not_enough_coin_fixed_price(
         aptos_framework: &signer,
         marketplace: &signer,
@@ -942,7 +942,7 @@ module listing_tests {
     }
 
     #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
-    #[expected_failure(abort_code = 0x10006, location = aptos_framework::coin)]
+    #[expected_failure(abort_code = 0x10004, location = aptos_framework::fungible_asset)]
     fun test_not_enough_coin_auction_bid(
         aptos_framework: &signer,
         marketplace: &signer,
@@ -971,7 +971,7 @@ module listing_tests {
     }
 
     #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
-    #[expected_failure(abort_code = 0x10006, location = aptos_framework::coin)]
+    #[expected_failure(abort_code = 0x10004, location = aptos_framework::fungible_asset)]
     fun test_not_enough_coin_auction_purchase(
         aptos_framework: &signer,
         marketplace: &signer,

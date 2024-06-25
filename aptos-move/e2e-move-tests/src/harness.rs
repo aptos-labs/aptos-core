@@ -891,7 +891,9 @@ impl MoveHarness {
                 addr,
                 LiteAccountGroup::struct_tag(),
                 lite_account::AccountResource::struct_tag(),
-            ).unwrap_or_default().sequence_number
+            )
+            .unwrap_or_default()
+            .sequence_number
         }
     }
 
