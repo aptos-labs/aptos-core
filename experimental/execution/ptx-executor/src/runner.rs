@@ -274,7 +274,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
 
                     // inform output state values to the manager
                     // TODO use try_into_storage_change_set() instead, and ChangeSet it returns, instead of VMOutput.
-                    for (key, op) in vm_output.change_set().concrete_write_set_iter() {
+                    for (key, op) in vm_output.concrete_write_set_iter() {
                         self.scheduler.try_inform_state_value(
                             (key.clone(), txn_idx),
                             op.expect("PTX executor currently doesn't support non-concrete writes")

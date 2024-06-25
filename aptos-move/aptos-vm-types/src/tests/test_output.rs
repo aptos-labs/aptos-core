@@ -16,7 +16,6 @@ use std::collections::BTreeMap;
 
 fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
     let vm_output_writes = &vm_output
-        .change_set()
         .concrete_write_set_iter()
         .map(|(k, v)| {
             (
@@ -97,23 +96,18 @@ fn test_ok_output_equality_with_deltas() {
     let expected_aggregator_write_set =
         BTreeMap::from([mock_modify("2", 2), mock_modify("3", 400)]);
     assert_eq!(
-        materialized_vm_output.change_set().resource_write_set(),
-        vm_output.change_set().resource_write_set()
+        materialized_vm_output.resource_write_set(),
+        vm_output.resource_write_set()
     );
     assert_eq!(
-        materialized_vm_output.change_set().module_write_set(),
-        vm_output.change_set().module_write_set()
+        materialized_vm_output.module_write_set(),
+        vm_output.module_write_set()
     );
     assert_eq!(
-        materialized_vm_output
-            .change_set()
-            .aggregator_v1_write_set(),
+        materialized_vm_output.aggregator_v1_write_set(),
         &expected_aggregator_write_set
     );
-    assert!(materialized_vm_output
-        .change_set()
-        .aggregator_v1_delta_set()
-        .is_empty());
+    assert!(materialized_vm_output.aggregator_v1_delta_set().is_empty());
     assert_eq!(
         vm_output.fee_statement(),
         materialized_vm_output.fee_statement()

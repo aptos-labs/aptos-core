@@ -25,7 +25,6 @@ pub struct EpilogueSession<'r, 'l> {
     #[deref_mut]
     session: RespawnedSession<'r, 'l>,
     storage_refund: Fee,
-    #[allow(dead_code)]
     module_write_set: BTreeMap<StateKey, WriteOp>,
 }
 
@@ -92,12 +91,16 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
         self.storage_refund
     }
 
-    pub fn finish(self, change_set_configs: &ChangeSetConfigs) -> Result<VMChangeSet, VMStatus> {
+    pub fn finish(
+        self,
+        change_set_configs: &ChangeSetConfigs,
+    ) -> Result<(VMChangeSet, BTreeMap<StateKey, WriteOp>), VMStatus> {
         let Self {
             session,
             storage_refund: _,
-            module_write_set: _,
+            module_write_set,
         } = self;
-        session.finish_with_squashed_change_set(change_set_configs, true)
+        let change_set = session.finish_with_squashed_change_set(change_set_configs, true)?;
+        Ok((change_set, module_write_set))
     }
 }

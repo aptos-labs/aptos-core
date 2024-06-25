@@ -46,6 +46,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
     chain_id::ChainId,
+    contract_event::ContractEvent,
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
@@ -53,7 +54,7 @@ use aptos_types::{
         OnChainConfig, TimedFeatures,
     },
     randomness::Randomness,
-    state_store::{StateView, TStateView},
+    state_store::{state_key::StateKey, StateView, TStateView},
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
@@ -62,6 +63,7 @@ use aptos_types::{
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
+    write_set::WriteOp,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
@@ -91,7 +93,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     move_resource::MoveStructType,
     transaction_argument::convert_txn_args,
-    value::{serialize_values, MoveValue},
+    value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::StatusType,
 };
 use move_vm_runtime::{
@@ -145,6 +147,7 @@ pub(crate) fn get_system_transaction_output(
     let change_set = session.finish(change_set_configs)?;
     Ok(VMOutput::new(
         change_set,
+        BTreeMap::new(),
         FeeStatement::zero(),
         TransactionStatus::Keep(ExecutionStatus::Success),
         TransactionAuxiliaryData::default(),
@@ -439,8 +442,9 @@ impl AptosVM {
                     change_set_configs,
                     traversal_context,
                 ) {
-                    Ok((change_set, fee_statement, status)) => VMOutput::new(
+                    Ok((change_set, module_write_set, fee_statement, status)) => VMOutput::new(
                         change_set,
+                        module_write_set,
                         fee_statement,
                         TransactionStatus::Keep(status),
                         txn_aux_data,
@@ -487,7 +491,15 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
-    ) -> Result<(VMChangeSet, FeeStatement, ExecutionStatus), VMStatus> {
+    ) -> Result<
+        (
+            VMChangeSet,
+            BTreeMap<StateKey, WriteOp>,
+            FeeStatement,
+            ExecutionStatus,
+        ),
+        VMStatus,
+    > {
         // Storage refund is zero since no slots are deleted in aborted transactions.
         const ZERO_STORAGE_REFUND: u64 = 0;
 
@@ -581,7 +593,9 @@ impl AptosVM {
             })?;
             epilogue_session
                 .finish(change_set_configs)
-                .map(|set| (set, fee_statement, status))
+                .map(|(change_set, module_write_set)| {
+                    (change_set, module_write_set, fee_statement, status)
+                })
         } else {
             let mut epilogue_session = EpilogueSession::on_user_session_failure(
                 self,
@@ -607,7 +621,9 @@ impl AptosVM {
             })?;
             epilogue_session
                 .finish(change_set_configs)
-                .map(|set| (set, fee_statement, status))
+                .map(|(change_set, module_write_set)| {
+                    (change_set, module_write_set, fee_statement, status)
+                })
         }
     }
 
@@ -651,9 +667,10 @@ impl AptosVM {
                 traversal_context,
             )
         })?;
-        let change_set = epilogue_session.finish(change_set_configs)?;
+        let (change_set, module_write_set) = epilogue_session.finish(change_set_configs)?;
         let output = VMOutput::new(
             change_set,
+            module_write_set,
             fee_statement,
             TransactionStatus::Keep(ExecutionStatus::Success),
             TransactionAuxiliaryData::default(),
@@ -1820,7 +1837,7 @@ impl AptosVM {
         write_set_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
-    ) -> Result<VMChangeSet, VMStatus> {
+    ) -> Result<(VMChangeSet, BTreeMap<StateKey, WriteOp>), VMStatus> {
         let change_set_configs =
             ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version);
 
@@ -1829,14 +1846,14 @@ impl AptosVM {
                 // this transaction is never delayed field capable.
                 // it requires restarting execution afterwards,
                 // which allows it to be used as last transaction in delayed_field_enabled context.
-                let change = VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
+                let (change_set, module_write_set) = VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
                     change_set.clone(),
                     &change_set_configs,
                 )
                 .map_err(|e| e.into_vm_status())?;
 
                 // validate_waypoint_change_set checks that this is true, so we only log here.
-                if !Self::should_restart_execution(&change) {
+                if !Self::should_restart_execution(change_set.events()) {
                     // This invariant needs to hold irrespectively, so we log error always.
                     // but if we are in delayed_field_optimization_capable context, we cannot execute any transaction after this.
                     // as transaction afterwards would be executed assuming delayed fields are exchanged and
@@ -1846,7 +1863,7 @@ impl AptosVM {
                         "[aptos_vm] direct write set finished without requiring should_restart_execution");
                 }
 
-                Ok(change)
+                Ok((change_set, module_write_set))
             },
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.new_session(resolver, session_id, None);
@@ -1865,7 +1882,10 @@ impl AptosVM {
                     senders,
                     script,
                 )?;
-                Ok(tmp_session.finish(&change_set_configs)?)
+                let change_set = tmp_session.finish(&change_set_configs)?;
+
+                // FIXME(George): What about code publishing?
+                Ok((change_set, BTreeMap::new()))
             },
         }
     }
@@ -1875,6 +1895,7 @@ impl AptosVM {
         executor_view: &dyn ExecutorView,
         resource_group_view: &dyn ResourceGroupView,
         change_set: &VMChangeSet,
+        module_write_set: &BTreeMap<StateKey, WriteOp>,
     ) -> PartialVMResult<()> {
         assert!(
             change_set.aggregator_v1_write_set().is_empty(),
@@ -1883,7 +1904,7 @@ impl AptosVM {
 
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
-        for state_key in change_set.module_write_set().keys() {
+        for state_key in module_write_set.keys() {
             executor_view.get_module_state_value(state_key)?;
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {
@@ -1903,15 +1924,13 @@ impl AptosVM {
     }
 
     fn validate_waypoint_change_set(
-        change_set: &VMChangeSet,
+        events: &[(ContractEvent, Option<MoveTypeLayout>)],
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let has_new_block_event = change_set
-            .events()
+        let has_new_block_event = events
             .iter()
             .any(|(e, _)| e.event_key() == Some(&new_block_event_key()));
-        let has_new_epoch_event = change_set
-            .events()
+        let has_new_epoch_event = events
             .iter()
             .any(|(e, _)| e.event_key() == Some(&new_epoch_event_key()));
         if has_new_block_event && has_new_epoch_event {
@@ -1933,18 +1952,19 @@ impl AptosVM {
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
-        let change_set = self.execute_write_set(
+        let (change_set, module_write_set) = self.execute_write_set(
             resolver,
             &write_set_payload,
             Some(account_config::reserved_vm_address()),
             SessionId::genesis(genesis_id),
         )?;
 
-        Self::validate_waypoint_change_set(&change_set, log_context)?;
+        Self::validate_waypoint_change_set(change_set.events(), log_context)?;
         self.read_change_set(
             resolver.as_executor_view(),
             resolver.as_resource_group_view(),
             &change_set,
+            &module_write_set,
         )
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
 
@@ -1952,6 +1972,7 @@ impl AptosVM {
 
         let output = VMOutput::new(
             change_set,
+            module_write_set,
             FeeStatement::zero(),
             TransactionStatus::Keep(ExecutionStatus::Success),
             TransactionAuxiliaryData::default(),
@@ -2247,10 +2268,9 @@ impl AptosVM {
         }
     }
 
-    pub fn should_restart_execution(vm_change_set: &VMChangeSet) -> bool {
+    pub fn should_restart_execution(events: &[(ContractEvent, Option<MoveTypeLayout>)]) -> bool {
         let new_epoch_event_key = new_epoch_event_key();
-        vm_change_set
-            .events()
+        events
             .iter()
             .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
     }
