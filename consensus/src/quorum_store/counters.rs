@@ -101,6 +101,46 @@ pub static PROOF_QUEUE_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
     )
 });
 
+pub static PROOF_QUEUE_ADD_BATCH_SUMMARIES_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_proof_queue_add_batch_summaries_duration",
+            "Duration of adding batch summaries to proof queue"
+        )
+        .unwrap(),
+    )
+});
+
+pub static PROOF_QUEUE_ADD_PROOFS_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_proof_queue_add_proofs_duration",
+            "Duration of adding proofs to proof queue"
+        )
+        .unwrap(),
+    )
+});
+
+pub static PROOF_QUEUE_COMMIT_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_proof_queue_commit_duration",
+            "Duration of committing proofs from proof queue"
+        )
+        .unwrap(),
+    )
+});
+
+pub static PROOF_QUEUE_REMAINING_TXNS_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_proof_queue_remaining_txns_duration",
+            "Duration of calculating remaining txns in proof queue"
+        )
+        .unwrap(),
+    )
+});
+
 /// Duration of each run of the event loop.
 pub static BATCH_GENERATOR_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(

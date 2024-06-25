@@ -517,6 +517,7 @@ impl ProofQueue {
     }
 
     pub(crate) fn remaining_txns_and_proofs(&self) -> (u64, u64) {
+        let start = Instant::now();
         counters::NUM_TOTAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_txns_with_duplicates as f64);
         counters::NUM_TOTAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_proofs as f64);
         counters::NUM_LOCAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_local_txns as f64);
@@ -554,6 +555,7 @@ impl ProofQueue {
                 .map(|proof| if proof.is_some() { 1 } else { 0 })
                 .sum::<i64>(),
         );
+        counters::PROOF_QUEUE_REMAINING_TXNS_DURATION.observe_duration(start.elapsed());
         (remaining_txns_without_duplicates, self.remaining_proofs)
     }
 
@@ -592,9 +594,11 @@ impl ProofQueue {
             if let Some(msg) = command_rx.recv().await {
                 match msg {
                     ProofQueueCommand::AddProofs(proofs) => {
+                        let start = Instant::now();
                         for proof in proofs {
                             self.push(proof);
                         }
+                        counters::PROOF_QUEUE_ADD_PROOFS_DURATION.observe_duration(start.elapsed());
 
                         let updated_back_pressure = self.qs_back_pressure();
                         if updated_back_pressure != back_pressure {
@@ -622,8 +626,10 @@ impl ProofQueue {
                         }
                     },
                     ProofQueueCommand::MarkCommitted(batches, block_timestamp) => {
+                        let start = Instant::now();
                         self.mark_committed(batches);
                         self.handle_updated_block_timestamp(block_timestamp);
+                        counters::PROOF_QUEUE_COMMIT_DURATION.observe_duration(start.elapsed());
 
                         let updated_back_pressure = self.qs_back_pressure();
                         if updated_back_pressure != back_pressure {
@@ -634,7 +640,10 @@ impl ProofQueue {
                         }
                     },
                     ProofQueueCommand::AddBatches(batch_summaries) => {
+                        let start = Instant::now();
                         self.add_batch_summaries(batch_summaries);
+                        counters::PROOF_QUEUE_ADD_BATCH_SUMMARIES_DURATION
+                            .observe_duration(start.elapsed());
                     },
                 }
             }
