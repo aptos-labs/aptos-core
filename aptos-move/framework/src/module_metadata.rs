@@ -431,7 +431,7 @@ pub fn is_valid_resource_group(
     if let Ok(ident_struct) = Identifier::new(struct_) {
         if let Some((struct_handle, struct_def)) = structs.get(ident_struct.as_ident_str()) {
             let num_fields = match &struct_def.field_information {
-                StructFieldInformation::Native => 0,
+                StructFieldInformation::Native | StructFieldInformation::DeclaredVariants(_) => 0,
                 StructFieldInformation::Declared(fields) => fields.len(),
             };
             if struct_handle.abilities == AbilitySet::EMPTY
