@@ -153,7 +153,7 @@ git_update_command = [
 ]
 
 git_update_command = [
-    f"cd aptos-core/ && git pull && git checkout multi_machine_sharding_new_metrics && git pull",
+    f"cd aptos-core/ && git pull && git checkout multi_machine_sharding_async_kv_send && git pull",
 ]
 
 def get_external_ip(instance):
@@ -196,10 +196,10 @@ def run_sessions_on_instances(instances, username, private_key_path):
     threads = []
     i = 0
     for instance in instances:
-        thread = threading.Thread(target=instance_session, args=(instance, username, private_key_path, close_event, git_update_command[i]))
+        thread = threading.Thread(target=instance_session, args=(instance, username, private_key_path, close_event, commands16shards[i]))
         thread.start()
         threads.append(thread)
-        #i = i + 1
+        i = i + 1
 
     for thread in threads:
         thread.join()

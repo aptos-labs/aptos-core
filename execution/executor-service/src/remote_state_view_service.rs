@@ -153,8 +153,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             }
         }
     }
-    #[tokio::main]
-    pub async fn handle_message(
+
+    pub fn handle_message(
         message: Message,
         state_view: Arc<RwLock<Option<Arc<S>>>>,
         kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
@@ -241,9 +241,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let timer_6 = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_requests_send"])
             .start_timer();
-        tokio::task::spawn_blocking(move || {
-            kv_tx_clone[shard_id][rand_send_thread_idx].lock().unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
-        });
+        kv_tx_clone[shard_id][rand_send_thread_idx].lock().unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
         drop(timer_6);
 
         {
