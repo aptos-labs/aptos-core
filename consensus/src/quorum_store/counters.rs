@@ -36,9 +36,6 @@ static PROOF_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     .to_vec()
 });
 
-static BATCH_COUNT_BUCKETS: Lazy<Vec<f64>> =
-    Lazy::new(|| [1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0, 17.0, 20.0, 25.0].to_vec());
-
 static BYTE_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
         /*start=*/ 500.0, /*factor=*/ 1.5, /*count=*/ 25,
@@ -88,6 +85,17 @@ pub static PROOF_MANAGER_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
         register_histogram!(
             "quorum_store_proof_manager_main_loop",
             "Duration of the each run of the proof manager event loop"
+        )
+        .unwrap(),
+    )
+});
+
+/// Duration of each run of the event loop.
+pub static PROOF_QUEUE_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_proof_queue_main_loop",
+            "Duration of the each run of the proof queue event loop"
         )
         .unwrap(),
     )

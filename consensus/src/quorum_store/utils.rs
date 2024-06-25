@@ -588,7 +588,7 @@ impl ProofQueue {
         };
 
         loop {
-            let _timer = counters::PROOF_MANAGER_MAIN_LOOP.start_timer();
+            let _timer = counters::PROOF_QUEUE_MAIN_LOOP.start_timer();
             if let Some(msg) = command_rx.recv().await {
                 match msg {
                     ProofQueueCommand::AddProofs(proofs) => {
