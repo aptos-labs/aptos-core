@@ -12,6 +12,7 @@ use crate::{
             BlockPayload, ConsensusObserverDirectSend, ConsensusObserverMessage,
             ConsensusObserverRequest, ConsensusObserverResponse, OrderedBlock,
         },
+        payload_store::BlockPayloadStore,
         publisher::ConsensusPublisher,
         subscription,
         subscription::ConsensusObserverSubscription,
@@ -28,7 +29,7 @@ use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
 use aptos_consensus_types::{
     pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
 };
-use aptos_crypto::{bls12381, Genesis, HashValue};
+use aptos_crypto::{bls12381, Genesis};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error, info, warn};
@@ -47,7 +48,6 @@ use aptos_types::{
         OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
         RandomnessConfigMoveStruct, ValidatorSet,
     },
-    transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
 };
 use futures::{
@@ -57,38 +57,12 @@ use futures::{
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap},
-    mem,
+    collections::{BTreeMap, HashMap},
     sync::Arc,
     time::Duration,
 };
-use tokio::{
-    sync::{mpsc::UnboundedSender, oneshot as tokio_oneshot},
-    time::interval,
-};
+use tokio::{sync::mpsc::UnboundedSender, time::interval};
 use tokio_stream::wrappers::IntervalStream;
-
-/// The transaction payload of each block
-#[derive(Debug, Clone)]
-pub struct BlockTransactionPayload {
-    pub transactions: Vec<SignedTransaction>,
-    pub limit: Option<usize>,
-}
-
-impl BlockTransactionPayload {
-    pub fn new(transactions: Vec<SignedTransaction>, limit: Option<usize>) -> Self {
-        Self {
-            transactions,
-            limit,
-        }
-    }
-}
-
-/// The status of consensus observer data
-pub enum ObserverDataStatus {
-    Requested(tokio_oneshot::Sender<BlockTransactionPayload>),
-    Available(BlockTransactionPayload),
-}
 
 /// The consensus observer receives consensus updates and propagates them to the execution pipeline
 pub struct ConsensusObserver {
@@ -103,12 +77,12 @@ pub struct ConsensusObserver {
     // The latest ledger info (updated via a callback)
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
 
+    // The payload store holds block transaction payloads
+    block_payload_store: BlockPayloadStore,
     // The pending execute/commit blocks (also buffers when in sync mode)
     pending_blocks: Arc<Mutex<BTreeMap<Round, (OrderedBlock, Option<CommitDecision>)>>>,
     // The execution client to the buffer manager
     execution_client: Arc<dyn TExecutionClient>,
-    // The payload store maps block id's to transaction payloads (the same as payload manager returns)
-    payload_store: Arc<Mutex<HashMap<HashValue, ObserverDataStatus>>>,
 
     // If the sync handle is set it indicates that we're in state sync mode
     sync_handle: Option<DropGuard>,
@@ -152,7 +126,7 @@ impl ConsensusObserver {
             root: Arc::new(Mutex::new(root)),
             pending_blocks: Arc::new(Mutex::new(BTreeMap::new())),
             execution_client,
-            payload_store: Arc::new(Mutex::new(HashMap::new())),
+            block_payload_store: BlockPayloadStore::new(),
             sync_handle: None,
             sync_notification_sender,
             reconfig_events,
@@ -254,12 +228,12 @@ impl ConsensusObserver {
         // Clone the root, pending blocks and payload store
         let root = self.root.clone();
         let pending_blocks = self.pending_blocks.clone();
-        let payload_store = self.payload_store.clone();
+        let mut block_payload_store = self.block_payload_store.clone();
 
         // Create the commit callback
         Box::new(move |blocks, ledger_info: LedgerInfoWithSignatures| {
             // Remove the committed blocks from the payload store
-            remove_payload_blocks(payload_store, blocks);
+            block_payload_store.remove_blocks(blocks);
 
             // Remove the committed blocks from the pending blocks
             remove_pending_blocks(pending_blocks, &ledger_info);
@@ -466,31 +440,11 @@ impl ConsensusObserver {
         let transactions = block_payload.transactions;
         let limit = block_payload.limit;
 
-        // Update the payload store with the transaction payload
-        let transaction_payload = BlockTransactionPayload::new(transactions, limit);
-        match self.payload_store.lock().entry(block.id()) {
-            Entry::Occupied(mut entry) => {
-                // Replace the status with the new block payload
-                let mut status = ObserverDataStatus::Available(transaction_payload.clone());
-                mem::swap(entry.get_mut(), &mut status);
+        // TODO: verify the block payload!
 
-                // If the status was originally requested, send the payload to the listener
-                if let ObserverDataStatus::Requested(payload_sender) = status {
-                    if let Err(error) = payload_sender.send(transaction_payload) {
-                        error!(
-                            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                                "Failed to send block payload to listener! Error: {:?}",
-                                error
-                            ))
-                        );
-                    }
-                }
-            },
-            Entry::Vacant(entry) => {
-                // Insert the block payload into the payload store
-                entry.insert(ObserverDataStatus::Available(transaction_payload));
-            },
-        }
+        // Update the payload store with the payload
+        self.block_payload_store
+            .insert_block_payload(block, transactions, limit);
     }
 
     /// Processes the commit decision
@@ -536,16 +490,10 @@ impl ConsensusObserver {
         if let Some((ordered_blocks, pending_commit_decision)) =
             pending_blocks.get_mut(&commit_decision.round())
         {
-            // Check if the payload already exists
-            let payload_exists = {
-                let payload_store = self.payload_store.lock();
-                ordered_blocks.blocks.iter().all(|block| {
-                    matches!(
-                        payload_store.get(&block.id()),
-                        Some(ObserverDataStatus::Available(_))
-                    )
-                })
-            };
+            // Check if the payloads for the ordered blocks already exist
+            let payload_exists = self
+                .block_payload_store
+                .all_payloads_exist(&ordered_blocks.blocks);
 
             // If the payload exists, add the commit decision to the pending blocks
             if payload_exists {
@@ -924,7 +872,7 @@ impl ConsensusObserver {
         // Create the payload manager
         let payload_manager = if consensus_config.quorum_store_enabled() {
             PayloadManager::ConsensusObserver(
-                self.payload_store.clone(),
+                self.block_payload_store.get_block_payloads(),
                 self.consensus_publisher.clone(),
             )
         } else {
@@ -1150,17 +1098,6 @@ async fn extract_on_chain_configs(
         execution_config,
         onchain_randomness_config,
     )
-}
-
-/// Removes the given payload blocks from the payload store
-fn remove_payload_blocks(
-    payload_store: Arc<Mutex<HashMap<HashValue, ObserverDataStatus>>>,
-    blocks: &[Arc<PipelinedBlock>],
-) {
-    let mut payload_store = payload_store.lock();
-    for block in blocks.iter() {
-        payload_store.remove(&block.id());
-    }
 }
 
 /// Removes the pending blocks before the given ledger info
