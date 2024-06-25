@@ -20,7 +20,7 @@ module 0x2.A {
   }
 }
 
-//# run --signers 0x1 --check-runtime-types
+//# run --signers 0x1
 import 0x2.A;
 main(account: signer) {
     let a: A.A;
@@ -30,7 +30,7 @@ label b0:
     return;
 }
 
-//# run --signers 0x1 --check-runtime-types
+//# run --signers 0x1
 import 0x2.A;
 main(account: signer) {
     let a: A.A;
@@ -40,7 +40,7 @@ label b0:
     return;
 }
 
-//# run --signers 0x1 --check-runtime-types
+//# run --signers 0x1
 main(account: signer) {
     let a: vector<u32>;
     let b: &mut u32;
@@ -52,7 +52,7 @@ label b0:
     return;
 }
 
-//# run --signers 0x1 --check-runtime-types
+//# run --signers 0x1
 main(account: signer) {
     let a: vector<u32>;
     let b: &mut u32;
@@ -64,7 +64,7 @@ label b0:
     return;
 }
 
-//# run --signers 0x1 --check-runtime-types
+//# run --signers 0x1
 main(account: signer) {
     let a: u32;
     let b: &mut u32;
@@ -75,7 +75,7 @@ label b0:
     return;
 }
 
-//# run --signers 0x1 --check-runtime-types
+//# run --signers 0x1
 main(account: signer) {
     let a: u32;
     let b: &mut u32;

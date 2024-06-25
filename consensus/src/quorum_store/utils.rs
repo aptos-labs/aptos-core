@@ -366,6 +366,7 @@ impl ProofQueue {
                         if cur_bytes + batch.num_bytes() > max_bytes
                             || cur_txns + batch.num_txns() > max_txns
                         {
+                            // Exceeded the limit for requested bytes or number of transactions.
                             full = true;
                             return false;
                         }

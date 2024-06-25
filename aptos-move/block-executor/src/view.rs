@@ -1301,15 +1301,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             state_key,
         );
 
-        let layout = if self.is_delayed_field_optimization_capable() {
-            layout
-        } else {
-            match layout {
-                UnknownOrLayout::Known(_) => UnknownOrLayout::Known(None),
-                UnknownOrLayout::Unknown => UnknownOrLayout::Unknown,
-            }
-        };
-
         let state = self.latest_view.get_resource_state();
 
         let mut ret = state.read_cached_data_by_kind(
@@ -1472,8 +1463,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<Bytes>> {
-        let maybe_layout = maybe_layout.filter(|_| self.is_delayed_field_optimization_capable());
-
         let mut group_read = self
             .latest_view
             .get_resource_group_state()
@@ -1612,13 +1601,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
     type Identifier = T::Identifier;
     type ResourceGroupTag = T::Tag;
     type ResourceKey = T::Key;
-
-    fn is_delayed_field_optimization_capable(&self) -> bool {
-        match &self.latest_view {
-            ViewState::Sync(_) => true,
-            ViewState::Unsync(_) => true,
-        }
-    }
 
     fn get_delayed_field_value(
         &self,

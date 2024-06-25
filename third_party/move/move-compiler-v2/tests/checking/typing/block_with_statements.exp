@@ -7,7 +7,7 @@ module 0x8675309::M {
         0;
         Borrow(Immutable)(0);
         Borrow(Mutable)(1);
-        M::R{ dummy_field: _ }: M::R = {
+        M::R{ dummy_field: _ } = {
           let r: M::R = {
             let r: M::R = pack M::R(false);
             r

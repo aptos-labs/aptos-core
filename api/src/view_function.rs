@@ -95,7 +95,7 @@ fn view_request(
 
     let view_function: ViewFunction = match request {
         ViewFunctionRequest::Json(data) => state_view
-            .as_converter(context.db.clone(), context.table_info_reader.clone())
+            .as_converter(context.db.clone(), context.indexer_reader.clone())
             .convert_view_function(data.0)
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code(
@@ -167,7 +167,7 @@ fn view_request(
         },
         AcceptType::Json => {
             let return_types = state_view
-                .as_converter(context.db.clone(), context.table_info_reader.clone())
+                .as_converter(context.db.clone(), context.indexer_reader.clone())
                 .function_return_types(&view_function)
                 .and_then(|tys| {
                     tys.into_iter()
@@ -187,7 +187,7 @@ fn view_request(
                 .zip(return_types.into_iter())
                 .map(|(v, ty)| {
                     state_view
-                        .as_converter(context.db.clone(), context.table_info_reader.clone())
+                        .as_converter(context.db.clone(), context.indexer_reader.clone())
                         .try_into_move_value(&ty, &v)
                 })
                 .collect::<anyhow::Result<Vec<_>>>()

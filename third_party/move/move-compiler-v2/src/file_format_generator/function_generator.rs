@@ -374,6 +374,12 @@ impl<'a> FunctionGenerator<'a> {
         self.flush_any_conflicts(ctx, dest, source);
         let fun_ctx = ctx.fun_ctx;
         match oper {
+            Operation::TestVariant(..)
+            | Operation::PackVariant(..)
+            | Operation::UnpackVariant(..)
+            | Operation::BorrowFieldVariant(..) => {
+                fun_ctx.internal_error("variants not yet implemented")
+            },
             Operation::Function(mid, fid, inst) => {
                 self.gen_call(ctx, dest, mid.qualified(*fid), inst, source);
             },
@@ -992,7 +998,10 @@ impl<'a> FunctionGenerator<'a> {
 impl<'env> FunctionContext<'env> {
     /// Emits an internal error for this function.
     pub fn internal_error(&self, msg: impl AsRef<str>) {
-        self.module.internal_error(&self.loc, msg)
+        self.module.internal_error(
+            &self.loc,
+            format!("file format generator: {}", msg.as_ref()),
+        )
     }
 
     /// Gets the type of the temporary.

@@ -11,7 +11,7 @@ module 0x8675309::M {
         Not(Move(x));
         Not(select M::R.f<M::R>(r));
         {
-          let M::R{ f: _ }: M::R = r;
+          let M::R{ f: _ } = r;
           Tuple()
         }
     }

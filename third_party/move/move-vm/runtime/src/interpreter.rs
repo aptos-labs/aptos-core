@@ -1868,29 +1868,29 @@ impl Frame {
             | Bytecode::Xor
             | Bytecode::Or
             | Bytecode::And => {
-                let lhs_ty = interpreter.operand_stack.pop_ty()?;
                 let rhs_ty = interpreter.operand_stack.pop_ty()?;
-                lhs_ty.paranoid_check_eq(&rhs_ty)?;
-                interpreter.operand_stack.push_ty(lhs_ty)?;
+                let lhs_ty = interpreter.operand_stack.pop_ty()?;
+                rhs_ty.paranoid_check_eq(&lhs_ty)?;
+                interpreter.operand_stack.push_ty(rhs_ty)?;
             },
             Bytecode::Shl | Bytecode::Shr => {
-                interpreter.operand_stack.pop_ty()?;
-                let ty = interpreter.operand_stack.pop_ty()?;
-                interpreter.operand_stack.push_ty(ty)?;
+                let _rhs = interpreter.operand_stack.pop_ty()?;
+                let lhs = interpreter.operand_stack.pop_ty()?;
+                interpreter.operand_stack.push_ty(lhs)?;
             },
             Bytecode::Lt | Bytecode::Le | Bytecode::Gt | Bytecode::Ge => {
-                let lhs_ty = interpreter.operand_stack.pop_ty()?;
                 let rhs_ty = interpreter.operand_stack.pop_ty()?;
-                lhs_ty.paranoid_check_eq(&rhs_ty)?;
+                let lhs_ty = interpreter.operand_stack.pop_ty()?;
+                rhs_ty.paranoid_check_eq(&lhs_ty)?;
 
                 let bool_ty = ty_builder.create_bool_ty();
                 interpreter.operand_stack.push_ty(bool_ty)?;
             },
             Bytecode::Eq | Bytecode::Neq => {
-                let lhs_ty = interpreter.operand_stack.pop_ty()?;
                 let rhs_ty = interpreter.operand_stack.pop_ty()?;
-                lhs_ty.paranoid_check_eq(&rhs_ty)?;
-                lhs_ty.paranoid_check_has_ability(Ability::Drop)?;
+                let lhs_ty = interpreter.operand_stack.pop_ty()?;
+                rhs_ty.paranoid_check_eq(&lhs_ty)?;
+                rhs_ty.paranoid_check_has_ability(Ability::Drop)?;
 
                 let bool_ty = ty_builder.create_bool_ty();
                 interpreter.operand_stack.push_ty(bool_ty)?;
