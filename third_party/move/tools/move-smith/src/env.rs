@@ -9,7 +9,7 @@ use crate::{
     types::{Type, TypePool},
 };
 use arbitrary::Unstructured;
-use log::trace;
+use log::{info, trace};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Default)]
@@ -70,12 +70,14 @@ impl LiveVarPool {
 
     /// Mark an identifier as alive in the given scope and all its parent scopes
     pub fn mark_alive(&mut self, scope: &Scope, id: &Identifier) {
+        trace!("Marking {:?} as alive in {:?}", id, scope);
         let live_vars = self.scopes.entry(scope.clone()).or_default();
         live_vars.insert(id.clone());
     }
 
     /// Mark an identifier as dead
     pub fn mark_moved(&mut self, scope: &Scope, id: &Identifier) {
+        trace!("Marking {:?} as moved in {:?}", id, scope);
         // The varibale is consumed at the given scope, but might be assigned
         // (marked alive) at an earlier scope, so we need to check back.
         scope.ancestors().iter().for_each(|s| {

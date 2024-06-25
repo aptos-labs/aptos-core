@@ -362,7 +362,7 @@ impl MoveSmith {
     /// * with in the same module (TODO: allow cross module reference)
     /// * have the desired abilities
     /// * if key is in desired abilities, the struct must have store ability
-    /// * does not create loop in the struct hierarchy (TODO: fix the check)
+    /// * does not create loop in the struct hierarchy
     fn get_usable_struct_type(
         &self,
         desired: Vec<Ability>,
@@ -491,7 +491,7 @@ impl MoveSmith {
                 false,
                 // TODO: unused vars are auto dropped so this prevents the error.
                 // TODO: should remove this after drop is properly handled
-                Some(vec![Ability::Drop]),
+                Some(vec![Ability::Copy, Ability::Drop]),
                 Some(vec![Ability::Key]),
             )?);
         }
@@ -1093,14 +1093,20 @@ impl MoveSmith {
         let abilities = self.derive_abilities_of_var(&chosen);
 
         // Randomly choose to explicitly copy or not
-        let copy = if allow_copy && abilities.contains(&Ability::Copy) {
+        let mut copy = if allow_copy && abilities.contains(&Ability::Copy) {
             bool::arbitrary(u)?
         } else {
             false
         };
 
+        // Use copy always to avoid running out of instanecs of type parameters
+        copy = true;
+
         if !copy {
             self.env_mut().live_vars.mark_moved(parent_scope, &chosen);
+        }
+        else {
+            warn!("{:?} does not have copy ability", chosen);
         }
 
         Ok(Some(VariableAccess { name: chosen, copy }))
@@ -1686,7 +1692,9 @@ impl MoveSmith {
     /// Helper to
     fn derive_abilities_of_var(&self, var: &Identifier) -> Vec<Ability> {
         let typ = self.env().type_pool.get_type(var).unwrap();
-        self.derive_abilities_of_type(&typ)
+        let abilities = self.derive_abilities_of_type(&typ);
+        trace!("Derived abilities of variable: {:?}: {:?}", var, abilities);
+        abilities
     }
 
     /// Helper to get the next identifier.

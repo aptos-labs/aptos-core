@@ -145,6 +145,7 @@ pub fn compile_move_code(code: String, v1: bool, v2: bool) -> bool {
     } else {
         true
     };
+    info!("Done compiling with V1, result is: {}", v1_result);
 
     let v2_result = if v2 {
         let config = create_compiler_config_v2();
@@ -152,6 +153,7 @@ pub fn compile_move_code(code: String, v1: bool, v2: bool) -> bool {
     } else {
         true
     };
+    info!("Done compiling with V2, result is: {}", v1_result);
 
     dir.close().unwrap();
 
