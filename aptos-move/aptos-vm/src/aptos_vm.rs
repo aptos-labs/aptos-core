@@ -11,8 +11,10 @@ use crate::{
     keyless_validation,
     move_vm_ext::{
         session::user_transaction_sessions::{
-            abort_hook::AbortHookSession, epilogue::EpilogueSession, prologue::PrologueSession,
-            user::UserSession,
+            abort_hook::AbortHookSession,
+            epilogue::EpilogueSession,
+            prologue::PrologueSession,
+            user::{UserSession, UserSessionChangeSet},
         },
         AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
     },
@@ -831,21 +833,18 @@ impl AptosVM {
             _ => unreachable!("Only scripts or entry functions are executed"),
         };
 
-        let module_write_set = session.execute(|session| {
-            self.resolve_pending_code_publish(
-                session,
-                gas_meter,
-                traversal_context,
-                new_published_modules_loaded,
-            )
-        })?;
+        let user_session_change_set = self.resolve_pending_code_publish_and_finish_user_session(
+            session,
+            gas_meter,
+            traversal_context,
+            new_published_modules_loaded,
+            change_set_configs,
+        )?;
 
         let epilogue_session = self.charge_change_set_and_respawn_session(
-            session,
-            module_write_set,
+            user_session_change_set,
             resolver,
             gas_meter,
-            change_set_configs,
             txn_data,
         )?;
 
@@ -889,16 +888,11 @@ impl AptosVM {
 
     fn charge_change_set_and_respawn_session<'r, 'l>(
         &'l self,
-        user_session: UserSession<'r, 'l>,
-        module_write_set: BTreeMap<StateKey, WriteOp>,
+        mut user_session_change_set: UserSessionChangeSet,
         resolver: &'r impl AptosMoveResolver,
         gas_meter: &mut impl AptosGasMeter,
-        change_set_configs: &ChangeSetConfigs,
         txn_data: &'l TransactionMetadata,
     ) -> Result<EpilogueSession<'r, 'l>, VMStatus> {
-        let mut user_session_change_set =
-            user_session.finish(module_write_set, change_set_configs)?;
-
         let storage_refund =
             self.charge_change_set(&mut user_session_change_set, gas_meter, txn_data, resolver)?;
 
@@ -915,7 +909,7 @@ impl AptosVM {
     fn simulate_multisig_transaction<'a, 'r, 'l>(
         &'l self,
         resolver: &'r impl AptosMoveResolver,
-        mut session: UserSession<'r, 'l>,
+        session: UserSession<'r, 'l>,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
         txn_data: &TransactionMetadata,
@@ -930,29 +924,26 @@ impl AptosVM {
                 match multisig_payload {
                     MultisigTransactionPayload::EntryFunction(entry_function) => {
                         aptos_try!({
-                            let module_write_set = session.execute(|session| {
-                                self.execute_multisig_entry_function(
-                                    resolver,
-                                    session,
-                                    gas_meter,
-                                    traversal_context,
-                                    payload.multisig_address,
-                                    entry_function,
-                                    new_published_modules_loaded,
-                                    txn_data,
-                                )
-                            })?;
+                            let user_session_change_set = self.execute_multisig_entry_function(
+                                resolver,
+                                session,
+                                gas_meter,
+                                traversal_context,
+                                payload.multisig_address,
+                                entry_function,
+                                new_published_modules_loaded,
+                                txn_data,
+                                change_set_configs,
+                            )?;
 
                             // TODO: Deduplicate this against execute_multisig_transaction
                             // A bit tricky since we need to skip success/failure cleanups,
                             // which is in the middle. Introducing a boolean would make the code
                             // messier.
                             let epilogue_session = self.charge_change_set_and_respawn_session(
-                                session,
-                                module_write_set,
+                                user_session_change_set,
                                 resolver,
                                 gas_meter,
-                                change_set_configs,
                                 txn_data,
                             )?;
 
@@ -1067,20 +1058,18 @@ impl AptosVM {
         // changes are not persisted.
         // The multisig transaction would still be considered executed even if execution fails.
         let execution_result = match payload {
-            MultisigTransactionPayload::EntryFunction(entry_function) => {
-                session.execute(|session| {
-                    self.execute_multisig_entry_function(
-                        resolver,
-                        session,
-                        gas_meter,
-                        traversal_context,
-                        txn_payload.multisig_address,
-                        &entry_function,
-                        new_published_modules_loaded,
-                        txn_data,
-                    )
-                })
-            },
+            MultisigTransactionPayload::EntryFunction(entry_function) => self
+                .execute_multisig_entry_function(
+                    resolver,
+                    session,
+                    gas_meter,
+                    traversal_context,
+                    txn_payload.multisig_address,
+                    &entry_function,
+                    new_published_modules_loaded,
+                    txn_data,
+                    change_set_configs,
+                ),
         };
 
         // Step 3: Call post transaction cleanup function in multisig account module with the result
@@ -1112,16 +1101,14 @@ impl AptosVM {
                     traversal_context,
                 )?
             },
-            Ok(module_write_set) => {
+            Ok(user_session_change_set) => {
                 // Charge gas for write set before we do cleanup. This ensures we don't charge gas for
                 // cleanup write set changes, which is consistent with outer-level success cleanup
                 // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
                 let mut epilogue_session = self.charge_change_set_and_respawn_session(
-                    session,
-                    module_write_set,
+                    user_session_change_set,
                     resolver,
                     gas_meter,
-                    change_set_configs,
                     txn_data,
                 )?;
                 epilogue_session.execute(|session| {
@@ -1195,35 +1182,38 @@ impl AptosVM {
     fn execute_multisig_entry_function(
         &self,
         resolver: &impl AptosMoveResolver,
-        session: &mut SessionExt,
+        mut session: UserSession<'_, '_>,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         multisig_address: AccountAddress,
         payload: &EntryFunction,
         new_published_modules_loaded: &mut bool,
         txn_data: &TransactionMetadata,
-    ) -> Result<BTreeMap<StateKey, WriteOp>, VMStatus> {
+        change_set_configs: &ChangeSetConfigs,
+    ) -> Result<UserSessionChangeSet, VMStatus> {
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
-        self.validate_and_execute_entry_function(
-            resolver,
-            session,
-            gas_meter,
-            traversal_context,
-            vec![multisig_address],
-            payload,
-            txn_data,
-        )?;
+        session.execute(|session| {
+            self.validate_and_execute_entry_function(
+                resolver,
+                session,
+                gas_meter,
+                traversal_context,
+                vec![multisig_address],
+                payload,
+                txn_data,
+            )
+        })?;
 
         // Resolve any pending module publishes in case the multisig transaction is deploying
         // modules.
-        let module_write_set = self.resolve_pending_code_publish(
+        self.resolve_pending_code_publish_and_finish_user_session(
             session,
             gas_meter,
             traversal_context,
             new_published_modules_loaded,
-        )?;
-        Ok(module_write_set)
+            change_set_configs,
+        )
     }
 
     fn failure_multisig_payload_cleanup<'r, 'l>(
@@ -1334,122 +1324,126 @@ impl AptosVM {
     }
 
     /// Resolve a pending code publish request registered via the NativeCodeContext.
-    fn resolve_pending_code_publish(
+    fn resolve_pending_code_publish_and_finish_user_session(
         &self,
-        session: &mut SessionExt,
+        mut session: UserSession<'_, '_>,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         new_published_modules_loaded: &mut bool,
-    ) -> VMResult<BTreeMap<StateKey, WriteOp>> {
-        if let Some(publish_request) = session.extract_publish_request() {
-            let PublishRequest {
-                destination,
-                bundle,
-                expected_modules,
-                allowed_deps,
-                check_compat: _,
-            } = publish_request;
+        change_set_configs: &ChangeSetConfigs,
+    ) -> Result<UserSessionChangeSet, VMStatus> {
+        let module_publishing_result = session.execute(|session| {
+            if let Some(publish_request) = session.extract_publish_request() {
+                let PublishRequest {
+                    destination,
+                    bundle,
+                    expected_modules,
+                    allowed_deps,
+                    check_compat: _,
+                } = publish_request;
 
-            // TODO: unfortunately we need to deserialize the entire bundle here to handle
-            // `init_module` and verify some deployment conditions, while the VM need to do
-            // the deserialization again. Consider adding an API to MoveVM which allows to
-            // directly pass CompiledModule.
-            let modules = self.deserialize_module_bundle(&bundle)?;
-            let modules: &Vec<CompiledModule> =
-                traversal_context.referenced_module_bundles.alloc(modules);
+                // TODO: unfortunately we need to deserialize the entire bundle here to handle
+                // `init_module` and verify some deployment conditions, while the VM need to do
+                // the deserialization again. Consider adding an API to MoveVM which allows to
+                // directly pass CompiledModule.
+                let modules = self.deserialize_module_bundle(&bundle)?;
+                let modules: &Vec<CompiledModule> =
+                    traversal_context.referenced_module_bundles.alloc(modules);
 
-            // Note: Feature gating is needed here because the traversal of the dependencies could
-            //       result in shallow-loading of the modules and therefore subtle changes in
-            //       the error semantics.
-            if self.gas_feature_version >= 15 {
-                // Charge old versions of the modules, in case of upgrades.
-                session.check_dependencies_and_charge_gas_non_recursive_optional(
-                    gas_meter,
-                    traversal_context,
-                    modules
+                // Note: Feature gating is needed here because the traversal of the dependencies could
+                //       result in shallow-loading of the modules and therefore subtle changes in
+                //       the error semantics.
+                if self.gas_feature_version >= 15 {
+                    // Charge old versions of the modules, in case of upgrades.
+                    session.check_dependencies_and_charge_gas_non_recursive_optional(
+                        gas_meter,
+                        traversal_context,
+                        modules
+                            .iter()
+                            .map(|module| (module.self_addr(), module.self_name())),
+                    )?;
+
+                    // Charge all modules in the bundle that is about to be published.
+                    for (module, blob) in modules.iter().zip(bundle.iter()) {
+                        let module_id = &module.self_id();
+                        gas_meter
+                            .charge_dependency(
+                                true,
+                                module_id.address(),
+                                module_id.name(),
+                                NumBytes::new(blob.code().len() as u64),
+                            )
+                            .map_err(|err| err.finish(Location::Undefined))?;
+                    }
+
+                    // Charge all dependencies.
+                    //
+                    // Must exclude the ones that are in the current bundle because they have not
+                    // been published yet.
+                    let module_ids_in_bundle = modules
                         .iter()
-                        .map(|module| (module.self_addr(), module.self_name())),
-                )?;
+                        .map(|module| (module.self_addr(), module.self_name()))
+                        .collect::<BTreeSet<_>>();
 
-                // Charge all modules in the bundle that is about to be published.
-                for (module, blob) in modules.iter().zip(bundle.iter()) {
-                    let module_id = &module.self_id();
-                    gas_meter
-                        .charge_dependency(
-                            true,
-                            module_id.address(),
-                            module_id.name(),
-                            NumBytes::new(blob.code().len() as u64),
-                        )
-                        .map_err(|err| err.finish(Location::Undefined))?;
+                    session.check_dependencies_and_charge_gas(
+                        gas_meter,
+                        traversal_context,
+                        modules
+                            .iter()
+                            .flat_map(|module| {
+                                module
+                                    .immediate_dependencies_iter()
+                                    .chain(module.immediate_friends_iter())
+                            })
+                            .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
+                    )?;
+
+                    // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
                 }
 
-                // Charge all dependencies.
-                //
-                // Must exclude the ones that are in the current bundle because they have not
-                // been published yet.
-                let module_ids_in_bundle = modules
-                    .iter()
-                    .map(|module| (module.self_addr(), module.self_name()))
-                    .collect::<BTreeSet<_>>();
+                // Validate the module bundle
+                self.validate_publish_request(session, modules, expected_modules, allowed_deps)?;
 
-                session.check_dependencies_and_charge_gas(
+                // Check what modules exist before publishing.
+                let mut exists = BTreeSet::new();
+                for m in modules {
+                    let id = m.self_id();
+                    if session.exists_module(&id)? {
+                        exists.insert(id);
+                    }
+                }
+
+                // Publish the bundle and execute initializers
+                // publish_module_bundle doesn't actually load the published module into
+                // the loader cache. It only puts the module data in the data cache.
+                session.publish_module_bundle_with_compat_config(
+                    bundle.into_inner(),
+                    destination,
                     gas_meter,
-                    traversal_context,
-                    modules
-                        .iter()
-                        .flat_map(|module| {
-                            module
-                                .immediate_dependencies_iter()
-                                .chain(module.immediate_friends_iter())
-                        })
-                        .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
+                    Compatibility::new(
+                        true,
+                        true,
+                        !self
+                            .features()
+                            .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                    ),
                 )?;
 
-                // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
+                self.execute_module_initialization(
+                    session,
+                    gas_meter,
+                    modules,
+                    exists,
+                    &[destination],
+                    new_published_modules_loaded,
+                    traversal_context,
+                )?;
             }
+            Ok::<(), VMError>(())
+        });
+        module_publishing_result?;
 
-            // Validate the module bundle
-            self.validate_publish_request(session, modules, expected_modules, allowed_deps)?;
-
-            // Check what modules exist before publishing.
-            let mut exists = BTreeSet::new();
-            for m in modules {
-                let id = m.self_id();
-                if session.exists_module(&id)? {
-                    exists.insert(id);
-                }
-            }
-
-            // Publish the bundle and execute initializers
-            // publish_module_bundle doesn't actually load the published module into
-            // the loader cache. It only puts the module data in the data cache.
-            session.publish_module_bundle_with_compat_config(
-                bundle.into_inner(),
-                destination,
-                gas_meter,
-                Compatibility::new(
-                    true,
-                    true,
-                    !self
-                        .features()
-                        .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-                ),
-            )?;
-
-            self.execute_module_initialization(
-                session,
-                gas_meter,
-                modules,
-                exists,
-                &[destination],
-                new_published_modules_loaded,
-                traversal_context,
-            )?;
-            Ok(BTreeMap::new())
-        } else {
-            Ok(BTreeMap::new())
-        }
+        session.finish(BTreeMap::new(), change_set_configs)
     }
 
     /// Validate a publish request.
