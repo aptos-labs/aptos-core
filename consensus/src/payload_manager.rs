@@ -3,7 +3,7 @@
 
 use crate::{
     consensus_observer::{
-        network_message::ConsensusObserverMessage, observer::ObserverDataStatus,
+        network_message::ConsensusObserverMessage, payload_store::BlockPayloadStatus,
         publisher::ConsensusPublisher,
     },
     counters,
@@ -42,7 +42,7 @@ pub enum PayloadManager {
         Option<Arc<ConsensusPublisher>>,
     ),
     ConsensusObserver(
-        Arc<Mutex<HashMap<HashValue, ObserverDataStatus>>>,
+        Arc<Mutex<HashMap<HashValue, BlockPayloadStatus>>>,
         Option<Arc<ConsensusPublisher>>,
     ),
 }
@@ -189,8 +189,8 @@ impl PayloadManager {
             // It's important to make sure this doesn't race with the payload insertion part.
             let result = match txns_pool.lock().entry(block.id()) {
                 Entry::Occupied(mut value) => match value.get_mut() {
-                    ObserverDataStatus::Available(data) => Either::Left(data.clone()),
-                    ObserverDataStatus::Requested(tx) => {
+                    BlockPayloadStatus::Available(data) => Either::Left(data.clone()),
+                    BlockPayloadStatus::Requested(tx) => {
                         let (new_tx, rx) = oneshot::channel();
                         *tx = new_tx;
                         Either::Right(rx)
@@ -198,7 +198,7 @@ impl PayloadManager {
                 },
                 Entry::Vacant(entry) => {
                     let (tx, rx) = oneshot::channel();
-                    entry.insert(ObserverDataStatus::Requested(tx));
+                    entry.insert(BlockPayloadStatus::Requested(tx));
                     Either::Right(rx)
                 },
             };
