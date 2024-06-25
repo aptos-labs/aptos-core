@@ -208,11 +208,13 @@ proptest! {
         let sig_unchecked = Signature::from_bytes_unchecked(&serialized);
         prop_assert!(sig_unchecked.is_ok());
 
-        // S = ORDER_HALF should be a canonical signature.
+        // Update the signature by setting S = L to make it invalid.
         serialized[32..].copy_from_slice(&ORDER_HALF);
-        let canonical: &[u8] = &serialized;
-        prop_assert!(
-            Signature::try_from(canonical).is_ok()
+        let serialized_malleable_l: &[u8] = &serialized;
+        // try_from will fail with CanonicalRepresentationError.
+        prop_assert_eq!(
+            Signature::try_from(serialized_malleable_l),
+            Err(CryptoMaterialError::CanonicalRepresentationError)
         );
     }
 }
