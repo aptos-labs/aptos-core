@@ -451,7 +451,7 @@ fn main() {
 
 
     let (sendx, recvx) = std::sync::mpsc::channel();
-    let num_threads = 10000;
+    let num_threads = 100000;
     let thread_pool = rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .thread_name(|i| format!("thread-{}", i))
