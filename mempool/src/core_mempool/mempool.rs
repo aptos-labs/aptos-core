@@ -650,16 +650,19 @@ impl Mempool {
         // but can't be executed before first txn. Once observed, such txn will be saved in
         // `skipped` DS and rechecked once it's ancestor becomes available
         let mut skipped = HashSet::new();
+        let mut first_skipped = HashSet::new();
         let mut total_bytes = 0;
         let mut txn_walked = 0usize;
         let mut txns_not_excluded: usize = 0;
         let mut initially_skipped = 0usize;
         let mut result_pushed: usize = 0;
+        let mut txns_walked = Vec::new();
+
         // iterate over the queue of transactions based on gas price
         'main: for txn in self.transactions.iter_queue() {
             txn_walked += 1;
             let txn_ptr = TxnPointer::from(txn);
-
+            txns_walked.push((txn.address, txn.sequence_number.transaction_sequence_number));
             // TODO: removed gas upgraded logic. double check if it's needed
             if exclude_transactions.contains_key(&txn_ptr) {
                 continue;
@@ -712,6 +715,7 @@ impl Mempool {
                 }
             } else {
                 skipped.insert((txn.address, tx_seq));
+                first_skipped.insert((txn.address, tx_seq));
                 initially_skipped += 1;
             }
         }
@@ -761,7 +765,20 @@ impl Mempool {
                 .collect::<Vec<&u64>>();
             skipped_seq_numbers.sort();
 
-            info!("Skipped txn: {:?}, account sequence number: {:?}, existing sequence numbers: {:?}, was_chosen: {}, account_sequence_number in excluded: {:?}, sequence numbers in excluded: {:?}, sequence numbers inserted: {:?}, sequence numbers skipped: {:?}", txn, self.transactions.get_sequence_number(&txn.0), account_seq_numbers, Self::txn_was_chosen(txn.0, txn.1 - 1, &inserted, &exclude_transactions), account_exluded, excluded_seq_numbers, inserted_seq_numbers, skipped_seq_numbers);
+            let mut first_skipped_seq_numbers = first_skipped
+                .iter()
+                .filter(|(sender, _)| *sender == txn.0)
+                .map(|(_, seq)| seq)
+                .collect::<Vec<&u64>>();
+            first_skipped_seq_numbers.sort();
+
+            let txns_walked_seq_numbers = txns_walked
+                .iter()
+                .filter(|(sender, _)| *sender == txn.0)
+                .map(|(_, seq)| seq)
+                .collect::<Vec<&u64>>();
+
+            info!("Skipped txn: {:?}, account sequence number: {:?}, existing sequence numbers: {:?}, was_chosen: {}, account_sequence_number in excluded: {:?}, sequence numbers in excluded: {:?}, sequence numbers inserted: {:?}, sequence numbers skipped: {:?}, sequence numbers originally skipped: {:?}, sequence numbers walked: {:?}", txn, self.transactions.get_sequence_number(&txn.0), account_seq_numbers, Self::txn_was_chosen(txn.0, txn.1 - 1, &inserted, &exclude_transactions), account_exluded, excluded_seq_numbers, inserted_seq_numbers, skipped_seq_numbers, first_skipped_seq_numbers, txns_walked_seq_numbers);
         }
         let result_size = result.len();
         let inserted_size = inserted.len();
