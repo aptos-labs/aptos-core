@@ -21,7 +21,7 @@ module 0x3.B {
     }
 }
 
-//# run --signers 0x1 --check-runtime-types
+//# run --signers 0x1
 import 0x3.B;
 import 0x2.A;
 main(account: signer) {

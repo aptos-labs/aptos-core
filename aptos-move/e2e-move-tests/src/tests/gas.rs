@@ -18,8 +18,8 @@ use aptos_types::{
     account_address::{default_stake_pool_address, AccountAddress},
     account_config::CORE_CODE_ADDRESS,
     transaction::{EntryFunction, TransactionPayload},
+    vm::configs::set_paranoid_type_checks,
 };
-use aptos_vm::AptosVM;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use sha3::{Digest, Sha3_512};
 use std::path::Path;
@@ -111,7 +111,7 @@ fn test_gas() {
         }
     };
 
-    AptosVM::set_paranoid_type_checks(true);
+    set_paranoid_type_checks(true);
 
     run(
         &mut harness,

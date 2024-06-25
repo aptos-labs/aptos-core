@@ -87,6 +87,14 @@ impl DeserializerConfig {
     }
 }
 
+impl Default for DeserializerConfig {
+    fn default() -> Self {
+        // Note that here version max is used as a default version, as this how
+        // it was previously defined in VM config.
+        Self::new(VERSION_MAX, IDENTIFIER_SIZE_MAX)
+    }
+}
+
 /// Table info: table type, offset where the table content starts from, count of bytes for
 /// the table content.
 #[derive(Clone, Debug)]

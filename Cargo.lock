@@ -4305,7 +4305,6 @@ dependencies = [
  "aptos-proptest-helpers",
  "aptos-types",
  "aptos-vm",
- "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
  "move-core-types",
@@ -4375,6 +4374,7 @@ dependencies = [
  "either",
  "move-binary-format",
  "move-core-types",
+ "move-vm-runtime",
  "move-vm-types",
  "rand 0.7.3",
  "serde",
@@ -4423,20 +4423,12 @@ name = "aptos-writeset-generator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-cached-packages",
  "aptos-crypto",
- "aptos-framework",
- "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm",
- "aptos-vm-types",
- "handlebars",
- "move-compiler",
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",
- "serde",
- "tempfile",
 ]
 
 [[package]]
@@ -8173,7 +8165,6 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
- "move-vm-runtime",
  "move-vm-types",
  "once_cell",
  "rayon",
@@ -11108,6 +11099,7 @@ dependencies = [
  "difference",
  "move-binary-format",
  "move-bytecode-source-map",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-compiler",
  "move-compiler-v2",

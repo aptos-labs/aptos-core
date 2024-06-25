@@ -19,7 +19,6 @@ libfuzzer-sys = "0.4"
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
-move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true, features = ["fuzzing"] }
 once_cell = { workspace = true }
 rayon = { workspace = true }

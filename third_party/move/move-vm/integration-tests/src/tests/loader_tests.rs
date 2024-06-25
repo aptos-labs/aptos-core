@@ -53,6 +53,7 @@ impl Adapter {
                 Identifier::new("just_c").unwrap(),
             ),
         ];
+
         let config = VMConfig {
             verifier_config: VerifierConfig {
                 max_dependency_depth: Some(100),
@@ -62,7 +63,7 @@ impl Adapter {
         };
         Self {
             store,
-            vm: Arc::new(MoveVM::new_with_config(vec![], config).unwrap()),
+            vm: Arc::new(MoveVM::new_with_config(vec![], config)),
             functions,
         }
     }
@@ -77,7 +78,7 @@ impl Adapter {
         };
         Self {
             store: self.store,
-            vm: Arc::new(MoveVM::new_with_config(vec![], config).unwrap()),
+            vm: Arc::new(MoveVM::new_with_config(vec![], config)),
             functions: self.functions,
         }
     }
