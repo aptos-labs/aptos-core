@@ -214,7 +214,6 @@ impl VMChangeSetBuilder {
     pub(crate) fn build(self) -> VMChangeSet {
         VMChangeSet::new(
             self.resource_write_set,
-            BTreeMap::new(),
             self.events,
             self.delayed_field_change_set,
             self.aggregator_v1_write_set,
@@ -362,7 +361,6 @@ impl ExpandedVMChangeSetBuilder {
         VMChangeSet::new_expanded(
             self.resource_write_set,
             self.resource_group_write_set,
-            BTreeMap::new(),
             self.aggregator_v1_write_set,
             self.aggregator_v1_delta_set,
             self.delayed_field_change_set,

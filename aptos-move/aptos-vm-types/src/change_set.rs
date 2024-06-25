@@ -80,7 +80,6 @@ pub fn randomly_check_layout_matches(
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMChangeSet {
     resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
-    module_write_set: BTreeMap<StateKey, WriteOp>,
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 
     // Changes separated out from the writes, for better concurrency,
@@ -110,7 +109,6 @@ impl VMChangeSet {
     pub fn empty() -> Self {
         Self {
             resource_write_set: BTreeMap::new(),
-            module_write_set: BTreeMap::new(),
             events: vec![],
             delayed_field_change_set: BTreeMap::new(),
             aggregator_v1_write_set: BTreeMap::new(),
@@ -120,7 +118,6 @@ impl VMChangeSet {
 
     pub fn new(
         resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
-        module_write_set: BTreeMap<StateKey, WriteOp>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
@@ -129,7 +126,6 @@ impl VMChangeSet {
     ) -> PartialVMResult<Self> {
         let change_set = Self {
             resource_write_set,
-            module_write_set,
             events,
             delayed_field_change_set,
             aggregator_v1_write_set,
@@ -145,7 +141,6 @@ impl VMChangeSet {
     pub fn new_expanded(
         resource_write_set: BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
         resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
-        module_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
@@ -214,7 +209,6 @@ impl VMChangeSet {
                         }
                     },
                 )?,
-            module_write_set,
             events,
             delayed_field_change_set,
             aggregator_v1_write_set,
@@ -265,7 +259,6 @@ impl VMChangeSet {
         let events = events.into_iter().map(|event| (event, None)).collect();
         let change_set = Self {
             resource_write_set,
-            module_write_set: BTreeMap::new(),
             delayed_field_change_set: BTreeMap::new(),
             aggregator_v1_write_set: BTreeMap::new(),
             aggregator_v1_delta_set: BTreeMap::new(),
@@ -293,7 +286,6 @@ impl VMChangeSet {
         // that knows how to deal with it.
         let Self {
             resource_write_set,
-            module_write_set: _,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
             delayed_field_change_set,
@@ -342,19 +334,14 @@ impl VMChangeSet {
             .iter()
             .map(|(k, v)| (k, v.try_as_concrete_write()))
             .chain(
-                self.module_write_set()
+                self.aggregator_v1_write_set()
                     .iter()
-                    .chain(self.aggregator_v1_write_set().iter())
                     .map(|(k, v)| (k, Some(v))),
             )
     }
 
     pub fn resource_write_set(&self) -> &BTreeMap<StateKey, AbstractResourceWriteOp> {
         &self.resource_write_set
-    }
-
-    pub fn module_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
-        &self.module_write_set
     }
 
     // Called by `into_transaction_output_with_materialized_writes` only.
@@ -593,23 +580,6 @@ impl VMChangeSet {
         Ok(())
     }
 
-    fn squash_additional_module_writes(
-        write_set: &mut BTreeMap<StateKey, WriteOp>,
-        additional_write_set: BTreeMap<StateKey, WriteOp>,
-    ) -> PartialVMResult<()> {
-        for (key, additional_write_op) in additional_write_set.into_iter() {
-            match write_set.entry(key) {
-                Occupied(mut entry) => {
-                    squash_writes_pair!(entry, additional_write_op);
-                },
-                Vacant(entry) => {
-                    entry.insert(additional_write_op);
-                },
-            }
-        }
-        Ok(())
-    }
-
     fn squash_additional_resource_write_ops<
         K: Hash + Eq + PartialEq + Ord + Clone + std::fmt::Debug,
     >(
@@ -834,7 +804,6 @@ impl VMChangeSet {
     ) -> PartialVMResult<()> {
         let Self {
             resource_write_set: additional_resource_write_set,
-            module_write_set: additional_module_write_set,
             aggregator_v1_write_set: additional_aggregator_write_set,
             aggregator_v1_delta_set: additional_aggregator_delta_set,
             delayed_field_change_set: additional_delayed_field_change_set,
@@ -850,10 +819,6 @@ impl VMChangeSet {
         Self::squash_additional_resource_writes(
             &mut self.resource_write_set,
             additional_resource_write_set,
-        )?;
-        Self::squash_additional_module_writes(
-            &mut self.module_write_set,
-            additional_module_write_set,
         )?;
         Self::squash_additional_delayed_field_changes(
             &mut self.delayed_field_change_set,
@@ -895,9 +860,7 @@ pub trait ChangeSetLike {
 
 impl ChangeSetLike for VMChangeSet {
     fn num_write_ops(&self) -> usize {
-        self.resource_write_set().len()
-            + self.module_write_set().len()
-            + self.aggregator_v1_write_set().len()
+        self.resource_write_set().len() + self.aggregator_v1_write_set().len()
     }
 
     fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
@@ -905,9 +868,8 @@ impl ChangeSetLike for VMChangeSet {
             .iter()
             .map(|(k, v)| (k, v.materialized_size()))
             .chain(
-                self.module_write_set()
+                self.aggregator_v1_write_set()
                     .iter()
-                    .chain(self.aggregator_v1_write_set().iter())
                     .map(|(k, v)| (k, v.write_op_size())),
             )
     }
@@ -924,14 +886,6 @@ impl ChangeSetLike for VMChangeSet {
                 metadata_mut: op.get_metadata_mut(),
             })
         });
-        let modules = self.module_write_set.iter_mut().map(|(key, op)| {
-            Ok(WriteOpInfo {
-                key,
-                op_size: op.write_op_size(),
-                prev_size: executor_view.get_module_state_value_size(key)?.unwrap_or(0),
-                metadata_mut: op.get_metadata_mut(),
-            })
-        });
         let v1_aggregators = self.aggregator_v1_write_set.iter_mut().map(|(key, op)| {
             Ok(WriteOpInfo {
                 key,
@@ -943,7 +897,7 @@ impl ChangeSetLike for VMChangeSet {
             })
         });
 
-        resources.chain(modules).chain(v1_aggregators)
+        resources.chain(v1_aggregators)
     }
 
     fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {

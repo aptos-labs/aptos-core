@@ -23,7 +23,6 @@ use move_core_types::{
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
-use std::collections::BTreeMap;
 
 pub struct GenesisSession<'r, 'l>(SessionExt<'r, 'l>);
 
@@ -115,7 +114,7 @@ where
 {
     let vm = GenesisMoveVM::new(chain_id);
 
-    let change_set = {
+    let (change_set, module_write_set) = {
         let resolver = state_view.as_move_resolver();
         let mut session = GenesisSession(vm.new_genesis_session(&resolver, genesis_id));
         session.disable_reconfiguration();
@@ -135,6 +134,6 @@ where
     //  and can directly publish modules, and use a single genesis session!
 
     change_set
-        .try_into_storage_change_set(BTreeMap::new())
+        .try_into_storage_change_set(module_write_set)
         .expect("Conversion from VMChangeSet into ChangeSet should always succeed")
 }

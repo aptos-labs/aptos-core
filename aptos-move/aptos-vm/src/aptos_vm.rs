@@ -65,7 +65,7 @@ use aptos_types::{
     vm_status::{AbortLocation, StatusCode, VMStatus},
     write_set::WriteOp,
 };
-use aptos_utils::{aptos_try, return_on_failure};
+use aptos_utils::aptos_try;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp,
@@ -144,10 +144,10 @@ pub(crate) fn get_system_transaction_output(
     session: SessionExt,
     change_set_configs: &ChangeSetConfigs,
 ) -> Result<VMOutput, VMStatus> {
-    let change_set = session.finish(change_set_configs)?;
+    let (change_set, module_write_set) = session.finish(change_set_configs)?;
     Ok(VMOutput::new(
         change_set,
-        BTreeMap::new(),
+        module_write_set,
         FeeStatement::zero(),
         TransactionStatus::Keep(ExecutionStatus::Success),
         TransactionAuxiliaryData::default(),
@@ -831,7 +831,7 @@ impl AptosVM {
             _ => unreachable!("Only scripts or entry functions are executed"),
         };
 
-        session.execute(|session| {
+        let module_write_set = session.execute(|session| {
             self.resolve_pending_code_publish(
                 session,
                 gas_meter,
@@ -842,6 +842,7 @@ impl AptosVM {
 
         let epilogue_session = self.charge_change_set_and_respawn_session(
             session,
+            module_write_set,
             resolver,
             gas_meter,
             change_set_configs,
@@ -889,12 +890,14 @@ impl AptosVM {
     fn charge_change_set_and_respawn_session<'r, 'l>(
         &'l self,
         user_session: UserSession<'r, 'l>,
+        module_write_set: BTreeMap<StateKey, WriteOp>,
         resolver: &'r impl AptosMoveResolver,
         gas_meter: &mut impl AptosGasMeter,
         change_set_configs: &ChangeSetConfigs,
         txn_data: &'l TransactionMetadata,
     ) -> Result<EpilogueSession<'r, 'l>, VMStatus> {
-        let mut user_session_change_set = user_session.finish(change_set_configs)?;
+        let mut user_session_change_set =
+            user_session.finish(module_write_set, change_set_configs)?;
 
         let storage_refund =
             self.charge_change_set(&mut user_session_change_set, gas_meter, txn_data, resolver)?;
@@ -927,8 +930,8 @@ impl AptosVM {
                 match multisig_payload {
                     MultisigTransactionPayload::EntryFunction(entry_function) => {
                         aptos_try!({
-                            return_on_failure!(session.execute(|session| self
-                                .execute_multisig_entry_function(
+                            let module_write_set = session.execute(|session| {
+                                self.execute_multisig_entry_function(
                                     resolver,
                                     session,
                                     gas_meter,
@@ -937,13 +940,16 @@ impl AptosVM {
                                     entry_function,
                                     new_published_modules_loaded,
                                     txn_data,
-                                )));
+                                )
+                            })?;
+
                             // TODO: Deduplicate this against execute_multisig_transaction
                             // A bit tricky since we need to skip success/failure cleanups,
                             // which is in the middle. Introducing a boolean would make the code
                             // messier.
                             let epilogue_session = self.charge_change_set_and_respawn_session(
                                 session,
+                                module_write_set,
                                 resolver,
                                 gas_meter,
                                 change_set_configs,
@@ -1086,33 +1092,52 @@ impl AptosVM {
             MoveValue::Address(txn_payload.multisig_address),
             MoveValue::vector_u8(payload_bytes),
         ]);
-        let epilogue_session = if let Err(execution_error) = execution_result {
-            // Invalidate the loader cache in case there was a new module loaded from a module
-            // publish request that failed.
-            // This is redundant with the logic in execute_user_transaction but unfortunately is
-            // necessary here as executing the underlying call can fail without this function
-            // returning an error to execute_user_transaction.
-            if *new_published_modules_loaded {
-                self.move_vm.mark_loader_cache_as_invalid();
-            };
-            self.failure_multisig_payload_cleanup(
-                resolver,
-                prologue_change_set,
-                execution_error,
-                txn_data,
-                cleanup_args,
-                traversal_context,
-            )?
-        } else {
-            self.success_multisig_payload_cleanup(
-                resolver,
-                session,
-                gas_meter,
-                txn_data,
-                cleanup_args,
-                change_set_configs,
-                traversal_context,
-            )?
+
+        let epilogue_session = match execution_result {
+            Err(execution_error) => {
+                // Invalidate the loader cache in case there was a new module loaded from a module
+                // publish request that failed.
+                // This is redundant with the logic in execute_user_transaction but unfortunately is
+                // necessary here as executing the underlying call can fail without this function
+                // returning an error to execute_user_transaction.
+                if *new_published_modules_loaded {
+                    self.move_vm.mark_loader_cache_as_invalid();
+                };
+                self.failure_multisig_payload_cleanup(
+                    resolver,
+                    prologue_change_set,
+                    execution_error,
+                    txn_data,
+                    cleanup_args,
+                    traversal_context,
+                )?
+            },
+            Ok(module_write_set) => {
+                // Charge gas for write set before we do cleanup. This ensures we don't charge gas for
+                // cleanup write set changes, which is consistent with outer-level success cleanup
+                // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
+                let mut epilogue_session = self.charge_change_set_and_respawn_session(
+                    session,
+                    module_write_set,
+                    resolver,
+                    gas_meter,
+                    change_set_configs,
+                    txn_data,
+                )?;
+                epilogue_session.execute(|session| {
+                    session
+                        .execute_function_bypass_visibility(
+                            &MULTISIG_ACCOUNT_MODULE,
+                            SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP,
+                            vec![],
+                            cleanup_args,
+                            &mut UnmeteredGasMeter,
+                            traversal_context,
+                        )
+                        .map_err(|e| e.into_vm_status())
+                })?;
+                epilogue_session
+            },
         };
 
         // TODO(Gas): Charge for aggregator writes
@@ -1177,7 +1202,7 @@ impl AptosVM {
         payload: &EntryFunction,
         new_published_modules_loaded: &mut bool,
         txn_data: &TransactionMetadata,
-    ) -> Result<(), VMStatus> {
+    ) -> Result<BTreeMap<StateKey, WriteOp>, VMStatus> {
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
         self.validate_and_execute_entry_function(
@@ -1192,48 +1217,13 @@ impl AptosVM {
 
         // Resolve any pending module publishes in case the multisig transaction is deploying
         // modules.
-        self.resolve_pending_code_publish(
+        let module_write_set = self.resolve_pending_code_publish(
             session,
             gas_meter,
             traversal_context,
             new_published_modules_loaded,
         )?;
-        Ok(())
-    }
-
-    fn success_multisig_payload_cleanup<'r, 'l>(
-        &'l self,
-        resolver: &'r impl AptosMoveResolver,
-        session: UserSession<'r, 'l>,
-        gas_meter: &mut impl AptosGasMeter,
-        txn_data: &'l TransactionMetadata,
-        cleanup_args: Vec<Vec<u8>>,
-        change_set_configs: &ChangeSetConfigs,
-        traversal_context: &mut TraversalContext,
-    ) -> Result<EpilogueSession<'r, 'l>, VMStatus> {
-        // Charge gas for write set before we do cleanup. This ensures we don't charge gas for
-        // cleanup write set changes, which is consistent with outer-level success cleanup
-        // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
-        let mut epilogue_session = self.charge_change_set_and_respawn_session(
-            session,
-            resolver,
-            gas_meter,
-            change_set_configs,
-            txn_data,
-        )?;
-        epilogue_session.execute(|session| {
-            session
-                .execute_function_bypass_visibility(
-                    &MULTISIG_ACCOUNT_MODULE,
-                    SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP,
-                    vec![],
-                    cleanup_args,
-                    &mut UnmeteredGasMeter,
-                    traversal_context,
-                )
-                .map_err(|e| e.into_vm_status())
-        })?;
-        Ok(epilogue_session)
+        Ok(module_write_set)
     }
 
     fn failure_multisig_payload_cleanup<'r, 'l>(
@@ -1350,15 +1340,16 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         new_published_modules_loaded: &mut bool,
-    ) -> VMResult<()> {
-        if let Some(PublishRequest {
-            destination,
-            bundle,
-            expected_modules,
-            allowed_deps,
-            check_compat: _,
-        }) = session.extract_publish_request()
-        {
+    ) -> VMResult<BTreeMap<StateKey, WriteOp>> {
+        if let Some(publish_request) = session.extract_publish_request() {
+            let PublishRequest {
+                destination,
+                bundle,
+                expected_modules,
+                allowed_deps,
+                check_compat: _,
+            } = publish_request;
+
             // TODO: unfortunately we need to deserialize the entire bundle here to handle
             // `init_module` and verify some deployment conditions, while the VM need to do
             // the deserialization again. Consider adding an API to MoveVM which allows to
@@ -1433,7 +1424,7 @@ impl AptosVM {
             // Publish the bundle and execute initializers
             // publish_module_bundle doesn't actually load the published module into
             // the loader cache. It only puts the module data in the data cache.
-            return_on_failure!(session.publish_module_bundle_with_compat_config(
+            session.publish_module_bundle_with_compat_config(
                 bundle.into_inner(),
                 destination,
                 gas_meter,
@@ -1444,7 +1435,7 @@ impl AptosVM {
                         .features()
                         .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
                 ),
-            ));
+            )?;
 
             self.execute_module_initialization(
                 session,
@@ -1454,9 +1445,10 @@ impl AptosVM {
                 &[destination],
                 new_published_modules_loaded,
                 traversal_context,
-            )
+            )?;
+            Ok(BTreeMap::new())
         } else {
-            Ok(())
+            Ok(BTreeMap::new())
         }
     }
 
@@ -1882,10 +1874,9 @@ impl AptosVM {
                     senders,
                     script,
                 )?;
-                let change_set = tmp_session.finish(&change_set_configs)?;
+                let (change_set, module_write_set) = tmp_session.finish(&change_set_configs)?;
 
-                // FIXME(George): What about code publishing?
-                Ok((change_set, BTreeMap::new()))
+                Ok((change_set, module_write_set))
             },
         }
     }

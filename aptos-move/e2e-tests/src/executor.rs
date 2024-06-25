@@ -70,7 +70,7 @@ use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     env,
     fs::{self, OpenOptions},
     io::Write,
@@ -1015,13 +1015,13 @@ impl FakeExecutor {
                     println!("Should error, but ignoring for now... {}", err);
                 }
             }
-            let change_set = session
+            let (change_set, module_write_set) = session
                 .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                     LATEST_GAS_FEATURE_VERSION,
                 ))
                 .expect("Failed to generate txn effects");
             change_set
-                .try_into_storage_change_set(BTreeMap::new())
+                .try_into_storage_change_set(module_write_set)
                 .expect("Failed to convert to ChangeSet")
                 .into_inner()
         };
@@ -1071,13 +1071,13 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            let change_set = session
+            let (change_set, module_write_set) = session
                 .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                     LATEST_GAS_FEATURE_VERSION,
                 ))
                 .expect("Failed to generate txn effects");
             change_set
-                .try_into_storage_change_set(BTreeMap::new())
+                .try_into_storage_change_set(module_write_set)
                 .expect("Failed to convert to ChangeSet")
                 .into_inner()
         };
@@ -1123,14 +1123,13 @@ impl FakeExecutor {
             )
             .map_err(|e| e.into_vm_status())?;
 
-        let change_set = session
+        let (change_set, module_write_set) = session
             .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                 LATEST_GAS_FEATURE_VERSION,
             ))
             .expect("Failed to generate txn effects");
-        // TODO: Support deltas in fake executor.
         let (write_set, events) = change_set
-            .try_into_storage_change_set(BTreeMap::new())
+            .try_into_storage_change_set(module_write_set)
             .expect("Failed to convert to ChangeSet")
             .into_inner();
         Ok((write_set, events))
