@@ -433,6 +433,35 @@ where
 }
 
 fn main() {
+    let (sendx, recvx) = std::sync::mpsc::channel();
+    let num_threads = 1000;
+    let thread_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(num_threads)
+        .thread_name(|i| format!("thread-{}", i))
+        .build()
+        .unwrap();
+
+    (0..num_threads).into_iter().for_each(|i| {
+        let sendx_clone = sendx.clone();
+        thread_pool.spawn(move || {
+            //sleep(Duration::new(3, 0));
+            let mut sum:u64 = 0;
+            for i in 0..100000000 {
+                sum += i % 313;
+            }
+            //println!("Hello from thread {}", rng.gen_range(0..10));
+            sendx_clone.send(sum).unwrap();
+        })
+    });
+    let mut cnt = 0;
+    while let Ok(msg) = recvx.recv() {
+        println!("Received message: {:?}", msg);
+        cnt += 1;
+        if cnt == num_threads {
+            break;
+        }
+    }
+    println!("END of CPU test");
     let opt = Opt::parse();
     aptos_logger::Logger::new().init();
     START_TIME.set(
