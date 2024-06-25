@@ -236,8 +236,18 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             .with_label_values(&["0", "kv_requests_4"])
             .start_timer();
 
+        let timer_5 = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "kv_requests_lock"])
+            .start_timer();
         let rand_send_thread_idx = rng.gen_range(0, kv_tx[shard_id].len());
-        kv_tx[shard_id][rand_send_thread_idx].lock().unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
+        let mtx = kv_tx[shard_id][rand_send_thread_idx].lock();
+        drop(timer_5);
+        let timer_6 = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "kv_requests_send"])
+            .start_timer();
+        mtx.unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
+        drop(timer_6);
+
         {
             let curr_time = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)

@@ -338,10 +338,14 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                         let execute_command_type = format!("execute_command_{}", shard_id);
                         let mut rng = StdRng::from_entropy();
                         let rand_send_thread_idx = rng.gen_range(0, senders[shard_id].len());
+                        let timer_1 = REMOTE_EXECUTOR_TIMER
+                            .with_label_values(&["0", "cmd_tx_lock_send"])
+                            .start_timer();
                         senders[shard_id][rand_send_thread_idx]
                             .lock()
                             .unwrap()
                             .send(msg, &MessageType::new(execute_command_type));
+                        drop(timer_1)
                     });
                 
                 /*let shard_txns = &transactions_clone.get_ref().0[shard_id];
