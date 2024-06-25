@@ -32,7 +32,8 @@ use aptos_types::{
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
-    abstract_write_op::AbstractResourceWriteOp, environment::Environment, output::VMOutput,
+    abstract_write_op::AbstractResourceWriteOp, change_set::ChangeSetLike,
+    environment::Environment, output::VMOutput,
 };
 use move_core_types::{
     language_storage::StructTag,

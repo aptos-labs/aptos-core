@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet};
+use crate::change_set::ChangeSetLike;
 use aptos_gas_schedule::AptosGasParameters;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
@@ -82,10 +82,8 @@ impl ChangeSetConfigs {
             params.max_write_ops_per_transaction.into(),
         )
     }
-}
 
-impl CheckChangeSet for ChangeSetConfigs {
-    fn check_change_set(&self, change_set: &VMChangeSet) -> PartialVMResult<()> {
+    pub fn check_change_set(&self, change_set: &impl ChangeSetLike) -> PartialVMResult<()> {
         if self.max_write_ops_per_transaction != 0
             && change_set.num_write_ops() as u64 > self.max_write_ops_per_transaction
         {
@@ -108,7 +106,7 @@ impl CheckChangeSet for ChangeSetConfigs {
         }
 
         let mut total_event_size = 0;
-        for (event, _) in change_set.events() {
+        for event in change_set.events_iter() {
             let size = event.event_data().len() as u64;
             if size > self.max_bytes_per_event {
                 return Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED));

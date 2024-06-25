@@ -67,7 +67,7 @@ use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp,
-    change_set::VMChangeSet,
+    change_set::{ChangeSetLike, VMChangeSet},
     environment::Environment,
     output::VMOutput,
     resolver::{ExecutorView, ResourceGroupView},
@@ -565,13 +565,8 @@ impl AptosVM {
                 )?;
             }
 
-            let mut epilogue_session = EpilogueSession::new(
-                self,
-                txn_data,
-                resolver,
-                change_set,
-                ZERO_STORAGE_REFUND.into(),
-            );
+            let mut epilogue_session =
+                EpilogueSession::on_user_session_failure(self, txn_data, resolver, change_set);
 
             epilogue_session.execute(|session| {
                 transaction_validation::run_failure_epilogue(
@@ -588,12 +583,11 @@ impl AptosVM {
                 .finish(change_set_configs)
                 .map(|set| (set, fee_statement, status))
         } else {
-            let mut epilogue_session = EpilogueSession::new(
+            let mut epilogue_session = EpilogueSession::on_user_session_failure(
                 self,
                 txn_data,
                 resolver,
                 prologue_change_set,
-                ZERO_STORAGE_REFUND.into(),
             );
 
             let status = self.inject_abort_info_if_available(status);
@@ -849,13 +843,13 @@ impl AptosVM {
 
     fn charge_change_set(
         &self,
-        change_set: &mut VMChangeSet,
+        change_set: &mut impl ChangeSetLike,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl AptosMoveResolver,
     ) -> Result<GasQuantity<Octa>, VMStatus> {
         gas_meter.charge_io_gas_for_transaction(txn_data.transaction_size())?;
-        for (event, _layout) in change_set.events() {
+        for event in change_set.events_iter() {
             gas_meter.charge_io_gas_for_event(event)?;
         }
         for (key, op_size) in change_set.write_set_size_iter() {
@@ -883,17 +877,17 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         txn_data: &'l TransactionMetadata,
     ) -> Result<EpilogueSession<'r, 'l>, VMStatus> {
-        let mut change_set = user_session.finish(change_set_configs)?;
+        let mut user_session_change_set = user_session.finish(change_set_configs)?;
 
         let storage_refund =
-            self.charge_change_set(&mut change_set, gas_meter, txn_data, resolver)?;
+            self.charge_change_set(&mut user_session_change_set, gas_meter, txn_data, resolver)?;
 
         // TODO[agg_v1](fix): Charge for aggregator writes
-        Ok(EpilogueSession::new(
+        Ok(EpilogueSession::on_user_session_success(
             self,
             txn_data,
             resolver,
-            change_set,
+            user_session_change_set,
             storage_refund,
         ))
     }
@@ -1236,12 +1230,11 @@ impl AptosVM {
     ) -> Result<EpilogueSession<'r, 'l>, VMStatus> {
         // Start a fresh session for running cleanup that does not contain any changes from
         // the inner function call earlier (since it failed).
-        let mut epilogue_session = EpilogueSession::new(
+        let mut epilogue_session = EpilogueSession::on_user_session_failure(
             self,
             txn_data,
             resolver,
             prologue_change_set.clone(),
-            0.into(),
         );
         let execution_error = ExecutionError::try_from(execution_error)
             .map_err(|_| VMStatus::error(StatusCode::UNREACHABLE, None))?;

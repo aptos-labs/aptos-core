@@ -6,8 +6,8 @@ use crate::{
         AbstractResourceWriteOp, GroupWrite, InPlaceDelayedFieldChangeOp,
         ResourceGroupInPlaceDelayedFieldChangeOp, WriteWithDelayedFieldsOp,
     },
-    check_change_set::CheckChangeSet,
     resolver::ExecutorView,
+    storage::change_set_configs::ChangeSetConfigs,
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange,
@@ -125,7 +125,7 @@ impl VMChangeSet {
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
-        checker: &dyn CheckChangeSet,
+        configs: &ChangeSetConfigs,
     ) -> PartialVMResult<Self> {
         let change_set = Self {
             resource_write_set,
@@ -137,7 +137,7 @@ impl VMChangeSet {
         };
         // Returns an error if structure of the change set is not valid,
         // e.g. the size in bytes is too large.
-        checker.check_change_set(&change_set)?;
+        configs.check_change_set(&change_set)?;
         Ok(change_set)
     }
 
@@ -155,7 +155,7 @@ impl VMChangeSet {
         >,
         group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (StateValueMetadata, u64)>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
-        checker: &dyn CheckChangeSet,
+        configs: &ChangeSetConfigs,
     ) -> PartialVMResult<Self> {
         Self::new(
             resource_write_set
@@ -219,7 +219,7 @@ impl VMChangeSet {
             delayed_field_change_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
-            checker,
+            configs,
         )
     }
 
@@ -239,7 +239,7 @@ impl VMChangeSet {
     /// Note: does not separate out individual resource group updates.
     pub fn try_from_storage_change_set_with_delayed_field_optimization_disabled(
         change_set: StorageChangeSet,
-        checker: &dyn CheckChangeSet,
+        configs: &ChangeSetConfigs,
     ) -> VMResult<Self> {
         let (write_set, events) = change_set.into_inner();
 
@@ -271,7 +271,7 @@ impl VMChangeSet {
             aggregator_v1_delta_set: BTreeMap::new(),
             events,
         };
-        checker
+        configs
             .check_change_set(&change_set)
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok(change_set)
@@ -344,60 +344,6 @@ impl VMChangeSet {
                     .chain(self.aggregator_v1_write_set().iter())
                     .map(|(k, v)| (k, Some(v))),
             )
-    }
-
-    pub fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
-        self.resource_write_set()
-            .iter()
-            .map(|(k, v)| (k, v.materialized_size()))
-            .chain(
-                self.module_write_set()
-                    .iter()
-                    .chain(self.aggregator_v1_write_set().iter())
-                    .map(|(k, v)| (k, v.write_op_size())),
-            )
-    }
-
-    pub fn num_write_ops(&self) -> usize {
-        self.resource_write_set().len()
-            + self.module_write_set().len()
-            + self.aggregator_v1_write_set().len()
-    }
-
-    /// Deposit amount is inserted into metadata at a different time than the WriteOp is created.
-    /// So this method is needed to be able to update metadata generically across different variants.
-    pub fn write_op_info_iter_mut<'a>(
-        &'a mut self,
-        executor_view: &'a dyn ExecutorView,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
-        let resources = self.resource_write_set.iter_mut().map(|(key, op)| {
-            Ok(WriteOpInfo {
-                key,
-                op_size: op.materialized_size(),
-                prev_size: op.prev_materialized_size(key, executor_view)?,
-                metadata_mut: op.get_metadata_mut(),
-            })
-        });
-        let modules = self.module_write_set.iter_mut().map(|(key, op)| {
-            Ok(WriteOpInfo {
-                key,
-                op_size: op.write_op_size(),
-                prev_size: executor_view.get_module_state_value_size(key)?.unwrap_or(0),
-                metadata_mut: op.get_metadata_mut(),
-            })
-        });
-        let v1_aggregators = self.aggregator_v1_write_set.iter_mut().map(|(key, op)| {
-            Ok(WriteOpInfo {
-                key,
-                op_size: op.write_op_size(),
-                prev_size: executor_view
-                    .get_aggregator_v1_state_value_size(key)?
-                    .unwrap_or(0),
-                metadata_mut: op.get_metadata_mut(),
-            })
-        });
-
-        resources.chain(modules).chain(v1_aggregators)
     }
 
     pub fn resource_write_set(&self) -> &BTreeMap<StateKey, AbstractResourceWriteOp> {
@@ -881,7 +827,7 @@ impl VMChangeSet {
     pub fn squash_additional_change_set(
         &mut self,
         additional_change_set: Self,
-        checker: &dyn CheckChangeSet,
+        configs: &ChangeSetConfigs,
     ) -> PartialVMResult<()> {
         let Self {
             resource_write_set: additional_resource_write_set,
@@ -912,7 +858,7 @@ impl VMChangeSet {
         )?;
         self.events.extend(additional_events);
 
-        checker.check_change_set(self)
+        configs.check_change_set(self)
     }
 
     pub fn has_creation(&self) -> bool {
@@ -926,6 +872,80 @@ pub struct WriteOpInfo<'a> {
     pub op_size: WriteOpSize,
     pub prev_size: u64,
     pub metadata_mut: &'a mut StateValueMetadata,
+}
+
+/// Represents the main functionality of any change set representation:
+///   1. It must contain write ops, and allow iterating over their sizes.
+///   2. it must also contain events.
+pub trait ChangeSetLike {
+    fn num_write_ops(&self) -> usize;
+
+    fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)>;
+
+    fn events_iter(&self) -> impl Iterator<Item = &ContractEvent>;
+
+    fn write_op_info_iter_mut(
+        &mut self,
+        executor_view: &dyn ExecutorView,
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>>;
+}
+
+impl ChangeSetLike for VMChangeSet {
+    fn num_write_ops(&self) -> usize {
+        self.resource_write_set().len()
+            + self.module_write_set().len()
+            + self.aggregator_v1_write_set().len()
+    }
+
+    fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
+        self.resource_write_set()
+            .iter()
+            .map(|(k, v)| (k, v.materialized_size()))
+            .chain(
+                self.module_write_set()
+                    .iter()
+                    .chain(self.aggregator_v1_write_set().iter())
+                    .map(|(k, v)| (k, v.write_op_size())),
+            )
+    }
+
+    fn write_op_info_iter_mut(
+        &mut self,
+        executor_view: &dyn ExecutorView,
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+        let resources = self.resource_write_set.iter_mut().map(|(key, op)| {
+            Ok(WriteOpInfo {
+                key,
+                op_size: op.materialized_size(),
+                prev_size: op.prev_materialized_size(key, executor_view)?,
+                metadata_mut: op.get_metadata_mut(),
+            })
+        });
+        let modules = self.module_write_set.iter_mut().map(|(key, op)| {
+            Ok(WriteOpInfo {
+                key,
+                op_size: op.write_op_size(),
+                prev_size: executor_view.get_module_state_value_size(key)?.unwrap_or(0),
+                metadata_mut: op.get_metadata_mut(),
+            })
+        });
+        let v1_aggregators = self.aggregator_v1_write_set.iter_mut().map(|(key, op)| {
+            Ok(WriteOpInfo {
+                key,
+                op_size: op.write_op_size(),
+                prev_size: executor_view
+                    .get_aggregator_v1_state_value_size(key)?
+                    .unwrap_or(0),
+                metadata_mut: op.get_metadata_mut(),
+            })
+        });
+
+        resources.chain(modules).chain(v1_aggregators)
+    }
+
+    fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {
+        self.events().iter().map(|(e, _)| e)
+    }
 }
 
 // Tests are in test_change_set.rs.
