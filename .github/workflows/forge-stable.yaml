@@ -25,14 +25,11 @@ on:
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
   schedule:
-    - cron: "0 6 * * *" # The main branch cadence. This runs every day at 6am UTC.
+    - cron: "0 22 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs
   pull_request:
     paths:
       - ".github/workflows/forge-stable.yaml"
       - "testsuite/find_latest_image.py"
-  push:
-    branches:
-      - aptos-release-v* # the aptos release branches
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
