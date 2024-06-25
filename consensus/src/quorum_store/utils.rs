@@ -319,6 +319,7 @@ impl ProofQueue {
         &mut self,
         batch_summaries: Vec<(BatchInfo, Vec<TransactionSummary>)>,
     ) {
+        let start = Instant::now();
         for (batch_info, txn_summaries) in batch_summaries {
             let batch_key = BatchKey::from_info(&batch_info);
             for txn_summary in txn_summaries {
@@ -329,6 +330,43 @@ impl ProofQueue {
             }
             self.batches_with_txn_summary.insert(batch_key);
         }
+        counters::PROOF_QUEUE_ADD_BATCH_SUMMARIES_DURATION.observe_duration(start.elapsed());
+    }
+
+    fn log_remaining_data_after_pull(
+        &self,
+        excluded_batches: &HashSet<BatchInfo>,
+        pulled_proofs: &[ProofOfStore],
+    ) {
+        let mut num_proofs_remaining_after_pull = 0;
+        let mut num_txns_remaining_after_pull = 0;
+        let excluded_batch_keys = excluded_batches
+            .iter()
+            .map(BatchKey::from_info)
+            .collect::<HashSet<_>>();
+        let mut remaining_proofs = vec![];
+        for (batch_key, proof) in &self.batch_to_proof {
+            if proof.is_some()
+                && !pulled_proofs
+                    .iter()
+                    .any(|p| BatchKey::from_info(p.info()) == *batch_key)
+                && !excluded_batch_keys.contains(batch_key)
+            {
+                num_proofs_remaining_after_pull += 1;
+                num_txns_remaining_after_pull += proof.as_ref().unwrap().0.num_txns();
+                remaining_proofs.push(proof.as_ref().unwrap().0.clone());
+            }
+        }
+        let pulled_txns = pulled_proofs.iter().map(|p| p.num_txns()).sum::<u64>();
+        info!(
+            "pulled_proofs: {}, pulled_txns: {}, remaining_proofs: {:?}",
+            pulled_proofs.len(),
+            pulled_txns,
+            remaining_proofs
+        );
+        counters::NUM_PROOFS_IN_PROOF_QUEUE_AFTER_PULL
+            .observe(num_proofs_remaining_after_pull as f64);
+        counters::NUM_TXNS_IN_PROOF_QUEUE_AFTER_PULL.observe(num_txns_remaining_after_pull as f64);
     }
 
     // gets excluded and iterates over the vector returning non excluded or expired entries.
@@ -401,36 +439,8 @@ impl ProofQueue {
             counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
-
             // Number of proofs remaining in proof queue after the pull
-            let mut num_proofs_remaining_after_pull = 0;
-            let mut num_txns_remaining_after_pull = 0;
-            let excluded_batch_keys = excluded_batches
-                .iter()
-                .map(BatchKey::from_info)
-                .collect::<HashSet<_>>();
-            let mut remaining_proofs = vec![];
-            for (batch_key, proof) in &self.batch_to_proof {
-                if proof.is_some()
-                    && !ret
-                        .iter()
-                        .any(|p| BatchKey::from_info(p.info()) == *batch_key)
-                    && !excluded_batch_keys.contains(batch_key)
-                {
-                    num_proofs_remaining_after_pull += 1;
-                    num_txns_remaining_after_pull += proof.as_ref().unwrap().0.num_txns();
-                    remaining_proofs.push(proof.as_ref().unwrap().0.clone());
-                }
-            }
-            info!(
-                "cur_txns: {}, remaining_proofs: {:?}",
-                cur_txns, remaining_proofs
-            );
-            counters::NUM_PROOFS_IN_PROOF_QUEUE_AFTER_PULL
-                .observe(num_proofs_remaining_after_pull as f64);
-            counters::NUM_TXNS_IN_PROOF_QUEUE_AFTER_PULL
-                .observe(num_txns_remaining_after_pull as f64);
-
+            self.log_remaining_data_after_pull(excluded_batches, &ret);
             // Stable sort, so the order of proofs within an author will not change.
             ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
             (ret, !full)
@@ -440,6 +450,7 @@ impl ProofQueue {
     }
 
     pub(crate) fn handle_updated_block_timestamp(&mut self, block_timestamp: u64) {
+        let start = Instant::now();
         assert!(
             self.latest_block_timestamp <= block_timestamp,
             "Decreasing block timestamp"
@@ -475,6 +486,7 @@ impl ProofQueue {
                 }
             }
         }
+        counters::PROOF_QUEUE_UPDATE_TIMESTAMP_DURATION.observe_duration(start.elapsed());
         counters::NUM_PROOFS_EXPIRED_WHEN_COMMIT.inc_by(num_expired_but_not_committed);
     }
 
@@ -523,6 +535,7 @@ impl ProofQueue {
 
     // Mark in the hashmap committed PoS, but keep them until they expire
     pub(crate) fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
+        let start = Instant::now();
         for batch in &batches {
             let batch_key = BatchKey::from_info(batch);
             if let Some(Some((proof, insertion_time))) = self.batch_to_proof.get(&batch_key) {
@@ -545,5 +558,6 @@ impl ProofQueue {
             }
             !batches.is_empty()
         });
+        counters::PROOF_QUEUE_COMMIT_DURATION.observe_duration(start.elapsed());
     }
 }
