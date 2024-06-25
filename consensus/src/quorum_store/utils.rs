@@ -572,11 +572,17 @@ impl ProofQueue {
             }
             self.batch_to_proof.insert(batch_key.clone(), None);
             self.batches_with_txn_summary.remove(&batch_key);
-            self.txn_summary_to_batches.retain(|_, batches| {
-                batches.remove(&batch_key);
-                !batches.is_empty()
-            });
         }
+        let batch_keys = batches
+            .iter()
+            .map(BatchKey::from_info)
+            .collect::<HashSet<_>>();
+        self.txn_summary_to_batches.retain(|_, batches| {
+            for batch_key in &batch_keys {
+                batches.remove(batch_key);
+            }
+            !batches.is_empty()
+        });
     }
 
     pub async fn start(
