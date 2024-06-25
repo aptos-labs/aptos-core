@@ -628,8 +628,12 @@ impl ProofQueue {
                     ProofQueueCommand::MarkCommitted(batches, block_timestamp) => {
                         let start = Instant::now();
                         self.mark_committed(batches);
-                        self.handle_updated_block_timestamp(block_timestamp);
                         counters::PROOF_QUEUE_COMMIT_DURATION.observe_duration(start.elapsed());
+
+                        let start = Instant::now();
+                        self.handle_updated_block_timestamp(block_timestamp);
+                        counters::PROOF_QUEUE_UPDATE_TIMESTAMP_DURATION
+                            .observe_duration(start.elapsed());
 
                         let updated_back_pressure = self.qs_back_pressure();
                         if updated_back_pressure != back_pressure {
