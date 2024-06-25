@@ -6,7 +6,6 @@ use crate::{
     abstract_write_op::{AbstractResourceWriteOp, GroupWrite},
     change_set::VMChangeSet,
     resolver::ResourceGroupSize,
-    storage::change_set_configs::ChangeSetConfigs,
     tests::utils::{
         as_bytes, as_state_key, mock_add, mock_create, mock_create_with_layout, mock_delete,
         mock_delete_with_layout, mock_modify, mock_modify_with_layout, mock_tag_1, raw_metadata,
@@ -18,7 +17,6 @@ use aptos_aggregator::{
     delayed_change::{DelayedApplyChange, DelayedChange},
     delta_change_set::DeltaWithMax,
 };
-use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_types::{
     delayed_fields::{PanicError, SnapshotToStringFormula},
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
@@ -159,10 +157,7 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
 #[test]
 fn test_successful_squash() {
     let (mut change_set, additional_change_set) = build_change_sets_for_test();
-    assert_ok!(change_set.squash_additional_change_set(
-        additional_change_set,
-        &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
-    ));
+    assert_ok!(change_set.squash_additional_change_set(additional_change_set,));
 
     let descriptor = "r";
     assert_eq!(
@@ -210,10 +205,7 @@ macro_rules! assert_invariant_violation {
         let cs2 = VMChangeSetBuilder::new()
             .with_resource_write_set($w2.clone())
             .build();
-        let res = cs1.squash_additional_change_set(
-            cs2,
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        );
+        let res = cs1.squash_additional_change_set(cs2);
         check(res);
         let mut cs1 = VMChangeSetBuilder::new()
             .with_aggregator_v1_write_set($w3.clone())
@@ -221,10 +213,7 @@ macro_rules! assert_invariant_violation {
         let cs2 = VMChangeSetBuilder::new()
             .with_aggregator_v1_write_set($w4.clone())
             .build();
-        let res = cs1.squash_additional_change_set(
-            cs2,
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        );
+        let res = cs1.squash_additional_change_set(cs2);
         check(res);
     };
 }
@@ -281,10 +270,7 @@ fn test_unsuccessful_squash_delete_delta() {
     let additional_change_set = VMChangeSetBuilder::new()
         .with_aggregator_v1_delta_set(aggregator_delta_set_2)
         .build();
-    let res = change_set.squash_additional_change_set(
-        additional_change_set,
-        &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-    );
+    let res = change_set.squash_additional_change_set(additional_change_set);
     let err = assert_err!(res);
     assert_eq!(
         err.major_status(),
@@ -304,10 +290,7 @@ fn test_unsuccessful_squash_delta_create() {
     let additional_change_set = VMChangeSetBuilder::new()
         .with_aggregator_v1_write_set(aggregator_write_set_2)
         .build();
-    let res = change_set.squash_additional_change_set(
-        additional_change_set,
-        &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-    );
+    let res = change_set.squash_additional_change_set(additional_change_set);
     let err = assert_err!(res);
     assert_eq!(
         err.major_status(),
@@ -335,12 +318,10 @@ fn test_roundtrip_to_storage_change_set() {
     .unwrap();
 
     let storage_change_set_before = StorageChangeSet::new(write_set, vec![]);
-    let (change_set, module_write_set) = assert_ok!(
+    let (change_set, module_write_set) =
         VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
             storage_change_set_before.clone(),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        )
-    );
+        );
 
     let storage_change_set_after =
         assert_ok!(change_set.try_into_storage_change_set(module_write_set));
@@ -419,10 +400,7 @@ fn test_aggregator_v2_snapshots_and_derived() {
         .with_delayed_field_change_set(agg_changes_2)
         .build();
 
-    assert_ok!(change_set_1.squash_additional_change_set(
-        change_set_2,
-        &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
-    ));
+    assert_ok!(change_set_1.squash_additional_change_set(change_set_2,));
 
     let output_map = change_set_1.delayed_field_change_set();
     assert_eq!(output_map.len(), 3);
@@ -522,10 +500,7 @@ fn test_resource_groups_squashing() {
 
     {
         let mut change_set = create_tag_0.clone();
-        assert_ok!(change_set.squash_additional_change_set(
-            modify_tag_0.clone(),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
-        ));
+        assert_ok!(change_set.squash_additional_change_set(modify_tag_0.clone(),));
         assert_eq!(change_set.resource_write_set().len(), 1);
         // create(x)+modify(y) becomes create(y)
         assert_some_eq!(
@@ -541,10 +516,7 @@ fn test_resource_groups_squashing() {
 
     {
         let mut change_set = create_tag_0.clone();
-        assert_ok!(change_set.squash_additional_change_set(
-            create_tag_1.clone(),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
-        ));
+        assert_ok!(change_set.squash_additional_change_set(create_tag_1.clone(),));
         assert_eq!(change_set.resource_write_set().len(), 1);
         assert_some_eq!(
             change_set.resource_write_set().get(&as_state_key!("1")),
@@ -556,10 +528,7 @@ fn test_resource_groups_squashing() {
             ))
         );
 
-        assert_ok!(change_set.squash_additional_change_set(
-            modify_tag_1.clone(),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
-        ));
+        assert_ok!(change_set.squash_additional_change_set(modify_tag_1.clone(),));
         assert_eq!(change_set.resource_write_set().len(), 1);
         // create(x)+modify(y) becomes create(y)
         assert_some_eq!(
@@ -575,10 +544,7 @@ fn test_resource_groups_squashing() {
 
     {
         let mut change_set = create_tag_0.clone();
-        assert_ok!(change_set.squash_additional_change_set(
-            modify_tag_1.clone(),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
-        ));
+        assert_ok!(change_set.squash_additional_change_set(modify_tag_1.clone(),));
         assert_eq!(change_set.resource_write_set().len(), 1);
         assert_some_eq!(
             change_set.resource_write_set().get(&as_state_key!("1")),
@@ -601,7 +567,6 @@ fn test_resource_groups_squashing() {
                     (modification_metadata.metadata().clone(), 400)
                 )])
                 .build(),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
         ));
     }
 }

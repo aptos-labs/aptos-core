@@ -5,13 +5,11 @@ use crate::{
     abstract_write_op::{AbstractResourceWriteOp, GroupWrite},
     change_set::VMChangeSet,
     output::VMOutput,
-    storage::change_set_configs::ChangeSetConfigs,
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, DeltaOp},
 };
-use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
@@ -218,9 +216,7 @@ impl VMChangeSetBuilder {
             self.delayed_field_change_set,
             self.aggregator_v1_write_set,
             self.aggregator_v1_delta_set,
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
-        .unwrap()
     }
 }
 
@@ -367,7 +363,6 @@ impl ExpandedVMChangeSetBuilder {
             self.reads_needing_delayed_field_exchange,
             self.group_reads_needing_delayed_field_exchange,
             self.events,
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
     }
 

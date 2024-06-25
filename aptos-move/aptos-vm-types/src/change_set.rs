@@ -7,7 +7,6 @@ use crate::{
         ResourceGroupInPlaceDelayedFieldChangeOp, WriteWithDelayedFieldsOp,
     },
     resolver::ExecutorView,
-    storage::change_set_configs::ChangeSetConfigs,
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange,
@@ -122,19 +121,14 @@ impl VMChangeSet {
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
-        configs: &ChangeSetConfigs,
-    ) -> PartialVMResult<Self> {
-        let change_set = Self {
+    ) -> Self {
+        Self {
             resource_write_set,
             events,
             delayed_field_change_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
-        };
-        // Returns an error if structure of the change set is not valid,
-        // e.g. the size in bytes is too large.
-        configs.check_change_set(&change_set)?;
-        Ok(change_set)
+        }
     }
 
     // TODO[agg_v2](cleanup) see if we can remove in favor of `new`.
@@ -150,9 +144,8 @@ impl VMChangeSet {
         >,
         group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (StateValueMetadata, u64)>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
-        configs: &ChangeSetConfigs,
     ) -> PartialVMResult<Self> {
-        Self::new(
+        Ok(Self::new(
             resource_write_set
                 .into_iter()
                 .map::<PartialVMResult<_>, _>(|(k, (w, l))| {
@@ -213,8 +206,7 @@ impl VMChangeSet {
             delayed_field_change_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
-            configs,
-        )
+        ))
     }
 
     /// Builds a new change set from the storage representation.
@@ -233,8 +225,7 @@ impl VMChangeSet {
     /// Note: does not separate out individual resource group updates.
     pub fn try_from_storage_change_set_with_delayed_field_optimization_disabled(
         change_set: StorageChangeSet,
-        configs: &ChangeSetConfigs,
-    ) -> VMResult<(Self, BTreeMap<StateKey, WriteOp>)> {
+    ) -> (Self, BTreeMap<StateKey, WriteOp>) {
         let (write_set, events) = change_set.into_inner();
 
         // There should be no aggregator writes if we have a change set from
@@ -264,10 +255,7 @@ impl VMChangeSet {
             aggregator_v1_delta_set: BTreeMap::new(),
             events,
         };
-        configs
-            .check_change_set(&change_set)
-            .map_err(|e| e.finish(Location::Undefined))?;
-        Ok((change_set, module_write_set))
+        (change_set, module_write_set)
     }
 
     /// Converts VM-native change set into its storage representation with fully
@@ -800,7 +788,6 @@ impl VMChangeSet {
     pub fn squash_additional_change_set(
         &mut self,
         additional_change_set: Self,
-        configs: &ChangeSetConfigs,
     ) -> PartialVMResult<()> {
         let Self {
             resource_write_set: additional_resource_write_set,
@@ -825,8 +812,7 @@ impl VMChangeSet {
             additional_delayed_field_change_set,
         )?;
         self.events.extend(additional_events);
-
-        configs.check_change_set(self)
+        Ok(())
     }
 
     pub fn has_creation(&self) -> bool {

@@ -1332,7 +1332,7 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
-        let module_publishing_result = session.execute(|session| {
+        session.execute(|session| {
             if let Some(publish_request) = session.extract_publish_request() {
                 let PublishRequest {
                     destination,
@@ -1440,10 +1440,8 @@ impl AptosVM {
                 )?;
             }
             Ok::<(), VMError>(())
-        });
-        module_publishing_result?;
-
-        session.finish(BTreeMap::new(), change_set_configs)
+        })?;
+        session.finish(change_set_configs)
     }
 
     /// Validate a publish request.
@@ -1824,9 +1822,6 @@ impl AptosVM {
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
     ) -> Result<(VMChangeSet, BTreeMap<StateKey, WriteOp>), VMStatus> {
-        let change_set_configs =
-            ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version);
-
         match write_set_payload {
             WriteSetPayload::Direct(change_set) => {
                 // this transaction is never delayed field capable.
@@ -1834,9 +1829,7 @@ impl AptosVM {
                 // which allows it to be used as last transaction in delayed_field_enabled context.
                 let (change_set, module_write_set) = VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
                     change_set.clone(),
-                    &change_set_configs,
-                )
-                .map_err(|e| e.into_vm_status())?;
+                );
 
                 // validate_waypoint_change_set checks that this is true, so we only log here.
                 if !Self::should_restart_execution(change_set.events()) {
@@ -1868,6 +1861,9 @@ impl AptosVM {
                     senders,
                     script,
                 )?;
+
+                let change_set_configs =
+                    ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version);
                 let (change_set, module_write_set) = tmp_session.finish(&change_set_configs)?;
 
                 Ok((change_set, module_write_set))

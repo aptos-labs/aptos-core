@@ -129,10 +129,6 @@ where
 
     // Genesis never produces the delta change set.
     assert!(change_set.aggregator_v1_delta_set().is_empty());
-
-    // FIXME(George): We need to refactor genesis because it is so special
-    //  and can directly publish modules, and use a single genesis session!
-
     change_set
         .try_into_storage_change_set(module_write_set)
         .expect("Conversion from VMChangeSet into ChangeSet should always succeed")

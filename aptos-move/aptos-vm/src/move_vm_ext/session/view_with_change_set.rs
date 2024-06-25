@@ -339,12 +339,9 @@ mod test {
         move_vm_ext::resolver::{AsExecutorView, AsResourceGroupView},
     };
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
-    use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
-    use aptos_vm_types::{
-        abstract_write_op::GroupWrite, storage::change_set_configs::ChangeSetConfigs,
-    };
+    use aptos_vm_types::abstract_write_op::GroupWrite;
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
@@ -486,7 +483,6 @@ mod test {
             BTreeMap::new(),
             BTreeMap::new(),
             vec![],
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
         .unwrap();
 

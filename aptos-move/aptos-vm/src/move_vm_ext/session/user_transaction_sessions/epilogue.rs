@@ -100,7 +100,12 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
             storage_refund: _,
             module_write_set,
         } = self;
-        let change_set = session.finish_with_squashed_change_set(change_set_configs, true)?;
+
+        // TODO(George): Epilogue can never publish modules! When we move publishing outside
+        //               of MoveVM, we do not need to use _ here, as modules will only be visible
+        //               in user session.
+        let (change_set, _) = session.finish_with_squashed_change_set(change_set_configs, true)?;
+        change_set_configs.check_change_set(&change_set)?;
         Ok((change_set, module_write_set))
     }
 }
