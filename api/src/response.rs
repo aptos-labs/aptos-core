@@ -643,7 +643,7 @@ pub fn account_not_found<E: NotFoundError>(
     ledger_info: &LedgerInfo,
 ) -> E {
     build_not_found(
-        "Account",
+        "Account v1",
         format!(
             "Address({}) and Ledger version({})",
             address, ledger_version

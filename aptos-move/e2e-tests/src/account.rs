@@ -4,7 +4,7 @@
 
 //! Test infrastructure for modeling Aptos accounts.
 
-use crate::{account::account_config::lite_account::Authenticator, gas_costs};
+use crate::gas_costs;
 use aptos_crypto::ed25519::*;
 use aptos_keygen::KeyGen;
 use aptos_types::{
@@ -592,11 +592,14 @@ impl LiteAccountData {
     /// Creates a new `AccountData` with the provided account.
     pub fn with_account(account: Account, balance: u64, sequence_number: u64) -> Self {
         let auth_key = account.auth_key();
+        let addr = *account.address();
         Self {
             account,
             lite_account: LiteAccountGroup::new(
-                sequence_number,
-                Authenticator::Native(Some(auth_key.to_vec()).into()),
+                addr,
+                Some(sequence_number),
+                Some(Some(auth_key)),
+                None
             ),
             fungible_store: FungibleStoreResource::new(AccountAddress::TEN, balance, false),
         }

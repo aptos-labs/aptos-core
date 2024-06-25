@@ -12,6 +12,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
+    account_config::lite_account::AccountResource as LiteAccountResource,
     state_store::{MoveResourceExt, StateView},
     transaction::{SignedTransaction, VMValidatorResult},
 };
@@ -20,6 +21,8 @@ use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
 use rand::{thread_rng, Rng};
 use std::sync::{Arc, Mutex};
+use aptos_types::account_config::lite_account::LiteAccountGroup;
+use move_core_types::move_resource::MoveStructType;
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
@@ -116,7 +119,11 @@ pub fn get_account_sequence_number(
 
     match AccountResource::fetch_move_resource(state_view, &address)? {
         Some(account_resource) => Ok(account_resource.sequence_number()),
-        None => Ok(0),
+        None => Ok(
+            match LiteAccountResource::fetch_move_resource_from_group(state_view, &address, &LiteAccountGroup::struct_tag())? {
+                Some(account_resource) => account_resource.sequence_number,
+                None => 0,
+            })
     }
 }
 

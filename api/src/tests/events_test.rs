@@ -208,7 +208,7 @@ async fn test_module_events() {
                 == "0x0"
         })
         .collect::<Vec<_>>();
-    assert_eq!(events.len(), 8);
+    assert_eq!(events.len(), 9);
 }
 
 // until we have generics in the genesis
