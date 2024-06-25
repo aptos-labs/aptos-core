@@ -16,8 +16,7 @@ use aptos_types::account_address::AccountAddress;
 use rand::seq::SliceRandom;
 use std::{
     cmp::Ordering,
-    collections::{btree_set::Iter, BTreeMap, BTreeSet, HashMap},
-    iter::Rev,
+    collections::{btree_set::Iter, BTreeMap, BTreeSet, HashMap, HashSet},
     ops::Bound,
     time::{Duration, Instant, SystemTime},
 };
@@ -31,15 +30,15 @@ pub type AccountTransactions = BTreeMap<u64, MempoolTransaction>;
 /// We don't store the full content of transactions in the index.
 /// Instead we use `OrderedQueueKey` - logical reference to the transaction in the main store.
 pub struct PriorityIndex {
-    data: BTreeSet<OrderedQueueKey>,
+    data: HashSet<OrderedQueueKey>,
 }
 
-pub type PriorityQueueIter<'a> = Rev<Iter<'a, OrderedQueueKey>>;
+pub type PriorityQueueIter<'a> = std::collections::hash_set::Iter<'a, OrderedQueueKey>;
 
 impl PriorityIndex {
     pub(crate) fn new() -> Self {
         Self {
-            data: BTreeSet::new(),
+            data: HashSet::new(),
         }
     }
 
@@ -68,7 +67,7 @@ impl PriorityIndex {
     }
 
     pub(crate) fn iter(&self) -> PriorityQueueIter {
-        self.data.iter().rev()
+        self.data.iter()
     }
 
     pub(crate) fn size(&self) -> usize {
