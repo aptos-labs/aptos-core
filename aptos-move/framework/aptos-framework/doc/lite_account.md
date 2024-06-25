@@ -33,6 +33,8 @@
 -  [Function `increment_sequence_number`](#0x1_lite_account_increment_sequence_number)
 -  [Function `dispatchable_authenticate`](#0x1_lite_account_dispatchable_authenticate)
 -  [Function `guid_creation_number`](#0x1_lite_account_guid_creation_number)
+-  [Function `set_sequence_number`](#0x1_lite_account_set_sequence_number)
+-  [Function `set_guid_creation_number`](#0x1_lite_account_set_guid_creation_number)
 -  [Function `create_guid`](#0x1_lite_account_create_guid)
 -  [Function `rotation_capability_offer`](#0x1_lite_account_rotation_capability_offer)
 -  [Function `signer_capability_offer`](#0x1_lite_account_signer_capability_offer)
@@ -1034,6 +1036,73 @@ Methods only for compatibility with account module.
     } <b>else</b> {
         0
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_lite_account_set_sequence_number"></a>
+
+## Function `set_sequence_number`
+
+Only used by account.move for migration.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="lite_account.md#0x1_lite_account_set_sequence_number">set_sequence_number</a>(addr: <b>address</b>, new_sequence_number: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="lite_account.md#0x1_lite_account_set_sequence_number">set_sequence_number</a>(addr: <b>address</b>, new_sequence_number: u64) <b>acquires</b> <a href="lite_account.md#0x1_lite_account_Account">Account</a> {
+    <b>if</b> (!<a href="lite_account.md#0x1_lite_account_account_resource_exists_at">account_resource_exists_at</a>(addr)) {
+        <a href="lite_account.md#0x1_lite_account_create_account_with_resource">create_account_with_resource</a>(addr);
+    };
+    <b>let</b> sequence_number = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_Account">Account</a>&gt;(addr).sequence_number;
+    <b>assert</b>!(
+        (new_sequence_number <b>as</b> u128) &lt; <a href="lite_account.md#0x1_lite_account_MAX_U64">MAX_U64</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="lite_account.md#0x1_lite_account_ESEQUENCE_NUMBER_OVERFLOW">ESEQUENCE_NUMBER_OVERFLOW</a>)
+    );
+    *sequence_number = new_sequence_number;
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_lite_account_set_guid_creation_number"></a>
+
+## Function `set_guid_creation_number`
+
+Only used by account.move for migration.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="lite_account.md#0x1_lite_account_set_guid_creation_number">set_guid_creation_number</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, creation_number: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="lite_account.md#0x1_lite_account_set_guid_creation_number">set_guid_creation_number</a>(
+    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    creation_number: u64
+) <b>acquires</b> <a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a> {
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>if</b> (!<b>exists</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(addr)) {
+        <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a> {
+            creation_number: 0
+        });
+    };
+    <b>borrow_global_mut</b>&lt;<a href="lite_account.md#0x1_lite_account_LegacyGUIDCreactionNumber">LegacyGUIDCreactionNumber</a>&gt;(addr).creation_number = creation_number;
 }
 </code></pre>
 

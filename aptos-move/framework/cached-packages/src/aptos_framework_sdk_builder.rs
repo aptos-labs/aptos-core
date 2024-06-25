@@ -37,6 +37,8 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
+    AccountMigrateToLiteAccount {},
+
     /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
     /// An account can delegate its rotation capability to only one other address at one time. If the account
     /// has an existing rotation capability offer, calling this function will update the rotation capability offer with
@@ -1051,6 +1053,7 @@ impl EntryFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use EntryFunctionCall::*;
         match self {
+            AccountMigrateToLiteAccount {} => account_migrate_to_lite_account(),
             AccountOfferRotationCapability {
                 rotation_capability_sig_bytes,
                 account_scheme,
@@ -1686,6 +1689,21 @@ impl EntryFunctionCall {
             None
         }
     }
+}
+
+pub fn account_migrate_to_lite_account() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("migrate_to_lite_account").to_owned(),
+        vec![],
+        vec![],
+    ))
 }
 
 /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
@@ -4743,6 +4761,16 @@ pub fn vesting_vest_many(contract_addresses: Vec<AccountAddress>) -> Transaction
 }
 mod decoder {
     use super::*;
+    pub fn account_migrate_to_lite_account(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountMigrateToLiteAccount {})
+        } else {
+            None
+        }
+    }
+
     pub fn account_offer_rotation_capability(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6529,6 +6557,10 @@ type EntryFunctionDecoderMap = std::collections::HashMap<
 static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMap> =
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
+        map.insert(
+            "account_migrate_to_lite_account".to_string(),
+            Box::new(decoder::account_migrate_to_lite_account),
+        );
         map.insert(
             "account_offer_rotation_capability".to_string(),
             Box::new(decoder::account_offer_rotation_capability),

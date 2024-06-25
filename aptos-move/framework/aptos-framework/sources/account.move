@@ -32,6 +32,11 @@ module aptos_framework::account {
         new_authentication_key: vector<u8>,
     }
 
+    #[event]
+    struct MigratedToLiteAccount has store, drop {
+        account: address,
+    }
+
     /// Resource representing an account.
     struct Account has key, store {
         authentication_key: vector<u8>,
@@ -175,6 +180,8 @@ module aptos_framework::account {
     const ENO_ROTATION_CAPABILITY_OFFERED: u64 = 21;
     // The account is a lite account that does not use native authenticator.
     const EACCOUNT_DOES_NOT_USE_NATIVE_AUTHENTICATOR: u64 = 22;
+    // The account to migrate already has existing lite account resources.
+    const ELITE_ACCOUNT_ALREADY_EXISTS: u64 = 23;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -304,6 +311,49 @@ module aptos_framework::account {
             option::destroy_some(lite_account::native_authenticator(addr))
         } else {
             abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
+    }
+
+    public entry fun migrate_to_lite_account(account: &signer) acquires Account {
+        let addr = signer::address_of(account);
+        let default_auth_key = bcs::to_bytes(&addr);
+        if (resource_exists_at(addr)) {
+            assert!(
+                lite_account::native_authenticator(addr) == option::some(
+                    default_auth_key
+                ) && !lite_account::using_dispatchable_authenticator(addr) ||
+                    lite_account::get_sequence_number(addr) == 0 ||
+                    lite_account::guid_creation_number(addr) == 0 ||
+                    option::is_none(&lite_account::rotation_capability_offer(addr)) ||
+                    option::is_none(&lite_account::signer_capability_offer(addr)),
+                error::invalid_state(ELITE_ACCOUNT_ALREADY_EXISTS)
+            );
+            let Account {
+                authentication_key,
+                sequence_number,
+                guid_creation_num,
+                coin_register_events,
+                key_rotation_events,
+                rotation_capability_offer,
+                signer_capability_offer,
+            } = move_from<Account>(addr);
+            if (authentication_key != default_auth_key) {
+                lite_account::update_native_authenticator_impl(account, option::some(authentication_key))
+            };
+            if (sequence_number != 0) {
+                lite_account::set_sequence_number(addr, sequence_number);
+            };
+            if (guid_creation_num != 0) {
+                lite_account::set_guid_creation_number(account, guid_creation_num);
+            };
+            event::destroy_handle(coin_register_events);
+            event::destroy_handle(key_rotation_events);
+
+            let CapabilityOffer { for : offeree } = rotation_capability_offer;
+            lite_account::set_rotation_capability_offer(account, offeree);
+            let CapabilityOffer { for : offeree } = signer_capability_offer;
+            lite_account::set_signer_capability_offer(account, offeree);
+            event::emit(MigratedToLiteAccount { account: addr });
         }
     }
 
@@ -1115,22 +1165,12 @@ module aptos_framework::account {
     #[test_only]
     public fun create_account_for_test(new_address: address): signer {
         // Make this easier by just allowing the account to be created again in a test
-        if (resource_exists_at(new_address)) {
+        if (resource_exists_at(new_address) || lite_account::account_resource_exists_at(new_address)) {
             create_signer_for_test(new_address)
-        } else if (!features::lite_account_enabled()) {
+        } else if (features::lite_account_enabled()) {
             lite_account::create_account_unchecked(new_address)
         } else {
             create_account_unchecked(new_address)
-        }
-    }
-
-    #[test_only]
-    public fun create_account_v1_for_test(new_address: address): signer {
-        // Make this easier by just allowing the account to be created again in a test
-        if (!exists_at(new_address)) {
-            create_account_unchecked(new_address)
-        } else {
-            create_signer_for_test(new_address)
         }
     }
 
@@ -1785,5 +1825,50 @@ module aptos_framework::account {
 
         let event = CoinRegisterEvent { type_info: type_info::type_of<SadFakeCoin>() };
         assert!(!event::was_event_emitted_by_handle(eventhandle, &event), 3);
+    }
+
+    #[test(bob = @0x1234)]
+    fun test_migration(bob: &signer) acquires Account {
+        let bob_addr = signer::address_of(bob);
+        create_account_unchecked(bob_addr);
+
+        let (alice_sk, alice_pk) = ed25519::generate_keys();
+        let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
+        let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
+        let alice_addr = signer::address_of(&alice);
+        rotate_authentication_key_internal(bob, bcs::to_bytes(&alice_addr));
+        increment_sequence_number(alice_addr);
+        create_guid(&alice);
+
+        let challenge = SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            source_address: alice_addr,
+            recipient_address: bob_addr,
+        };
+
+        let alice_signer_capability_offer_sig = ed25519::sign_struct(&alice_sk, challenge);
+
+        offer_signer_capability(
+            &alice,
+            ed25519::signature_to_bytes(&alice_signer_capability_offer_sig),
+            0,
+            alice_pk_bytes,
+            bob_addr
+        );
+
+        migrate_to_lite_account(bob);
+        migrate_to_lite_account(&alice);
+
+        assert!(lite_account::native_authenticator(bob_addr) == option::some(bcs::to_bytes(&alice_addr)), 0);
+        assert!(lite_account::get_sequence_number(bob_addr) == 0, 0);
+        assert!(lite_account::guid_creation_number(bob_addr) == 2, 0);
+        assert!(option::is_none(&lite_account::rotation_capability_offer(bob_addr)), 0);
+        assert!(option::is_none(&lite_account::signer_capability_offer(bob_addr)), 0);
+
+        assert!(lite_account::native_authenticator(alice_addr) == option::some(bcs::to_bytes(&alice_addr)), 0);
+        assert!(lite_account::get_sequence_number(alice_addr) == 1, 0);
+        assert!(lite_account::guid_creation_number(alice_addr) == 3, 0);
+        assert!(option::is_none(&lite_account::rotation_capability_offer(alice_addr)), 0);
+        assert!(lite_account::signer_capability_offer(alice_addr) == option::some(bob_addr), 0);
     }
 }
