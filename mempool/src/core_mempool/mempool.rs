@@ -670,26 +670,26 @@ impl Mempool {
                 && Self::txn_was_chosen(txn.address, tx_seq - 1, &inserted, &exclude_transactions);
             let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
 
-            let mut bypass = false;
-            if let Some(account_sequence_number) = account_sequence_number {
-                if *account_sequence_number == tx_seq - 1 {
-                    let min_inclusive =
-                        TxnPointer::new(txn.address, *account_sequence_number, HashValue::zero());
-                    let max_exclusive = TxnPointer::new(
-                        txn.address,
-                        account_sequence_number.saturating_add(1),
-                        HashValue::zero(),
-                    );
-                    bypass = exclude_transactions
-                        .range(min_inclusive..max_exclusive)
-                        .next()
-                        .is_some();
-                }
-            }
+            // let mut bypass = false;
+            // if let Some(account_sequence_number) = account_sequence_number {
+            //     if *account_sequence_number == tx_seq - 1 {
+            //         let min_inclusive =
+            //             TxnPointer::new(txn.address, *account_sequence_number, HashValue::zero());
+            //         let max_exclusive = TxnPointer::new(
+            //             txn.address,
+            //             account_sequence_number.saturating_add(1),
+            //             HashValue::zero(),
+            //         );
+            //         bypass = exclude_transactions
+            //             .range(min_inclusive..max_exclusive)
+            //             .next()
+            //             .is_some();
+            //     }
+            // }
 
             // include transaction if it's "next" for given account or
             // we've already sent its ancestor to Consensus.
-            if txn_in_sequence || account_sequence_number == Some(&tx_seq) || bypass {
+            if txn_in_sequence || account_sequence_number == Some(&tx_seq) {
                 inserted.insert((txn.address, tx_seq));
                 result.push((txn.address, tx_seq));
                 result_pushed += 1;
@@ -733,12 +733,20 @@ impl Mempool {
                 None
             };
 
-            let seq_numbers = exclude_transactions
+            let mut excluded_seq_numbers = exclude_transactions
                 .keys()
                 .filter(|t| t.sender == txn.0)
                 .map(|t| t.sequence_number)
                 .collect::<Vec<u64>>();
-            info!("Skipped txn: {:?}, account sequence number: {:?}, existing sequence numbers: {:?}, was_chosen: {}, account_sequence_number in excluded: {:?}, sequence numbers in excluded: {:?}", txn, self.transactions.get_sequence_number(&txn.0), self.transactions.get_account_sequence_numbers(&txn.0), Self::txn_was_chosen(txn.0, txn.1 - 1, &inserted, &exclude_transactions), account_exluded, seq_numbers);
+            excluded_seq_numbers.sort();
+
+            let mut account_seq_numbers = self
+                .transactions
+                .get_account_sequence_numbers(&txn.0)
+                .into_iter()
+                .collect::<Vec<u64>>();
+            account_seq_numbers.sort();
+            info!("Skipped txn: {:?}, account sequence number: {:?}, existing sequence numbers: {:?}, was_chosen: {}, account_sequence_number in excluded: {:?}, sequence numbers in excluded: {:?}", txn, self.transactions.get_sequence_number(&txn.0), account_seq_numbers, Self::txn_was_chosen(txn.0, txn.1 - 1, &inserted, &exclude_transactions), account_exluded, excluded_seq_numbers);
         }
         let result_size = result.len();
         let inserted_size = inserted.len();
