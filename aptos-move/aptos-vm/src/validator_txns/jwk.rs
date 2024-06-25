@@ -17,12 +17,11 @@ use crate::{
 };
 use aptos_logger::debug;
 use aptos_types::{
-    fee_statement::FeeStatement,
     jwks,
     jwks::{Issuer, ObservedJWKs, ProviderJWKs, QuorumCertifiedUpdate},
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{OnChainConfig, ValidatorSet},
-    transaction::{ExecutionStatus, TransactionStatus},
+    transaction::TransactionStatus,
     validator_verifier::ValidatorVerifier,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;

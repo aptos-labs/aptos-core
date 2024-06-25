@@ -342,21 +342,16 @@ mod test {
         move_vm_ext::resolver::{AsExecutorView, AsResourceGroupView},
     };
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
+    use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
-    use aptos_vm_types::{abstract_write_op::GroupWrite, check_change_set::CheckChangeSet};
+    use aptos_vm_types::{
+        abstract_write_op::GroupWrite, storage::change_set_configs::ChangeSetConfigs,
+    };
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
-
-    struct NoOpChangeSetChecker;
-
-    impl CheckChangeSet for NoOpChangeSetChecker {
-        fn check_change_set(&self, _change_set: &VMChangeSet) -> PartialVMResult<()> {
-            Ok(())
-        }
-    }
 
     fn key(s: impl ToString) -> StateKey {
         StateKey::raw(s.to_string().as_bytes())
@@ -501,7 +496,7 @@ mod test {
             BTreeMap::new(),
             BTreeMap::new(),
             vec![],
-            &NoOpChangeSetChecker,
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
         .unwrap();
 

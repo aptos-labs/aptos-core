@@ -4,13 +4,14 @@
 use crate::{
     abstract_write_op::{AbstractResourceWriteOp, GroupWrite},
     change_set::VMChangeSet,
-    check_change_set::CheckChangeSet,
     output::VMOutput,
+    storage::change_set_configs::ChangeSetConfigs,
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, DeltaOp},
 };
+use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
@@ -20,6 +21,7 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
     write_set::WriteOp,
 };
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
@@ -27,14 +29,6 @@ use move_core_types::{
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{collections::BTreeMap, sync::Arc};
-
-pub(crate) struct MockChangeSetChecker;
-
-impl CheckChangeSet for MockChangeSetChecker {
-    fn check_change_set(&self, _change_set: &VMChangeSet) -> PartialVMResult<()> {
-        Ok(())
-    }
-}
 
 macro_rules! as_state_key {
     ($k:ident) => {
@@ -56,7 +50,6 @@ macro_rules! as_bytes {
 }
 
 pub(crate) use as_bytes;
-use move_binary_format::errors::PartialVMResult;
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -237,7 +230,7 @@ impl VMChangeSetBuilder {
             self.delayed_field_change_set,
             self.aggregator_v1_write_set,
             self.aggregator_v1_delta_set,
-            &MockChangeSetChecker,
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
         .unwrap()
     }
@@ -398,7 +391,7 @@ impl ExpandedVMChangeSetBuilder {
             self.reads_needing_delayed_field_exchange,
             self.group_reads_needing_delayed_field_exchange,
             self.events,
-            &MockChangeSetChecker,
+            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
     }
 

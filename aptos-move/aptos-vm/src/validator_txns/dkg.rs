@@ -14,10 +14,9 @@ use crate::{
 };
 use aptos_types::{
     dkg::{DKGState, DKGTrait, DKGTranscript, DefaultDKG},
-    fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{ConfigurationResource, OnChainConfig},
-    transaction::{ExecutionStatus, TransactionStatus},
+    transaction::TransactionStatus,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;
