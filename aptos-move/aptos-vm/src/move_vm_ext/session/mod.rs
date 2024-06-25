@@ -171,7 +171,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             events,
             table_change_set,
             aggregator_change_set,
-            configs,
+            configs.legacy_resource_creation_as_modification(),
         )
         .map_err(|e| e.finish(Location::Undefined))?;
 
@@ -358,7 +358,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
-        configs: &ChangeSetConfigs,
+        legacy_resource_creation_as_modification: bool,
     ) -> PartialVMResult<(VMChangeSet, BTreeMap<StateKey, WriteOp>)> {
         let mut resource_write_set = BTreeMap::new();
         let mut resource_group_write_set = BTreeMap::new();
@@ -373,7 +373,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let op = woc.convert_resource(
                     &state_key,
                     blob_and_layout_op,
-                    configs.legacy_resource_creation_as_modification(),
+                    legacy_resource_creation_as_modification,
                 )?;
 
                 resource_write_set.insert(state_key, op);
@@ -448,7 +448,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             reads_needing_exchange,
             group_reads_needing_change,
             events,
-            configs,
         )?;
         Ok((change_set, module_write_set))
     }

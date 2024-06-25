@@ -161,7 +161,11 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = vm.genesis_change_set_configs();
-    let (mut change_set, _) = session.finish(&configs).unwrap();
+    let (mut change_set, module_write_set) = session.finish(&configs).unwrap();
+    assert!(
+        module_write_set.is_empty(),
+        "Modules cannot be published in this session"
+    );
 
     // Publish the framework, using a different session id, in case both scripts create tables.
     let state_view = GenesisStateView::new();
@@ -173,7 +177,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     publish_framework(&mut session, framework);
     let (additional_change_set, module_write_set) = session.finish(&configs).unwrap();
     change_set
-        .squash_additional_change_set(additional_change_set, &configs)
+        .squash_additional_change_set(additional_change_set)
         .unwrap();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
@@ -288,7 +292,11 @@ pub fn encode_genesis_change_set(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = vm.genesis_change_set_configs();
-    let (mut change_set, _) = session.finish(&configs).unwrap();
+    let (mut change_set, module_write_set) = session.finish(&configs).unwrap();
+    assert!(
+        module_write_set.is_empty(),
+        "Modules cannot be published in this session"
+    );
 
     let state_view = GenesisStateView::new();
     let resolver = state_view.as_move_resolver();
@@ -300,7 +308,7 @@ pub fn encode_genesis_change_set(
     publish_framework(&mut session, framework);
     let (additional_change_set, module_write_set) = session.finish(&configs).unwrap();
     change_set
-        .squash_additional_change_set(additional_change_set, &configs)
+        .squash_additional_change_set(additional_change_set)
         .unwrap();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and

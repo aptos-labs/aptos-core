@@ -39,6 +39,12 @@ impl<'r, 'l> AbortHookSession<'r, 'l> {
 
     pub fn finish(self, change_set_configs: &ChangeSetConfigs) -> Result<VMChangeSet, VMStatus> {
         let Self { session } = self;
-        session.finish_with_squashed_change_set(change_set_configs, false)
+
+        // TODO(George): Abort hook can never publish modules! When we move publishing outside
+        //               of MoveVM, we do not need to use _ here, as modules will only be visible
+        //               in user session.
+        let (change_set, _) = session.finish_with_squashed_change_set(change_set_configs, false)?;
+        change_set_configs.check_change_set(&change_set)?;
+        Ok(change_set)
     }
 }

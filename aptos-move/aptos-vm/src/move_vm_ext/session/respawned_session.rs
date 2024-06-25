@@ -9,9 +9,13 @@ use crate::{
     },
     AptosVM,
 };
-use aptos_types::transaction::user_transaction_context::UserTransactionContext;
+use aptos_types::{
+    state_store::state_key::StateKey,
+    transaction::user_transaction_context::UserTransactionContext, write_set::WriteOp,
+};
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
+use std::collections::BTreeMap;
 
 fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VMStatus> {
     value
@@ -72,9 +76,8 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         mut self,
         change_set_configs: &ChangeSetConfigs,
         assert_no_additional_creation: bool,
-    ) -> Result<VMChangeSet, VMStatus> {
-        // FIXME(George): double check this
-        let (additional_change_set, _) = self.with_session_mut(|session| {
+    ) -> Result<(VMChangeSet, BTreeMap<StateKey, WriteOp>), VMStatus> {
+        let (additional_change_set, module_write_set) = self.with_session_mut(|session| {
             unwrap_or_invariant_violation(
                 session.take(),
                 "VM session cannot be finished more than once.",
@@ -97,13 +100,13 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         }
         let mut change_set = self.into_heads().executor_view.change_set;
         change_set
-            .squash_additional_change_set(additional_change_set, change_set_configs)
+            .squash_additional_change_set(additional_change_set)
             .map_err(|_err| {
                 VMStatus::error(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                     err_msg("Failed to squash VMChangeSet"),
                 )
             })?;
-        Ok(change_set)
+        Ok((change_set, module_write_set))
     }
 }
