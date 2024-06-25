@@ -1457,6 +1457,7 @@ dependencies = [
  "rayon",
  "serde",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
