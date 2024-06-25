@@ -881,6 +881,12 @@ where
         }
 
         let num_txns = signature_verified_block.len();
+        let concurrency_level = self.config.local.concurrency_level;
+        let num_threads = if concurrency_level > num_txns / 2 { 
+            num_txns / 2
+        } else {
+            concurrency_level
+        };
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
@@ -903,7 +909,7 @@ where
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            for _ in 0..self.config.local.concurrency_level {
+            for _ in 0..num_threads {
                 s.spawn(|_| {
                     if let Err(err) = self.worker_loop(
                         &executor_initial_arguments,
@@ -1311,6 +1317,8 @@ where
         signature_verified_block: &[T],
         base_view: &S,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
+
+        
         if self.config.local.concurrency_level > 1 {
             let parallel_result = self.execute_transactions_parallel(
                 executor_arguments,
