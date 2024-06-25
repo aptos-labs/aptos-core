@@ -590,6 +590,9 @@ impl ConsensusObserver {
                         error,
                     ))
                 );
+
+                // Send another unsubscription request to the peer
+                self.unsubscribe_from_peer(peer_network_id);
                 return;
             }
         } else {
@@ -599,6 +602,10 @@ impl ConsensusObserver {
                     peer_network_id
                 ))
             );
+
+            // Send an unsubscription request to the peer
+            self.unsubscribe_from_peer(peer_network_id);
+            return;
         };
 
         // Increment the received message counter
