@@ -172,21 +172,14 @@ spec aptos_framework::staking_config {
     }
 
     spec last_rewards_rate_period_start_in_seconds(): u64 {
-        aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
-        aborts_if !features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
     }
 
     spec rewards_rate_decrease_rate(): (u64, u64) {
-        aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
-        aborts_if !features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
-
     }
 
     spec rewards_rate_period_start_in_secs(): u64 {
-        aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
-        aborts_if !features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
     }
 
