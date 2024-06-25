@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account_address::AccountAddress;
+use crate::function_info::FunctionInfo;
 use anyhow::Result;
 use move_core_types::{
     ident_str,
@@ -13,17 +13,21 @@ use move_core_types::{
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use move_core_types::account_address::AccountAddress;
+use move_core_types::language_storage::StructTag;
 
 /// A Rust representation of an Account resource.
 /// This is not how the Account is represented in the VM but it's a convenient representation.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct LiteAccountGroup {
-    pub account: AccountResource,
-    pub authenticator: Authenticator,
+    addr: AccountAddress,
+    pub account: Option<AccountResource>,
+    pub native_authenticator: Option<NativeAuthenticatorResource>,
+    pub dispatchable_authenticator: Option<DispatchableAuthenticatorResource>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct AccountResource {
     pub sequence_number: u64,
@@ -43,59 +47,75 @@ impl From<Option<Vec<u8>>> for NativeAuthenticatorResource {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct CustomizedAuthenticatorResource {
-    account_address: AccountAddress,
-    module_name: Vec<u8>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub enum Authenticator {
-    Native(NativeAuthenticatorResource),
-    Customized(CustomizedAuthenticatorResource),
+pub struct DispatchableAuthenticatorResource {
+    pub auth_function: FunctionInfo,
 }
 
 impl LiteAccountGroup {
     /// Constructs an Account resource.
-    pub fn new(sequence_number: u64, authenticator: Authenticator) -> Self {
+    pub fn new(addr: AccountAddress, sequence_number: Option<u64>, auth_key: Option<Option<Vec<u8>>>, dispatchable_authenticator: Option<DispatchableAuthenticatorResource>) -> Self {
         LiteAccountGroup {
-            account: AccountResource { sequence_number },
-            authenticator,
+            addr,
+            account: sequence_number.map(|s| AccountResource { sequence_number: s }),
+            native_authenticator: auth_key.map(|k| NativeAuthenticatorResource {
+                authentication_key: k
+            }),
+            dispatchable_authenticator
         }
     }
 
     /// Return the sequence_number field for the given Account
     pub fn sequence_number(&self) -> u64 {
-        self.account.sequence_number
+        if let Some(ar) = &self.account { ar.sequence_number } else { 0 }
     }
 
     /// Return the authentication_key field for the given Account
-    pub fn authentication_key(&self) -> Option<&Vec<u8>> {
-        match &self.authenticator {
-            Authenticator::Native(native_authenticator) => {
-                native_authenticator.authentication_key.as_ref()
-            },
-            _ => unreachable!(),
+    pub fn authentication_key(&self) -> Option<&[u8]> {
+        if let Some(na) = &self.native_authenticator {
+            na.authentication_key.as_ref().map(|v| v.as_slice())
+        } else {
+            Some(self.addr.as_ref())
         }
     }
 
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut group = BTreeMap::new();
-        group.insert(
-            AccountResource::struct_tag(),
-            bcs::to_bytes(&self.account).unwrap(),
-        );
-        match &self.authenticator {
-            Authenticator::Native(native) => group.insert(
+        if let Some(ar) = &self.account {
+            group.insert(
+                AccountResource::struct_tag(),
+                bcs::to_bytes(ar).unwrap(),
+            );
+        }
+        if let Some(na) = &self.native_authenticator {
+            group.insert(
                 NativeAuthenticatorResource::struct_tag(),
-                bcs::to_bytes(native)?,
-            ),
-            Authenticator::Customized(customized) => group.insert(
-                CustomizedAuthenticatorResource::struct_tag(),
-                bcs::to_bytes(customized)?,
-            ),
-        };
+                bcs::to_bytes(na).unwrap(),
+            );
+        }
+        if let Some(da) = &self.dispatchable_authenticator {
+            group.insert(
+                DispatchableAuthenticatorResource::struct_tag(),
+                bcs::to_bytes(da).unwrap(),
+            );
+        }
         Ok(bcs::to_bytes(&group)?)
+    }
+
+    pub fn from_bytes(addr: &AccountAddress, value: Option<&[u8]>) -> Result<Self> {
+        if let Some(value) = value {
+            let group: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(value)?;
+            let account = group.get(&AccountResource::struct_tag()).map(|bytes| bcs::from_bytes::<AccountResource>(bytes.as_slice())).transpose()?;
+            let native_authenticator = group.get(&NativeAuthenticatorResource::struct_tag()).map(|bytes| bcs::from_bytes::<NativeAuthenticatorResource>(bytes.as_slice())).transpose()?;
+            let dispatchable_authenticator = group.get(&DispatchableAuthenticatorResource::struct_tag()).map(|bytes| bcs::from_bytes::<DispatchableAuthenticatorResource>(bytes.as_slice())).transpose()?;
+            Ok(Self {
+                addr: *addr,
+                account,
+                native_authenticator,
+                dispatchable_authenticator,
+            })
+        } else {
+            Ok(Self::new(*addr, None, None, None))
+        }
     }
 }
 
@@ -120,9 +140,9 @@ impl MoveStructType for NativeAuthenticatorResource {
 
 impl MoveResource for NativeAuthenticatorResource {}
 
-impl MoveStructType for CustomizedAuthenticatorResource {
+impl MoveStructType for DispatchableAuthenticatorResource {
     const MODULE_NAME: &'static IdentStr = ident_str!("lite_account");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("CustomizedAuthenticator");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("DispatchableAuthenticator");
 }
 
-impl MoveResource for CustomizedAuthenticatorResource {}
+impl MoveResource for DispatchableAuthenticatorResource {}

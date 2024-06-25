@@ -662,15 +662,24 @@ impl TestContext {
     }
 
     pub async fn get_sequence_number(&self, account: AccountAddress) -> u64 {
-        let account_resource = self
-            .gen_resource(&account, "0x1::account::Account")
-            .await
-            .unwrap();
-        account_resource["data"]["sequence_number"]
-            .as_str()
-            .unwrap()
-            .parse::<u64>()
-            .unwrap()
+        if let Some(account_resource) = self.gen_resource(&account, "0x1::account::Account").await {
+            account_resource["data"]["sequence_number"]
+                .as_str()
+                .unwrap()
+                .parse::<u64>()
+                .unwrap()
+        } else {
+            let lite_account_resource = self.gen_resource(&account, "0x1::lite_account::Account").await;
+            lite_account_resource
+                .map(|x| {
+                    x["data"]["sequence_number"]
+                        .as_str()
+                        .unwrap()
+                        .parse::<u64>()
+                        .unwrap()
+                })
+                .unwrap_or(0)
+        }
     }
 
     pub async fn get_apt_balance(&self, account: AccountAddress) -> u64 {

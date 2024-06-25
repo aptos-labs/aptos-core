@@ -71,6 +71,8 @@ use std::{
     sync::Arc,
 };
 use tempfile::NamedTempFile;
+use aptos_types::account_config::{FungibleStoreResource, lite_account, ObjectGroupResource};
+use aptos_types::account_config::lite_account::LiteAccountGroup;
 
 /**
  * Definitions
@@ -415,60 +417,35 @@ impl<'a> AptosTestAdapter<'a> {
         (addresses, private_keys)
     }
 
-    /// Obtain a Rust representation of the account resource from storage, which is used to derive
-    /// a few default transaction parameters.
-    fn fetch_account_resource(&self, signer_addr: &AccountAddress) -> Result<AccountResource> {
-        let account_blob = self
-            .storage
-            .get_state_value_bytes(&StateKey::resource_typed::<AccountResource>(signer_addr)?)
-            .unwrap()
-            .ok_or_else(|| {
-                format_err!(
-                "Failed to fetch account resource under address {}. Has the account been created?",
-                signer_addr
+    fn sequence_number(&self, addr: &AccountAddress) -> u64 {
+        if let Some(acct_v1) =
+            self.read_resource::<AccountResource>(addr, AccountResource::struct_tag())
+        {
+            acct_v1.sequence_number()
+        } else {
+            self.read_resource_from_resource_group::<lite_account::AccountResource>(
+                addr,
+                LiteAccountGroup::struct_tag(),
+                lite_account::AccountResource::struct_tag(),
             )
-            })?;
-        Ok(bcs::from_bytes(&account_blob).unwrap())
+                .unwrap()
+                .sequence_number
+        }
     }
 
     /// Obtain the AptosCoin amount under address `signer_addr`
-    fn fetch_account_balance(&self, signer_addr: &AccountAddress) -> Result<u64> {
-        let aptos_coin_tag = CoinStoreResource::struct_tag();
-
-        let balance_blob = self
-            .storage
-            .get_state_value_bytes(&StateKey::resource(signer_addr, &aptos_coin_tag)?)
-            .unwrap()
-            .ok_or_else(|| {
-                format_err!(
-                    "Failed to fetch balance resource under address {}.",
-                    signer_addr
-                )
-            })?;
-
-        let annotated = AptosValueAnnotator::new(&self.storage)
-            .view_resource(&aptos_coin_tag, &balance_blob)?;
-
-        // Filter the Coin resource and return the resouce value
-        for (key, val) in annotated.value {
-            if key != Identifier::new("coin").unwrap() {
-                continue;
-            }
-
-            if let AnnotatedMoveValue::Struct(s) = val {
-                for (key, val) in s.value {
-                    if key != Identifier::new("value").unwrap() {
-                        continue;
-                    }
-
-                    if let AnnotatedMoveValue::U64(v) = val {
-                        return Ok(v);
-                    }
-                }
-            }
-        }
-
-        bail!("Failed to fetch balance under address {}.", signer_addr)
+    fn read_aptos_balance(&self, addr: &AccountAddress) -> u64 {
+        self.read_resource::<CoinStoreResource>(addr, CoinStoreResource::struct_tag())
+            .map(|c| c.coin())
+            .unwrap_or(0)
+            + self
+            .read_resource_from_resource_group::<FungibleStoreResource>(
+                &aptos_types::account_config::fungible_store::primary_apt_store(*addr),
+                ObjectGroupResource::struct_tag(),
+                FungibleStoreResource::struct_tag(),
+            )
+            .map(|c| c.balance())
+            .unwrap_or(0)
     }
 
     /// Derive the default transaction parameters from the account and balance resources fetched
@@ -482,9 +459,7 @@ impl<'a> AptosTestAdapter<'a> {
         gas_unit_price: Option<u64>,
         max_gas_amount: Option<u64>,
     ) -> Result<TransactionParameters> {
-        let account_resource = self.fetch_account_resource(signer_addr)?;
-
-        let sequence_number = sequence_number.unwrap_or_else(|| account_resource.sequence_number());
+        let sequence_number = self.sequence_number(signer_addr);
         let max_number_of_gas_units =
             TransactionGasParameters::initial().maximum_number_of_gas_units;
         let gas_unit_price = gas_unit_price.unwrap_or(1000);
@@ -492,7 +467,7 @@ impl<'a> AptosTestAdapter<'a> {
             if gas_unit_price == 0 {
                 u64::from(max_number_of_gas_units)
             } else {
-                let account_balance = self.fetch_account_balance(signer_addr).unwrap();
+                let account_balance = self.read_aptos_balance(signer_addr);
                 std::cmp::min(
                     u64::from(max_number_of_gas_units),
                     account_balance / gas_unit_price,

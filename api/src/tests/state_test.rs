@@ -13,8 +13,13 @@ use std::path::PathBuf;
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resource() {
     let mut context = new_test_context(current_function_name!());
+    // create root lite account resource.
+    let user = &mut context.gen_account();
+    let txn1 = context.mint_user_account(user).await;
+    context.commit_block(&vec![txn1]).await;
+    let root = context.root_account().await;
     let resp = context
-        .get(&get_account_resource("0xA550C18", "0x1::account::Account"))
+        .get(&get_account_resource(&root.address().to_standard_string(), "0x1::lite_account::Account"))
         .await;
     context.check_golden_output(resp);
 }
@@ -68,11 +73,16 @@ async fn test_get_account_resource_struct_tag_not_found() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resource_with_version() {
     let mut context = new_test_context(current_function_name!());
+    // create root lite account resource.
+    let user = &mut context.gen_account();
+    let txn1 = context.mint_user_account(user).await;
+    context.commit_block(&vec![txn1]).await;
+    let root = context.root_account().await;
     let ledger_version = context.get_latest_ledger_info().version();
     let resp = context
         .get(&get_account_resource_with_version(
-            "0xA550C18",
-            "0x1::account::Account",
+            &root.address().to_standard_string(),
+            "0x1::lite_account::Account",
             ledger_version,
         ))
         .await;
@@ -192,7 +202,7 @@ async fn test_merkle_leaves_with_nft_transfer() {
         .unwrap();
     assert_eq!(
         num_leaves_after_transfer_nft,
-        num_leaves_at_beginning + 2  /* 1 token store + 1 token*/ + num_block_resource
+        num_leaves_at_beginning + 3  /* 1 token store + 1 token + GUID(LiteAccountGroup) */ + num_block_resource
     );
 
     let transfer_to_creator_txn = owner.sign_multi_agent_with_transaction_builder(
@@ -214,7 +224,7 @@ async fn test_merkle_leaves_with_nft_transfer() {
 
     assert_eq!(
         num_leaves_after_return_nft,
-        num_leaves_at_beginning + 1 + num_block_resource * 2
+        num_leaves_at_beginning + 2 + num_block_resource * 2
     );
 }
 

@@ -8,7 +8,7 @@ pub use golden_output::*;
 use serde_json::Value;
 pub use test_context::*;
 
-pub fn find_value(val: &Value, filter: for<'r> fn(&'r &Value) -> bool) -> Value {
+pub fn find_value(val: &Value, filter: for<'r> fn(&'r &Value) -> bool) -> Option<Value> {
     let resources = val
         .as_array()
         .unwrap_or_else(|| panic!("expect array, but got: {}", val));
@@ -19,11 +19,9 @@ pub fn find_value(val: &Value, filter: for<'r> fn(&'r &Value) -> bool) -> Value 
             if let Some(val) = more {
                 panic!("found multiple items by the filter: {}", pretty(val));
             }
-            resource.clone()
+            Some(resource.clone())
         },
-        None => {
-            panic!("\ncould not find item in {}", pretty(val))
-        },
+        None => None
     }
 }
 
