@@ -617,6 +617,9 @@ impl ConsensusObserver {
                         error,
                     ))
                 );
+
+                // Send another subscription request to the peer
+                self.unsubscribe_from_peer(peer_network_id);
                 return;
             }
         } else {
