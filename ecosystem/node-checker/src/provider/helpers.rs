@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub const MISSING_PROVIDER_MESSAGE: &str = "Incomplete request";

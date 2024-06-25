@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_rest_client::{aptos_api_types, AptosBaseUrl, Client as RestClient};

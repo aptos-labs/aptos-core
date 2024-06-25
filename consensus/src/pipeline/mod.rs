@@ -1,26 +1,26 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
+// Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 /*
- *         ┌──────────────────┐
- *         │ 2. Signing Phase │
- *         └──────────────▲─┬─┘
- *                        │ │
- * ┌────────────────────┐ │ │ ┌─────────────────────┐
- * │ 1. Execution Phase │ │ │ │ 4. Persisting Phase │
- * └─────────────────▲─┬┘ │ │ └┬─▲──────────────────┘
- *                   │ │  │ │  │ │
- *     0. Ordered  ┌─┴─▼──┴─▼──▼─┴────┐ 3. Commit Vote  ┌─────────┐
- *        Blocks   │                  ├─────────────────►         │
- *       ┌─────────►  Buffer Manager  │                 │ Network │
- *       │         │                  ◄─────────────────┤         │
- *  ┌────┴─────┐   └─────────▲────────┘    Commit Vote  └─────────┘
- *  │ Ordering │             │
- *  │ State    │   Sync Req  │
- *  │ Computer ├─────────────┘
- *  └──────────┘
- */
+*         /------------------\
+*         | 2. Signing Phase |
+*         \--------------A-+-/
+*                        | |
+* /--------------------\ | | /---------------------\
+* | 1. Execution Phase | | | | 4. Persisting Phase |
+* \-----------------A--/ | | \+-A------------------/
+*                   | |  | |  | |
+*     0. Ordered  /-+-V--+-V--V-+--\ 3. Commit Vote   /-----------\
+*        Blocks   |                +------------------>           |
+*       /---------> Buffer Manager |                  |  Network  |
+*       |         |                <------------------+           |
+*  /----+------\  \---------A------/    Commit Vote   \-----------/
+*  | Ordering  |            |
+*  | State     |  Sync Req  |
+*  | Computer  |-----------/
+*  \-----------/
+*/
 
 pub mod buffer;
 pub mod buffer_item;

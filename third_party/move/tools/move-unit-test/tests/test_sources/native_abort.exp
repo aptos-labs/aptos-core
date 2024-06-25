@@ -12,7 +12,6 @@ Output: Ok(Changes { accounts: {} })
 Test failures:
 
 Failures in 0x1::A:
-
 ┌── native_abort_good_wrong_code ──────
 │ error[E11001]: test failure
 │    ┌─ native_abort.move:12:9
@@ -24,7 +23,6 @@ Failures in 0x1::A:
 │ 
 │ 
 └──────────────────
-
 
 ┌── native_abort_unexpected_abort ──────
 │ error[E11001]: test failure

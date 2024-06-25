@@ -407,7 +407,7 @@ impl Signature for Ed25519Signature {
 
     /// Verifies that the provided signature is valid for the provided
     /// message, according to the RFC8032 algorithm. This strict verification performs the
-    /// recommended check of 5.1.7 §3, on top of the required RFC8032 verifications.
+    /// recommended check of 5.1.7 SS3, on top of the required RFC8032 verifications.
     fn verify<T: CryptoHash + Serialize>(
         &self,
         message: &T,

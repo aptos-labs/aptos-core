@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
+// Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! An implementation of HKDF, the HMAC-based Extract-and-Expand Key Derivation Function
@@ -51,7 +51,7 @@
 //! it be independent of the seed.
 //!
 //! **Which function to use: extract, expand or both?**
-//! Unless absolutely sure of what they are doing, applications should use both steps — if only for
+//! Unless absolutely sure of what they are doing, applications should use both steps - if only for
 //! the sake of compatibility with the general case.
 //!
 //! # Example
@@ -128,7 +128,7 @@ where
 
     /// The RFC5869 HKDF-Expand operation.
     pub fn expand(prk: &[u8], info: Option<&[u8]>, length: usize) -> Result<Vec<u8>, HkdfError> {
-        // According to RFC5869, MAX_OUTPUT_LENGTH <= 255 * HashLen — which is
+        // According to RFC5869, MAX_OUTPUT_LENGTH <= 255 * HashLen - which is
         // checked below.
         // We specifically exclude a zero size length as well.
         if length == 0 {

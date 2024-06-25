@@ -9,11 +9,9 @@ Output: Ok(Changes { accounts: {} })
 Test failures:
 
 Failures in 0x1::M:
-
 ┌── fail ──────
 │ Test did not error as expected
 └──────────────────
-
 
 ┌── fail_with_code ──────
 │ Test did not error as expected

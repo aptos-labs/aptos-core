@@ -12,11 +12,9 @@ Output: Ok(Changes { accounts: {} })
 Test failures:
 
 Failures in 0x42::m:
-
 ┌── t0 ──────
 │ Test did not error as expected
 └──────────────────
-
 
 ┌── t1 ──────
 │ error[E11001]: test failure
@@ -29,7 +27,6 @@ Failures in 0x42::m:
 │ 
 │ 
 └──────────────────
-
 
 ┌── t2 ──────
 │ error[E11001]: test failure

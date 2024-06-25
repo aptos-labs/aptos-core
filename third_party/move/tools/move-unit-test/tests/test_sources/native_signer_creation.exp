@@ -12,7 +12,6 @@ Output: Ok(Changes { accounts: {000000000000000000000000000000000000000000000000
 Test failures:
 
 Failures in 0x1::M:
-
 ┌── test_doesnt_exist ──────
 │ error[E11001]: test failure
 │    ┌─ native_signer_creation.move:47:9

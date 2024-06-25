@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, build_package, tests::common, MoveHarness};
@@ -216,7 +216,7 @@ fn sample_mint_nft_part4_unit_test_signature() {
 
 /// Run `cargo test generate_nft_tutorial_part4_signature -- --nocapture`
 /// to generate a valid signature for `[resource_account_address]::create_nft_getting_production_ready::mint_event_pass()` function
-/// in `aptos-move/move-examples/mint_nft/4-Getting-Production-Ready/sources/create_nft_getting_production_ready.move`. åååååååå
+/// in `aptos-move/move-examples/mint_nft/4-Getting-Production-Ready/sources/create_nft_getting_production_ready.move`
 #[test]
 fn generate_nft_tutorial_part4_signature() {
     let mut h = MoveHarness::new();

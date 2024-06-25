@@ -320,7 +320,7 @@ pub fn derive_enum_signature(input: TokenStream) -> TokenStream {
 }
 
 // There is a unit test for this logic in the crypto crate, at
-// diem_crypto::unit_tests::cryptohasher — you may have to modify it if you
+// diem_crypto::unit_tests::cryptohasher - you may have to modify it if you
 // edit the below.
 #[proc_macro_derive(CryptoHasher)]
 pub fn hasher_dispatch(input: TokenStream) -> TokenStream {
