@@ -6,6 +6,7 @@
 
 
 -  [Struct `KeyRotation`](#0x1_account_KeyRotation)
+-  [Struct `MigratedToLiteAccount`](#0x1_account_MigratedToLiteAccount)
 -  [Resource `Account`](#0x1_account_Account)
 -  [Struct `KeyRotationEvent`](#0x1_account_KeyRotationEvent)
 -  [Struct `CoinRegisterEvent`](#0x1_account_CoinRegisterEvent)
@@ -30,6 +31,7 @@
 -  [Function `get_sequence_number`](#0x1_account_get_sequence_number)
 -  [Function `increment_sequence_number`](#0x1_account_increment_sequence_number)
 -  [Function `get_authentication_key`](#0x1_account_get_authentication_key)
+-  [Function `migrate_to_lite_account`](#0x1_account_migrate_to_lite_account)
 -  [Function `rotate_authentication_key_internal`](#0x1_account_rotate_authentication_key_internal)
 -  [Function `rotate_authentication_key_call`](#0x1_account_rotate_authentication_key_call)
 -  [Function `rotate_authentication_key`](#0x1_account_rotate_authentication_key)
@@ -148,6 +150,34 @@
 </dd>
 <dt>
 <code>new_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_account_MigratedToLiteAccount"></a>
+
+## Struct `MigratedToLiteAccount`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="account.md#0x1_account_MigratedToLiteAccount">MigratedToLiteAccount</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="account.md#0x1_account">account</a>: <b>address</b></code>
 </dt>
 <dd>
 
@@ -751,6 +781,15 @@ Specified scheme required to proceed with the smart contract operation - can onl
 
 
 
+<a id="0x1_account_ELITE_ACCOUNT_ALREADY_EXISTS"></a>
+
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_ELITE_ACCOUNT_ALREADY_EXISTS">ELITE_ACCOUNT_ALREADY_EXISTS</a>: u64 = 23;
+</code></pre>
+
+
+
 <a id="0x1_account_ENO_CAPABILITY"></a>
 
 The caller does not have a digital-signature-based capability to call this function
@@ -1224,6 +1263,69 @@ is returned. This way, the caller of this function can publish additional resour
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(<a href="lite_account.md#0x1_lite_account_native_authenticator">lite_account::native_authenticator</a>(addr))
     } <b>else</b> {
         <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_migrate_to_lite_account"></a>
+
+## Function `migrate_to_lite_account`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_migrate_to_lite_account">migrate_to_lite_account</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_migrate_to_lite_account">migrate_to_lite_account</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> default_auth_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&addr);
+    <b>if</b> (<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr)) {
+        <b>assert</b>!(
+            <a href="lite_account.md#0x1_lite_account_native_authenticator">lite_account::native_authenticator</a>(addr) == <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
+                default_auth_key
+            ) && !<a href="lite_account.md#0x1_lite_account_using_dispatchable_authenticator">lite_account::using_dispatchable_authenticator</a>(addr) ||
+                <a href="lite_account.md#0x1_lite_account_get_sequence_number">lite_account::get_sequence_number</a>(addr) == 0 ||
+                <a href="lite_account.md#0x1_lite_account_guid_creation_number">lite_account::guid_creation_number</a>(addr) == 0 ||
+                <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&<a href="lite_account.md#0x1_lite_account_rotation_capability_offer">lite_account::rotation_capability_offer</a>(addr)) ||
+                <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&<a href="lite_account.md#0x1_lite_account_signer_capability_offer">lite_account::signer_capability_offer</a>(addr)),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account.md#0x1_account_ELITE_ACCOUNT_ALREADY_EXISTS">ELITE_ACCOUNT_ALREADY_EXISTS</a>)
+        );
+        <b>let</b> <a href="account.md#0x1_account_Account">Account</a> {
+            authentication_key,
+            sequence_number,
+            guid_creation_num,
+            coin_register_events,
+            key_rotation_events,
+            rotation_capability_offer,
+            signer_capability_offer,
+        } = <b>move_from</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+        <b>if</b> (authentication_key != default_auth_key) {
+            <a href="lite_account.md#0x1_lite_account_update_native_authenticator_impl">lite_account::update_native_authenticator_impl</a>(<a href="account.md#0x1_account">account</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(authentication_key))
+        };
+        <b>if</b> (sequence_number != 0) {
+            <a href="lite_account.md#0x1_lite_account_set_sequence_number">lite_account::set_sequence_number</a>(addr, sequence_number);
+        };
+        <b>if</b> (guid_creation_num != 0) {
+            <a href="lite_account.md#0x1_lite_account_set_guid_creation_number">lite_account::set_guid_creation_number</a>(<a href="account.md#0x1_account">account</a>, guid_creation_num);
+        };
+        <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(coin_register_events);
+        <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(key_rotation_events);
+
+        <b>let</b> <a href="account.md#0x1_account_CapabilityOffer">CapabilityOffer</a> { for : offeree } = rotation_capability_offer;
+        <a href="lite_account.md#0x1_lite_account_set_rotation_capability_offer">lite_account::set_rotation_capability_offer</a>(<a href="account.md#0x1_account">account</a>, offeree);
+        <b>let</b> <a href="account.md#0x1_account_CapabilityOffer">CapabilityOffer</a> { for : offeree } = signer_capability_offer;
+        <a href="lite_account.md#0x1_lite_account_set_signer_capability_offer">lite_account::set_signer_capability_offer</a>(<a href="account.md#0x1_account">account</a>, offeree);
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="account.md#0x1_account_MigratedToLiteAccount">MigratedToLiteAccount</a> { <a href="account.md#0x1_account">account</a>: addr });
     }
 }
 </code></pre>

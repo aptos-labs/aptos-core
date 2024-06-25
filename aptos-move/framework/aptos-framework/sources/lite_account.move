@@ -340,6 +340,33 @@ module aptos_framework::lite_account {
         }
     }
 
+    /// Only used by account.move for migration.
+    public(friend) fun set_sequence_number(addr: address, new_sequence_number: u64) acquires Account {
+        if (!account_resource_exists_at(addr)) {
+            create_account_with_resource(addr);
+        };
+        let sequence_number = &mut borrow_global_mut<Account>(addr).sequence_number;
+        assert!(
+            (new_sequence_number as u128) < MAX_U64,
+            error::out_of_range(ESEQUENCE_NUMBER_OVERFLOW)
+        );
+        *sequence_number = new_sequence_number;
+    }
+
+    /// Only used by account.move for migration.
+    public(friend) fun set_guid_creation_number(
+        account: &signer,
+        creation_number: u64
+    ) acquires LegacyGUIDCreactionNumber {
+        let addr = signer::address_of(account);
+        if (!exists<LegacyGUIDCreactionNumber>(addr)) {
+            move_to(account, LegacyGUIDCreactionNumber {
+                creation_number: 0
+            });
+        };
+        borrow_global_mut<LegacyGUIDCreactionNumber>(addr).creation_number = creation_number;
+    }
+
     public(friend) fun create_guid(account: &signer): GUID acquires LegacyGUIDCreactionNumber {
         let addr = signer::address_of(account);
         if (!exists<LegacyGUIDCreactionNumber>(addr)) {
