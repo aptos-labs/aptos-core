@@ -4,6 +4,7 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_logger::error;
 use aptos_types::{
     contract_event::ContractEvent, ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
@@ -100,6 +101,8 @@ impl ConsensusNotificationSender for ConsensusNotifier {
             return Ok(());
         }
 
+        error!("ConsensusNotificationSender: Before notification to state sync");
+
         // Construct a oneshot channel to receive a state sync response
         let (callback, callback_receiver) = oneshot::channel();
         let commit_notification =
@@ -121,6 +124,7 @@ impl ConsensusNotificationSender for ConsensusNotifier {
                 error
             )));
         }
+        error!("ConsensusNotificationSender: Transaction commit notification to state sync");
 
         // Handle any responses or a timeout
         if let Ok(response) =

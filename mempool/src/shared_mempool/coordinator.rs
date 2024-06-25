@@ -206,7 +206,7 @@ fn handle_commit_notification<TransactionValidator>(
 ) where
     TransactionValidator: TransactionValidation,
 {
-    debug!(
+    error!(
         block_timestamp_usecs = msg.block_timestamp_usecs,
         num_committed_txns = msg.transactions.len(),
         LogSchema::event_log(LogEntry::StateSyncCommit, LogEvent::Received),

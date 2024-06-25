@@ -247,6 +247,7 @@ impl<
     async fn handle_consensus_notification(&mut self, notification: ConsensusNotification) {
         // Verify the notification: full nodes shouldn't receive notifications
         // and consensus should only send notifications after bootstrapping!
+        error!("handle consensus notification");
         let result = if !self.is_consensus_enabled() {
             Err(Error::FullNodeConsensusNotification(format!(
                 "Received consensus notification: {:?}",
@@ -308,7 +309,7 @@ impl<
         &mut self,
         consensus_commit_notification: ConsensusCommitNotification,
     ) -> Result<(), Error> {
-        info!(
+        error!(
             LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
                 "Received a consensus commit notification! Total transactions: {:?}, events: {:?}",
                 consensus_commit_notification.transactions.len(),

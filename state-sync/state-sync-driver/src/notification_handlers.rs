@@ -85,7 +85,7 @@ impl CommitNotification {
     ) -> Result<(), Error> {
         // Log the highest synced version and timestamp
         let blockchain_timestamp_usecs = latest_synced_ledger_info.ledger_info().timestamp_usecs();
-        debug!(
+        error!(
             LogSchema::new(LogEntry::NotificationHandler).message(&format!(
                 "Notifying the storage service, mempool and the event subscription service of version: {:?} and timestamp: {:?}.",
                 latest_synced_version, blockchain_timestamp_usecs
