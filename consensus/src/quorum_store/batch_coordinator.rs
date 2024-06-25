@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::utils::ProofQueueCommand;
 use crate::{
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
@@ -33,7 +32,6 @@ pub struct BatchCoordinator {
     network_sender: Arc<NetworkSender>,
     sender_to_proof_manager: Arc<Sender<ProofManagerCommand>>,
     sender_to_batch_generator: Arc<Sender<BatchGeneratorCommand>>,
-    sender_to_proof_queue: Arc<Sender<ProofQueueCommand>>,
     batch_store: Arc<BatchStore>,
     max_batch_txns: u64,
     max_batch_bytes: u64,
@@ -47,7 +45,6 @@ impl BatchCoordinator {
         network_sender: NetworkSender,
         sender_to_proof_manager: Sender<ProofManagerCommand>,
         sender_to_batch_generator: Sender<BatchGeneratorCommand>,
-        sender_to_proof_queue: Arc<Sender<ProofQueueCommand>>,
         batch_store: Arc<BatchStore>,
         max_batch_txns: u64,
         max_batch_bytes: u64,
@@ -59,7 +56,6 @@ impl BatchCoordinator {
             network_sender: Arc::new(network_sender),
             sender_to_proof_manager: Arc::new(sender_to_proof_manager),
             sender_to_batch_generator: Arc::new(sender_to_batch_generator),
-            sender_to_proof_queue,
             batch_store,
             max_batch_txns,
             max_batch_bytes,
@@ -80,7 +76,12 @@ impl BatchCoordinator {
             let peer_id = persist_requests[0].author();
             let batches = persist_requests
                 .iter()
-                .map(|persisted_value| persisted_value.batch_info().clone())
+                .map(|persisted_value| {
+                    (
+                        persisted_value.batch_info().clone(),
+                        persisted_value.summary(),
+                    )
+                })
                 .collect();
             let signed_batch_infos = batch_store.persist(persist_requests);
             if !signed_batch_infos.is_empty() {
@@ -138,10 +139,6 @@ impl BatchCoordinator {
         }
 
         let mut persist_requests = vec![];
-        let batches_summary = batches
-            .iter()
-            .map(|batch| (batch.batch_info().clone(), batch.summary()))
-            .collect();
         for batch in batches.into_iter() {
             // TODO: maybe don't message batch generator if the persist is unsuccessful?
             if let Err(e) = self
@@ -153,10 +150,6 @@ impl BatchCoordinator {
             }
             persist_requests.push(batch.into());
         }
-        self.sender_to_proof_queue
-            .send(ProofQueueCommand::AddBatches(batches_summary))
-            .await
-            .expect("Failed to send NewBatches to ProofQueue");
         counters::RECEIVED_BATCH_COUNT.inc_by(persist_requests.len() as u64);
         if author != self.my_peer_id {
             counters::RECEIVED_REMOTE_BATCH_COUNT.inc_by(persist_requests.len() as u64);

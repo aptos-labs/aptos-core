@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::batch_generator::BackPressure;
 use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
@@ -193,27 +192,6 @@ impl Ord for BatchSortKey {
     }
 }
 
-#[derive(Debug)]
-pub enum ProofQueueCommand {
-    // Proof manager sends this command to add the proofs to the proof queue
-    AddProofs(Vec<ProofOfStore>),
-    // Batch coordinator sends this command to add the received batches to the proof queue.
-    // For each transaction, the proof queue stores the list of batches containing the transaction.
-    AddBatches(Vec<(BatchInfo, Vec<TransactionSummary>)>),
-    // Proof manager sends this command to pull proofs from the proof queue to
-    // include in the block proposal.
-    PullProofs {
-        excluded_batches: HashSet<BatchInfo>,
-        max_txns: u64,
-        max_bytes: u64,
-        return_non_full: bool,
-        response_sender: oneshot::Sender<(Vec<ProofOfStore>, bool)>,
-    },
-    // Proof manager sends this command to mark these batches as committed and
-    // update the block timestamp.
-    MarkCommitted(Vec<BatchInfo>, u64),
-}
-
 pub struct ProofQueue {
     my_peer_id: PeerId,
     // Queue per peer to ensure fairness between peers and priority within peer
@@ -228,8 +206,6 @@ pub struct ProofQueue {
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
-    back_pressure_total_txn_limit: u64,
-    back_pressure_total_proof_limit: u64,
     remaining_txns_with_duplicates: u64,
     remaining_proofs: u64,
     remaining_local_txns: u64,
@@ -237,11 +213,7 @@ pub struct ProofQueue {
 }
 
 impl ProofQueue {
-    pub(crate) fn new(
-        my_peer_id: PeerId,
-        back_pressure_total_txn_limit: u64,
-        back_pressure_total_proof_limit: u64,
-    ) -> Self {
+    pub(crate) fn new(my_peer_id: PeerId) -> Self {
         Self {
             my_peer_id,
             author_to_batches: HashMap::new(),
@@ -250,8 +222,6 @@ impl ProofQueue {
             batches_with_txn_summary: HashSet::new(),
             expirations: TimeExpirations::new(),
             latest_block_timestamp: 0,
-            back_pressure_total_txn_limit,
-            back_pressure_total_proof_limit,
             remaining_txns_with_duplicates: 0,
             remaining_proofs: 0,
             remaining_local_txns: 0,
@@ -358,15 +328,6 @@ impl ProofQueue {
                     .insert(batch_key.clone());
             }
             self.batches_with_txn_summary.insert(batch_key);
-        }
-    }
-
-    /// return true when quorum store is back pressured
-    pub(crate) fn qs_back_pressure(&self) -> BackPressure {
-        let (remaining_total_txn_num, remaining_total_proof_num) = self.remaining_txns_and_proofs();
-        BackPressure {
-            txn_count: remaining_total_txn_num > self.back_pressure_total_txn_limit,
-            proof_count: remaining_total_proof_num > self.back_pressure_total_proof_limit,
         }
     }
 
@@ -477,7 +438,7 @@ impl ProofQueue {
         }
     }
 
-    fn handle_updated_block_timestamp(&mut self, block_timestamp: u64) {
+    pub(crate) fn handle_updated_block_timestamp(&mut self, block_timestamp: u64) {
         assert!(
             self.latest_block_timestamp <= block_timestamp,
             "Decreasing block timestamp"
@@ -560,7 +521,7 @@ impl ProofQueue {
     }
 
     // Mark in the hashmap committed PoS, but keep them until they expire
-    fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
+    pub(crate) fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
         for batch in &batches {
             let batch_key = BatchKey::from_info(batch);
             if let Some(Some((proof, insertion_time))) = self.batch_to_proof.get(&batch_key) {
@@ -583,80 +544,5 @@ impl ProofQueue {
             }
             !batches.is_empty()
         });
-    }
-
-    pub async fn start(
-        mut self,
-        back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
-        mut command_rx: tokio::sync::mpsc::Receiver<ProofQueueCommand>,
-    ) {
-        let mut back_pressure = BackPressure {
-            txn_count: false,
-            proof_count: false,
-        };
-
-        loop {
-            let _timer = counters::PROOF_QUEUE_MAIN_LOOP.start_timer();
-            if let Some(msg) = command_rx.recv().await {
-                match msg {
-                    ProofQueueCommand::AddProofs(proofs) => {
-                        let start = Instant::now();
-                        for proof in proofs {
-                            self.push(proof);
-                        }
-                        counters::PROOF_QUEUE_ADD_PROOFS_DURATION.observe_duration(start.elapsed());
-
-                        let updated_back_pressure = self.qs_back_pressure();
-                        if updated_back_pressure != back_pressure {
-                            back_pressure = updated_back_pressure;
-                            if back_pressure_tx.send(back_pressure).await.is_err() {
-                                debug!("Failed to send back_pressure for proposal");
-                            }
-                        }
-                    },
-                    ProofQueueCommand::PullProofs {
-                        excluded_batches,
-                        max_txns,
-                        max_bytes,
-                        return_non_full,
-                        response_sender,
-                    } => {
-                        let (proofs, full) = self.pull_proofs(
-                            &excluded_batches,
-                            max_txns,
-                            max_bytes,
-                            return_non_full,
-                        );
-                        if let Err(e) = response_sender.send((proofs, full)) {
-                            warn!("Failed to send response to PullProofs: {:?}", e);
-                        }
-                    },
-                    ProofQueueCommand::MarkCommitted(batches, block_timestamp) => {
-                        let start = Instant::now();
-                        self.mark_committed(batches);
-                        counters::PROOF_QUEUE_COMMIT_DURATION.observe_duration(start.elapsed());
-
-                        let start = Instant::now();
-                        self.handle_updated_block_timestamp(block_timestamp);
-                        counters::PROOF_QUEUE_UPDATE_TIMESTAMP_DURATION
-                            .observe_duration(start.elapsed());
-
-                        let updated_back_pressure = self.qs_back_pressure();
-                        if updated_back_pressure != back_pressure {
-                            back_pressure = updated_back_pressure;
-                            if back_pressure_tx.send(back_pressure).await.is_err() {
-                                debug!("Failed to send back_pressure for proposal");
-                            }
-                        }
-                    },
-                    ProofQueueCommand::AddBatches(batch_summaries) => {
-                        let start = Instant::now();
-                        self.add_batch_summaries(batch_summaries);
-                        counters::PROOF_QUEUE_ADD_BATCH_SUMMARIES_DURATION
-                            .observe_duration(start.elapsed());
-                    },
-                }
-            }
-        }
     }
 }
