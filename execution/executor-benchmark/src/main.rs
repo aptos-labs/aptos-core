@@ -451,14 +451,14 @@ fn main() {
 
 
     let (sendx, recvx) = std::sync::mpsc::channel();
-    let num_threads = 100000;
+    let num_tasks = 100000;
     let thread_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads)
+        .num_threads(60)
         .thread_name(|i| format!("thread-{}", i))
         .build()
         .unwrap();
 
-    (0..num_threads).into_iter().for_each(|i| {
+    (0..num_tasks).into_iter().for_each(|i| {
         let sendx_clone = sendx.clone();
         thread_pool.spawn(move || {
             //sleep(Duration::new(3, 0));
@@ -474,7 +474,7 @@ fn main() {
     while let Ok(msg) = recvx.recv() {
         println!("Received message: {:?}", msg);
         cnt += 1;
-        if cnt == num_threads {
+        if cnt == num_tasks {
             break;
         }
     }
