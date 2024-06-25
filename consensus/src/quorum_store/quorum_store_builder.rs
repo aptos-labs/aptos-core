@@ -20,7 +20,6 @@ use crate::{
         proof_manager::{ProofManager, ProofManagerCommand},
         quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
         types::{Batch, BatchResponse},
-        utils::{ProofQueue, ProofQueueCommand},
     },
     round_manager::VerifiedEvent,
 };
@@ -139,8 +138,6 @@ pub struct InnerBuilder {
     proof_coordinator_cmd_rx: Option<tokio::sync::mpsc::Receiver<ProofCoordinatorCommand>>,
     proof_manager_cmd_tx: tokio::sync::mpsc::Sender<ProofManagerCommand>,
     proof_manager_cmd_rx: Option<tokio::sync::mpsc::Receiver<ProofManagerCommand>>,
-    proof_queue_cmd_tx: Arc<tokio::sync::mpsc::Sender<ProofQueueCommand>>,
-    proof_queue_cmd_rx: Option<tokio::sync::mpsc::Receiver<ProofQueueCommand>>,
     back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
     back_pressure_rx: Option<tokio::sync::mpsc::Receiver<BackPressure>>,
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
@@ -184,7 +181,6 @@ impl InnerBuilder {
                 config.channel_size,
                 None,
             );
-        let (proof_queue_tx, proof_queue_rx) = tokio::sync::mpsc::channel(config.channel_size);
         let mut remote_batch_coordinator_cmd_tx = Vec::new();
         let mut remote_batch_coordinator_cmd_rx = Vec::new();
         for _ in 0..config.num_workers_for_remote_batches {
@@ -215,8 +211,6 @@ impl InnerBuilder {
             proof_coordinator_cmd_rx: Some(proof_coordinator_cmd_rx),
             proof_manager_cmd_tx,
             proof_manager_cmd_rx: Some(proof_manager_cmd_rx),
-            proof_queue_cmd_tx: Arc::new(proof_queue_tx),
-            proof_queue_cmd_rx: Some(proof_queue_rx),
             back_pressure_tx,
             back_pressure_rx: Some(back_pressure_rx),
             quorum_store_storage,
@@ -320,20 +314,6 @@ impl InnerBuilder {
             )
         );
 
-        let proof_queue = ProofQueue::new(
-            self.author,
-            self.config.back_pressure.backlog_txn_limit_count,
-            self.config
-                .back_pressure
-                .backlog_per_validator_batch_limit_count
-                * self.num_validators,
-        );
-        let proof_queue_cmd_rx = self.proof_queue_cmd_rx.take().unwrap();
-        spawn_named!(
-            "proof_queue",
-            proof_queue.start(self.back_pressure_tx.clone(), proof_queue_cmd_rx)
-        );
-
         for (i, remote_batch_coordinator_cmd_rx) in
             self.remote_batch_coordinator_cmd_rx.into_iter().enumerate()
         {
@@ -342,7 +322,6 @@ impl InnerBuilder {
                 self.network_sender.clone(),
                 self.proof_manager_cmd_tx.clone(),
                 self.batch_generator_cmd_tx.clone(),
-                self.proof_queue_cmd_tx.clone(),
                 self.batch_store.clone().unwrap(),
                 self.config.receiver_max_batch_txns as u64,
                 self.config.receiver_max_batch_bytes as u64,
@@ -377,13 +356,19 @@ impl InnerBuilder {
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
         let proof_manager = ProofManager::new(
+            self.author,
+            self.config.back_pressure.backlog_txn_limit_count,
+            self.config
+                .back_pressure
+                .backlog_per_validator_batch_limit_count
+                * self.num_validators,
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
-            self.proof_queue_cmd_tx.clone(),
         );
         spawn_named!(
             "proof_manager",
             proof_manager.start(
+                self.back_pressure_tx.clone(),
                 self.consensus_to_quorum_store_receiver,
                 proof_manager_cmd_rx,
             )

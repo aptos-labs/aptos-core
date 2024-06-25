@@ -57,6 +57,22 @@ impl PersistedValue {
     pub fn payload(&self) -> &Option<Vec<SignedTransaction>> {
         &self.maybe_payload
     }
+
+    pub fn summary(&self) -> Vec<TransactionSummary> {
+        if let Some(payload) = &self.maybe_payload {
+            return payload
+                .iter()
+                .map(|txn| {
+                    TransactionSummary::new(
+                        txn.sender(),
+                        txn.sequence_number(),
+                        txn.committed_hash(),
+                    )
+                })
+                .collect();
+        }
+        vec![]
+    }
 }
 
 impl Deref for PersistedValue {
@@ -170,16 +186,6 @@ impl Batch {
 
     pub fn into_transactions(self) -> Vec<SignedTransaction> {
         self.payload.into_transactions()
-    }
-
-    pub fn summary(&self) -> Vec<TransactionSummary> {
-        self.payload
-            .txns()
-            .iter()
-            .map(|txn| {
-                TransactionSummary::new(txn.sender(), txn.sequence_number(), txn.committed_hash())
-            })
-            .collect()
     }
 
     pub fn batch_info(&self) -> &BatchInfo {

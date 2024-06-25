@@ -18,7 +18,6 @@ use aptos_api_types::{
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
-use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::{error, info, Schema};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
@@ -34,6 +33,7 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::EventWithVersion,
     event::EventKey,
+    indexer::indexer_db_reader::IndexerReader,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig, OnChainExecutionConfig},
     state_store::{
@@ -76,7 +76,7 @@ pub struct Context {
     gas_limit_cache: Arc<RwLock<GasLimitCache>>,
     view_function_stats: Arc<FunctionStats>,
     simulate_txn_stats: Arc<FunctionStats>,
-    pub table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    pub indexer_reader: Option<Arc<dyn IndexerReader>>,
     pub wait_for_hash_active_connections: Arc<AtomicUsize>,
 }
 
@@ -92,7 +92,7 @@ impl Context {
         db: Arc<dyn DbReader>,
         mp_sender: MempoolClientSender,
         node_config: NodeConfig,
-        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+        indexer_reader: Option<Arc<dyn IndexerReader>>,
     ) -> Self {
         let (view_function_stats, simulate_txn_stats) = {
             let log_per_call_stats = node_config.api.periodic_function_stats_sec.is_some();
@@ -129,7 +129,7 @@ impl Context {
             })),
             view_function_stats,
             simulate_txn_stats,
-            table_info_reader,
+            indexer_reader,
             wait_for_hash_active_connections: Arc::new(AtomicUsize::new(0)),
         }
     }
@@ -418,7 +418,7 @@ impl Context {
 
         // We should be able to do an unwrap here, otherwise the above db read would fail.
         let state_view = self.state_view_at_version(version)?;
-        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
 
         // Extract resources from resource groups and flatten into all resources
         let kvs = kvs
@@ -618,7 +618,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -650,7 +650,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -1177,13 +1177,18 @@ impl Context {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
 
-            let gas_schedule_params =
-                match GasScheduleV2::fetch_config(&state_view).and_then(|gas_schedule| {
-                    let feature_version = gas_schedule.feature_version;
-                    let gas_schedule = gas_schedule.into_btree_map();
-                    AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
+            let gas_schedule_params = {
+                let may_be_params =
+                    GasScheduleV2::fetch_config(&state_view).and_then(|gas_schedule| {
+                        let feature_version = gas_schedule.feature_version;
+                        let gas_schedule = gas_schedule.into_btree_map();
+                        AptosGasParameters::from_on_chain_gas_schedule(
+                            &gas_schedule,
+                            feature_version,
+                        )
                         .ok()
-                }) {
+                    });
+                match may_be_params {
                     Some(gas_schedule) => Ok(gas_schedule),
                     None => GasSchedule::fetch_config(&state_view)
                         .and_then(|gas_schedule| {
@@ -1197,7 +1202,8 @@ impl Context {
                                 ledger_info,
                             )
                         }),
-                }?;
+                }?
+            };
 
             // Update the cache
             cache.gas_schedule_params = Some(gas_schedule_params.clone());

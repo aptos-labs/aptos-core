@@ -4,19 +4,17 @@
 
 use anyhow::format_err;
 use aptos_crypto::HashValue;
-use aptos_gas_schedule::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
-    on_chain_config::{Features, TimedFeaturesBuilder},
+    chain_id::ChainId,
     state_store::StateView,
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
-    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
+    move_vm_ext::{GenesisMoveVM, SessionExt},
 };
-use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -105,34 +103,26 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
     }
 }
 
-pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, chain_id: u8) -> ChangeSet
+pub fn build_changeset<S: StateView, F>(
+    state_view: &S,
+    procedure: F,
+    chain_id: ChainId,
+    genesis_id: HashValue,
+) -> ChangeSet
 where
     F: FnOnce(&mut GenesisSession),
 {
-    let resolver = state_view.as_move_resolver();
-    let move_vm = MoveVmExt::new(
-        LATEST_GAS_FEATURE_VERSION,
-        Ok(&AptosGasParameters::zeros()),
-        chain_id,
-        Features::default(),
-        TimedFeaturesBuilder::enable_all().build(),
-        &resolver,
-        false,
-    )
-    .unwrap();
+    let vm = GenesisMoveVM::new(chain_id);
+
     let change_set = {
-        // TODO: specify an id by human and pass that in.
-        let genesis_id = HashValue::zero();
-        let mut session =
-            GenesisSession(move_vm.new_session(&resolver, SessionId::genesis(genesis_id), None));
+        let resolver = state_view.as_move_resolver();
+        let mut session = GenesisSession(vm.new_genesis_session(&resolver, genesis_id));
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();
         session
             .0
-            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
-                LATEST_GAS_FEATURE_VERSION,
-            ))
+            .finish(&vm.genesis_change_set_configs())
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
             .unwrap()
     };

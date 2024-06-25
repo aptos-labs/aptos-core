@@ -15,6 +15,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
+    config::VMConfig,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
 };
@@ -103,7 +104,12 @@ fn instantiation_err() {
     };
 
     move_bytecode_verifier::verify_module(&cm).expect("verify failed");
-    let vm = MoveVM::new(vec![]).unwrap();
+
+    let vm_config = VMConfig {
+        paranoid_type_checks: false,
+        ..VMConfig::default()
+    };
+    let vm = MoveVM::new_with_config(vec![], vm_config);
 
     let storage: InMemoryStorage = InMemoryStorage::new();
     let mut session = vm.new_session(&storage);

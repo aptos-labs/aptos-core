@@ -2,60 +2,120 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptos_vm::{aptos_default_ty_builder, aptos_prod_ty_builder},
     move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId},
+    natives::aptos_natives_with_builder,
 };
-use aptos_framework::natives::{
-    aggregator_natives::NativeAggregatorContext,
-    code::NativeCodeContext,
-    cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
-    event::NativeEventContext,
-    object::NativeObjectContext,
-    randomness::RandomnessContext,
-    state_storage::NativeStateStorageContext,
-    transaction_context::NativeTransactionContext,
-};
+use aptos_crypto::HashValue;
 use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_schedule::{AptosGasParameters, MiscGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{
+    AptosGasParameters, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_native_interface::SafeNativeBuilder;
-use aptos_table_natives::NativeTableContext;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{Features, TimedFeatures},
+    on_chain_config::{FeatureFlag, Features, TimedFeaturesBuilder},
     transaction::user_transaction_context::UserTransactionContext,
     vm::configs::aptos_prod_vm_config,
 };
-use move_binary_format::errors::VMResult;
-use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
-use std::ops::Deref;
+use aptos_vm_types::{
+    environment::{aptos_default_ty_builder, aptos_prod_ty_builder, Environment},
+    storage::change_set_configs::ChangeSetConfigs,
+};
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
+use std::{ops::Deref, sync::Arc};
 
-pub struct MoveVmExt {
-    inner: MoveVM,
-    chain_id: u8,
+/// MoveVM wrapper which is used to run genesis initializations. Designed as a
+/// stand-alone struct to ensure all genesis configurations are in one place,
+/// and are modified accordingly. The VM is initialized with default parameters,
+/// and should only be used to run genesis sessions.
+pub struct GenesisMoveVM {
+    vm: MoveVM,
+    chain_id: ChainId,
     features: Features,
 }
 
+impl GenesisMoveVM {
+    pub fn new(chain_id: ChainId) -> Self {
+        let features = Features::default();
+        let timed_features = TimedFeaturesBuilder::enable_all().build();
+
+        // Genesis runs sessions, where there is no concept of block execution.
+        // Hence, delayed fields are not enabled.
+        let delayed_field_optimization_enabled = false;
+        let vm_config = aptos_prod_vm_config(
+            &features,
+            &timed_features,
+            delayed_field_optimization_enabled,
+            aptos_default_ty_builder(&features),
+        );
+
+        // All genesis sessions run with unmetered gas meter, and here we set
+        // the gas parameters for natives as zeros (because they do not matter).
+        let mut native_builder = SafeNativeBuilder::new(
+            LATEST_GAS_FEATURE_VERSION,
+            NativeGasParameters::zeros(),
+            MiscGasParameters::zeros(),
+            timed_features.clone(),
+            features.clone(),
+            None,
+        );
+
+        let vm = MoveVM::new_with_config(
+            aptos_natives_with_builder(&mut native_builder),
+            vm_config.clone(),
+        );
+
+        Self {
+            vm,
+            chain_id,
+            features,
+        }
+    }
+
+    pub fn genesis_change_set_configs(&self) -> ChangeSetConfigs {
+        // Because genesis sessions are not metered, there are no change set
+        // (storage) costs as well.
+        ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION)
+    }
+
+    pub fn new_genesis_session<'r, R: AptosMoveResolver>(
+        &self,
+        resolver: &'r R,
+        genesis_id: HashValue,
+    ) -> SessionExt<'r, '_> {
+        let session_id = SessionId::genesis(genesis_id);
+        SessionExt::new(
+            session_id,
+            &self.vm,
+            self.chain_id,
+            &self.features,
+            None,
+            resolver,
+        )
+    }
+}
+
+pub struct MoveVmExt {
+    inner: MoveVM,
+    pub(crate) env: Arc<Environment>,
+}
+
 impl MoveVmExt {
-    fn new_impl<F>(
+    fn new_impl(
         gas_feature_version: u64,
         gas_params: Result<&AptosGasParameters, &String>,
-        chain_id: u8,
-        features: Features,
-        timed_features: TimedFeatures,
-        gas_hook: Option<F>,
+        env: Arc<Environment>,
+        gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
         resolver: &impl AptosMoveResolver,
-        aggregator_v2_type_tagging: bool,
-    ) -> VMResult<Self>
-    where
-        F: Fn(DynamicExpression) + Send + Sync + 'static,
-    {
+    ) -> Self {
         // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
         //            This only happens in a edge case that is probably related to write set transactions or genesis,
         //            which logically speaking, shouldn't be handled by the VM at all.
         //            We should clean up the logic here once we get that refactored.
         let (native_gas_params, misc_gas_params, ty_builder) = match gas_params {
             Ok(gas_params) => {
-                let ty_builder = aptos_prod_ty_builder(&features, gas_feature_version, gas_params);
+                let ty_builder =
+                    aptos_prod_ty_builder(env.features(), gas_feature_version, gas_params);
                 (
                     gas_params.natives.clone(),
                     gas_params.vm.misc.clone(),
@@ -63,7 +123,7 @@ impl MoveVmExt {
                 )
             },
             Err(_) => {
-                let ty_builder = aptos_default_ty_builder(&features);
+                let ty_builder = aptos_default_ty_builder(env.features());
                 (
                     NativeGasParameters::zeros(),
                     MiscGasParameters::zeros(),
@@ -72,125 +132,74 @@ impl MoveVmExt {
             },
         };
 
-        let mut builder = SafeNativeBuilder::new(
+        let builder = SafeNativeBuilder::new(
             gas_feature_version,
             native_gas_params,
             misc_gas_params,
-            timed_features.clone(),
-            features.clone(),
+            env.timed_features().clone(),
+            env.features().clone(),
+            gas_hook,
         );
-        if let Some(hook) = gas_hook {
-            builder.set_gas_hook(hook);
-        }
 
-        let paranoid_type_checks = crate::AptosVM::get_paranoid_checks();
-        let vm_config = aptos_prod_vm_config(
-            &features,
-            &timed_features,
-            aggregator_v2_type_tagging,
+        // TODO(George): Move gas configs to environment to avoid this clone!
+        let vm_config = VMConfig {
+            verifier_config: env.vm_config().verifier_config.clone(),
+            deserializer_config: env.vm_config().deserializer_config.clone(),
+            paranoid_type_checks: env.vm_config().paranoid_type_checks,
+            check_invariant_in_swap_loc: env.vm_config().check_invariant_in_swap_loc,
+            max_value_nest_depth: env.vm_config().max_value_nest_depth,
+            type_max_cost: env.vm_config().type_max_cost,
+            type_base_cost: env.vm_config().type_base_cost,
+            type_byte_cost: env.vm_config().type_byte_cost,
+            delayed_field_optimization_enabled: env.vm_config().delayed_field_optimization_enabled,
             ty_builder,
-            paranoid_type_checks,
-        );
+        };
 
-        Ok(Self {
-            inner: WarmVmCache::get_warm_vm(builder, vm_config, resolver)?,
-            chain_id,
-            features,
-        })
+        Self {
+            inner: WarmVmCache::get_warm_vm(
+                builder,
+                vm_config,
+                resolver,
+                env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
+            )
+            .expect("should be able to create Move VM; check if there are duplicated natives"),
+            env,
+        }
     }
 
     pub fn new(
         gas_feature_version: u64,
         gas_params: Result<&AptosGasParameters, &String>,
-        chain_id: u8,
-        features: Features,
-        timed_features: TimedFeatures,
+        env: Arc<Environment>,
         resolver: &impl AptosMoveResolver,
-        aggregator_v2_type_tagging: bool,
-    ) -> VMResult<Self> {
-        Self::new_impl::<fn(DynamicExpression)>(
-            gas_feature_version,
-            gas_params,
-            chain_id,
-            features,
-            timed_features,
-            None,
-            resolver,
-            aggregator_v2_type_tagging,
-        )
+    ) -> Self {
+        Self::new_impl(gas_feature_version, gas_params, env, None, resolver)
     }
 
-    pub fn new_with_gas_hook<F>(
+    pub fn new_with_gas_hook(
         gas_feature_version: u64,
         gas_params: Result<&AptosGasParameters, &String>,
-        chain_id: u8,
-        features: Features,
-        timed_features: TimedFeatures,
-        gas_hook: Option<F>,
+        env: Arc<Environment>,
+        gas_hook: Option<Arc<dyn Fn(DynamicExpression) + Send + Sync>>,
         resolver: &impl AptosMoveResolver,
-        aggregator_v2_type_tagging: bool,
-    ) -> VMResult<Self>
-    where
-        F: Fn(DynamicExpression) + Send + Sync + 'static,
-    {
-        Self::new_impl(
-            gas_feature_version,
-            gas_params,
-            chain_id,
-            features,
-            timed_features,
-            gas_hook,
-            resolver,
-            aggregator_v2_type_tagging,
-        )
+    ) -> Self {
+        Self::new_impl(gas_feature_version, gas_params, env, gas_hook, resolver)
     }
 
-    pub fn new_session<'r, S: AptosMoveResolver>(
+    pub fn new_session<'r, R: AptosMoveResolver>(
         &self,
-        resolver: &'r S,
+        resolver: &'r R,
         session_id: SessionId,
-        user_transaction_context_opt: Option<UserTransactionContext>,
+        maybe_user_transaction_context: Option<UserTransactionContext>,
     ) -> SessionExt<'r, '_> {
-        let mut extensions = NativeContextExtensions::default();
-        let txn_hash: [u8; 32] = session_id
-            .as_uuid()
-            .to_vec()
-            .try_into()
-            .expect("HashValue should convert to [u8; 32]");
-
-        extensions.add(NativeTableContext::new(txn_hash, resolver));
-        extensions.add(NativeRistrettoPointContext::new());
-        extensions.add(AlgebraContext::new());
-        extensions.add(NativeAggregatorContext::new(txn_hash, resolver, resolver));
-        extensions.add(RandomnessContext::new());
-        extensions.add(NativeTransactionContext::new(
-            txn_hash.to_vec(),
-            session_id.into_script_hash(),
-            self.chain_id,
-            user_transaction_context_opt,
-        ));
-        extensions.add(NativeCodeContext::default());
-        extensions.add(NativeStateStorageContext::new(resolver));
-        extensions.add(NativeEventContext::default());
-        extensions.add(NativeObjectContext::default());
-
-        // The VM code loader has bugs around module upgrade. After a module upgrade, the internal
-        // cache needs to be flushed to work around those bugs.
-        self.inner.flush_loader_cache_if_invalidated();
-
         SessionExt::new(
-            self.inner.new_session_with_extensions(resolver, extensions),
+            session_id,
+            &self.inner,
+            self.env.chain_id(),
+            self.env.features(),
+            maybe_user_transaction_context,
             resolver,
-            self.features.is_storage_slot_metadata_enabled(),
         )
-    }
-
-    pub(crate) fn features(&self) -> &Features {
-        &self.features
-    }
-
-    pub fn chain_id(&self) -> ChainId {
-        ChainId::new(self.chain_id)
     }
 }
 

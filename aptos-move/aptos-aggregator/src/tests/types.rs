@@ -86,10 +86,6 @@ impl TDelayedFieldView for FakeAggregatorView {
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool {
-        true
-    }
-
     fn get_delayed_field_value(
         &self,
         id: &Self::Identifier,

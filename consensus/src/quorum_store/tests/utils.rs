@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::utils::ProofQueue;
-use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo, ProofOfStore};
+use aptos_consensus_types::{
+    common::TransactionSummary,
+    proof_of_store::{BatchId, BatchInfo, ProofOfStore},
+};
 use aptos_crypto::HashValue;
 use aptos_types::{aggregate_signature::AggregateSignature, PeerId};
 use maplit::hashset;
@@ -27,7 +30,7 @@ fn proof_of_store(author: PeerId, batch_id: BatchId, gas_bucket_start: u64) -> P
 #[test]
 fn test_proof_queue_sorting() {
     let my_peer_id = PeerId::random();
-    let mut proof_queue = ProofQueue::new(my_peer_id, 10, 10);
+    let mut proof_queue = ProofQueue::new(my_peer_id);
 
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
@@ -92,4 +95,67 @@ fn test_proof_queue_sorting() {
     }
     assert_eq!(count_author_0, 2);
     assert_eq!(count_author_1, 2);
+}
+
+#[test]
+fn test_proof_calculate_remaining_txns_and_proofs() {
+    let my_peer_id = PeerId::random();
+    let mut proof_queue = ProofQueue::new(my_peer_id);
+
+    let author_0 = PeerId::random();
+    let author_1 = PeerId::random();
+
+    let author_0_batches = vec![
+        proof_of_store(author_0, BatchId::new_for_test(0), 100),
+        proof_of_store(author_0, BatchId::new_for_test(1), 200),
+        proof_of_store(author_0, BatchId::new_for_test(2), 50),
+        proof_of_store(author_0, BatchId::new_for_test(3), 300),
+    ];
+    let info_1 = author_0_batches[0].info().clone();
+    let info_2 = author_0_batches[3].info().clone();
+    proof_queue.add_batch_summaries(vec![(info_1, vec![TransactionSummary::new(
+        PeerId::ONE,
+        1,
+        HashValue::zero(),
+    )])]);
+    for batch in author_0_batches {
+        proof_queue.push(batch);
+    }
+
+    let author_1_batches = vec![
+        proof_of_store(author_1, BatchId::new_for_test(4), 500),
+        proof_of_store(author_1, BatchId::new_for_test(5), 400),
+        proof_of_store(author_1, BatchId::new_for_test(6), 600),
+        proof_of_store(author_1, BatchId::new_for_test(7), 50),
+    ];
+    let info_3 = author_1_batches[1].info().clone();
+    let info_4 = author_1_batches[3].info().clone();
+    for batch in author_1_batches {
+        proof_queue.push(batch);
+    }
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (8, 8));
+
+    proof_queue.add_batch_summaries(vec![(info_3, vec![TransactionSummary::new(
+        PeerId::ONE,
+        1,
+        HashValue::zero(),
+    )])]);
+
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (7, 8));
+
+    proof_queue.add_batch_summaries(vec![(info_2, vec![TransactionSummary::new(
+        PeerId::ONE,
+        2,
+        HashValue::zero(),
+    )])]);
+
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (7, 8));
+
+    proof_queue.add_batch_summaries(vec![(info_4, vec![TransactionSummary::new(
+        PeerId::ONE,
+        2,
+        HashValue::zero(),
+    )])]);
+
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (6, 8));
 }

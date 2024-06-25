@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::batch_generator::BackPressure;
 use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
@@ -193,29 +192,6 @@ impl Ord for BatchSortKey {
     }
 }
 
-#[derive(Debug)]
-pub enum ProofQueueCommand {
-    // Proof manager sends this command to add the proofs to the proof queue
-    // We send back (remaining_txns, remaining_proofs) to the proof manager
-    AddProofs(Vec<ProofOfStore>),
-    // Batch coordinator sends this command to add the received batches to the proof queue.
-    // For each transaction, the proof queue stores the list of batches containing the transaction.
-    AddBatches(Vec<(BatchInfo, Vec<TransactionSummary>)>),
-    // Proof manager sends this command to pull proofs from the proof queue to
-    // include in the block proposal.
-    PullProofs {
-        excluded_batches: HashSet<BatchInfo>,
-        max_txns: u64,
-        max_bytes: u64,
-        return_non_full: bool,
-        response_sender: oneshot::Sender<(Vec<ProofOfStore>, bool)>,
-    },
-    // Proof manager sends this command to mark these batches as committed and
-    // update the block timestamp.
-    // We send back the (remaining_txns, remaining_proofs) to the proof manager
-    MarkCommitted(Vec<BatchInfo>, u64),
-}
-
 pub struct ProofQueue {
     my_peer_id: PeerId,
     // Queue per peer to ensure fairness between peers and priority within peer
@@ -230,8 +206,6 @@ pub struct ProofQueue {
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
-    back_pressure_total_txn_limit: u64,
-    back_pressure_total_proof_limit: u64,
     remaining_txns_with_duplicates: u64,
     remaining_proofs: u64,
     remaining_local_txns: u64,
@@ -239,11 +213,7 @@ pub struct ProofQueue {
 }
 
 impl ProofQueue {
-    pub(crate) fn new(
-        my_peer_id: PeerId,
-        back_pressure_total_txn_limit: u64,
-        back_pressure_total_proof_limit: u64,
-    ) -> Self {
+    pub(crate) fn new(my_peer_id: PeerId) -> Self {
         Self {
             my_peer_id,
             author_to_batches: HashMap::new(),
@@ -252,8 +222,6 @@ impl ProofQueue {
             batch_to_txn_summaries: HashMap::new(),
             expirations: TimeExpirations::new(),
             latest_block_timestamp: 0,
-            back_pressure_total_txn_limit,
-            back_pressure_total_proof_limit,
             remaining_txns_with_duplicates: 0,
             remaining_proofs: 0,
             remaining_local_txns: 0,
@@ -323,7 +291,7 @@ impl ProofQueue {
             return;
         }
         let batch_key = BatchKey::from_info(proof.info());
-        if self.batch_to_proof.get(&batch_key).is_some() {
+        if self.batch_to_proof.contains_key(&batch_key) {
             counters::inc_rejected_pos_count(counters::POS_DUPLICATE_LABEL);
             return;
         }
@@ -347,34 +315,58 @@ impl ProofQueue {
         self.inc_remaining(&author, num_txns);
     }
 
-    /// return true when quorum store is back pressured
-    pub(crate) fn qs_back_pressure_1(&self) -> BackPressure {
-        let (remaining_total_txn_num, remaining_total_proof_num) = self.remaining_txns_and_proofs();
-        if remaining_total_txn_num > self.back_pressure_total_txn_limit {
-            info!(
-                "QuorumStore back pressured Adding Proofs: txn_count: {}, proof_count: {}",
-                remaining_total_txn_num, remaining_total_proof_num
-            );
+    pub(crate) fn add_batch_summaries(
+        &mut self,
+        batch_summaries: Vec<(BatchInfo, Vec<TransactionSummary>)>,
+    ) {
+        let start = Instant::now();
+        for (batch_info, txn_summaries) in batch_summaries {
+            let batch_key = BatchKey::from_info(&batch_info);
+            for txn_summary in txn_summaries {
+                self.txn_summary_to_batches
+                    .entry(txn_summary)
+                    .or_default()
+                    .insert(batch_key.clone());
+            }
+            self.batches_with_txn_summary.insert(batch_key);
         }
-        BackPressure {
-            txn_count: remaining_total_txn_num > self.back_pressure_total_txn_limit,
-            proof_count: remaining_total_proof_num > self.back_pressure_total_proof_limit,
-        }
+        counters::PROOF_QUEUE_ADD_BATCH_SUMMARIES_DURATION.observe_duration(start.elapsed());
     }
 
-    /// return true when quorum store is back pressured
-    pub(crate) fn qs_back_pressure_2(&self) -> BackPressure {
-        let (remaining_total_txn_num, remaining_total_proof_num) = self.remaining_txns_and_proofs();
-        if remaining_total_txn_num > self.back_pressure_total_txn_limit {
-            info!(
-                "QuorumStore back pressured Committed: txn_count: {}, proof_count: {}",
-                remaining_total_txn_num, remaining_total_proof_num
-            );
+    fn log_remaining_data_after_pull(
+        &self,
+        excluded_batches: &HashSet<BatchInfo>,
+        pulled_proofs: &[ProofOfStore],
+    ) {
+        let mut num_proofs_remaining_after_pull = 0;
+        let mut num_txns_remaining_after_pull = 0;
+        let excluded_batch_keys = excluded_batches
+            .iter()
+            .map(BatchKey::from_info)
+            .collect::<HashSet<_>>();
+        let mut remaining_proofs = vec![];
+        for (batch_key, proof) in &self.batch_to_proof {
+            if proof.is_some()
+                && !pulled_proofs
+                    .iter()
+                    .any(|p| BatchKey::from_info(p.info()) == *batch_key)
+                && !excluded_batch_keys.contains(batch_key)
+            {
+                num_proofs_remaining_after_pull += 1;
+                num_txns_remaining_after_pull += proof.as_ref().unwrap().0.num_txns();
+                remaining_proofs.push(proof.as_ref().unwrap().0.clone());
+            }
         }
-        BackPressure {
-            txn_count: remaining_total_txn_num > self.back_pressure_total_txn_limit,
-            proof_count: remaining_total_proof_num > self.back_pressure_total_proof_limit,
-        }
+        let pulled_txns = pulled_proofs.iter().map(|p| p.num_txns()).sum::<u64>();
+        info!(
+            "pulled_proofs: {}, pulled_txns: {}, remaining_proofs: {:?}",
+            pulled_proofs.len(),
+            pulled_txns,
+            remaining_proofs
+        );
+        counters::NUM_PROOFS_IN_PROOF_QUEUE_AFTER_PULL
+            .observe(num_proofs_remaining_after_pull as f64);
+        counters::NUM_TXNS_IN_PROOF_QUEUE_AFTER_PULL.observe(num_txns_remaining_after_pull as f64);
     }
 
     // gets excluded and iterates over the vector returning non excluded or expired entries.
@@ -404,9 +396,6 @@ impl ProofQueue {
                 }
             }
         }
-
-        counters::PULL_PROOFS_MAX_TXNS.observe(max_txns as f64);
-        counters::PULL_PROOFS_MAX_BYTES.observe(max_bytes as f64);
 
         let mut iters = vec![];
         for (_, batches) in self.author_to_batches.iter() {
@@ -482,36 +471,8 @@ impl ProofQueue {
             counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
-
             // Number of proofs remaining in proof queue after the pull
-            let mut num_proofs_remaining_after_pull = 0;
-            let mut num_txns_remaining_after_pull = 0;
-            let excluded_batch_keys = excluded_batches
-                .iter()
-                .map(BatchKey::from_info)
-                .collect::<HashSet<_>>();
-            let mut remaining_proofs = vec![];
-            for (batch_key, proof) in &self.batch_to_proof {
-                if proof.is_some()
-                    && !ret
-                        .iter()
-                        .any(|p| BatchKey::from_info(p.info()) == *batch_key)
-                    && !excluded_batch_keys.contains(batch_key)
-                {
-                    num_proofs_remaining_after_pull += 1;
-                    num_txns_remaining_after_pull += proof.as_ref().unwrap().0.num_txns();
-                    remaining_proofs.push(proof.as_ref().unwrap().0.clone());
-                }
-            }
-            info!(
-                "cur_txns: {}, remaining_proofs: {:?}",
-                cur_txns, remaining_proofs
-            );
-            counters::NUM_PROOFS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION
-                .observe(num_proofs_remaining_after_pull as f64);
-            counters::NUM_TXNS_LEFT_IN_PROOF_QUEUE_AFTER_PROPOSAL_GENERATION
-                .observe(num_txns_remaining_after_pull as f64);
-
+            self.log_remaining_data_after_pull(excluded_batches, &ret);
             // Stable sort, so the order of proofs within an author will not change.
             ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
             (ret, !full)
@@ -520,7 +481,8 @@ impl ProofQueue {
         }
     }
 
-    fn handle_updated_block_timestamp(&mut self, block_timestamp: u64) {
+    pub(crate) fn handle_updated_block_timestamp(&mut self, block_timestamp: u64) {
+        let start = Instant::now();
         assert!(
             self.latest_block_timestamp <= block_timestamp,
             "Decreasing block timestamp"
@@ -556,16 +518,18 @@ impl ProofQueue {
                 }
             }
         }
+        counters::PROOF_QUEUE_UPDATE_TIMESTAMP_DURATION.observe_duration(start.elapsed());
         counters::NUM_PROOFS_EXPIRED_WHEN_COMMIT.inc_by(num_expired_but_not_committed);
     }
 
     pub(crate) fn remaining_txns_and_proofs(&self) -> (u64, u64) {
+        let start = Instant::now();
         counters::NUM_TOTAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_txns_with_duplicates as f64);
         counters::NUM_TOTAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_proofs as f64);
         counters::NUM_LOCAL_TXNS_LEFT_ON_UPDATE.observe(self.remaining_local_txns as f64);
         counters::NUM_LOCAL_PROOFS_LEFT_ON_UPDATE.observe(self.remaining_local_proofs as f64);
         let remaining_txns_without_duplicates = self.remaining_txns_without_duplicates();
-        counters::NUM_TOTAL_TXNS_LEFT_ON_UPDATE_WITHOUT_DUPLICATES
+        counters::NUM_UNIQUE_TOTAL_TXNS_LEFT_ON_UPDATE
             .observe(remaining_txns_without_duplicates as f64);
         //count the number of transactions with more than one batches
         counters::TXNS_WITH_DUPLICATE_BATCHES.set(
@@ -597,11 +561,13 @@ impl ProofQueue {
                 .map(|proof| if proof.is_some() { 1 } else { 0 })
                 .sum::<i64>(),
         );
+        counters::PROOF_QUEUE_REMAINING_TXNS_DURATION.observe_duration(start.elapsed());
         (remaining_txns_without_duplicates, self.remaining_proofs)
     }
 
     // Mark in the hashmap committed PoS, but keep them until they expire
-    fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
+    pub(crate) fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
+        let start = Instant::now();
         for batch in &batches {
             let batch_key = BatchKey::from_info(batch);
             if let Some(Some((proof, insertion_time))) = self.batch_to_proof.get(&batch_key) {
@@ -612,85 +578,18 @@ impl ProofQueue {
                 self.dec_remaining(&batch.author(), batch.num_txns());
             }
             self.batch_to_proof.insert(batch_key.clone(), None);
-            self.batch_to_txn_summaries.remove(&batch_key);
-            self.txn_summary_to_batches.retain(|_, batches| {
-                batches.remove(&batch_key);
-                !batches.is_empty()
-            });
+            self.batches_with_txn_summary.remove(&batch_key);
         }
-    }
-
-    pub async fn start(
-        mut self,
-        back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
-        mut command_rx: tokio::sync::mpsc::Receiver<ProofQueueCommand>,
-    ) {
-        let mut back_pressure = BackPressure {
-            txn_count: false,
-            proof_count: false,
-        };
-
-        loop {
-            let _timer = counters::PROOF_MANAGER_MAIN_LOOP.start_timer();
-            if let Some(msg) = command_rx.recv().await {
-                match msg {
-                    ProofQueueCommand::AddProofs(proofs) => {
-                        for proof in proofs {
-                            self.push(proof);
-                        }
-
-                        let updated_back_pressure = self.qs_back_pressure_1();
-                        if updated_back_pressure != back_pressure {
-                            back_pressure = updated_back_pressure;
-                            if back_pressure_tx.send(back_pressure).await.is_err() {
-                                debug!("Failed to send back_pressure for proposal");
-                            }
-                        }
-                    },
-                    ProofQueueCommand::PullProofs {
-                        excluded_batches,
-                        max_txns,
-                        max_bytes,
-                        return_non_full,
-                        response_sender,
-                    } => {
-                        let (proofs, full) = self.pull_proofs(
-                            &excluded_batches,
-                            max_txns,
-                            max_bytes,
-                            return_non_full,
-                        );
-                        if let Err(e) = response_sender.send((proofs, full)) {
-                            warn!("Failed to send response to PullProofs: {:?}", e);
-                        }
-                    },
-                    ProofQueueCommand::MarkCommitted(batches, block_timestamp) => {
-                        self.mark_committed(batches);
-                        self.handle_updated_block_timestamp(block_timestamp);
-
-                        let updated_back_pressure = self.qs_back_pressure_2();
-                        if updated_back_pressure != back_pressure {
-                            back_pressure = updated_back_pressure;
-                            if back_pressure_tx.send(back_pressure).await.is_err() {
-                                debug!("Failed to send back_pressure for proposal");
-                            }
-                        }
-                    },
-                    ProofQueueCommand::AddBatches(batch_summaries) => {
-                        for (batch_info, txn_summaries) in batch_summaries {
-                            let batch_key = BatchKey::from_info(&batch_info);
-                            self.batch_to_txn_summaries
-                                .insert(batch_key.clone(), txn_summaries.clone());
-                            for txn_summary in txn_summaries {
-                                self.txn_summary_to_batches
-                                    .entry(txn_summary)
-                                    .or_default()
-                                    .insert(batch_key.clone());
-                            }
-                        }
-                    },
-                }
+        let batch_keys = batches
+            .iter()
+            .map(BatchKey::from_info)
+            .collect::<HashSet<_>>();
+        self.txn_summary_to_batches.retain(|_, batches| {
+            for batch_key in &batch_keys {
+                batches.remove(batch_key);
             }
-        }
+            !batches.is_empty()
+        });
+        counters::PROOF_QUEUE_COMMIT_DURATION.observe_duration(start.elapsed());
     }
 }
