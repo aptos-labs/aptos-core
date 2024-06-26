@@ -6,6 +6,7 @@ use crate::{
     context::{ClientTuple, Context, JsonWebTokenService, LogIngestClients, PeerStoreTuple},
     index::routes,
     metrics::PrometheusExporter,
+    peer_location::PeerLocationUpdater,
     validator_cache::PeerSetCacheUpdater,
 };
 use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
@@ -40,6 +41,7 @@ mod index;
 mod jwt_auth;
 mod log_ingest;
 mod metrics;
+mod peer_location;
 mod prometheus_push_metrics;
 mod remote_config;
 #[cfg(test)]
@@ -78,9 +80,11 @@ impl AptosTelemetryServiceArgs {
                 .expect("environment variable GOOGLE_APPLICATION_CREDENTIALS must be set")
                 .as_str(),
         )
-        .await;
-        let bigquery_client = big_query::TableWriteClient::new(
-            bigquery_client,
+        .await
+        .expect("Failed to create BigQuery client");
+
+        let bigquery_table_client = big_query::TableWriteClient::new(
+            bigquery_client.clone(),
             config.custom_event_config.project_id.clone(),
             config.custom_event_config.dataset_id.clone(),
             config.custom_event_config.table_id.clone(),
@@ -105,6 +109,7 @@ impl AptosTelemetryServiceArgs {
 
         let validators = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
         let validator_fullnodes = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
+        let peer_locations = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
         let public_fullnodes = config.pfn_allowlist.clone();
 
         let context = Context::new(
@@ -115,13 +120,14 @@ impl AptosTelemetryServiceArgs {
                 public_fullnodes,
             ),
             ClientTuple::new(
-                Some(bigquery_client),
+                Some(bigquery_table_client),
                 Some(metrics_clients),
                 Some(log_ingest_clients),
             ),
             jwt_service,
             config.log_env_map.clone(),
             config.peer_identities.clone(),
+            peer_locations.clone(),
         );
 
         PeerSetCacheUpdater::new(
@@ -131,6 +137,12 @@ impl AptosTelemetryServiceArgs {
             Duration::from_secs(config.update_interval),
         )
         .run();
+
+        if let Err(err) =
+            PeerLocationUpdater::new(bigquery_client.clone(), peer_locations.clone()).run()
+        {
+            error!("Failed to start PeerLocationUpdater: {:?}", err);
+        }
 
         PrometheusExporter::new(telemetry_metrics_client).run();
 
@@ -197,13 +209,10 @@ impl MetricsEndpoint {
                     panic!(
                         "environment variable {} is missing secret for {}",
                         self.keys_env_var.clone(),
-                        name,
+                        name
                     )
                 });
-                (
-                    name.clone(),
-                    MetricsClient::new(url.clone(), secret.clone()),
-                )
+                (name.clone(), MetricsClient::new(url.clone(), secret.into()))
             })
             .collect()
     }

@@ -27,6 +27,7 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
     executable::{ExecutableTestType, ModulePath},
+    state_store::state_value::StateValueMetadata,
 };
 use claims::assert_matches;
 use fail::FailScenario;
@@ -69,6 +70,7 @@ fn resource_group_bcs_fallback() {
         MockIncarnation::new(vec![KeyType::<u32>(1, false)], vec![], vec![], vec![], 10);
     group_incarnation.group_writes.push((
         KeyType::<u32>(100, false),
+        StateValueMetadata::none(),
         HashMap::from([(101, ValueType::from_value(vec![5], true))]),
     ));
     let t_2 = MockTransaction::from_behavior(group_incarnation);
@@ -96,7 +98,7 @@ fn resource_group_bcs_fallback() {
     );
 
     // Execute the block normally.
-    let output = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+    let output = block_executor.execute_transactions_parallel(&(), &transactions, &data_view);
     match output {
         Ok(block_output) => {
             let txn_outputs = block_output.into_transaction_outputs_forced();
@@ -114,7 +116,7 @@ fn resource_group_bcs_fallback() {
     fail::cfg("fail-point-resource-group-serialization", "return()").unwrap();
     assert!(!fail::list().is_empty());
 
-    let par_output = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+    let par_output = block_executor.execute_transactions_parallel(&(), &transactions, &data_view);
     assert_matches!(par_output, Err(()));
 
     let seq_output =
@@ -194,7 +196,7 @@ fn block_output_err_precedence() {
     assert!(!fail::list().is_empty());
     // Pause the thread that processes the aborting txn1, so txn2 can halt the scheduler first.
     // Confirm that the fatal VM error is still detected and sequential fallback triggered.
-    let output = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+    let output = block_executor.execute_transactions_parallel(&(), &transactions, &data_view);
     assert_matches!(output, Err(()));
     scenario.teardown();
 }
@@ -227,7 +229,7 @@ fn skip_rest_gas_limit() {
     );
 
     // Should hit block limit on the skip transaction.
-    let _ = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+    let _ = block_executor.execute_transactions_parallel(&(), &transactions, &data_view);
 }
 
 // TODO: add unit test for block gas limit!
@@ -258,7 +260,7 @@ where
         executor_thread_pool,
         None,
     )
-    .execute_transactions_parallel((), &transactions, &data_view);
+    .execute_transactions_parallel(&(), &transactions, &data_view);
 
     let baseline = BaselineOutput::generate(&transactions, None);
     baseline.assert_parallel_output(&output);

@@ -5,6 +5,7 @@ use super::{DagConsensusConfig, IndexerTableInfoConfig};
 use crate::{
     config::{
         consensus_observer_config::ConsensusObserverConfig, dkg_config::DKGConfig,
+        internal_indexer_db_config::InternalIndexerDBConfig,
         jwk_consensus_config::JWKConsensusConfig, netbench_config::NetbenchConfig,
         node_config_loader::NodeConfigLoader, node_startup_config::NodeStartupConfig,
         persistable_config::PersistableConfig, utils::RootPath, AdminServiceConfig, ApiConfig,
@@ -83,6 +84,8 @@ pub struct NodeConfig {
     pub storage: StorageConfig,
     #[serde(default)]
     pub validator_network: Option<NetworkConfig>,
+    #[serde(default)]
+    pub indexer_db_config: InternalIndexerDBConfig,
 }
 
 impl NodeConfig {
@@ -121,7 +124,7 @@ impl NodeConfig {
     /// Sets the data directory for this config
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         // Set the base directory
-        self.base.data_dir = data_dir.clone();
+        self.base.data_dir.clone_from(&data_dir);
 
         // Set the data directory for each sub-module
         self.consensus.set_data_dir(data_dir.clone());

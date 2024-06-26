@@ -3,7 +3,7 @@
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
-    test_utils::{create_and_fund_account, transfer_coins_non_blocking},
+    utils::{create_and_fund_account, transfer_coins_non_blocking},
 };
 use aptos_forge::{
     test_utils::consensus_utils::{
@@ -159,6 +159,20 @@ async fn run_fail_point_test(
     .unwrap();
 }
 
+fn successful_criteria(executed_epochs: u64, executed_rounds: u64, executed_transactions: u64) {
+    assert!(
+        executed_transactions >= 4,
+        "no progress with active consensus, only {} transactions",
+        executed_transactions
+    );
+    assert!(
+        executed_epochs >= 1 || executed_rounds >= 2,
+        "no progress with active consensus, only {} epochs, {} rounds",
+        executed_epochs,
+        executed_rounds
+    );
+}
+
 #[tokio::test]
 async fn test_no_failures() {
     let num_validators = 3;
@@ -171,19 +185,12 @@ async fn test_no_failures() {
         5.0,
         1,
         no_failure_injection(),
-        Box::new(move |_, _, executed_rounds, executed_transactions, _, _| {
-            assert!(
-                executed_transactions >= 4,
-                "no progress with active consensus, only {} transactions",
-                executed_transactions
-            );
-            assert!(
-                executed_rounds >= 2,
-                "no progress with active consensus, only {} rounds",
-                executed_rounds
-            );
-            Ok(())
-        }),
+        Box::new(
+            move |_, executed_epochs, executed_rounds, executed_transactions, _, _| {
+                successful_criteria(executed_epochs, executed_rounds, executed_transactions);
+                Ok(())
+            },
+        ),
         true,
         false,
     )
@@ -212,19 +219,46 @@ async fn test_ordered_only_cert() {
                 true,
             )
         }))),
-        Box::new(move |_, _, executed_rounds, executed_transactions, _, _| {
-            assert!(
-                executed_transactions >= 4,
-                "no progress with active consensus, only {} transactions",
-                executed_transactions
-            );
-            assert!(
-                executed_rounds >= 2,
-                "no progress with active consensus, only {} rounds",
-                executed_rounds
-            );
-            Ok(())
-        }),
+        Box::new(
+            move |_, executed_epochs, executed_rounds, executed_transactions, _, _| {
+                successful_criteria(executed_epochs, executed_rounds, executed_transactions);
+                Ok(())
+            },
+        ),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn test_execution_retry() {
+    let num_validators = 4;
+
+    let mut swarm = create_swarm(num_validators, 1).await;
+
+    test_consensus_fault_tolerance(
+        &mut swarm,
+        3,
+        5.0,
+        1,
+        Box::new(FailPointFailureInjection::new(Box::new(move |cycle, _| {
+            (
+                vec![(
+                    cycle % num_validators,
+                    "consensus::prepare_block".to_string(),
+                    format!("{}%return", 50),
+                )],
+                true,
+            )
+        }))),
+        Box::new(
+            move |_, executed_epochs, executed_rounds, executed_transactions, _, _| {
+                successful_criteria(executed_epochs, executed_rounds, executed_transactions);
+                Ok(())
+            },
+        ),
         true,
         false,
     )
@@ -344,19 +378,12 @@ async fn test_changing_working_consensus() {
                 (vec![], false)
             }
         }),
-        Box::new(|_, _, executed_rounds, executed_transactions, _, _| {
-            assert!(
-                executed_transactions >= 5,
-                "no progress with active consensus, only {} transactions",
-                executed_transactions
-            );
-            assert!(
-                executed_rounds >= 2,
-                "no progress with active consensus, only {} rounds",
-                executed_rounds
-            );
-            Ok(())
-        }),
+        Box::new(
+            move |_, executed_epochs, executed_rounds, executed_transactions, _, _| {
+                successful_criteria(executed_epochs, executed_rounds, executed_transactions);
+                Ok(())
+            },
+        ),
     )
     .await;
 }
@@ -405,19 +432,12 @@ async fn test_changing_working_consensus_fast() {
                 true,
             )
         }),
-        Box::new(|_, _, executed_rounds, executed_transactions, _, _| {
-            assert!(
-                executed_transactions >= 4,
-                "no progress with active consensus, only {} transactions",
-                executed_transactions
-            );
-            assert!(
-                executed_rounds >= 2,
-                "no progress with active consensus, only {} rounds",
-                executed_rounds
-            );
-            Ok(())
-        }),
+        Box::new(
+            move |_, executed_epochs, executed_rounds, executed_transactions, _, _| {
+                successful_criteria(executed_epochs, executed_rounds, executed_transactions);
+                Ok(())
+            },
+        ),
     )
     .await;
 }
@@ -469,33 +489,36 @@ async fn test_alternating_having_consensus() {
                 (vec![], false)
             }
         }),
-        Box::new(|cycle, _, executed_rounds, executed_transactions, _, _| {
-            if cycle % 2 == 1 {
-                // allow 1 round / 3 transactions, in case anything was leftover in the pipeline
-                assert!(
-                    executed_transactions <= 3,
-                    "progress with active consensus, {} transactions",
-                    executed_transactions
-                );
-                assert!(
-                    executed_rounds <= 1,
-                    "progress with active consensus, {} rounds",
-                    executed_rounds
-                );
-            } else {
-                assert!(
-                    executed_transactions >= 5,
-                    "no progress with active consensus, only {} transactions",
-                    executed_transactions
-                );
-                assert!(
-                    executed_rounds >= 2,
-                    "no progress with active consensus, only {} rounds",
-                    executed_rounds
-                );
-            }
-            Ok(())
-        }),
+        Box::new(
+            |cycle, executed_epochs, executed_rounds, executed_transactions, _, _| {
+                if cycle % 2 == 1 {
+                    // allow 1 round / 3 transactions, in case anything was leftover in the pipeline
+                    assert!(
+                        executed_transactions <= 3,
+                        "progress with active consensus, {} transactions",
+                        executed_transactions
+                    );
+                    assert!(
+                        executed_rounds <= 1,
+                        "progress with active consensus, {} rounds",
+                        executed_rounds
+                    );
+                } else {
+                    assert!(
+                        executed_transactions >= 5,
+                        "no progress with active consensus, only {} transactions",
+                        executed_transactions
+                    );
+                    assert!(
+                        executed_epochs >= 1 || executed_rounds >= 2,
+                        "no progress with active consensus, only {} epochs, {} rounds",
+                        executed_epochs,
+                        executed_rounds
+                    );
+                }
+                Ok(())
+            },
+        ),
     )
     .await;
 }

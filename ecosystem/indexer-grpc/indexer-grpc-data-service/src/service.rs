@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
-    BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT,
-    LATEST_PROCESSED_VERSION_PER_PROCESSOR, PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR,
+    BYTES_READY_TO_TRANSFER_FROM_SERVER, BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING,
+    CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION_PER_PROCESSOR,
+    NUM_TRANSACTIONS_STRIPPED, PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR,
     PROCESSED_VERSIONS_COUNT_PER_PROCESSOR, SHORT_CONNECTION_COUNT,
 };
 use anyhow::{Context, Result};
@@ -28,11 +29,12 @@ use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
     transaction::v1::{transaction::TxnData, Transaction},
 };
+use aptos_transaction_filter::{BooleanTransactionFilter, Filterable};
 use futures::Stream;
 use prost::Message;
 use redis::Client;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     pin::Pin,
     str::FromStr,
     sync::Arc,
@@ -77,9 +79,25 @@ pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
-    pub sender_addresses_to_ignore: HashSet<String>,
+    pub txns_to_strip_filter: BooleanTransactionFilter,
     pub cache_storage_format: StorageFormat,
     in_memory_cache: Arc<InMemoryCache>,
+}
+
+// Exclude in_memory-cache
+impl std::fmt::Debug for RawDataServerWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RawDataServerWrapper")
+            .field("redis_client", &"Arc<redis::Client>")
+            .field("file_store_config", &self.file_store_config)
+            .field(
+                "data_service_response_channel_size",
+                &self.data_service_response_channel_size,
+            )
+            .field("txns_to_strip_filter", &self.txns_to_strip_filter)
+            .field("cache_storage_format", &self.cache_storage_format)
+            .finish()
+    }
 }
 
 impl RawDataServerWrapper {
@@ -87,7 +105,7 @@ impl RawDataServerWrapper {
         redis_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
         data_service_response_channel_size: usize,
-        sender_addresses_to_ignore: HashSet<String>,
+        txns_to_strip_filter: BooleanTransactionFilter,
         cache_storage_format: StorageFormat,
         in_memory_cache: Arc<InMemoryCache>,
     ) -> anyhow::Result<Self> {
@@ -99,7 +117,7 @@ impl RawDataServerWrapper {
             ),
             file_store_config,
             data_service_response_channel_size,
-            sender_addresses_to_ignore,
+            txns_to_strip_filter,
             cache_storage_format,
             in_memory_cache,
         })
@@ -175,7 +193,7 @@ impl RawData for RawDataServerWrapper {
         let redis_client = self.redis_client.clone();
         let cache_storage_format = self.cache_storage_format;
         let request_metadata = Arc::new(request_metadata);
-        let sender_addresses_to_ignore = self.sender_addresses_to_ignore.clone();
+        let txns_to_strip_filter = self.txns_to_strip_filter.clone();
         let in_memory_cache = self.in_memory_cache.clone();
         tokio::spawn({
             let request_metadata = request_metadata.clone();
@@ -187,7 +205,7 @@ impl RawData for RawDataServerWrapper {
                     request_metadata,
                     transactions_count,
                     tx,
-                    sender_addresses_to_ignore,
+                    txns_to_strip_filter,
                     current_version,
                     in_memory_cache,
                 )
@@ -375,7 +393,7 @@ async fn data_fetcher_task(
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
     transactions_count: Option<u64>,
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
-    sender_addresses_to_ignore: HashSet<String>,
+    txns_to_strip_filter: BooleanTransactionFilter,
     mut current_version: u64,
     in_memory_cache: Arc<InMemoryCache>,
 ) {
@@ -510,11 +528,22 @@ async fn data_fetcher_task(
         // 2. Push the data to the response channel, i.e. stream the data to the client.
         let current_batch_size = transaction_data.as_slice().len();
         let end_of_batch_version = transaction_data.as_slice().last().unwrap().version;
-        let resp_items = get_transactions_responses_builder(
+        let (resp_items, num_stripped) = get_transactions_responses_builder(
             transaction_data,
             chain_id as u32,
-            &sender_addresses_to_ignore,
+            &txns_to_strip_filter,
         );
+        NUM_TRANSACTIONS_STRIPPED
+            .with_label_values(&request_metadata.get_label_values())
+            .inc_by(num_stripped as u64);
+        let bytes_ready_to_transfer_after_stripping = resp_items
+            .iter()
+            .flat_map(|response| &response.transactions)
+            .map(|t| t.encoded_len())
+            .sum::<usize>();
+        BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING
+            .with_label_values(&request_metadata.get_label_values())
+            .inc_by(bytes_ready_to_transfer_after_stripping as u64);
         let data_latency_in_secs = resp_items
             .last()
             .unwrap()
@@ -529,7 +558,7 @@ async fn data_fetcher_task(
             .await
         {
             Ok(_) => {
-                // TODO: Reasses whether this metric useful
+                // TODO: Reasses whether this metric is useful.
                 LATEST_PROCESSED_VERSION_PER_PROCESSOR
                     .with_label_values(&request_metadata.get_label_values())
                     .set(end_of_batch_version as i64);
@@ -597,14 +626,14 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
             // If this batch is fully contained within the previous batch, skip it
             if prev_start <= start_version && prev_end >= end_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE, &"full"])
+                    .with_label_values(&[SERVICE_TYPE, "full"])
                     .inc_by(end_version - start_version);
                 continue;
             }
             // If this batch overlaps with the previous batch, combine them
             if prev_end >= start_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE, &"partial"])
+                    .with_label_values(&[SERVICE_TYPE, "partial"])
                     .inc_by(prev_end - start_version + 1);
                 tracing::debug!(
                     batch_first_version = first_version,
@@ -622,7 +651,7 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
             // Otherwise there is a gap
             if prev_end + 1 != start_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE, &"gap"])
+                    .with_label_values(&[SERVICE_TYPE, "gap"])
                     .inc_by(prev_end - start_version + 1);
 
                 tracing::error!(
@@ -653,22 +682,26 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
     transactions
 }
 
-/// Builds the response for the get transactions request. Partial batch is ok, i.e., a batch with transactions < 1000.
+/// Builds the response for the get transactions request. Partial batch is ok, i.e., a
+/// batch with transactions < 1000.
+///
+/// It also returns the number of txns that were stripped.
 fn get_transactions_responses_builder(
     transactions: Vec<Transaction>,
     chain_id: u32,
-    sender_addresses_to_ignore: &HashSet<String>,
-) -> Vec<TransactionsResponse> {
-    let filtered_transactions =
-        filter_transactions_for_sender_addresses(transactions, sender_addresses_to_ignore);
-    let chunks = chunk_transactions(filtered_transactions, MESSAGE_SIZE_LIMIT);
-    chunks
+    txns_to_strip_filter: &BooleanTransactionFilter,
+) -> (Vec<TransactionsResponse>, usize) {
+    let (stripped_transactions, num_stripped) =
+        strip_transactions(transactions, txns_to_strip_filter);
+    let chunks = chunk_transactions(stripped_transactions, MESSAGE_SIZE_LIMIT);
+    let responses = chunks
         .into_iter()
         .map(|chunk| TransactionsResponse {
             chain_id: Some(chain_id as u64),
             transactions: chunk,
         })
-        .collect()
+        .collect();
+    (responses, num_stripped)
 }
 
 // This is a CPU bound operation, so we spawn_blocking
@@ -937,37 +970,53 @@ async fn channel_send_multiple_with_timeout(
     Ok(())
 }
 
-fn filter_transactions_for_sender_addresses(
+/// This function strips transactions that match the given filter. Stripping means we
+/// remove the payload, signature, events, and writesets. Note, the filter can be
+/// composed of many conditions, see `BooleanTransactionFilter` for more.
+///
+/// This returns the mutated txns and the number of txns that were stripped.
+fn strip_transactions(
     transactions: Vec<Transaction>,
-    sender_addresses_to_ignore: &HashSet<String>,
-) -> Vec<Transaction> {
-    transactions
+    txns_to_strip_filter: &BooleanTransactionFilter,
+) -> (Vec<Transaction>, usize) {
+    let mut stripped_count = 0;
+
+    let stripped_transactions: Vec<Transaction> = transactions
         .into_iter()
         .map(|mut txn| {
-            if let Some(TxnData::User(user_transaction)) = txn.txn_data.as_mut() {
-                if let Some(utr) = user_transaction.request.as_mut() {
-                    if sender_addresses_to_ignore.contains(&utr.sender) {
+            // Note: `is_allowed` means the txn matches the filter, in which case
+            // we strip it.
+            if txns_to_strip_filter.is_allowed(&txn) {
+                stripped_count += 1;
+                if let Some(info) = txn.info.as_mut() {
+                    info.changes = vec![];
+                }
+                if let Some(TxnData::User(user_transaction)) = txn.txn_data.as_mut() {
+                    user_transaction.events = vec![];
+                    if let Some(utr) = user_transaction.request.as_mut() {
                         // Wipe the payload and signature.
                         utr.payload = None;
                         utr.signature = None;
-                        user_transaction.events = vec![];
-                        txn.info.as_mut().unwrap().changes = vec![];
                     }
                 }
             }
             txn
         })
-        .collect()
+        .collect();
+
+    (stripped_transactions, stripped_count)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{ensure_sequential_transactions, filter_transactions_for_sender_addresses};
+    use super::*;
     use aptos_protos::transaction::v1::{
         transaction::TxnData, Event, Signature, Transaction, TransactionInfo, TransactionPayload,
         UserTransaction, UserTransactionRequest, WriteSetChange,
     };
-    use std::collections::HashSet;
+    use aptos_transaction_filter::{
+        boolean_transaction_filter::APIFilter, filters::UserTransactionFilterBuilder,
+    };
 
     #[test]
     fn test_ensure_sequential_transactions_merges_and_sorts() {
@@ -1015,7 +1064,7 @@ mod tests {
     }
 
     #[test]
-    fn test_transactions_are_filter_correctly() {
+    fn test_transactions_are_stripped_correctly_sender_addresses() {
         let sender_address = "0x1234".to_string();
         // Create a transaction with a user transaction
         let txn = Transaction {
@@ -1035,12 +1084,25 @@ mod tests {
             }),
             ..Default::default()
         };
-        // create ignore list.
-        let ignore_hash_set: HashSet<String> = vec![sender_address].into_iter().collect();
 
-        let filtered_txn = filter_transactions_for_sender_addresses(vec![txn], &ignore_hash_set);
-        assert_eq!(filtered_txn.len(), 1);
-        let txn = filtered_txn.first().unwrap();
+        // Create filter for senders to ignore.
+        let sender_filters = vec![sender_address]
+            .into_iter()
+            .map(|address| {
+                BooleanTransactionFilter::from(APIFilter::UserTransactionFilter(
+                    UserTransactionFilterBuilder::default()
+                        .sender(address)
+                        .build()
+                        .unwrap(),
+                ))
+            })
+            .collect();
+        let filter = BooleanTransactionFilter::new_or(sender_filters);
+
+        let (filtered_txns, num_stripped) = strip_transactions(vec![txn], &filter);
+        assert_eq!(num_stripped, 1);
+        assert_eq!(filtered_txns.len(), 1);
+        let txn = filtered_txns.first().unwrap();
         let user_transaction = match &txn.txn_data {
             Some(TxnData::User(user_transaction)) => user_transaction,
             _ => panic!("Expected user transaction"),

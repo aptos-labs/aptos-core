@@ -25,6 +25,9 @@ fungible asset to it. This emits an deposit event.
 -  [Function `primary_store_address`](#0x1_primary_fungible_store_primary_store_address)
 -  [Function `primary_store`](#0x1_primary_fungible_store_primary_store)
 -  [Function `primary_store_exists`](#0x1_primary_fungible_store_primary_store_exists)
+-  [Function `primary_store_address_inlined`](#0x1_primary_fungible_store_primary_store_address_inlined)
+-  [Function `primary_store_inlined`](#0x1_primary_fungible_store_primary_store_inlined)
+-  [Function `primary_store_exists_inlined`](#0x1_primary_fungible_store_primary_store_exists_inlined)
 -  [Function `balance`](#0x1_primary_fungible_store_balance)
 -  [Function `is_balance_at_least`](#0x1_primary_fungible_store_is_balance_at_least)
 -  [Function `is_frozen`](#0x1_primary_fungible_store_is_frozen)
@@ -275,6 +278,86 @@ Return whether the given account's primary store exists.
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_store_exists</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): bool {
     <a href="fungible_asset.md#0x1_fungible_asset_store_exists">fungible_asset::store_exists</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_store_address</a>(<a href="account.md#0x1_account">account</a>, metadata))
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_primary_fungible_store_primary_store_address_inlined"></a>
+
+## Function `primary_store_address_inlined`
+
+Get the address of the primary store for the given account.
+Use instead of the corresponding view functions for dispatchable hooks to avoid circular dependencies of modules.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address_inlined">primary_store_address_inlined</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address_inlined">primary_store_address_inlined</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): <b>address</b> {
+    <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
+    <a href="object.md#0x1_object_create_user_derived_object_address">object::create_user_derived_object_address</a>(owner, metadata_addr)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_primary_fungible_store_primary_store_inlined"></a>
+
+## Function `primary_store_inlined`
+
+Get the primary store object for the given account.
+Use instead of the corresponding view functions for dispatchable hooks to avoid circular dependencies of modules.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_inlined">primary_store_inlined</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_inlined">primary_store_inlined</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): Object&lt;FungibleStore&gt; {
+    <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address_inlined">primary_store_address_inlined</a>(owner, metadata);
+    <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>(store)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_primary_fungible_store_primary_store_exists_inlined"></a>
+
+## Function `primary_store_exists_inlined`
+
+Return whether the given account's primary store exists.
+Use instead of the corresponding view functions for dispatchable hooks to avoid circular dependencies of modules.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists_inlined">primary_store_exists_inlined</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists_inlined">primary_store_exists_inlined</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): bool {
+    <a href="fungible_asset.md#0x1_fungible_asset_store_exists">fungible_asset::store_exists</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address_inlined">primary_store_address_inlined</a>(<a href="account.md#0x1_account">account</a>, metadata))
 }
 </code></pre>
 

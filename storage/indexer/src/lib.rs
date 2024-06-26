@@ -3,20 +3,20 @@
 
 /// TODO(jill): deprecate Indexer once Indexer Async V2 is ready
 mod db;
+pub mod db_indexer;
 pub mod db_ops;
 pub mod db_v2;
-mod metadata;
-mod schema;
-pub mod table_info_reader;
+pub mod indexer_reader;
+mod utils;
 
-use crate::{
-    db::INDEX_DB_NAME,
+use crate::db::INDEX_DB_NAME;
+use aptos_config::config::RocksdbConfig;
+use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue},
     schema::{
         column_families, indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema,
     },
 };
-use aptos_config::config::RocksdbConfig;
 use aptos_logger::warn;
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_rocksdb_options::gen_rocksdb_options;

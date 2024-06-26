@@ -13,7 +13,9 @@ use crate::{
         stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
         stale_state_value_index::StaleStateValueIndexSchema,
+        stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
         state_value::StateValueSchema,
+        state_value_by_key_hash::StateValueByKeyHashSchema,
         transaction::TransactionSchema,
         transaction_accumulator::TransactionAccumulatorSchema,
         transaction_info::TransactionInfoSchema,
@@ -30,7 +32,7 @@ use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{
     schema::{Schema, SeekKeyCodec},
-    ReadOptions, SchemaBatch, DB,
+    SchemaBatch, DB,
 };
 use aptos_storage_interface::Result;
 use aptos_types::{proof::position::Position, transaction::Version};
@@ -123,7 +125,12 @@ pub(crate) fn truncate_state_kv_db_single_shard(
     target_version: Version,
 ) -> Result<()> {
     let batch = SchemaBatch::new();
-    delete_state_value_and_index(state_kv_db.db_shard(shard_id), target_version + 1, &batch)?;
+    delete_state_value_and_index(
+        state_kv_db.db_shard(shard_id),
+        target_version + 1,
+        &batch,
+        state_kv_db.enabled_sharding(),
+    )?;
     state_kv_db.commit_single_shard(target_version, shard_id, batch)
 }
 
@@ -199,7 +206,7 @@ pub(crate) fn find_closest_node_version_at_or_before(
 ) -> Result<Option<Version>> {
     let mut iter = state_merkle_db
         .metadata_db()
-        .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+        .rev_iter::<JellyfishMerkleNodeSchema>()?;
     iter.seek_for_prev(&NodeKey::new_empty_path(version))?;
     Ok(iter.next().transpose()?.map(|item| item.0.version()))
 }
@@ -213,8 +220,7 @@ fn truncate_transaction_accumulator(
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let mut iter =
-        transaction_accumulator_db.iter::<TransactionAccumulatorSchema>(ReadOptions::default())?;
+    let mut iter = transaction_accumulator_db.iter::<TransactionAccumulatorSchema>()?;
     iter.seek_to_last();
     let (position, _) = iter.next().transpose()?.unwrap();
     let num_frozen_nodes = position.to_postorder_index() + 1;
@@ -304,7 +310,7 @@ fn delete_per_epoch_data(
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let mut iter = ledger_db.iter::<LedgerInfoSchema>(ReadOptions::default())?;
+    let mut iter = ledger_db.iter::<LedgerInfoSchema>()?;
     iter.seek_to_last();
     if let Some((epoch, ledger_info)) = iter.next().transpose()? {
         let version = ledger_info.commit_info().version();
@@ -318,7 +324,7 @@ fn delete_per_epoch_data(
         }
     }
 
-    let mut iter = ledger_db.iter::<EpochByVersionSchema>(ReadOptions::default())?;
+    let mut iter = ledger_db.iter::<EpochByVersionSchema>()?;
     iter.seek(&start_version)?;
 
     for item in iter {
@@ -372,7 +378,7 @@ fn delete_per_version_data_impl<S>(
 where
     S: Schema<Key = Version>,
 {
-    let mut iter = ledger_db.iter::<S>(ReadOptions::default())?;
+    let mut iter = ledger_db.iter::<S>()?;
     iter.seek_to_last();
     if let Some((lastest_version, _)) = iter.next().transpose()? {
         if lastest_version >= start_version {
@@ -414,14 +420,29 @@ fn delete_state_value_and_index(
     state_kv_db_shard: &DB,
     start_version: Version,
     batch: &SchemaBatch,
+    enable_sharding: bool,
 ) -> Result<()> {
-    let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
-    iter.seek(&start_version)?;
+    if enable_sharding {
+        let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexByKeyHashSchema>()?;
+        iter.seek(&start_version)?;
 
-    for item in iter {
-        let (index, _) = item?;
-        batch.delete::<StaleStateValueIndexSchema>(&index)?;
-        batch.delete::<StateValueSchema>(&(index.state_key, index.stale_since_version))?;
+        for item in iter {
+            let (index, _) = item?;
+            batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
+            batch.delete::<StateValueByKeyHashSchema>(&(
+                index.state_key_hash,
+                index.stale_since_version,
+            ))?;
+        }
+    } else {
+        let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>()?;
+        iter.seek(&start_version)?;
+
+        for item in iter {
+            let (index, _) = item?;
+            batch.delete::<StaleStateValueIndexSchema>(&index)?;
+            batch.delete::<StateValueSchema>(&(index.state_key, index.stale_since_version))?;
+        }
     }
 
     Ok(())
@@ -436,7 +457,7 @@ where
     S: Schema<Key = StaleNodeIndex>,
     Version: SeekKeyCodec<S>,
 {
-    let mut iter = db.iter::<S>(ReadOptions::default())?;
+    let mut iter = db.iter::<S>()?;
     iter.seek(&version)?;
     for item in iter {
         let (index, _) = item?;
@@ -457,7 +478,7 @@ fn delete_nodes_and_stale_indices_at_or_after_version(
         db, version, batch,
     )?;
 
-    let mut iter = db.iter::<JellyfishMerkleNodeSchema>(ReadOptions::default())?;
+    let mut iter = db.iter::<JellyfishMerkleNodeSchema>()?;
     iter.seek(&NodeKey::new_empty_path(version))?;
     for item in iter {
         let (key, _) = item?;

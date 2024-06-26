@@ -31,7 +31,9 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
-use aptos_vm_types::{abstract_write_op::AbstractResourceWriteOp, output::VMOutput};
+use aptos_vm_types::{
+    abstract_write_op::AbstractResourceWriteOp, environment::Environment, output::VMOutput,
+};
 use move_core_types::{
     language_storage::StructTag,
     value::MoveTypeLayout,
@@ -415,16 +417,18 @@ impl BlockAptosVM {
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
         let executor = BlockExecutor::<
             SignatureVerifiedTransaction,
-            AptosExecutorTask<S>,
+            AptosExecutorTask,
             S,
             L,
             ExecutableTestType,
         >::new(config, executor_thread_pool, transaction_commit_listener);
 
-        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
+        let environment =
+            Arc::new(Environment::new(state_view).try_enable_delayed_field_optimization());
+        let ret = executor.execute_block(environment, signature_verified_block, state_view);
         match ret {
             Ok(block_output) => {
-                let transaction_outputs = block_output.into_inner();
+                let (transaction_outputs, block_end_info) = block_output.into_inner();
                 let output_vec: Vec<_> = transaction_outputs
                     .into_iter()
                     .map(|output| output.take_output())
@@ -439,7 +443,7 @@ impl BlockAptosVM {
                     flush_speculative_logs(pos);
                 }
 
-                Ok(BlockOutput::new(output_vec))
+                Ok(BlockOutput::new(output_vec, block_end_info))
             },
             Err(BlockExecutionError::FatalBlockExecutorError(PanicError::CodeInvariantError(
                 err_msg,

@@ -77,6 +77,7 @@ macro_rules! generate_error_traits {
         $(
         pub trait [<$trait_name Error>]: AptosErrorResponse {
             // With ledger info and an error code
+            #[allow(unused)]
             fn [<$trait_name:snake _with_code>]<Err: std::fmt::Display>(
                 err: Err,
                 error_code: aptos_api_types::AptosErrorCode,
@@ -84,11 +85,13 @@ macro_rules! generate_error_traits {
             ) -> Self where Self: Sized;
 
             // With an error code and no ledger info headers (special case)
+            #[allow(unused)]
             fn [<$trait_name:snake _with_code_no_info>]<Err: std::fmt::Display>(
                 err: Err,
                 error_code: aptos_api_types::AptosErrorCode,
             ) -> Self where Self: Sized;
 
+            #[allow(unused)]
             fn [<$trait_name:snake _with_vm_status>]<Err: std::fmt::Display>(
                 err: Err,
                 error_code: aptos_api_types::AptosErrorCode,
@@ -96,6 +99,7 @@ macro_rules! generate_error_traits {
                 ledger_info: &aptos_api_types::LedgerInfo
             ) -> Self where Self: Sized;
 
+            #[allow(unused)]
             fn [<$trait_name:snake _from_aptos_error>](
                 aptos_error: aptos_api_types::AptosError,
                 ledger_info: &aptos_api_types::LedgerInfo

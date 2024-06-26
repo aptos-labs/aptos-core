@@ -46,14 +46,20 @@ impl Clone for VMRuntime {
 }
 
 impl VMRuntime {
+    /// Creates a new runtime instance with provided native functions and VM
+    /// configurations. If there are duplicated natives, panics.
     pub(crate) fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
-    ) -> PartialVMResult<Self> {
-        Ok(VMRuntime {
-            loader: Loader::new(NativeFunctions::new(natives)?, vm_config),
+    ) -> Self {
+        VMRuntime {
+            loader: Loader::new(
+                NativeFunctions::new(natives)
+                    .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e)),
+                vm_config,
+            ),
             module_cache: Arc::new(ModuleCache::new()),
-        })
+        }
     }
 
     pub(crate) fn publish_module_bundle(
@@ -358,11 +364,12 @@ impl VMRuntime {
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
         let LoadedFunction { ty_args, function } = func;
+        let ty_builder = self.loader().ty_builder();
 
         let param_tys = function
             .param_tys()
             .iter()
-            .map(|ty| ty.subst(&ty_args))
+            .map(|ty| ty_builder.create_ty_with_subst(ty, &ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let mut_ref_args = param_tys
@@ -379,7 +386,7 @@ impl VMRuntime {
         let return_tys = function
             .return_tys()
             .iter()
-            .map(|ty| ty.subst(&ty_args))
+            .map(|ty| ty_builder.create_ty_with_subst(ty, &ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
 

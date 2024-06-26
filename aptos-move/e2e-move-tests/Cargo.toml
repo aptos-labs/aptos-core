@@ -39,6 +39,7 @@ proptest = { workspace = true }
 rand = { workspace = true }
 rstest = { workspace = true }
 serde = { workspace = true }
+sha3 = { workspace = true }
 test-case = { workspace = true }
 
 [dev-dependencies]

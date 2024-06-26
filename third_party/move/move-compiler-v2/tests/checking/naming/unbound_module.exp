@@ -10,4 +10,4 @@ error: unbound module
   ┌─ tests/checking/naming/unbound_module.move:4:9
   │
 4 │         X::foo();
-  │         ^ Unbound module alias 'X'
+  │         ^ Unbound module or type alias 'X'

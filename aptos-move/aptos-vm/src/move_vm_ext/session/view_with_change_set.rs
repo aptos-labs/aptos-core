@@ -84,11 +84,6 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool {
-        self.base_executor_view
-            .is_delayed_field_optimization_capable()
-    }
-
     fn get_delayed_field_value(
         &self,
         id: &Self::Identifier,

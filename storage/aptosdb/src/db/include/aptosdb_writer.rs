@@ -362,7 +362,7 @@ impl AptosDB {
             skip_index_and_usage,
             txns_to_commit
                 .iter()
-                .rposition(|txn| txn.is_state_checkpoint()),
+                .rposition(|txn| txn.has_state_checkpoint_hash()),
         )?;
 
         // Write block index if event index is skipped.

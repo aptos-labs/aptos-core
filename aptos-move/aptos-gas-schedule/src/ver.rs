@@ -8,8 +8,10 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V20
+///   - Limits for bounding MoveVM type sizes
 /// - V19
-///   - gas for aggregator_v2::is_at_least native function
+///   - Gas for aggregator_v2::is_at_least native function
 /// - V18
 ///   - Separate limits for governance scripts
 ///   - Function info & dispatchable token gas params
@@ -62,9 +64,8 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 19;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 20;
 
-#[allow(dead_code)]
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
     pub const RELEASE_V1_9_SKIPPED: u64 = 12;
@@ -74,4 +75,5 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_12: u64 = 17;
     pub const RELEASE_V1_13: u64 = 18;
     pub const RELEASE_V1_14: u64 = 19;
+    pub const RELEASE_V1_15: u64 = 20;
 }

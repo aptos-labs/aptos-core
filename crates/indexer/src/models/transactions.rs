@@ -219,12 +219,26 @@ impl Transaction {
                 vec![],
                 vec![],
             ),
+            APITransaction::BlockEpilogueTransaction(block_epilogue_txn) => (
+                Self::from_transaction_info(
+                    &block_epilogue_txn.info,
+                    None,
+                    transaction.type_str().to_string(),
+                    0,
+                    block_height,
+                    epoch,
+                ),
+                None,
+                vec![],
+                vec![],
+                vec![],
+            ),
             APITransaction::PendingTransaction(..) => {
                 unreachable!()
             },
             APITransaction::ValidatorTransaction(validator_txn) => (
                 Self::from_transaction_info(
-                    &validator_txn.info,
+                    validator_txn.transaction_info(),
                     None,
                     transaction.type_str().to_string(),
                     0,

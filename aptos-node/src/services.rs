@@ -6,31 +6,31 @@ use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::{
-    consensus_observer::network::ObserverMessage, network_interface::ConsensusMsg,
+    consensus_observer::publisher::ConsensusPublisher, network_interface::ConsensusMsg,
     persistent_liveness_storage::StorageWriteProxy, quorum_store::quorum_store_db::QuorumStoreDB,
 };
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
-use aptos_db_indexer::table_info_reader::TableInfoReader;
+use aptos_db_indexer::indexer_reader::IndexerReaders;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
-use aptos_indexer_grpc_table_info::runtime::bootstrap as bootstrap_indexer_table_info;
+use aptos_indexer_grpc_table_info::runtime::{
+    bootstrap as bootstrap_indexer_table_info, bootstrap_internal_indexer_db,
+};
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::{
-    interface::{NetworkClient, NetworkClientInterface},
-    storage::PeersAndMetadata,
-};
+use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
 use aptos_network_benchmark::{run_netbench_service, NetbenchMessage};
 use aptos_peer_monitoring_service_server::{
     network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
     PeerMonitoringServiceServer,
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
+use aptos_schemadb::DB;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
@@ -45,8 +45,10 @@ pub fn bootstrap_api_and_indexer(
     node_config: &NodeConfig,
     db_rw: DbReaderWriter,
     chain_id: ChainId,
+    internal_indexer_db: Option<Arc<DB>>,
 ) -> anyhow::Result<(
     Receiver<MempoolClientRequest>,
+    Option<Runtime>,
     Option<Runtime>,
     Option<Runtime>,
     Option<Runtime>,
@@ -66,18 +68,27 @@ pub fn bootstrap_api_and_indexer(
         None => (None, None),
     };
 
+    let (db_indexer_runtime, txn_event_reader) =
+        match bootstrap_internal_indexer_db(node_config, db_rw.clone(), internal_indexer_db) {
+            Some((runtime, db_indexer)) => (Some(runtime), Some(db_indexer)),
+            None => (None, None),
+        };
+
+    let indexer_readers = IndexerReaders::new(indexer_async_v2, txn_event_reader);
+
     // Create the API runtime
-    let table_info_reader: Option<Arc<dyn TableInfoReader>> = indexer_async_v2.map(|arc| {
-        let trait_object: Arc<dyn TableInfoReader> = arc;
+    let indexer_reader: Option<Arc<dyn IndexerReader>> = indexer_readers.map(|readers| {
+        let trait_object: Arc<dyn IndexerReader> = Arc::new(readers);
         trait_object
     });
+
     let api_runtime = if node_config.api.enabled {
         Some(bootstrap_api(
             node_config,
             chain_id,
             db_rw.reader.clone(),
             mempool_client_sender.clone(),
-            table_info_reader.clone(),
+            indexer_reader.clone(),
         )?)
     } else {
         None
@@ -89,7 +100,7 @@ pub fn bootstrap_api_and_indexer(
         chain_id,
         db_rw.reader.clone(),
         mempool_client_sender.clone(),
-        table_info_reader,
+        indexer_reader,
     );
 
     // Create the indexer runtime
@@ -106,6 +117,7 @@ pub fn bootstrap_api_and_indexer(
         indexer_table_info_runtime,
         indexer_runtime,
         indexer_grpc,
+        db_indexer_runtime,
     ))
 }
 
@@ -118,7 +130,7 @@ pub fn start_consensus_runtime(
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
     vtxn_pool: VTxnPoolState,
-    observer_network_client: Option<NetworkClient<ObserverMessage>>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
 
@@ -134,7 +146,7 @@ pub fn start_consensus_runtime(
         db_rw,
         reconfig_subscription,
         vtxn_pool,
-        observer_network_client,
+        consensus_publisher,
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
 

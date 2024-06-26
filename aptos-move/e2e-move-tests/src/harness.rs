@@ -32,7 +32,6 @@ use aptos_types::{
         ViewFunctionOutput,
     },
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use claims::assert_ok;
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
@@ -908,7 +907,7 @@ impl MoveHarness {
         let gas_schedule: GasScheduleV2 = self.get_gas_schedule();
         let feature_version = gas_schedule.feature_version;
         let params = AptosGasParameters::from_on_chain_gas_schedule(
-            &gas_schedule.to_btree_map(),
+            &gas_schedule.into_btree_map(),
             feature_version,
         )
         .unwrap();
@@ -918,13 +917,6 @@ impl MoveHarness {
     pub fn get_gas_schedule(&self) -> GasScheduleV2 {
         self.read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
             .unwrap()
-    }
-
-    pub fn new_vm(&self) -> AptosVM {
-        AptosVM::new(
-            &self.executor.data_store().as_move_resolver(),
-            /*override_is_delayed_field_optimization_capable=*/ None,
-        )
     }
 
     pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {

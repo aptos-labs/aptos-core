@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/variants/variants_parse_err2.move:5:12
+  │
+5 │         red: u64
+  │            ^
+  │            │
+  │            Unexpected ':'
+  │            Expected ','
