@@ -233,7 +233,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         for i in 0..self.num_shards() {
             results.push(vec![]);
         }
-        (0..self.num_shards()).into_par_iter().for_each(|shard_id| {
+        (0..self.num_shards()).into_iter().for_each(|shard_id| {
             let send_outputs_clone = send_outputs.clone();
             let expected_outputs_clone = expected_outputs.clone();
             let result_rxs_clone = self.result_rxs[shard_id].clone();
@@ -260,8 +260,12 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 send_outputs_clone.send((shard_id, outputs)).expect("Failed to send outputs to main thread");
             });
         });
+        let mut cnt = 0;
         while let Ok(msg) = recv_outputs.recv() {
             results[msg.0] = msg.1;
+            if cnt == self.num_shards() {
+                break;
+            }
         }
         // let results: Vec<Vec<TransactionIdxAndOutput>> = (0..self.num_shards()).into_par_iter().map(|shard_id| {
         //     let mut num_outputs_received: u64 = 0;
