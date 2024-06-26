@@ -1359,26 +1359,36 @@ impl AptosVM {
                     // Charge old versions of existing modules, in case of upgrades.
                     for module in modules.iter() {
                         let addr = module.self_addr();
-                        let name = module.self_name();
-                        let state_key = StateKey::module(addr, name);
+                        let module_name = module.self_name();
 
-                        if let Some(size) = resolver
-                            .as_executor_view()
-                            .get_module_state_value_size(&state_key)
-                            .map_err(|e| e.finish(Location::Undefined))?
+                        let module_exists = resolver
+                            .check_module_exists(addr, module_name)
+                            .map_err(|e| e.finish(Location::Undefined))?;
+                        if !module_exists {
+                            continue;
+                        }
+
+                        if !addr.is_special()
+                            && !traversal_context.visited.contains_key(&(addr, module_name))
                         {
-                            if !addr.is_special()
-                                && traversal_context.visited.insert((addr, name), ()).is_none()
-                            {
-                                gas_meter
-                                    .charge_dependency(false, addr, name, NumBytes::new(size))
-                                    .map_err(|err| {
-                                        err.finish(Location::Module(ModuleId::new(
-                                            *addr,
-                                            name.to_owned(),
-                                        )))
-                                    })?;
-                            }
+                            let size = resolver
+                                .fetch_module_size_in_bytes(addr, module_name)
+                                .map_err(|e| e.finish(Location::Undefined))?;
+                            traversal_context.visited.insert((addr, module_name), ());
+
+                            gas_meter
+                                .charge_dependency(
+                                    false,
+                                    addr,
+                                    module_name,
+                                    NumBytes::new(size as u64),
+                                )
+                                .map_err(|err| {
+                                    err.finish(Location::Module(ModuleId::new(
+                                        *addr,
+                                        module_name.to_owned(),
+                                    )))
+                                })?;
                         }
                     }
 
@@ -1905,8 +1915,8 @@ impl AptosVM {
 
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
-        for state_key in module_write_set.keys() {
-            executor_view.get_module_state_value(state_key)?;
+        for _state_key in module_write_set.keys() {
+            // FIXME(George): when keys are different, read state value here (e.g., check existence)
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {
             executor_view.get_resource_state_value(state_key, None)?;

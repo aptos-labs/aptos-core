@@ -196,6 +196,14 @@ impl<'e, E: ExecutorView> AptosModuleStorage for StorageAdapter<'e, E> {
         self.executor_view.check_module_exists(address, module_name)
     }
 
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Bytes> {
+        self.executor_view.fetch_module_bytes(address, module_name)
+    }
+
     fn fetch_module_size_in_bytes(
         &self,
         address: &AccountAddress,
@@ -251,8 +259,20 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
     }
 
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
-        self.executor_view
-            .get_module_bytes(&StateKey::module_id(module_id))
+        let address = module_id.address();
+        let module_name = module_id.name();
+
+        let module_exists = self
+            .executor_view
+            .check_module_exists(address, module_name)?;
+        Ok(if module_exists {
+            Some(
+                self.executor_view
+                    .fetch_module_bytes(address, module_name)?,
+            )
+        } else {
+            None
+        })
     }
 }
 

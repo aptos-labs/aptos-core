@@ -26,8 +26,8 @@ use aptos_vm_types::{
     change_set::{randomly_check_layout_matches, VMChangeSet},
     module_storage::AptosModuleStorage,
     resolver::{
-        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
-        TResourceGroupView, TResourceView,
+        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
+        TResourceView,
     },
 };
 use bytes::Bytes;
@@ -325,6 +325,15 @@ impl<'r> AptosModuleStorage for ExecutorViewWithChangeSet<'r> {
             .check_module_exists(address, module_name)
     }
 
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Bytes> {
+        self.base_executor_view
+            .fetch_module_bytes(address, module_name)
+    }
+
     fn fetch_module_size_in_bytes(
         &self,
         address: &AccountAddress,
@@ -359,14 +368,6 @@ impl<'r> AptosModuleStorage for ExecutorViewWithChangeSet<'r> {
     ) -> PartialVMResult<Vec<(&AccountAddress, &IdentStr)>> {
         self.base_executor_view
             .fetch_module_immediate_friends(address, module_name)
-    }
-}
-
-impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
-    type Key = StateKey;
-
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        self.base_executor_view.get_module_state_value(state_key)
     }
 }
 
@@ -410,8 +411,8 @@ mod test {
         bcs::from_bytes(&view.get_resource_bytes(&key(s), None).unwrap().unwrap()).unwrap()
     }
 
-    fn read_module(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
-        bcs::from_bytes(&view.get_module_bytes(&key(s)).unwrap().unwrap()).unwrap()
+    fn read_module(_view: &ExecutorViewWithChangeSet, _s: impl ToString) -> u128 {
+        todo!()
     }
 
     fn read_aggregator(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {

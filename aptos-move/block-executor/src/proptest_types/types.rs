@@ -889,10 +889,11 @@ where
                     // TODO: later test errors as well? (by fixing state_view behavior).
                     // TODO: test aggregator reads.
                     if k.is_module_path() {
-                        match view.get_module_bytes(k) {
-                            Ok(v) => read_results.push(v.map(Into::into)),
-                            Err(_) => read_results.push(None),
-                        }
+                        todo!()
+                        // match view.get_module_bytes(k) {
+                        //     Ok(v) => read_results.push(v.map(Into::into)),
+                        //     Err(_) => read_results.push(None),
+                        // }
                     } else {
                         match view.get_resource_bytes(k, None) {
                             Ok(v) => read_results.push(v.map(Into::into)),

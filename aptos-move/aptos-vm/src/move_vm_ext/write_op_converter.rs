@@ -15,8 +15,8 @@ use aptos_vm_types::{
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    effects::Op as MoveStorageOp, language_storage::StructTag, value::MoveTypeLayout,
-    vm_status::StatusCode,
+    account_address::AccountAddress, effects::Op as MoveStorageOp, identifier::IdentStr,
+    language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode,
 };
 use move_vm_types::delayed_values::error::code_invariant_error;
 use std::{collections::BTreeMap, sync::Arc};
@@ -24,27 +24,6 @@ use std::{collections::BTreeMap, sync::Arc};
 pub(crate) struct WriteOpConverter<'r> {
     remote: &'r dyn AptosMoveResolver,
     new_slot_metadata: Option<StateValueMetadata>,
-}
-
-macro_rules! convert_impl {
-    ($convert_func_name:ident, $get_metadata_callback:ident) => {
-        pub(crate) fn $convert_func_name(
-            &self,
-            state_key: &StateKey,
-            move_storage_op: MoveStorageOp<Bytes>,
-            legacy_creation_as_modification: bool,
-        ) -> PartialVMResult<WriteOp> {
-            let state_value_metadata = self
-                .remote
-                .as_executor_view()
-                .$get_metadata_callback(state_key)?;
-            self.convert(
-                state_value_metadata,
-                move_storage_op,
-                legacy_creation_as_modification,
-            )
-        }
-    };
 }
 
 // We set SPECULATIVE_EXECUTION_ABORT_ERROR here, as the error can happen due to
@@ -138,9 +117,45 @@ fn check_size_and_existence_match(
 }
 
 impl<'r> WriteOpConverter<'r> {
-    convert_impl!(convert_module, get_module_state_value_metadata);
+    pub(crate) fn convert_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+        move_storage_op: MoveStorageOp<Bytes>,
+        legacy_creation_as_modification: bool,
+    ) -> PartialVMResult<WriteOp> {
+        let module_exists = self.remote.check_module_exists(address, module_name)?;
+        let state_value_metadata = if module_exists {
+            Some(
+                self.remote
+                    .fetch_module_state_value_metadata(address, module_name)?,
+            )
+        } else {
+            None
+        };
+        self.convert(
+            state_value_metadata,
+            move_storage_op,
+            legacy_creation_as_modification,
+        )
+    }
 
-    convert_impl!(convert_aggregator, get_aggregator_v1_state_value_metadata);
+    pub(crate) fn convert_aggregator(
+        &self,
+        state_key: &StateKey,
+        move_storage_op: MoveStorageOp<Bytes>,
+        legacy_creation_as_modification: bool,
+    ) -> PartialVMResult<WriteOp> {
+        let state_value_metadata = self
+            .remote
+            .as_executor_view()
+            .get_aggregator_v1_state_value_metadata(state_key)?;
+        self.convert(
+            state_value_metadata,
+            move_storage_op,
+            legacy_creation_as_modification,
+        )
+    }
 
     pub(crate) fn new(
         remote: &'r dyn AptosMoveResolver,

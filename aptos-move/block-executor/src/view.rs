@@ -50,9 +50,7 @@ use aptos_types::{
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
     module_storage::AptosModuleStorage,
-    resolver::{
-        ResourceGroupSize, StateStorageView, TModuleView, TResourceGroupView, TResourceView,
-    },
+    resolver::{ResourceGroupSize, StateStorageView, TResourceGroupView, TResourceView},
 };
 use bytes::Bytes;
 use claims::assert_ok;
@@ -465,6 +463,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .set_base_value(id, base_value)
     }
 
+    #[allow(dead_code)]
     fn fetch_module(&self, key: &T::Key, txn_idx: TxnIndex) -> PartialVMResult<Option<Arc<()>>> {
         loop {
             match self.versioned_map.module_storage().read(key, txn_idx) {
@@ -1536,6 +1535,39 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     }
 }
 
+// fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
+//     debug_assert!(
+//         !state_key.is_module_path(),
+//         "Reading a resource {:?} using ModuleView",
+//         state_key,
+//     );
+//
+//     let maybe_module = match &self.latest_view {
+//         ViewState::Sync(state) => state.fetch_module(state_key, self.txn_idx)?,
+//         ViewState::Unsync(state) => state.unsync_map.fetch_module(state_key),
+//     };
+//
+//     if maybe_module.is_none() {
+//         // FIXME(George): use base value & maybe module
+//         let _base_value = self.get_raw_base_value(state_key)?;
+//         let _maybe_module = match &self.latest_view {
+//             ViewState::Sync(state) => {
+//                 state
+//                     .versioned_map
+//                     .module_storage()
+//                     .set_base_value(state_key.clone(), Arc::new(()));
+//                 state.fetch_module(state_key, self.txn_idx)?
+//             },
+//             ViewState::Unsync(state) => {
+//                 state.unsync_map.write_module(state_key.clone());
+//                 state.unsync_map.fetch_module(state_key)
+//             },
+//         };
+//     };
+//     // FIXME(George): Set to module
+//     Ok(None)
+// }
+
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModuleStorage
     for LatestView<'a, T, S, X>
 {
@@ -1544,6 +1576,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> PartialVMResult<bool> {
+        todo!()
+    }
+
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Bytes> {
         todo!()
     }
 
@@ -1577,45 +1617,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
         _module_name: &IdentStr,
     ) -> PartialVMResult<Vec<(&AccountAddress, &IdentStr)>> {
         todo!()
-    }
-}
-
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
-    for LatestView<'a, T, S, X>
-{
-    type Key = T::Key;
-
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        debug_assert!(
-            !state_key.is_module_path(),
-            "Reading a resource {:?} using ModuleView",
-            state_key,
-        );
-
-        let maybe_module = match &self.latest_view {
-            ViewState::Sync(state) => state.fetch_module(state_key, self.txn_idx)?,
-            ViewState::Unsync(state) => state.unsync_map.fetch_module(state_key),
-        };
-
-        if maybe_module.is_none() {
-            // FIXME(George): use base value & maybe module
-            let _base_value = self.get_raw_base_value(state_key)?;
-            let _maybe_module = match &self.latest_view {
-                ViewState::Sync(state) => {
-                    state
-                        .versioned_map
-                        .module_storage()
-                        .set_base_value(state_key.clone(), Arc::new(()));
-                    state.fetch_module(state_key, self.txn_idx)?
-                },
-                ViewState::Unsync(state) => {
-                    state.unsync_map.write_module(state_key.clone());
-                    state.unsync_map.fetch_module(state_key)
-                },
-            };
-        };
-        // FIXME(George): Set to module
-        Ok(None)
     }
 }
 

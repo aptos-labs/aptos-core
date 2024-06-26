@@ -380,8 +380,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
 
             for (name, blob_op) in modules {
+                let op = woc.convert_module(&addr, &name, blob_op, false)?;
                 let state_key = StateKey::module(&addr, &name);
-                let op = woc.convert_module(&state_key, blob_op, false)?;
                 module_write_set.insert(state_key, op);
             }
         }

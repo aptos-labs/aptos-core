@@ -18,7 +18,7 @@ use aptos_vm_types::{
 };
 use derive_more::{Deref, DerefMut};
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::vm_status::VMStatus;
+use move_core_types::{account_address::AccountAddress, ident_str, vm_status::VMStatus};
 use std::collections::BTreeMap;
 
 pub struct UserSessionChangeSet {
@@ -51,10 +51,21 @@ impl ChangeSetInterface for UserSessionChangeSet {
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
         self.change_set.write_op_info_iter_mut(executor_view).chain(
             self.module_write_set.iter_mut().map(|(key, op)| {
+                // FIXME(George): Switch to different keys for modules!
+                let tmp_addr = AccountAddress::ONE;
+                let module_name = ident_str!("tmp_foo");
+
+                let module_exists = executor_view.check_module_exists(&tmp_addr, module_name)?;
+                let prev_size = if module_exists {
+                    executor_view.fetch_module_size_in_bytes(&tmp_addr, module_name)? as u64
+                } else {
+                    0
+                };
+
                 Ok(WriteOpInfo {
                     key,
                     op_size: op.write_op_size(),
-                    prev_size: executor_view.get_module_state_value_size(key)?.unwrap_or(0),
+                    prev_size,
                     metadata_mut: op.get_metadata_mut(),
                 })
             }),
