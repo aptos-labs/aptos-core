@@ -139,7 +139,7 @@ impl<K: Hash + Clone + Eq, M> VersionedModuleStorage<K, M> {
             .publish_if_pending();
     }
 
-    pub fn pending(&self, key: K, txn_idx: TxnIndex, module: Arc<M>) {
+    pub fn add_pending(&self, key: K, txn_idx: TxnIndex, module: Arc<M>) {
         let mut v = self
             .entries
             .entry(key)

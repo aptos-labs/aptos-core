@@ -25,7 +25,7 @@ use aptos_aggregator::{
     types::{code_invariant_error, expect_ok, PanicOr},
 };
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_logger::{debug, error, info};
+use aptos_logger::{error, info};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
@@ -178,11 +178,13 @@ where
                     .write(k, idx_to_execute, incarnation, v, maybe_layout);
             }
 
-            for (k, v) in output.module_write_set().into_iter() {
+            for (k, _v) in output.module_write_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
                     needs_suffix_validation = true;
                 }
-                versioned_cache.modules().write(k, idx_to_execute, v);
+                versioned_cache
+                    .module_storage()
+                    .add_pending(k, idx_to_execute, Arc::new(()));
             }
 
             // Then, apply deltas.
@@ -281,7 +283,7 @@ where
             use KeyKind::*;
             match kind {
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
-                Module => versioned_cache.modules().remove(&k, idx_to_execute),
+                Module => versioned_cache.module_storage().remove(&k, idx_to_execute),
                 Group => {
                     // A change in state observable during speculative execution
                     // (which includes group metadata and size) changes, suffix
@@ -306,14 +308,7 @@ where
             versioned_cache.delayed_fields().remove(&id, idx_to_execute);
         }
 
-        if !last_input_output.record(idx_to_execute, read_set, result, resource_write_set) {
-            // Module R/W is an expected fallback behavior, no alert is required.
-            debug!("[Execution] At txn {}, Module read & write", idx_to_execute);
-
-            return Err(PanicOr::Or(
-                ParallelBlockExecutionError::ModulePathReadWriteError,
-            ));
-        }
+        last_input_output.record(idx_to_execute, read_set, result, resource_write_set);
         Ok(needs_suffix_validation)
     }
 
@@ -340,9 +335,10 @@ where
         // (i.e. not re-execute unless some other part of the validation fails or
         // until commit, but mark as estimates).
 
-        // TODO: validate modules when there is no r/w fallback.
         Ok(
             read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
+                && read_set
+                    .validate_module_reads(versioned_cache.module_storage(), idx_to_validate)
                 && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate),
         )
     }
@@ -363,7 +359,7 @@ where
                 use KeyKind::*;
                 match kind {
                     Resource => versioned_cache.data().mark_estimate(&k, txn_idx),
-                    Module => versioned_cache.modules().mark_estimate(&k, txn_idx),
+                    Module => versioned_cache.module_storage().mark_estimate(&k, txn_idx),
                     Group => {
                         // Validation for both group size and metadata is based on values.
                         // Execution may wait for estimates.
@@ -514,6 +510,13 @@ where
                 .map_err(PanicOr::Or)?;
             // Handle a potential vm error, then check invariants on the recorded outputs.
             last_input_output.check_execution_status_during_commit(txn_idx)?;
+
+            // Resolve pending code publish if it exists.
+            if let Some(keys) = last_input_output.module_keys(txn_idx) {
+                for key in keys {
+                    versioned_cache.module_storage().publish(&key, txn_idx)
+                }
+            }
 
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
                 let approx_output_size = block_gas_limit_type.block_output_limit().and_then(|_| {
@@ -982,8 +985,9 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
-        for (key, write_op) in output.module_write_set().into_iter() {
-            unsync_map.write_module(key, write_op);
+        for (key, _write_op) in output.module_write_set().into_iter() {
+            // FIXME(George)
+            unsync_map.write_module(key);
         }
 
         let mut second_phase = Vec::new();
@@ -1056,9 +1060,6 @@ where
             self.config.onchain.block_gas_limit_type.clone(),
             num_txns,
         );
-
-        let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =
-            TxnLastInputOutput::new(num_txns as TxnIndex);
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let latest_view = LatestView::<T, S, X>::new(
@@ -1135,13 +1136,6 @@ where
                                 output.get_write_summary(),
                             )
                         });
-
-                    if last_input_output.check_and_append_module_rw_conflict(
-                        sequential_reads.module_reads.iter(),
-                        output.module_write_set().keys(),
-                    ) {
-                        block_limit_processor.process_module_rw_conflict();
-                    }
 
                     block_limit_processor.accumulate_fee_statement(
                         fee_statement,

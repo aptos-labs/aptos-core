@@ -5,23 +5,20 @@
 use crate::{
     versioned_data::VersionedData, versioned_delayed_fields::VersionedDelayedFields,
     versioned_group_data::VersionedGroupData, versioned_module_storage::VersionedModuleStorage,
-    versioned_modules::VersionedModules,
 };
 use aptos_types::{
     executable::{Executable, ModulePath},
     write_set::TransactionWrite,
 };
 use serde::Serialize;
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 pub mod types;
 pub mod unsync_map;
-mod utils;
 pub mod versioned_data;
 pub mod versioned_delayed_fields;
 pub mod versioned_group_data;
 pub mod versioned_module_storage;
-pub mod versioned_modules;
 
 #[cfg(test)]
 mod unit_tests;
@@ -39,9 +36,9 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
-    modules: VersionedModules<K, V, X>,
-    #[allow(dead_code)]
     module_storage: VersionedModuleStorage<K, ()>,
+
+    phantom_data: PhantomData<X>,
 }
 
 impl<
@@ -60,8 +57,9 @@ impl<
             data: VersionedData::new(),
             group_data: VersionedGroupData::new(),
             delayed_fields: VersionedDelayedFields::new(),
-            modules: VersionedModules::new(),
             module_storage: VersionedModuleStorage::empty(),
+
+            phantom_data: PhantomData,
         }
     }
 
@@ -70,7 +68,7 @@ impl<
             num_resources: self.data.num_keys(),
             num_resource_groups: self.group_data.num_keys(),
             num_delayed_fields: self.delayed_fields.num_keys(),
-            num_modules: self.modules.num_keys(),
+            num_modules: self.module_storage.num_keys(),
             base_resources_size: self.data.total_base_value_size(),
             base_delayed_fields_size: self.delayed_fields.total_base_value_size(),
         }
@@ -91,8 +89,8 @@ impl<
         &self.delayed_fields
     }
 
-    pub fn modules(&self) -> &VersionedModules<K, V, X> {
-        &self.modules
+    pub fn module_storage(&self) -> &VersionedModuleStorage<K, ()> {
+        &self.module_storage
     }
 }
 

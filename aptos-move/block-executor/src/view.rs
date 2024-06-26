@@ -28,11 +28,11 @@ use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
         GroupReadResult, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError,
-        MVModulesError, MVModulesOutput, StorageVersion, TxnIndex, UnknownOrLayout,
-        UnsyncGroupError, ValueWithLayout,
+        StorageVersion, TxnIndex, UnknownOrLayout, UnsyncGroupError, ValueWithLayout,
     },
     unsync_map::UnsyncMap,
     versioned_delayed_fields::TVersionedDelayedFieldView,
+    versioned_module_storage::ModuleReadError,
     MVHashMap,
 };
 use aptos_types::{
@@ -459,19 +459,27 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .set_base_value(id, base_value)
     }
 
-    // TODO: Actually fill in the logic to record fetched executables, etc.
-    fn fetch_module(
-        &self,
-        key: &T::Key,
-        txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVModulesOutput<T::Value, X>, MVModulesError> {
-        // Record for the R/W path intersection fallback for modules.
-        self.captured_reads
-            .borrow_mut()
-            .module_reads
-            .push(key.clone());
-
-        self.versioned_map.modules().fetch_module(key, txn_idx)
+    fn fetch_module(&self, key: &T::Key, txn_idx: TxnIndex) -> PartialVMResult<Option<Arc<()>>> {
+        loop {
+            match self.versioned_map.module_storage().read(key, txn_idx) {
+                Ok(m) => {
+                    self.captured_reads
+                        .borrow_mut()
+                        .module_reads
+                        .push(key.clone());
+                    return Ok(Some(m));
+                },
+                Err(ModuleReadError::Uninitialized) => return Ok(None),
+                Err(ModuleReadError::Dependency(dep_idx)) => {
+                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx)? {
+                        return Err(PartialVMError::new(
+                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                        )
+                        .with_message("Interrupted as block execution was halted".to_string()));
+                    }
+                },
+            }
+        }
     }
 
     fn read_group_size(
@@ -1534,34 +1542,30 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
             state_key,
         );
 
-        match &self.latest_view {
-            ViewState::Sync(state) => {
-                use MVModulesError::*;
-                use MVModulesOutput::*;
+        let maybe_module = match &self.latest_view {
+            ViewState::Sync(state) => state.fetch_module(state_key, self.txn_idx)?,
+            ViewState::Unsync(state) => state.unsync_map.fetch_module(state_key),
+        };
 
-                match state.fetch_module(state_key, self.txn_idx) {
-                    Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
-                    Ok(Module((v, _))) => Ok(v.as_state_value()),
-                    Err(Dependency(_)) => {
-                        // Return anything (e.g. module does not exist) to avoid waiting,
-                        // because parallel execution will fall back to sequential anyway.
-                        Ok(None)
-                    },
-                    Err(NotFound) => self.get_raw_base_value(state_key),
-                }
-            },
-            ViewState::Unsync(state) => {
-                state
-                    .read_set
-                    .borrow_mut()
-                    .module_reads
-                    .insert(state_key.clone());
-                state.unsync_map.fetch_module_data(state_key).map_or_else(
-                    || self.get_raw_base_value(state_key),
-                    |v| Ok(v.as_state_value()),
-                )
-            },
-        }
+        if maybe_module.is_none() {
+            // FIXME(George): use base value & maybe module
+            let _base_value = self.get_raw_base_value(state_key)?;
+            let _maybe_module = match &self.latest_view {
+                ViewState::Sync(state) => {
+                    state
+                        .versioned_map
+                        .module_storage()
+                        .set_base_value(state_key.clone(), Arc::new(()));
+                    state.fetch_module(state_key, self.txn_idx)?
+                },
+                ViewState::Unsync(state) => {
+                    state.unsync_map.write_module(state_key.clone());
+                    state.unsync_map.fetch_module(state_key)
+                },
+            };
+        };
+        // FIXME(George): Set to module
+        Ok(None)
     }
 }
 

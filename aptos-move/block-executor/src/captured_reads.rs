@@ -18,6 +18,7 @@ use aptos_mvhashmap::{
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
     versioned_group_data::VersionedGroupData,
+    versioned_module_storage::{ModuleReadError, VersionedModuleStorage},
 };
 use aptos_types::{
     delayed_fields::PanicError, state_store::state_value::StateValueMetadata,
@@ -627,6 +628,28 @@ impl<T: Transaction> CapturedReads<T> {
                     },
                 }
             })
+        })
+    }
+
+    pub(crate) fn validate_module_reads(
+        &self,
+        module_storage: &VersionedModuleStorage<T::Key, ()>,
+        idx_to_validate: TxnIndex,
+    ) -> bool {
+        if self.speculative_failure {
+            return false;
+        }
+
+        self.module_reads.iter().all(|k| {
+            use ModuleReadError::*;
+
+            match module_storage.read(k, idx_to_validate) {
+                Ok(_) => {
+                    // FIXME(George): Use hash to distinguish
+                    true
+                },
+                Err(Dependency(_)) | Err(Uninitialized) => false,
+            }
         })
     }
 

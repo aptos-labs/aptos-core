@@ -35,7 +35,6 @@ use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, samp
 use proptest_derive::Arbitrary;
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap, BTreeSet, HashMap, HashSet},
-    convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},
     marker::PhantomData,

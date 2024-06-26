@@ -2,16 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::state_key::{inner::StateKeyInner, StateKey};
-use aptos_crypto::HashValue;
-
-#[derive(PartialEq, Eq, Debug)]
-pub enum ExecutableDescriptor {
-    /// Possibly speculative, based on code published during the block.
-    Published(HashValue),
-
-    /// Based on code published (and committed) in previous blocks.
-    Storage,
-}
 
 pub trait ModulePath {
     fn is_module_path(&self) -> bool;
