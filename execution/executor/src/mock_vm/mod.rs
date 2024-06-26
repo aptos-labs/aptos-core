@@ -71,35 +71,6 @@ impl TransactionBlockExecutor for MockVM {
 }
 
 impl VMExecutor for MockVM {
-    fn execute_write_set_payload(
-        state_view: &impl StateView,
-        _write_set_payload: &WriteSetPayload,
-    ) -> Result<TransactionOutput, VMStatus> {
-        read_state_value_from_storage(
-            state_view,
-            &StateKey::on_chain_config::<ValidatorSet>().unwrap(),
-        );
-        read_state_value_from_storage(
-            state_view,
-            &StateKey::on_chain_config::<ConfigurationResource>().unwrap(),
-        );
-
-        Ok(TransactionOutput::new(
-            // WriteSet cannot be empty so use genesis write set only for testing.
-            gen_genesis_writeset(),
-            // mock the validator set event
-            vec![ContractEvent::new_v1(
-                new_epoch_event_key(),
-                0,
-                TypeTag::Bool,
-                bcs::to_bytes(&0).unwrap(),
-            )],
-            0,
-            KEEP_STATUS.clone(),
-            TransactionAuxiliaryData::default(),
-        ))
-    }
-
     fn execute_block(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &impl StateView,
@@ -124,7 +95,29 @@ impl VMExecutor for MockVM {
             }
 
             if matches!(txn, Transaction::GenesisTransaction(_)) {
-                unreachable!("Genesis transaction is not executed in the block")
+                read_state_value_from_storage(
+                    state_view,
+                    &StateKey::on_chain_config::<ValidatorSet>().unwrap(),
+                );
+                read_state_value_from_storage(
+                    state_view,
+                    &StateKey::on_chain_config::<ConfigurationResource>().unwrap(),
+                );
+                outputs.push(TransactionOutput::new(
+                    // WriteSet cannot be empty so use genesis writeset only for testing.
+                    gen_genesis_writeset(),
+                    // mock the validator set event
+                    vec![ContractEvent::new_v1(
+                        new_epoch_event_key(),
+                        0,
+                        TypeTag::Bool,
+                        bcs::to_bytes(&0).unwrap(),
+                    )],
+                    0,
+                    KEEP_STATUS.clone(),
+                    TransactionAuxiliaryData::default(),
+                ));
+                continue;
             }
 
             match decode_transaction(txn.try_as_signed_user_txn().unwrap()) {

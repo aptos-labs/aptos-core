@@ -16,6 +16,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     aggregate_signature::AggregateSignature,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ConfigurationResource,
@@ -127,7 +128,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     executed_trees: ExecutedTrees,
     genesis_txn: &Transaction,
 ) -> Result<GenesisCommitter> {
-    // DB bootstrapper works on either an empty transaction accumulator or an existing blockchain.
+    // DB bootstrapper works on either an empty transaction accumulator or an existing block chain.
     // In the very extreme and sad situation of losing quorum among validators, we refer to the
     // second use case said above.
     let genesis_version = executed_trees.version().map_or(0, |v| v + 1);
@@ -143,8 +144,12 @@ pub fn calculate_genesis<V: VMExecutor>(
         get_state_epoch(&base_state_view)?
     };
 
-    let (mut output, _, _) = ChunkOutput::genesis::<V>(genesis_txn, base_state_view)?
-        .apply_to_ledger(&executed_trees, None)?;
+    let (mut output, _, _) = ChunkOutput::by_transaction_execution::<V>(
+        vec![genesis_txn.clone().into()].into(),
+        base_state_view,
+        BlockExecutorConfigFromOnchain::new_no_block_limit(),
+    )?
+    .apply_to_ledger(&executed_trees, None)?;
     ensure!(
         !output.transactions_to_commit().is_empty(),
         "Genesis txn execution failed."

@@ -1857,6 +1857,100 @@ impl AptosVM {
         }
     }
 
+    #[allow(dead_code)]
+    fn execute_write_set_payload(
+        state_view: &impl StateView,
+        write_set_payload: &WriteSetPayload,
+    ) -> Result<TransactionOutput, VMStatus> {
+        let change_set = match write_set_payload {
+            WriteSetPayload::Direct(change_set) => {
+                // All Move executions satisfy the read-before-write property.
+                // Thus, we need to read each state key that the write set is
+                // going to update.
+                for (key, _) in change_set.write_set() {
+                    state_view.get_state_value(key).map_err(|e| {
+                        PartialVMError::new(StatusCode::STORAGE_ERROR)
+                            .with_message(format!("Storage error: {}", e))
+                            .finish(Location::Undefined)
+                            .into_vm_status()
+                    })?;
+                }
+
+                change_set.clone()
+            },
+            WriteSetPayload::Script { script, execute_as } => {
+                let resolver = state_view.as_move_resolver();
+                let vm = Self::new(&resolver, Some(false));
+
+                // There is no gas metering involved for write set payloads.
+                let mut gas_meter = UnmeteredGasMeter;
+                let change_set_configs =
+                    ChangeSetConfigs::unlimited_at_gas_feature_version(vm.gas_feature_version);
+                let senders = vec![account_config::reserved_vm_address(), *execute_as];
+
+                let traversal_storage = TraversalStorage::new();
+                let mut traversal_context = TraversalContext::new(&traversal_storage);
+
+                // TODO: user specified genesis id to distinguish different genesis write sets
+                let session_id = SessionId::genesis(HashValue::zero());
+                let mut session = vm.new_session(&resolver, session_id, None);
+                vm.validate_and_execute_script(
+                    &mut session,
+                    &mut gas_meter,
+                    &mut traversal_context,
+                    senders,
+                    script,
+                )?;
+
+                let mut change_set = session.finish(&change_set_configs)?;
+                change_set
+                    .try_materialize_aggregator_v1_delta_set(&resolver)
+                    .expect("Aggregator V1 deltas can always be materialized");
+
+                // Conversion to storage change set representation should not
+                // fail, due to:
+                //  1) aggregators V1 being materialized,
+                //  2) disabled abstract resource writes.
+                change_set
+                    .try_into_storage_change_set()
+                    .expect("Must be able to create the storage change set")
+            },
+        };
+
+        // Validate the emitted change set.
+        let has_new_block_event = change_set
+            .events()
+            .iter()
+            .any(|e| e.event_key() == Some(&new_block_event_key()));
+        let has_new_epoch_event = change_set
+            .events()
+            .iter()
+            .any(|e| e.event_key() == Some(&new_epoch_event_key()));
+        if !has_new_block_event || !has_new_epoch_event {
+            let log_context = AdapterLogSchema::new(state_view.id(), 0);
+            error!(
+                log_context,
+                "[aptos_vm] waypoint txn needs to emit new epoch and block"
+            );
+            return Err(VMStatus::error(StatusCode::INVALID_WRITE_SET, None));
+        }
+
+        SYSTEM_TRANSACTIONS_EXECUTED.inc();
+
+        let gas_used = 0;
+        let status = TransactionStatus::from_executed_vm_status(VMStatus::Executed);
+        let auxiliary_data = TransactionAuxiliaryData::default();
+        let (write_set, events) = change_set.into_inner();
+
+        Ok(TransactionOutput::new(
+            write_set,
+            events,
+            gas_used,
+            status,
+            auxiliary_data,
+        ))
+    }
+
     fn process_block_prologue(
         &self,
         resolver: &impl AptosMoveResolver,
@@ -2338,99 +2432,6 @@ impl AptosVM {
 
 // Executor external API
 impl VMExecutor for AptosVM {
-    fn execute_write_set_payload(
-        state_view: &impl StateView,
-        write_set_payload: &WriteSetPayload,
-    ) -> Result<TransactionOutput, VMStatus> {
-        let change_set = match write_set_payload {
-            WriteSetPayload::Direct(change_set) => {
-                // All Move executions satisfy the read-before-write property.
-                // Thus, we need to read each state key that the write set is
-                // going to update.
-                for (key, _) in change_set.write_set() {
-                    state_view.get_state_value(key).map_err(|e| {
-                        PartialVMError::new(StatusCode::STORAGE_ERROR)
-                            .with_message(format!("Storage error: {}", e))
-                            .finish(Location::Undefined)
-                            .into_vm_status()
-                    })?;
-                }
-
-                change_set.clone()
-            },
-            WriteSetPayload::Script { script, execute_as } => {
-                let resolver = state_view.as_move_resolver();
-                let vm = Self::new(&resolver, Some(false));
-
-                // There is no gas metering involved for write set payloads.
-                let mut gas_meter = UnmeteredGasMeter;
-                let change_set_configs =
-                    ChangeSetConfigs::unlimited_at_gas_feature_version(vm.gas_feature_version);
-                let senders = vec![account_config::reserved_vm_address(), *execute_as];
-
-                let traversal_storage = TraversalStorage::new();
-                let mut traversal_context = TraversalContext::new(&traversal_storage);
-
-                // TODO: user specified genesis id to distinguish different genesis write sets
-                let session_id = SessionId::genesis(HashValue::zero());
-                let mut session = vm.new_session(&resolver, session_id, None);
-                vm.validate_and_execute_script(
-                    &mut session,
-                    &mut gas_meter,
-                    &mut traversal_context,
-                    senders,
-                    script,
-                )?;
-
-                let mut change_set = session.finish(&change_set_configs)?;
-                change_set
-                    .try_materialize_aggregator_v1_delta_set(&resolver)
-                    .expect("Aggregator V1 deltas can always be materialized");
-
-                // Conversion to storage change set representation should not
-                // fail, due to:
-                //  1) aggregators V1 being materialized,
-                //  2) disabled abstract resource writes.
-                change_set
-                    .try_into_storage_change_set()
-                    .expect("Must be able to create the storage change set")
-            },
-        };
-
-        // Validate the emitted change set.
-        let has_new_block_event = change_set
-            .events()
-            .iter()
-            .any(|e| e.event_key() == Some(&new_block_event_key()));
-        let has_new_epoch_event = change_set
-            .events()
-            .iter()
-            .any(|e| e.event_key() == Some(&new_epoch_event_key()));
-        if !has_new_block_event || !has_new_epoch_event {
-            let log_context = AdapterLogSchema::new(state_view.id(), 0);
-            error!(
-                log_context,
-                "[aptos_vm] waypoint txn needs to emit new epoch and block"
-            );
-            return Err(VMStatus::error(StatusCode::INVALID_WRITE_SET, None));
-        }
-
-        SYSTEM_TRANSACTIONS_EXECUTED.inc();
-
-        let gas_used = 0;
-        let status = TransactionStatus::from_executed_vm_status(VMStatus::Executed);
-        let auxiliary_data = TransactionAuxiliaryData::default();
-        let (write_set, events) = change_set.into_inner();
-
-        Ok(TransactionOutput::new(
-            write_set,
-            events,
-            gas_used,
-            status,
-            auxiliary_data,
-        ))
-    }
-
     /// Execute a block of `transactions`. The output vector will have the exact same length as the
     /// input vector. The discarded transactions will be marked as `TransactionStatus::Discard` and
     /// have an empty `WriteSet`. Also `state_view` is immutable, and does not have interior

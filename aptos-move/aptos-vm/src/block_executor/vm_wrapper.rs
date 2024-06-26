@@ -66,7 +66,6 @@ impl ExecutorTask for AptosExecutorTask {
                         format!("Transaction discarded, status: {:?}", vm_status),
                     );
                 }
-
                 if vm_status.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
                     ExecutionStatus::SpeculativeExecutionAbortError(
                         vm_status.message().cloned().unwrap_or_default(),

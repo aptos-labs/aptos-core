@@ -243,7 +243,6 @@ mod tests {
         let mut transactions = vec![];
         for _ in 0..5 {
             transactions.push(create_block_metadata_transaction());
-            // FIXME? notify_new_commit ignores genesis txns...
             transactions.push(create_genesis_transaction());
         }
 

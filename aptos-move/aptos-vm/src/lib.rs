@@ -132,7 +132,7 @@ use aptos_types::{
     state_store::StateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
-        SignedTransaction, TransactionOutput, VMValidatorResult, WriteSetPayload,
+        SignedTransaction, TransactionOutput, VMValidatorResult,
     },
     vm_status::VMStatus,
 };
@@ -151,11 +151,6 @@ pub trait VMValidator {
 
 /// This trait describes the VM's execution interface.
 pub trait VMExecutor: Send + Sync {
-    fn execute_write_set_payload(
-        state_view: &impl StateView,
-        write_set_payload: &WriteSetPayload,
-    ) -> Result<TransactionOutput, VMStatus>;
-
     // NOTE: At the moment there are no persistent caches that live past the end of a block (that's
     // why execute_block doesn't take &self.)
     // There are some cache invalidation issues around transactions publishing code that need to be

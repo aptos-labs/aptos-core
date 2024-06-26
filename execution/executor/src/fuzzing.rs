@@ -26,7 +26,7 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, Transaction, TransactionOutput, TransactionToCommit, Version, WriteSetPayload,
+        BlockOutput, Transaction, TransactionOutput, TransactionToCommit, Version,
     },
     vm_status::VMStatus,
 };
@@ -79,14 +79,6 @@ impl TransactionBlockExecutor for FakeVM {
 }
 
 impl VMExecutor for FakeVM {
-    fn execute_write_set_payload(
-        _state_view: &impl StateView,
-        _write_set_payload: &WriteSetPayload,
-    ) -> Result<TransactionOutput, VMStatus> {
-        // What is this file?
-        todo!()
-    }
-
     fn execute_block_sharded<S: StateView + Send + Sync, E: ExecutorClient<S>>(
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
         _transactions: PartitionedTransactions,
