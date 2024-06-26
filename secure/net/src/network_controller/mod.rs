@@ -13,6 +13,7 @@ use std::{
 };
 use std::cmp::Ordering;
 use tokio::{runtime, runtime::Runtime, sync::oneshot};
+use async_channel;
 
 mod error;
 mod inbound_handler;
@@ -115,8 +116,8 @@ impl NetworkController {
         Self {
             inbound_handler,
             outbound_handler,
-            inbound_rpc_runtime: runtime::Builder::new_multi_thread().worker_threads(10).enable_all().thread_name("inbound_rpc").build().unwrap(),
-            outbound_rpc_runtime: Arc::new(runtime::Builder::new_multi_thread().worker_threads(40).enable_all().thread_name("outbound_rpc").build().unwrap()),
+            inbound_rpc_runtime: runtime::Builder::new_multi_thread().enable_all().thread_name("inbound_rpc").build().unwrap(),
+            outbound_rpc_runtime: Arc::new(runtime::Builder::new_multi_thread().enable_all().thread_name("outbound_rpc").build().unwrap()),
             // we initialize the shutdown handles when we start the network controller
             inbound_server_shutdown_tx: None,
             outbound_task_shutdown_tx: None,
@@ -147,7 +148,7 @@ impl NetworkController {
 
     pub fn create_inbound_channel(&mut self, message_type: String) -> Receiver<Message> {
         let (inbound_sender, inbound_receiver) = unbounded();
-
+        //let (inbound_sender, inbound_receiver) = async_channel::unbounded();
         self.inbound_handler
             .lock()
             .unwrap()

@@ -448,38 +448,6 @@ fn main() {
 
     aptos_node_resource_metrics::register_node_metrics_collector();
     let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
-
-
-    let (sendx, recvx) = std::sync::mpsc::channel();
-    let num_tasks = 100000;
-    let thread_pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(60)
-        .thread_name(|i| format!("thread-{}", i))
-        .build()
-        .unwrap();
-
-    (0..num_tasks).into_iter().for_each(|i| {
-        let sendx_clone = sendx.clone();
-        thread_pool.spawn(move || {
-            //sleep(Duration::new(3, 0));
-            let mut sum:u64 = 0;
-            for i in 0..100000000 {
-                sum += i % 313;
-            }
-            //println!("Hello from thread {}", rng.gen_range(0..10));
-            sendx_clone.send(sum).unwrap();
-        })
-    });
-    let mut cnt = 0;
-    while let Ok(msg) = recvx.recv() {
-        println!("Received message: {:?}", msg);
-        cnt += 1;
-        if cnt == num_tasks {
-            break;
-        }
-    }
-    println!("END of CPU test");
-
     let execution_threads = opt.execution_threads();
     let execution_shards = opt.pipeline_opt.sharding_opt.num_executor_shards;
     let mut execution_threads_per_shard = execution_threads;
