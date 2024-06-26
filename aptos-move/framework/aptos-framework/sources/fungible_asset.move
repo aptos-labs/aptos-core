@@ -183,7 +183,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// MutateMetadataRef can be used to directly modify the fungible asset's Metadata.
-    struct MutateMetadataRef has key, drop, store {
+    struct MutateMetadataRef has drop, store {
         metadata: Object<Metadata>
     }
 
