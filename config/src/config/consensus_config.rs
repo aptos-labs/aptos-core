@@ -19,17 +19,6 @@ pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
 static MAX_SENDING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| MAX_SENDING_BLOCK_UNIQUE_TXNS.max(MAX_RECEIVING_BLOCK_TXNS.saturating_sub(2000)));
 
-// pub const MAX_RECEIVING_BLOCK_TXNS: u64 = if (2 * MAX_SENDING_BLOCK_UNIQUE_TXNS) > 10000 {
-//     2 * MAX_SENDING_BLOCK_UNIQUE_TXNS
-// } else {
-//     10000
-// };
-// const MAX_SENDING_BLOCK_TXNS: u64 =
-//     if MAX_SENDING_BLOCK_UNIQUE_TXNS > MAX_RECEIVING_BLOCK_TXNS.saturating_sub(2000) {
-//         MAX_SENDING_BLOCK_UNIQUE_TXNS
-//     } else {
-//         MAX_RECEIVING_BLOCK_TXNS.saturating_sub(2000)
-//     };
 // stop reducing size at this point, so 1MB transactions can still go through
 const MIN_BLOCK_BYTES_OVERRIDE: u64 = 1024 * 1024 + BATCH_PADDING_BYTES as u64;
 
