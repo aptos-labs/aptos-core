@@ -197,9 +197,6 @@ impl MoveSmith {
             self.fill_struct(u, s, &scope)?;
         }
 
-        // TODO: do not generate runner code for now
-        // TODO: re-enable this after function call with type param is done
-
         // Generate function bodies and runners
         for f in module.borrow().functions.iter() {
             self.fill_function(u, f)?;
@@ -319,8 +316,6 @@ impl MoveSmith {
         let mut ability_choices = vec![Ability::Store, Ability::Key];
         // TODO: Drop is added for all struct to avoid E05001 for now
         // TODO: this should be properly handled
-        // TODO: Copy is added to avoid "use moved value"
-        // TODO: Copy should be removed after copy/move is properly handled
         let mut abilities = vec![Ability::Drop, Ability::Copy];
         for _ in 0..u.int_in_range(0..=0)? {
             let idx = u.int_in_range(0..=(ability_choices.len() - 1))?;
@@ -518,11 +513,6 @@ impl MoveSmith {
         let mut parameters = Vec::new();
         for _ in 0..num_params {
             let (name, _) = self.get_next_identifier(IDKinds::Var, parent_scope);
-
-            // TODO: currently struct is not allowed in signature because script
-            // TODO: cannot create structs
-            // TODO: should remove this after visibility check is implemented
-            // TODO: structs should be allowed for non-public functions
             let typ = self.get_random_type(u, parent_scope, true, false, true, false)?;
             self.env_mut().type_pool.insert_mapping(&name, &typ);
             parameters.push((name, typ));
@@ -1778,8 +1768,6 @@ impl MoveSmith {
     ///
     /// If `ret_type` is specified, only functions that can return the given type
     /// will be returned.
-    ///
-    // TODO: Handle visibility check
     fn get_callable_functions(&self, scope: &Scope) -> Vec<FunctionSignature> {
         let mut callable = Vec::new();
         for f in self.function_signatures.borrow().iter() {

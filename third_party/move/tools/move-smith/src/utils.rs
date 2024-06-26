@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Utility functions for MoveSmith.
-// TODO: consider move compiler/vm glue code to a separate file
 
 use crate::{ast::CompileUnit, config::Config, move_smith::MoveSmith};
 use arbitrary::{Result, Unstructured};

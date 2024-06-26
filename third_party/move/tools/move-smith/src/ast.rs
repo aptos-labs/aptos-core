@@ -31,13 +31,9 @@ pub struct Module {
     // pub attributes: Vec<Attributes>,
     // pub address: Option<LeadingNameAccess>,
     pub name: Identifier,
-    // pub is_spec_module: bool,
     pub functions: Vec<RefCell<Function>>,
     pub structs: Vec<RefCell<StructDefinition>>,
-    // pub uses: Vec<UseDecl>,
-    // pub friends: Vec<FriendDecl>,
     // pub constants: Vec<Constant>,
-    // pub specs: Vec<SpecBlock>,
 }
 
 /// A simplified Move Script.
@@ -45,7 +41,6 @@ pub struct Module {
 /// The `main` function only consists of a sequence of function calls.
 #[derive(Debug, Clone)]
 pub struct Script {
-    // pub uses: Vec<UseDecl>,
     pub main: Vec<FunctionCall>,
 }
 
@@ -57,8 +52,6 @@ pub struct Function {
     // pub attributes: Vec<Attributes>,
     pub visibility: Visibility,
     pub signature: FunctionSignature,
-    /// `None` indicates no specifiers given, `Some([])` indicates the `pure` keyword has been
-    /// used.
     // pub access_specifiers: Option<Vec<AccessSpecifier>>,
     // pub inline: bool,
     pub body: Option<Block>,
@@ -67,7 +60,6 @@ pub struct Function {
 /// The Visibility
 #[derive(Debug, Clone)]
 pub struct Visibility {
-    // TODO: add friend
     pub public: bool,
 }
 
@@ -108,7 +100,6 @@ impl HasType for StructDefinition {
 /// A statement in a function body.
 #[derive(Debug, Clone)]
 pub enum Statement {
-    // If(If),
     // While(While),
     // For(For),
     // Break,
