@@ -1647,7 +1647,9 @@ impl Loader {
             Type::U256 => TypeTag::U256,
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
-            Type::Vector(ty) => TypeTag::Vector(Box::new(self.type_to_type_tag(ty)?)),
+            Type::Vector(ty) => {
+                TypeTag::Vector(Box::new(self.type_to_type_tag_impl(ty, gas_context)?))
+            },
             Type::Struct { idx, .. } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
                 *idx,
                 &[],
