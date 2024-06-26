@@ -73,7 +73,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 command_tx
             })
             .collect_vec();
-        let rt_kv_proc = runtime::Builder::new_multi_thread().worker_threads(60).enable_all().thread_name("kv_proc").build().unwrap();
+        let rt_kv_proc = runtime::Builder::new_multi_thread().worker_threads(20).enable_all().thread_name("kv_proc").build().unwrap();
         Self {
             kv_rx: result_rx,
             kv_unprocessed_pq: Arc::new(ConcurrentPriorityQueue::new()),
