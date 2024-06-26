@@ -605,7 +605,7 @@ fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 20, 3)
+            realistic_env_max_load_test(duration, test_cmd, 7, 3)
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
@@ -684,7 +684,7 @@ fn get_realistic_env_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
+        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 10, 10),
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),

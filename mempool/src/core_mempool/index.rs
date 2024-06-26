@@ -84,45 +84,45 @@ pub struct OrderedQueueKey {
     pub hash: HashValue,
 }
 
-impl PartialOrd for OrderedQueueKey {
-    fn partial_cmp(&self, other: &OrderedQueueKey) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
+// impl PartialOrd for OrderedQueueKey {
+//     fn partial_cmp(&self, other: &OrderedQueueKey) -> Option<Ordering> {
+//         Some(self.cmp(other))
+//     }
+// }
 
-impl Ord for OrderedQueueKey {
-    fn cmp(&self, other: &OrderedQueueKey) -> Ordering {
-        // if self.address == other.address {
-        //     return self
-        //         .sequence_number
-        //         .transaction_sequence_number
-        //         .cmp(&other.sequence_number.transaction_sequence_number)
-        //         .reverse();
-        // }
-        match self.gas_ranking_score.cmp(&other.gas_ranking_score) {
-            Ordering::Equal => {},
-            ordering => return ordering,
-        }
-        match self.expiration_time.cmp(&other.expiration_time).reverse() {
-            Ordering::Equal => {},
-            ordering => return ordering,
-        }
-        match self.address.cmp(&other.address) {
-            Ordering::Equal => {},
-            ordering => return ordering,
-        }
-        match self
-            .sequence_number
-            .transaction_sequence_number
-            .cmp(&other.sequence_number.transaction_sequence_number)
-            .reverse()
-        {
-            Ordering::Equal => {},
-            ordering => return ordering,
-        }
-        self.hash.cmp(&other.hash)
-    }
-}
+// impl Ord for OrderedQueueKey {
+//     fn cmp(&self, other: &OrderedQueueKey) -> Ordering {
+//         // if self.address == other.address {
+//         //     return self
+//         //         .sequence_number
+//         //         .transaction_sequence_number
+//         //         .cmp(&other.sequence_number.transaction_sequence_number)
+//         //         .reverse();
+//         // }
+//         match self.gas_ranking_score.cmp(&other.gas_ranking_score) {
+//             Ordering::Equal => {},
+//             ordering => return ordering,
+//         }
+//         match self.expiration_time.cmp(&other.expiration_time).reverse() {
+//             Ordering::Equal => {},
+//             ordering => return ordering,
+//         }
+//         match self.address.cmp(&other.address) {
+//             Ordering::Equal => {},
+//             ordering => return ordering,
+//         }
+//         match self
+//             .sequence_number
+//             .transaction_sequence_number
+//             .cmp(&other.sequence_number.transaction_sequence_number)
+//             .reverse()
+//         {
+//             Ordering::Equal => {},
+//             ordering => return ordering,
+//         }
+//         self.hash.cmp(&other.hash)
+//     }
+// }
 
 /// TTLIndex is used to perform garbage collection of old transactions in Mempool.
 /// Periodically separate GC-like job queries this index to find out transactions that have to be
