@@ -43,6 +43,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `decimals`](#0x1_fungible_asset_decimals)
 -  [Function `icon_uri`](#0x1_fungible_asset_icon_uri)
 -  [Function `project_uri`](#0x1_fungible_asset_project_uri)
+-  [Function `metadata`](#0x1_fungible_asset_metadata)
 -  [Function `store_exists`](#0x1_fungible_asset_store_exists)
 -  [Function `store_exists_inline`](#0x1_fungible_asset_store_exists_inline)
 -  [Function `concurrent_fungible_balance_exists_inline`](#0x1_fungible_asset_concurrent_fungible_balance_exists_inline)
@@ -185,7 +186,7 @@ Metadata of a Fungible asset
 
 
 <pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
-<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> <b>has</b> key
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> <b>has</b> <b>copy</b>, key
 </code></pre>
 
 
@@ -1692,6 +1693,32 @@ Get the project uri from the <code>metadata</code> object.
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_project_uri">project_uri</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): String <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
     <a href="fungible_asset.md#0x1_fungible_asset_borrow_fungible_metadata">borrow_fungible_metadata</a>(&metadata).project_uri
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_metadata"></a>
+
+## Function `metadata`
+
+Get the project uri from the <code>metadata</code> object.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_metadata">metadata</a>&lt;T: key&gt;(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_metadata">metadata</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
+    *<a href="fungible_asset.md#0x1_fungible_asset_borrow_fungible_metadata">borrow_fungible_metadata</a>(&metadata)
 }
 </code></pre>
 
