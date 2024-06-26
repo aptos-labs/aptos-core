@@ -24,7 +24,7 @@ use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_
 pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
     kv_rx: Receiver<Message>,
     kv_unprocessed_pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
-    kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
+    kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
     //thread_pool: Arc<Vec<rayon::ThreadPool>>,
     thread_pool: Arc<rayon::ThreadPool>,
     state_view: Arc<RwLock<Option<Arc<S>>>>,
@@ -66,7 +66,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 //controller.create_outbound_channel(*address, kv_response_type.to_string())
                 let mut command_tx = vec![];
                 for _ in 0..num_kv_req_threads {
-                    command_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), *address, controller.get_outbound_rpc_runtime())));
+                    command_tx.push(tokio::sync::Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), *address, controller.get_outbound_rpc_runtime())));
                 }
                 command_tx
             })
@@ -138,7 +138,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     }
 
     pub fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
-                            kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
+                            kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
                             pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
                             recv_condition: Arc<(Mutex<bool>, Condvar)>,
                             outbound_rpc_runtime: Arc<Runtime>) {
@@ -163,7 +163,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn handle_message(
         message: Message,
         state_view: Arc<RwLock<Option<Arc<S>>>>,
-        kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
+        kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
         rng: &mut StdRng,
         outbound_rpc_runtime: Arc<Runtime>,
     ) {
@@ -249,7 +249,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             .with_label_values(&["0", "kv_requests_send"])
             .start_timer();
         outbound_rpc_runtime.spawn( async move {
-            kv_tx_clone[shard_id][rand_send_thread_idx].lock().unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
+            kv_tx_clone[shard_id][rand_send_thread_idx].lock().await.send_async(resp_message, &MessageType::new("remote_kv_response".to_string()));
         });
         //kv_tx_clone[shard_id][rand_send_thread_idx].lock().unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
         drop(timer_6);
