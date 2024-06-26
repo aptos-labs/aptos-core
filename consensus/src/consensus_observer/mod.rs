@@ -9,5 +9,6 @@ pub mod network_events;
 pub mod network_message;
 pub mod observer;
 pub mod payload_store;
+pub mod pending_blocks;
 pub mod publisher;
 mod subscription;

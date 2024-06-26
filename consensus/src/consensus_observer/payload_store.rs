@@ -85,13 +85,9 @@ impl BlockPayloadStore {
 
                 // If the status was originally requested, send the payload to the listener
                 if let BlockPayloadStatus::Requested(payload_sender) = status {
-                    if let Err(error) = payload_sender.send(block_transaction_payload) {
-                        error!(
-                            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                                "Failed to send block payload to listener! Error: {:?}",
-                                error
-                            ))
-                        );
+                    if payload_sender.send(block_transaction_payload).is_err() {
+                        error!(LogSchema::new(LogEntry::ConsensusObserver)
+                            .message("Failed to send block payload to listener!",));
                     }
                 }
             },
