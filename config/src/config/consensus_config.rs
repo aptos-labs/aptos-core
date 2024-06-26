@@ -6,6 +6,7 @@ use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
     QuorumStoreConfig, ReliableBroadcastConfig, SafetyRulesConfig, BATCH_PADDING_BYTES,
 };
+use aptos_crypto::_once_cell::sync::Lazy;
 use aptos_types::chain_id::ChainId;
 use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
@@ -13,17 +14,22 @@ use std::path::PathBuf;
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
 const MAX_SENDING_BLOCK_UNIQUE_TXNS: u64 = 1900;
-pub const MAX_RECEIVING_BLOCK_TXNS: u64 = if (2 * MAX_SENDING_BLOCK_UNIQUE_TXNS) > 10000 {
-    2 * MAX_SENDING_BLOCK_UNIQUE_TXNS
-} else {
-    10000
-};
-const MAX_SENDING_BLOCK_TXNS: u64 =
-    if MAX_SENDING_BLOCK_UNIQUE_TXNS > MAX_RECEIVING_BLOCK_TXNS.saturating_sub(2000) {
-        MAX_SENDING_BLOCK_UNIQUE_TXNS
-    } else {
-        MAX_RECEIVING_BLOCK_TXNS.saturating_sub(2000)
-    };
+pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
+    Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_UNIQUE_TXNS));
+static MAX_SENDING_BLOCK_TXNS: Lazy<u64> =
+    Lazy::new(|| MAX_SENDING_BLOCK_UNIQUE_TXNS.max(MAX_RECEIVING_BLOCK_TXNS.saturating_sub(2000)));
+
+// pub const MAX_RECEIVING_BLOCK_TXNS: u64 = if (2 * MAX_SENDING_BLOCK_UNIQUE_TXNS) > 10000 {
+//     2 * MAX_SENDING_BLOCK_UNIQUE_TXNS
+// } else {
+//     10000
+// };
+// const MAX_SENDING_BLOCK_TXNS: u64 =
+//     if MAX_SENDING_BLOCK_UNIQUE_TXNS > MAX_RECEIVING_BLOCK_TXNS.saturating_sub(2000) {
+//         MAX_SENDING_BLOCK_UNIQUE_TXNS
+//     } else {
+//         MAX_RECEIVING_BLOCK_TXNS.saturating_sub(2000)
+//     };
 // stop reducing size at this point, so 1MB transactions can still go through
 const MIN_BLOCK_BYTES_OVERRIDE: u64 = 1024 * 1024 + BATCH_PADDING_BYTES as u64;
 
@@ -161,10 +167,10 @@ impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
             max_network_channel_size: 1024,
-            max_sending_block_txns: MAX_SENDING_BLOCK_TXNS,
+            max_sending_block_txns: *MAX_SENDING_BLOCK_TXNS,
             max_sending_block_unique_txns: MAX_SENDING_BLOCK_UNIQUE_TXNS,
             max_sending_block_bytes: 3 * 1024 * 1024, // 3MB
-            max_receiving_block_txns: MAX_RECEIVING_BLOCK_TXNS,
+            max_receiving_block_txns: *MAX_RECEIVING_BLOCK_TXNS,
             max_sending_inline_txns: 100,
             max_sending_inline_bytes: 200 * 1024,       // 200 KB
             max_receiving_block_bytes: 6 * 1024 * 1024, // 6MB
@@ -202,14 +208,14 @@ impl Default for ConsensusConfig {
                     // pipeline once quorum on execution result among validators has been reached
                     // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
                     back_pressure_pipeline_latency_limit_ms: 800,
-                    max_sending_block_txns_override: MAX_SENDING_BLOCK_TXNS,
+                    max_sending_block_txns_override: *MAX_SENDING_BLOCK_TXNS,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
                     max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1100,
-                    max_sending_block_txns_override: MAX_SENDING_BLOCK_TXNS,
+                    max_sending_block_txns_override: *MAX_SENDING_BLOCK_TXNS,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
                     max_txns_from_block_to_execute: None,
