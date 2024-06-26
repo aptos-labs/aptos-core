@@ -39,7 +39,7 @@ jobs:
       SUB_DIR: e1
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config
-      RUNS_ON: high-perf-docker-with-local-ssd
+      RUNS_ON: runs-on,cpu=64,family=m6id,hdd=100,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
       TIMEOUT_MINUTES: 20
 
   verify-modules-mainnet:
@@ -52,7 +52,7 @@ jobs:
       SUB_DIR: e1
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config
-      RUNS_ON: high-perf-docker-with-local-ssd
+      RUNS_ON: runs-on,cpu=64,family=m6id,hdd=100,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
       TIMEOUT_MINUTES: 20
 
   test-verify-modules:
@@ -65,5 +65,5 @@ jobs:
       SUB_DIR: e1
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config
-      RUNS_ON: "high-perf-docker-with-local-ssd"
+      RUNS_ON: "runs-on,cpu=64,family=m6id,hdd=100,image=ubuntu22-full-x64,run-id=${{ github.run_id }}"
       TIMEOUT_MINUTES: 20

@@ -25,7 +25,7 @@ on:
         description: "The runner to use for the job."
         type: string
         required: true
-        default: "high-perf-docker-with-local-ssd"
+        default: "runs-on,cpu=64,family=m6id,hdd=100,image=ubuntu22-full-x64"
       TIMEOUT_MINUTES:
         description: "Github job timeout in minutes"
         type: number
