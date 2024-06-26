@@ -64,4 +64,6 @@ pub trait BlockReader: Send + Sync {
 
     // Return time difference between last committed block and new proposal
     fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration;
+
+    fn get_recent_block_execution_times(&self, num_blocks: usize) -> Vec<(u64, Duration)>;
 }

@@ -38,6 +38,7 @@ pub struct PipelinedBlock {
     state_compute_result: StateComputeResult,
     randomness: OnceCell<Randomness>,
     pipeline_insertion_time: OnceCell<Instant>,
+    execution_time: Arc<OnceCell<Duration>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -91,6 +92,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             state_compute_result,
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
+            execution_time: Arc::new(OnceCell::new()),
         };
         if let Some(r) = randomness {
             block.set_randomness(r);
@@ -104,9 +106,11 @@ impl PipelinedBlock {
         mut self,
         input_transactions: Vec<SignedTransaction>,
         result: StateComputeResult,
+        execution_time: Duration,
     ) -> Self {
         self.state_compute_result = result;
         self.input_transactions = input_transactions;
+        assert!(self.execution_time.set(execution_time).is_ok());
         self
     }
 
@@ -143,6 +147,7 @@ impl PipelinedBlock {
             state_compute_result,
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
+            execution_time: Arc::new(OnceCell::new()),
         }
     }
 
@@ -153,6 +158,7 @@ impl PipelinedBlock {
             state_compute_result: StateComputeResult::new_dummy(),
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
+            execution_time: Arc::new(OnceCell::new()),
         }
     }
 
@@ -249,5 +255,11 @@ impl PipelinedBlock {
 
     pub fn elapsed_in_pipeline(&self) -> Option<Duration> {
         self.pipeline_insertion_time.get().map(|t| t.elapsed())
+    }
+
+    pub fn get_execution_time_and_size(&self) -> Option<(u64, Duration)> {
+        self.execution_time
+            .get()
+            .map(|v| (self.input_transactions.len() as u64, *v))
     }
 }
