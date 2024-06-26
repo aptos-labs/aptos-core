@@ -55,7 +55,7 @@ fn test_proof_queue_sorting() {
     }
 
     // Expect: [600, 300]
-    let (pulled, _) = proof_queue.pull_proofs(&hashset![], 2, 2, true);
+    let (pulled, _) = proof_queue.pull_proofs(&hashset![], 4, 2, 2, true);
     let mut count_author_0 = 0;
     let mut count_author_1 = 0;
     let mut prev: Option<&ProofOfStore> = None;
@@ -76,7 +76,7 @@ fn test_proof_queue_sorting() {
     assert_eq!(count_author_1, 1);
 
     // Expect: [600, 500, 300, 100]
-    let (pulled, _) = proof_queue.pull_proofs(&hashset![], 4, 4, true);
+    let (pulled, _) = proof_queue.pull_proofs(&hashset![], 6, 4, 4, true);
     let mut count_author_0 = 0;
     let mut count_author_1 = 0;
     let mut prev: Option<&ProofOfStore> = None;

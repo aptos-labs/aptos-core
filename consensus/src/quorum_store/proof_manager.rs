@@ -205,6 +205,7 @@ impl ProofManager {
         match msg {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
+                max_unique_txns,
                 max_bytes,
                 max_inline_txns,
                 max_inline_bytes,
@@ -220,9 +221,14 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let (proof_block, proof_queue_fully_utilized) = self
-                    .proofs_for_consensus
-                    .pull_proofs(&excluded_batches, max_txns, max_bytes, return_non_full);
+                let (proof_block, proof_queue_fully_utilized) =
+                    self.proofs_for_consensus.pull_proofs(
+                        &excluded_batches,
+                        max_txns,
+                        max_unique_txns,
+                        max_bytes,
+                        return_non_full,
+                    );
 
                 counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE.observe(self.batch_queue.len() as f64);
                 counters::PROOF_QUEUE_FULLY_UTILIZED
@@ -234,7 +240,7 @@ impl ProofManager {
 
                 if self.allow_batches_without_pos_in_proposal && proof_queue_fully_utilized {
                     inline_block = self.batch_queue.pull_batches(
-                        min(max_txns - cur_txns, max_inline_txns),
+                        min(max_unique_txns - cur_txns, max_inline_txns),
                         min(max_bytes - cur_bytes, max_inline_bytes),
                         excluded_batches
                             .iter()

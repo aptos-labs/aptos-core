@@ -378,12 +378,14 @@ impl ProofQueue {
         &mut self,
         excluded_batches: &HashSet<BatchInfo>,
         max_txns: u64,
+        max_unique_txns: u64,
         max_bytes: u64,
         return_non_full: bool,
     ) -> (Vec<ProofOfStore>, bool) {
         let mut ret = vec![];
         let mut cur_bytes = 0;
-        let mut cur_txns = 0;
+        let mut cur_unique_txns = 0;
+        let mut cur_all_txns = 0;
         let mut excluded_txns = 0;
         let mut full = false;
         // Set of all the excluded transactions and all the transactions included in the result
@@ -412,10 +414,10 @@ impl ProofQueue {
                         self.batch_to_proof.get(&sort_key.batch_key)
                     {
                         // Calculate the number of unique transactions if this batch is included in the result
-                        let temp_txns = if let Some(txn_summaries) =
+                        let temp_unique_txns = if let Some(txn_summaries) =
                             self.batch_to_txn_summaries.get(&sort_key.batch_key)
                         {
-                            cur_txns
+                            cur_unique_txns
                                 + txn_summaries
                                     .iter()
                                     .filter(|txn_summary| {
@@ -423,29 +425,36 @@ impl ProofQueue {
                                     })
                                     .count() as u64
                         } else {
-                            cur_txns + batch.num_txns()
+                            cur_unique_txns + batch.num_txns()
                         };
-                        if cur_bytes + batch.num_bytes() > max_bytes || temp_txns > max_txns {
+                        if cur_bytes + batch.num_bytes() > max_bytes
+                            || temp_unique_txns > max_unique_txns
+                            || cur_all_txns + batch.num_txns() > max_txns
+                        {
                             // Exceeded the limit for requested bytes or number of transactions.
                             full = true;
                             return false;
                         }
                         cur_bytes += batch.num_bytes();
+                        cur_all_txns += batch.num_txns();
                         // Add this batch to included_and_excluded_txns and calculate the number of
                         // unique transactions added in the result so far.
-                        cur_txns += self.batch_to_txn_summaries.get(&sort_key.batch_key).map_or(
-                            batch.num_txns(),
-                            |summaries| {
+                        cur_unique_txns += self
+                            .batch_to_txn_summaries
+                            .get(&sort_key.batch_key)
+                            .map_or(batch.num_txns(), |summaries| {
                                 summaries
                                     .iter()
                                     .filter(|summary| included_and_excluded_txns.insert(**summary))
                                     .count() as u64
-                            },
-                        );
+                            });
                         let bucket = proof.gas_bucket_start();
                         ret.push(proof.clone());
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
-                        if cur_bytes == max_bytes || cur_txns == max_txns {
+                        if cur_bytes == max_bytes
+                            || cur_all_txns == max_txns
+                            || cur_unique_txns == max_unique_txns
+                        {
                             full = true;
                             return false;
                         }
@@ -459,7 +468,8 @@ impl ProofQueue {
         info!(
             // before non full check
             byte_size = cur_bytes,
-            block_size = cur_txns,
+            block_total_txns = cur_all_txns,
+            block_unique_txns = cur_unique_txns,
             batch_count = ret.len(),
             full = full,
             return_non_full = return_non_full,
@@ -467,10 +477,9 @@ impl ProofQueue {
         );
 
         if full || return_non_full {
-            let total_txns = ret.iter().map(|p| p.num_txns()).sum::<u64>();
-            counters::BLOCK_SIZE_WHEN_PULL.observe(cur_txns as f64);
-            counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(total_txns as f64);
-            counters::EXTRA_TXNS_WHEN_PULL.observe((total_txns - cur_txns) as f64);
+            counters::BLOCK_SIZE_WHEN_PULL.observe(cur_unique_txns as f64);
+            counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(cur_all_txns as f64);
+            counters::EXTRA_TXNS_WHEN_PULL.observe((cur_all_txns - cur_unique_txns) as f64);
             counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);

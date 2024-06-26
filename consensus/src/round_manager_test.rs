@@ -304,6 +304,7 @@ impl NodeSetup {
             time_service.clone(),
             Duration::ZERO,
             10,
+            20,
             1000,
             5,
             500,
