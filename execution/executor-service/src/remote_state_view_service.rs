@@ -249,7 +249,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             .with_label_values(&["0", "kv_requests_send"])
             .start_timer();
         outbound_rpc_runtime.spawn( async move {
-            kv_tx_clone[shard_id][rand_send_thread_idx].lock().await.send_async(resp_message, &MessageType::new("remote_kv_response".to_string()));
+            kv_tx_clone[shard_id][rand_send_thread_idx].lock().await.send_async(resp_message, &MessageType::new("remote_kv_response".to_string())).await;
         });
         //kv_tx_clone[shard_id][rand_send_thread_idx].lock().unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
         drop(timer_6);
