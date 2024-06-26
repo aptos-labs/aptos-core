@@ -73,11 +73,11 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
 
         let mut gamma_abc_g1 = Vec::new();
 
-        for _i in 0..num_public_inputs {
+        for _i in 0..num_public_inputs+1 {
             let a = E::ScalarField::rand(rng);
             let b = E::ScalarField::rand(rng);
             let c = E::ScalarField::rand(rng);
-            let mut acc = alpha * a + beta * b + c;
+            let mut acc = beta * a + alpha * b + c;
             acc = acc * gamma.inverse().unwrap();
             let gamma_abc_g1_i = g1_generator * acc;
             gamma_abc_g1.push(gamma_abc_g1_i.into_affine());
@@ -297,7 +297,38 @@ where
     }
 }
 
+fn test_prove_and_verify_circuit_agnostic<E>(n_iters: usize)
+where 
+    E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>, G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>, G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>, <E as Pairing>::ScalarField: From<i32>
+{
+    let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998]; 
+    let public_input = ark_ff::BigInt::new(public_input_values);
+    let public_input = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(public_input).unwrap();
+    let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
+
+    for _ in 0..n_iters {
+        let (pk, vk) = Groth16Simulator::<E>::circuit_agnostic_specific_setup_with_trapdoor(&mut rng, 1).unwrap();
+        let pvk = prepare_verifying_key::<E>(&vk);
+
+        let proof = Groth16Simulator::<E>::create_random_proof_with_trapdoor(
+            &[public_input],
+            &pk,
+            &mut rng,
+        )
+        .unwrap();
+
+        assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[public_input], &proof).unwrap());
+        let a = E::ScalarField::rand(&mut rng);
+        assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
+    }
+}
+
 #[test]
 fn prove_and_verify() {
     test_prove_and_verify::<Bn254>(25);
+}
+
+#[test]
+fn prove_and_verify_circuit_agnostic() {
+    test_prove_and_verify_circuit_agnostic::<Bn254>(25);
 }
