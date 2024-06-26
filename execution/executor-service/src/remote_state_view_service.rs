@@ -16,6 +16,7 @@ use std::sync::{Condvar, Mutex};
 use cpq::ConcurrentPriorityQueue;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+use tokio::runtime::Runtime;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
@@ -28,6 +29,7 @@ pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
     thread_pool: Arc<rayon::ThreadPool>,
     state_view: Arc<RwLock<Option<Arc<S>>>>,
     recv_condition: Arc<(Mutex<bool>, Condvar)>,
+    outbound_rpc_runtime: Arc<Runtime>,
 }
 
 impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
@@ -36,7 +38,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         remote_shard_addresses: Vec<SocketAddr>,
         num_threads: Option<usize>,
     ) -> Self {
-        let num_threads = 40; //num_threads.unwrap_or_else(num_cpus::get);
+        let num_threads = 60; //num_threads.unwrap_or_else(num_cpus::get);
         let num_kv_req_threads = num_cpus::get() / 2;
         let num_shards = remote_shard_addresses.len();
         info!("num threads for remote state view service: {}", num_threads);
@@ -76,6 +78,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             thread_pool: Arc::new(thread_pool),
             state_view: Arc::new(RwLock::new(None)),
             recv_condition: Arc::new((Mutex::new(false), Condvar::new())),
+            outbound_rpc_runtime: controller.get_outbound_rpc_runtime(),
         }
     }
 
@@ -92,18 +95,19 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn start(&self) {
         //let (signal_tx, signal_rx) = unbounded();
         let thread_pool_clone = self.thread_pool.clone();
-
+        let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
         info!("Num handlers created is {}", thread_pool_clone.current_num_threads());
         for _ in 0..thread_pool_clone.current_num_threads() {
             let state_view_clone = self.state_view.clone();
             let kv_tx_clone = self.kv_tx.clone();
             let kv_unprocessed_pq_clone = self.kv_unprocessed_pq.clone();
             let recv_condition_clone = self.recv_condition.clone();
-            thread_pool_clone
-                .spawn(move || Self::priority_handler(state_view_clone.clone(),
+            outbound_rpc_runtime_clone
+                .spawn(async move {Self::priority_handler(state_view_clone.clone(),
                                                       kv_tx_clone.clone(),
                                                       kv_unprocessed_pq_clone.clone(),
-                                                      recv_condition_clone.clone()));
+                                                      recv_condition_clone.clone())
+                });
         }
 
         while let Ok(message) = self.kv_rx.recv() {
