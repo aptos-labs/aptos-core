@@ -442,6 +442,7 @@ fn main() {
             .as_millis() as i64,
     );
     rayon::ThreadPoolBuilder::new()
+        .num_threads(60)
         .thread_name(|index| format!("rayon-global-{}", index))
         .build_global()
         .expect("Failed to build rayon global thread pool.");
