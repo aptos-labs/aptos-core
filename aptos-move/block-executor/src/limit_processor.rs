@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Instant;
-
 use crate::{counters, types::ReadWriteSummary};
 use aptos_logger::info;
 use aptos_types::{
@@ -11,6 +9,7 @@ use aptos_types::{
     transaction::{block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction},
 };
 use claims::{assert_le, assert_none};
+use std::time::Instant;
 
 pub struct BlockGasLimitProcessor<T: Transaction> {
     block_gas_limit_type: BlockGasLimitType,
@@ -194,6 +193,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         is_parallel: bool,
         num_committed: u32,
         num_total: u32,
+        num_workers: usize,
     ) {
         let accumulated_effective_block_gas = self.get_effective_accumulated_block_gas();
         let accumulated_approx_output_size = self.get_accumulated_approx_output_size();
@@ -220,15 +220,18 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                 .block_gas_limit_type
                 .block_output_limit()
                 .map_or(false, |limit| accumulated_approx_output_size >= limit),
-            "[BlockSTM]: {} execution completed. {} out of {} txns committed, took {}ms",
+            elapsed_ms = self.start_time.elapsed().as_millis(),
+            num_committed = num_committed,
+            num_total = num_total,
+            num_workers = num_workers,
+            "[BlockSTM]: {} execution completed. {} out of {} txns committed",
             if is_parallel {
-                "Parallel"
+                format!("Parallel[{}]", num_workers)
             } else {
-                "Sequential"
+                "Sequential".to_string()
             },
             num_committed,
             num_total,
-            self.start_time.elapsed().as_millis(),
         );
     }
 
@@ -236,8 +239,9 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         &self,
         num_committed: u32,
         num_total: u32,
+        num_workers: usize,
     ) {
-        self.finish_update_counters_and_log_info(true, num_committed, num_total)
+        self.finish_update_counters_and_log_info(true, num_committed, num_total, num_workers)
     }
 
     pub(crate) fn finish_sequential_update_counters_and_log_info(
@@ -245,7 +249,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         num_committed: u32,
         num_total: u32,
     ) {
-        self.finish_update_counters_and_log_info(false, num_committed, num_total)
+        self.finish_update_counters_and_log_info(false, num_committed, num_total, 1)
     }
 
     pub(crate) fn get_block_end_info(&self) -> BlockEndInfo {

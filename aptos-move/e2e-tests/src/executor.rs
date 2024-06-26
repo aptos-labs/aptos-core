@@ -533,7 +533,7 @@ impl FakeExecutor {
             },
             onchain: onchain_config,
         };
-        BlockAptosVM::execute_block::<
+        BlockAptosVM::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(

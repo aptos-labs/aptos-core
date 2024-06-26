@@ -52,7 +52,14 @@ impl AdapterLogSchema {
                 base_version: Some(base_version),
                 txn_idx,
             },
-            StateViewId::Miscellaneous | StateViewId::Replay => Self {
+            StateViewId::Replay => Self {
+                name: LogEntry::Execution,
+                block_id: None,
+                first_version: None,
+                base_version: None,
+                txn_idx,
+            },
+            StateViewId::Miscellaneous => Self {
                 name: LogEntry::Miscellaneous,
                 block_id: None,
                 first_version: None,

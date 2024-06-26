@@ -11,7 +11,8 @@ use aptos_framework::natives::code::PackageMetadata;
 use aptos_types::{
     account_address::AccountAddress,
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue, Result as StateViewResult, StateViewId, TStateView
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        Result as StateViewResult, StateViewId, TStateView,
     },
     transaction::{Transaction, TransactionInfo, Version},
 };

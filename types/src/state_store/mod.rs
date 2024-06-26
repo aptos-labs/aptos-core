@@ -60,11 +60,17 @@ impl<T: TStateView<Key = StateKey>> StateView for T {}
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StateViewId {
     /// State-sync applying a chunk of transactions.
-    ChunkExecution { first_version: Version },
+    ChunkExecution {
+        first_version: Version,
+    },
     /// LEC applying a block.
-    BlockExecution { block_id: HashValue },
+    BlockExecution {
+        block_id: HashValue,
+    },
     /// VmValidator verifying incoming transaction.
-    TransactionValidation { base_version: Version },
+    TransactionValidation {
+        base_version: Version,
+    },
     /// For test, db-bootstrapper, etc. Usually not aimed to pass to VM.
     Miscellaneous,
     Replay,

@@ -70,7 +70,9 @@ impl Command {
             println!("===============================");
             println!(
                 "{:#?}",
-                debugger.execute_past_transactions(version, 1, false, 1, &[self.concurrency_level]).await?
+                debugger
+                    .execute_past_transactions(version, 1, false, 1, &[self.concurrency_level])
+                    .await?
             );
         }
 
