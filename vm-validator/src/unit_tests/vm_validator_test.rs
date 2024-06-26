@@ -349,7 +349,7 @@ fn test_validate_invalid_arguments() {
         Some(program),
     );
     let _ret = vm_validator.validate_transaction(transaction).unwrap();
-    // TODO: Script arguement types are now checked at execution time. Is this an idea behavior?
+    // TODO: Script argument types are now checked at execution time. Is this an idea behavior?
     // assert_eq!(ret.status().unwrap().major_status, StatusCode::TYPE_MISMATCH);
 }
 

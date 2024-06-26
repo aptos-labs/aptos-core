@@ -237,7 +237,7 @@ impl<'env> ConstantFolder<'env> {
             .unwrap_or_else(|| BigInt::from(256))
     }
 
-    /// Try constant folding of a non-tuple binary operation `oper` applied to arguements `arg0` and
+    /// Try constant folding of a non-tuple binary operation `oper` applied to arguments `arg0` and
     /// `arg1`, returning `Some(exp)` where `exp` is a ExpData::Value(id, ..)` expression if
     /// constant folding is possible.  Operation result type may be obtained from `id`.
     ///

@@ -31,7 +31,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use url::Url;
 
-/// Stuct that represents a parser for a single entry from queue
+/// Struct that represents a parser for a single entry from queue
 pub struct Worker {
     config: Arc<ParserConfig>,
     conn: PooledConnection<ConnectionManager<PgConnection>>,
