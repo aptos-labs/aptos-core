@@ -1,0 +1,53 @@
+name: "Runs On Build"
+on: # build on main branch OR when a PR is labeled with `CICD:build-images`
+  # Allow us to run this specific workflow without a PR
+  workflow_dispatch:
+  pull_request_target:
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+  push:
+    branches:
+      - balaji/build-runson
+
+concurrency:
+  # for push and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
+  # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_ECR_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
+  GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+  # TARGET_CACHE_ID is used as part of the docker tag / cache key inside our bake.hcl docker bake files.
+  # The goal here is to have a branch or PR-local cache such that consecutive pushes to a shared branch or a specific PR can
+  # reuse layers from a previous docker build/commit.
+  # We use `pr-<pr_number>` as cache-id for PRs and simply <branch_name> otherwise.
+  TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
+  # On PRs, only build and push to GCP
+  # On push, build and push to all remote registries
+  TARGET_REGISTRY: ${{ github.event_name == 'pull_request_target' && 'remote' || 'remote-all' }}
+
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+
+jobs:
+  rust-all:
+    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
+
+      - name: Build Rust
+        run: |
+          sudo apt update && sudo apt install -y libudev-dev
+          cargo build -p aptos-node --profile performance
+          cargo build -p aptos-forge-cli --release
+
+      - name: Build Tools
+        run: |
+          CARGO_TARGET_DIR=./target/tools ./docker/builder/build-tools.sh
+
+      - name: Build Indexer
+        run: |
+          CARGO_TARGET_DIR=./target/indexer ./docker/builder/build-indexer.sh
