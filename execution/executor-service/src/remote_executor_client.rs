@@ -477,7 +477,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         drop(cmd_tx_timer);
 
         //let execution_results = self.get_output_from_shards()?;
-        sleep(Duration::from_millis(200));
+        //sleep(Duration::from_millis(200));
         let results = self.get_streamed_output_from_shards(expected_outputs, duration_since_epoch);
 
         let timer = REMOTE_EXECUTOR_TIMER
