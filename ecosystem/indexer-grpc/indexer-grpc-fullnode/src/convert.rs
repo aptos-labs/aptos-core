@@ -15,7 +15,10 @@ use aptos_logger::warn;
 use aptos_protos::{
     transaction::{
         v1 as transaction,
-        v1::{any_signature, Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn},
+        v1::{
+            any_signature, Ed25519, Keyless, NoAccountSignature, Secp256k1Ecdsa,
+            TransactionSizeInfo, WebAuthn,
+        },
     },
     util::timestamp,
 };
@@ -658,6 +661,10 @@ pub fn convert_account_signature(
             transaction::account_signature::Signature::MultiKeySignature(
                 convert_multi_key_signature(s),
             ),
+        ),
+        AccountSignature::NoAccountSignature(_) => (
+            transaction::account_signature::Type::NoAccountSignature,
+            transaction::account_signature::Signature::NoAccountSignature(NoAccountSignature {}),
         ),
     };
 
