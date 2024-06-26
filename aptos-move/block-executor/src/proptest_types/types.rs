@@ -28,7 +28,7 @@ use aptos_types::{
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{identifier::IdentStr, value::MoveTypeLayout};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -159,6 +159,10 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> 
         let mut hashed_address = vec![1u8; AccountAddress::LENGTH - 8];
         hashed_address.extend_from_slice(&hasher.finish().to_ne_bytes());
         self.1
+    }
+
+    fn from_address_and_module_name(_address: &AccountAddress, _module_name: &IdentStr) -> Self {
+        unimplemented!()
     }
 }
 

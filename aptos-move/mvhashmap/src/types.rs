@@ -227,6 +227,7 @@ pub(crate) mod test {
     };
     use bytes::Bytes;
     use claims::{assert_err, assert_ok_eq};
+    use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
     use std::{fmt::Debug, hash::Hash, sync::Arc};
 
     #[derive(Clone, Eq, Hash, PartialEq, Debug)]
@@ -238,6 +239,13 @@ pub(crate) mod test {
     impl<K: Hash + Clone + Eq + Debug> ModulePath for KeyType<K> {
         fn is_module_path(&self) -> bool {
             false
+        }
+
+        fn from_address_and_module_name(
+            _address: &AccountAddress,
+            _module_name: &IdentStr,
+        ) -> Self {
+            unreachable!("This is not a module path")
         }
     }
 

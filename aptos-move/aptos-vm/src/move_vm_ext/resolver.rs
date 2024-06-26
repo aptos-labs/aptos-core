@@ -4,8 +4,9 @@
 use aptos_aggregator::resolver::{AggregatorV1Resolver, DelayedFieldResolver};
 use aptos_table_natives::TableResolver;
 use aptos_types::{on_chain_config::ConfigStorage, state_store::state_key::StateKey};
-use aptos_vm_types::resolver::{
-    ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
+use aptos_vm_types::{
+    module_storage::AptosModuleStorage,
+    resolver::{ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView},
 };
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -25,6 +26,7 @@ pub trait AptosMoveResolver:
     + TableResolver
     + AsExecutorView
     + AsResourceGroupView
+    + AptosModuleStorage
 {
 }
 

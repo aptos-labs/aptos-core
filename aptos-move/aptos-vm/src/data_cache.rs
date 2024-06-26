@@ -29,6 +29,7 @@ use aptos_types::{
     vm::configs::aptos_prod_deserializer_config,
 };
 use aptos_vm_types::{
+    module_storage::AptosModuleStorage,
     resolver::{
         ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
     },
@@ -38,6 +39,7 @@ use bytes::Bytes;
 use move_binary_format::{deserializer::DeserializerConfig, errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
+    identifier::IdentStr,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     resolver::{resource_size, ModuleResolver, ResourceResolver},
@@ -182,6 +184,52 @@ impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<(Option<Bytes>, usize), Self::Error> {
         self.get_any_resource_with_layout(address, struct_tag, metadata, maybe_layout)
+    }
+}
+
+impl<'e, E: ExecutorView> AptosModuleStorage for StorageAdapter<'e, E> {
+    fn check_module_exists(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        self.executor_view.check_module_exists(address, module_name)
+    }
+
+    fn fetch_module_size_in_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
+        self.executor_view
+            .fetch_module_size_in_bytes(address, module_name)
+    }
+
+    fn fetch_module_state_value_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<StateValueMetadata> {
+        self.executor_view
+            .fetch_module_state_value_metadata(address, module_name)
+    }
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(&AccountAddress, &IdentStr)>> {
+        self.executor_view
+            .fetch_module_immediate_dependencies(address, module_name)
+    }
+
+    fn fetch_module_immediate_friends(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(&AccountAddress, &IdentStr)>> {
+        self.executor_view
+            .fetch_module_immediate_friends(address, module_name)
     }
 }
 

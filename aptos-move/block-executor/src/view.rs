@@ -48,13 +48,19 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::resolver::{
-    ResourceGroupSize, StateStorageView, TModuleView, TResourceGroupView, TResourceView,
+use aptos_vm_types::{
+    module_storage::AptosModuleStorage,
+    resolver::{
+        ResourceGroupSize, StateStorageView, TModuleView, TResourceGroupView, TResourceView,
+    },
 };
 use bytes::Bytes;
 use claims::assert_ok;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, value::MoveTypeLayout,
+    vm_status::StatusCode,
+};
 use move_vm_types::{
     delayed_values::delayed_field_id::ExtractUniqueIndex,
     value_serde::{
@@ -1527,6 +1533,50 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
             ViewState::Sync(_) => true,
             ViewState::Unsync(_) => true,
         }
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModuleStorage
+    for LatestView<'a, T, S, X>
+{
+    fn check_module_exists(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        todo!()
+    }
+
+    fn fetch_module_size_in_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
+        todo!()
+    }
+
+    fn fetch_module_state_value_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<StateValueMetadata> {
+        todo!()
+    }
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(&AccountAddress, &IdentStr)>> {
+        todo!()
+    }
+
+    fn fetch_module_immediate_friends(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(&AccountAddress, &IdentStr)>> {
+        todo!()
     }
 }
 

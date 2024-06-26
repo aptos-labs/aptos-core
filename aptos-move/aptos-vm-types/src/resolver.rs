@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::module_storage::AptosModuleStorage;
 use aptos_aggregator::resolver::{TAggregatorV1View, TDelayedFieldView};
 use aptos_types::{
     serde_helper::bcs_utils::size_u32_as_uleb128,
@@ -15,7 +16,10 @@ use aptos_types::{
 };
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::StructTag,
+    value::MoveTypeLayout, vm_status::StatusCode,
+};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, HashMap};
 
@@ -204,6 +208,7 @@ pub trait TExecutorView<K, T, L, I, V>:
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
     + StateStorageView
+    + AptosModuleStorage
 {
 }
 
@@ -213,6 +218,7 @@ impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
         + StateStorageView
+        + AptosModuleStorage
 {
 }
 
@@ -271,6 +277,51 @@ where
                 state_key, e
             ))
         })
+    }
+}
+
+impl<S> AptosModuleStorage for S
+where
+    S: StateView,
+{
+    fn check_module_exists(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<bool> {
+        todo!()
+    }
+
+    fn fetch_module_size_in_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<usize> {
+        todo!()
+    }
+
+    fn fetch_module_state_value_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<StateValueMetadata> {
+        todo!()
+    }
+
+    fn fetch_module_immediate_dependencies(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(&AccountAddress, &IdentStr)>> {
+        todo!()
+    }
+
+    fn fetch_module_immediate_friends(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Vec<(&AccountAddress, &IdentStr)>> {
+        todo!()
     }
 }
 
