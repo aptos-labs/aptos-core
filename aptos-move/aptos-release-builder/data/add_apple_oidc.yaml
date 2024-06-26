@@ -1,0 +1,11 @@
+---
+remote_endpoint: ~
+name: "20240626-add-apple-oidc"
+proposals:
+  - name: main
+    metadata:
+      title: "AIP-90: Add Apple to OIDC list for Keyless"
+      description: "AIP-90: Add Apple to OIDC list for Keyless"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/add_apple_oidc.move
