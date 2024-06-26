@@ -317,8 +317,6 @@ impl<
         );
         self.update_consensus_commit_metrics(&consensus_commit_notification);
 
-        // TODO(joshlind): can we get consensus to forward the events?
-
         // Handle the commit notification
         let committed_transactions = CommittedTransactions {
             events: consensus_commit_notification.subscribable_events.clone(),
