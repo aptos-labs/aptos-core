@@ -322,13 +322,13 @@ impl ProofQueue {
         let start = Instant::now();
         for (batch_info, txn_summaries) in batch_summaries {
             let batch_key = BatchKey::from_info(&batch_info);
-            for txn_summary in txn_summaries {
+            for txn_summary in &txn_summaries {
                 self.txn_summary_to_batches
-                    .entry(txn_summary)
+                    .entry(*txn_summary)
                     .or_default()
                     .insert(batch_key.clone());
             }
-            self.batches_with_txn_summary.insert(batch_key);
+            self.batch_to_txn_summaries.insert(batch_key, txn_summaries);
         }
         counters::PROOF_QUEUE_ADD_BATCH_SUMMARIES_DURATION.observe_duration(start.elapsed());
     }
@@ -383,10 +383,10 @@ impl ProofQueue {
     ) -> (Vec<ProofOfStore>, bool) {
         let mut ret = vec![];
         let mut cur_bytes = 0;
-        let mut cur_txns: u64 = 0;
-        let mut total_txns = 0;
+        let mut cur_txns = 0;
         let mut excluded_txns = 0;
         let mut full = false;
+        // Set of all the excluded transactions and all the transactions included in the result
         let mut included_and_excluded_txns = HashSet::new();
         for batch_info in excluded_batches {
             let batch_key = BatchKey::from_info(batch_info);
@@ -411,6 +411,7 @@ impl ProofQueue {
                     } else if let Some(Some((proof, insertion_time))) =
                         self.batch_to_proof.get(&sort_key.batch_key)
                     {
+                        // Calculate the number of unique transactions if this batch is included in the result
                         let temp_txns = if let Some(txn_summaries) =
                             self.batch_to_txn_summaries.get(&sort_key.batch_key)
                         {
@@ -430,7 +431,8 @@ impl ProofQueue {
                             return false;
                         }
                         cur_bytes += batch.num_bytes();
-                        total_txns += batch.num_txns();
+                        // Add this batch to included_and_excluded_txns and calculate the number of
+                        // unique transactions added in the result so far.
                         cur_txns += self.batch_to_txn_summaries.get(&sort_key.batch_key).map_or(
                             batch.num_txns(),
                             |summaries| {
@@ -465,6 +467,7 @@ impl ProofQueue {
         );
 
         if full || return_non_full {
+            let total_txns = ret.iter().map(|p| p.num_txns()).sum::<u64>();
             counters::BLOCK_SIZE_WHEN_PULL.observe(cur_txns as f64);
             counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(total_txns as f64);
             counters::EXTRA_TXNS_WHEN_PULL.observe((total_txns - cur_txns) as f64);
@@ -578,7 +581,7 @@ impl ProofQueue {
                 self.dec_remaining(&batch.author(), batch.num_txns());
             }
             self.batch_to_proof.insert(batch_key.clone(), None);
-            self.batches_with_txn_summary.remove(&batch_key);
+            self.batch_to_txn_summaries.remove(&batch_key);
         }
         let batch_keys = batches
             .iter()
