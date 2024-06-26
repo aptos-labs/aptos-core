@@ -230,6 +230,9 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         //info!("expected outputs {:?} ", expected_outputs);
         let (send_outputs, recv_outputs) = crossbeam_channel::unbounded();
         let mut results: Vec<Vec<TransactionIdxAndOutput>> = Vec::with_capacity(self.num_shards());
+        for i in 0..self.num_shards() {
+            results.push(vec![]);
+        }
         (0..self.num_shards()).into_par_iter().for_each(|shard_id| {
             let send_outputs_clone = send_outputs.clone();
             let expected_outputs_clone = expected_outputs.clone();
