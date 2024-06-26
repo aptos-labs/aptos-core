@@ -338,16 +338,6 @@ pub static PROPOSER_MAX_BLOCK_TXNS_AFTER_FILTERING: Lazy<Histogram> = Lazy::new(
     .unwrap()
 });
 
-/// Histogram for max number of transactions proposer uses when creating block.
-pub static PROPOSER_MAX_BLOCK_TXNS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "aptos_proposer_max_block_txns",
-        "Histogram for max number of transactions proposer uses when creating block.",
-        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
-    )
-    .unwrap()
-});
-
 /// Histogram for max number of transactions to execute proposer uses when creating block.
 pub static PROPOSER_MAX_BLOCK_TXNS_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
