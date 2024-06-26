@@ -447,45 +447,4 @@ impl<'r, 'l> Session<'r, 'l> {
             .get_struct_type_by_identifier(&name.name, &name.module)
             .ok()
     }
-
-    pub fn check_dependencies_and_charge_gas<'a, I>(
-        &mut self,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        ids: I,
-    ) -> VMResult<()>
-    where
-        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
-        I::IntoIter: DoubleEndedIterator,
-    {
-        self.move_vm
-            .runtime
-            .loader()
-            .check_dependencies_and_charge_gas(
-                &self.module_store,
-                &mut self.data_cache,
-                gas_meter,
-                &mut traversal_context.visited,
-                traversal_context.referenced_modules,
-                ids,
-            )
-    }
-
-    pub fn check_script_dependencies_and_check_gas(
-        &mut self,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        script: impl Borrow<[u8]>,
-    ) -> VMResult<()> {
-        self.move_vm
-            .runtime
-            .loader()
-            .check_script_dependencies_and_check_gas(
-                &self.module_store,
-                &mut self.data_cache,
-                gas_meter,
-                traversal_context,
-                script.borrow(),
-            )
-    }
 }

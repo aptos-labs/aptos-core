@@ -95,14 +95,6 @@ impl ModuleStorageAdapter {
         self.modules.fetch_module(id)
     }
 
-    pub(crate) fn module_at_by_ref(
-        &self,
-        addr: &AccountAddress,
-        name: &IdentStr,
-    ) -> Option<Arc<Module>> {
-        self.modules.fetch_module_by_ref(addr, name)
-    }
-
     pub(crate) fn insert(
         &self,
         natives: &NativeFunctions,
@@ -198,6 +190,7 @@ pub struct Module {
     id: ModuleId,
 
     // size in bytes
+    #[allow(dead_code)]
     pub(crate) size: usize,
 
     // primitive pools
