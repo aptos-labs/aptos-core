@@ -389,12 +389,12 @@ impl ProofQueue {
         let mut excluded_txns = 0;
         let mut full = false;
         // Set of all the excluded transactions and all the transactions included in the result
-        let mut included_and_excluded_txns = HashSet::new();
+        let mut filtered_txns = HashSet::new();
         for batch_info in excluded_batches {
             let batch_key = BatchKey::from_info(batch_info);
             if let Some(txn_summaries) = self.batch_to_txn_summaries.get(&batch_key) {
                 for txn_summary in txn_summaries {
-                    included_and_excluded_txns.insert(*txn_summary);
+                    filtered_txns.insert(*txn_summary);
                 }
             }
         }
@@ -420,9 +420,7 @@ impl ProofQueue {
                             cur_unique_txns
                                 + txn_summaries
                                     .iter()
-                                    .filter(|txn_summary| {
-                                        !included_and_excluded_txns.contains(txn_summary)
-                                    })
+                                    .filter(|txn_summary| !filtered_txns.contains(txn_summary))
                                     .count() as u64
                         } else {
                             cur_unique_txns + batch.num_txns()
@@ -437,7 +435,7 @@ impl ProofQueue {
                         }
                         cur_bytes += batch.num_bytes();
                         cur_all_txns += batch.num_txns();
-                        // Add this batch to included_and_excluded_txns and calculate the number of
+                        // Add this batch to filtered_txns and calculate the number of
                         // unique transactions added in the result so far.
                         cur_unique_txns += self
                             .batch_to_txn_summaries
@@ -445,7 +443,7 @@ impl ProofQueue {
                             .map_or(batch.num_txns(), |summaries| {
                                 summaries
                                     .iter()
-                                    .filter(|summary| included_and_excluded_txns.insert(**summary))
+                                    .filter(|summary| filtered_txns.insert(**summary))
                                     .count() as u64
                             });
                         let bucket = proof.gas_bucket_start();
@@ -479,7 +477,8 @@ impl ProofQueue {
         if full || return_non_full {
             counters::BLOCK_SIZE_WHEN_PULL.observe(cur_unique_txns as f64);
             counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(cur_all_txns as f64);
-            counters::EXTRA_TXNS_WHEN_PULL.observe((cur_all_txns - cur_unique_txns) as f64);
+            counters::KNOWN_DUPLICATE_TXNS_WHEN_PULL
+                .observe((cur_all_txns - cur_unique_txns) as f64);
             counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);

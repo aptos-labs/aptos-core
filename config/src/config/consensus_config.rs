@@ -16,6 +16,8 @@ use std::path::PathBuf;
 const MAX_SENDING_BLOCK_UNIQUE_TXNS: u64 = 1900;
 pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_UNIQUE_TXNS));
+// The receiving validator can accept upto 2k more transactions in the block than the max sending limit.
+// The extra cushion of 2k transactions is added just in case we need to increase the max sending limit in the future.
 static MAX_SENDING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| MAX_SENDING_BLOCK_UNIQUE_TXNS.max(MAX_RECEIVING_BLOCK_TXNS.saturating_sub(2000)));
 

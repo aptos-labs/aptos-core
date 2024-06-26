@@ -226,8 +226,8 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
     let (pulled_validator_txns, Payload::DirectMempool(pulled_user_txns)) = client
         .pull_payload(
             Duration::from_secs(1), // max_poll_time
-            120,                   // max_items
-            99,                    // max_unique_items
+            120,                    // max_items
+            99,                     // max_unique_items
             all_validator_txns[0].size_in_bytes() as u64,
             50,
             all_validator_txns[0].size_in_bytes() as u64,
@@ -268,7 +268,7 @@ async fn mixed_payload_client_should_respect_validator_txn_feature_flag() {
     let (pulled_validator_txns, Payload::DirectMempool(pulled_user_txns)) = client
         .pull_payload(
             Duration::from_millis(50), // max_poll_time
-            120,                        // max_items
+            120,                       // max_items
             99,                        // max_unique_items
             1048576,                   // size limit: 1MB
             50,

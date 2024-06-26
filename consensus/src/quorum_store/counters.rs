@@ -193,10 +193,10 @@ pub static TOTAL_BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static EXTRA_TXNS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
+pub static KNOWN_DUPLICATE_TXNS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
-        "quorum_store_extra_txns_when_pull",
-        "Histogram for the number of extra transactions in a block when pulled for consensus.",
+        "quorum_store_known_duplicate_txns_when_pull",
+        "Histogram for the number of known duplicate transactions in a block when pulled for consensus.",
         TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
