@@ -70,7 +70,7 @@ async fn get_proposal(
 fn assert_payload_response(
     payload: Payload,
     expected: &[ProofOfStore],
-    max_txns_from_block_to_execute: Option<usize>,
+    max_txns_from_block_to_execute: Option<u64>,
 ) {
     match payload {
         Payload::InQuorumStore(proofs) => {

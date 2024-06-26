@@ -146,7 +146,7 @@ pub struct PipelineBackpressureValues {
     // If we want to dynamically increase it beyond quorum_store_poll_time,
     // we need to adjust timeouts other nodes use for the backpressured round.
     pub backpressure_proposal_delay_ms: u64,
-    pub max_txns_from_block_to_execute: Option<usize>,
+    pub max_txns_from_block_to_execute: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -157,7 +157,7 @@ pub struct ChainHealthBackoffValues {
     pub max_sending_block_bytes_override: u64,
 
     pub backoff_proposal_delay_ms: u64,
-    pub max_txns_from_block_to_execute: Option<usize>,
+    pub max_txns_from_block_to_execute: Option<u64>,
 }
 
 impl Default for ConsensusConfig {

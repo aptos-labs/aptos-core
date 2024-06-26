@@ -620,7 +620,11 @@ impl BlockReader for BlockStore {
             match cur_block {
                 Some(block) => {
                     if let Some(execution_time_and_size) = block.get_execution_time_and_size() {
-                        info!("Found execution time for {}, {:?}", block.id(), execution_time_and_size );
+                        info!(
+                            "Found execution time for {}, {:?}",
+                            block.id(),
+                            execution_time_and_size
+                        );
                         res.push(execution_time_and_size);
                         if res.len() >= num_blocks {
                             return res;

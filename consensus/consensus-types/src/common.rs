@@ -168,7 +168,7 @@ impl ProofWithData {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ProofWithDataWithTxnLimit {
     pub proof_with_data: ProofWithData,
-    pub max_txns_to_execute: Option<usize>,
+    pub max_txns_to_execute: Option<u64>,
 }
 
 impl PartialEq for ProofWithDataWithTxnLimit {
@@ -181,7 +181,7 @@ impl PartialEq for ProofWithDataWithTxnLimit {
 impl Eq for ProofWithDataWithTxnLimit {}
 
 impl ProofWithDataWithTxnLimit {
-    pub fn new(proof_with_data: ProofWithData, max_txns_to_execute: Option<usize>) -> Self {
+    pub fn new(proof_with_data: ProofWithData, max_txns_to_execute: Option<u64>) -> Self {
         Self {
             proof_with_data,
             max_txns_to_execute,
@@ -197,7 +197,7 @@ impl ProofWithDataWithTxnLimit {
     }
 }
 
-fn sum_max_txns_to_execute(m1: Option<usize>, m2: Option<usize>) -> Option<usize> {
+fn sum_max_txns_to_execute(m1: Option<u64>, m2: Option<u64>) -> Option<u64> {
     match (m1, m2) {
         (None, _) => m2,
         (_, None) => m1,
@@ -214,12 +214,12 @@ pub enum Payload {
     QuorumStoreInlineHybrid(
         Vec<(BatchInfo, Vec<SignedTransaction>)>,
         ProofWithData,
-        Option<usize>,
+        Option<u64>,
     ),
 }
 
 impl Payload {
-    pub fn transform_to_quorum_store_v2(self, max_txns_to_execute: Option<usize>) -> Self {
+    pub fn transform_to_quorum_store_v2(self, max_txns_to_execute: Option<u64>) -> Self {
         match self {
             Payload::InQuorumStore(proof_with_status) => Payload::InQuorumStoreWithLimit(
                 ProofWithDataWithTxnLimit::new(proof_with_status, max_txns_to_execute),

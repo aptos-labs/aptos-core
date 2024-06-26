@@ -72,11 +72,11 @@ use tokio_stream::wrappers::IntervalStream;
 #[derive(Debug, Clone)]
 pub struct BlockTransactionPayload {
     pub transactions: Vec<SignedTransaction>,
-    pub limit: Option<usize>,
+    pub limit: Option<u64>,
 }
 
 impl BlockTransactionPayload {
-    pub fn new(transactions: Vec<SignedTransaction>, limit: Option<usize>) -> Self {
+    pub fn new(transactions: Vec<SignedTransaction>, limit: Option<u64>) -> Self {
         Self {
             transactions,
             limit,
