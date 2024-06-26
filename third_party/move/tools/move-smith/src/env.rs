@@ -222,4 +222,9 @@ impl Env {
         self.type_depth -= dec;
         trace!("Decrement type depth to: {}", self.type_depth);
     }
+
+    /// Check if the current type depth has reached the limit
+    pub fn reached_type_depth_limit(&self) -> bool {
+        self.type_depth >= self.max_expr_depth
+    }
 }

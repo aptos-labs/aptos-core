@@ -20,6 +20,7 @@ struct Args {
 }
 
 fn main() {
+    env_logger::init();
     let args = Args::parse();
     let bytes = fs::read(&args.input_file).unwrap();
     let mut u = Unstructured::new(&bytes);

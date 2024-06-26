@@ -93,7 +93,7 @@ impl Default for Config {
             max_num_calls_in_script: 20,
 
             max_expr_depth: 3,
-            max_type_depth: 3,
+            max_type_depth: 10,
             max_num_type_params_in_func: 3,
             max_num_type_params_in_struct: 3,
         }

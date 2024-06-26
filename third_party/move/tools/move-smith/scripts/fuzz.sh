@@ -71,7 +71,7 @@ function run_libfuzzer() {
         -max_len=819200 \
         -keep_seed=1 \
         -fork=$JOBS \
-        -timeout=20 \
+        -timeout=3 \
         -ignore_timeouts=1 \
         -ignore_crashes=1 \
         -print_final_stats=1 2>&1 | tee -a $log_file

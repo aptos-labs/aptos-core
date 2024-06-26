@@ -136,6 +136,22 @@ impl Type {
         self.is_numerical() || self.is_bool()
     }
 
+    pub fn is_concrete(&self) -> bool {
+        if self.is_num_or_bool() {
+            return true;
+        }
+
+        if let Type::StructConcrete(_) = self {
+            return true;
+        }
+
+        if let Type::Struct(st) = self {
+            return st.type_parameters.type_parameters.is_empty();
+        }
+
+        false
+    }
+
     /// Get an identifier for the type
     ///
     /// The returned name should be used to find the scope of this type

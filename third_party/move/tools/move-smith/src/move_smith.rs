@@ -878,8 +878,7 @@ impl MoveSmith {
             );
             match concretized {
                 Some(c) => type_args.push(c),
-                None => panic!("searchme"),
-                // None => type_args.push(Type::TypeParameter(tp.clone())),
+                None => type_args.push(Type::TypeParameter(tp.clone())),
             }
         }
 
@@ -918,7 +917,11 @@ impl MoveSmith {
         // !!! the constraints of the type parameter.
         // !!! This is ensured because we insert a struct with all abilities
         // !!! to all modules
-        let choices = self.get_types_with_abilities(parent_scope, &constraints, true);
+        let mut choices = self.get_types_with_abilities(parent_scope, &constraints, true);
+        if self.env().reached_type_depth_limit() {
+            warn!("Max type depth reached, choosing concrete types");
+            choices = choices.into_iter().filter(|t| t.is_concrete()).collect();
+        }
         let chosen = u.choose(&choices).unwrap().clone();
 
         match self.is_type_concretizable(&chosen, parent_scope) {
