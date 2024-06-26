@@ -18,7 +18,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Struct `MintRef`](#0x1_fungible_asset_MintRef)
 -  [Struct `TransferRef`](#0x1_fungible_asset_TransferRef)
 -  [Struct `BurnRef`](#0x1_fungible_asset_BurnRef)
--  [Resource `MutateMetadataRef`](#0x1_fungible_asset_MutateMetadataRef)
+-  [Struct `MutateMetadataRef`](#0x1_fungible_asset_MutateMetadataRef)
 -  [Struct `Deposit`](#0x1_fungible_asset_Deposit)
 -  [Struct `Withdraw`](#0x1_fungible_asset_Withdraw)
 -  [Struct `Frozen`](#0x1_fungible_asset_Frozen)
@@ -501,13 +501,12 @@ BurnRef can be used to burn fungible assets from a given holder account.
 
 <a id="0x1_fungible_asset_MutateMetadataRef"></a>
 
-## Resource `MutateMetadataRef`
+## Struct `MutateMetadataRef`
 
 MutateMetadataRef can be used to directly modify the fungible asset's Metadata.
 
 
-<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
-<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_MutateMetadataRef">MutateMetadataRef</a> <b>has</b> drop, store, key
+<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_MutateMetadataRef">MutateMetadataRef</a> <b>has</b> drop, store
 </code></pre>
 
 
