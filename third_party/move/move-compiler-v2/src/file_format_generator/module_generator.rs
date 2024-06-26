@@ -217,20 +217,24 @@ impl ModuleGenerator {
         }
         let struct_handle = self.struct_index(ctx, loc, struct_env);
         let fields = struct_env.get_fields();
-        let field_information = FF::StructFieldInformation::Declared(
-            fields
-                .map(|f| {
-                    let field_loc = f.get_loc();
-                    self.source_map
-                        .add_struct_field_mapping(def_idx, ctx.env.to_ir_loc(field_loc))
-                        .expect(SOURCE_MAP_OK);
-                    let name = self.name_index(ctx, field_loc, f.get_name());
-                    let signature =
-                        FF::TypeSignature(self.signature_token(ctx, loc, &f.get_type()));
-                    FF::FieldDefinition { name, signature }
-                })
-                .collect(),
-        );
+        let field_information = if struct_env.get_field_count() == 0 {
+            FF::StructFieldInformation::Native
+        } else {
+            FF::StructFieldInformation::Declared(
+                fields
+                    .map(|f| {
+                        let field_loc = f.get_loc();
+                        self.source_map
+                            .add_struct_field_mapping(def_idx, ctx.env.to_ir_loc(field_loc))
+                            .expect(SOURCE_MAP_OK);
+                        let name = self.name_index(ctx, field_loc, f.get_name());
+                        let signature =
+                            FF::TypeSignature(self.signature_token(ctx, loc, &f.get_type()));
+                        FF::FieldDefinition { name, signature }
+                    })
+                    .collect(),
+            )
+        };
         let def = FF::StructDefinition {
             struct_handle,
             field_information,

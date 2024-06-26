@@ -83,6 +83,7 @@ static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
         ("typing/v1-naming", "naming"),
         ("typing/v1-operators", "operators"),
         ("typing/v1-signer", "signer"),
+        ("typing/v1-examples", "examples"),
         ("live-var/v1-commands", "commands"),
         ("live-var", "liveness"),
         ("visibility-checker/v1-typing", "typing"),
