@@ -48,6 +48,8 @@ def draw_comparison(wkd: Path):
     plt.grid(True)
     for log in wkd.rglob('fuzz.log'):
         log = log.absolute()
+        if "afl" in log.as_posix():
+            continue
         run_name = log.parent.name
 
         output = open(log).readlines()
