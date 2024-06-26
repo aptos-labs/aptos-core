@@ -133,6 +133,44 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let kv_tx_clone = self.kv_tx.clone();
             let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
             let rand_send_thread_idx = rng.gen_range(0, self.kv_tx[0].len());
+
+            // CPU test
+            let (sendx, recvx) = std::sync::mpsc::channel();
+            let num_tasks1 = 1200;
+            let num_tasks2 = 0;
+            let thread_pool1 = rayon::ThreadPoolBuilder::new()
+                .num_threads(60)
+                .thread_name(|i| format!("thread-{}", i))
+                .build()
+                .unwrap();
+            // let thread_pool2 = rayon::ThreadPoolBuilder::new()
+            //     .num_threads(1)
+            //     .thread_name(|i| format!("thread-{}", i))
+            //     .build()
+            //     .unwrap();
+
+            let mut rng = StdRng::from_entropy();
+            (0..num_tasks1).into_iter().for_each(|i| {
+                let sendx_clone = sendx.clone();
+                thread_pool1.spawn(move || {
+                    //sleep(Duration::new(3, 0));
+                    let mut sum:u64 = 0;
+                    for i in 0..1000000000 {
+                        sum += i % 313;
+                    }
+                    //println!("Hello from thread {}", rng.gen_range(0..10));
+                    sendx_clone.send(sum).unwrap();
+                })
+            });
+            let mut cnt = 0;
+            while let Ok(msg) = recvx.recv() {
+                println!("Received message: {:?}", msg);
+                cnt += 1;
+                if cnt == num_tasks1 + num_tasks2 {
+                    break;
+                }
+            }
+            info!("CPU test finished");
             tokio::spawn(async move {
                 handle_message(message,
                                      state_view_clone,
