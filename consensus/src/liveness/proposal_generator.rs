@@ -342,7 +342,7 @@ impl ProposalGenerator {
                 .unwrap_or(0);
             // Use non-backpressure reduced values for computing fill_fraction
             let max_fill_fraction = (max_pending_block_len as f32
-                / self.max_block_unique_txns as f32)
+                / self.max_block_txns as f32)
                 .max(max_pending_block_bytes as f32 / self.max_block_bytes as f32);
             PROPOSER_PENDING_BLOCKS_COUNT.set(pending_blocks.len() as i64);
             PROPOSER_PENDING_BLOCKS_FILL_FRACTION.set(max_fill_fraction as f64);
