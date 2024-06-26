@@ -95,19 +95,19 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn start(&self) {
         //let (signal_tx, signal_rx) = unbounded();
         let thread_pool_clone = self.thread_pool.clone();
-        let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
         info!("Num handlers created is {}", thread_pool_clone.current_num_threads());
         for _ in 0..thread_pool_clone.current_num_threads() {
             let state_view_clone = self.state_view.clone();
             let kv_tx_clone = self.kv_tx.clone();
             let kv_unprocessed_pq_clone = self.kv_unprocessed_pq.clone();
             let recv_condition_clone = self.recv_condition.clone();
-            outbound_rpc_runtime_clone
-                .spawn(async move {Self::priority_handler(state_view_clone.clone(),
-                                                      kv_tx_clone.clone(),
-                                                      kv_unprocessed_pq_clone.clone(),
-                                                      recv_condition_clone.clone())
-                });
+            let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
+            thread_pool_clone.spawn(move || {
+                Self::priority_handler(state_view_clone.clone(),
+                                       kv_tx_clone.clone(),
+                                       kv_unprocessed_pq_clone.clone(),
+                                       recv_condition_clone.clone(),
+                                       outbound_rpc_runtime_clone)});
         }
 
         while let Ok(message) = self.kv_rx.recv() {
@@ -140,7 +140,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
                             kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
                             pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
-                            recv_condition: Arc<(Mutex<bool>, Condvar)>) {
+                            recv_condition: Arc<(Mutex<bool>, Condvar)>,
+                            outbound_rpc_runtime: Arc<Runtime>) {
         let mut rng = StdRng::from_entropy();
         loop {
             let (lock, cvar) = &*recv_condition;
@@ -153,7 +154,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 let state_view = state_view.clone();
                 let kv_txs = kv_tx.clone();
 
-                Self::handle_message(message, state_view, kv_txs, &mut rng);
+                let outbound_rpc_runtime_clone = outbound_rpc_runtime.clone();
+                Self::handle_message(message, state_view, kv_txs, &mut rng, outbound_rpc_runtime_clone);
             }
         }
     }
@@ -163,6 +165,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         state_view: Arc<RwLock<Option<Arc<S>>>>,
         kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
         rng: &mut StdRng,
+        outbound_rpc_runtime: Arc<Runtime>,
     ) {
         let start_ms_since_epoch = message.start_ms_since_epoch.unwrap();
         {
@@ -245,7 +248,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let timer_6 = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_requests_send"])
             .start_timer();
-        kv_tx_clone[shard_id][rand_send_thread_idx].lock().unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
+        outbound_rpc_runtime.spawn_blocking( move || {
+            kv_tx_clone[shard_id][rand_send_thread_idx].lock().unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
+        });
+        //kv_tx_clone[shard_id][rand_send_thread_idx].lock().unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
         drop(timer_6);
 
         {
