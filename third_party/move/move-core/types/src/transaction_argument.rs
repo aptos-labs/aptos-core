@@ -19,6 +19,7 @@ pub enum TransactionArgument {
     U16(u16),
     U32(u32),
     U256(u256::U256),
+    Raw(Vec<u8>),
 }
 
 impl fmt::Debug for TransactionArgument {
@@ -35,6 +36,7 @@ impl fmt::Debug for TransactionArgument {
             TransactionArgument::U16(value) => write!(f, "{{U16: {}}}", value),
             TransactionArgument::U32(value) => write!(f, "{{U32: {}}}", value),
             TransactionArgument::U256(value) => write!(f, "{{U256: {}}}", value),
+            TransactionArgument::Raw(value) => write!(f, "{{RAW_BYTES: {}}}", hex::encode(value)),
         }
     }
 }
@@ -51,6 +53,7 @@ impl From<TransactionArgument> for MoveValue {
             TransactionArgument::U16(i) => MoveValue::U16(i),
             TransactionArgument::U32(i) => MoveValue::U32(i),
             TransactionArgument::U256(i) => MoveValue::U256(i),
+            TransactionArgument::Raw(value) => MoveValue::vector_u8(value),
         }
     }
 }
@@ -90,9 +93,13 @@ impl TryFrom<MoveValue> for TransactionArgument {
 pub fn convert_txn_args(args: &[TransactionArgument]) -> Vec<Vec<u8>> {
     args.iter()
         .map(|arg| {
-            MoveValue::from(arg.clone())
-                .simple_serialize()
-                .expect("transaction arguments must serialize")
+            if let TransactionArgument::Raw(bytes) = arg {
+                bytes.clone()
+            } else {
+                MoveValue::from(arg.clone())
+                    .simple_serialize()
+                    .expect("transaction arguments must serialize")
+            }
         })
         .collect()
 }
