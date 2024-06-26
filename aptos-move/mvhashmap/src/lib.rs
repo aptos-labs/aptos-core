@@ -4,7 +4,8 @@
 
 use crate::{
     versioned_data::VersionedData, versioned_delayed_fields::VersionedDelayedFields,
-    versioned_group_data::VersionedGroupData, versioned_modules::VersionedModules,
+    versioned_group_data::VersionedGroupData, versioned_module_storage::VersionedModuleStorage,
+    versioned_modules::VersionedModules,
 };
 use aptos_types::{
     executable::{Executable, ModulePath},
@@ -19,6 +20,7 @@ mod utils;
 pub mod versioned_data;
 pub mod versioned_delayed_fields;
 pub mod versioned_group_data;
+pub mod versioned_module_storage;
 pub mod versioned_modules;
 
 #[cfg(test)]
@@ -38,6 +40,8 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
+    #[allow(dead_code)]
+    module_storage: VersionedModuleStorage<K, ()>,
 }
 
 impl<
@@ -57,6 +61,7 @@ impl<
             group_data: VersionedGroupData::new(),
             delayed_fields: VersionedDelayedFields::new(),
             modules: VersionedModules::new(),
+            module_storage: VersionedModuleStorage::empty(),
         }
     }
 
