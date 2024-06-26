@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
+use chrono::DateTime;
 use clap::Args;
 use determinator::{
     rules::{DeterminatorMarkChanged, DeterminatorPostRule, DeterminatorRules, PathRule},
@@ -19,7 +20,7 @@ use std::{
     fs,
     io::Read,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Output},
 };
 use url::Url;
 
@@ -39,6 +40,9 @@ const IGNORED_DETERMINATOR_PATHS: [&str; 8] = [
     "scripts/*",
     "terraform/*",
 ];
+
+// The maximum number of days allowed since the merge-base commit for the branch
+const MAX_NUM_DAYS_SINCE_MERGE_BASE: u64 = 7;
 
 // The delimiter used to separate the package path and the package name.
 pub const PACKAGE_NAME_DELIMITER: &str = "#";
@@ -109,13 +113,25 @@ impl SelectedPackageArgs {
                 "https://storage.googleapis.com/aptos-core-cargo-metadata-public/{}",
                 file_name
             );
-            let response = reqwest::blocking::get(url)?.error_for_status()?;
-            let response = response.text()?;
-            contents.clone_from(&response);
+            let response = reqwest::blocking::get(url)?.error_for_status();
+            match response {
+                Ok(response) => {
+                    let response = response.text()?;
+                    contents.clone_from(&response);
 
-            // Write the contents of the file to the local directory
-            fs::create_dir_all("target/aptos-x-tool")?;
-            fs::write(file_path, response)?;
+                    // Write the contents of the file to the local directory
+                    fs::create_dir_all("target/aptos-x-tool")?;
+                    fs::write(file_path, response)?;
+                },
+                Err(error) => {
+                    return Err(anyhow!(
+                        "Failed to fetch remote metadata for merge-base commit: {:?}! Error: {}\
+                            \nRebasing your branch may fix this error!",
+                        merge_base,
+                        error
+                    ));
+                },
+            }
         }
 
         // Return the contents of the file
@@ -128,8 +144,7 @@ impl SelectedPackageArgs {
         &self,
     ) -> anyhow::Result<(PackageGraph, PackageGraph, Utf8Paths0)> {
         // Determine the merge base
-        let merge_base = self.identify_merge_base();
-        info!("Identified the merge base: {:?}", merge_base);
+        let merge_base = self.identify_merge_base()?;
 
         // Download merge base metadata
         let base_metadata = self.fetch_remote_metadata(&merge_base)?;
@@ -151,21 +166,58 @@ impl SelectedPackageArgs {
 
     /// Identifies the merge base to compare against. This is done by identifying
     /// the commit at which the current branch forked off origin/main.
-    /// TODO: do we need to make this more intelligent?
-    fn identify_merge_base(&self) -> String {
+    ///
+    /// Note: if the merge-base is too old, an error will be returned.
+    fn identify_merge_base(&self) -> anyhow::Result<String> {
         // Run the git merge-base command
-        let output = Command::new("git")
+        let merge_base_output = Command::new("git")
             .arg("merge-base")
             .arg("HEAD")
             .arg("origin/main")
             .output()
             .expect("failed to execute git merge-base");
+        let merge_base = parse_string_from_output(merge_base_output);
 
-        // Return the output
-        String::from_utf8(output.stdout)
-            .expect("invalid UTF-8")
-            .trim()
-            .to_owned()
+        // Get the commit timestamp of the merge-base
+        let commit_timestamp_output = Command::new("git")
+            .arg("show")
+            .arg("-s")
+            .arg("--format=%cI")
+            .arg(&merge_base)
+            .output()
+            .expect("failed to execute git show");
+        let commit_timestamp = parse_string_from_output(commit_timestamp_output);
+
+        // Log the merge-base and commit timestamp
+        info!(
+            "Identified the merge base: {:?} (commit date: {:?})",
+            merge_base, commit_timestamp
+        );
+
+        // Calculate the time difference between the merge-base and the current time (in days)
+        let commit_datetime = DateTime::parse_from_rfc3339(&commit_timestamp)
+            .expect("failed to parse commit timestamp");
+        let current_datetime = DateTime::parse_from_rfc3339(&chrono::Utc::now().to_rfc3339())
+            .expect("failed to parse current timestamp");
+        let time_difference_days = current_datetime
+            .signed_duration_since(commit_datetime)
+            .num_days() as u64;
+
+        // Check if the merge-base is too old
+        if time_difference_days >= MAX_NUM_DAYS_SINCE_MERGE_BASE {
+            return Err(anyhow!(
+                "The merge base is too old ({:?} days)! Please rebase your branch!",
+                time_difference_days
+            ));
+        } else {
+            info!(
+                "The merge base is within the maximum number of days. Maximum: {:?} (days), Merge-base: {:?} (days)",
+                MAX_NUM_DAYS_SINCE_MERGE_BASE, time_difference_days
+            );
+        }
+
+        // Return the merge-base commit
+        Ok(merge_base)
     }
 
     /// Computes the affected target packages based on the
@@ -188,6 +240,7 @@ impl SelectedPackageArgs {
         // Set the cargo options for the determinator
         let mut cargo_options = CargoOptions::new();
         cargo_options.set_resolver(CargoResolverVersion::V2);
+        cargo_options.set_include_dev(true); // Include dev-dependencies to ensure test-only packages are handled correctly
         determinator.set_cargo_options(&cargo_options);
 
         // Set the ignore rules for the determinator
@@ -226,4 +279,12 @@ impl SelectedPackageArgs {
 
         Ok(package_set)
     }
+}
+
+/// Parses a UTF-8 string from the given command output
+fn parse_string_from_output(output: Output) -> String {
+    String::from_utf8(output.stdout)
+        .expect("invalid UTF-8")
+        .trim()
+        .to_owned()
 }

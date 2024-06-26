@@ -169,7 +169,7 @@ pub(crate) fn map_id_to_values_in_group_writes<
 >(
     finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>,
     latest_view: &LatestView<T, S, X>,
-) -> ::std::result::Result<Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>, PanicError> {
+) -> Result<Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>, PanicError> {
     let mut patched_finalized_groups = Vec::with_capacity(finalized_groups.len());
     for (group_key, group_metadata_op, resource_vec) in finalized_groups.into_iter() {
         let mut patched_resource_vec = Vec::with_capacity(resource_vec.len());

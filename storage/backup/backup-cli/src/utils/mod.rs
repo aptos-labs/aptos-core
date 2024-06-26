@@ -55,6 +55,13 @@ pub struct GlobalBackupOpt {
         help = "Maximum chunk file size in bytes."
     )]
     pub max_chunk_size: usize,
+    #[clap(
+        long,
+        default_value_t = 8,
+        help = "When applicable (currently only for state snapshot backups), the number of \
+        concurrent requests to the fullnode backup service. "
+    )]
+    pub concurrent_data_requests: usize,
 }
 
 #[derive(Clone, Parser)]
@@ -362,6 +369,9 @@ impl ConcurrentDownloadsOpt {
         ret
     }
 }
+
+#[derive(Clone, Copy, Default, Parser)]
+pub struct ConcurrentDataRequestsOpt {}
 
 #[derive(Clone, Copy, Default, Parser)]
 pub struct ReplayConcurrencyLevelOpt {

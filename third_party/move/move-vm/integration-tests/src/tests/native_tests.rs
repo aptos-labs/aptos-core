@@ -70,8 +70,7 @@ fn test_publish_module_with_nested_loops() {
                 ..Default::default()
             },
             ..Default::default()
-        })
-        .unwrap();
+        });
 
         let mut sess = vm.new_session(&storage);
         sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)

@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_metrics_core::{register_int_counter_vec, IntCounterVec};
 use aptos_push_metrics::{
     exponential_buckets, register_histogram_vec, register_int_gauge, HistogramVec, IntGauge,
 };
@@ -53,6 +54,15 @@ pub static BACKUP_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
         "Various timers for performance analysis.",
         &["name"],
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static THROUGHPUT_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_db_backup_received_bytes",
+        "Backup controller throughput in bytes.",
+        &["endpoint"]
     )
     .unwrap()
 });

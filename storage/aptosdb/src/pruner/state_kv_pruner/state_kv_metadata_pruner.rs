@@ -5,8 +5,8 @@ use crate::{
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         stale_state_value_index::StaleStateValueIndexSchema,
+        stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
         state_value::StateValueSchema,
-        state_value_index::StateValueIndexSchema,
     },
     state_kv_db::StateKvDb,
     utils::get_progress,
@@ -39,14 +39,13 @@ impl StateKvMetadataPruner {
                 let mut iter = self
                     .state_kv_db
                     .db_shard(shard_id)
-                    .iter::<StaleStateValueIndexSchema>()?;
+                    .iter::<StaleStateValueIndexByKeyHashSchema>()?;
                 iter.seek(&current_progress)?;
                 for item in iter {
                     let (index, _) = item?;
                     if index.stale_since_version > target_version {
                         break;
                     }
-                    batch.delete::<StateValueIndexSchema>(&(index.state_key, index.version))?;
                 }
             }
         } else {

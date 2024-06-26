@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::handlers::bytes_sender;
-use aptos_db::backup::backup_handler::BackupHandler;
+use aptos_db::{backup::backup_handler::BackupHandler, metrics::BACKUP_TIMER};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
+    register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec, TimerHelper,
 };
 use aptos_storage_interface::Result as DbResult;
 use hyper::Body;
@@ -56,7 +56,11 @@ where
 
     // spawn and forget, error propagates through the `stream: TryStream<_>`
     let bh = backup_handler.clone();
-    let _join_handle = tokio::task::spawn_blocking(move || abort_on_error(f)(bh, sender));
+    let _join_handle = tokio::task::spawn_blocking(move || {
+        let _timer =
+            BACKUP_TIMER.timer_with(&[&format!("backup_service_bytes_sender_{}", endpoint)]);
+        abort_on_error(f)(bh, sender)
+    });
 
     Box::new(Response::new(Body::wrap_stream(stream)))
 }

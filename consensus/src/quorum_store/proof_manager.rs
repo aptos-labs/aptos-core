@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, ProofWithData},
+    common::{Payload, PayloadFilter, ProofWithData, TransactionSummary},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
@@ -29,7 +29,7 @@ use std::{
 #[derive(Debug)]
 pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg),
-    ReceiveBatches(Vec<BatchInfo>),
+    ReceiveBatches(Vec<(BatchInfo, Vec<TransactionSummary>)>),
     CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
@@ -166,10 +166,19 @@ impl ProofManager {
             self.proofs_for_consensus.remaining_txns_and_proofs();
     }
 
-    pub(crate) fn receive_batches(&mut self, batches: Vec<BatchInfo>) {
+    pub(crate) fn receive_batches(
+        &mut self,
+        batch_summaries: Vec<(BatchInfo, Vec<TransactionSummary>)>,
+    ) {
         if self.allow_batches_without_pos_in_proposal {
+            let batches = batch_summaries
+                .iter()
+                .map(|(batch_info, _)| batch_info.clone())
+                .collect();
             self.batch_queue.add_batches(batches);
         }
+        self.proofs_for_consensus
+            .add_batch_summaries(batch_summaries);
     }
 
     pub(crate) fn handle_commit_notification(
