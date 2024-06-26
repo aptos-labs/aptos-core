@@ -263,6 +263,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         let mut cnt = 0;
         while let Ok(msg) = recv_outputs.recv() {
             results[msg.0] = msg.1;
+            cnt += 1;
             if cnt == self.num_shards() {
                 break;
             }
