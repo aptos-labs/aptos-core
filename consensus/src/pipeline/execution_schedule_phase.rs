@@ -93,8 +93,12 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             let mut results = vec![];
             for (block, fut) in itertools::zip_eq(ordered_blocks, futs) {
                 debug!("try to receive compute result for block {}", block.id());
-                let PipelineExecutionResult { input_txns, result } = fut.await?;
-                results.push(block.set_execution_result(input_txns, result));
+                let PipelineExecutionResult {
+                    input_txns,
+                    result,
+                    execution_time,
+                } = fut.await?;
+                results.push(block.set_execution_result(input_txns, result, execution_time));
             }
             drop(lifetime_guard);
             Ok(results)

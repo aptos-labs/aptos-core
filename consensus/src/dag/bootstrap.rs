@@ -621,6 +621,8 @@ impl DagBootstrapper {
                     .health_config
                     .pipeline_backpressure_config
                     .clone(),
+                // TODO: add pipeline backpressure based on execution speed to DAG config
+                None,
             ),
             ordered_notifier.clone(),
         );

@@ -461,6 +461,70 @@ impl BlockStore {
             .store(back_pressure, Ordering::Relaxed)
     }
 
+    pub fn pending_blocks(&self) -> Arc<Mutex<PendingBlocks>> {
+        self.pending_blocks.clone()
+    }
+}
+
+impl BlockReader for BlockStore {
+    fn block_exists(&self, block_id: HashValue) -> bool {
+        self.inner.read().block_exists(&block_id)
+    }
+
+    fn get_block(&self, block_id: HashValue) -> Option<Arc<PipelinedBlock>> {
+        self.inner.read().get_block(&block_id)
+    }
+
+    fn ordered_root(&self) -> Arc<PipelinedBlock> {
+        self.inner.read().ordered_root()
+    }
+
+    fn commit_root(&self) -> Arc<PipelinedBlock> {
+        self.inner.read().commit_root()
+    }
+
+    fn get_quorum_cert_for_block(&self, block_id: HashValue) -> Option<Arc<QuorumCert>> {
+        self.inner.read().get_quorum_cert_for_block(&block_id)
+    }
+
+    fn path_from_ordered_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>> {
+        self.inner.read().path_from_ordered_root(block_id)
+    }
+
+    fn path_from_commit_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>> {
+        self.inner.read().path_from_commit_root(block_id)
+    }
+
+    fn highest_certified_block(&self) -> Arc<PipelinedBlock> {
+        self.inner.read().highest_certified_block()
+    }
+
+    fn highest_quorum_cert(&self) -> Arc<QuorumCert> {
+        self.inner.read().highest_quorum_cert()
+    }
+
+    fn highest_ordered_cert(&self) -> Arc<WrappedLedgerInfo> {
+        self.inner.read().highest_ordered_cert()
+    }
+
+    fn highest_commit_cert(&self) -> Arc<WrappedLedgerInfo> {
+        self.inner.read().highest_commit_cert()
+    }
+
+    fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutCertificate>> {
+        self.inner.read().highest_2chain_timeout_cert()
+    }
+
+    fn sync_info(&self) -> SyncInfo {
+        SyncInfo::new_decoupled(
+            self.highest_quorum_cert().as_ref().clone(),
+            self.highest_ordered_cert().as_ref().clone(),
+            self.highest_commit_cert().as_ref().clone(),
+            self.highest_2chain_timeout_cert()
+                .map(|tc| tc.as_ref().clone()),
+        )
+    }
+
     /// Return if the consensus is backpressured
     fn vote_back_pressure(&self) -> bool {
         #[cfg(any(test, feature = "fuzzing"))]
@@ -477,11 +541,7 @@ impl BlockStore {
         ordered_round > self.vote_back_pressure_limit + commit_round
     }
 
-    pub fn pending_blocks(&self) -> Arc<Mutex<PendingBlocks>> {
-        self.pending_blocks.clone()
-    }
-
-    pub fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
+    fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
         let ordered_root = self.ordered_root();
         let commit_root = self.commit_root();
         let pending_path = self
@@ -552,73 +612,27 @@ impl BlockStore {
             Duration::ZERO
         }
     }
-}
 
-impl BlockReader for BlockStore {
-    fn block_exists(&self, block_id: HashValue) -> bool {
-        self.inner.read().block_exists(&block_id)
-    }
-
-    fn get_block(&self, block_id: HashValue) -> Option<Arc<PipelinedBlock>> {
-        self.inner.read().get_block(&block_id)
-    }
-
-    fn ordered_root(&self) -> Arc<PipelinedBlock> {
-        self.inner.read().ordered_root()
-    }
-
-    fn commit_root(&self) -> Arc<PipelinedBlock> {
-        self.inner.read().commit_root()
-    }
-
-    fn get_quorum_cert_for_block(&self, block_id: HashValue) -> Option<Arc<QuorumCert>> {
-        self.inner.read().get_quorum_cert_for_block(&block_id)
-    }
-
-    fn path_from_ordered_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>> {
-        self.inner.read().path_from_ordered_root(block_id)
-    }
-
-    fn path_from_commit_root(&self, block_id: HashValue) -> Option<Vec<Arc<PipelinedBlock>>> {
-        self.inner.read().path_from_commit_root(block_id)
-    }
-
-    fn highest_certified_block(&self) -> Arc<PipelinedBlock> {
-        self.inner.read().highest_certified_block()
-    }
-
-    fn highest_quorum_cert(&self) -> Arc<QuorumCert> {
-        self.inner.read().highest_quorum_cert()
-    }
-
-    fn highest_ordered_cert(&self) -> Arc<WrappedLedgerInfo> {
-        self.inner.read().highest_ordered_cert()
-    }
-
-    fn highest_commit_cert(&self) -> Arc<WrappedLedgerInfo> {
-        self.inner.read().highest_commit_cert()
-    }
-
-    fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutCertificate>> {
-        self.inner.read().highest_2chain_timeout_cert()
-    }
-
-    fn sync_info(&self) -> SyncInfo {
-        SyncInfo::new_decoupled(
-            self.highest_quorum_cert().as_ref().clone(),
-            self.highest_ordered_cert().as_ref().clone(),
-            self.highest_commit_cert().as_ref().clone(),
-            self.highest_2chain_timeout_cert()
-                .map(|tc| tc.as_ref().clone()),
-        )
-    }
-
-    fn vote_back_pressure(&self) -> bool {
-        self.vote_back_pressure()
-    }
-
-    fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
-        self.pipeline_pending_latency(proposal_timestamp)
+    fn get_recent_block_execution_times(&self, num_blocks: usize) -> Vec<(u64, Duration)> {
+        let mut res = vec![];
+        let mut cur_block = Some(self.ordered_root());
+        loop {
+            match cur_block {
+                Some(block) => {
+                    if let Some(execution_time_and_size) = block.get_execution_time_and_size() {
+                        info!("Found execution time for {}, {:?}", block.id(), execution_time_and_size );
+                        res.push(execution_time_and_size);
+                        if res.len() >= num_blocks {
+                            return res;
+                        }
+                    } else {
+                        info!("Couldn't find execution time for {}", block.id());
+                    }
+                    cur_block = self.get_block(block.parent_id());
+                },
+                None => return res,
+            }
+        }
     }
 }
 
