@@ -7,9 +7,7 @@ module aptos_framework::ten_x_token_tests {
     use std::option;
 
     #[test(creator = @0xcafe)]
-    fun test_ten_x(
-        creator: &signer,
-    ) {
+    fun test_ten_x(creator: &signer,) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);

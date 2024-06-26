@@ -2,7 +2,8 @@ spec aptos_framework::dkg {
 
     spec module {
         use aptos_framework::chain_status;
-        invariant [suspendable] chain_status::is_operating() ==> exists<DKGState>(@aptos_framework);
+        invariant [suspendable] chain_status::is_operating() ==>
+            exists<DKGState>(@aptos_framework);
     }
 
     spec initialize(aptos_framework: &signer) {
@@ -31,9 +32,7 @@ spec aptos_framework::dkg {
     spec fun has_incomplete_session(): bool {
         if (exists<DKGState>(@aptos_framework)) {
             option::spec_is_some(global<DKGState>(@aptos_framework).in_progress)
-        } else {
-            false
-        }
+        } else { false }
     }
 
     spec try_clear_incomplete_session(fx: &signer) {

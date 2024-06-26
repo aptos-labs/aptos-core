@@ -3,7 +3,8 @@ spec aptos_framework::randomness {
     spec module {
         use aptos_framework::chain_status;
         pragma verify = true;
-        invariant [suspendable] chain_status::is_operating() ==> exists<PerBlockRandomness>(@aptos_framework);
+        invariant [suspendable] chain_status::is_operating() ==>
+            exists<PerBlockRandomness>(@aptos_framework);
         global var: vector<u8>;
     }
 
@@ -29,12 +30,17 @@ spec aptos_framework::randomness {
         aborts_if framework_addr != @aptos_framework;
     }
 
-    spec on_new_block(vm: &signer, epoch: u64, round: u64, seed_for_new_block: Option<vector<u8>>) {
+    spec on_new_block(
+        vm: &signer, epoch: u64, round: u64, seed_for_new_block: Option<vector<u8>>
+    ) {
         use std::signer;
         aborts_if signer::address_of(vm) != @vm;
-        ensures exists<PerBlockRandomness>(@aptos_framework) ==> global<PerBlockRandomness>(@aptos_framework).seed == seed_for_new_block;
-        ensures exists<PerBlockRandomness>(@aptos_framework) ==> global<PerBlockRandomness>(@aptos_framework).epoch == epoch;
-        ensures exists<PerBlockRandomness>(@aptos_framework) ==> global<PerBlockRandomness>(@aptos_framework).round == round;
+        ensures exists<PerBlockRandomness>(@aptos_framework) ==>
+            global<PerBlockRandomness>(@aptos_framework).seed == seed_for_new_block;
+        ensures exists<PerBlockRandomness>(@aptos_framework) ==>
+            global<PerBlockRandomness>(@aptos_framework).epoch == epoch;
+        ensures exists<PerBlockRandomness>(@aptos_framework) ==>
+            global<PerBlockRandomness>(@aptos_framework).round == round;
     }
 
     spec next_32_bytes(): vector<u8> {
@@ -46,7 +52,8 @@ spec aptos_framework::randomness {
         let txn_hash = transaction_context::spec_get_txn_hash();
         let txn_counter = spec_fetch_and_increment_txn_counter();
         ensures len(result) == 32;
-        ensures result == hash::sha3_256(concat(concat(concat(input, seed), txn_hash), txn_counter));
+        ensures result
+            == hash::sha3_256(concat(concat(concat(input, seed), txn_hash), txn_counter));
     }
 
     spec schema NextBlobAbortsIf {
@@ -104,7 +111,6 @@ spec aptos_framework::randomness {
         aborts_if min_incl >= max_excl;
         ensures result >= min_incl && result < max_excl;
     }
-
 
     spec u64_range(min_incl: u64, max_excl: u64): u64 {
         pragma verify_duration_estimate = 120;

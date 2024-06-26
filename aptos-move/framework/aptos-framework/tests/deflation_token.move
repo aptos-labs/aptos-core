@@ -13,17 +13,20 @@ module 0xcafe::deflation_token {
         burn_ref: BurnRef,
     }
 
-    public fun initialize(account: &signer, constructor_ref: &ConstructorRef) {
+    public fun initialize(
+        account: &signer, constructor_ref: &ConstructorRef
+    ) {
         let burn_ref = fungible_asset::generate_burn_ref(constructor_ref);
 
         assert!(signer::address_of(account) == @0xcafe, 1);
         move_to<BurnStore>(account, BurnStore { burn_ref });
 
-        let withdraw = function_info::new_function_info(
-            account,
-            string::utf8(b"deflation_token"),
-            string::utf8(b"withdraw"),
-        );
+        let withdraw =
+            function_info::new_function_info(
+                account,
+                string::utf8(b"deflation_token"),
+                string::utf8(b"withdraw"),
+            );
 
         dispatchable_fungible_asset::register_dispatch_functions(
             constructor_ref,
@@ -41,7 +44,9 @@ module 0xcafe::deflation_token {
         // For every withdraw, we burn 10% from the store.
         let burn_amount = amount / 10;
         if (burn_amount > 0) {
-            fungible_asset::burn_from(&borrow_global<BurnStore>(@0xcafe).burn_ref, store, burn_amount);
+            fungible_asset::burn_from(
+                &borrow_global<BurnStore>(@0xcafe).burn_ref, store, burn_amount
+            );
         };
 
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
@@ -53,10 +58,8 @@ module 0xcafe::deflation_token {
     use aptos_framework::fungible_asset::{Metadata, TestToken};
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(major_status=4037, location=aptos_framework::dispatchable_fungible_asset)]
-    fun test_self_reentrancy(
-        creator: &signer,
-    ) {
+    #[expected_failure(major_status = 4037, location = aptos_framework::dispatchable_fungible_asset)]
+    fun test_self_reentrancy(creator: &signer,) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);
@@ -72,7 +75,8 @@ module 0xcafe::deflation_token {
         dispatchable_fungible_asset::deposit(creator_store, fa);
 
         // Withdraw will cause an re-entrant call into self module.
-        let fa = dispatchable_fungible_asset::withdraw(creator, creator_store, 10);
+        let fa =
+            dispatchable_fungible_asset::withdraw(creator, creator_store, 10);
         dispatchable_fungible_asset::deposit(creator_store, fa);
     }
 }

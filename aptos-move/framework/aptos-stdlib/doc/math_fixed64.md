@@ -147,7 +147,8 @@ is positive for all values of x.
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed64.md#0x1_math_fixed64_ln_plus_32ln2">ln_plus_32ln2</a>(x: FixedPoint64): FixedPoint64 {
     <b>let</b> raw_value = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">fixed_point64::get_raw_value</a>(x);
-    <b>let</b> x = (<a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">fixed_point64::get_raw_value</a>(<a href="math128.md#0x1_math128_log2_64">math128::log2_64</a>(raw_value)) <b>as</b> u256);
+    <b>let</b> x =
+        (<a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">fixed_point64::get_raw_value</a>(<a href="math128.md#0x1_math128_log2_64">math128::log2_64</a>(raw_value)) <b>as</b> u256);
     <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a>(((x * <a href="math_fixed64.md#0x1_math_fixed64_LN2">LN2</a>) &gt;&gt; 64 <b>as</b> u128))
 }
 </code></pre>
@@ -202,7 +203,7 @@ Specialized function for x * y / z that omits intermediate shifting
     <b>let</b> a = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">fixed_point64::get_raw_value</a>(x);
     <b>let</b> b = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">fixed_point64::get_raw_value</a>(y);
     <b>let</b> c = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">fixed_point64::get_raw_value</a>(z);
-    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a> (<a href="math128.md#0x1_math128_mul_div">math128::mul_div</a>(a, b, c))
+    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a>(<a href="math128.md#0x1_math128_mul_div">math128::mul_div</a>(a, b, c))
 }
 </code></pre>
 
@@ -237,7 +238,7 @@ Specialized function for x * y / z that omits intermediate shifting
     <b>let</b> exponent = remainder / bigfactor;
     <b>let</b> x = remainder % bigfactor;
     // 2^(remainder / ln2) = (2^(1/580))^exponent * <a href="math_fixed64.md#0x1_math_fixed64_exp">exp</a>(x / 2^64)
-    <b>let</b> roottwo = 18468802611690918839;  // fixed point representation of 2^(1/580)
+    <b>let</b> roottwo = 18468802611690918839; // fixed point representation of 2^(1/580)
     // 2^(1/580) = roottwo(1 - eps), so the number we seek is roottwo^exponent (1 - eps * exponent)
     <b>let</b> power = <a href="math_fixed64.md#0x1_math_fixed64_pow_raw">pow_raw</a>(roottwo, (exponent <b>as</b> u128));
     <b>let</b> eps_correction = 219071715585908898;
@@ -250,7 +251,8 @@ Specialized function for x * y / z that omits intermediate shifting
     <b>let</b> taylor4 = (taylor3 * x) &gt;&gt; 64;
     <b>let</b> taylor5 = (taylor4 * x) &gt;&gt; 64;
     <b>let</b> taylor6 = (taylor5 * x) &gt;&gt; 64;
-    (power &lt;&lt; shift) + taylor1 + taylor2 / 2 + taylor3 / 6 + taylor4 / 24 + taylor5 / 120 + taylor6 / 720
+    (power &lt;&lt; shift) + taylor1 + taylor2 / 2 + taylor3 / 6 + taylor4 / 24 + taylor5 /
+        120 + taylor6 / 720
 }
 </code></pre>
 

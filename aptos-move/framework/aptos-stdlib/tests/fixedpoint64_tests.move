@@ -97,7 +97,8 @@ module aptos_std::fixed_point64_tests {
         assert!(not_three == 2, 0);
 
         // Try again with a fraction slightly larger than 1/3.
-        let f = fixed_point64::create_from_raw_value(fixed_point64::get_raw_value(f) + 1);
+        let f =
+            fixed_point64::create_from_raw_value(fixed_point64::get_raw_value(f) + 1);
         let three = fixed_point64::multiply_u128(9, f);
         assert!(three == 3, 1);
     }
@@ -116,10 +117,10 @@ module aptos_std::fixed_point64_tests {
         let two = fixed_point64::create_from_rational(2, 1);
         let smaller_number1 = fixed_point64::min(one, two);
         let val1 = fixed_point64::get_raw_value(smaller_number1);
-        assert!(val1 == POW2_64, 0);  // 0x1.00000000
+        assert!(val1 == POW2_64, 0); // 0x1.00000000
         let smaller_number2 = fixed_point64::min(two, one);
         let val2 = fixed_point64::get_raw_value(smaller_number2);
-        assert!(val2 == POW2_64, 0);  // 0x1.00000000
+        assert!(val2 == POW2_64, 0); // 0x1.00000000
     }
 
     #[test]
@@ -129,9 +130,9 @@ module aptos_std::fixed_point64_tests {
         let larger_number1 = fixed_point64::max(one, two);
         let larger_number2 = fixed_point64::max(two, one);
         let val1 = fixed_point64::get_raw_value(larger_number1);
-        assert!(val1 == 2 * POW2_64, 0);  // 0x2.00000000
+        assert!(val1 == 2 * POW2_64, 0); // 0x2.00000000
         let val2 = fixed_point64::get_raw_value(larger_number2);
-        assert!(val2 == 2 * POW2_64, 0);  // 0x2.00000000
+        assert!(val2 == 2 * POW2_64, 0); // 0x2.00000000
     }
 
     #[test]

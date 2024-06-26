@@ -39,9 +39,7 @@ module aptos_framework::config_buffer {
     public fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         if (!exists<PendingConfigs>(@aptos_framework)) {
-            move_to(aptos_framework, PendingConfigs {
-                configs: simple_map::new(),
-            })
+            move_to(aptos_framework, PendingConfigs { configs: simple_map::new(), })
         }
     }
 
@@ -50,9 +48,7 @@ module aptos_framework::config_buffer {
         if (exists<PendingConfigs>(@aptos_framework)) {
             let config = borrow_global<PendingConfigs>(@aptos_framework);
             simple_map::contains_key(&config.configs, &type_info::type_name<T>())
-        } else {
-            false
-        }
+        } else { false }
     }
 
     /// Upsert an on-chain config to the buffer for the next epoch.

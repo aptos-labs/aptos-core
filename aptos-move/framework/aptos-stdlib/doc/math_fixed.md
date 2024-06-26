@@ -209,7 +209,7 @@ Specialized function for x * y / z that omits intermediate shifting
     <b>let</b> a = <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(x);
     <b>let</b> b = <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(y);
     <b>let</b> c = <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_get_raw_value">fixed_point32::get_raw_value</a>(z);
-    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a> (<a href="math64.md#0x1_math64_mul_div">math64::mul_div</a>(a, b, c))
+    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a>(<a href="math64.md#0x1_math64_mul_div">math64::mul_div</a>(a, b, c))
 }
 </code></pre>
 
@@ -244,7 +244,7 @@ Specialized function for x * y / z that omits intermediate shifting
     <b>let</b> exponent = remainder / bigfactor;
     <b>let</b> x = remainder % bigfactor;
     // 2^(remainder / ln2) = (2^(1/4999))^exponent * <a href="math_fixed.md#0x1_math_fixed_exp">exp</a>(x / 2^32)
-    <b>let</b> roottwo = 4295562865;  // fixed point representation of 2^(1/4999)
+    <b>let</b> roottwo = 4295562865; // fixed point representation of 2^(1/4999)
     // This <b>has</b> an <a href="../../move-stdlib/doc/error.md#0x1_error">error</a> of 5000 / 4 10^9 roughly 6 digits of precission
     <b>let</b> power = <a href="math_fixed.md#0x1_math_fixed_pow_raw">pow_raw</a>(roottwo, exponent);
     <b>let</b> eps_correction = 1241009291;

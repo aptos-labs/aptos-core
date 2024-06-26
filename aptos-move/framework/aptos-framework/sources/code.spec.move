@@ -93,11 +93,15 @@ spec aptos_framework::code {
         pragma verify = false;
     }
 
-    spec check_upgradability(old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>) {
+    spec check_upgradability(
+        old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>
+    ) {
         // TODO: Can't verify 'vector::enumerate' loop.
         pragma aborts_if_is_partial;
         aborts_if old_pack.upgrade_policy.policy >= upgrade_policy_immutable().policy;
-        aborts_if !can_change_upgrade_policy_to(old_pack.upgrade_policy, new_pack.upgrade_policy);
+        aborts_if !can_change_upgrade_policy_to(
+            old_pack.upgrade_policy, new_pack.upgrade_policy
+        );
     }
 
     spec check_dependencies(publish_address: address, pack: &PackageMetadata): vector<AllowedDep> {

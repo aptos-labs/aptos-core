@@ -103,7 +103,7 @@ module aptos_token_objects::aptos_token {
             tokens_burnable_by_creator,
             tokens_freezable_by_creator,
             royalty_numerator,
-            royalty_denominator
+            royalty_denominator,
         );
     }
 
@@ -126,28 +126,36 @@ module aptos_token_objects::aptos_token {
         royalty_denominator: u64,
     ): Object<AptosCollection> {
         let creator_addr = signer::address_of(creator);
-        let royalty = royalty::create(royalty_numerator, royalty_denominator, creator_addr);
-        let constructor_ref = collection::create_fixed_collection(
-            creator,
-            description,
-            max_supply,
-            name,
-            option::some(royalty),
-            uri,
-        );
+        let royalty =
+            royalty::create(royalty_numerator, royalty_denominator, creator_addr);
+        let constructor_ref =
+            collection::create_fixed_collection(
+                creator,
+                description,
+                max_supply,
+                name,
+                option::some(royalty),
+                uri,
+            );
 
         let object_signer = object::generate_signer(&constructor_ref);
-        let mutator_ref = if (mutable_description || mutable_uri) {
-            option::some(collection::generate_mutator_ref(&constructor_ref))
-        } else {
-            option::none()
-        };
+        let mutator_ref =
+            if (mutable_description || mutable_uri) {
+                option::some(collection::generate_mutator_ref(&constructor_ref))
+            } else {
+                option::none()
+            };
 
-        let royalty_mutator_ref = if (mutable_royalty) {
-            option::some(royalty::generate_mutator_ref(object::generate_extend_ref(&constructor_ref)))
-        } else {
-            option::none()
-        };
+        let royalty_mutator_ref =
+            if (mutable_royalty) {
+                option::some(
+                    royalty::generate_mutator_ref(
+                        object::generate_extend_ref(&constructor_ref)
+                    ),
+                )
+            } else {
+                option::none()
+            };
 
         let aptos_collection = AptosCollection {
             mutator_ref,
@@ -176,7 +184,16 @@ module aptos_token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
     ) acquires AptosCollection, AptosToken {
-        mint_token_object(creator, collection, description, name, uri, property_keys, property_types, property_values);
+        mint_token_object(
+            creator,
+            collection,
+            description,
+            name,
+            uri,
+            property_keys,
+            property_types,
+            property_values,
+        );
     }
 
     /// Mint a token into an existing collection, and retrieve the object / address of the token.
@@ -190,16 +207,17 @@ module aptos_token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
     ): Object<AptosToken> acquires AptosCollection, AptosToken {
-        let constructor_ref = mint_internal(
-            creator,
-            collection,
-            description,
-            name,
-            uri,
-            property_keys,
-            property_types,
-            property_values,
-        );
+        let constructor_ref =
+            mint_internal(
+                creator,
+                collection,
+                description,
+                name,
+                uri,
+                property_keys,
+                property_types,
+                property_values,
+            );
 
         let collection = collection_object(creator, &collection);
 
@@ -236,7 +254,7 @@ module aptos_token_objects::aptos_token {
             property_keys,
             property_types,
             property_values,
-            soul_bound_to
+            soul_bound_to,
         );
     }
 
@@ -252,16 +270,17 @@ module aptos_token_objects::aptos_token {
         property_values: vector<vector<u8>>,
         soul_bound_to: address,
     ): Object<AptosToken> acquires AptosCollection {
-        let constructor_ref = mint_internal(
-            creator,
-            collection,
-            description,
-            name,
-            uri,
-            property_keys,
-            property_types,
-            property_values,
-        );
+        let constructor_ref =
+            mint_internal(
+                creator,
+                collection,
+                description,
+                name,
+                uri,
+                property_keys,
+                property_types,
+                property_values,
+            );
 
         let transfer_ref = object::generate_transfer_ref(&constructor_ref);
         let linear_transfer_ref = object::generate_linear_transfer_ref(&transfer_ref);
@@ -281,28 +300,29 @@ module aptos_token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
     ): ConstructorRef acquires AptosCollection {
-        let constructor_ref = token::create(creator, collection, description, name, option::none(), uri);
+        let constructor_ref =
+            token::create(creator, collection, description, name, option::none(), uri);
 
         let object_signer = object::generate_signer(&constructor_ref);
 
         let collection_obj = collection_object(creator, &collection);
         let collection = borrow_collection(&collection_obj);
 
-        let mutator_ref = if (
-            collection.mutable_token_description
+        let mutator_ref =
+            if (collection.mutable_token_description
                 || collection.mutable_token_name
-                || collection.mutable_token_uri
-        ) {
-            option::some(token::generate_mutator_ref(&constructor_ref))
-        } else {
-            option::none()
-        };
+                || collection.mutable_token_uri) {
+                option::some(token::generate_mutator_ref(&constructor_ref))
+            } else {
+                option::none()
+            };
 
-        let burn_ref = if (collection.tokens_burnable_by_creator) {
-            option::some(token::generate_burn_ref(&constructor_ref))
-        } else {
-            option::none()
-        };
+        let burn_ref =
+            if (collection.tokens_burnable_by_creator) {
+                option::some(token::generate_burn_ref(&constructor_ref))
+            } else {
+                option::none()
+            };
 
         let aptos_token = AptosToken {
             burn_ref,
@@ -312,7 +332,8 @@ module aptos_token_objects::aptos_token {
         };
         move_to(&object_signer, aptos_token);
 
-        let properties = property_map::prepare_input(property_keys, property_types, property_values);
+        let properties =
+            property_map::prepare_input(property_keys, property_types, property_values);
         property_map::init(&constructor_ref, properties);
 
         constructor_ref
@@ -362,7 +383,9 @@ module aptos_token_objects::aptos_token {
 
     // Token mutators
 
-    inline fun authorized_borrow<T: key>(token: &Object<T>, creator: &signer): &AptosToken {
+    inline fun authorized_borrow<T: key>(
+        token: &Object<T>, creator: &signer
+    ): &AptosToken {
         let token_address = object::object_address(token);
         assert!(
             exists<AptosToken>(token_address),
@@ -384,34 +407,32 @@ module aptos_token_objects::aptos_token {
         );
         move aptos_token;
         let aptos_token = move_from<AptosToken>(object::object_address(&token));
-        let AptosToken {
-            burn_ref,
-            transfer_ref: _,
-            mutator_ref: _,
-            property_mutator_ref,
-        } = aptos_token;
+        let AptosToken { burn_ref, transfer_ref: _, mutator_ref: _, property_mutator_ref, } = aptos_token;
         property_map::burn(property_mutator_ref);
         token::burn(option::extract(&mut burn_ref));
     }
 
-    public entry fun freeze_transfer<T: key>(creator: &signer, token: Object<T>) acquires AptosCollection, AptosToken {
+    public entry fun freeze_transfer<T: key>(
+        creator: &signer, token: Object<T>
+    ) acquires AptosCollection, AptosToken {
         let aptos_token = authorized_borrow(&token, creator);
         assert!(
-            are_collection_tokens_freezable(token::collection_object(token))
-                && option::is_some(&aptos_token.transfer_ref),
+            are_collection_tokens_freezable(token::collection_object(token)) && option::is_some(
+                &aptos_token.transfer_ref
+            ),
             error::permission_denied(EFIELD_NOT_MUTABLE),
         );
         object::disable_ungated_transfer(option::borrow(&aptos_token.transfer_ref));
     }
 
     public entry fun unfreeze_transfer<T: key>(
-        creator: &signer,
-        token: Object<T>
+        creator: &signer, token: Object<T>
     ) acquires AptosCollection, AptosToken {
         let aptos_token = authorized_borrow(&token, creator);
         assert!(
-            are_collection_tokens_freezable(token::collection_object(token))
-                && option::is_some(&aptos_token.transfer_ref),
+            are_collection_tokens_freezable(token::collection_object(token)) && option::is_some(
+                &aptos_token.transfer_ref
+            ),
             error::permission_denied(EFIELD_NOT_MUTABLE),
         );
         object::enable_ungated_transfer(option::borrow(&aptos_token.transfer_ref));
@@ -458,8 +479,7 @@ module aptos_token_objects::aptos_token {
 
     public entry fun add_property<T: key>(
         creator: &signer,
-        token: Object<T>,
-        key: String,
+        token: Object<T>, key: String,
         type: String,
         value: vector<u8>,
     ) acquires AptosCollection, AptosToken {
@@ -474,8 +494,7 @@ module aptos_token_objects::aptos_token {
 
     public entry fun add_typed_property<T: key, V: drop>(
         creator: &signer,
-        token: Object<T>,
-        key: String,
+        token: Object<T>, key: String,
         value: V,
     ) acquires AptosCollection, AptosToken {
         let aptos_token = authorized_borrow(&token, creator);
@@ -489,8 +508,7 @@ module aptos_token_objects::aptos_token {
 
     public entry fun remove_property<T: key>(
         creator: &signer,
-        token: Object<T>,
-        key: String,
+        token: Object<T>, key: String,
     ) acquires AptosCollection, AptosToken {
         let aptos_token = authorized_borrow(&token, creator);
         assert!(
@@ -503,8 +521,7 @@ module aptos_token_objects::aptos_token {
 
     public entry fun update_property<T: key>(
         creator: &signer,
-        token: Object<T>,
-        key: String,
+        token: Object<T>, key: String,
         type: String,
         value: vector<u8>,
     ) acquires AptosCollection, AptosToken {
@@ -519,8 +536,7 @@ module aptos_token_objects::aptos_token {
 
     public entry fun update_typed_property<T: key, V: drop>(
         creator: &signer,
-        token: Object<T>,
-        key: String,
+        token: Object<T>, key: String,
         value: V,
     ) acquires AptosCollection, AptosToken {
         let aptos_token = authorized_borrow(&token, creator);
@@ -535,7 +551,8 @@ module aptos_token_objects::aptos_token {
     // Collection accessors
 
     inline fun collection_object(creator: &signer, name: &String): Object<AptosCollection> {
-        let collection_addr = collection::create_collection_address(&signer::address_of(creator), name);
+        let collection_addr =
+            collection::create_collection_address(&signer::address_of(creator), name);
         object::address_to_object<AptosCollection>(collection_addr)
     }
 
@@ -560,9 +577,7 @@ module aptos_token_objects::aptos_token {
         option::is_some(&borrow_collection(&collection).royalty_mutator_ref)
     }
 
-    public fun is_mutable_collection_uri<T: key>(
-        collection: Object<T>,
-    ): bool acquires AptosCollection {
+    public fun is_mutable_collection_uri<T: key>(collection: Object<T>,): bool acquires AptosCollection {
         borrow_collection(&collection).mutable_uri
     }
 
@@ -604,7 +619,9 @@ module aptos_token_objects::aptos_token {
 
     // Collection mutators
 
-    inline fun authorized_borrow_collection<T: key>(collection: &Object<T>, creator: &signer): &AptosCollection {
+    inline fun authorized_borrow_collection<T: key>(
+        collection: &Object<T>, creator: &signer
+    ): &AptosCollection {
         let collection_address = object::object_address(collection);
         assert!(
             exists<AptosCollection>(collection_address),
@@ -627,7 +644,9 @@ module aptos_token_objects::aptos_token {
             aptos_collection.mutable_description,
             error::permission_denied(EFIELD_NOT_MUTABLE),
         );
-        collection::set_description(option::borrow(&aptos_collection.mutator_ref), description);
+        collection::set_description(
+            option::borrow(&aptos_collection.mutator_ref), description
+        );
     }
 
     public fun set_collection_royalties<T: key>(
@@ -650,7 +669,8 @@ module aptos_token_objects::aptos_token {
         royalty_denominator: u64,
         payee_address: address,
     ) acquires AptosCollection {
-        let royalty = royalty::create(royalty_numerator, royalty_denominator, payee_address);
+        let royalty =
+            royalty::create(royalty_numerator, royalty_denominator, payee_address);
         set_collection_royalties(creator, collection, royalty);
     }
 
@@ -698,17 +718,18 @@ module aptos_token_objects::aptos_token {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
 
-        let token = mint_soul_bound_token_object(
-            creator,
-            collection_name,
-            string::utf8(b""),
-            token_name,
-            string::utf8(b""),
-            vector[],
-            vector[],
-            vector[],
-            signer::address_of(bob),
-        );
+        let token =
+            mint_soul_bound_token_object(
+                creator,
+                collection_name,
+                string::utf8(b""),
+                token_name,
+                string::utf8(b""),
+                vector[],
+                vector[],
+                vector[],
+                signer::address_of(bob),
+            );
 
         object::transfer(bob, token, @0x345);
     }
@@ -789,8 +810,7 @@ module aptos_token_objects::aptos_token {
     #[test(creator = @0x123, noncreator = @0x456)]
     #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_set_description_non_creator(
-        creator: &signer,
-        noncreator: &signer,
+        creator: &signer, noncreator: &signer,
     ) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -831,8 +851,7 @@ module aptos_token_objects::aptos_token {
     #[test(creator = @0x123, noncreator = @0x456)]
     #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_set_name_non_creator(
-        creator: &signer,
-        noncreator: &signer,
+        creator: &signer, noncreator: &signer,
     ) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -873,8 +892,7 @@ module aptos_token_objects::aptos_token {
     #[test(creator = @0x123, noncreator = @0x456)]
     #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_set_uri_non_creator(
-        creator: &signer,
-        noncreator: &signer,
+        creator: &signer, noncreator: &signer,
     ) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -915,8 +933,7 @@ module aptos_token_objects::aptos_token {
     #[test(creator = @0x123, noncreator = @0x456)]
     #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_burn_non_creator(
-        creator: &signer,
-        noncreator: &signer,
+        creator: &signer, noncreator: &signer,
     ) acquires AptosCollection, AptosToken {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -948,8 +965,7 @@ module aptos_token_objects::aptos_token {
     #[test(creator = @0x123, noncreator = @0x456)]
     #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_set_collection_description_non_creator(
-        creator: &signer,
-        noncreator: &signer,
+        creator: &signer, noncreator: &signer,
     ) acquires AptosCollection {
         let collection_name = string::utf8(b"collection name");
         let collection = create_collection_helper(creator, collection_name, true);
@@ -977,8 +993,7 @@ module aptos_token_objects::aptos_token {
     #[test(creator = @0x123, noncreator = @0x456)]
     #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_set_collection_uri_non_creator(
-        creator: &signer,
-        noncreator: &signer,
+        creator: &signer, noncreator: &signer,
     ) acquires AptosCollection {
         let collection_name = string::utf8(b"collection name");
         let collection = create_collection_helper(creator, collection_name, true);
@@ -994,7 +1009,7 @@ module aptos_token_objects::aptos_token {
 
         create_collection_helper(creator, collection_name, true);
         let token = mint_helper(creator, collection_name, token_name);
-        add_property(creator, token, property_name, property_type, vector [ 0x08 ]);
+        add_property(creator, token, property_name, property_type, vector[0x08]);
 
         assert!(property_map::read_u8(&token, &property_name) == 0x8, 0);
     }
@@ -1021,7 +1036,7 @@ module aptos_token_objects::aptos_token {
 
         create_collection_helper(creator, collection_name, true);
         let token = mint_helper(creator, collection_name, token_name);
-        update_property(creator, token, property_name, property_type, vector [ 0x00 ]);
+        update_property(creator, token, property_name, property_type, vector[0x00]);
 
         assert!(!property_map::read_bool(&token, &property_name), 0);
     }

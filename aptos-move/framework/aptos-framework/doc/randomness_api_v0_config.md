@@ -93,7 +93,11 @@ Only used in genesis.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, required_amount: <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a>, allow_custom_max_gas_flag: <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a>) {
+<pre><code><b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_initialize">initialize</a>(
+    framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    required_amount: <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a>,
+    allow_custom_max_gas_flag: <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a>
+) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
     <b>move_to</b>(framework, required_amount);
@@ -121,7 +125,9 @@ This can be called by on-chain governance to update <code><a href="randomness_ap
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_set_for_next_epoch">set_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_amount: Option&lt;u64&gt;) {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_set_for_next_epoch">set_for_next_epoch</a>(
+    framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_amount: Option&lt;u64&gt;
+) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a> { gas_amount });
 }
@@ -147,9 +153,11 @@ This can be called by on-chain governance to update <code><a href="randomness_ap
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_set_allow_max_gas_flag_for_next_epoch">set_allow_max_gas_flag_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, value: bool) {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_set_allow_max_gas_flag_for_next_epoch">set_allow_max_gas_flag_for_next_epoch</a>(
+    framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, value: bool
+) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a> { value } );
+    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a> { value });
 }
 </code></pre>
 

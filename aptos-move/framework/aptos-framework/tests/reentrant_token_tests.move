@@ -7,10 +7,8 @@ module 0xcafe::reentrant_token_tests {
     use std::option;
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(major_status=4037, location=aptos_framework::dispatchable_fungible_asset)]
-    fun test_reentrant_deposit(
-        creator: &signer,
-    ) {
+    #[expected_failure(major_status = 4037, location = aptos_framework::dispatchable_fungible_asset)]
+    fun test_reentrant_deposit(creator: &signer,) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);

@@ -39,9 +39,7 @@ module aptos_framework::reconfiguration_state {
     public fun initialize(fx: &signer) {
         system_addresses::assert_aptos_framework(fx);
         if (!exists<State>(@aptos_framework)) {
-            move_to(fx, State {
-                variant: copyable_any::pack(StateInactive {})
-            })
+            move_to(fx, State { variant: copyable_any::pack(StateInactive {}) })
         }
     }
 
@@ -67,11 +65,13 @@ module aptos_framework::reconfiguration_state {
     public(friend) fun on_reconfig_start() acquires State {
         if (exists<State>(@aptos_framework)) {
             let state = borrow_global_mut<State>(@aptos_framework);
-            let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
+            let variant_type_name = *string::bytes(
+                copyable_any::type_name(&state.variant)
+            );
             if (variant_type_name == b"0x1::reconfiguration_state::StateInactive") {
-                state.variant = copyable_any::pack(StateActive {
-                    start_time_secs: timestamp::now_seconds()
-                });
+                state.variant = copyable_any::pack(
+                    StateActive { start_time_secs: timestamp::now_seconds() }
+                );
             }
         };
     }
@@ -94,7 +94,9 @@ module aptos_framework::reconfiguration_state {
     public(friend) fun on_reconfig_finish() acquires State {
         if (exists<State>(@aptos_framework)) {
             let state = borrow_global_mut<State>(@aptos_framework);
-            let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
+            let variant_type_name = *string::bytes(
+                copyable_any::type_name(&state.variant)
+            );
             if (variant_type_name == b"0x1::reconfiguration_state::StateActive") {
                 state.variant = copyable_any::pack(StateInactive {});
             } else {

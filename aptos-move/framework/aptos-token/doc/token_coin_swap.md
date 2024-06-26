@@ -374,8 +374,7 @@ Token is not in escrow
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_does_listing_exist">does_listing_exist</a>&lt;CoinType&gt;(
-    _token_owner: <b>address</b>,
-    _token_id: TokenId
+    _token_owner: <b>address</b>, _token_id: TokenId
 ): bool {
     <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>)
 }
@@ -550,9 +549,7 @@ Private function for withdraw tokens from an escrow stored in token owner addres
 
 
 <pre><code><b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_withdraw_token_from_escrow_internal">withdraw_token_from_escrow_internal</a>(
-    _token_owner_addr: <b>address</b>,
-    _token_id: TokenId,
-    _amount: u64
+    _token_owner_addr: <b>address</b>, _token_id: TokenId, _amount: u64
 ): Token {
     <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>)
 }
@@ -579,9 +576,7 @@ Withdraw tokens from the token escrow. It needs a signer to authorize
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_withdraw_token_from_escrow">withdraw_token_from_escrow</a>(
-    _token_owner: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    _token_id: TokenId,
-    _amount: u64
+    _token_owner: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _token_id: TokenId, _amount: u64
 ): Token {
     <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token_coin_swap.md#0x3_token_coin_swap_EDEPRECATED_MODULE">EDEPRECATED_MODULE</a>)
 }

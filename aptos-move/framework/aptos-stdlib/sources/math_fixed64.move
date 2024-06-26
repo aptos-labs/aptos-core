@@ -9,7 +9,7 @@ module aptos_std::math_fixed64 {
     const EOVERFLOW_EXP: u64 = 1;
 
     /// Natural log 2 in 32 bit fixed point
-    const LN2: u256 = 12786308645202655660;  // ln(2) in fixed 64 representation
+    const LN2: u256 = 12786308645202655660; // ln(2) in fixed 64 representation
 
     /// Square root of fixed point number
     public fun sqrt(x: FixedPoint64): FixedPoint64 {
@@ -34,7 +34,8 @@ module aptos_std::math_fixed64 {
 
     public fun ln_plus_32ln2(x: FixedPoint64): FixedPoint64 {
         let raw_value = fixed_point64::get_raw_value(x);
-        let x = (fixed_point64::get_raw_value(math128::log2_64(raw_value)) as u256);
+        let x =
+            (fixed_point64::get_raw_value(math128::log2_64(raw_value)) as u256);
         fixed_point64::create_from_raw_value(((x * LN2) >> 64 as u128))
     }
 
@@ -49,7 +50,7 @@ module aptos_std::math_fixed64 {
         let a = fixed_point64::get_raw_value(x);
         let b = fixed_point64::get_raw_value(y);
         let c = fixed_point64::get_raw_value(z);
-        fixed_point64::create_from_raw_value (math128::mul_div(a, b, c))
+        fixed_point64::create_from_raw_value(math128::mul_div(a, b, c))
     }
 
     // Calculate e^x where x and the result are fixed point numbers
@@ -65,7 +66,7 @@ module aptos_std::math_fixed64 {
         let exponent = remainder / bigfactor;
         let x = remainder % bigfactor;
         // 2^(remainder / ln2) = (2^(1/580))^exponent * exp(x / 2^64)
-        let roottwo = 18468802611690918839;  // fixed point representation of 2^(1/580)
+        let roottwo = 18468802611690918839; // fixed point representation of 2^(1/580)
         // 2^(1/580) = roottwo(1 - eps), so the number we seek is roottwo^exponent (1 - eps * exponent)
         let power = pow_raw(roottwo, (exponent as u128));
         let eps_correction = 219071715585908898;
@@ -78,7 +79,8 @@ module aptos_std::math_fixed64 {
         let taylor4 = (taylor3 * x) >> 64;
         let taylor5 = (taylor4 * x) >> 64;
         let taylor6 = (taylor5 * x) >> 64;
-        (power << shift) + taylor1 + taylor2 / 2 + taylor3 / 6 + taylor4 / 24 + taylor5 / 120 + taylor6 / 720
+        (power << shift) + taylor1 + taylor2 / 2 + taylor3 / 6 + taylor4 / 24 + taylor5 /
+            120 + taylor6 / 720
     }
 
     // Calculate x to the power of n, where x and the result are fixed point numbers.
@@ -102,7 +104,9 @@ module aptos_std::math_fixed64 {
         assert!(fixed_point64::get_raw_value(result) == fixed_base, 0);
 
         let result = sqrt(fixed_point64::create_from_u128(2));
-        assert_approx_the_same((fixed_point64::get_raw_value(result) as u256), 26087635650665564424, 16);
+        assert_approx_the_same(
+            (fixed_point64::get_raw_value(result) as u256), 26087635650665564424, 16
+        );
     }
 
     #[test]
@@ -112,11 +116,11 @@ module aptos_std::math_fixed64 {
         assert!(result == fixed_base, 0);
 
         let result = exp_raw(fixed_base);
-        let e = 50143449209799256682;  // e in 32 bit fixed point
+        let e = 50143449209799256682; // e in 32 bit fixed point
         assert_approx_the_same(result, e, 16);
 
         let result = exp_raw(10 * fixed_base);
-        let exp10 = 406316577365116946489258;  // e^10 in 32 bit fixed point
+        let exp10 = 406316577365116946489258; // e^10 in 32 bit fixed point
         assert_approx_the_same(result, exp10, 16);
     }
 
@@ -124,7 +128,7 @@ module aptos_std::math_fixed64 {
     public entry fun test_pow() {
         // We use the case of exp
         let result = pow_raw(18468802611690918839, 580);
-        assert_approx_the_same(result,  1 << 65, 16);
+        assert_approx_the_same(result, 1 << 65, 16);
     }
 
     #[test_only]

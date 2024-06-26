@@ -224,7 +224,9 @@ This can be called by on-chain governance to update on-chain consensus configs f
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_set_for_next_epoch">set_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_config: <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>) {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_set_for_next_epoch">set_for_next_epoch</a>(
+    framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_config: <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>
+) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(new_config);
 }
@@ -289,11 +291,11 @@ The feature works if and only if <code><a href="consensus_config.md#0x1_consensu
 <pre><code><b>public</b> <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_enabled">enabled</a>(): bool <b>acquires</b> <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
     <b>if</b> (<b>exists</b>&lt;<a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>&gt;(@aptos_framework)) {
         <b>let</b> config = <b>borrow_global</b>&lt;<a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>&gt;(@aptos_framework);
-        <b>let</b> variant_type_name = *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(<a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(&config.variant));
+        <b>let</b> variant_type_name = *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(
+            <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(&config.variant)
+        );
         variant_type_name != b"<a href="randomness_config.md#0x1_randomness_config_ConfigOff">0x1::randomness_config::ConfigOff</a>"
-    } <b>else</b> {
-        <b>false</b>
-    }
+    } <b>else</b> { <b>false</b> }
 }
 </code></pre>
 
@@ -318,9 +320,7 @@ Create a <code><a href="randomness_config.md#0x1_randomness_config_ConfigOff">Co
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_new_off">new_off</a>(): <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
-    <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
-        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>( <a href="randomness_config.md#0x1_randomness_config_ConfigOff">ConfigOff</a> {} )
-    }
+    <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> { variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="randomness_config.md#0x1_randomness_config_ConfigOff">ConfigOff</a> {}) }
 }
 </code></pre>
 
@@ -344,12 +344,13 @@ Create a <code><a href="randomness_config.md#0x1_randomness_config_ConfigV1">Con
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_new_v1">new_v1</a>(secrecy_threshold: FixedPoint64, reconstruction_threshold: FixedPoint64): <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_new_v1">new_v1</a>(
+    secrecy_threshold: FixedPoint64, reconstruction_threshold: FixedPoint64
+): <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
     <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
-        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>( <a href="randomness_config.md#0x1_randomness_config_ConfigV1">ConfigV1</a> {
-            secrecy_threshold,
-            reconstruction_threshold
-        } )
+        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(
+            <a href="randomness_config.md#0x1_randomness_config_ConfigV1">ConfigV1</a> { secrecy_threshold, reconstruction_threshold },
+        )
     }
 }
 </code></pre>
@@ -380,11 +381,13 @@ Create a <code><a href="randomness_config.md#0x1_randomness_config_ConfigV2">Con
     fast_path_secrecy_threshold: FixedPoint64,
 ): <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
     <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
-        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>( <a href="randomness_config.md#0x1_randomness_config_ConfigV2">ConfigV2</a> {
-            secrecy_threshold,
-            reconstruction_threshold,
-            fast_path_secrecy_threshold,
-        } )
+        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(
+            <a href="randomness_config.md#0x1_randomness_config_ConfigV2">ConfigV2</a> {
+                secrecy_threshold,
+                reconstruction_threshold,
+                fast_path_secrecy_threshold,
+            },
+        )
     }
 }
 </code></pre>

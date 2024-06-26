@@ -351,11 +351,8 @@ Returns the smaller of the two FixedPoint32 numbers.
 
 
 <pre><code><b>public</b> <b>fun</b> <b>min</b>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> {
-    <b>if</b> (num1.value &lt; num2.value) {
-        num1
-    } <b>else</b> {
-        num2
-    }
+    <b>if</b> (num1.value &lt; num2.value) { num1 }
+    <b>else</b> { num2 }
 }
 </code></pre>
 
@@ -380,11 +377,8 @@ Returns the larger of the two FixedPoint32 numbers.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_max">max</a>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> {
-    <b>if</b> (num1.value &gt; num2.value) {
-        num1
-    } <b>else</b> {
-        num2
-    }
+    <b>if</b> (num1.value &gt; num2.value) { num1 }
+    <b>else</b> { num2 }
 }
 </code></pre>
 
@@ -411,7 +405,7 @@ Create a fixedpoint value from a u64 value.
 <pre><code><b>public</b> <b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_create_from_u64">create_from_u64</a>(val: u64): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> {
     <b>let</b> value = (val <b>as</b> u128) &lt;&lt; 32;
     <b>assert</b>!(value &lt;= <a href="fixed_point32.md#0x1_fixed_point32_MAX_U64">MAX_U64</a>, <a href="fixed_point32.md#0x1_fixed_point32_ERATIO_OUT_OF_RANGE">ERATIO_OUT_OF_RANGE</a>);
-    <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> {value: (value <b>as</b> u64)}
+    <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> { value: (value <b>as</b> u64) }
 }
 </code></pre>
 
@@ -627,7 +621,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 <pre><code><b>schema</b> <a href="fixed_point32.md#0x1_fixed_point32_CreateFromRationalAbortsIf">CreateFromRationalAbortsIf</a> {
     numerator: u64;
     denominator: u64;
-    <b>let</b> scaled_numerator = (numerator <b>as</b> u128)&lt;&lt; 64;
+    <b>let</b> scaled_numerator = (numerator <b>as</b> u128) &lt;&lt; 64;
     <b>let</b> scaled_denominator = (denominator <b>as</b> u128) &lt;&lt; 32;
     <b>let</b> quotient = scaled_numerator / scaled_denominator;
     <b>aborts_if</b> scaled_denominator == 0 <b>with</b> <a href="fixed_point32.md#0x1_fixed_point32_EDENOMINATOR">EDENOMINATOR</a>;
@@ -643,7 +637,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 <pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_create_from_rational">spec_create_from_rational</a>(numerator: num, denominator: num): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> {
-   <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>{value: (numerator &lt;&lt; 64) / (denominator &lt;&lt; 32)}
+   <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> { value: (numerator &lt;&lt; 64) / (denominator &lt;&lt; 32) }
 }
 </code></pre>
 
@@ -690,11 +684,8 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 <pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_min">spec_min</a>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> {
-   <b>if</b> (num1.value &lt; num2.value) {
-       num1
-   } <b>else</b> {
-       num2
-   }
+   <b>if</b> (num1.value &lt; num2.value) { num1 }
+   <b>else</b> { num2 }
 }
 </code></pre>
 
@@ -723,11 +714,8 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 <pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_max">spec_max</a>(num1: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>, num2: <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a>): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> {
-   <b>if</b> (num1.value &gt; num2.value) {
-       num1
-   } <b>else</b> {
-       num2
-   }
+   <b>if</b> (num1.value &gt; num2.value) { num1 }
+   <b>else</b> { num2 }
 }
 </code></pre>
 
@@ -769,7 +757,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 <pre><code><b>fun</b> <a href="fixed_point32.md#0x1_fixed_point32_spec_create_from_u64">spec_create_from_u64</a>(val: num): <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> {
-   <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> {value: val &lt;&lt; 32}
+   <a href="fixed_point32.md#0x1_fixed_point32_FixedPoint32">FixedPoint32</a> { value: val &lt;&lt; 32 }
 }
 </code></pre>
 

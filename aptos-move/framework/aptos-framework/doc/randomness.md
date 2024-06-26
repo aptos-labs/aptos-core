@@ -220,11 +220,10 @@ Must be called in tests to initialize the <code><a href="randomness.md#0x1_rando
 <pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <b>if</b> (!<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework)) {
-        <b>move_to</b>(framework, <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
-            epoch: 0,
-            round: 0,
-            seed: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-        });
+        <b>move_to</b>(
+            framework,
+            <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> { epoch: 0, round: 0, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), },
+        );
     }
 }
 </code></pre>
@@ -249,7 +248,9 @@ Invoked in block prologues to update the block-level randomness seed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_on_new_block">on_new_block</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, epoch: u64, round: u64, seed_for_new_block: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;) <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_on_new_block">on_new_block</a>(
+    vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, epoch: u64, round: u64, seed_for_new_block: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
+) <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(vm);
     <b>if</b> (<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework)) {
         <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global_mut</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
@@ -785,11 +786,11 @@ If you need perfect uniformity, consider implement your own with <code><a href="
     <b>let</b> sample = r1 % range;
     <b>let</b> i = 0;
     <b>while</b> ({
-        <b>spec</b> {
-            <b>invariant</b> sample &gt;= 0 && sample &lt; max_excl - min_incl;
-        };
-        i &lt; 256
-    }) {
+            <b>spec</b> {
+                <b>invariant</b> sample &gt;= 0 && sample &lt; max_excl - min_incl;
+            };
+            i &lt; 256
+        }) {
         sample = <a href="randomness.md#0x1_randomness_safe_add_mod">safe_add_mod</a>(sample, sample, range);
         i = i + 1;
     };
@@ -829,19 +830,19 @@ If n is 0, returns the empty vector.
 <pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_permutation">permutation</a>(n: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
     <b>let</b> values = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
 
-    <b>if</b>(n == 0) {
+    <b>if</b> (n == 0) {
         <b>return</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]
     };
 
     // Initialize into [0, 1, ..., n-1].
     <b>let</b> i = 0;
     <b>while</b> ({
-        <b>spec</b> {
-            <b>invariant</b> i &lt;= n;
-            <b>invariant</b> len(values) == i;
-        };
-        i &lt; n
-    }) {
+            <b>spec</b> {
+                <b>invariant</b> i &lt;= n;
+                <b>invariant</b> len(values) == i;
+            };
+            i &lt; n
+        }) {
         std::vector::push_back(&<b>mut</b> values, i);
         i = i + 1;
     };
@@ -852,11 +853,11 @@ If n is 0, returns the empty vector.
     // Shuffle.
     <b>let</b> tail = n - 1;
     <b>while</b> ({
-        <b>spec</b> {
-            <b>invariant</b> tail &gt;= 0 && tail &lt; len(values);
-        };
-        tail &gt; 0
-    }) {
+            <b>spec</b> {
+                <b>invariant</b> tail &gt;= 0 && tail &lt; len(values);
+            };
+            tail &gt; 0
+        }) {
         <b>let</b> pop_position = <a href="randomness.md#0x1_randomness_u64_range_internal">u64_range_internal</a>(0, tail + 1);
         <b>spec</b> {
             <b>assert</b> pop_position &lt; len(values);
@@ -992,7 +993,8 @@ function as its payload.
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
-<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt;
+    <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
 <a id="0x1_randomness_var"></a>
 <b>global</b> <a href="randomness.md#0x1_randomness_var">var</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
@@ -1028,9 +1030,12 @@ function as its payload.
 
 
 <pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(vm) != @vm;
-<b>ensures</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework) ==&gt; <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework).seed == seed_for_new_block;
-<b>ensures</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework) ==&gt; <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework).epoch == epoch;
-<b>ensures</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework) ==&gt; <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework).round == round;
+<b>ensures</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework) ==&gt;
+    <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework).seed == seed_for_new_block;
+<b>ensures</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework) ==&gt;
+    <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework).epoch == epoch;
+<b>ensures</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework) ==&gt;
+    <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework).round == round;
 </code></pre>
 
 
@@ -1053,7 +1058,8 @@ function as its payload.
 <b>let</b> txn_hash = <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">transaction_context::spec_get_txn_hash</a>();
 <b>let</b> txn_counter = <a href="randomness.md#0x1_randomness_spec_fetch_and_increment_txn_counter">spec_fetch_and_increment_txn_counter</a>();
 <b>ensures</b> len(result) == 32;
-<b>ensures</b> result == <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(concat(concat(concat(input, seed), txn_hash), txn_counter));
+<b>ensures</b> result
+    == <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(concat(concat(concat(input, seed), txn_hash), txn_counter));
 </code></pre>
 
 

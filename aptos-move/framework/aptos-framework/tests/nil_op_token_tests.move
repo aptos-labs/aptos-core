@@ -7,10 +7,8 @@ module aptos_framework::nil_op_token_tests {
     use std::option;
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code=0x70002, location=aptos_framework::dispatchable_fungible_asset)]
-    fun test_nil_op_token(
-        creator: &signer,
-    ) {
+    #[expected_failure(abort_code = 0x70002, location = aptos_framework::dispatchable_fungible_asset)]
+    fun test_nil_op_token(creator: &signer,) {
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = object::convert<TestToken, Metadata>(token_object);
@@ -27,7 +25,8 @@ module aptos_framework::nil_op_token_tests {
         dispatchable_fungible_asset::deposit(creator_store, fa);
 
         // Withdraw will fail because it's not drawing the basic amount.
-        let fa = dispatchable_fungible_asset::withdraw(creator, creator_store, 10);
+        let fa =
+            dispatchable_fungible_asset::withdraw(creator, creator_store, 10);
         dispatchable_fungible_asset::deposit(creator_store, fa);
     }
 }

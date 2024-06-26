@@ -34,7 +34,9 @@ spec aptos_framework::aptos_coin {
         pragma aborts_if_is_strict;
     }
 
-    spec initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
+    spec initialize(aptos_framework: &signer): (
+        BurnCapability<AptosCoin>, MintCapability<AptosCoin>
+    ) {
         use aptos_framework::aggregator_factory;
 
         let addr = signer::address_of(aptos_framework);
@@ -48,7 +50,7 @@ spec aptos_framework::aptos_coin {
         ensures exists<MintCapStore>(addr);
         // property 3: The abilities to mint Aptos tokens should be transferable, duplicatable, and destroyable.
         /// [high-level-req-3]
-        ensures global<MintCapStore>(addr).mint_cap ==  MintCapability<AptosCoin> {};
+        ensures global<MintCapStore>(addr).mint_cap == MintCapability<AptosCoin> {};
         ensures exists<coin::CoinInfo<AptosCoin>>(addr);
         ensures result_1 == BurnCapability<AptosCoin> {};
         ensures result_2 == MintCapability<AptosCoin> {};
@@ -66,11 +68,7 @@ spec aptos_framework::aptos_coin {
     }
 
     // Only callable in tests and testnets. not needed verify.
-    spec mint(
-        account: &signer,
-        dst_addr: address,
-        amount: u64,
-    ) {
+    spec mint(account: &signer, dst_addr: address, amount: u64,) {
         pragma verify = false;
     }
 
@@ -91,5 +89,4 @@ spec aptos_framework::aptos_coin {
     spec schema ExistsAptosCoin {
         requires exists<coin::CoinInfo<AptosCoin>>(@aptos_framework);
     }
-
 }

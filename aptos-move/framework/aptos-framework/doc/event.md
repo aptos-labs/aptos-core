@@ -139,10 +139,7 @@ Use EventHandleGenerator to generate a unique event handle for <code>sig</code>
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="event.md#0x1_event_new_event_handle">new_event_handle</a>&lt;T: drop + store&gt;(<a href="guid.md#0x1_guid">guid</a>: GUID): <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt; {
-    <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt; {
-        counter: 0,
-        <a href="guid.md#0x1_guid">guid</a>,
-    }
+    <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt; { counter: 0, <a href="guid.md#0x1_guid">guid</a>, }
 }
 </code></pre>
 
@@ -167,7 +164,9 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit_event">emit_event</a>&lt;T: drop + store&gt;(handle_ref: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt;, msg: T) {
+<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit_event">emit_event</a>&lt;T: drop + store&gt;(
+    handle_ref: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T&gt;, msg: T
+) {
     <a href="event.md#0x1_event_write_to_event_store">write_to_event_store</a>&lt;T&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&handle_ref.<a href="guid.md#0x1_guid">guid</a>), handle_ref.counter, msg);
     <b>spec</b> {
         <b>assume</b> handle_ref.counter + 1 &lt;= MAX_U64;

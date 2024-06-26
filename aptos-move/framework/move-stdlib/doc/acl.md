@@ -99,7 +99,7 @@ Return an empty ACL.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="acl.md#0x1_acl_empty">empty</a>(): <a href="acl.md#0x1_acl_ACL">ACL</a> {
-    <a href="acl.md#0x1_acl_ACL">ACL</a>{ list: <a href="vector.md#0x1_vector_empty">vector::empty</a>&lt;<b>address</b>&gt;() }
+    <a href="acl.md#0x1_acl_ACL">ACL</a> { list: <a href="vector.md#0x1_vector_empty">vector::empty</a>&lt;<b>address</b>&gt;() }
 }
 </code></pre>
 
@@ -124,7 +124,9 @@ Add the address to the ACL.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="acl.md#0x1_acl_add">add</a>(<a href="acl.md#0x1_acl">acl</a>: &<b>mut</b> <a href="acl.md#0x1_acl_ACL">ACL</a>, addr: <b>address</b>) {
-    <b>assert</b>!(!<a href="vector.md#0x1_vector_contains">vector::contains</a>(&<b>mut</b> <a href="acl.md#0x1_acl">acl</a>.list, &addr), <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="acl.md#0x1_acl_ECONTAIN">ECONTAIN</a>));
+    <b>assert</b>!(
+        !<a href="vector.md#0x1_vector_contains">vector::contains</a>(&<b>mut</b> <a href="acl.md#0x1_acl">acl</a>.list, &addr), <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="acl.md#0x1_acl_ECONTAIN">ECONTAIN</a>)
+    );
     <a href="vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> <a href="acl.md#0x1_acl">acl</a>.list, addr);
 }
 </code></pre>
