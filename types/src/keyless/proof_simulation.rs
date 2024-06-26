@@ -56,7 +56,7 @@ pub struct ProvingKeyWithTrapdoor<E: Pairing> {
 
 impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> 
 {
-    fn circuit_agnostic_specific_setup_with_trapdoor<R: RngCore>(
+    fn circuit_agnostic_setup_with_trapdoor<R: RngCore>(
         rng: &mut R,
         num_public_inputs: u32,
     ) -> Result<(ProvingKeyWithTrapdoor<E>, VerifyingKey<E>), SynthesisError> {
@@ -307,7 +307,7 @@ where
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
     for _ in 0..n_iters {
-        let (pk, vk) = Groth16Simulator::<E>::circuit_agnostic_specific_setup_with_trapdoor(&mut rng, 1).unwrap();
+        let (pk, vk) = Groth16Simulator::<E>::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
         let pvk = prepare_verifying_key::<E>(&vk);
 
         let proof = Groth16Simulator::<E>::create_random_proof_with_trapdoor(
