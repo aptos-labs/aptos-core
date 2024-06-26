@@ -13,6 +13,7 @@ use crate::{
             ConsensusObserverRequest, ConsensusObserverResponse, OrderedBlock,
         },
         payload_store::BlockPayloadStore,
+        pending_blocks::PendingOrderedBlocks,
         publisher::ConsensusPublisher,
         subscription,
         subscription::ConsensusObserverSubscription,
@@ -56,11 +57,7 @@ use futures::{
 };
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::UnboundedSender, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
@@ -79,8 +76,8 @@ pub struct ConsensusObserver {
 
     // The payload store holds block transaction payloads
     block_payload_store: BlockPayloadStore,
-    // The pending execute/commit blocks (also buffers when in sync mode)
-    pending_blocks: Arc<Mutex<BTreeMap<Round, (OrderedBlock, Option<CommitDecision>)>>>,
+    // The pending ordered blocks (these are also buffered when in state sync mode)
+    pending_ordered_blocks: PendingOrderedBlocks,
     // The execution client to the buffer manager
     execution_client: Arc<dyn TExecutionClient>,
 
@@ -124,7 +121,7 @@ impl ConsensusObserver {
             consensus_observer_client,
             epoch: root.commit_info().epoch(),
             root: Arc::new(Mutex::new(root)),
-            pending_blocks: Arc::new(Mutex::new(BTreeMap::new())),
+            pending_ordered_blocks: PendingOrderedBlocks::new(),
             execution_client,
             block_payload_store: BlockPayloadStore::new(),
             sync_handle: None,
@@ -227,8 +224,8 @@ impl ConsensusObserver {
     fn create_commit_callback(&self) -> StateComputerCommitCallBackType {
         // Clone the root, pending blocks and payload store
         let root = self.root.clone();
-        let pending_blocks = self.pending_blocks.clone();
-        let mut block_payload_store = self.block_payload_store.clone();
+        let pending_ordered_blocks = self.pending_ordered_blocks.clone();
+        let block_payload_store = self.block_payload_store.clone();
 
         // Create the commit callback
         Box::new(move |blocks, ledger_info: LedgerInfoWithSignatures| {
@@ -236,7 +233,7 @@ impl ConsensusObserver {
             block_payload_store.remove_blocks(blocks);
 
             // Remove the committed blocks from the pending blocks
-            remove_pending_blocks(pending_blocks, &ledger_info);
+            pending_ordered_blocks.remove_blocks_for_commit(&ledger_info);
 
             // Verify the ledger info is for the same epoch
             let mut root = root.lock();
@@ -403,9 +400,8 @@ impl ConsensusObserver {
 
     /// Returns the last known block
     fn get_last_block(&self) -> BlockInfo {
-        if let Some((_, (last_blocks, _))) = self.pending_blocks.lock().last_key_value() {
-            // Return the last block in the pending blocks
-            last_blocks.blocks.last().unwrap().block_info()
+        if let Some(last_pending_block) = self.pending_ordered_blocks.get_last_pending_block() {
+            last_pending_block
         } else {
             // Return the root ledger info
             self.root.lock().commit_info().clone()
@@ -449,6 +445,8 @@ impl ConsensusObserver {
 
     /// Processes the commit decision
     fn process_commit_decision(&mut self, commit_decision: CommitDecision) {
+        // TODO: verify the commit decision!
+
         // Update the pending blocks with the commit decision
         if self.process_commit_decision_for_pending_block(&commit_decision) {
             return; // The commit decision was successfully processed
@@ -469,7 +467,7 @@ impl ConsensusObserver {
 
             // Update the root and clear the pending blocks
             *self.root.lock() = commit_decision.ledger_info().clone();
-            self.pending_blocks.lock().clear();
+            self.pending_ordered_blocks.clear_all_pending_blocks();
 
             // Start the state sync process
             let abort_handle = sync_to_commit_decision(
@@ -486,24 +484,23 @@ impl ConsensusObserver {
     /// Processes the commit decision for the pending block and returns iff
     /// the commit decision was successfully processed.
     fn process_commit_decision_for_pending_block(&self, commit_decision: &CommitDecision) -> bool {
-        let mut pending_blocks = self.pending_blocks.lock();
-        if let Some((ordered_blocks, pending_commit_decision)) =
-            pending_blocks.get_mut(&commit_decision.round())
-        {
-            // Check if the payloads for the ordered blocks already exist
-            let payload_exists = self
-                .block_payload_store
-                .all_payloads_exist(&ordered_blocks.blocks);
-
+        let pending_block = self
+            .pending_ordered_blocks
+            .get_pending_block(commit_decision.round());
+        if let Some(pending_block) = pending_block {
             // If the payload exists, add the commit decision to the pending blocks
-            if payload_exists {
+            if self
+                .block_payload_store
+                .all_payloads_exist(&pending_block.blocks)
+            {
                 debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Adding decision to pending block: {}",
                         commit_decision.ledger_info().commit_info()
                     ))
                 );
-                *pending_commit_decision = Some(commit_decision.clone());
+                self.pending_ordered_blocks
+                    .update_commit_decision(commit_decision);
 
                 // If we are not in sync mode, forward the commit decision to the execution pipeline
                 if self.sync_handle.is_none() {
@@ -616,19 +613,13 @@ impl ConsensusObserver {
             return;
         }
 
+        // TODO: verify the ordered block!
+
         // If the block is a child of our last block, we can insert it
         if self.get_last_block().id() == blocks.first().unwrap().parent_id() {
-            debug!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Adding ordered block to the pending blocks: {}",
-                    ordered_proof.commit_info()
-                ))
-            );
-
             // Insert the ordered block into the pending blocks
-            self.pending_blocks
-                .lock()
-                .insert(blocks.last().unwrap().round(), (ordered_block, None));
+            self.pending_ordered_blocks
+                .insert_ordered_block(ordered_block);
 
             // If we are not in sync mode, forward the blocks to the execution pipeline
             if self.sync_handle.is_none() {
@@ -713,9 +704,10 @@ impl ConsensusObserver {
         // Reset and drop the sync handle
         self.sync_handle = None;
 
-        // Process the pending blocks
-        let pending_blocks = self.pending_blocks.lock().clone();
-        for (_, (ordered_block, commit_decision)) in pending_blocks.into_iter() {
+        // Process all the pending blocks. These were all buffered during the state sync process.
+        for (_, (ordered_block, commit_decision)) in
+            self.pending_ordered_blocks.get_all_pending_blocks()
+        {
             // Unpack the ordered block
             let OrderedBlock {
                 blocks,
@@ -1098,19 +1090,6 @@ async fn extract_on_chain_configs(
         execution_config,
         onchain_randomness_config,
     )
-}
-
-/// Removes the pending blocks before the given ledger info
-fn remove_pending_blocks(
-    pending_blocks: Arc<Mutex<BTreeMap<Round, (OrderedBlock, Option<CommitDecision>)>>>,
-    ledger_info: &LedgerInfoWithSignatures,
-) {
-    // Determine the round to split off
-    let split_off_round = ledger_info.commit_info().round() + 1;
-
-    // Remove the pending blocks before the split off round
-    let mut pending_blocks = pending_blocks.lock();
-    *pending_blocks = pending_blocks.split_off(&split_off_round);
 }
 
 /// Spawns a task to sync to the given commit decision and notifies
