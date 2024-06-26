@@ -73,7 +73,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 command_tx
             })
             .collect_vec();
-        let rt_kv_proc = runtime::Builder::new_multi_thread().enable_all().thread_name("kv_proc").build().unwrap();
+        let rt_kv_proc = runtime::Builder::new_multi_thread().worker_threads(60).enable_all().thread_name("kv_proc").build().unwrap();
         Self {
             kv_rx: result_rx,
             kv_unprocessed_pq: Arc::new(ConcurrentPriorityQueue::new()),
@@ -133,12 +133,12 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let kv_tx_clone = self.kv_tx.clone();
             let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
             let rand_send_thread_idx = rng.gen_range(0, self.kv_tx[0].len());
-            rt_kv_proc_runtime_clone.spawn(async move {
+            rt_kv_proc_runtime_clone.spawn_blocking(move || {
                 handle_message(message,
                                      state_view_clone,
                                      kv_tx_clone,
                                      rand_send_thread_idx,
-                                     outbound_rpc_runtime_clone).await;
+                                     outbound_rpc_runtime_clone);
                 });
             // {
             //     let (lock, cvar) = &*self.recv_condition;
@@ -289,7 +289,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
 }
 
 
-pub async fn handle_message<S: StateView + Sync + Send + 'static>(
+pub fn handle_message<S: StateView + Sync + Send + 'static>(
     message: Message,
     state_view: Arc<RwLock<Option<Arc<S>>>>,
     kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
