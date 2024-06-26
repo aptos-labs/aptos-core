@@ -246,7 +246,6 @@ pub(crate) mod test {
     use super::*;
     use aptos_aggregator::delta_change_set::serialize;
     use aptos_types::{
-        access_path::AccessPath,
         executable::ModulePath,
         state_store::state_value::StateValue,
         write_set::{TransactionWrite, WriteOpKind},
@@ -262,8 +261,8 @@ pub(crate) mod test {
     );
 
     impl<K: Hash + Clone + Eq + Debug> ModulePath for KeyType<K> {
-        fn module_path(&self) -> Option<AccessPath> {
-            None
+        fn is_module_path(&self) -> bool {
+            false
         }
     }
 
