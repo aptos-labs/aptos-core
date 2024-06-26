@@ -32,7 +32,7 @@ use aptos_framework::{
 };
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
-use aptos_gas_schedule::{AptosGasParameters, TransactionGasParameters, VMGasParameters};
+use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
@@ -61,7 +61,6 @@ use aptos_types::{
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
-    vm::configs::RandomnessConfig,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::{aptos_try, return_on_failure};
@@ -221,7 +220,6 @@ pub struct AptosVM {
     pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
-    randomness_config: RandomnessConfig,
 }
 
 impl AptosVM {
@@ -249,7 +247,6 @@ impl AptosVM {
         let pvk = keyless_validation::get_groth16_vk_onchain(&resolver)
             .ok()
             .and_then(|vk| vk.try_into().ok());
-        let randomness_config = RandomnessConfig::fetch(state_view);
 
         Self {
             is_simulation: false,
@@ -258,7 +255,6 @@ impl AptosVM {
             gas_params,
             storage_gas_params,
             pvk,
-            randomness_config,
         }
     }
 
@@ -1643,7 +1639,7 @@ impl AptosVM {
         &self,
         resolver: &impl AptosMoveResolver,
         txn: &SignedTransaction,
-        mut txn_data: TransactionMetadata,
+        txn_data: TransactionMetadata,
         is_approved_gov_script: bool,
         gas_meter: &mut impl AptosGasMeter,
         log_context: &AdapterLogSchema,
@@ -1656,14 +1652,6 @@ impl AptosVM {
             unwrap_or_discard!(PrologueSession::new(self, &txn_data, resolver));
 
         let exec_result = prologue_session.execute(|session| {
-            let required_deposit = self.get_required_deposit(
-                session,
-                resolver,
-                &gas_meter.vm_gas_params().txn,
-                &txn_data,
-                txn.payload(),
-            )?;
-            txn_data.set_required_deposit(required_deposit);
             self.validate_signed_transaction(
                 session,
                 resolver,
@@ -2435,52 +2423,6 @@ impl AptosVM {
             },
         })
     }
-
-    #[allow(clippy::manual_filter)]
-    pub fn get_required_deposit(
-        &self,
-        session: &mut SessionExt,
-        resolver: &impl AptosMoveResolver,
-        _txn_gas_params: &TransactionGasParameters,
-        txn_metadata: &TransactionMetadata,
-        payload: &TransactionPayload,
-    ) -> Result<Option<u64>, VMStatus> {
-        match payload {
-            TransactionPayload::EntryFunction(entry_func) => {
-                if let Some(annotation) =
-                    get_randomness_annotation(resolver, session, entry_func).unwrap_or(None)
-                {
-                    if let Some(default_gas_amount) =
-                        self.randomness_config.randomness_api_v0_required_deposit
-                    {
-                        let required_gas_amount =
-                            if self.randomness_config.allow_rand_contract_custom_max_gas {
-                                annotation.max_gas.unwrap_or(default_gas_amount)
-                            } else {
-                                default_gas_amount
-                            };
-                        let txn_max_gas = u64::from(txn_metadata.max_gas_amount);
-                        if required_gas_amount != txn_max_gas {
-                            return Err(VMStatus::error(
-                                StatusCode::REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS,
-                                None,
-                            ));
-                        }
-                        let octa_amount =
-                            u64::from(txn_metadata.max_gas_amount * txn_metadata.gas_unit_price);
-                        Ok(Some(octa_amount))
-                    } else {
-                        Ok(None)
-                    }
-                } else {
-                    Ok(None)
-                }
-            },
-            TransactionPayload::Script(_)
-            | TransactionPayload::ModuleBundle(_)
-            | TransactionPayload::Multisig(_) => Ok(None),
-        }
-    }
 }
 
 // Executor external API
@@ -2611,7 +2553,7 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
         };
-        let mut txn_data = TransactionMetadata::new(&txn);
+        let txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
@@ -2621,25 +2563,6 @@ impl VMValidator for AptosVM {
             SessionId::prologue_meta(&txn_data),
             Some(txn_data.as_user_transaction_context()),
         );
-        let required_deposit = if let Ok(gas_params) = &self.gas_params {
-            let maybe_required_deposit = self.get_required_deposit(
-                &mut session,
-                &resolver,
-                &gas_params.vm.txn,
-                &txn_data,
-                txn.payload(),
-            );
-            match maybe_required_deposit {
-                Ok(required_deposit) => required_deposit,
-                Err(vm_status) => {
-                    return VMValidatorResult::error(vm_status.status_code());
-                },
-            }
-        } else {
-            return VMValidatorResult::error(StatusCode::GAS_PARAMS_MISSING);
-        };
-
-        txn_data.set_required_deposit(required_deposit);
 
         let storage = TraversalStorage::new();
 
