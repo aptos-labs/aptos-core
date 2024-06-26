@@ -13,7 +13,6 @@ use std::{
 };
 use std::cmp::Ordering;
 use tokio::{runtime, runtime::Runtime, sync::oneshot};
-use async_channel;
 
 mod error;
 mod inbound_handler;
