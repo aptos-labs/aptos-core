@@ -196,7 +196,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             )?;
         }
 
-        DEFAULT_DROPPER.schedule_drop(persisted_state);
+        drop(persisted_state);
+        //DEFAULT_DROPPER.schedule_drop(persisted_state);
 
         let _timer = APTOS_CHUNK_EXECUTOR_OTHER_SECONDS
             .timer_with(&["commit_chunk_impl__dequeue_and_return"]);
