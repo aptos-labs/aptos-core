@@ -218,6 +218,8 @@ impl ModuleGenerator {
         let struct_handle = self.struct_index(ctx, loc, struct_env);
         let fields = struct_env.get_fields();
         let field_information = if struct_env.get_field_count() == 0 {
+            // If a struct has no field, we can be sure that it is native
+            // because a user-defined empty struct will be attached with the `dummy_field` in the previous step
             FF::StructFieldInformation::Native
         } else {
             FF::StructFieldInformation::Declared(
