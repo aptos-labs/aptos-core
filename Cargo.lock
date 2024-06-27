@@ -2935,6 +2935,7 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-metrics-core",
  "async-trait",
+ "axum 0.5.17",
  "backoff",
  "bytes",
  "chrono",
@@ -2954,7 +2955,6 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
- "warp",
 ]
 
 [[package]]
