@@ -582,6 +582,18 @@ module std::features {
         is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
+    /// Whether the multisig v2 fix is enabled. Once enabled, the multisig transaction execution will explicitly
+    /// abort if the provided payload does not match the payload stored on-chain.
+    ///
+    /// Lifetime: transient
+    const SIMULATION_ENHANCEMENT: u64 = 71;
+
+    public fun get_simulation_enhancement_feature(): u64 { SIMULATION_ENHANCEMENT }
+
+    public fun simulation_enhancement_enabled(): bool acquires Features {
+        is_enabled(SIMULATION_ENHANCEMENT)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

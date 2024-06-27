@@ -89,6 +89,7 @@ pub(crate) fn run_script_prologue(
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
+    is_simulation: bool,
 ) -> Result<(), VMStatus> {
     let txn_sequence_number = txn_data.sequence_number();
     let txn_authentication_key = txn_data.authentication_key().to_vec();
@@ -118,6 +119,7 @@ pub(crate) fn run_script_prologue(
             MoveValue::U64(txn_max_gas_units.into()),
             MoveValue::U64(txn_expiration_timestamp_secs),
             MoveValue::U8(chain_id.id()),
+            MoveValue::Bool(is_simulation),
         ];
         if txn_data.required_deposit.is_some() {
             args.push(txn_data.required_deposit.as_move_value());
@@ -139,6 +141,7 @@ pub(crate) fn run_script_prologue(
             MoveValue::U64(txn_max_gas_units.into()),
             MoveValue::U64(txn_expiration_timestamp_secs),
             MoveValue::U8(chain_id.id()),
+            MoveValue::Bool(is_simulation),
         ];
         (
             &APTOS_TRANSACTION_VALIDATION.multi_agent_prologue_name,
@@ -154,6 +157,7 @@ pub(crate) fn run_script_prologue(
             MoveValue::U64(txn_expiration_timestamp_secs),
             MoveValue::U8(chain_id.id()),
             MoveValue::vector_u8(txn_data.script_hash.clone()),
+            MoveValue::Bool(is_simulation),
         ];
         if txn_data.required_deposit.is_some() {
             args.push(txn_data.required_deposit.as_move_value());
@@ -229,6 +233,7 @@ fn run_epilogue(
     txn_data: &TransactionMetadata,
     features: &Features,
     traversal_context: &mut TraversalContext,
+    is_simulation: bool,
 ) -> VMResult<()> {
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
@@ -244,6 +249,7 @@ fn run_epilogue(
                 MoveValue::U64(txn_gas_price.into()),
                 MoveValue::U64(txn_max_gas_units.into()),
                 MoveValue::U64(gas_remaining.into()),
+                MoveValue::Bool(is_simulation),
             ];
             if txn_data.required_deposit.is_some() {
                 args.push(txn_data.required_deposit.as_move_value());
@@ -275,6 +281,7 @@ fn run_epilogue(
                 MoveValue::U64(txn_gas_price.into()),
                 MoveValue::U64(txn_max_gas_units.into()),
                 MoveValue::U64(gas_remaining.into()),
+                MoveValue::Bool(is_simulation),
             ];
             if txn_data.required_deposit.is_some() {
                 args.push(txn_data.required_deposit.as_move_value());
@@ -335,6 +342,7 @@ pub(crate) fn run_success_epilogue(
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
+    is_simulation: bool,
 ) -> Result<(), VMStatus> {
     fail_point!("move_adapter::run_success_epilogue", |_| {
         Err(VMStatus::error(
@@ -350,6 +358,7 @@ pub(crate) fn run_success_epilogue(
         txn_data,
         features,
         traversal_context,
+        is_simulation,
     )
     .or_else(|err| convert_epilogue_error(err, log_context))
 }
@@ -364,6 +373,7 @@ pub(crate) fn run_failure_epilogue(
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
+    is_simulation: bool,
 ) -> Result<(), VMStatus> {
     run_epilogue(
         session,
@@ -372,6 +382,7 @@ pub(crate) fn run_failure_epilogue(
         txn_data,
         features,
         traversal_context,
+        is_simulation,
     )
     .or_else(|e| {
         expect_only_successful_execution(

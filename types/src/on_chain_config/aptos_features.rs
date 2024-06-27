@@ -86,6 +86,7 @@ pub enum FeatureFlag {
     DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE = 68,
     LIMIT_VM_TYPE_SIZE = 69,
     ABORT_IF_MULTISIG_PAYLOAD_MISMATCH = 70,
+    SIMULATION_ENHANCEMENT = 71,
 }
 
 impl FeatureFlag {
@@ -152,6 +153,7 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
             FeatureFlag::LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
+            FeatureFlag::SIMULATION_ENHANCEMENT,
         ]
     }
 }
@@ -291,6 +293,10 @@ impl Features {
 
     pub fn is_abort_if_multisig_payload_mismatch_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
+    }
+
+    pub fn is_simulation_enhancement_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::SIMULATION_ENHANCEMENT)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
