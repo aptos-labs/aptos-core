@@ -41,7 +41,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         remote_shard_addresses: Vec<SocketAddr>,
         num_threads: Option<usize>,
     ) -> Self {
-        let num_threads = 60; //num_threads.unwrap_or_else(num_cpus::get);
+        let num_threads = remote_shard_addresses.len() * 2; //num_threads.unwrap_or_else(num_cpus::get);
         let num_kv_req_threads = 16; //= num_cpus::get() / 2;
         let num_shards = remote_shard_addresses.len();
         info!("num threads for remote state view service: {}", num_threads);
@@ -120,7 +120,6 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             });
         }
         let mut rng = StdRng::from_entropy();
-        let mut msg_count = 0;
         while let Ok(message) = self.kv_rx.recv() {
             msg_count += 1;
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
@@ -159,7 +158,6 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             //     .with_label_values(&["0", "kv_req_pq_size"])
             //     .observe(self.kv_unprocessed_pq.len() as f64);
         }
-        info!("Total messages received: {}", msg_count);
     }
 
     pub fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
@@ -187,10 +185,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let outbound_rpc_runtime_clone = outbound_rpc_runtime.clone();
             Self::handle_message(message, state_view, kv_txs, rng.gen_range(0, kv_tx[0].len()), outbound_rpc_runtime_clone);
 
-                prev_time = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64;
+            prev_time = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
         }
     }
 
