@@ -4,7 +4,7 @@
 use crate::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
-    transaction::{BlockExecutableTransaction, Transaction},
+    transaction::{BlockExecutableTransaction, ChangeSet, Transaction, WriteSetPayload},
     write_set::WriteOp,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -55,6 +55,17 @@ impl SignatureVerifiedTransaction {
         match self {
             SignatureVerifiedTransaction::Valid(txn) => txn,
             SignatureVerifiedTransaction::Invalid(_) => panic!("Expected valid transaction"),
+        }
+    }
+
+    pub fn as_valid_direct_write_set_payload(&self) -> Option<&ChangeSet> {
+        use SignatureVerifiedTransaction::*;
+        use Transaction::*;
+        use WriteSetPayload::*;
+
+        match self {
+            Valid(GenesisTransaction(Direct(change_set))) => Some(change_set),
+            _ => None,
         }
     }
 }

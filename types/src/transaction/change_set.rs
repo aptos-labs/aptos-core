@@ -31,7 +31,7 @@ impl ChangeSet {
         &self.write_set
     }
 
-    pub fn events(&self) -> &[ContractEvent] {
-        &self.events
+    pub fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {
+        self.events.iter()
     }
 }

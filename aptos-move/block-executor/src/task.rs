@@ -72,6 +72,7 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
+        base_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
         view: &(impl TExecutorView<
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Tag,

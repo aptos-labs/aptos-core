@@ -871,6 +871,7 @@ where
 
     fn execute_transaction(
         &self,
+        _base_view: &impl TStateView<Key = K>,
         view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID, ValueType>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         txn: &Self::Txn,

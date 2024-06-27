@@ -41,6 +41,7 @@ impl ExecutorTask for AptosExecutorTask {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
+        base_view: &impl StateView,
         executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
@@ -50,6 +51,30 @@ impl ExecutorTask for AptosExecutorTask {
         });
 
         let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
+
+        // We process direct write set payload here, to ensure that VM does not have to lift
+        // storage-level abstractions into more fine-grained types used by the VM.
+        if let Some(change_set) = txn.as_valid_direct_write_set_payload() {
+            let execution_result =
+                self.vm
+                    .execute_direct_write_set_payload(base_view, change_set, &log_context);
+            return match execution_result {
+                Ok(output) => {
+                    // Direct payload triggers reconfiguration, and subsequent transactions are skipped.
+                    // Note that here we read all state keys in the change set from the base state view,
+                    // which is fine: we do not use the results of these reads anyway. Changes made by
+                    // this transaction are applied directly and also do not break any other outputs,
+                    // because of reconfiguration.
+                    speculative_info!(
+                        &log_context,
+                        "Reconfiguration occurred: restart required".into()
+                    );
+                    ExecutionStatus::SkipRest(AptosTransactionOutput::new_committed(output))
+                },
+                Err(vm_status) => ExecutionStatus::Abort(vm_status),
+            };
+        }
+
         let resolver = self
             .vm
             .as_move_resolver_with_group_view(executor_with_group_view);

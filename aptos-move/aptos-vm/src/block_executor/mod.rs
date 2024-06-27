@@ -64,6 +64,13 @@ impl AptosTransactionOutput {
         }
     }
 
+    pub(crate) fn new_committed(output: TransactionOutput) -> Self {
+        Self {
+            vm_output: Mutex::new(None),
+            committed_output: OnceCell::with_value(output),
+        }
+    }
+
     pub(crate) fn committed_output(&self) -> &TransactionOutput {
         self.committed_output.get().unwrap()
     }
