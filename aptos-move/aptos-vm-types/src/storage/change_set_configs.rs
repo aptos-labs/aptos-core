@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::change_set::ChangeSetLike;
+use crate::change_set::ChangeSetInterface;
 use aptos_gas_schedule::AptosGasParameters;
 use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::vm_status::{StatusCode, VMStatus};
@@ -83,7 +83,7 @@ impl ChangeSetConfigs {
         )
     }
 
-    pub fn check_change_set(&self, change_set: &impl ChangeSetLike) -> Result<(), VMStatus> {
+    pub fn check_change_set(&self, change_set: &impl ChangeSetInterface) -> Result<(), VMStatus> {
         let storage_write_limit_reached = || {
             Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED)
                 .with_message("Too many write ops.".to_string())

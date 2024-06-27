@@ -193,7 +193,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     verify_genesis_write_set(change_set.events());
 
     let change_set = change_set
-        .try_into_storage_change_set(module_write_set)
+        .try_combine_into_storage_change_set(module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis");
     Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
 }
@@ -325,7 +325,7 @@ pub fn encode_genesis_change_set(
     verify_genesis_write_set(change_set.events());
 
     change_set
-        .try_into_storage_change_set(module_write_set)
+        .try_combine_into_storage_change_set(module_write_set)
         .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis")
 }
 

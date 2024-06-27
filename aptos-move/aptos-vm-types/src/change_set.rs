@@ -209,60 +209,12 @@ impl VMChangeSet {
         ))
     }
 
-    /// Builds a new change set from the storage representation.
-    ///
-    /// **WARNING**: this creates a write set that assumes dynamic change set optimizations to be disabled.
-    /// this needs to be applied directly to storage, you cannot get appropriate reads from this in a
-    /// dynamic change set optimization enabled context.
-    /// We have two dynamic change set optimizations, both there to reduce conflicts between transactions:
-    ///  - exchanging delayed fields and leaving their materialization to happen at the end
-    ///  - unpacking resource groups and treating each resource inside it separately
-    ///
-    /// **WARNING**: Has complexity O(#write_ops) because we need to iterate
-    /// over blobs and split them into resources or modules. Only used to
-    /// support transactions with write-set payload.
-    ///
-    /// Note: does not separate out individual resource group updates.
-    pub fn try_from_storage_change_set_with_delayed_field_optimization_disabled(
-        change_set: StorageChangeSet,
-    ) -> (Self, BTreeMap<StateKey, WriteOp>) {
-        let (write_set, events) = change_set.into_inner();
-
-        // There should be no aggregator writes if we have a change set from
-        // storage.
-        let mut resource_write_set = BTreeMap::new();
-        let mut module_write_set = BTreeMap::new();
-
-        for (state_key, write_op) in write_set {
-            if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
-                module_write_set.insert(state_key, write_op);
-            } else {
-                // TODO[agg_v1](fix) While everything else must be a resource, first
-                // version of aggregators is implemented as a table item. Revisit when
-                // we split MVHashMap into data and aggregators.
-
-                // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
-                resource_write_set.insert(state_key, AbstractResourceWriteOp::Write(write_op));
-            }
-        }
-
-        // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
-        let events = events.into_iter().map(|event| (event, None)).collect();
-        let change_set = Self {
-            resource_write_set,
-            delayed_field_change_set: BTreeMap::new(),
-            aggregator_v1_write_set: BTreeMap::new(),
-            aggregator_v1_delta_set: BTreeMap::new(),
-            events,
-        };
-        (change_set, module_write_set)
-    }
-
     /// Converts VM-native change set into its storage representation with fully
     /// serialized changes. The conversion fails if:
     /// - deltas are not materialized.
     /// - resource group writes are not (combined &) converted to resource writes.
-    pub fn try_into_storage_change_set(
+    /// In addition, the caller can include changes to published modules.
+    pub fn try_combine_into_storage_change_set(
         self,
         module_write_set: BTreeMap<StateKey, WriteOp>,
     ) -> Result<StorageChangeSet, PanicError> {
@@ -821,6 +773,55 @@ impl VMChangeSet {
     }
 }
 
+/// Builds a new change set from the storage representation.
+///
+/// **WARNING**: this creates a write set that assumes dynamic change set optimizations to be disabled.
+/// this needs to be applied directly to storage, you cannot get appropriate reads from this in a
+/// dynamic change set optimization enabled context.
+/// We have two dynamic change set optimizations, both there to reduce conflicts between transactions:
+///  - exchanging delayed fields and leaving their materialization to happen at the end
+///  - unpacking resource groups and treating each resource inside it separately
+///
+/// **WARNING**: Has complexity O(#write_ops) because we need to iterate
+/// over blobs and split them into resources or modules. Only used to
+/// support transactions with write-set payload.
+///
+/// Note: does not separate out individual resource group updates.
+pub fn create_vm_change_set_with_modules_when_delayed_field_optimization_disabled(
+    change_set: StorageChangeSet,
+) -> (VMChangeSet, BTreeMap<StateKey, WriteOp>) {
+    let (write_set, events) = change_set.into_inner();
+
+    // There should be no aggregator writes if we have a change set from
+    // storage.
+    let mut resource_write_set = BTreeMap::new();
+    let mut module_write_set = BTreeMap::new();
+
+    for (state_key, write_op) in write_set {
+        if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
+            module_write_set.insert(state_key, write_op);
+        } else {
+            // TODO[agg_v1](fix) While everything else must be a resource, first
+            // version of aggregators is implemented as a table item. Revisit when
+            // we split MVHashMap into data and aggregators.
+
+            // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
+            resource_write_set.insert(state_key, AbstractResourceWriteOp::Write(write_op));
+        }
+    }
+
+    // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
+    let events = events.into_iter().map(|event| (event, None)).collect();
+    let change_set = VMChangeSet::new(
+        resource_write_set,
+        events,
+        BTreeMap::new(),
+        BTreeMap::new(),
+        BTreeMap::new(),
+    );
+    (change_set, module_write_set)
+}
+
 pub struct WriteOpInfo<'a> {
     pub key: &'a StateKey,
     pub op_size: WriteOpSize,
@@ -829,9 +830,10 @@ pub struct WriteOpInfo<'a> {
 }
 
 /// Represents the main functionality of any change set representation:
-///   1. It must contain write ops, and allow iterating over their sizes.
+///   1. It must contain write ops, and allow iterating over their sizes,
+///      as well as other information.
 ///   2. it must also contain events.
-pub trait ChangeSetLike {
+pub trait ChangeSetInterface {
     fn num_write_ops(&self) -> usize;
 
     fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)>;
@@ -844,8 +846,10 @@ pub trait ChangeSetLike {
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>>;
 }
 
-impl ChangeSetLike for VMChangeSet {
+impl ChangeSetInterface for VMChangeSet {
     fn num_write_ops(&self) -> usize {
+        // Note: we only use resources and aggregators because they use write ops directly,
+        // and deltas & events are not part of these.
         self.resource_write_set().len() + self.aggregator_v1_write_set().len()
     }
 
