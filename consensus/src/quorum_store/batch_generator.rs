@@ -23,7 +23,7 @@ use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
 use rayon::prelude::*;
 use std::{
-    collections::{btree_map::Entry, BTreeMap, HashMap},
+    collections::{btree_map::Entry, BTreeMap, HashMap, VecDeque},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -408,7 +408,7 @@ impl BatchGenerator {
         let mut back_pressure_decrease_latest = start;
         let mut back_pressure_increase_latest = start;
         let mut dynamic_pull_txn_per_s = self.config.back_pressure.dynamic_max_txn_per_s;
-
+        let mut pulled_txns_window: VecDeque<(Instant, u64)> = VecDeque::new();
         loop {
             let _timer = counters::BATCH_GENERATOR_MAIN_LOOP.start_timer();
 
@@ -460,8 +460,17 @@ impl BatchGenerator {
                         || last_pulled_num_txns >= 50_u64
                         || last_pulled_num_txns > (last_pulled_max_txn as f64 / 2.0) as u64 {
 
-                        let dynamic_pull_max_txn = std::cmp::max(
-                            (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
+                        while let Some(&(tick_start, _)) = pulled_txns_window.front() {
+                            if tick_start.elapsed() > Duration::from_secs(1) {
+                                pulled_txns_window.pop_front();
+                            } else {
+                                break;
+                            }
+                        }
+                        let pulled_in_last_sec = pulled_txns_window.iter().map(|(_, txns)| txns).sum();
+                        let dynamic_pull_max_txn = dynamic_pull_txn_per_s.saturating_sub(pulled_in_last_sec);
+                        // let dynamic_pull_max_txn = std::cmp::max(
+                        //     (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
                         counters::QS_SINCE_LAST_NON_EMPTY_PULL_TIME.observe_duration(Duration::from_millis(since_last_non_empty_pull_ms as u64));
                         counters::QS_DYNAMIC_MAX_PULL_TXNS.observe(dynamic_pull_max_txn as f64);
                         let pull_max_txn = std::cmp::min(
