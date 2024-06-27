@@ -2292,6 +2292,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-intent"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs 0.1.4",
+ "bytes",
+ "getrandom 0.2.11",
+ "move-binary-format",
+ "move-core-types",
+ "serde",
+ "serde_bytes",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "aptos-jellyfish-merkle"
 version = "0.1.0"
 dependencies = [
