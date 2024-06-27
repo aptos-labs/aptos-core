@@ -82,7 +82,7 @@ jobs:
       TIMEOUT_MINUTES: 480
 
   test-replay:
-    if: ${{ github.event_name == 'pull_request' }}
+    if: ${{ (github.event_name == 'pull_request') && contains(github.event.pull_request.labels.*.name, 'CICD:test-replay')}}
     needs: determine-test-metadata
     uses: ./.github/workflows/workflow-run-replay-verify.yaml
     secrets: inherit

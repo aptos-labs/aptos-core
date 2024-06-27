@@ -35,7 +35,7 @@ use std::{
     env,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     path::PathBuf,
-    sync::Arc,
+    sync::{atomic::AtomicU32, Arc},
 };
 use tempfile::TempDir;
 
@@ -504,7 +504,7 @@ pub async fn install_public_fullnode<'a>(
         haproxy_enabled: false,
 
         port_forward_enabled: use_port_forward,
-        rest_api_port: REST_API_SERVICE_PORT, // in the case of port-forward, this port will be changed at runtime
+        rest_api_port: AtomicU32::new(REST_API_SERVICE_PORT), // in the case of port-forward, this port will be changed at runtime
     };
 
     Ok((node_peer_id, ret_node))

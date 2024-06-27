@@ -9,20 +9,53 @@ use crate::{
     CoreContext, Result, Swarm, TestReport,
 };
 use aptos_transaction_emitter_lib::{EmitJobRequest, TxnStats};
-use std::time::Duration;
-use tokio::runtime::Runtime;
+use async_trait::async_trait;
+use std::{future::Future, sync::Arc, time::Duration};
+use tokio::runtime::{Handle, Runtime};
 
 /// The testing interface which defines a test written with full control over an existing network.
 /// Tests written against this interface will have access to both the Root account as well as the
 /// nodes which comprise the network.
+#[async_trait]
 pub trait NetworkTest: Test {
     /// Executes the test against the given context.
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()>;
+    async fn run<'t>(&self, ctx: NetworkContextSynchronizer<'t>) -> Result<()>;
+}
+
+#[derive(Clone)]
+pub struct NetworkContextSynchronizer<'t> {
+    pub ctx: Arc<tokio::sync::Mutex<NetworkContext<'t>>>,
+    pub handle: tokio::runtime::Handle,
+}
+
+// TODO: some useful things that don't need to hold the lock or make a copy
+impl<'t> NetworkContextSynchronizer<'t> {
+    pub fn new(ctx: NetworkContext<'t>, handle: tokio::runtime::Handle) -> Self {
+        Self {
+            ctx: Arc::new(tokio::sync::Mutex::new(ctx)),
+            handle,
+        }
+    }
+
+    pub async fn report_text(&self, text: String) {
+        let mut locker = self.ctx.lock().await;
+        locker.report.report_text(text);
+    }
+
+    pub fn flex_block_on<F: Future>(&self, future: F) -> F::Output {
+        match Handle::try_current() {
+            Ok(handle) => {
+                // we are in an async context, we don't need block_on
+                handle.block_on(future)
+            },
+            Err(_) => self.handle.block_on(future),
+        }
+    }
 }
 
 pub struct NetworkContext<'t> {
     core: CoreContext,
-    pub swarm: &'t mut dyn Swarm,
+    pub swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     pub report: &'t mut TestReport,
     pub global_duration: Duration,
     pub emit_job: EmitJobRequest,
@@ -33,7 +66,7 @@ pub struct NetworkContext<'t> {
 impl<'t> NetworkContext<'t> {
     pub fn new(
         core: CoreContext,
-        swarm: &'t mut dyn Swarm,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         report: &'t mut TestReport,
         global_duration: Duration,
         emit_job: EmitJobRequest,
@@ -46,19 +79,15 @@ impl<'t> NetworkContext<'t> {
             global_duration,
             emit_job,
             success_criteria,
-            runtime: Runtime::new().unwrap(),
+            runtime: aptos_runtimes::spawn_named_runtime("emitter".into(), Some(64)),
         }
-    }
-
-    pub fn swarm(&mut self) -> &mut dyn Swarm {
-        self.swarm
     }
 
     pub fn core(&mut self) -> &mut CoreContext {
         &mut self.core
     }
 
-    pub fn check_for_success(
+    pub async fn check_for_success(
         &mut self,
         stats: &TxnStats,
         window: Duration,
@@ -68,18 +97,38 @@ impl<'t> NetworkContext<'t> {
         start_version: u64,
         end_version: u64,
     ) -> Result<()> {
-        self.runtime
-            .block_on(SuccessCriteriaChecker::check_for_success(
-                &self.success_criteria,
-                self.swarm,
-                self.report,
-                stats,
-                window,
-                latency_breakdown,
-                start_time,
-                end_time,
-                start_version,
-                end_version,
-            ))
+        SuccessCriteriaChecker::check_for_success(
+            &self.success_criteria,
+            self.swarm.clone(),
+            self.report,
+            stats,
+            window,
+            latency_breakdown,
+            start_time,
+            end_time,
+            start_version,
+            end_version,
+        )
+        .await
+    }
+
+    pub fn handle(&self) -> Handle {
+        match Handle::try_current() {
+            Ok(handle) => {
+                // we are in an async context, we don't need block_on
+                handle
+            },
+            Err(_) => self.runtime.handle().clone(),
+        }
+    }
+
+    pub fn flex_block_on<F: Future>(&self, future: F) -> F::Output {
+        match Handle::try_current() {
+            Ok(handle) => {
+                // we are in an async context, we don't need block_on
+                handle.block_on(future)
+            },
+            Err(_) => self.runtime.block_on(future),
+        }
     }
 }

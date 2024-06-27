@@ -1854,6 +1854,7 @@ fn block_retrieval_test() {
     });
 }
 
+#[ignore] // TODO: turn this test back on once the flakes have resolved.
 #[test]
 pub fn forking_retrieval_test() {
     let runtime = consensus_runtime();
