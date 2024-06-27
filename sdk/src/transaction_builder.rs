@@ -137,6 +137,10 @@ impl TransactionFactory {
         self.transaction_expiration_time
     }
 
+    pub fn get_chain_id(&self) -> ChainId {
+        self.chain_id
+    }
+
     pub fn payload(&self, payload: TransactionPayload) -> TransactionBuilder {
         self.transaction_builder(payload)
     }
