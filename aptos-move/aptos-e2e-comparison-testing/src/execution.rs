@@ -12,12 +12,11 @@ use aptos_language_e2e_tests::{data_store::FakeDataStore, executor::FakeExecutor
 use aptos_types::{
     contract_event::ContractEvent,
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
-    transaction::{Transaction, TransactionPayload, Version},
+    transaction::{Transaction, Version},
     vm_status::VMStatus,
     write_set::WriteSet,
 };
 use aptos_validator_interface::AptosValidatorInterface;
-use aptos_vm::data_cache::AsMoveResolver;
 use clap::ValueEnum;
 use itertools::Itertools;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
@@ -321,18 +320,19 @@ impl Execution {
             );
             self.print_mismatches(cur_version, &res_main, &res_other);
         } else {
-            let res = res_main;
-            if let Ok(res_ok) = res {
-                self.output_result_str(format!(
-                    "version:{}\nwrite set:{:?}\n events:{:?}\n",
-                    cur_version, res_ok.0, res_ok.1
-                ));
-            } else {
-                self.output_result_str(format!(
-                    "execution error {} at version: {}, error",
-                    res.unwrap_err(),
-                    cur_version
-                ));
+            match res_main {
+                Ok((write_set, events)) => {
+                    self.output_result_str(format!(
+                        "version:{}\nwrite set:{:?}\n events:{:?}\n",
+                        cur_version, write_set, events
+                    ));
+                },
+                Err(vm_status) => {
+                    self.output_result_str(format!(
+                        "execution error {} at version: {}, error",
+                        vm_status, cur_version
+                    ));
+                },
             }
         }
     }

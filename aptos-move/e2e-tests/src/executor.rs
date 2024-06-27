@@ -34,15 +34,14 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     move_utils::MemberId,
-    on_chain_config::{AptosVersion, FeatureFlag, Features, OnChainConfig, ValidatorSet},
+    on_chain_config::{AptosVersion, OnChainConfig, ValidatorSet},
     state_store::{state_key::StateKey, state_value::StateValue, StateView, TStateView},
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, EntryFunction, ExecutionStatus, SignedTransaction, Transaction,
-        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
-        ViewFunctionOutput,
+        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::WriteSet,
@@ -50,9 +49,9 @@ use aptos_types::{
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
-    gas::{get_gas_parameters, make_prod_gas_meter},
-    move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionId},
-    verifier, AptosVM, VMValidator,
+    gas::make_prod_gas_meter,
+    move_vm_ext::{MoveVmExt, SessionId},
+    AptosVM, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
