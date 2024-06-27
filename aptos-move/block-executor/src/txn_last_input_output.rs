@@ -236,7 +236,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     ) -> Result<(), PanicError> {
         if let Some(status) = self.outputs[txn_idx as usize].load_full() {
             match status.as_ref() {
-                ExecutionStatus::Success(_) | ExecutionStatus::MaterializedSkipRest(_) | ExecutionStatus::SkipRest(_) => Ok(()),
+                ExecutionStatus::Success(_)
+                | ExecutionStatus::MaterializedSkipRest(_)
+                | ExecutionStatus::SkipRest(_) => Ok(()),
                 // Transaction cannot be committed with below statuses, as:
                 // - Speculative error must have failed validation.
                 // - Execution w. delayed field code error propagates the error directly,
