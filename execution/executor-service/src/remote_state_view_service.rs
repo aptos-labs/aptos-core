@@ -139,13 +139,13 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let kv_tx_clone = self.kv_tx.clone();
             let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
             let rand_send_thread_idx = rng.gen_range(0, self.kv_tx[0].len());
-            let priority_pool = 3 * kv_int_txs.len() / 4;
-            info!("Received message with priority {}", priority);
+            let priority_pool = 1 * kv_int_txs.len() / 2;
+            //info!("Received message with priority {}", priority);
             if priority == 1 {
-                kv_int_txs[rng.gen_range(0, 45)].send(message);
+                kv_int_txs[rng.gen_range(0, priority_pool)].send(message);
             }
             else {
-                kv_int_txs[rng.gen_range(45, kv_int_txs.len())].send(message);
+                kv_int_txs[rng.gen_range(priority_pool, kv_int_txs.len())].send(message);
             }
             // tokio::spawn(async move {
             //     handle_message(message,
