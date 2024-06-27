@@ -4,6 +4,7 @@
 use aptos_config::config::NodeConfig;
 use aptos_db_indexer::{db_indexer::DBIndexer, db_ops::open_internal_indexer_db};
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
+use aptos_schemadb::DB;
 use aptos_storage_interface::DbReader;
 use std::sync::Arc;
 
@@ -15,26 +16,39 @@ pub struct InternalIndexerDBService {
 }
 
 impl InternalIndexerDBService {
-    pub fn new(db_reader: Arc<dyn DbReader>, node_config: &NodeConfig) -> Self {
-        let db_path = node_config
-            .storage
-            .get_dir_paths()
-            .default_root_path()
-            .join(INTERNAL_INDEXER_DB);
-        let rocksdb_config = node_config.storage.rocksdb_configs.index_db_config;
-        let db = Arc::new(
-            open_internal_indexer_db(db_path, &rocksdb_config)
-                .expect("Failed to open up indexer db initially"),
-        );
-
+    pub fn new(
+        db_reader: Arc<dyn DbReader>,
+        node_config: &NodeConfig,
+        internal_indexer_db: Arc<DB>,
+    ) -> Self {
         let internal_db_indexer = Arc::new(DBIndexer::new(
-            db,
+            internal_indexer_db,
             db_reader,
             &node_config.indexer_db_config,
         ));
         Self {
             db_indexer: internal_db_indexer,
         }
+    }
+
+    pub fn get_indexer_db(node_config: &NodeConfig) -> Option<Arc<DB>> {
+        if !node_config
+            .indexer_db_config
+            .is_internal_indexer_db_enabled()
+        {
+            return None;
+        }
+        let db_path_buf = node_config
+            .storage
+            .get_dir_paths()
+            .default_root_path()
+            .join(INTERNAL_INDEXER_DB);
+        let rocksdb_config = node_config.storage.rocksdb_configs.index_db_config;
+        let db_path = db_path_buf.as_path();
+        Some(Arc::new(
+            open_internal_indexer_db(db_path, &rocksdb_config)
+                .expect("Failed to open up indexer db initially"),
+        ))
     }
 
     pub fn get_db_indexer(&self) -> Arc<DBIndexer> {

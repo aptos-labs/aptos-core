@@ -145,8 +145,7 @@ fn execute_function_in_module(
         let vm = MoveVM::new(move_stdlib::natives::all_natives(
             AccountAddress::from_hex_literal("0x1").unwrap(),
             move_stdlib::natives::GasParameters::zeros(),
-        ))
-        .unwrap();
+        ));
 
         let mut changeset = ChangeSet::new();
         let mut blob = vec![];

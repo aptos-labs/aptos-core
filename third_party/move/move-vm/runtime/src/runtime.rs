@@ -46,14 +46,20 @@ impl Clone for VMRuntime {
 }
 
 impl VMRuntime {
+    /// Creates a new runtime instance with provided native functions and VM
+    /// configurations. If there are duplicated natives, panics.
     pub(crate) fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         vm_config: VMConfig,
-    ) -> PartialVMResult<Self> {
-        Ok(VMRuntime {
-            loader: Loader::new(NativeFunctions::new(natives)?, vm_config),
+    ) -> Self {
+        VMRuntime {
+            loader: Loader::new(
+                NativeFunctions::new(natives)
+                    .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e)),
+                vm_config,
+            ),
             module_cache: Arc::new(ModuleCache::new()),
-        })
+        }
     }
 
     pub(crate) fn publish_module_bundle(

@@ -100,10 +100,16 @@ pub mod fuzzing {
             assert_no_panic_decoding::<
                 super::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
             >(data);
+            assert_no_panic_decoding::<
+                super::stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
+            >(data);
             assert_no_panic_decoding::<super::stale_state_value_index::StaleStateValueIndexSchema>(
                 data,
             );
             assert_no_panic_decoding::<super::state_value::StateValueSchema>(data);
+            assert_no_panic_decoding::<super::state_value_by_key_hash::StateValueByKeyHashSchema>(
+                data,
+            );
             assert_no_panic_decoding::<super::state_value_index::StateValueIndexSchema>(data);
             assert_no_panic_decoding::<super::transaction::TransactionSchema>(data);
             assert_no_panic_decoding::<super::transaction_accumulator::TransactionAccumulatorSchema>(

@@ -513,10 +513,6 @@ mod test {
         type ResourceGroupTag = ();
         type ResourceKey = ();
 
-        fn is_delayed_field_optimization_capable(&self) -> bool {
-            unimplemented!("Irrelevant for the test")
-        }
-
         fn get_delayed_field_value(
             &self,
             _id: &Self::Identifier,

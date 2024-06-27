@@ -150,7 +150,7 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
-            // FeatureFlag::LIMIT_VM_TYPE_SIZE, // TODO: Enable when type builder rolls out
+            FeatureFlag::LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
         ]
     }
@@ -241,12 +241,6 @@ impl Features {
         // requires emit fee statement
         self.is_emit_fee_statement_enabled()
             && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
-    }
-
-    /// Whether the Aggregator V2 API feature is enabled.
-    /// Once enabled, the functions from aggregator_v2.move will be available for use.
-    pub fn is_aggregator_v2_api_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::AGGREGATOR_V2_API)
     }
 
     /// Whether the Aggregator V2 delayed fields feature is enabled.

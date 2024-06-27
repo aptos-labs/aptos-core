@@ -3,7 +3,7 @@ module 0x2.A {
   struct A has drop { x: u64 }
 }
 
-//# run --signers 0x1 --check-runtime-types
+//# run --signers 0x1
 import 0x1.type_name;
 import 0x1.ascii;
 import 0x2.A;

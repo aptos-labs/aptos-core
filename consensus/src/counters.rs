@@ -320,10 +320,13 @@ pub static CONSENSUS_PROPOSAL_PENDING_ROUNDS: Lazy<Histogram> = Lazy::new(|| {
 });
 
 /// duration pending when creating proposal
-pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<Histogram> = Lazy::new(|| {
-    register_avg_counter(
-        "aptos_consensus_proposal_pending_duration",
-        "duration pending when creating proposal",
+pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_proposal_pending_duration",
+            "duration pending when creating proposal",
+        )
+        .unwrap(),
     )
 });
 
@@ -764,6 +767,16 @@ pub static NUM_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the number of bytes in the committed blocks.
+pub static NUM_BYTES_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_num_bytes_per_block",
+        "Histogram for the number of bytes per (committed) blocks.",
+        exponential_buckets(/*start=*/ 500.0, /*factor=*/ 1.4, /*count=*/ 32).unwrap()
+    )
+    .unwrap()
+});
+
 // Histogram buckets that expand DEFAULT_BUCKETS with more granularity:
 // * 0.3 to 2.0: step 0.1
 // * 2.0 to 4.0: step 0.2
@@ -1065,6 +1078,8 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlo
         observe_block(block.block().timestamp_usecs(), BlockStage::COMMITTED);
         let txn_status = block.compute_result().compute_status_for_input_txns();
         NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
+        NUM_BYTES_PER_BLOCK
+            .observe(block.block().payload().map_or(0, |payload| payload.size()) as f64);
         COMMITTED_BLOCKS_COUNT.inc();
         LAST_COMMITTED_ROUND.set(block.round() as i64);
         LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
