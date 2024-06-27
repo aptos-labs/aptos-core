@@ -11,16 +11,19 @@ use aptos_db::AptosDB;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_sdk::{
-    move_types::account_address::AccountAddress,
+    move_types::{account_address::AccountAddress, move_resource::MoveStructType},
     transaction_builder::TransactionFactory,
-    types::{AccountKey, LocalAccount},
+    types::{get_apt_primary_store_address, AccountKey, LocalAccount},
 };
 use aptos_storage_interface::{
     state_view::{DbStateViewAtVersion, VerifiedStateViewAtVersion},
     DbReaderWriter, Order,
 };
 use aptos_types::{
-    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
+    account_config::{
+        aptos_test_root_address, AccountResource, CoinStoreResource, FungibleStoreResource,
+        ObjectGroupResource,
+    },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     event::EventKey,
@@ -234,7 +237,7 @@ pub fn test_execution_with_storage_impl_inner(
         .unwrap();
     verify_committed_txn_status(latest_li, &t8, &block1[7]).unwrap();
     // We requested the events to come back from this one, so verify that they did
-    assert_eq!(t8.events.unwrap().len(), 5);
+    assert_eq!(t8.events.unwrap().len(), 4);
 
     let t9 = db
         .reader
@@ -295,7 +298,7 @@ pub fn test_execution_with_storage_impl_inner(
                 current_version,
             )
             .unwrap();
-        assert_eq!(account1_sent_events.len(), 2);
+        assert_eq!(account1_sent_events.len(), 0);
 
         let account2_sent_events = db
             .reader
@@ -307,7 +310,7 @@ pub fn test_execution_with_storage_impl_inner(
                 current_version,
             )
             .unwrap();
-        assert_eq!(account2_sent_events.len(), 1);
+        assert_eq!(account2_sent_events.len(), 0);
 
         let account3_sent_events = db
             .reader
@@ -332,7 +335,7 @@ pub fn test_execution_with_storage_impl_inner(
             )
             .unwrap();
         // Account1 has one deposit event since AptosCoin was minted to it.
-        assert_eq!(account1_received_events.len(), 1);
+        assert_eq!(account1_received_events.len(), 0);
 
         let account2_received_events = db
             .reader
@@ -345,7 +348,7 @@ pub fn test_execution_with_storage_impl_inner(
             )
             .unwrap();
         // Account2 has two deposit events: from being minted to and from one transfer.
-        assert_eq!(account2_received_events.len(), 2);
+        assert_eq!(account2_received_events.len(), 0);
 
         let account3_received_events = db
             .reader
@@ -358,7 +361,7 @@ pub fn test_execution_with_storage_impl_inner(
             )
             .unwrap();
         // Account3 has three deposit events: from being minted to and from two transfers.
-        assert_eq!(account3_received_events.len(), 3);
+        assert_eq!(account3_received_events.len(), 0);
         let view = db
             .reader
             .verified_state_view_at_version(Some(current_version), latest_li)
@@ -466,7 +469,7 @@ pub fn test_execution_with_storage_impl_inner(
                 current_version,
             )
             .unwrap();
-        assert_eq!(account1_sent_events_batch1.len(), 10);
+        assert_eq!(account1_sent_events_batch1.len(), 0);
 
         let account1_sent_events_batch2 = db
             .reader
@@ -478,7 +481,7 @@ pub fn test_execution_with_storage_impl_inner(
                 current_version,
             )
             .unwrap();
-        assert_eq!(account1_sent_events_batch2.len(), 6);
+        assert_eq!(account1_sent_events_batch2.len(), 0);
 
         let account3_received_events_batch1 = db
             .reader
@@ -490,16 +493,7 @@ pub fn test_execution_with_storage_impl_inner(
                 current_version,
             )
             .unwrap();
-        assert_eq!(account3_received_events_batch1.len(), 10);
-        // Account3 has one extra deposit event from being minted to.
-        assert_eq!(
-            account3_received_events_batch1[0]
-                .event
-                .v1()
-                .unwrap()
-                .sequence_number(),
-            16
-        );
+        assert_eq!(account3_received_events_batch1.len(), 0);
 
         let account3_received_events_batch2 = db
             .reader
@@ -511,15 +505,7 @@ pub fn test_execution_with_storage_impl_inner(
                 current_version,
             )
             .unwrap();
-        assert_eq!(account3_received_events_batch2.len(), 7);
-        assert_eq!(
-            account3_received_events_batch2[0]
-                .event
-                .v1()
-                .unwrap()
-                .sequence_number(),
-            6
-        );
+        assert_eq!(account3_received_events_batch2.len(), 0);
     }
 
     aptos_db
@@ -558,6 +544,13 @@ pub fn get_account_balance(state_view: &dyn StateView, address: &AccountAddress)
     CoinStoreResource::fetch_move_resource(state_view, address)
         .unwrap()
         .map_or(0, |coin_store| coin_store.coin())
+        + FungibleStoreResource::fetch_move_resource_from_group(
+            state_view,
+            &get_apt_primary_store_address(*address),
+            &ObjectGroupResource::struct_tag(),
+        )
+        .unwrap()
+        .map_or(0, |store| store.balance())
 }
 
 pub fn verify_account_balance<F>(balance: u64, f: F) -> Result<()>

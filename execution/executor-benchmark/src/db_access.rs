@@ -2,15 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_sdk::types::get_apt_primary_store_address;
 use aptos_storage_interface::state_view::DbStateView;
 use aptos_types::{
     account_address::AccountAddress,
+    account_config::{lite_account::LiteAccountGroup, ObjectGroupResource},
     state_store::{state_key::StateKey, StateView},
     write_set::TOTAL_SUPPLY_STATE_KEY,
 };
 use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
+    move_resource::MoveStructType,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::str::FromStr;
@@ -99,18 +102,28 @@ impl DbAccessUtil {
         ])
     }
 
-    pub fn get_account(
-        account_key: &StateKey,
+    pub fn get_lite_account_group(
+        account: &AccountAddress,
         state_view: &impl StateView,
-    ) -> Result<Option<Account>> {
-        Self::get_value(account_key, state_view)
+    ) -> Result<LiteAccountGroup> {
+        let bytes = Self::get_value_bytes(
+            &StateKey::resource_group(account, &LiteAccountGroup::struct_tag()),
+            state_view,
+        )?;
+        Ok(LiteAccountGroup::from_bytes(account, bytes.as_deref())?)
     }
 
-    pub fn get_coin_store(
-        coin_store_key: &StateKey,
+    pub fn get_fungible_store_group(
+        account: &AccountAddress,
         state_view: &impl StateView,
-    ) -> Result<Option<CoinStore>> {
-        Self::get_value(coin_store_key, state_view)
+    ) -> Result<Option<ObjectGroupResource>> {
+        Self::get_value(
+            &StateKey::resource_group(
+                &get_apt_primary_store_address(*account),
+                &ObjectGroupResource::struct_tag(),
+            ),
+            state_view,
+        )
     }
 
     pub fn get_value<T: DeserializeOwned>(
@@ -121,6 +134,15 @@ impl DbAccessUtil {
             .get_state_value_bytes(state_key)?
             .map(move |value| bcs::from_bytes(&value));
         value.transpose().map_err(anyhow::Error::msg)
+    }
+
+    pub fn get_value_bytes(
+        state_key: &StateKey,
+        state_view: &impl StateView,
+    ) -> Result<Option<Vec<u8>>> {
+        Ok(state_view
+            .get_state_value_bytes(state_key)?
+            .map(|b| b.to_vec()))
     }
 
     pub fn get_db_value<T: DeserializeOwned>(
