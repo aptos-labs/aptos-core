@@ -221,7 +221,7 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let (proof_block, proof_queue_fully_utilized) =
+                let (proof_block, cur_unique_txns, proof_queue_fully_utilized) =
                     self.proofs_for_consensus.pull_proofs(
                         &excluded_batches,
                         max_txns,
@@ -235,12 +235,15 @@ impl ProofManager {
                     .observe(if proof_queue_fully_utilized { 1.0 } else { 0.0 });
 
                 let mut inline_block: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
-                let cur_txns: u64 = proof_block.iter().map(|p| p.num_txns()).sum();
+                let cur_all_txns: u64 = proof_block.iter().map(|p| p.num_txns()).sum();
                 let cur_bytes: u64 = proof_block.iter().map(|p| p.num_bytes()).sum();
 
                 if self.allow_batches_without_pos_in_proposal && proof_queue_fully_utilized {
                     inline_block = self.batch_queue.pull_batches(
-                        min(max_unique_txns - cur_txns, max_inline_txns),
+                        min(
+                            min(max_txns - cur_all_txns, max_unique_txns - cur_unique_txns),
+                            max_inline_txns,
+                        ),
                         min(max_bytes - cur_bytes, max_inline_bytes),
                         excluded_batches
                             .iter()

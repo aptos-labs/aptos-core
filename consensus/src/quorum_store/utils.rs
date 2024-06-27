@@ -374,6 +374,8 @@ impl ProofQueue {
     // The flag in the second return argument is true iff the entire proof queue is fully utilized
     // when pulling the proofs. If any proof from proof queue cannot be included due to size limits,
     // this flag is set false.
+    // Returns the proofs, the number of unique transactions in the proofs, and a flag indicating
+    // whether the proof queue is fully utilized.
     pub(crate) fn pull_proofs(
         &mut self,
         excluded_batches: &HashSet<BatchInfo>,
@@ -381,7 +383,7 @@ impl ProofQueue {
         max_unique_txns: u64,
         max_bytes: u64,
         return_non_full: bool,
-    ) -> (Vec<ProofOfStore>, bool) {
+    ) -> (Vec<ProofOfStore>, u64, bool) {
         let mut ret = vec![];
         let mut cur_bytes = 0;
         let mut cur_unique_txns = 0;
@@ -486,9 +488,9 @@ impl ProofQueue {
             self.log_remaining_data_after_pull(excluded_batches, &ret);
             // Stable sort, so the order of proofs within an author will not change.
             ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
-            (ret, !full)
+            (ret, cur_unique_txns, !full)
         } else {
-            (Vec::new(), !full)
+            (Vec::new(), 0, !full)
         }
     }
 
