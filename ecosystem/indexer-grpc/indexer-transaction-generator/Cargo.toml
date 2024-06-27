@@ -1,0 +1,22 @@
+[package]
+name = "aptos-indexer-transaction-generator"
+description = "Indexer integration testing framework."
+version = "1.0.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+# used for localnode.
+aptos = { workspace = true }
+aptos-config = { workspace = true }
+futures = { workspace = true }
+rand = { workspace = true }
+tokio = { workspace = true }

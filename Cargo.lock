@@ -2145,30 +2145,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-indexer-grpc-integration-tests"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-indexer-grpc-cache-worker",
- "aptos-indexer-grpc-file-store",
- "aptos-indexer-grpc-server-framework",
- "aptos-indexer-grpc-utils",
- "aptos-logger",
- "aptos-transaction-emitter-lib",
- "aptos-transaction-generator-lib",
- "aptos-types",
- "once_cell",
- "redis",
- "regex",
- "reqwest",
- "tempfile",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "aptos-indexer-grpc-server-framework"
 version = "1.0.0"
 dependencies = [
@@ -2249,6 +2225,18 @@ dependencies = [
  "tonic 0.11.0",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "aptos-indexer-transaction-generator"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos",
+ "aptos-config",
+ "futures",
+ "rand 0.7.3",
+ "tokio",
 ]
 
 [[package]]
