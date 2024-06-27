@@ -997,14 +997,6 @@ impl TransactionStatus {
             _ => self,
         }
     }
-
-    pub fn from_executed_vm_status(vm_status: VMStatus) -> Self {
-        if vm_status == VMStatus::Executed {
-            TransactionStatus::Keep(ExecutionStatus::Success)
-        } else {
-            panic!("Auto-conversion should not be called with non-executed status.")
-        }
-    }
 }
 
 impl From<ExecutionStatus> for TransactionStatus {

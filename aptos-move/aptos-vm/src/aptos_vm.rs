@@ -81,7 +81,7 @@ use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
-    errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
+    errors::{Location, PartialVMError, VMError, VMResult},
     CompiledModule,
 };
 use move_core_types::{
@@ -1879,8 +1879,7 @@ impl AptosVM {
                 change_set.clone()
             },
             WriteSetPayload::Script { script, execute_as } => {
-                let resolver = state_view.as_move_resolver();
-                let vm = Self::new(&resolver, Some(false));
+                let vm = Self::new(state_view);
 
                 // There is no gas metering involved for write set payloads.
                 let mut gas_meter = UnmeteredGasMeter;
@@ -1893,6 +1892,8 @@ impl AptosVM {
 
                 // TODO: user specified genesis id to distinguish different genesis write sets
                 let session_id = SessionId::genesis(HashValue::zero());
+
+                let resolver = state_view.as_move_resolver();
                 let mut session = vm.new_session(&resolver, session_id, None);
                 vm.validate_and_execute_script(
                     &mut session,
@@ -1937,17 +1938,13 @@ impl AptosVM {
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let gas_used = 0;
-        let status = TransactionStatus::from_executed_vm_status(VMStatus::Executed);
-        let auxiliary_data = TransactionAuxiliaryData::default();
         let (write_set, events) = change_set.into_inner();
-
         Ok(TransactionOutput::new(
             write_set,
             events,
-            gas_used,
-            status,
-            auxiliary_data,
+            0,
+            TransactionStatus::Keep(ExecutionStatus::Success),
+            TransactionAuxiliaryData::default(),
         ))
     }
 
