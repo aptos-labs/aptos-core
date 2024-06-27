@@ -228,7 +228,69 @@ impl DbWriter for AptosDB {
         // Lock buffered state in the state store
         let state_lock = self.state_store.reset_lock();
 
-        // Update the provided ledger info and the overall commit progress
+        // Revert the overall commit progress
+        ledger_batch.put::<DbMetadataSchema>(
+            &DbMetadataKey::OverallCommitProgress,
+            &DbMetadataValue::Version(target_version),
+        )?;
+
+        // Write ledger metadata db changes
+        self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
+
+        let temp_position = Position::from_postorder_index(latest_version)?;
+
+        // Revert the transaction accumulator
+        let batch = SchemaBatch::new();
+        self.ledger_db
+            .transaction_accumulator_db()
+            .revert_transaction_accumulator(target_version, &batch, temp_position)?;
+        self.ledger_db
+            .transaction_accumulator_db()
+            .write_schemas(batch)?;
+
+        // Revert the transaction info
+        // FIXME: need to delete the range to current latest?
+        let batch = SchemaBatch::new();
+        self.ledger_db
+            .transaction_info_db()
+            .delete_transaction_info(target_version + 1, &batch)?;
+        self.ledger_db.transaction_info_db().write_schemas(batch)?;
+
+        // Revert the events
+        // FIXME: need to delete the range to current latest?
+        let batch = SchemaBatch::new();
+        self.ledger_db
+            .event_db()
+            .delete_events(target_version + 1, &batch)?;
+        self.ledger_db.event_db().write_schemas(batch)?;
+
+        // Revert the transaction auxiliary data
+        let batch = SchemaBatch::new();
+        TransactionAuxiliaryDataDb::prune(target_version, latest_version, &batch)?;
+        self.ledger_db
+            .transaction_auxiliary_data_db()
+            .write_schemas(batch)?;
+
+        // Revert the write set
+        let batch = SchemaBatch::new();
+        WriteSetDb::prune(target_version, latest_version, &batch)?;
+        self.ledger_db.write_set_db().write_schemas(batch)?;
+
+        // Remove the transactions
+        let batch = SchemaBatch::new();
+        self.ledger_db.transaction_db().prune_transactions(
+            target_version,
+            latest_version,
+            &batch,
+        )?;
+        self.ledger_db.transaction_db().write_schemas(batch)?;
+
+        // Revert the state kv and ledger metadata
+        self.state_store
+            .state_kv_db
+            .revert_state_kv_and_ledger_metadata(target_version)?;
+
+        // Update the provided ledger info
         let new_root_hash = ledger_info_with_sigs.commit_info().executed_state_id();
         self.commit_ledger_info(target_version, new_root_hash, Some(&ledger_info_with_sigs))?;
 
