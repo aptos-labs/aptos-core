@@ -16,7 +16,8 @@ use aptos_types::account_address::AccountAddress;
 use rand::seq::SliceRandom;
 use std::{
     cmp::Ordering,
-    collections::{btree_set::Iter, BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{btree_set::Iter, BTreeMap, BTreeSet, HashMap},
+    iter::Rev,
     ops::Bound,
     time::{Duration, Instant, SystemTime},
 };
@@ -30,22 +31,20 @@ pub type AccountTransactions = BTreeMap<u64, MempoolTransaction>;
 /// We don't store the full content of transactions in the index.
 /// Instead we use `OrderedQueueKey` - logical reference to the transaction in the main store.
 pub struct PriorityIndex {
-    data: HashSet<OrderedQueueKey>,
+    data: BTreeSet<OrderedQueueKey>,
 }
 
-pub type PriorityQueueIter<'a> = std::collections::hash_set::Iter<'a, OrderedQueueKey>;
+pub type PriorityQueueIter<'a> = Rev<Iter<'a, OrderedQueueKey>>;
 
 impl PriorityIndex {
     pub(crate) fn new() -> Self {
         Self {
-            data: HashSet::new(),
+            data: BTreeSet::new(),
         }
     }
 
-    pub(crate) fn insert(&mut self, txn: &mut MempoolTransaction) {
-        if self.data.insert(self.make_key(txn)) {
-            txn.insertion_info.priority_index_inserted_time = Some(SystemTime::now());
-        }
+    pub(crate) fn insert(&mut self, txn: &MempoolTransaction) {
+        self.data.insert(self.make_key(txn));
     }
 
     pub(crate) fn remove(&mut self, txn: &MempoolTransaction) {
@@ -67,7 +66,7 @@ impl PriorityIndex {
     }
 
     pub(crate) fn iter(&self) -> PriorityQueueIter {
-        self.data.iter()
+        self.data.iter().rev()
     }
 
     pub(crate) fn size(&self) -> usize {
@@ -84,45 +83,38 @@ pub struct OrderedQueueKey {
     pub hash: HashValue,
 }
 
-// impl PartialOrd for OrderedQueueKey {
-//     fn partial_cmp(&self, other: &OrderedQueueKey) -> Option<Ordering> {
-//         Some(self.cmp(other))
-//     }
-// }
+impl PartialOrd for OrderedQueueKey {
+    fn partial_cmp(&self, other: &OrderedQueueKey) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
-// impl Ord for OrderedQueueKey {
-//     fn cmp(&self, other: &OrderedQueueKey) -> Ordering {
-//         // if self.address == other.address {
-//         //     return self
-//         //         .sequence_number
-//         //         .transaction_sequence_number
-//         //         .cmp(&other.sequence_number.transaction_sequence_number)
-//         //         .reverse();
-//         // }
-//         match self.gas_ranking_score.cmp(&other.gas_ranking_score) {
-//             Ordering::Equal => {},
-//             ordering => return ordering,
-//         }
-//         match self.expiration_time.cmp(&other.expiration_time).reverse() {
-//             Ordering::Equal => {},
-//             ordering => return ordering,
-//         }
-//         match self.address.cmp(&other.address) {
-//             Ordering::Equal => {},
-//             ordering => return ordering,
-//         }
-//         match self
-//             .sequence_number
-//             .transaction_sequence_number
-//             .cmp(&other.sequence_number.transaction_sequence_number)
-//             .reverse()
-//         {
-//             Ordering::Equal => {},
-//             ordering => return ordering,
-//         }
-//         self.hash.cmp(&other.hash)
-//     }
-// }
+impl Ord for OrderedQueueKey {
+    fn cmp(&self, other: &OrderedQueueKey) -> Ordering {
+        match self.gas_ranking_score.cmp(&other.gas_ranking_score) {
+            Ordering::Equal => {},
+            ordering => return ordering,
+        }
+        match self.expiration_time.cmp(&other.expiration_time).reverse() {
+            Ordering::Equal => {},
+            ordering => return ordering,
+        }
+        match self.address.cmp(&other.address) {
+            Ordering::Equal => {},
+            ordering => return ordering,
+        }
+        match self
+            .sequence_number
+            .transaction_sequence_number
+            .cmp(&other.sequence_number.transaction_sequence_number)
+            .reverse()
+        {
+            Ordering::Equal => {},
+            ordering => return ordering,
+        }
+        self.hash.cmp(&other.hash)
+    }
+}
 
 /// TTLIndex is used to perform garbage collection of old transactions in Mempool.
 /// Periodically separate GC-like job queries this index to find out transactions that have to be
