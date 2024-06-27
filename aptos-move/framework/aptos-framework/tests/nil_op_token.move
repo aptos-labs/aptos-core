@@ -22,7 +22,6 @@ module 0xcafe::nil_op_token {
             option::some(withdraw),
             option::none(),
             option::none(),
-            option::none()
         );
     }
 

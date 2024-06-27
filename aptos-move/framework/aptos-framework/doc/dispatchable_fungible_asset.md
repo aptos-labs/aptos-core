@@ -23,6 +23,7 @@ See AIP-73 for further discussion
 -  [Resource `TransferRefStore`](#0x1_dispatchable_fungible_asset_TransferRefStore)
 -  [Constants](#@Constants_0)
 -  [Function `register_dispatch_functions`](#0x1_dispatchable_fungible_asset_register_dispatch_functions)
+-  [Function `register_derive_supply_dispatch_function`](#0x1_dispatchable_fungible_asset_register_derive_supply_dispatch_function)
 -  [Function `withdraw`](#0x1_dispatchable_fungible_asset_withdraw)
 -  [Function `deposit`](#0x1_dispatchable_fungible_asset_deposit)
 -  [Function `transfer`](#0x1_dispatchable_fungible_asset_transfer)
@@ -130,7 +131,7 @@ TransferRefStore doesn't exist on the fungible asset type.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_register_dispatch_functions">register_dispatch_functions</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, withdraw_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;, deposit_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;, derived_balance_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;, derived_supply_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_register_dispatch_functions">register_dispatch_functions</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, withdraw_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;, deposit_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;, derived_balance_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;)
 </code></pre>
 
 
@@ -144,14 +145,12 @@ TransferRefStore doesn't exist on the fungible asset type.
     withdraw_function: Option&lt;FunctionInfo&gt;,
     deposit_function: Option&lt;FunctionInfo&gt;,
     derived_balance_function: Option&lt;FunctionInfo&gt;,
-    derived_supply_function: Option&lt;FunctionInfo&gt;
 ) {
     <a href="fungible_asset.md#0x1_fungible_asset_register_dispatch_functions">fungible_asset::register_dispatch_functions</a>(
         constructor_ref,
         withdraw_function,
         deposit_function,
         derived_balance_function,
-        derived_supply_function
     );
     <b>let</b> store_obj = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
     <b>move_to</b>&lt;<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a>&gt;(
@@ -159,6 +158,36 @@ TransferRefStore doesn't exist on the fungible asset type.
         <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a> {
             transfer_ref: <a href="fungible_asset.md#0x1_fungible_asset_generate_transfer_ref">fungible_asset::generate_transfer_ref</a>(constructor_ref),
         }
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_dispatchable_fungible_asset_register_derive_supply_dispatch_function"></a>
+
+## Function `register_derive_supply_dispatch_function`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_register_derive_supply_dispatch_function">register_derive_supply_dispatch_function</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, dispatch_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_register_derive_supply_dispatch_function">register_derive_supply_dispatch_function</a>(
+    constructor_ref: &ConstructorRef,
+    dispatch_function: Option&lt;FunctionInfo&gt;
+) {
+    <a href="fungible_asset.md#0x1_fungible_asset_register_derive_supply_dispatch_function">fungible_asset::register_derive_supply_dispatch_function</a>(
+        constructor_ref,
+        dispatch_function
     );
 }
 </code></pre>
@@ -377,7 +406,7 @@ The semantics of value will be governed by the function specified in DispatchFun
 
 Get the derived supply of the fungible asset using the overloaded hook.
 
-The semantics of supply will be governed by the function specified in DispatchFunctionStore.
+The semantics of supply will be governed by the function specified in DeriveSupplyDispatch.
 
 
 <pre><code>#[view]

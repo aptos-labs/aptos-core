@@ -13,6 +13,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Resource `Untransferable`](#0x1_fungible_asset_Untransferable)
 -  [Resource `FungibleStore`](#0x1_fungible_asset_FungibleStore)
 -  [Resource `DispatchFunctionStore`](#0x1_fungible_asset_DispatchFunctionStore)
+-  [Resource `DeriveSupply`](#0x1_fungible_asset_DeriveSupply)
 -  [Resource `ConcurrentFungibleBalance`](#0x1_fungible_asset_ConcurrentFungibleBalance)
 -  [Struct `FungibleAsset`](#0x1_fungible_asset_FungibleAsset)
 -  [Struct `MintRef`](#0x1_fungible_asset_MintRef)
@@ -33,6 +34,8 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `set_untransferable`](#0x1_fungible_asset_set_untransferable)
 -  [Function `is_untransferable`](#0x1_fungible_asset_is_untransferable)
 -  [Function `register_dispatch_functions`](#0x1_fungible_asset_register_dispatch_functions)
+-  [Function `register_derive_supply_dispatch_function`](#0x1_fungible_asset_register_derive_supply_dispatch_function)
+-  [Function `register_dispatch_function_sanity_check`](#0x1_fungible_asset_register_dispatch_function_sanity_check)
 -  [Function `generate_mint_ref`](#0x1_fungible_asset_generate_mint_ref)
 -  [Function `generate_burn_ref`](#0x1_fungible_asset_generate_burn_ref)
 -  [Function `generate_transfer_ref`](#0x1_fungible_asset_generate_transfer_ref)
@@ -341,8 +344,30 @@ The store object that holds fungible assets of a specific type associated with a
 <dd>
 
 </dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_fungible_asset_DeriveSupply"></a>
+
+## Resource `DeriveSupply`
+
+
+
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_DeriveSupply">DeriveSupply</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
 <dt>
-<code>derived_supply_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;</code>
+<code>dispatch_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;</code>
 </dt>
 <dd>
 
@@ -751,7 +776,7 @@ Maximum possible coin supply.
 Trying to re-register dispatch hook on a fungible asset.
 
 
-<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EALREADY_REGISTERED">EALREADY_REGISTERED</a>: u64 = 30;
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EALREADY_REGISTERED">EALREADY_REGISTERED</a>: u64 = 29;
 </code></pre>
 
 
@@ -781,7 +806,7 @@ Cannot destroy non-empty fungible assets.
 Cannot register dispatch hook for APT.
 
 
-<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EAPT_NOT_DISPATCHABLE">EAPT_NOT_DISPATCHABLE</a>: u64 = 32;
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EAPT_NOT_DISPATCHABLE">EAPT_NOT_DISPATCHABLE</a>: u64 = 31;
 </code></pre>
 
 
@@ -821,7 +846,7 @@ Burn ref and store do not match.
 Flag for Concurrent Supply not enabled
 
 
-<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_ECONCURRENT_BALANCE_NOT_ENABLED">ECONCURRENT_BALANCE_NOT_ENABLED</a>: u64 = 33;
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_ECONCURRENT_BALANCE_NOT_ENABLED">ECONCURRENT_BALANCE_NOT_ENABLED</a>: u64 = 32;
 </code></pre>
 
 
@@ -871,7 +896,7 @@ Provided derived_balance function type doesn't meet the signature requirement.
 Provided derived_supply function type doesn't meet the signature requirement.
 
 
-<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH">EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH</a>: u64 = 28;
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH">EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH</a>: u64 = 33;
 </code></pre>
 
 
@@ -901,7 +926,7 @@ Fungible asset do not match when merging.
 Fungible metadata does not exist on this account.
 
 
-<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_METADATA_EXISTENCE">EFUNGIBLE_METADATA_EXISTENCE</a>: u64 = 31;
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_METADATA_EXISTENCE">EFUNGIBLE_METADATA_EXISTENCE</a>: u64 = 30;
 </code></pre>
 
 
@@ -932,7 +957,7 @@ Invalid withdraw/deposit on dispatchable token. The specified token has a dispat
 Need to invoke dispatchable_fungible_asset::withdraw/deposit to perform transfer.
 
 
-<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EINVALID_DISPATCHABLE_OPERATIONS">EINVALID_DISPATCHABLE_OPERATIONS</a>: u64 = 29;
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EINVALID_DISPATCHABLE_OPERATIONS">EINVALID_DISPATCHABLE_OPERATIONS</a>: u64 = 28;
 </code></pre>
 
 
@@ -1318,7 +1343,7 @@ Returns true if the FA is untransferable.
 Create a fungible asset store whose transfer rule would be overloaded by the provided function.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_register_dispatch_functions">register_dispatch_functions</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, withdraw_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;, deposit_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;, derived_balance_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;, derived_supply_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_register_dispatch_functions">register_dispatch_functions</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, withdraw_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;, deposit_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;, derived_balance_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;)
 </code></pre>
 
 
@@ -1332,7 +1357,6 @@ Create a fungible asset store whose transfer rule would be overloaded by the pro
     withdraw_function: Option&lt;FunctionInfo&gt;,
     deposit_function: Option&lt;FunctionInfo&gt;,
     derived_balance_function: Option&lt;FunctionInfo&gt;,
-    derived_supply_function: Option&lt;FunctionInfo&gt;
 ) {
     // Verify that caller type matches callee type so wrongly typed function cannot be registered.
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_for_each_ref">option::for_each_ref</a>(&withdraw_function, |withdraw_function| {
@@ -1388,45 +1412,12 @@ Create a fungible asset store whose transfer rule would be overloaded by the pro
             )
         );
     });
-
-    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_for_each_ref">option::for_each_ref</a>(&derived_supply_function, |supply_function| {
-        <b>let</b> dispatcher_derived_supply_function_info = <a href="function_info.md#0x1_function_info_new_function_info_from_address">function_info::new_function_info_from_address</a>(
-            @aptos_framework,
-            <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset">dispatchable_fungible_asset</a>"),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"dispatchable_derived_supply"),
-        );
-        // Verify that caller type matches callee type so wrongly typed function cannot be registered.
-        <b>assert</b>!(
-            <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">function_info::check_dispatch_type_compatibility</a>(
-                &dispatcher_derived_supply_function_info,
-                supply_function
-            ),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(
-                <a href="fungible_asset.md#0x1_fungible_asset_EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH">EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH</a>
-            )
-        );
-    });
-
-    // Cannot register hook for APT.
-    <b>assert</b>!(
-        <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(constructor_ref) != @aptos_fungible_asset,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_EAPT_NOT_DISPATCHABLE">EAPT_NOT_DISPATCHABLE</a>)
-    );
-    <b>assert</b>!(
-        !<a href="object.md#0x1_object_can_generate_delete_ref">object::can_generate_delete_ref</a>(constructor_ref),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EOBJECT_IS_DELETABLE">EOBJECT_IS_DELETABLE</a>)
-    );
+    <a href="fungible_asset.md#0x1_fungible_asset_register_dispatch_function_sanity_check">register_dispatch_function_sanity_check</a>(constructor_ref);
     <b>assert</b>!(
         !<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DispatchFunctionStore">DispatchFunctionStore</a>&gt;(
             <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(constructor_ref)
         ),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="fungible_asset.md#0x1_fungible_asset_EALREADY_REGISTERED">EALREADY_REGISTERED</a>)
-    );
-    <b>assert</b>!(
-        <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(
-            <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(constructor_ref)
-        ),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_METADATA_EXISTENCE">EFUNGIBLE_METADATA_EXISTENCE</a>),
     );
 
     <b>let</b> store_obj = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
@@ -1438,8 +1429,111 @@ Create a fungible asset store whose transfer rule would be overloaded by the pro
             withdraw_function,
             deposit_function,
             derived_balance_function,
-            derived_supply_function
         }
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_register_derive_supply_dispatch_function"></a>
+
+## Function `register_derive_supply_dispatch_function`
+
+Define the derived supply dispatch with the provided function.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_register_derive_supply_dispatch_function">register_derive_supply_dispatch_function</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, dispatch_function: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_register_derive_supply_dispatch_function">register_derive_supply_dispatch_function</a>(
+    constructor_ref: &ConstructorRef,
+    dispatch_function: Option&lt;FunctionInfo&gt;
+) {
+    // Verify that caller type matches callee type so wrongly typed function cannot be registered.
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_for_each_ref">option::for_each_ref</a>(&dispatch_function, |supply_function| {
+        <b>let</b> <a href="function_info.md#0x1_function_info">function_info</a> = <a href="function_info.md#0x1_function_info_new_function_info_from_address">function_info::new_function_info_from_address</a>(
+            @aptos_framework,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset">dispatchable_fungible_asset</a>"),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"dispatchable_derived_supply"),
+        );
+        // Verify that caller type matches callee type so wrongly typed function cannot be registered.
+        <b>assert</b>!(
+            <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">function_info::check_dispatch_type_compatibility</a>(
+                &<a href="function_info.md#0x1_function_info">function_info</a>,
+                supply_function
+            ),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(
+                <a href="fungible_asset.md#0x1_fungible_asset_EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH">EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH</a>
+            )
+        );
+    });
+    <a href="fungible_asset.md#0x1_fungible_asset_register_dispatch_function_sanity_check">register_dispatch_function_sanity_check</a>(constructor_ref);
+    <b>assert</b>!(
+        !<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DeriveSupply">DeriveSupply</a>&gt;(
+            <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(constructor_ref)
+        ),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="fungible_asset.md#0x1_fungible_asset_EALREADY_REGISTERED">EALREADY_REGISTERED</a>)
+    );
+
+
+    <b>let</b> store_obj = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
+
+    // Store the overload function hook.
+    <b>move_to</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DeriveSupply">DeriveSupply</a>&gt;(
+        store_obj,
+        <a href="fungible_asset.md#0x1_fungible_asset_DeriveSupply">DeriveSupply</a> {
+            dispatch_function
+        }
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_register_dispatch_function_sanity_check"></a>
+
+## Function `register_dispatch_function_sanity_check`
+
+Check the requirements for registering a dispatchable function.
+
+
+<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_register_dispatch_function_sanity_check">register_dispatch_function_sanity_check</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_register_dispatch_function_sanity_check">register_dispatch_function_sanity_check</a>(
+    constructor_ref: &ConstructorRef,
+)  {
+    // Cannot register hook for APT.
+    <b>assert</b>!(
+        <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(constructor_ref) != @aptos_fungible_asset,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_EAPT_NOT_DISPATCHABLE">EAPT_NOT_DISPATCHABLE</a>)
+    );
+    <b>assert</b>!(
+        !<a href="object.md#0x1_object_can_generate_delete_ref">object::can_generate_delete_ref</a>(constructor_ref),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EOBJECT_IS_DELETABLE">EOBJECT_IS_DELETABLE</a>)
+    );
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(
+            <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(constructor_ref)
+        ),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_METADATA_EXISTENCE">EFUNGIBLE_METADATA_EXISTENCE</a>),
     );
 }
 </code></pre>
@@ -2210,10 +2304,10 @@ Return whether a fungible asset type is dispatchable.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_derived_supply_dispatch_function">derived_supply_dispatch_function</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): Option&lt;FunctionInfo&gt; <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_DispatchFunctionStore">DispatchFunctionStore</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_derived_supply_dispatch_function">derived_supply_dispatch_function</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): Option&lt;FunctionInfo&gt; <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_DeriveSupply">DeriveSupply</a> {
     <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
-    <b>if</b> (<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DispatchFunctionStore">DispatchFunctionStore</a>&gt;(metadata_addr)) {
-        <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DispatchFunctionStore">DispatchFunctionStore</a>&gt;(metadata_addr).derived_supply_function
+    <b>if</b> (<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DeriveSupply">DeriveSupply</a>&gt;(metadata_addr)) {
+        <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DeriveSupply">DeriveSupply</a>&gt;(metadata_addr).dispatch_function
     } <b>else</b> {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }

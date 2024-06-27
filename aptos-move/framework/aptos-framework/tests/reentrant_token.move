@@ -21,7 +21,6 @@ module 0xcafe::reentrant_token {
             constructor_ref,
             option::none(),
             option::some(deposit),
-            option::none(),
             option::none()
         );
     }

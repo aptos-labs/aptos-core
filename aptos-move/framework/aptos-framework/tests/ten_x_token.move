@@ -26,7 +26,10 @@ module 0xcafe::ten_x_token {
             constructor_ref,
             option::none(),
             option::none(),
-            option::some(balance_value),
+            option::some(balance_value)
+        );
+        dispatchable_fungible_asset::register_derive_supply_dispatch_function(
+            constructor_ref,
             option::some(supply_value)
         );
     }

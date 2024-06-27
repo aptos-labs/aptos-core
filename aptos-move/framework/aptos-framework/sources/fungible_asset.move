@@ -74,19 +74,19 @@ module aptos_framework::fungible_asset {
     const EDEPOSIT_FUNCTION_SIGNATURE_MISMATCH: u64 = 26;
     /// Provided derived_balance function type doesn't meet the signature requirement.
     const EDERIVED_BALANCE_FUNCTION_SIGNATURE_MISMATCH: u64 = 27;
-    /// Provided derived_supply function type doesn't meet the signature requirement.
-    const EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH: u64 = 28;
     /// Invalid withdraw/deposit on dispatchable token. The specified token has a dispatchable function hook.
     /// Need to invoke dispatchable_fungible_asset::withdraw/deposit to perform transfer.
-    const EINVALID_DISPATCHABLE_OPERATIONS: u64 = 29;
+    const EINVALID_DISPATCHABLE_OPERATIONS: u64 = 28;
     /// Trying to re-register dispatch hook on a fungible asset.
-    const EALREADY_REGISTERED: u64 = 30;
+    const EALREADY_REGISTERED: u64 = 29;
     /// Fungible metadata does not exist on this account.
-    const EFUNGIBLE_METADATA_EXISTENCE: u64 = 31;
+    const EFUNGIBLE_METADATA_EXISTENCE: u64 = 30;
     /// Cannot register dispatch hook for APT.
-    const EAPT_NOT_DISPATCHABLE: u64 = 32;
+    const EAPT_NOT_DISPATCHABLE: u64 = 31;
     /// Flag for Concurrent Supply not enabled
-    const ECONCURRENT_BALANCE_NOT_ENABLED: u64 = 33;
+    const ECONCURRENT_BALANCE_NOT_ENABLED: u64 = 32;
+    /// Provided derived_supply function type doesn't meet the signature requirement.
+    const EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH: u64 = 33;
 
     //
     // Constants
@@ -152,7 +152,11 @@ module aptos_framework::fungible_asset {
 		withdraw_function: Option<FunctionInfo>,
 		deposit_function: Option<FunctionInfo>,
         derived_balance_function: Option<FunctionInfo>,
-        derived_supply_function: Option<FunctionInfo>
+    }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct DeriveSupply has key {
+        dispatch_function: Option<FunctionInfo>
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -291,7 +295,6 @@ module aptos_framework::fungible_asset {
         withdraw_function: Option<FunctionInfo>,
         deposit_function: Option<FunctionInfo>,
         derived_balance_function: Option<FunctionInfo>,
-        derived_supply_function: Option<FunctionInfo>
     ) {
         // Verify that caller type matches callee type so wrongly typed function cannot be registered.
         option::for_each_ref(&withdraw_function, |withdraw_function| {
@@ -347,45 +350,12 @@ module aptos_framework::fungible_asset {
                 )
             );
         });
-
-        option::for_each_ref(&derived_supply_function, |supply_function| {
-            let dispatcher_derived_supply_function_info = function_info::new_function_info_from_address(
-                @aptos_framework,
-                string::utf8(b"dispatchable_fungible_asset"),
-                string::utf8(b"dispatchable_derived_supply"),
-            );
-            // Verify that caller type matches callee type so wrongly typed function cannot be registered.
-            assert!(
-                function_info::check_dispatch_type_compatibility(
-                    &dispatcher_derived_supply_function_info,
-                    supply_function
-                ),
-                error::invalid_argument(
-                    EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH
-                )
-            );
-        });
-
-        // Cannot register hook for APT.
-        assert!(
-            object::address_from_constructor_ref(constructor_ref) != @aptos_fungible_asset,
-            error::permission_denied(EAPT_NOT_DISPATCHABLE)
-        );
-        assert!(
-            !object::can_generate_delete_ref(constructor_ref),
-            error::invalid_argument(EOBJECT_IS_DELETABLE)
-        );
+        register_dispatch_function_sanity_check(constructor_ref);
         assert!(
             !exists<DispatchFunctionStore>(
                 object::address_from_constructor_ref(constructor_ref)
             ),
             error::already_exists(EALREADY_REGISTERED)
-        );
-        assert!(
-            exists<Metadata>(
-                object::address_from_constructor_ref(constructor_ref)
-            ),
-            error::not_found(EFUNGIBLE_METADATA_EXISTENCE),
         );
 
         let store_obj = &object::generate_signer(constructor_ref);
@@ -397,8 +367,71 @@ module aptos_framework::fungible_asset {
                 withdraw_function,
                 deposit_function,
                 derived_balance_function,
-                derived_supply_function
             }
+        );
+    }
+
+    /// Define the derived supply dispatch with the provided function.
+    public(friend) fun register_derive_supply_dispatch_function(
+        constructor_ref: &ConstructorRef,
+        dispatch_function: Option<FunctionInfo>
+    ) {
+        // Verify that caller type matches callee type so wrongly typed function cannot be registered.
+        option::for_each_ref(&dispatch_function, |supply_function| {
+            let function_info = function_info::new_function_info_from_address(
+                @aptos_framework,
+                string::utf8(b"dispatchable_fungible_asset"),
+                string::utf8(b"dispatchable_derived_supply"),
+            );
+            // Verify that caller type matches callee type so wrongly typed function cannot be registered.
+            assert!(
+                function_info::check_dispatch_type_compatibility(
+                    &function_info,
+                    supply_function
+                ),
+                error::invalid_argument(
+                    EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH
+                )
+            );
+        });
+        register_dispatch_function_sanity_check(constructor_ref);
+        assert!(
+            !exists<DeriveSupply>(
+                object::address_from_constructor_ref(constructor_ref)
+            ),
+            error::already_exists(EALREADY_REGISTERED)
+        );
+
+
+        let store_obj = &object::generate_signer(constructor_ref);
+
+        // Store the overload function hook.
+        move_to<DeriveSupply>(
+            store_obj,
+            DeriveSupply {
+                dispatch_function
+            }
+        );
+    }
+
+    /// Check the requirements for registering a dispatchable function.
+    inline fun register_dispatch_function_sanity_check(
+        constructor_ref: &ConstructorRef,
+    )  {
+        // Cannot register hook for APT.
+        assert!(
+            object::address_from_constructor_ref(constructor_ref) != @aptos_fungible_asset,
+            error::permission_denied(EAPT_NOT_DISPATCHABLE)
+        );
+        assert!(
+            !object::can_generate_delete_ref(constructor_ref),
+            error::invalid_argument(EOBJECT_IS_DELETABLE)
+        );
+        assert!(
+            exists<Metadata>(
+                object::address_from_constructor_ref(constructor_ref)
+            ),
+            error::not_found(EFUNGIBLE_METADATA_EXISTENCE),
         );
     }
 
@@ -629,10 +662,10 @@ module aptos_framework::fungible_asset {
         }
     }
 
-    public(friend) fun derived_supply_dispatch_function<T: key>(metadata: Object<T>): Option<FunctionInfo> acquires DispatchFunctionStore {
+    public(friend) fun derived_supply_dispatch_function<T: key>(metadata: Object<T>): Option<FunctionInfo> acquires DeriveSupply {
         let metadata_addr = object::object_address(&metadata);
-        if (exists<DispatchFunctionStore>(metadata_addr)) {
-            borrow_global<DispatchFunctionStore>(metadata_addr).derived_supply_function
+        if (exists<DeriveSupply>(metadata_addr)) {
+            borrow_global<DeriveSupply>(metadata_addr).dispatch_function
         } else {
             option::none()
         }
