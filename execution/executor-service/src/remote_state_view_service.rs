@@ -41,7 +41,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         remote_shard_addresses: Vec<SocketAddr>,
         num_threads: Option<usize>,
     ) -> Self {
-        let num_threads = remote_shard_addresses.len() * 2; //num_threads.unwrap_or_else(num_cpus::get);
+        let num_threads = 50;//remote_shard_addresses.len() * 2; //num_threads.unwrap_or_else(num_cpus::get);
         let num_kv_req_threads = 16; //= num_cpus::get() / 2;
         let num_shards = remote_shard_addresses.len();
         info!("num threads for remote state view service: {}", num_threads);
@@ -112,7 +112,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let recv_condition_clone = self.recv_condition.clone();
             let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
             let kv_int_rxs_i_clone = kv_int_rxs[i].clone();
-            thread_pool_clone.spawn(move || {
+            rayon::spawn(move || {
                 Self::priority_handler(state_view_clone.clone(),
                                        kv_tx_clone.clone(),
                                        kv_int_rxs_i_clone,
