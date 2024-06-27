@@ -36,7 +36,7 @@ popd() {
 }
 
 proofgen() {
-    branch=$1
+    circuit_dir=$1
     prover_key=$2
     outdir=$3
     
@@ -54,24 +54,27 @@ proofgen() {
     mkdir -p $tmpdir
     pushd $tmpdir/ 
     {
-        if [ $branch == "--local" ]; then
-            echo
-            echo "Using current repo in $repodir"
-            keylessrepo=$repodir
-        else
-            keylessrepo=aptos-keyless-circuit-$(echo $branch | tr / -)
-            echo
-            echo "Cloning or updating aptos-keyless-circuit:$branch in $keylessrepo..."
-            if [ -d $keylessrepo ]; then 
-                echo "Looks like repo is cloned. Updating..."
-                pushd $keylessrepo; git checkout $branch; popd
-            else
-                echo "Cloning..."
-                git clone git@github.com:aptos-labs/aptos-keyless-circuit $keylessrepo
-                pushd $keylessrepo; git checkout $branch; popd
-            fi
-        fi
+        #if [ $branch == "--local" ]; then
+        #    echo
+        #    echo "Using current repo in $repodir"
+        #    keylessrepo=$repodir
+        #else
+        #    keylessrepo=aptos-keyless-circuit-$(echo $branch | tr / -)
+        #    echo
+        #    echo "Cloning or updating aptos-keyless-circuit:$branch in $keylessrepo..."
+        #    if [ -d $keylessrepo ]; then 
+        #        echo "Looks like repo is cloned. Updating..."
+        #        pushd $keylessrepo; git checkout $branch; popd
+        #    else
+        #        echo "Cloning..."
+        #        git clone git@github.com:aptos-labs/aptos-keyless-circuit $keylessrepo
+        #        pushd $keylessrepo; git checkout $branch; popd
+        #    fi
+        #fi
+	keylessrepo=/Users/michael/aptos-labs/aptos-core/keyless/circuit #$circuit_dir
+	echo "About to pushd keyless repo"
         pushd $keylessrepo 
+	echo "Just did pushd on keyless repo"
         {
             echo
             echo "Creating python3 virtual env w/ deps..."
@@ -80,15 +83,23 @@ proofgen() {
 
             pip3 install pyjwt pycryptodome cryptography
     
+	    echo "About to install deps"
+	    pwd
+	    npm install -g circomlib@2.0.5
+	    #sh ./tools/install-deps.sh
+	    echo "Installed deps"
             pushd templates/
             {
                 echo
                 echo "(Re)compiling circuit. This will take several seconds..."
-                circom -l . main.circom --r1cs --wasm --sym 
+                #circom -l . main.circom --r1cs --wasm --sym 
+                circom -l `npm root -g` main.circom --r1cs --wasm --sym 
             }
             popd
 
+	    cp tools/input_gen.py ./input_gen.py
             echo
+	    pwd
             echo "Running input_gen.py..."
             touch input.json
             python3 input_gen.py
@@ -99,7 +110,7 @@ proofgen() {
                 node generate_witness.js main.wasm ../../input.json witness.wtns
             }
             popd
-
+ 
             echo
             echo "Generating proof. Should take around 30 seconds..."
             rm -f $outdir/proof.json
