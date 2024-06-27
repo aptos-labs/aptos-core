@@ -12,7 +12,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp, WriteOpSize},
 };
 use aptos_vm_types::{
-    change_set::{ChangeSetLike, VMChangeSet, WriteOpInfo},
+    change_set::{ChangeSetInterface, VMChangeSet, WriteOpInfo},
     resolver::ExecutorView,
     storage::change_set_configs::ChangeSetConfigs,
 };
@@ -32,7 +32,7 @@ impl UserSessionChangeSet {
     }
 }
 
-impl ChangeSetLike for UserSessionChangeSet {
+impl ChangeSetInterface for UserSessionChangeSet {
     fn num_write_ops(&self) -> usize {
         self.change_set.num_write_ops() + self.module_write_set.len()
     }

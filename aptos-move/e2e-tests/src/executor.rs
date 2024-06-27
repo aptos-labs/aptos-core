@@ -1021,8 +1021,8 @@ impl FakeExecutor {
                 ))
                 .expect("Failed to generate txn effects");
             change_set
-                .try_into_storage_change_set(module_write_set)
-                .expect("Failed to convert to ChangeSet")
+                .try_combine_into_storage_change_set(module_write_set)
+                .expect("Failed to convert to storage ChangeSet")
                 .into_inner()
         };
         self.data_store.add_write_set(&write_set);
@@ -1077,8 +1077,8 @@ impl FakeExecutor {
                 ))
                 .expect("Failed to generate txn effects");
             change_set
-                .try_into_storage_change_set(module_write_set)
-                .expect("Failed to convert to ChangeSet")
+                .try_combine_into_storage_change_set(module_write_set)
+                .expect("Failed to convert to storage ChangeSet")
                 .into_inner()
         };
         self.data_store.add_write_set(&write_set);
@@ -1129,8 +1129,8 @@ impl FakeExecutor {
             ))
             .expect("Failed to generate txn effects");
         let (write_set, events) = change_set
-            .try_into_storage_change_set(module_write_set)
-            .expect("Failed to convert to ChangeSet")
+            .try_combine_into_storage_change_set(module_write_set)
+            .expect("Failed to convert to storage ChangeSet")
             .into_inner();
         Ok((write_set, events))
     }

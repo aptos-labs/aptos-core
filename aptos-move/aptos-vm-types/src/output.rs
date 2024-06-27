@@ -3,7 +3,7 @@
 
 use crate::{
     abstract_write_op::AbstractResourceWriteOp,
-    change_set::{ChangeSetLike, VMChangeSet},
+    change_set::{ChangeSetInterface, VMChangeSet},
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::AggregatorV1Resolver,
@@ -179,7 +179,7 @@ impl VMOutput {
             auxiliary_data,
         } = self;
         let (write_set, events) = change_set
-            .try_into_storage_change_set(module_write_set)?
+            .try_combine_into_storage_change_set(module_write_set)?
             .into_inner();
         Ok(TransactionOutput::new(
             write_set,

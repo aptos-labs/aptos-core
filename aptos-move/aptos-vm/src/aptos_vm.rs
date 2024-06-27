@@ -71,7 +71,10 @@ use aptos_utils::aptos_try;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp,
-    change_set::{ChangeSetLike, VMChangeSet},
+    change_set::{
+        create_vm_change_set_with_modules_when_delayed_field_optimization_disabled,
+        ChangeSetInterface, VMChangeSet,
+    },
     environment::Environment,
     output::VMOutput,
     resolver::{ExecutorView, ResourceGroupView},
@@ -860,7 +863,7 @@ impl AptosVM {
 
     fn charge_change_set(
         &self,
-        change_set: &mut impl ChangeSetLike,
+        change_set: &mut impl ChangeSetInterface,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl AptosMoveResolver,
@@ -1827,9 +1830,10 @@ impl AptosVM {
                 // this transaction is never delayed field capable.
                 // it requires restarting execution afterwards,
                 // which allows it to be used as last transaction in delayed_field_enabled context.
-                let (change_set, module_write_set) = VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
-                    change_set.clone(),
-                );
+                let (change_set, module_write_set) =
+                    create_vm_change_set_with_modules_when_delayed_field_optimization_disabled(
+                        change_set.clone(),
+                    );
 
                 // validate_waypoint_change_set checks that this is true, so we only log here.
                 if !Self::should_restart_execution(change_set.events()) {
