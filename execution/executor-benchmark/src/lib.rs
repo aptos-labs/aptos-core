@@ -52,6 +52,7 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
+use aptos_vm::counters::TIMER;
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
@@ -512,6 +513,8 @@ struct ExecutionTimeMeasurement {
     commit_total: f64,
 
     vm_time: f64,
+
+    vm_time_no_flatten: f64,
 }
 
 impl ExecutionTimeMeasurement {
@@ -540,6 +543,10 @@ impl ExecutionTimeMeasurement {
 
         let vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
 
+        let vm_time_no_flatten = TIMER
+            .with_label_values(&["sharded_block_executor_coordinator_wrapper"])
+            .get_sample_sum();
+
         Self {
             output_size,
             partitioning_total,
@@ -549,6 +556,7 @@ impl ExecutionTimeMeasurement {
             ledger_update_total,
             commit_total,
             vm_time,
+            vm_time_no_flatten,
         }
     }
 
@@ -568,6 +576,7 @@ impl ExecutionTimeMeasurement {
             ledger_update_total: end.ledger_update_total - self.ledger_update_total,
             commit_total: end.commit_total - self.commit_total,
             vm_time: end.vm_time - self.vm_time,
+            vm_time_no_flatten: end.vm_time_no_flatten - self.vm_time_no_flatten,
         }
     }
 }
@@ -607,6 +616,13 @@ impl OverallMeasuring {
             (num_txns / delta_execution.vm_time) as usize,
             num_txns,
             delta_execution.vm_time
+        );
+        info!(
+            "{} VM execution TPS {} txn/s excluding flattening; ({} / {})",
+            prefix,
+            (num_txns / delta_execution.vm_time_no_flatten) as usize,
+            num_txns,
+            delta_execution.vm_time_no_flatten
         );
         info!("{} GPS: {} gas/s", prefix, delta_gas.gas / elapsed);
         info!(
