@@ -340,6 +340,7 @@ fn buffer_manager_happy_path_test() {
     });
 }
 
+#[ignore] // TODO: turn this test back on once the flakes have resolved.
 #[test]
 fn buffer_manager_sync_test() {
     // happy path

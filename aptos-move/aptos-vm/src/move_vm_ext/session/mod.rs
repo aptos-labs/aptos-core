@@ -3,15 +3,26 @@
 
 use crate::{
     data_cache::get_resource_group_member_from_metadata,
-    move_vm_ext::{resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver},
+    move_vm_ext::{
+        resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver, SessionId,
+    },
 };
 use aptos_framework::natives::{
     aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
+    cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
     event::NativeEventContext,
+    object::NativeObjectContext,
+    randomness::RandomnessContext,
+    state_storage::NativeStateStorageContext,
+    transaction_context::NativeTransactionContext,
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
-use aptos_types::{contract_event::ContractEvent, state_store::state_key::StateKey};
+use aptos_types::{
+    chain_id::ChainId, contract_event::ContractEvent, on_chain_config::Features,
+    state_store::state_key::StateKey,
+    transaction::user_transaction_context::UserTransactionContext,
+};
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
@@ -21,7 +32,9 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
-use move_vm_runtime::{move_vm::MoveVM, session::Session};
+use move_vm_runtime::{
+    move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session,
+};
 use move_vm_types::{value_serde::serialize_and_allow_delayed_values, values::Value};
 use std::{
     collections::BTreeMap,
@@ -46,19 +59,55 @@ pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
 pub struct SessionExt<'r, 'l> {
     inner: Session<'r, 'l>,
-    remote: &'r dyn AptosMoveResolver,
+    resolver: &'r dyn AptosMoveResolver,
     is_storage_slot_metadata_enabled: bool,
 }
 
 impl<'r, 'l> SessionExt<'r, 'l> {
-    pub fn new(
-        inner: Session<'r, 'l>,
-        remote: &'r dyn AptosMoveResolver,
-        is_storage_slot_metadata_enabled: bool,
+    pub(crate) fn new<R: AptosMoveResolver>(
+        session_id: SessionId,
+        move_vm: &'l MoveVM,
+        chain_id: ChainId,
+        features: &Features,
+        maybe_user_transaction_context: Option<UserTransactionContext>,
+        resolver: &'r R,
     ) -> Self {
+        let mut extensions = NativeContextExtensions::default();
+        let txn_hash: [u8; 32] = session_id
+            .as_uuid()
+            .to_vec()
+            .try_into()
+            .expect("HashValue should convert to [u8; 32]");
+
+        extensions.add(NativeTableContext::new(txn_hash, resolver));
+        extensions.add(NativeRistrettoPointContext::new());
+        extensions.add(AlgebraContext::new());
+        extensions.add(NativeAggregatorContext::new(
+            txn_hash,
+            resolver,
+            move_vm.vm_config().delayed_field_optimization_enabled,
+            resolver,
+        ));
+        extensions.add(RandomnessContext::new());
+        extensions.add(NativeTransactionContext::new(
+            txn_hash.to_vec(),
+            session_id.into_script_hash(),
+            chain_id.id(),
+            maybe_user_transaction_context,
+        ));
+        extensions.add(NativeCodeContext::default());
+        extensions.add(NativeStateStorageContext::new(resolver));
+        extensions.add(NativeEventContext::default());
+        extensions.add(NativeObjectContext::default());
+
+        // The VM code loader has bugs around module upgrade. After a module upgrade, the internal
+        // cache needs to be flushed to work around those bugs.
+        move_vm.flush_loader_cache_if_invalidated();
+
+        let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
-            inner,
-            remote,
+            inner: move_vm.new_session_with_extensions(resolver, extensions),
+            resolver,
             is_storage_slot_metadata_enabled,
         }
     }
@@ -94,7 +143,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .finish_with_extensions_with_custom_effects(&resource_converter)?;
 
         let (change_set, resource_group_change_set) =
-            Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)
+            Self::split_and_merge_resource_groups(move_vm, self.resolver, change_set)
                 .map_err(|e| e.finish(Location::Undefined))?;
 
         let table_context: NativeTableContext = extensions.remove();
@@ -110,7 +159,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.into_events();
 
-        let woc = WriteOpConverter::new(self.remote, self.is_storage_slot_metadata_enabled);
+        let woc = WriteOpConverter::new(self.resolver, self.is_storage_slot_metadata_enabled);
 
         let change_set = Self::convert_change_set(
             &woc,
@@ -206,7 +255,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     /// merging them into the a single op corresponding to the whole resource group (V0).
     fn split_and_merge_resource_groups(
         runtime: &MoveVM,
-        remote: &dyn AptosMoveResolver,
+        resolver: &dyn AptosMoveResolver,
         change_set: ChangeSet,
     ) -> PartialVMResult<(ChangeSet, ResourceGroupChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
@@ -217,7 +266,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         };
         let mut change_set_filtered = ChangeSet::new();
 
-        let mut maybe_resource_group_cache = remote.release_resource_group_cache().map(|v| {
+        let mut maybe_resource_group_cache = resolver.release_resource_group_cache().map(|v| {
             v.into_iter()
                 .map(|(k, v)| (k, v.into_iter().collect::<BTreeMap<_, _>>()))
                 .collect::<BTreeMap<_, _>>()
@@ -282,7 +331,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                         // Maintain the behavior of failing the transaction on resource
                         // group member existence invariants.
                         for (struct_tag, current_op) in resources.iter() {
-                            let exists = remote.resource_exists_in_group(&state_key, struct_tag)?;
+                            let exists =
+                                resolver.resource_exists_in_group(&state_key, struct_tag)?;
                             if matches!(current_op, MoveStorageOp::New(_)) == exists {
                                 // Deletion and Modification require resource to exist,
                                 // while creation requires the resource to not exist.

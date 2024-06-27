@@ -89,7 +89,7 @@ impl ConsensusObserverSubscription {
         // Verify that we're subscribed to the most optimal peer
         if let Some(optimal_peer) = sort_peers_by_distance_and_latency(peers_and_metadata).first() {
             if *optimal_peer != self.peer_network_id {
-                return Err(Error::SubscriptionTermination(format!(
+                return Err(Error::SubscriptionSuboptimal(format!(
                     "Subscription to peer: {} is no longer optimal! New optimal peer: {}",
                     self.peer_network_id, optimal_peer
                 )));
@@ -110,7 +110,7 @@ impl ConsensusObserverSubscription {
         if duration_since_last_message
             > Duration::from_millis(self.consensus_observer_config.max_subscription_timeout_ms)
         {
-            return Err(Error::SubscriptionTermination(format!(
+            return Err(Error::SubscriptionTimeout(format!(
                 "Subscription to peer: {} has timed out! No message received for: {:?}",
                 self.peer_network_id, duration_since_last_message
             )));
@@ -145,7 +145,7 @@ impl ConsensusObserverSubscription {
                     self.consensus_observer_config.max_synced_version_timeout_ms,
                 )
             {
-                return Err(Error::SubscriptionTermination(format!(
+                return Err(Error::SubscriptionProgressStopped(format!(
                     "The DB is not making sync progress! Highest synced version: {}, elapsed: {:?}",
                     highest_synced_version, duration_since_highest_seen
                 )));

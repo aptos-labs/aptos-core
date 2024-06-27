@@ -140,8 +140,6 @@ pub trait TDelayedFieldView {
     type ResourceKey;
     type ResourceGroupTag;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool;
-
     /// Fetch a value of a DelayedField.
     fn get_delayed_field_value(
         &self,
@@ -227,11 +225,6 @@ where
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-
-    fn is_delayed_field_optimization_capable(&self) -> bool {
-        // For resolvers that are not capable, it cannot be enabled
-        false
-    }
 
     fn get_delayed_field_value(
         &self,

@@ -2182,6 +2182,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-runtimes",
+ "aptos-schemadb",
  "aptos-storage-interface",
  "aptos-types",
  "flate2",
@@ -2834,6 +2835,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-retry",
+ "tokio-stream",
  "tokio-util 0.7.10",
 ]
 
@@ -2994,6 +2996,7 @@ dependencies = [
  "aptos-peer-monitoring-service-types",
  "aptos-runtimes",
  "aptos-safety-rules",
+ "aptos-schemadb",
  "aptos-state-sync-driver",
  "aptos-storage-interface",
  "aptos-storage-service-client",
@@ -3640,6 +3643,7 @@ dependencies = [
  "aptos-data-client",
  "aptos-data-streaming-service",
  "aptos-db",
+ "aptos-db-indexer-schemas",
  "aptos-event-notifications",
  "aptos-executor",
  "aptos-executor-test-helpers",
@@ -4307,7 +4311,6 @@ dependencies = [
  "aptos-proptest-helpers",
  "aptos-types",
  "aptos-vm",
- "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
  "move-core-types",
@@ -4377,6 +4380,7 @@ dependencies = [
  "either",
  "move-binary-format",
  "move-core-types",
+ "move-vm-runtime",
  "move-vm-types",
  "rand 0.7.3",
  "serde",
@@ -4425,20 +4429,12 @@ name = "aptos-writeset-generator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-cached-packages",
  "aptos-crypto",
- "aptos-framework",
- "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm",
- "aptos-vm-types",
- "handlebars",
- "move-compiler",
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",
- "serde",
- "tempfile",
 ]
 
 [[package]]
@@ -8175,7 +8171,6 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
- "move-vm-runtime",
  "move-vm-types",
  "once_cell",
  "rayon",
@@ -10424,6 +10419,7 @@ dependencies = [
  "arbitrary",
  "backtrace",
  "indexmap 1.9.3",
+ "move-bytecode-spec",
  "move-core-types",
  "proptest",
  "proptest-derive",
@@ -10449,6 +10445,15 @@ dependencies = [
  "move-ir-types",
  "move-symbol-pool",
  "serde",
+]
+
+[[package]]
+name = "move-bytecode-spec"
+version = "0.1.0"
+dependencies = [
+ "once_cell",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -11110,6 +11115,7 @@ dependencies = [
  "difference",
  "move-binary-format",
  "move-bytecode-source-map",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-compiler",
  "move-compiler-v2",
@@ -14826,6 +14832,7 @@ dependencies = [
  "aptos-consensus",
  "aptos-crypto",
  "aptos-db",
+ "aptos-db-indexer-schemas",
  "aptos-debugger",
  "aptos-dkg",
  "aptos-faucet-core",
@@ -14836,6 +14843,7 @@ dependencies = [
  "aptos-genesis",
  "aptos-global-constants",
  "aptos-indexer",
+ "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-inspection-service",
  "aptos-keygen",
@@ -14844,6 +14852,7 @@ dependencies = [
  "aptos-release-builder",
  "aptos-rest-client",
  "aptos-rosetta",
+ "aptos-schemadb",
  "aptos-sdk",
  "aptos-secure-storage",
  "aptos-storage-interface",
@@ -14868,6 +14877,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
+ "tempfile",
  "tokio",
  "url",
  "walkdir",

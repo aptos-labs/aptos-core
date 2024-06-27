@@ -1,12 +1,13 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::utils::PrefixedStateValueIterator;
 use aptos_config::config::internal_indexer_db_config::InternalIndexerDBConfig;
 use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue},
     schema::{
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
-        indexer_metadata::InternalIndexerMetadataSchema,
+        indexer_metadata::InternalIndexerMetadataSchema, state_keys::StateKeysSchema,
         transaction_by_account::TransactionByAccountSchema,
     },
     utils::{
@@ -23,7 +24,12 @@ use aptos_types::{
     contract_event::{ContractEvent, EventWithVersion},
     event::EventKey,
     indexer::indexer_db_reader::Order,
+    state_store::{
+        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_value::StateValue,
+    },
     transaction::{AccountTransactionsWithProof, Transaction, Version},
+    write_set::{TransactionWrite, WriteSet},
 };
 use std::{
     cmp::min,
@@ -120,31 +126,43 @@ impl DBIndexer {
         self.config.enable_transaction
     }
 
+    pub fn statekeys_enabled(&self) -> bool {
+        self.config.enable_statekeys
+    }
+
     fn get_main_db_iter(
         &self,
         start_version: Version,
         num_transactions: u64,
-    ) -> Result<impl Iterator<Item = Result<(Transaction, Vec<ContractEvent>)>> + '_> {
+    ) -> Result<impl Iterator<Item = Result<(Transaction, Vec<ContractEvent>, WriteSet)>> + '_>
+    {
         let txn_iter = self
             .main_db_reader
             .get_transaction_iterator(start_version, num_transactions)?;
         let event_vec_iter = self
             .main_db_reader
             .get_events_iterator(start_version, num_transactions)?;
-        let zipped = txn_iter
-            .zip(event_vec_iter)
-            .map(|(txn_res, event_vec_res)| {
+        let writeset_iter = self
+            .main_db_reader
+            .get_write_set_iterator(start_version, num_transactions)?;
+        let zipped = txn_iter.zip(event_vec_iter).zip(writeset_iter).map(
+            |((txn_res, event_vec_res), writeset_res)| {
                 let txn = txn_res?;
                 let event_vec = event_vec_res?;
-                Ok((txn, event_vec))
-            });
+                let writeset = writeset_res?;
+                Ok((txn, event_vec, writeset))
+            },
+        );
         Ok(zipped)
     }
 
     fn get_num_of_transactions(&self, version: Version) -> Result<u64> {
         let highest_version = self.main_db_reader.get_synced_version()?;
         // we want to include the last transaction since the iterator interface will is right exclusive.
-        let num_of_transaction = min(self.config.batch_size as u64, highest_version - version) + 1;
+        let num_of_transaction = min(
+            (self.config.batch_size + 1) as u64,
+            highest_version - version + 1,
+        );
         Ok(num_of_transaction)
     }
 
@@ -155,7 +173,7 @@ impl DBIndexer {
         let mut db_iter = self.get_main_db_iter(version, num_transactions)?;
         let batch = SchemaBatch::new();
         db_iter.try_for_each(|res| {
-            let (txn, events) = res?;
+            let (txn, events, writeset) = res?;
             if let Some(txn) = txn.try_as_signed_user_txn() {
                 if self.config.enable_transaction {
                     batch.put::<TransactionByAccountSchema>(
@@ -163,26 +181,37 @@ impl DBIndexer {
                         &version,
                     )?;
                 }
-
-                if self.config.enable_event {
-                    events.iter().enumerate().for_each(|(idx, event)| {
-                        if let ContractEvent::V1(v1) = event {
-                            batch
-                                .put::<EventByKeySchema>(
-                                    &(*v1.key(), v1.sequence_number()),
-                                    &(version, idx as u64),
-                                )
-                                .expect("Failed to put events by key to a batch");
-                            batch
-                                .put::<EventByVersionSchema>(
-                                    &(*v1.key(), version, v1.sequence_number()),
-                                    &(idx as u64),
-                                )
-                                .expect("Failed to put events by version to a batch");
-                        }
-                    });
-                }
             }
+
+            if self.config.enable_event {
+                events.iter().enumerate().for_each(|(idx, event)| {
+                    if let ContractEvent::V1(v1) = event {
+                        batch
+                            .put::<EventByKeySchema>(
+                                &(*v1.key(), v1.sequence_number()),
+                                &(version, idx as u64),
+                            )
+                            .expect("Failed to put events by key to a batch");
+                        batch
+                            .put::<EventByVersionSchema>(
+                                &(*v1.key(), version, v1.sequence_number()),
+                                &(idx as u64),
+                            )
+                            .expect("Failed to put events by version to a batch");
+                    }
+                });
+            }
+
+            if self.config.enable_statekeys {
+                writeset.iter().for_each(|(state_key, write_op)| {
+                    if write_op.is_creation() {
+                        batch
+                            .put::<StateKeysSchema>(state_key, &())
+                            .expect("Failed to put state keys to a batch");
+                    }
+                });
+            }
+
             version += 1;
             Ok::<(), AptosDbError>(())
         })?;
@@ -271,6 +300,16 @@ impl DBIndexer {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
+    pub fn get_state_keys(&self, prefix: &StateKeyPrefix) -> Result<Vec<StateKey>> {
+        let mut iter = self.db.iter::<StateKeysSchema>()?;
+        iter.seek_to_first();
+        Ok(iter
+            .map(|res| res.unwrap().0)
+            .filter(|k| prefix.is_prefix(k).unwrap())
+            .collect())
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn get_event_by_key_iter(
         &self,
     ) -> Result<Box<dyn Iterator<Item = (EventKey, u64, u64, u64)> + '_>> {
@@ -289,7 +328,7 @@ impl DBIndexer {
         order: Order,
         limit: u64,
         ledger_version: Version,
-    ) -> anyhow::Result<Vec<EventWithVersion>> {
+    ) -> Result<Vec<EventWithVersion>> {
         self.get_events_by_event_key(event_key, start, order, limit, ledger_version)
     }
 
@@ -300,7 +339,7 @@ impl DBIndexer {
         order: Order,
         limit: u64,
         ledger_version: Version,
-    ) -> anyhow::Result<Vec<EventWithVersion>> {
+    ) -> Result<Vec<EventWithVersion>> {
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
         let get_latest = order == Order::Descending && start_seq_num == u64::max_value();
 
@@ -367,7 +406,7 @@ impl DBIndexer {
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> anyhow::Result<AccountTransactionsWithProof> {
+    ) -> Result<AccountTransactionsWithProof> {
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
 
         let txns_with_proofs = self
@@ -383,5 +422,20 @@ impl DBIndexer {
             .collect::<Result<Vec<_>>>()?;
 
         Ok(AccountTransactionsWithProof::new(txns_with_proofs))
+    }
+
+    pub fn get_prefixed_state_value_iterator(
+        &self,
+        key_prefix: &StateKeyPrefix,
+        cursor: Option<&StateKey>,
+        version: Version,
+    ) -> Result<impl Iterator<Item = anyhow::Result<(StateKey, StateValue)>> + '_> {
+        PrefixedStateValueIterator::new(
+            self.main_db_reader.clone(),
+            self.db.as_ref(),
+            key_prefix.clone(),
+            cursor.cloned(),
+            version,
+        )
     }
 }
