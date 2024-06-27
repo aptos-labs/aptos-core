@@ -7,6 +7,7 @@
 use crate::account::AccountData;
 use aptos_types::{
     account_config::CoinInfoResource,
+    on_chain_config::{Features, OnChainConfig},
     state_store::{
         errors::StateviewError, in_memory_state_view::InMemoryStateView, state_key::StateKey,
         state_storage_usage::StateStorageUsage, state_value::StateValue, TStateView,
@@ -116,6 +117,14 @@ impl FakeDataStore {
         self.set(
             StateKey::module_id(module_id),
             StateValue::new_legacy(blob.into()),
+        );
+    }
+
+    pub fn set_features(&mut self, features: Features) {
+        let bytes = bcs::to_bytes(&features).expect("Features should always be serializable");
+        self.set(
+            StateKey::resource(Features::address(), &Features::struct_tag()).unwrap(),
+            StateValue::new_legacy(bytes.into()),
         );
     }
 }
