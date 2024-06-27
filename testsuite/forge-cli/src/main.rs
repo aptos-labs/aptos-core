@@ -2042,9 +2042,9 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     const MAX_TXNS_PER_BLOCK: usize = 10_000;
     // Overestimate: causes batch queueing. Underestimate: not enough txns in quorum store.
     // This is validator latency, minus mempool queueing time.
-    const VN_LATENCY_S: f64 = 4;
+    const VN_LATENCY_S: f64 = 4.0;
     // Overestimate: causes mempool queueing. Underestimate: not enough txns incoming.
-    const VFN_LATENCY_S: f64 = 8.0;
+    const VFN_LATENCY_S: f64 = 7.0;
 
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
