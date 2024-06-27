@@ -246,7 +246,6 @@ impl DbWriter for AptosDB {
         self.ledger_db
             .transaction_info_db()
             .delete_transaction_info(target_version + 1, &batch)?;
-        let batch = SchemaBatch::new();
         self.ledger_db.transaction_info_db().write_schemas(batch)?;
 
         // Revert the events
@@ -260,7 +259,6 @@ impl DbWriter for AptosDB {
         // Revert the transaction auxiliary data
         let batch = SchemaBatch::new();
         TransactionAuxiliaryDataDb::prune(target_version, latest_version, &batch)?;
-        let batch = SchemaBatch::new();
         self.ledger_db
             .transaction_auxiliary_data_db()
             .write_schemas(batch)?;
@@ -268,11 +266,16 @@ impl DbWriter for AptosDB {
         // Revert the write set
         let batch = SchemaBatch::new();
         WriteSetDb::prune(target_version, latest_version, &batch)?;
+        self.ledger_db.write_set_db().write_schemas(batch)?;
+
+        // Remove the transactions
+        let batch = SchemaBatch::new();
         self.ledger_db.transaction_db().prune_transactions(
             target_version,
             latest_version,
             &batch,
         )?;
+        self.ledger_db.transaction_db().write_schemas(batch)?;
 
         // Revert the state kv and ledger metadata
         self.state_store
