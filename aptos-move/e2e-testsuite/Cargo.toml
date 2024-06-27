@@ -30,6 +30,9 @@ move-core-types = { workspace = true }
 move-ir-compiler = { workspace = true }
 proptest = { workspace = true }
 
+[dev-dependencies]
+aptos-vm-logging = { workspace = true }
+
 [features]
 default = [
     "aptos-cached-packages/fuzzing",
