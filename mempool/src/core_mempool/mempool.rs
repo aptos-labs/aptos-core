@@ -778,7 +778,7 @@ impl Mempool {
                 .map(|(_, seq)| seq)
                 .collect::<Vec<&u64>>();
 
-            info!("Skipped txn: {:?}, account sequence number: {:?}, existing sequence numbers: {:?}, was_chosen: {}, account_sequence_number in excluded: {:?}, sequence numbers in excluded: {:?}, sequence numbers inserted: {:?}, sequence numbers skipped: {:?}, sequence numbers originally skipped: {:?}, sequence numbers walked: {:?}, result length: {:?}", txn, self.transactions.get_sequence_number(&txn.0), account_seq_numbers, Self::txn_was_chosen(txn.0, txn.1 - 1, &inserted, &exclude_transactions), account_exluded, excluded_seq_numbers, inserted_seq_numbers, skipped_seq_numbers, first_skipped_seq_numbers, txns_walked_seq_numbers, result.len());
+            info!("Skipped txn: {:?}, account sequence number: {:?}, existing sequence numbers: {:?}, was_chosen: {}, account_sequence_number in excluded: {:?}, sequence numbers in excluded: {:?}, sequence numbers inserted: {:?}, sequence numbers skipped: {:?}, sequence numbers originally skipped: {:?}, sequence numbers walked: {:?}, result length: {:?}, inserted length: {:?}, max_txns: {:?}", txn, self.transactions.get_sequence_number(&txn.0), account_seq_numbers, Self::txn_was_chosen(txn.0, txn.1 - 1, &inserted, &exclude_transactions), account_exluded, excluded_seq_numbers, inserted_seq_numbers, skipped_seq_numbers, first_skipped_seq_numbers, txns_walked_seq_numbers, result.len(), inserted.len(), max_txns);
         }
         let result_size = result.len();
         let inserted_size = inserted.len();
