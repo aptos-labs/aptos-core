@@ -144,7 +144,7 @@ impl RemoteStateViewClient {
         state_keys.clone().into_iter().for_each(|state_key| {
             state_view_clone.read().unwrap().insert_state_key(state_key);
         });
-        let mut seq_num = 0;
+        //let mut seq_num = 0;
 
         state_keys
             .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
@@ -154,6 +154,7 @@ impl RemoteStateViewClient {
                 // if state_keys.len() > 1 {
                 //     seq_num += 1;
                 // }
+                let seq_num;
                 if state_keys.len() > 1 {
                     seq_num = 2;
                 }
