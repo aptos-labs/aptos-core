@@ -15,12 +15,14 @@ use aptos_executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
 use aptos_executor_types::BlockExecutorTrait;
+use aptos_sdk::types::get_apt_primary_store_address;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{
-        aptos_test_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
+        aptos_test_root_address, new_block_event_key, CoinStoreResource, FungibleStoreResource,
+        NewBlockEvent, ObjectGroupResource,
     },
     contract_event::ContractEvent,
     event::EventHandle,
@@ -167,10 +169,17 @@ fn get_aptos_coin_transfer_transaction(
 
 fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-    CoinStoreResource::fetch_move_resource(&db_state_view, account)
+    let coin_balance = CoinStoreResource::fetch_move_resource(&db_state_view, account)
         .unwrap()
-        .unwrap()
-        .coin()
+        .map(|store| store.coin());
+    let fa_balance = FungibleStoreResource::fetch_move_resource_from_group(
+        &db_state_view,
+        &get_apt_primary_store_address(*account),
+        &ObjectGroupResource::struct_tag(),
+    )
+    .unwrap()
+    .map(|store| store.balance());
+    coin_balance.unwrap_or_default() + fa_balance.unwrap_or_default()
 }
 
 fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
@@ -276,7 +285,7 @@ fn test_new_genesis() {
     assert_eq!(trusted_state.version(), 6);
 
     // Effect of bootstrapping reflected.
-    assert_eq!(get_balance(&account1, &db), 100_000_000);
+    assert_eq!(get_balance(&account1, &db), 300_000_000);
     // State before new genesis accessible.
     assert_eq!(get_balance(&account2, &db), 200_000_000);
 

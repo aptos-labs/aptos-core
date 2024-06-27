@@ -20,9 +20,9 @@ pub fn primary_apt_store(address: AccountAddress) -> AccountAddress {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct FungibleStoreResource {
-    metadata: AccountAddress,
-    balance: u64,
-    frozen: bool,
+    pub metadata: AccountAddress,
+    pub balance: u64,
+    pub frozen: bool,
 }
 
 impl FungibleStoreResource {
