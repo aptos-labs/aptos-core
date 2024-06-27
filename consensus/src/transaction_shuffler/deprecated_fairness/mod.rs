@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction_shuffler::{
-    fairness::{
+    deprecated_fairness::{
         conflict_key::{
             entry_fun::EntryFunKey, entry_fun_module::EntryFunModuleKey, txn_sender::TxnSenderKey,
             ConflictKeyRegistry,
@@ -178,7 +178,7 @@ impl<'a, const NUM_CONFLICT_ZONES: usize> FairnessShufflerImpl<'a, NUM_CONFLICT_
 
 #[cfg(test)]
 mod test_utils {
-    use crate::transaction_shuffler::fairness::FairnessShuffler;
+    use crate::transaction_shuffler::deprecated_fairness::FairnessShuffler;
     use proptest::prelude::*;
 
     impl FairnessShuffler {
