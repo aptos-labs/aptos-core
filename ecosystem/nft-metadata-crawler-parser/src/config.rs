@@ -87,6 +87,7 @@ impl RunnableConfig for ParserConfig {
         info!("[NFT Metadata Crawler] Finished migrations");
 
         // Create request context
+        // Dynamic dispatch over different variations of servers
         let config = Arc::new(self.clone());
         let context: Arc<dyn Server> = match self.server_type {
             ServerType::Parser => Arc::new(ParserContext::new(config, pool).await),

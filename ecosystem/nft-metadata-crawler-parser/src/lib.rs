@@ -17,12 +17,14 @@ pub mod schema;
 pub mod utils;
 pub mod worker;
 
+/// Different variations of servers that utilize the CDN
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ServerType {
     Parser,
     AssetUploader,
 }
 
+/// Trait for handling requests to the server
 #[async_trait::async_trait]
 trait Server: Send + Sync {
     async fn handle_request(self: Arc<Self>, bytes: Bytes) -> Response;
