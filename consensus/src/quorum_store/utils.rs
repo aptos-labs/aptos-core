@@ -3,7 +3,7 @@
 
 use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
-    common::{TransactionInProgress, TransactionSummary},
+    common::{TransactionInProgress, TransactionSummary, TransactionSynopsis},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
 };
 use aptos_logger::prelude::*;
@@ -198,11 +198,11 @@ pub struct ProofQueue {
     author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
     // ProofOfStore and insertion_time. None if committed
     batch_to_proof: HashMap<BatchKey, Option<(ProofOfStore, Instant)>>,
-    // Map of txn_summary = (sender, sequence number, hash) to all the batches that contain
+    // Map of txn_summary = (sender, sequence number, expiration_timestamp_secs, hash) to all the batches that contain
     // the transaction. This helps in counting the number of unique transactions in the pipeline.
-    txn_summary_to_batches: HashMap<TransactionSummary, HashSet<BatchKey>>,
+    txn_summary_to_batches: HashMap<TransactionSynopsis, HashSet<BatchKey>>,
     // List of transaction summaries for each batch
-    batch_to_txn_summaries: HashMap<BatchKey, Vec<TransactionSummary>>,
+    batch_to_txn_summaries: HashMap<BatchKey, Vec<TransactionSynopsis>>,
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
@@ -317,7 +317,7 @@ impl ProofQueue {
 
     pub(crate) fn add_batch_summaries(
         &mut self,
-        batch_summaries: Vec<(BatchInfo, Vec<TransactionSummary>)>,
+        batch_summaries: Vec<(BatchInfo, Vec<TransactionSynopsis>)>,
     ) {
         let start = Instant::now();
         for (batch_info, txn_summaries) in batch_summaries {
@@ -422,7 +422,11 @@ impl ProofQueue {
                             cur_unique_txns
                                 + txn_summaries
                                     .iter()
-                                    .filter(|txn_summary| !filtered_txns.contains(txn_summary))
+                                    .filter(|txn_summary| {
+                                        !filtered_txns.contains(txn_summary)
+                                            && txn_summary.expiration_timestamp_secs
+                                                > self.latest_block_timestamp
+                                    })
                                     .count() as u64
                         } else {
                             cur_unique_txns + batch.num_txns()
