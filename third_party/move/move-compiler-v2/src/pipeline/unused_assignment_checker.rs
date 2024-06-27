@@ -3,7 +3,6 @@
 
 //! Implements a pipeline that checks and gives warning on unused assignments.
 //! Prerequisite: live variable annotation.
-//! Side effect: the `LiveVarAnnotation` will be added to the function target annotations.
 
 use crate::pipeline::livevar_analysis_processor::LiveVarAnnotation;
 use codespan_reporting::diagnostic::Severity;
