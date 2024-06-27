@@ -163,7 +163,7 @@ impl PipelineBackpressureConfig {
         self.execution.as_ref().and_then(|config| {
             let sizes = block_execution_times
                 .iter()
-                .map(|(num_txns, execution_time)| {
+                .flat_map(|(num_txns, execution_time)| {
                     let execution_time_ms = execution_time.as_millis();
                     if execution_time_ms > config.min_block_time_ms_to_activate as u128 {
                         Some(
@@ -176,13 +176,14 @@ impl PipelineBackpressureConfig {
                         None
                     }
                 })
-                .sorted_by_key(|key| key.unwrap_or(u64::MAX))
+                .sorted()
+                // .sorted_by_key(|key| key.unwrap_or(u64::MAX))
                 .collect::<Vec<_>>();
             info!("Estimated block back-offs block sizes: {:?}", sizes);
             if sizes.len() >= config.min_blocks_to_activate {
-                *sizes
+                Some(*sizes
                     .get((config.percentile * sizes.len() as f64) as usize)
-                    .unwrap()
+                    .unwrap())
             } else {
                 None
             }
@@ -537,23 +538,21 @@ impl ProposalGenerator {
         let proposal_delay = values_proposal_delay.into_iter().max().unwrap();
         let max_txns_from_block_to_execute =
             values_max_txns_from_block_to_execute.into_iter().min().filter(|v| *v < max_block_txns);
-        if pipeline_backpressure.is_some()
-            || chain_health_backoff.is_some()
-            || execution_backpressure_applied
-        {
-            warn!(
-                proposal_delay_ms = proposal_delay.as_millis(),
-                max_block_txns = max_block_txns,
-                max_txns_from_block_to_execute =
-                    max_txns_from_block_to_execute.unwrap_or(max_block_txns),
-                max_block_bytes = max_block_bytes,
-                is_pipeline_backpressure = pipeline_backpressure.is_some(),
-                is_execution_backpressure = execution_backpressure_applied,
-                is_chain_health_backoff = chain_health_backoff.is_some(),
-                round = round,
-                "Backpressure triggered while generating proposal at round",
-            );
-        }
+
+        warn!(
+            pipeline_pending_latency = pipeline_pending_latency.as_millis(),
+            proposal_delay_ms = proposal_delay.as_millis(),
+            max_block_txns = max_block_txns,
+            max_txns_from_block_to_execute =
+                max_txns_from_block_to_execute.unwrap_or(max_block_txns),
+            max_block_bytes = max_block_bytes,
+            is_pipeline_backpressure = pipeline_backpressure.is_some(),
+            is_execution_backpressure = execution_backpressure_applied,
+            is_chain_health_backoff = chain_health_backoff.is_some(),
+            round = round,
+            "Proposal generation backpressure details",
+        );
+
         (
             max_block_txns,
             max_block_bytes,

@@ -198,8 +198,8 @@ impl Default for ConsensusConfig {
             vote_back_pressure_limit: 7,
             execution_backpressure: Some(ExecutionBackpressureConfig {
                 back_pressure_pipeline_latency_limit_ms: 500,
-                num_blocks_to_look_at: 10,
-                min_blocks_to_activate: 5,
+                num_blocks_to_look_at: 12,
+                min_blocks_to_activate: 4,
                 percentile: 0.5,
                 target_block_time_ms: 300,
                 min_block_time_ms_to_activate: 100,

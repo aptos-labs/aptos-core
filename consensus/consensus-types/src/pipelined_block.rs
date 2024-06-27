@@ -260,6 +260,6 @@ impl PipelinedBlock {
     pub fn get_execution_time_and_size(&self) -> Option<(u64, Duration)> {
         self.execution_time
             .get()
-            .map(|v| (self.input_transactions.len() as u64, *v))
+            .map(|v| (self.block.payload().map_or(0, |payload| payload.len_for_execution()), *v))
     }
 }
