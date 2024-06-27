@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use ark_groth16::{prepare_verifying_key, Groth16};
 use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
@@ -26,6 +29,7 @@ use num_bigint_v4::BigInt;
 use ark_ff::MontBackend;
 use ark_bn254::FrConfig;
 use crate::keyless::bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine};
+use crate::keyless::Groth16VerificationKey;
 
 /// The SNARK of [[Groth16]](https://eprint.iacr.org/2016/260.pdf), where "proving" implements the
 /// simulation algorithm instead, using the trapdoor output by the modified setup algorithm also
@@ -46,7 +50,7 @@ pub struct ProvingKeyWithTrapdoor<E: Pairing> {
     pub beta: E::ScalarField,
     /// Trapdoor delta
     pub delta: E::ScalarField,
-    /// Trapdoor gamma 
+    /// Trapdoor gamma
     pub gamma: E::ScalarField,
     /// Generator for G1
     pub g1: E::G1Affine,
@@ -54,13 +58,13 @@ pub struct ProvingKeyWithTrapdoor<E: Pairing> {
     pub g2: E::G2Affine,
 }
 
-impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> 
+impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
 {
     fn circuit_agnostic_setup_with_trapdoor<R: RngCore>(
         rng: &mut R,
         num_public_inputs: u32,
     ) -> Result<(ProvingKeyWithTrapdoor<E>, VerifyingKey<E>), SynthesisError> {
-        let alpha = E::ScalarField::rand(rng); 
+        let alpha = E::ScalarField::rand(rng);
         let beta = E::ScalarField::rand(rng);
         let gamma = E::ScalarField::rand(rng);
         let delta = E::ScalarField::rand(rng);
@@ -193,11 +197,11 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP>
 
         let g1_ab = pk.g1 * ab;
         let g1_alpha_beta = pk.g1 * alpha_beta;
-        
+
         let g1_a = pk.g1 * a;
         let g2_b = pk.g2 * b;
 
-        let g1_c = (g1_ab - g1_alpha_beta - g_ic) * delta_inverse; 
+        let g1_c = (g1_ab - g1_alpha_beta - g_ic) * delta_inverse;
 
         Ok(Proof {
             a: g1_a.into_affine(),
@@ -248,7 +252,7 @@ fn test_prove_and_verify<E>(n_iters: usize)
 where
     E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>, G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>, G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>, <E as Pairing>::ScalarField: From<i32>
 {
-    let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998]; 
+    let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998];
     let public_input = ark_ff::BigInt::new(public_input_values);
     let public_input = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(public_input).unwrap();
 
@@ -258,7 +262,7 @@ where
 
     let alpha = ark_ff::BigInt::new([13589250698370566876, 10784887203457314976, 6639402089555444182, 1191924897023214780]);
     let beta = ark_ff::BigInt::new([14178762603900149007, 12962024561264135011, 14428984149348267640, 2476511004800185890]);
-    let delta = ark_ff::BigInt::new([3179598508510334931, 14251246036142938839, 16048432879094000504, 631025878161227752]); 
+    let delta = ark_ff::BigInt::new([3179598508510334931, 14251246036142938839, 16048432879094000504, 631025878161227752]);
     let gamma = ark_ff::BigInt::new([11598791714797084619, 8636816033478259993, 9421779656337856707, 1282424503525360291]);
     let g1 = g1_projective_str_to_affine("4222373349639520364951440530881871792125172922277902916438521241182902659786", "17927966855233484418691891293716534853276480020896221403452331194253900034172").unwrap();
     let g2 = g2_projective_str_to_affine(["7060239192912576352445678919251015303857900508169996987700616563495505759758", "2459845072558806286978423063428307489778927966556743480120663459709217599487"], ["19288633317757364243662951827532421887714035432540311650844990893553936393814", "20639282316004454458884347800936381746504150536012576786666607919028441606072"]).unwrap();
@@ -266,7 +270,7 @@ where
     let beta = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(beta).unwrap();
     let delta = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(delta).unwrap();
     let gamma = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(gamma).unwrap();
-    let pk =  ProvingKeyWithTrapdoor { 
+    let pk =  ProvingKeyWithTrapdoor {
         gamma_abc_g1: gamma_abc_g1.clone(),
         alpha,
         beta,
@@ -297,11 +301,26 @@ where
     }
 }
 
-fn test_prove_and_verify_circuit_agnostic<E>(n_iters: usize)
-where 
-    E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>, G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>, G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>, <E as Pairing>::ScalarField: From<i32>
+pub fn bn254_circuit_agnostic_setup_with_trapdoor<R>(mut rng: &mut R, num_public_inputs: usize) -> (ProvingKeyWithTrapdoor<Bn254>, Groth16VerificationKey)
+    where R: RngCore
 {
-    let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998]; 
+    let (prk, vk) = Groth16Simulator::<Bn254>::circuit_agnostic_setup_with_trapdoor(&mut rng, num_public_inputs as u32).unwrap();
+    let pvk = prepare_verifying_key::<Bn254>(&vk);
+
+    let vk = Groth16VerificationKey::from(&pvk);
+
+    (prk, vk)
+}
+
+fn test_prove_and_verify_circuit_agnostic<E>(n_iters: usize)
+where
+    E: Pairing<
+        ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>,
+        G2Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g2::Config>,
+        G1Affine = ark_ec::short_weierstrass::Affine<ark_bn254::g1::Config>>,
+    <E as Pairing>::ScalarField: From<i32>
+{
+    let public_input_values: [u64; 4] = [3195712670376992034, 3685578554708232021, 11025712379582751444, 3215552108872721998];
     let public_input = ark_ff::BigInt::new(public_input_values);
     let public_input = ark_ff::Fp::<MontBackend<FrConfig, 4>, 4>::from_bigint(public_input).unwrap();
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());

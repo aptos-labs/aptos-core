@@ -33,8 +33,7 @@ mod groth16_vk;
 mod openid_sig;
 pub mod test_utils;
 mod zkp_sig;
-#[cfg(test)]
-mod proof_simulation;
+pub mod proof_simulation;
 
 use crate::keyless::circuit_constants::devnet_prepared_vk;
 pub use bn254_circom::{
