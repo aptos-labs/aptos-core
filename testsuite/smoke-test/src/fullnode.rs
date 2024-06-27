@@ -146,7 +146,7 @@ async fn test_internal_indexer_with_fast_sync() {
         .wait_for_all_nodes_to_catchup(Duration::from_secs(60))
         .await
         .unwrap();
-    let node = swarm.full_node_mut(peer_id).unwrap();
+    let node = swarm.full_node(peer_id).unwrap();
     let node_config = node.config().to_owned();
     node.stop().await.unwrap();
     check_indexer_db(&node_config);
