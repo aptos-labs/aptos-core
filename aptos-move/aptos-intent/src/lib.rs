@@ -12,6 +12,7 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
 
 mod codegen;
 
@@ -218,6 +219,8 @@ impl ModuleResolver for NullResolver {
     type Error = anyhow::Error;
 
     fn get_module(&self, id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+        let code = get_module(id.address().to_hex(), id.name().to_string());
+
         anyhow::bail!("non")
     }
 
@@ -226,5 +229,19 @@ impl ModuleResolver for NullResolver {
         module_id: &ModuleId,
     ) -> Vec<move_core_types::metadata::Metadata> {
         vec![]
+    }
+}
+
+#[wasm_bindgen]
+pub async fn get_module(account: String, module_name: String) -> Result<String, String> {
+    let url = format!(
+        "https://api.testnet.aptoslabs.com/v1/accounts/{}/module/{}",
+        account, module_name
+    );
+    let response = reqwest::get(url).await.unwrap();
+    if response.status().is_success() {
+        Ok(response.text().await.unwrap())
+    } else {
+        Err(response.text().await.unwrap())
     }
 }

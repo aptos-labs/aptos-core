@@ -23,5 +23,8 @@ move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
-getrandom ={ version = "0.2", features = ["js"]}
+getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4.42"
+reqwest-wasm = { version = "*", features = [] }
+reqwest = { version = "*", features = [] }
