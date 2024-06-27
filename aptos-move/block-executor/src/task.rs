@@ -33,6 +33,7 @@ pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
     SkipRest(O),
+    MaterializedSkipRest(O),
     /// Transaction detected that it is in inconsistent state due to speculative
     /// reads it did, and needs to be re-executed.
     SpeculativeExecutionAbortError(String),
@@ -187,8 +188,6 @@ pub trait TransactionOutput: Send + Sync + Debug {
         )>,
         patched_events: Vec<<Self::Txn as Transaction>::Event>,
     ) -> Result<(), PanicError>;
-
-    fn set_txn_output_for_non_dynamic_change_set(&self);
 
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;

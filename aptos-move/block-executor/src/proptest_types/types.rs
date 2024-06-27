@@ -1184,10 +1184,6 @@ where
         Ok(())
     }
 
-    fn set_txn_output_for_non_dynamic_change_set(&self) {
-        // TODO[agg_v2](tests): anything to be added here for tests?
-    }
-
     fn fee_statement(&self) -> FeeStatement {
         // First argument is supposed to be total (not important for the test though).
         // Next two arguments are different kinds of execution gas that are counted

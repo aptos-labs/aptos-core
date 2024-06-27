@@ -87,7 +87,7 @@ impl AptosTransactionOutput {
                 .take()
                 .expect("Output must be set")
                 .into_transaction_output()
-                .expect("Transaction output is not alerady materialized"),
+                .expect("Transaction output is not already materialized"),
         }
     }
 }
@@ -315,22 +315,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             "Could not combine VMOutput with the materialized resource and event data"
         );
         Ok(())
-    }
-
-    fn set_txn_output_for_non_dynamic_change_set(&self) {
-        assert!(
-            self.committed_output
-                .set(
-                    self.vm_output
-                        .lock()
-                        .take()
-                        .expect("Output must be set to incorporate materialized data")
-                        .into_transaction_output()
-                        .expect("We should be able to always convert to transaction output"),
-                )
-                .is_ok(),
-            "Could not combine VMOutput with the materialized resource and event data"
-        );
     }
 
     /// Return the fee statement of the transaction.

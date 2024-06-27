@@ -69,7 +69,7 @@ impl ExecutorTask for AptosExecutorTask {
                         &log_context,
                         "Reconfiguration occurred: restart required".into()
                     );
-                    ExecutionStatus::SkipRest(AptosTransactionOutput::new_committed(output))
+                    ExecutionStatus::MaterializedSkipRest(AptosTransactionOutput::new_committed(output))
                 },
                 Err(vm_status) => ExecutionStatus::Abort(vm_status),
             };

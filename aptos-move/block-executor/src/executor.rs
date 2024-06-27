@@ -261,6 +261,9 @@ where
                     Vec::new(),
                 )
             },
+            ExecutionStatus::MaterializedSkipRest(output) => {
+                (ExecutionStatus::MaterializedSkipRest(output), Vec::new())
+            }
             ExecutionStatus::Abort(err) => {
                 // Abort indicates an unrecoverable VM failure, but currently it seemingly
                 // can occur due to speculative execution (in particular for BlockMetadata txn).
@@ -717,7 +720,7 @@ where
         )?;
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             match last_input_output.txn_output(txn_idx).unwrap().as_ref() {
-                ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                ExecutionStatus::Success(output) | ExecutionStatus::MaterializedSkipRest(output) | ExecutionStatus::SkipRest(output) => {
                     txn_commit_listener.on_transaction_committed(txn_idx, output);
                 },
                 ExecutionStatus::Abort(_) => {
@@ -732,7 +735,7 @@ where
 
         let mut final_results = final_results.acquire();
         match last_input_output.take_output(txn_idx) {
-            ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+            ExecutionStatus::Success(t) | ExecutionStatus::MaterializedSkipRest(t) | ExecutionStatus::SkipRest(t) => {
                 final_results[txn_idx as usize] = t;
             },
             ExecutionStatus::Abort(_) => (),
@@ -1063,7 +1066,7 @@ where
                 idx as TxnIndex,
             );
             let res = executor.execute_transaction(base_view, &latest_view, txn, idx as TxnIndex);
-            let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
+            let must_skip = matches!(res, ExecutionStatus::MaterializedSkipRest(_) | ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {
                     if let Some(commit_hook) = &self.transaction_commit_hook {
@@ -1096,6 +1099,12 @@ where
                         BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
                     ));
                 },
+                ExecutionStatus::MaterializedSkipRest(output) => {
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_transaction_committed(idx as TxnIndex, &output);
+                    }
+                    ret.push(output);
+                }
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                     // Calculating the accumulated gas costs of the committed txns.
                     let fee_statement = output.fee_statement();
@@ -1279,8 +1288,6 @@ where
                             materialized_events,
                         )?;
                     }
-                    // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
-                    //   output.set_txn_output_for_non_dynamic_change_set();
 
                     if latest_view.is_incorrect_use() {
                         return Err(

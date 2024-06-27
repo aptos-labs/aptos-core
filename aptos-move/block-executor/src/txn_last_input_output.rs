@@ -36,7 +36,8 @@ macro_rules! forward_on_success_or_skip_rest {
             .as_ref()
             .map_or(vec![], |txn_output| match txn_output.as_ref() {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t.$f(),
-                ExecutionStatus::Abort(_)
+                ExecutionStatus::MaterializedSkipRest(_)
+                | ExecutionStatus::Abort(_)
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => vec![],
             })
@@ -136,7 +137,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 output.module_write_set()
             },
-            ExecutionStatus::Abort(_)
+            ExecutionStatus::MaterializedSkipRest(_)
+            | ExecutionStatus::Abort(_)
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => BTreeMap::new(),
         };
@@ -178,7 +180,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 Some(output.fee_statement())
             },
-            _ => None,
+            ExecutionStatus::MaterializedSkipRest(_)
+            | ExecutionStatus::Abort(_)
+            | ExecutionStatus::SpeculativeExecutionAbortError(_)
+            | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
         }
     }
 
@@ -191,7 +196,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 Some(output.output_approx_size())
             },
-            _ => None,
+            ExecutionStatus::MaterializedSkipRest(_)
+            | ExecutionStatus::Abort(_)
+            | ExecutionStatus::SpeculativeExecutionAbortError(_)
+            | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
         }
     }
 
@@ -202,7 +210,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 .load_full()
                 .unwrap_or_else(|| panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution"))
                 .as_ref(),
-            ExecutionStatus::SkipRest(_)
+            ExecutionStatus::SkipRest(_) | ExecutionStatus::MaterializedSkipRest(_)
         )
     }
 
@@ -228,7 +236,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     ) -> Result<(), PanicError> {
         if let Some(status) = self.outputs[txn_idx as usize].load_full() {
             match status.as_ref() {
-                ExecutionStatus::Success(_) | ExecutionStatus::SkipRest(_) => Ok(()),
+                ExecutionStatus::Success(_) | ExecutionStatus::MaterializedSkipRest(_) | ExecutionStatus::SkipRest(_) => Ok(()),
                 // Transaction cannot be committed with below statuses, as:
                 // - Speculative error must have failed validation.
                 // - Execution w. delayed field code error propagates the error directly,
@@ -301,7 +309,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                                 .map(|(k, _)| (k, KeyKind::Group)),
                         ),
                 ),
-                ExecutionStatus::Abort(_)
+                ExecutionStatus::MaterializedSkipRest(_)
+                | ExecutionStatus::Abort(_)
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -318,7 +327,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     Some(t.delayed_field_change_set().into_keys())
                 },
-                ExecutionStatus::Abort(_)
+                ExecutionStatus::MaterializedSkipRest(_)
+                | ExecutionStatus::Abort(_)
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -360,7 +370,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     let events = t.get_events();
                     Box::new(events.into_iter())
                 },
-                ExecutionStatus::Abort(_)
+                ExecutionStatus::MaterializedSkipRest(_)
+                | ExecutionStatus::Abort(_)
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
                     Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>())
@@ -413,7 +424,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     patched_events,
                 )?;
             },
-            ExecutionStatus::Abort(_)
+            ExecutionStatus::MaterializedSkipRest(_)
+            | ExecutionStatus::Abort(_)
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {},
         };
@@ -438,7 +450,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             .as_ref()
         {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t.get_write_summary(),
-            ExecutionStatus::Abort(_)
+            ExecutionStatus::MaterializedSkipRest(_)
+            | ExecutionStatus::Abort(_)
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => HashSet::new(),
         }
