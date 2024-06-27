@@ -164,12 +164,30 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                             kv_int_rx: Arc<Receiver<Message>>,
                             outbound_rpc_runtime: Arc<Runtime>) {
         let mut rng = StdRng::from_entropy();
+        let mut curr_time;
+        let mut prev_time = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
         while let Ok(message) = kv_int_rx.recv() {
+            curr_time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            REMOTE_EXECUTOR_TIMER
+                .with_label_values(&["0", "kv_proc_thread_waiting_time"])
+                .observe((curr_time - prev_time) as f64);
+
             let state_view = state_view.clone();
             let kv_txs = kv_tx.clone();
 
             let outbound_rpc_runtime_clone = outbound_rpc_runtime.clone();
             Self::handle_message(message, state_view, kv_txs, rng.gen_range(0, kv_tx[0].len()), outbound_rpc_runtime_clone);
+
+                prev_time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
         }
     }
 
