@@ -452,9 +452,7 @@ impl BatchGenerator {
                     if (!self.back_pressure.proof_count
                         && since_last_non_empty_pull_ms >= self.config.batch_generation_min_non_empty_interval_ms)
                         || since_last_non_empty_pull_ms == self.config.batch_generation_max_interval_ms
-                        || last_pulled_num_txns >= 50_u64
-                        || last_pulled_num_txns > (last_pulled_max_txn as f64 / 2.0) as u64 {
-
+                        || last_pulled_num_txns >= 50_u64 {
                         while let Some(&(tick_start, _)) = pulled_txns_window.front() {
                             if tick_start.elapsed() > Duration::from_secs(1) {
                                 pulled_txns_window.pop_front();
