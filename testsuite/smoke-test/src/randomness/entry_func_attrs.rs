@@ -138,6 +138,39 @@ async fn randomness_attr_000() {
 }
 
 #[tokio::test]
+async fn randomness_attr_100() {
+    common(TestParams {
+        chain_generates_randomness_seed: true,
+        chain_requires_deposit_for_randtxn: false,
+        chain_allows_custom_max_gas_for_randtxn: false,
+        rolls: vec![
+            RollParams::new(RollFunc::NoAttr, 10000, CommittedWithBiasableAbort),
+            RollParams::new(RollFunc::NoAttr, 45678, CommittedWithBiasableAbort),
+            RollParams::new(RollFunc::NoAttr, 56789, CommittedWithBiasableAbort),
+            RollParams::new(RollFunc::AttrOnly, 10000, CommittedSucceeded),
+            RollParams::new(RollFunc::AttrOnly, 45678, CommittedSucceeded),
+            RollParams::new(RollFunc::AttrOnly, 56789, CommittedSucceeded),
+            RollParams::new(
+                RollFunc::AttrWithMaxGasProp,
+                10000,
+                CommittedSucceeded,
+            ),
+            RollParams::new(
+                RollFunc::AttrWithMaxGasProp,
+                45678,
+                CommittedSucceeded,
+            ),
+            RollParams::new(
+                RollFunc::AttrWithMaxGasProp,
+                56789,
+                CommittedSucceeded,
+            ),
+        ],
+    })
+        .await;
+}
+
+#[tokio::test]
 async fn randomness_attr_010() {
     common(TestParams {
         chain_generates_randomness_seed: false,
