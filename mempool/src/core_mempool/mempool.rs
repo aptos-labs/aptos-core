@@ -352,10 +352,9 @@ impl Mempool {
                 // check if we can now include some transactions
                 // that were skipped before for given account
                 let mut skipped_txn = (txn.address, tx_seq + 1);
-                while skipped.contains(&skipped_txn) {
+                while skipped.remove(&skipped_txn) {
                     inserted.insert(skipped_txn);
                     result.push(skipped_txn);
-                    skipped.remove(&skipped_txn);
                     if (result.len() as u64) == max_txns {
                         break 'main;
                     }
