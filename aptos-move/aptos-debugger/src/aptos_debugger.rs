@@ -61,64 +61,7 @@ impl AptosDebugger {
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
 
-        let transaction_types = sig_verified_txns
-            .iter()
-            .map(|txn| txn.expect_valid().type_name().to_string())
-            // conflate same consecutive elements into one with count
-            .group_by(|k| k.clone())
-            .into_iter()
-            .map(|(k, r)| {
-                let num = r.count();
-                if num > 1 {
-                    format!("{} {}s", num, k)
-                } else {
-                    k
-                }
-            })
-            .collect::<Vec<_>>();
-        let entry_functions = sig_verified_txns
-            .iter()
-            .filter_map(|txn| {
-                txn.expect_valid()
-                    .try_as_signed_user_txn()
-                    .map(|txn| match &txn.payload() {
-                        TransactionPayload::EntryFunction(txn) => format!(
-                            "entry: {:?}::{:?}",
-                            txn.module().name.as_str(),
-                            txn.function().as_str()
-                        ),
-                        TransactionPayload::Script(_) => "script".to_string(),
-                        TransactionPayload::ModuleBundle(_) => panic!("deprecated module bundle"),
-                        TransactionPayload::Multisig(_) => "multisig".to_string(),
-                    })
-            })
-            // Count number of instances for each (irrsepsecitve of order)
-            .sorted()
-            .group_by(|k| k.clone())
-            .into_iter()
-            .map(|(k, r)| (r.count(), k))
-            .sorted_by_key(|(num, _k)| *num)
-            .rev()
-            .map(|(num, k)| {
-                if num > 1 {
-                    format!("{} {}s", num, k)
-                } else {
-                    k
-                }
-            })
-            .collect::<Vec<_>>();
-        println!(
-            "[{} txns from {}] Transaction types: {:?}",
-            sig_verified_txns.len(),
-            version,
-            transaction_types
-        );
-        println!(
-            "[{} txns from {}] Entry Functions {:?}",
-            sig_verified_txns.len(),
-            version,
-            entry_functions
-        );
+        print_transaction_stats(&sig_verified_txns, version);
 
         let mut result = None;
 
@@ -207,13 +150,13 @@ impl AptosDebugger {
 
     pub async fn execute_past_transactions(
         &self,
-        mut begin: Version,
-        mut limit: u64,
+        begin: Version,
+        limit: u64,
         use_same_block_boundaries: bool,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
     ) -> Result<Vec<TransactionOutput>> {
-        let (mut txns, mut txn_infos) = self
+        let (txns, txn_infos) = self
             .debugger
             .get_committed_transactions(begin, limit)
             .await?;
@@ -230,30 +173,15 @@ impl AptosDebugger {
                 )
                 .await?)
         } else {
-            let mut ret = vec![];
-            while limit != 0 {
-                println!(
-                    "Starting epoch execution at {:?}, {:?} transactions remaining",
-                    begin, limit
-                );
-
-                let mut epoch_result = self
-                    .execute_transactions_by_epoch(
-                        begin,
-                        txns.clone(),
-                        repeat_execution_times,
-                        concurrency_levels,
-                    )
-                    .await?;
-                begin += epoch_result.len() as u64;
-                limit -= epoch_result.len() as u64;
-                txns = txns.split_off(epoch_result.len());
-                let epoch_txn_infos = txn_infos.drain(0..epoch_result.len()).collect::<Vec<_>>();
-                Self::print_mismatches(&epoch_result, &epoch_txn_infos, begin);
-
-                ret.append(&mut epoch_result);
-            }
-            Ok(ret)
+            self.execute_transactions_by_epoch(
+                limit,
+                begin,
+                txns,
+                repeat_execution_times,
+                concurrency_levels,
+                txn_infos,
+            )
+            .await
         }
     }
 
@@ -293,7 +221,7 @@ impl AptosDebugger {
         all_match
     }
 
-    pub async fn execute_transactions_by_epoch(
+    async fn execute_transactions_until_epoch_end(
         &self,
         begin: Version,
         txns: Vec<Transaction>,
@@ -321,7 +249,42 @@ impl AptosDebugger {
         Ok(ret)
     }
 
-    pub async fn execute_transactions_by_block(
+    async fn execute_transactions_by_epoch(
+        &self,
+        mut limit: u64,
+        mut begin: u64,
+        mut txns: Vec<Transaction>,
+        repeat_execution_times: u64,
+        concurrency_levels: &[usize],
+        mut txn_infos: Vec<TransactionInfo>,
+    ) -> Result<Vec<TransactionOutput>> {
+        let mut ret = vec![];
+        while limit != 0 {
+            println!(
+                "Starting epoch execution at {:?}, {:?} transactions remaining",
+                begin, limit
+            );
+
+            let mut epoch_result = self
+                .execute_transactions_until_epoch_end(
+                    begin,
+                    txns.clone(),
+                    repeat_execution_times,
+                    concurrency_levels,
+                )
+                .await?;
+            begin += epoch_result.len() as u64;
+            limit -= epoch_result.len() as u64;
+            txns = txns.split_off(epoch_result.len());
+            let epoch_txn_infos = txn_infos.drain(0..epoch_result.len()).collect::<Vec<_>>();
+            Self::print_mismatches(&epoch_result, &epoch_txn_infos, begin);
+
+            ret.append(&mut epoch_result);
+        }
+        Ok(ret)
+    }
+
+    async fn execute_transactions_by_block(
         &self,
         begin: Version,
         txns: Vec<Transaction>,
@@ -385,6 +348,67 @@ impl AptosDebugger {
     pub fn state_view_at_version(&self, version: Version) -> DebuggerStateView {
         DebuggerStateView::new(self.debugger.clone(), version)
     }
+}
+
+fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], version: u64) {
+    let transaction_types = sig_verified_txns
+        .iter()
+        .map(|txn| txn.expect_valid().type_name().to_string())
+        // conflate same consecutive elements into one with count
+        .group_by(|k| k.clone())
+        .into_iter()
+        .map(|(k, r)| {
+            let num = r.count();
+            if num > 1 {
+                format!("{} {}s", num, k)
+            } else {
+                k
+            }
+        })
+        .collect::<Vec<_>>();
+    let entry_functions = sig_verified_txns
+        .iter()
+        .filter_map(|txn| {
+            txn.expect_valid()
+                .try_as_signed_user_txn()
+                .map(|txn| match &txn.payload() {
+                    TransactionPayload::EntryFunction(txn) => format!(
+                        "entry: {:?}::{:?}",
+                        txn.module().name.as_str(),
+                        txn.function().as_str()
+                    ),
+                    TransactionPayload::Script(_) => "script".to_string(),
+                    TransactionPayload::ModuleBundle(_) => panic!("deprecated module bundle"),
+                    TransactionPayload::Multisig(_) => "multisig".to_string(),
+                })
+        })
+        // Count number of instances for each (irrsepsecitve of order)
+        .sorted()
+        .group_by(|k| k.clone())
+        .into_iter()
+        .map(|(k, r)| (r.count(), k))
+        .sorted_by_key(|(num, _k)| *num)
+        .rev()
+        .map(|(num, k)| {
+            if num > 1 {
+                format!("{} {}s", num, k)
+            } else {
+                k
+            }
+        })
+        .collect::<Vec<_>>();
+    println!(
+        "[{} txns from {}] Transaction types: {:?}",
+        sig_verified_txns.len(),
+        version,
+        transaction_types
+    );
+    println!(
+        "[{} txns from {}] Entry Functions {:?}",
+        sig_verified_txns.len(),
+        version,
+        entry_functions
+    );
 }
 
 fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {

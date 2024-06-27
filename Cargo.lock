@@ -3990,9 +3990,7 @@ dependencies = [
  "criterion",
  "criterion-cpu-time",
  "num_cpus",
- "once_cell",
  "proptest",
- "rayon",
 ]
 
 [[package]]
