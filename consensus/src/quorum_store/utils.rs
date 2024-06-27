@@ -480,7 +480,7 @@ impl ProofQueue {
             counters::BLOCK_SIZE_WHEN_PULL.observe(cur_unique_txns as f64);
             counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(cur_all_txns as f64);
             counters::KNOWN_DUPLICATE_TXNS_WHEN_PULL
-                .observe((cur_all_txns - cur_unique_txns) as f64);
+                .observe((cur_all_txns.saturating_sub(cur_unique_txns)) as f64);
             counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);

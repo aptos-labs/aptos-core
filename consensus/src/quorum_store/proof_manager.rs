@@ -241,7 +241,10 @@ impl ProofManager {
                 if self.allow_batches_without_pos_in_proposal && proof_queue_fully_utilized {
                     inline_block = self.batch_queue.pull_batches(
                         min(
-                            min(max_txns - cur_all_txns, max_unique_txns - cur_unique_txns),
+                            min(
+                                max_txns.saturating_sub(cur_all_txns),
+                                max_unique_txns.saturating_sub(cur_unique_txns),
+                            ),
                             max_inline_txns,
                         ),
                         min(max_bytes - cur_bytes, max_inline_bytes),

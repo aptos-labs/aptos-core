@@ -24,6 +24,8 @@ on:
         required: false
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
+  # NOTE: to support testing different branches on different schedules, you need to specify the cron schedule in the 'determine-test-branch' step as well below
+  # Reference: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
   schedule:
     - cron: "0 22 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs
   pull_request:
@@ -52,9 +54,10 @@ jobs:
 
       - name: Determine branch based on cadence
         id: determine-test-branch
+        # NOTE: the schedule cron MUST match the one in the 'on.schedule.cron' section above
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            if [[ "${{ github.event.schedule }}" == "0 6 * * *" ]]; then
+            if [[ "${{ github.event.schedule }}" == "0 22 * * 0,2,4" ]]; then
               echo "Branch: main"
               echo "BRANCH=main" >> $GITHUB_OUTPUT
             else

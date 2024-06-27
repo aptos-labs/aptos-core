@@ -533,7 +533,7 @@ impl FakeExecutor {
             },
             onchain: onchain_config,
         };
-        BlockAptosVM::execute_block::<
+        BlockAptosVM::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
@@ -865,7 +865,8 @@ impl FakeExecutor {
                 StorageGasParameters::latest(),
             ),
             GasMeterType::UnmeteredGasMeter => (
-                AptosGasParameters::zeros(),
+                // In case of unmetered execution, we still want to enforce limits.
+                AptosGasParameters::initial(),
                 StorageGasParameters::unlimited(),
             ),
         };
@@ -1045,10 +1046,9 @@ impl FakeExecutor {
         let (write_set, events) = {
             let resolver = self.data_store.as_move_resolver();
 
-            // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 LATEST_GAS_FEATURE_VERSION,
-                Ok(&AptosGasParameters::zeros()),
+                Ok(&AptosGasParameters::initial()),
                 self.env.clone(),
                 &resolver,
             );
@@ -1060,6 +1060,7 @@ impl FakeExecutor {
                     &Self::name(function_name),
                     type_params,
                     args,
+                    // TODO(Gas): we probably want to switch to metered execution in the future
                     &mut UnmeteredGasMeter,
                     &mut TraversalContext::new(&storage),
                 )
@@ -1169,11 +1170,9 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let resolver = self.data_store.as_move_resolver();
-
-        // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
             LATEST_GAS_FEATURE_VERSION,
-            Ok(&AptosGasParameters::zeros()),
+            Ok(&AptosGasParameters::initial()),
             self.env.clone(),
             &resolver,
         );
@@ -1185,6 +1184,7 @@ impl FakeExecutor {
                 &Self::name(function_name),
                 type_params,
                 args,
+                // TODO(Gas): we probably want to switch to metered execution in the future
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&storage),
             )

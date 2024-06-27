@@ -14,7 +14,7 @@ use crate::{
 use aptos_gas_algebra::Gas;
 use aptos_types::{
     account_config::constants::CORE_CODE_ADDRESS, fee_statement::FeeStatement,
-    move_utils::as_move_value::AsMoveValue, on_chain_config::Features, transaction::Multisig,
+    on_chain_config::Features, transaction::Multisig,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -36,21 +36,10 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         module_addr: CORE_CODE_ADDRESS,
         module_name: Identifier::new("transaction_validation").unwrap(),
         fee_payer_prologue_name: Identifier::new("fee_payer_script_prologue").unwrap(),
-        fee_payer_prologue_collect_deposit_name: Identifier::new(
-            "fee_payer_script_prologue_collect_deposit",
-        )
-        .unwrap(),
         script_prologue_name: Identifier::new("script_prologue").unwrap(),
-        script_prologue_collect_deposit_name: Identifier::new("script_prologue_collect_deposit")
-            .unwrap(),
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
-        user_epilogue_return_deposit_name: Identifier::new("epilogue_return_deposit").unwrap(),
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
-        user_epilogue_gas_payer_return_deposit_name: Identifier::new(
-            "epilogue_gas_payer_return_deposit",
-        )
-        .unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -59,14 +48,10 @@ pub struct TransactionValidation {
     pub module_addr: AccountAddress,
     pub module_name: Identifier,
     pub fee_payer_prologue_name: Identifier,
-    pub fee_payer_prologue_collect_deposit_name: Identifier,
     pub script_prologue_name: Identifier,
-    pub script_prologue_collect_deposit_name: Identifier,
     pub multi_agent_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
-    pub user_epilogue_return_deposit_name: Identifier,
     pub user_epilogue_gas_payer_name: Identifier,
-    pub user_epilogue_gas_payer_return_deposit_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -106,7 +91,7 @@ pub(crate) fn run_script_prologue(
         txn_data.fee_payer(),
         txn_data.fee_payer_authentication_key.as_ref(),
     ) {
-        let mut args = vec![
+        let args = vec![
             MoveValue::Signer(txn_data.sender),
             MoveValue::U64(txn_sequence_number),
             MoveValue::vector_u8(txn_authentication_key),
@@ -119,15 +104,7 @@ pub(crate) fn run_script_prologue(
             MoveValue::U64(txn_expiration_timestamp_secs),
             MoveValue::U8(chain_id.id()),
         ];
-        if txn_data.required_deposit.is_some() {
-            args.push(txn_data.required_deposit.as_move_value());
-            (
-                &APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_collect_deposit_name,
-                args,
-            )
-        } else {
-            (&APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_name, args)
-        }
+        (&APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_name, args)
     } else if txn_data.is_multi_agent() {
         let args = vec![
             MoveValue::Signer(txn_data.sender),
@@ -145,7 +122,7 @@ pub(crate) fn run_script_prologue(
             args,
         )
     } else {
-        let mut args = vec![
+        let args = vec![
             MoveValue::Signer(txn_data.sender),
             MoveValue::U64(txn_sequence_number),
             MoveValue::vector_u8(txn_authentication_key),
@@ -155,15 +132,7 @@ pub(crate) fn run_script_prologue(
             MoveValue::U8(chain_id.id()),
             MoveValue::vector_u8(txn_data.script_hash.clone()),
         ];
-        if txn_data.required_deposit.is_some() {
-            args.push(txn_data.required_deposit.as_move_value());
-            (
-                &APTOS_TRANSACTION_VALIDATION.script_prologue_collect_deposit_name,
-                args,
-            )
-        } else {
-            (&APTOS_TRANSACTION_VALIDATION.script_prologue_name, args)
-        }
+        (&APTOS_TRANSACTION_VALIDATION.script_prologue_name, args)
     };
     session
         .execute_function_bypass_visibility(
@@ -237,7 +206,7 @@ fn run_epilogue(
     // accepted it, in which case the gas payer feature is enabled.
     if let Some(fee_payer) = txn_data.fee_payer() {
         let (func_name, args) = {
-            let mut args = vec![
+            let args = vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::Address(fee_payer),
                 MoveValue::U64(fee_statement.storage_fee_refund()),
@@ -245,18 +214,10 @@ fn run_epilogue(
                 MoveValue::U64(txn_max_gas_units.into()),
                 MoveValue::U64(gas_remaining.into()),
             ];
-            if txn_data.required_deposit.is_some() {
-                args.push(txn_data.required_deposit.as_move_value());
-                (
-                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_return_deposit_name,
-                    args,
-                )
-            } else {
-                (
-                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_name,
-                    args,
-                )
-            }
+            (
+                &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_name,
+                args,
+            )
         };
         session.execute_function_bypass_visibility(
             &APTOS_TRANSACTION_VALIDATION.module_id(),
@@ -269,22 +230,14 @@ fn run_epilogue(
     } else {
         // Regular tx, run the normal epilogue
         let (func_name, args) = {
-            let mut args = vec![
+            let args = vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(fee_statement.storage_fee_refund()),
                 MoveValue::U64(txn_gas_price.into()),
                 MoveValue::U64(txn_max_gas_units.into()),
                 MoveValue::U64(gas_remaining.into()),
             ];
-            if txn_data.required_deposit.is_some() {
-                args.push(txn_data.required_deposit.as_move_value());
-                (
-                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_return_deposit_name,
-                    args,
-                )
-            } else {
-                (&APTOS_TRANSACTION_VALIDATION.user_epilogue_name, args)
-            }
+            (&APTOS_TRANSACTION_VALIDATION.user_epilogue_name, args)
         };
         session.execute_function_bypass_visibility(
             &APTOS_TRANSACTION_VALIDATION.module_id(),

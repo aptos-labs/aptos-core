@@ -29,19 +29,22 @@ pub mod validator_reboot_stress_test;
 use anyhow::Context;
 use aptos_forge::{
     prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown},
-    EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
-    TestReport, TxnEmitter, TxnStats, Version,
+    EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt, Result,
+    Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
 };
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
+use async_trait::async_trait;
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     fmt::Write,
+    ops::DerefMut,
+    sync::Arc,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 
 const WARMUP_DURATION_FRACTION: f32 = 0.07;
 const COOLDOWN_DURATION_FRACTION: f32 = 0.04;
@@ -52,14 +55,20 @@ async fn batch_update(
     version: &Version,
 ) -> Result<()> {
     for validator in validators_to_update {
-        ctx.swarm().upgrade_validator(*validator, version).await?;
+        ctx.swarm
+            .write()
+            .await
+            .upgrade_validator(*validator, version)
+            .await?;
     }
 
-    ctx.swarm().health_check().await?;
+    ctx.swarm.read().await.health_check().await?;
     let deadline = Instant::now() + Duration::from_secs(60);
     for validator in validators_to_update {
-        ctx.swarm()
-            .validator_mut(*validator)
+        ctx.swarm
+            .read()
+            .await
+            .validator(*validator)
             .unwrap()
             .wait_until_healthy(deadline)
             .await?;
@@ -68,8 +77,62 @@ async fn batch_update(
     Ok(())
 }
 
-pub fn create_emitter_and_request(
-    swarm: &mut dyn Swarm,
+async fn batch_update_gradually(
+    ctxa: NetworkContextSynchronizer<'_>,
+    validators_to_update: &[PeerId],
+    version: &Version,
+    wait_until_healthy: bool,
+    delay: Duration,
+    max_wait: Duration,
+) -> Result<()> {
+    for validator in validators_to_update {
+        info!("batch_update_gradually upgrade start: {}", validator);
+        {
+            ctxa.ctx
+                .lock()
+                .await
+                .swarm
+                .write()
+                .await
+                .upgrade_validator(*validator, version)
+                .await?;
+        }
+        if wait_until_healthy {
+            info!("batch_update_gradually upgrade waiting: {}", validator);
+            let deadline = Instant::now() + max_wait;
+            ctxa.ctx
+                .lock()
+                .await
+                .swarm
+                .read()
+                .await
+                .validator(*validator)
+                .unwrap()
+                .wait_until_healthy(deadline)
+                .await?;
+            info!("batch_update_gradually upgrade healthy: {}", validator);
+        }
+        if !delay.is_zero() {
+            info!("batch_update_gradually upgrade delay: {:?}", delay);
+            tokio::time::sleep(delay).await;
+        }
+        info!("batch_update_gradually upgrade done: {}", validator);
+    }
+
+    ctxa.ctx
+        .lock()
+        .await
+        .swarm
+        .read()
+        .await
+        .health_check()
+        .await?;
+
+    Ok(())
+}
+
+pub async fn create_emitter_and_request(
+    swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     mut emit_job_request: EmitJobRequest,
     nodes: &[PeerId],
     rng: StdRng,
@@ -77,12 +140,16 @@ pub fn create_emitter_and_request(
     // as we are loading nodes, use higher client timeout
     let client_timeout = Duration::from_secs(30);
 
-    let chain_info = swarm.chain_info();
+    let chain_info = swarm.read().await.chain_info();
     let transaction_factory = TransactionFactory::new(chain_info.chain_id);
     let emitter = TxnEmitter::new(transaction_factory, rng);
 
-    emit_job_request =
-        emit_job_request.rest_clients(swarm.get_clients_for_peers(nodes, client_timeout));
+    emit_job_request = emit_job_request.rest_clients(
+        swarm
+            .read()
+            .await
+            .get_clients_for_peers(nodes, client_timeout),
+    );
     Ok((emitter, emit_job_request))
 }
 
@@ -91,7 +158,7 @@ pub fn traffic_emitter_runtime() -> Result<Runtime> {
     Ok(runtime)
 }
 
-pub fn generate_traffic(
+pub async fn generate_traffic(
     ctx: &mut NetworkContext<'_>,
     nodes: &[PeerId],
     duration: Duration,
@@ -99,14 +166,15 @@ pub fn generate_traffic(
     let emit_job_request = ctx.emit_job.clone();
     let rng = SeedableRng::from_rng(ctx.core().rng())?;
     let (emitter, emit_job_request) =
-        create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng)?;
+        create_emitter_and_request(ctx.swarm.clone(), emit_job_request, nodes, rng).await?;
 
-    let rt = traffic_emitter_runtime()?;
-    let stats = rt.block_on(emitter.emit_txn_for(
-        ctx.swarm().chain_info().root_account,
-        emit_job_request,
-        duration,
-    ))?;
+    let stats = emitter
+        .emit_txn_for(
+            ctx.swarm.read().await.chain_info().root_account,
+            emit_job_request,
+            duration,
+        )
+        .await?;
 
     Ok(stats)
 }
@@ -121,7 +189,11 @@ pub enum LoadDestination {
 }
 
 impl LoadDestination {
-    fn get_destination_nodes(self, swarm: &mut dyn Swarm) -> Vec<PeerId> {
+    async fn get_destination_nodes(
+        self,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
+    ) -> Vec<PeerId> {
+        let swarm = swarm.read().await;
         let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
         let all_fullnodes = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
 
@@ -141,50 +213,59 @@ impl LoadDestination {
     }
 }
 
+#[async_trait]
 pub trait NetworkLoadTest: Test {
-    fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
+    async fn setup<'a>(&self, _ctx: &mut NetworkContext<'a>) -> Result<LoadDestination> {
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
     // Load is started before this function is called, and stops after this function returns.
     // Expected duration is passed into this function, expecting this function to take that much
     // time to finish. How long this function takes will dictate how long the actual test lasts.
-    fn test(
+    async fn test(
         &self,
-        _swarm: &mut dyn Swarm,
+        _swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
         _report: &mut TestReport,
         duration: Duration,
     ) -> Result<()> {
-        std::thread::sleep(duration);
+        tokio::time::sleep(duration).await;
         Ok(())
     }
 
-    fn finish(&self, _ctx: &mut NetworkContext) -> Result<()> {
+    async fn finish<'a>(&self, _ctx: &mut NetworkContext<'a>) -> Result<()> {
         Ok(())
     }
 }
 
+#[async_trait]
 impl NetworkTest for dyn NetworkLoadTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
-        let runtime = Runtime::new().unwrap();
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
         let start_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
-        let (start_version, _) = runtime
-            .block_on(ctx.swarm().get_client_with_newest_ledger_version())
+        let (start_version, _) = ctx
+            .swarm
+            .read()
+            .await
+            .get_client_with_newest_ledger_version()
+            .await
             .context("no clients replied for start version")?;
         let emit_job_request = ctx.emit_job.clone();
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let duration = ctx.global_duration;
-        let stats_by_phase = self.network_load_test(
-            ctx,
-            emit_job_request,
-            duration,
-            WARMUP_DURATION_FRACTION,
-            COOLDOWN_DURATION_FRACTION,
-            rng,
-        )?;
+        let stats_by_phase = self
+            .network_load_test(
+                ctx,
+                emit_job_request,
+                duration,
+                WARMUP_DURATION_FRACTION,
+                COOLDOWN_DURATION_FRACTION,
+                rng,
+            )
+            .await?;
 
         let phased = stats_by_phase.len() > 1;
         for (phase, phase_stats) in stats_by_phase.iter().enumerate() {
@@ -219,11 +300,15 @@ impl NetworkTest for dyn NetworkLoadTest {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
-        let (end_version, _) = runtime
-            .block_on(ctx.swarm().get_client_with_newest_ledger_version())
+        let (end_version, _) = ctx
+            .swarm
+            .read()
+            .await
+            .get_client_with_newest_ledger_version()
+            .await
             .context("no clients replied for end version")?;
 
-        self.finish(ctx).context("finish NetworkLoadTest ")?;
+        self.finish(ctx).await.context("finish NetworkLoadTest ")?;
 
         for phase_stats in stats_by_phase.into_iter() {
             ctx.check_for_success(
@@ -235,6 +320,7 @@ impl NetworkTest for dyn NetworkLoadTest {
                 start_version,
                 end_version,
             )
+            .await
             .context("check for success")?;
         }
 
@@ -242,28 +328,34 @@ impl NetworkTest for dyn NetworkLoadTest {
     }
 }
 
-impl dyn NetworkLoadTest {
-    pub fn network_load_test(
+impl dyn NetworkLoadTest + '_ {
+    pub async fn network_load_test<'a>(
         &self,
-        ctx: &mut NetworkContext,
+        ctx: &mut NetworkContext<'a>,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
         rng: StdRng,
     ) -> Result<Vec<LoadTestPhaseStats>> {
-        let destination = self.setup(ctx).context("setup NetworkLoadTest")?;
-        let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm());
+        let destination = self.setup(ctx).await.context("setup NetworkLoadTest")?;
+        let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm.clone()).await;
 
         // Generate some traffic
 
-        let (mut emitter, emit_job_request) =
-            create_emitter_and_request(ctx.swarm(), emit_job_request, &nodes_to_send_load_to, rng)
-                .context("create emitter")?;
+        let (mut emitter, emit_job_request) = create_emitter_and_request(
+            ctx.swarm.clone(),
+            emit_job_request,
+            &nodes_to_send_load_to,
+            rng,
+        )
+        .await
+        .context("create emitter")?;
 
-        let rt = traffic_emitter_runtime()?;
         let clients = ctx
-            .swarm()
+            .swarm
+            .read()
+            .await
             .get_clients_for_peers(&nodes_to_send_load_to, Duration::from_secs(10));
 
         let mut stats_tracking_phases = emit_job_request.get_num_phases();
@@ -273,12 +365,13 @@ impl dyn NetworkLoadTest {
         }
 
         info!("Starting emitting txns for {}s", duration.as_secs());
-        let mut job = rt
-            .block_on(emitter.start_job(
-                ctx.swarm().chain_info().root_account,
+        let mut job = emitter
+            .start_job(
+                ctx.swarm.read().await.chain_info().root_account,
                 emit_job_request,
                 stats_tracking_phases,
-            ))
+            )
+            .await
             .context("start emitter job")?;
 
         let total_start = PhaseTimingStart::now();
@@ -288,14 +381,14 @@ impl dyn NetworkLoadTest {
         let test_duration = duration - warmup_duration - cooldown_duration;
         let phase_duration = test_duration.div_f32((stats_tracking_phases - 2) as f32);
 
-        job = rt.block_on(job.periodic_stat_forward(warmup_duration, 60));
+        job = job.periodic_stat_forward(warmup_duration, 60).await;
         info!("{}s warmup finished", warmup_duration.as_secs());
 
         let mut phase_timing = Vec::new();
         let mut phase_start_network_state = Vec::new();
         let test_start = Instant::now();
         for i in 0..stats_tracking_phases - 2 {
-            phase_start_network_state.push(rt.block_on(NetworkState::new(&clients)));
+            phase_start_network_state.push(NetworkState::new(&clients).await);
             job.start_next_phase();
 
             if i > 0 {
@@ -307,10 +400,11 @@ impl dyn NetworkLoadTest {
             }
             let phase_start = PhaseTimingStart::now();
 
-            let join_stats = rt.spawn(job.periodic_stat_forward(phase_duration, 60));
-            self.test(ctx.swarm, ctx.report, phase_duration)
+            let join_stats = Handle::current().spawn(job.periodic_stat_forward(phase_duration, 60));
+            self.test(ctx.swarm.clone(), ctx.report, phase_duration)
+                .await
                 .context("test NetworkLoadTest")?;
-            job = rt.block_on(join_stats).context("join stats")?;
+            job = join_stats.await.context("join stats")?;
             phase_timing.push(phase_start.elapsed());
         }
         let actual_test_duration = test_start.elapsed();
@@ -320,13 +414,15 @@ impl dyn NetworkLoadTest {
             actual_test_duration.as_secs()
         );
 
-        phase_start_network_state.push(rt.block_on(NetworkState::new(&clients)));
+        phase_start_network_state.push(NetworkState::new(&clients).await);
         job.start_next_phase();
         let cooldown_start = Instant::now();
 
         let cooldown_used = cooldown_start.elapsed();
         if cooldown_used < cooldown_duration {
-            job = rt.block_on(job.periodic_stat_forward(cooldown_duration - cooldown_used, 60));
+            job = job
+                .periodic_stat_forward(cooldown_duration - cooldown_used, 60)
+                .await;
         }
         info!("{}s cooldown finished", cooldown_duration.as_secs());
 
@@ -337,7 +433,7 @@ impl dyn NetworkLoadTest {
             total_timing.start_unixtime_s,
             total_timing.end_unixtime_s,
         );
-        let stats_by_phase = rt.block_on(job.stop_job());
+        let stats_by_phase = job.stop_job().await;
 
         info!("Stopped job");
         info!("Warmup stats: {}", stats_by_phase[0].rate());
@@ -353,11 +449,12 @@ impl dyn NetworkLoadTest {
             } else {
                 Some(cur.clone())
             };
-            let latency_breakdown = rt.block_on(fetch_latency_breakdown(
-                ctx.swarm(),
+            let latency_breakdown = fetch_latency_breakdown(
+                ctx.swarm.clone(),
                 phase_timing[i].start_unixtime_s,
                 phase_timing[i].end_unixtime_s,
-            ))?;
+            )
+            .await?;
             info!(
                 "Latency breakdown details for phase {}: from {} to {}: {:?}",
                 i,
@@ -491,14 +588,23 @@ impl CompositeNetworkTest {
     }
 }
 
+#[async_trait]
 impl NetworkTest for CompositeNetworkTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
-        for wrapper in &self.wrappers {
-            wrapper.setup(ctx)?;
+    async fn run<'a>(&self, ctxa: NetworkContextSynchronizer<'a>) -> Result<()> {
+        {
+            let mut ctx_locker = ctxa.ctx.lock().await;
+            let ctx = ctx_locker.deref_mut();
+            for wrapper in &self.wrappers {
+                wrapper.setup(ctx).await?;
+            }
         }
-        self.test.run(ctx)?;
-        for wrapper in &self.wrappers {
-            wrapper.finish(ctx)?;
+        self.test.run(ctxa.clone()).await?;
+        {
+            let mut ctx_locker = ctxa.ctx.lock().await;
+            let ctx = ctx_locker.deref_mut();
+            for wrapper in &self.wrappers {
+                wrapper.finish(ctx).await?;
+            }
         }
         Ok(())
     }

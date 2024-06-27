@@ -1678,6 +1678,7 @@ dependencies = [
  "aptos-logger",
  "aptos-rest-client",
  "aptos-retrier",
+ "aptos-runtimes",
  "aptos-sdk",
  "aptos-short-hex-str",
  "aptos-state-sync-driver",
@@ -2650,6 +2651,7 @@ name = "aptos-move-debugger"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-executor",
  "aptos-consensus",
  "aptos-crypto",
  "aptos-gas-profiling",
@@ -2662,6 +2664,7 @@ dependencies = [
  "aptos-vm-types",
  "bcs 0.1.4",
  "clap 4.4.14",
+ "itertools 0.12.1",
  "regex",
  "reqwest",
  "tokio",
@@ -3945,6 +3948,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "assert_approx_eq",
+ "async-trait",
  "bcs 0.1.4",
  "csv",
  "futures",
@@ -3953,6 +3957,7 @@ dependencies = [
  "rand 0.7.3",
  "reqwest",
  "tokio",
+ "tokio-scoped",
 ]
 
 [[package]]
@@ -3988,9 +3993,7 @@ dependencies = [
  "criterion",
  "criterion-cpu-time",
  "num_cpus",
- "once_cell",
  "proptest",
- "rayon",
 ]
 
 [[package]]
@@ -15694,6 +15697,16 @@ dependencies = [
  "rustls 0.23.7",
  "rustls-pki-types",
  "tokio",
+]
+
+[[package]]
+name = "tokio-scoped"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4beb8ba13bc53ac53ce1d52b42f02e5d8060f0f42138862869beb769722b256"
+dependencies = [
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
