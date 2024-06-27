@@ -193,7 +193,7 @@ NUMBER_OF_EXECUTION_THREADS = int(
 )
 
 if os.environ.get("DETAILED"):
-    EXECUTION_ONLY_NUMBER_OF_THREADS = [1, 2, 4, 8, 16, 32, 60]
+    EXECUTION_ONLY_NUMBER_OF_THREADS = [1, 2, 4, 8, 16, 32, 48, 60]
 else:
     EXECUTION_ONLY_NUMBER_OF_THREADS = []
 
@@ -407,9 +407,12 @@ def print_table(
             if single_field is not None:
                 _, field_getter = single_field
                 for num_threads in number_of_execution_threads:
-                    row.append(
-                        field_getter(result.number_of_threads_results[num_threads])
-                    )
+                    if num_threads in result.number_of_threads_results:
+                        row.append(
+                            field_getter(result.number_of_threads_results[num_threads])
+                        )
+                    else:
+                        row.append("-")
 
         if single_field is not None:
             _, field_getter = single_field
@@ -504,7 +507,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         number_of_threads_results = {}
 
         for execution_threads in EXECUTION_ONLY_NUMBER_OF_THREADS:
-            test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {execution_threads} {common_command_suffix} --skip-commit --blocks {NUM_BLOCKS_DETAILED}"
+            test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {execution_threads} --skip-commit {common_command_suffix} --blocks {NUM_BLOCKS_DETAILED}"
             output = execute_command(test_db_command)
 
             number_of_threads_results[execution_threads] = extract_run_results(
