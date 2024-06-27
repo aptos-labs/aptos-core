@@ -16,8 +16,21 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
 from Crypto.Hash import SHA256
 import Crypto
-import pprint
+import pprint 
 
+
+def calc_string_bodies(string):
+    string_bodies = [False] * len(string)
+    string_bodies[1] = string[0] == '"'
+
+    for i in range(2,len(string)):
+        if not string_bodies[i-2] and string[i-1] == '"' and string[i-2] != '\\':
+            string_bodies[i] = True
+        elif string_bodies[i-1] and string[i] == '"' and string[i-1] != '\\':
+            string_bodies[i] = False
+        else:
+            string_bodies[i] = string_bodies[i-1]
+    return string_bodies
 
 # Returns JSON array of bytes representing the input `string`, 0 padded to `maxLen`
 def pad_string_new(string, maxLen, n="", use_ord=False):
@@ -61,7 +74,7 @@ def pad_string(string, maxLen, n="", use_ord=False):
 def format_output(dictionary):
     res = "{"
     for key in dictionary:
-        res = res + key + " : " + dictionary[key] + ","
+        res = res + key + " : " + str(dictionary[key]) + ","
     res = res[:-1] + "}"
     return res
 
@@ -189,6 +202,7 @@ maxAudNameLen = 40
 maxAudValueLen = 120
 # aud_field_string = "\"aud\":\"407408718192.apps.googleusercontent.com\","
 aud_field_string = "\"aud\":\"511276456880-i7i4787c1863damto6899ts989j2e35r.apps.googleusercontent.com\","
+aud_string_bodies = calc_string_bodies(aud_field_string)
 aud_field_value = pad_string(aud_field_string, maxAudKVPairLen)
 aud_field_len_value = '"' + str(len(aud_field_string)) + '"'
 aud_index_value = '"' + str(jwt_payload.index("aud") - 1) + '"'  # First '"' character in aud field index in payload
