@@ -41,7 +41,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         remote_shard_addresses: Vec<SocketAddr>,
         num_threads: Option<usize>,
     ) -> Self {
-        let num_threads = 16; //num_threads.unwrap_or_else(num_cpus::get);
+        let num_threads = 60; //num_threads.unwrap_or_else(num_cpus::get);
         let num_kv_req_threads = 16; //= num_cpus::get() / 2;
         let num_shards = remote_shard_addresses.len();
         info!("num threads for remote state view service: {}", num_threads);
@@ -176,7 +176,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 .as_millis() as u64;
             REMOTE_EXECUTOR_TIMER
                 .with_label_values(&["0", "kv_proc_thread_waiting_time"])
-                .observe((curr_time - prev_time) as f64);
+                .observe(((curr_time - prev_time) / 1000) as f64);
 
             let state_view = state_view.clone();
             let kv_txs = kv_tx.clone();
