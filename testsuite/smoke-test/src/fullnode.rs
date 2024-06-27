@@ -48,7 +48,7 @@ async fn test_indexer() {
         )
         .unwrap();
 
-    let fullnode = swarm.full_node_mut(fullnode_peer_id).unwrap();
+    let fullnode = swarm.full_node(fullnode_peer_id).unwrap();
     fullnode
         .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
         .await
@@ -146,7 +146,7 @@ async fn test_internal_indexer_with_fast_sync() {
         .wait_for_all_nodes_to_catchup(Duration::from_secs(60))
         .await
         .unwrap();
-    let node = swarm.full_node_mut(peer_id).unwrap();
+    let node = swarm.full_node(peer_id).unwrap();
     let node_config = node.config().to_owned();
     node.stop().await.unwrap();
     check_indexer_db(&node_config);

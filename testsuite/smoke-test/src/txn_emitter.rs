@@ -206,8 +206,9 @@ async fn test_txn_emmitter_low_funds() {
             mempool_backlog: 10,
         });
 
+    let account_1 = Arc::new(account_1);
     let txn_stat = emitter
-        .emit_txn_for_with_stats(&account_1, emit_job_request, Duration::from_secs(10), 3)
+        .emit_txn_for_with_stats(account_1, emit_job_request, Duration::from_secs(10), 3)
         .await
         .unwrap();
 

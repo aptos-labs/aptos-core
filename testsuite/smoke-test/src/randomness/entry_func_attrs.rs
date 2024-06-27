@@ -271,7 +271,7 @@ async fn common(params: TestParams) {
     let epoch_duration_secs = 20;
     let estimated_dkg_latency_secs = 30;
 
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
