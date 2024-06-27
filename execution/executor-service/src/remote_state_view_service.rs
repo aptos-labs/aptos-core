@@ -120,7 +120,9 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             });
         }
         let mut rng = StdRng::from_entropy();
+        let mut msg_count = 0;
         while let Ok(message) = self.kv_rx.recv() {
+            msg_count += 1;
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             let mut delta = 0.0;
             if curr_time > message.start_ms_since_epoch.unwrap() {
@@ -157,6 +159,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             //     .with_label_values(&["0", "kv_req_pq_size"])
             //     .observe(self.kv_unprocessed_pq.len() as f64);
         }
+        info!("Total messages received: {}", msg_count);
     }
 
     pub fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
