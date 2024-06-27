@@ -56,7 +56,7 @@ fn test_proof_queue_sorting() {
     }
 
     // Expect: [600, 300]
-    let (pulled, _) = proof_queue.pull_proofs(&hashset![], 4, 2, 2, true);
+    let (pulled, num_unique_txns, _) = proof_queue.pull_proofs(&hashset![], 4, 2, 2, true);
     let mut count_author_0 = 0;
     let mut count_author_1 = 0;
     let mut prev: Option<&ProofOfStore> = None;
@@ -75,9 +75,10 @@ fn test_proof_queue_sorting() {
     }
     assert_eq!(count_author_0, 1);
     assert_eq!(count_author_1, 1);
+    assert_eq!(num_unique_txns, 2);
 
     // Expect: [600, 500, 300, 100]
-    let (pulled, _) = proof_queue.pull_proofs(&hashset![], 6, 4, 4, true);
+    let (pulled, num_unique_txns, _) = proof_queue.pull_proofs(&hashset![], 6, 4, 4, true);
     let mut count_author_0 = 0;
     let mut count_author_1 = 0;
     let mut prev: Option<&ProofOfStore> = None;
@@ -94,6 +95,7 @@ fn test_proof_queue_sorting() {
         }
         prev = Some(batch);
     }
+    assert_eq!(num_unique_txns, 4);
     assert_eq!(count_author_0, 2);
     assert_eq!(count_author_1, 2);
 }
@@ -226,6 +228,7 @@ fn test_proof_pull_proofs_with_duplicates() {
         };
     }
     assert!(pulled_txns.len() == 4);
+    assert!(result.1 == 4);
     assert!(
         proof_queue
             .pull_proofs(&hashset![info_0], 8, 4, 400, true)
