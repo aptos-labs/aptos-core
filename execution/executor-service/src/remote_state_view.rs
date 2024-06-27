@@ -151,8 +151,14 @@ impl RemoteStateViewClient {
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
+                // if state_keys.len() > 1 {
+                //     seq_num += 1;
+                // }
                 if state_keys.len() > 1 {
-                    seq_num += 1;
+                    seq_num = 2;
+                }
+                else {
+                    seq_num = 1;
                 }
                 thread_pool.spawn_fifo(move || {
                     let mut rng = StdRng::from_entropy();

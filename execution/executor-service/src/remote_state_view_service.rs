@@ -41,7 +41,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         remote_shard_addresses: Vec<SocketAddr>,
         num_threads: Option<usize>,
     ) -> Self {
-        let num_threads = 50;//remote_shard_addresses.len() * 2; //num_threads.unwrap_or_else(num_cpus::get);
+        let num_threads = 60;//remote_shard_addresses.len() * 2; //num_threads.unwrap_or_else(num_cpus::get);
         let num_kv_req_threads = 16; //= num_cpus::get() / 2;
         let num_shards = remote_shard_addresses.len();
         info!("num threads for remote state view service: {}", num_threads);
@@ -139,7 +139,13 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let kv_tx_clone = self.kv_tx.clone();
             let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
             let rand_send_thread_idx = rng.gen_range(0, self.kv_tx[0].len());
-            kv_int_txs[rng.gen_range(0, kv_int_txs.len())].send(message);
+            let priority_pool = 3 * kv_int_txs.len() / 4;
+            if priority == 1 {
+                kv_int_txs[rng.gen_range(0, priority_pool)].send(message);
+            }
+            else {
+                kv_int_txs[rng.gen_range(priority_pool, kv_int_txs.len())].send(message);
+            }
             // tokio::spawn(async move {
             //     handle_message(message,
             //                          state_view_clone,
