@@ -2039,12 +2039,12 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     const TARGET_TPS: usize = 100_000;
     // Overestimate: causes blocks to be too small. Underestimate: causes blocks that are too large.
     // Ideally, want the block size to take 200-250ms of execution time to match broadcast RTT.
-    const MAX_TXNS_PER_BLOCK: usize = 3500;
+    const MAX_TXNS_PER_BLOCK: usize = 10_000;
     // Overestimate: causes batch queueing. Underestimate: not enough txns in quorum store.
     // This is validator latency, minus mempool queueing time.
-    const VN_LATENCY_S: f64 = 2.5;
+    const VN_LATENCY_S: f64 = 4;
     // Overestimate: causes mempool queueing. Underestimate: not enough txns incoming.
-    const VFN_LATENCY_S: f64 = 4.0;
+    const VFN_LATENCY_S: f64 = 8.0;
 
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
@@ -2062,7 +2062,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             config.consensus.quorum_store_pull_timeout_ms = 200;
 
             // Experimental storage optimizations
-            config.storage.rocksdb_configs.enable_storage_sharding = false;
+            config.storage.rocksdb_configs.enable_storage_sharding = true;
 
             // Increase the concurrency level
             if USE_CRAZY_MACHINES {
