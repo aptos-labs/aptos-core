@@ -26,7 +26,7 @@ concurrency:
 jobs:
   # Run Aptos Move Compiler v2 tests. This is a PR required job.
   rust-move-tests:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker]
     steps:
       - uses: actions/checkout@v3
       - name: Run Aptos Move tests with compiler V2

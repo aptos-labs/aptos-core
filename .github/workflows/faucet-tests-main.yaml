@@ -49,7 +49,7 @@ jobs:
   # be compatible in production.
   run-tests-main:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker]
     steps:
       - uses: actions/checkout@v3
         if: ${{ !inputs.SKIP_JOB }}

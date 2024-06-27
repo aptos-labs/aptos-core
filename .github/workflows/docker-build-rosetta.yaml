@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker]
     steps:
       - uses: actions/checkout@v3
 
