@@ -150,7 +150,7 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
-            // FeatureFlag::LIMIT_VM_TYPE_SIZE, // TODO: Enable when type builder rolls out
+            FeatureFlag::LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
         ]
     }
