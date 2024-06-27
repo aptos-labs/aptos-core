@@ -490,9 +490,10 @@ impl ConsensusObserver {
                 ))
             );
 
-            // Update the root and clear the pending blocks
+            // Update the root and clear the pending blocks (up to the commit)
             *self.root.lock() = commit_decision.ledger_info().clone();
-            self.pending_ordered_blocks.clear_all_pending_blocks();
+            self.pending_ordered_blocks
+                .remove_blocks_for_commit(commit_decision.ledger_info());
 
             // Start the state sync process
             let abort_handle = sync_to_commit_decision(
@@ -506,7 +507,7 @@ impl ConsensusObserver {
         }
     }
 
-    /// Processes the commit decision for the pending block and returns iff
+    /// Processes the commit decision for the pending block and returns true iff
     /// the commit decision was successfully processed.
     fn process_commit_decision_for_pending_block(&self, commit_decision: &CommitDecision) -> bool {
         let pending_block = self
@@ -627,27 +628,46 @@ impl ConsensusObserver {
             ordered_proof,
         } = ordered_block.clone();
 
-        // Verify that we have at least one ordered block
-        if blocks.is_empty() {
-            warn!(
+        // Verify the ordered blocks before processing
+        if let Err(error) = self.verify_ordered_blocks(&blocks, &ordered_proof) {
+            error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Received empty ordered block! Ignoring: {:?}",
-                    ordered_proof.commit_info()
+                    "Failed to verify ordered blocks! Ignoring: {:?}, Error: {:?}",
+                    ordered_proof.commit_info(),
+                    error
                 ))
             );
             return;
-        }
+        };
 
-        // TODO: verify the ordered block!
+        // If the ordered block is for the current epoch, verify the proof
+        let verified_ordered_proof =
+            if ordered_proof.commit_info().epoch() == self.get_epoch_state().epoch {
+                // Verify the ordered proof
+                if let Err(error) = self.verify_ordered_proof(&ordered_proof) {
+                    warn!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Failed to verify ordered proof! Ignoring: {:?}, Error: {:?}",
+                            ordered_proof.commit_info(),
+                            error
+                        ))
+                    );
+                    return;
+                }
+
+                true // We have successfully verified the proof
+            } else {
+                false // We can't verify the proof yet
+            };
 
         // If the block is a child of our last block, we can insert it
         if self.get_last_block().id() == blocks.first().unwrap().parent_id() {
             // Insert the ordered block into the pending blocks
             self.pending_ordered_blocks
-                .insert_ordered_block(ordered_block);
+                .insert_ordered_block(ordered_block, verified_ordered_proof);
 
-            // If we are not in sync mode, forward the blocks to the execution pipeline
-            if self.sync_handle.is_none() {
+            // If we verified the proof, and we're not in sync mode, forward the blocks to execution
+            if verified_ordered_proof && self.sync_handle.is_none() {
                 debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Forwarding blocks to the execution pipeline: {}",
@@ -722,8 +742,11 @@ impl ConsensusObserver {
 
         // If the epoch has changed, end the current epoch and start the new one
         if epoch > self.get_epoch_state().epoch {
+            // Wait for the next epoch to start
             self.execution_client.end_epoch().await;
             self.wait_for_epoch_start().await;
+
+            //
         }
 
         // Reset and drop the sync handle
@@ -876,6 +899,66 @@ impl ConsensusObserver {
                 Error::InvalidMessageError(format!(
                     "Failed to verify the commit decision ledger info: {:?}, Error: {:?}",
                     commit_decision.ledger_info().commit_info(),
+                    error
+                ))
+            })
+    }
+
+    /// Verifies the ordered blocks and returns an error if the data
+    /// is invalid. Note: this does not check the ordered proof.
+    fn verify_ordered_blocks(
+        &self,
+        blocks: &[Arc<PipelinedBlock>],
+        ordered_proof: &LedgerInfoWithSignatures,
+    ) -> Result<(), Error> {
+        // Verify that we have at least one ordered block
+        if blocks.is_empty() {
+            return Err(Error::InvalidMessageError(
+                "Received empty ordered block!".to_string(),
+            ));
+        }
+
+        // Verify the last block ID matches the ordered proof block ID
+        if blocks.last().unwrap().id() != ordered_proof.commit_info().id() {
+            return Err(Error::InvalidMessageError(
+                format!(
+                    "Last ordered block ID does not match the ordered proof ID! Number of blocks: {:?}, Last ordered block ID: {:?}, Ordered proof ID: {:?}",
+                    blocks.len(),
+                    blocks.last().unwrap().id(),
+                    ordered_proof.commit_info().id()
+                )
+            ));
+        }
+
+        // Verify the blocks are correctly chained together (from the last block to the first)
+        let mut expected_parent_id = None;
+        for block in blocks.iter().rev() {
+            if let Some(expected_parent_id) = expected_parent_id {
+                if block.id() != expected_parent_id {
+                    return Err(Error::InvalidMessageError(
+                        format!(
+                            "Block parent ID does not match the expected parent ID! Block ID: {:?}, Expected parent ID: {:?}",
+                            block.id(),
+                            expected_parent_id
+                        )
+                    ));
+                }
+            }
+
+            expected_parent_id = Some(block.parent_id());
+        }
+
+        Ok(())
+    }
+
+    /// Verifies the ordered proof and returns an error if the proof is invalid
+    fn verify_ordered_proof(&self, ordered_proof: &LedgerInfoWithSignatures) -> Result<(), Error> {
+        self.get_epoch_state()
+            .verify(ordered_proof)
+            .map_err(|error| {
+                Error::InvalidMessageError(format!(
+                    "Failed to verify ordered proof ledger info: {:?}, Error: {:?}",
+                    ordered_proof.commit_info(),
                     error
                 ))
             })

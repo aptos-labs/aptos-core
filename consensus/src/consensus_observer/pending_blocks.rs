@@ -14,80 +14,116 @@ use std::{collections::BTreeMap, sync::Arc};
 /// A simple struct to store the block payloads of ordered and committed blocks
 #[derive(Clone)]
 pub struct PendingOrderedBlocks {
-    // Pending ordered blocks (indexed by consensus round)
-    pending_ordered_blocks: Arc<Mutex<BTreeMap<Round, (OrderedBlock, Option<CommitDecision>)>>>,
+    // Verified pending ordered blocks (exclusively for the current epoch)
+    verified_pending_blocks:
+        Arc<Mutex<BTreeMap<(u64, Round), (OrderedBlock, Option<CommitDecision>)>>>,
+
+    // Unverified pending ordered blocks (exclusively for future epochs)
+    unverified_pending_blocks:
+        Arc<Mutex<BTreeMap<(u64, Round), (OrderedBlock, Option<CommitDecision>)>>>,
 }
 
 impl PendingOrderedBlocks {
     pub fn new() -> Self {
         Self {
-            pending_ordered_blocks: Arc::new(Mutex::new(BTreeMap::new())),
+            verified_pending_blocks: Arc::new(Mutex::new(BTreeMap::new())),
+            unverified_pending_blocks: Arc::new(Mutex::new(BTreeMap::new())),
         }
-    }
-
-    /// Clears all pending blocks
-    pub fn clear_all_pending_blocks(&self) {
-        self.pending_ordered_blocks.lock().clear();
     }
 
     /// Returns a copy of the pending ordered blocks map
     pub fn get_all_pending_blocks(
         &self,
     ) -> BTreeMap<Round, (OrderedBlock, Option<CommitDecision>)> {
-        self.pending_ordered_blocks.lock().clone()
+        self.verified_pending_blocks.lock().clone()
     }
 
-    /// Returns the pending ordered block (if any)
+    /// Returns the last pending ordered block (if any). We take into
+    /// account verified and unverified pending blocks, to ensure we're
+    /// able to buffer blocks across epoch boundaries.
     pub fn get_last_pending_block(&self) -> Option<BlockInfo> {
-        let pending_ordered_blocks = self.pending_ordered_blocks.lock();
-        if let Some((_, (ordered_block, _))) = pending_ordered_blocks.last_key_value() {
-            Some(ordered_block.blocks.last().unwrap().block_info())
-        } else {
-            None // No pending blocks were found
+        // Return the last block for the next epoch (if any)
+        if let Some((_, (ordered_block, _))) =
+            self.unverified_pending_blocks.lock().last_key_value()
+        {
+            return Some(ordered_block.blocks.last().unwrap().block_info());
         }
+
+        // Otherwise, return the last block for the current epoch (if any)
+        if let Some((_, (ordered_block, _))) = self.verified_pending_blocks.lock().last_key_value()
+        {
+            return Some(ordered_block.blocks.last().unwrap().block_info());
+        }
+
+        // Otherwise, no pending blocks were found
+        None
     }
 
     /// Returns the pending ordered block (if any)
     pub fn get_pending_block(&self, round: Round) -> Option<OrderedBlock> {
-        let pending_ordered_blocks = self.pending_ordered_blocks.lock();
+        let pending_ordered_blocks = self.verified_pending_blocks.lock();
         pending_ordered_blocks
             .get(&round)
             .map(|(ordered_block, _)| ordered_block.clone())
     }
 
     /// Inserts the given ordered block into the pending blocks
-    pub fn insert_ordered_block(&self, ordered_block: OrderedBlock) {
+    pub fn insert_ordered_block(&self, ordered_block: OrderedBlock, verified_ordered_proof: bool) {
         debug!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Adding ordered block to the pending blocks: {}",
+                "Adding ordered block to the pending blocks: {}. Verified ordered proof: {:?}",
+                verified_ordered_proof,
                 ordered_block.ordered_proof.commit_info()
             ))
         );
 
-        // Insert the ordered block into the pending ordered blocks
-        let last_block_round = ordered_block.blocks.last().unwrap().round();
-        self.pending_ordered_blocks
+        // Get the epoch and round of the last ordered block
+        let last_block = ordered_block.blocks.last().unwrap();
+        let last_block_epoch = last_block.epoch();
+        let last_block_round = last_block.round();
+
+        // Insert the pending block depending on if the ordered proof is verified.
+        // If the proof is verified, it must be for the current epoch.
+        let pending_ordered_blocks = if verified_ordered_proof {
+            &self.verified_pending_blocks
+        } else {
+            &self.unverified_pending_blocks
+        };
+        pending_ordered_blocks
             .lock()
-            .insert(last_block_round, (ordered_block, None));
+            .insert((last_block_epoch, last_block_round), (ordered_block, None));
     }
 
     /// Removes the pending blocks for the given commit ledger info.
-    /// This will remove all blocks up to (and including) the commit
-    /// round of the committed ledger info.
+    /// This will remove all blocks up to (and including) the epoch and
+    /// commit round of the committed ledger info.
     pub fn remove_blocks_for_commit(&self, commit_ledger_info: &LedgerInfoWithSignatures) {
-        // Determine the round to split off
+        // Determine the epoch and round to split off
+        let split_off_epoch = commit_ledger_info.ledger_info().epoch();
         let split_off_round = commit_ledger_info.commit_info().round() + 1;
 
-        // Remove the pending blocks before the split off round
-        let mut pending_ordered_blocks = self.pending_ordered_blocks.lock();
-        *pending_ordered_blocks = pending_ordered_blocks.split_off(&split_off_round);
+        // Remove the blocks from the verified pending blocks
+        let mut verified_pending_blocks = self.verified_pending_blocks.lock();
+        *verified_pending_blocks =
+            verified_pending_blocks.split_off(&(split_off_epoch, split_off_round));
+
+        // Remove the blocks from the unverified pending blocks
+        let mut unverified_pending_blocks = self.unverified_pending_blocks.lock();
+        *unverified_pending_blocks =
+            unverified_pending_blocks.split_off(&(split_off_epoch, split_off_round));
     }
 
-    /// Updates the commit decision of the pending ordered block (if found)
+    /// Updates the commit decision of the pending ordered block (if found).
+    /// This can only be done for verified pending blocks.
     pub fn update_commit_decision(&self, commit_decision: &CommitDecision) {
-        let mut pending_ordered_blocks = self.pending_ordered_blocks.lock();
+        // Get the epoch and round of the commit decision
+        let commit_decision_epoch = commit_decision.epoch();
+        let commit_decision_round = commit_decision.round();
+
+        // Update the commit decision for the verified pending blocks
+        let mut verified_pending_blocks = self.verified_pending_blocks.lock();
         if let Some((_, existing_commit_decision)) =
-            pending_ordered_blocks.get_mut(&commit_decision.round())
+            verified_pending_blocks.get_mut(&(commit_decision_epoch, commit_decision_round))
         {
             *existing_commit_decision = Some(commit_decision.clone());
         }
@@ -113,40 +149,6 @@ mod test {
     use aptos_types::{
         aggregate_signature::AggregateSignature, ledger_info::LedgerInfo, transaction::Version,
     };
-
-    #[test]
-    pub fn test_clear_pending_blocks() {
-        // Create new pending ordered blocks
-        let pending_ordered_blocks = PendingOrderedBlocks::new();
-
-        // Insert several pending blocks
-        let num_pending_blocks = 10;
-        let pending_blocks =
-            create_and_add_pending_blocks(&pending_ordered_blocks, num_pending_blocks);
-
-        // Verify the pending blocks were all inserted
-        let all_pending_blocks = pending_ordered_blocks.get_all_pending_blocks();
-        assert_eq!(all_pending_blocks.len(), num_pending_blocks);
-
-        // Verify the pending blocks were inserted by round
-        for pending_block in pending_blocks {
-            // Get the round of the last block in the pending block
-            let round = pending_block.blocks.last().unwrap().round();
-
-            // Verify the pending block exists for the round
-            assert_eq!(
-                pending_block,
-                pending_ordered_blocks.get_pending_block(round).unwrap()
-            );
-        }
-
-        // Clear all pending blocks
-        pending_ordered_blocks.clear_all_pending_blocks();
-
-        // Verify all blocks were removed
-        let all_pending_blocks = pending_ordered_blocks.get_all_pending_blocks();
-        assert_eq!(all_pending_blocks.len(), 0);
-    }
 
     #[test]
     pub fn test_get_last_pending_block() {
@@ -309,11 +311,11 @@ mod test {
             );
             let ordered_block = OrderedBlock {
                 blocks,
-                ordered_proof,
+                ordered_proof: ordered_proof.clone(),
             };
 
             // Insert the ordered block into the pending ordered blocks
-            pending_ordered_blocks.insert_ordered_block(ordered_block.clone());
+            pending_ordered_blocks.insert_ordered_block(ordered_block.clone(), true);
 
             // Add the ordered block to the pending blocks
             pending_blocks.push(ordered_block);
