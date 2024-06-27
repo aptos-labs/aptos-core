@@ -121,7 +121,6 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         }
         let mut rng = StdRng::from_entropy();
         while let Ok(message) = self.kv_rx.recv() {
-            msg_count += 1;
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             let mut delta = 0.0;
             if curr_time > message.start_ms_since_epoch.unwrap() {
