@@ -203,6 +203,7 @@ maxAudValueLen = 120
 # aud_field_string = "\"aud\":\"407408718192.apps.googleusercontent.com\","
 aud_field_string = "\"aud\":\"511276456880-i7i4787c1863damto6899ts989j2e35r.apps.googleusercontent.com\","
 aud_string_bodies = calc_string_bodies(aud_field_string)
+aud_string_bodies_value = pad_string(aud_string_bodies, maxAudKVPairLen)
 aud_field_value = pad_string(aud_field_string, maxAudKVPairLen)
 aud_field_len_value = '"' + str(len(aud_field_string)) + '"'
 aud_index_value = '"' + str(jwt_payload.index("aud") - 1) + '"'  # First '"' character in aud field index in payload
@@ -246,6 +247,8 @@ maxUidNameLen = 30
 maxUidValueLen = 330
 # uid_field_string = "\"sub\":\"113990307082899718775\","
 uid_field_string = "\"sub\":\"102904630171592520592\","
+uid_string_bodies = calc_string_bodies(uid_field_string)
+uid_string_bodies_value = pad_string(uid_string_bodies, maxUidKVPairLen)
 uid_field_value = pad_string(uid_field_string, maxUidKVPairLen)
 uid_field_len_value = '"' + str(len(uid_field_string)) + '"'
 uid_index_value = '"' + str(jwt_payload.index("sub") - 1) + '"'  # This doesn't work for non-sub user id fields
@@ -304,6 +307,8 @@ maxIssNameLen = 40
 maxIssValueLen = 120
 # iss_field_string = "\"iss\":\"https://accounts.google.com\","
 iss_field_string = "\"iss\":\"test.oidc.provider\","
+iss_string_bodies = calc_string_bodies(iss_field_string)
+iss_string_bodies_value = pad_string(iss_string_bodies, maxIssKVPairLen)
 iss_field_value = pad_string(iss_field_string, maxIssKVPairLen)
 iss_field_len_value = '"' + str(len(iss_field_string)) + '"'
 iss_index_value = '"' + str(jwt_payload.index("iss") - 1) + '"'
@@ -334,6 +339,7 @@ maxNonceKVPairLen = 105
 maxNonceNameLen = 10
 maxNonceValueLen = 100
 nonce_field_string = "\"nonce\":\"" + nonce_value + "\"}"
+nonce_string_bodies = calc_string_bodies(nonce_field_string, maxNonceKVPairLen)
 nonce_field_value = pad_string(nonce_field_string, maxNonceKVPairLen)
 nonce_field_len_value = '"' + str(len(nonce_field_string)) + '"'
 nonce_index_value = '"' + str(jwt_payload.index("nonce") - 1) + '"'
@@ -477,13 +483,14 @@ json_dict = {
     "\"signature\"": sig_value,
     "\"pubkey_modulus\"": mod_value,
     "\"aud_field\"": aud_field_value,
-    "\"aud_field_string_bodies\"": 0,
+    "\"aud_field_string_bodies\"": aud_string_bodies_value,
     "\"aud_field_len\"": aud_field_len_value,
     "\"aud_index\"": aud_index_value,
     "\"aud_value_index\"": aud_value_index_value,
     "\"aud_colon_index\"": aud_colon_index_value,
     "\"aud_name\"": aud_name_value,
     "\"uid_field\"": uid_field_value,
+    "\"uid_field_string_bodies\"": uid_string_bodies_value,
     "\"uid_field_len\"": uid_field_len_value,
     "\"uid_index\"": uid_index_value,
     "\"uid_name_len\"": uid_name_len_value,
@@ -501,6 +508,7 @@ json_dict = {
     "\"ev_name\"": ev_name_value,
     "\"ev_value\"": ev_value_value,
     "\"iss_field\"": iss_field_value,
+    "\iss_field_string_bodies\"": iss_string_bodies_value,
     "\"iss_field_len\"": iss_field_len_value,
     "\"iss_index\"": iss_index_value,
     "\"iss_value_index\"": iss_value_index_value,
@@ -509,6 +517,7 @@ json_dict = {
     "\"iss_name\"": iss_name_value,
     "\"iss_value\"": iss_value_value,
     "\"nonce_field\"": nonce_field_value,
+    "\"nonce_field_string_bodies\"": nonce_string_bodies_value,
     "\"nonce_field_len\"": nonce_field_len_value,
     "\"nonce_index\"": nonce_index_value,
     "\"nonce_value_index\"": nonce_value_index_value,
