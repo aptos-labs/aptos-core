@@ -16,8 +16,7 @@ use std::sync::{Condvar, Mutex};
 use cpq::ConcurrentPriorityQueue;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator};
-use rayon::iter::ParallelIterator;
+use rayon::iter::IntoParallelIterator;
 use tokio::runtime;
 use tokio::runtime::Runtime;
 use aptos_drop_helper::DEFAULT_DROPPER;
@@ -44,7 +43,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         num_threads: Option<usize>,
     ) -> Self {
         let num_threads = 60;//remote_shard_addresses.len() * 2; //num_threads.unwrap_or_else(num_cpus::get);
-        let num_kv_req_threads = 16; //= num_cpus::get() / 2;
+        let num_kv_req_threads = 4; //= num_cpus::get() / 2;
         let num_shards = remote_shard_addresses.len();
         info!("num threads for remote state view service: {}", num_threads);
         /*let mut thread_pool = vec![];
@@ -100,7 +99,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn start(&self) {
         //let (signal_tx, signal_rx) = unbounded();
         let thread_pool_clone = self.thread_pool.clone();
-        let num_handlers = 120;
+        let num_handlers = 60;
         info!("Num handlers created is {}", num_handlers);
         for i in 0..num_handlers {
             let state_view_clone = self.state_view.clone();
@@ -258,21 +257,36 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             shard_id,
             state_keys.len()
         );
-        let mut resp = vec![]; 
-        state_keys
-        .into_par_iter()
-        .map(|state_key| {
-            let state_value = state_view
-                .read()
-                .unwrap()
-                .as_ref()
-                .unwrap()
-                .get_state_value(&state_key)
-                .unwrap();
-            (state_key, state_value)
-        })
-        .collect_into_vec(&mut resp);
+        let resp = state_keys
+            .into_iter()
+            .map(|state_key| {
+                let state_value = state_view
+                    .read()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .get_state_value(&state_key)
+                    .unwrap();
+                (state_key, state_value)
+            })
+            .collect_vec();
         drop(timer_2);
+
+        // let mut resp = vec![];
+        // state_keys
+        //     .into_par_iter()
+        //     .map(|state_key| {
+        //         let state_value = state_view
+        //             .read()
+        //             .unwrap()
+        //             .as_ref()
+        //             .unwrap()
+        //             .get_state_value(&state_key)
+        //             .unwrap();
+        //         (state_key, state_value)
+        //     })
+        //     .collect_into_vec(&mut resp);
+        // drop(timer_2);
 
         let timer_3 = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_requests_3"])
