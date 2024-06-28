@@ -122,6 +122,9 @@ impl CliCommand<()> for InitTool {
             }
         };
 
+        // Ensure the config contains the network used
+        profile_config.network = Some(network);
+
         // Ensure that there is at least a REST URL set for the network
         match network {
             Network::Mainnet => {

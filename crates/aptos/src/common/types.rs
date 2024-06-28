@@ -232,6 +232,7 @@ pub const CONFIG_FOLDER: &str = ".aptos";
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
+    /// Name of network being used, if setup from aptos init
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     /// Private key for commands.
