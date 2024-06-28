@@ -31,7 +31,7 @@ version = "0.0.0"
 // TODO: consider using `rand::distributions::WeightedIndex` for this.
 // The current `int_in_range` doesn't seems to be evenly distributed.
 // Concern is that the fuzzer will not be able to directly control the choice
-pub fn choose_idx_weighted(u: &mut Unstructured, weights: &Vec<u32>) -> Result<usize> {
+pub fn choose_idx_weighted(u: &mut Unstructured, weights: &[u32]) -> Result<usize> {
     assert!(!weights.is_empty());
     let sum = weights.iter().sum::<u32>();
     let thresholds = weights

@@ -61,7 +61,7 @@ fn main() {
                     if buffer_size > BUFFER_SIZE_START * 1024 {
                         panic!("Failed to parse raw bytes: {}", e);
                     }
-                }
+                },
             }
             buffer_size *= 2;
 
