@@ -16,7 +16,7 @@ use std::collections::HashSet;
 
 fn create_proof_manager() -> ProofManager {
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(PeerId::random(), 10, 10, batch_store, true)
+    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, 100000)
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {

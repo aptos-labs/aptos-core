@@ -91,6 +91,8 @@ pub struct QuorumStoreConfig {
     pub num_workers_for_remote_batches: usize,
     pub batch_buckets: Vec<u64>,
     pub allow_batches_without_pos_in_proposal: bool,
+    /// Maximum number of transaction summaries stored in the proof queue.
+    pub max_txn_summary_storage: usize,
 }
 
 impl Default for QuorumStoreConfig {
@@ -129,6 +131,7 @@ impl Default for QuorumStoreConfig {
             num_workers_for_remote_batches: 10,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
             allow_batches_without_pos_in_proposal: true,
+            max_txn_summary_storage: 100_000,
         }
     }
 }
