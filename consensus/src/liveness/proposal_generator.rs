@@ -21,10 +21,7 @@ use aptos_config::config::{
     ChainHealthBackoffValues, ExecutionBackpressureConfig, PipelineBackpressureValues,
 };
 use aptos_consensus_types::{
-    block::Block,
-    block_data::BlockData,
-    common::{Author, Payload, PayloadFilter, Round},
-    quorum_cert::QuorumCert,
+    block::Block, block_data::BlockData, common::{Author, Payload, PayloadFilter, Round}, pipelined_block::ExecutionSummary, quorum_cert::QuorumCert
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, info, sample, sample::SampleRate, warn};
@@ -153,7 +150,7 @@ impl PipelineBackpressureConfig {
 
     pub fn get_execution_block_size_backoff(
         &self,
-        block_execution_times: &[(u64, Duration)],
+        block_execution_times: &[ExecutionSummary],
     ) -> Option<u64> {
         info!(
             "Estimated block execution times: {:?}",
@@ -163,12 +160,13 @@ impl PipelineBackpressureConfig {
         self.execution.as_ref().and_then(|config| {
             let sizes = block_execution_times
                 .iter()
-                .flat_map(|(num_txns, execution_time)| {
-                    let execution_time_ms = execution_time.as_millis();
+                .flat_map(|summary| {
+                    let execution_time_ms = summary.execution_time.as_millis();
                     if execution_time_ms > config.min_block_time_ms_to_activate as u128 {
                         Some(
                             ((config.target_block_time_ms as f64 / execution_time_ms as f64
-                                * *num_txns as f64)
+                                * (summary.to_commit as f64 / (summary.to_commit + summary.to_retry) as f64)
+                                * summary.payload_len as f64)
                                 .floor() as u64)
                                 .max(1),
                         )

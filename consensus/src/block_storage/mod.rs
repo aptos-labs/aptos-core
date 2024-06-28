@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::{
-    pipelined_block::PipelinedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
+    pipelined_block::{ExecutionSummary, PipelinedBlock}, quorum_cert::QuorumCert, sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate, wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
@@ -65,5 +65,5 @@ pub trait BlockReader: Send + Sync {
     // Return time difference between last committed block and new proposal
     fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration;
 
-    fn get_recent_block_execution_times(&self, num_blocks: usize) -> Vec<(u64, Duration)>;
+    fn get_recent_block_execution_times(&self, num_blocks: usize) -> Vec<ExecutionSummary>;
 }
