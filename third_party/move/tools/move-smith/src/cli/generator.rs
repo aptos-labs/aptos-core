@@ -29,7 +29,7 @@ struct Args {
     package: bool,
 }
 
-const BUFFER_SIZE_PER_FILE: usize = 1024 * 16;
+const BUFFER_SIZE_PER_FILE: usize = 1024 * 128;
 const MOVE_TOML_TEMPLATE: &str = r#"[package]
 name = "test"
 version = "0.0.0"
@@ -49,7 +49,7 @@ fn main() {
         rng.fill(&mut buffer[..]);
         let module = match raw_to_compile_unit(&buffer) {
             Ok(module) => module,
-            Err(_) => panic!("Failed to parse raw bytes"),
+            Err(e) => panic!("Failed to parse raw bytes: {}", e),
         };
         let code = module.emit_code();
         let file_name = format!("Output_{}.move", i);

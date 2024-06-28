@@ -126,15 +126,25 @@ impl Env {
     ) -> Vec<Identifier> {
         // Filter based on the IDKind
         let all_ident = match ident_kind {
-            Some(t) => self.id_pool.get_identifiers_of_ident_kind(t),
+            Some(ref t) => self.id_pool.get_identifiers_of_ident_kind(t.clone()),
             None => self.id_pool.get_all_identifiers(),
         };
+        trace!(
+            "All identifiers of type {:?}: {:?}",
+            ident_kind,
+            all_ident.len()
+        );
 
         // Filter based on Scope
         let ident_in_scope = match scope {
             Some(s) => self.id_pool.filter_identifier_in_scope(&all_ident, s),
             None => all_ident,
         };
+        trace!(
+            "In scope identifiers at {:?}: {:?}",
+            scope,
+            ident_in_scope.len()
+        );
 
         // Filter based on Type
         let type_matched = match typ {

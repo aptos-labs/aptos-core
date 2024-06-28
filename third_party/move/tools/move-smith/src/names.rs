@@ -329,3 +329,18 @@ fn test_scope() {
     let ans = scope.ancestors();
     assert_eq!(ans.len(), 5);
 }
+
+#[test]
+fn test_identifier_type() {
+    let mut id_pool = IdentifierPool::new();
+
+    let _ = id_pool.next_identifier(IdentifierKind::Block, &ROOT_SCOPE);
+    let _ = id_pool.next_identifier(IdentifierKind::Block, &ROOT_SCOPE);
+    let _ = id_pool.next_identifier(IdentifierKind::Struct, &ROOT_SCOPE);
+
+    let bids = id_pool.get_identifiers_of_ident_kind(IdentifierKind::Block);
+    println!("{:?}", bids);
+    assert!(bids.len() == 2);
+    let sids = id_pool.get_identifiers_of_ident_kind(IdentifierKind::Struct);
+    assert!(sids.len() == 1);
+}

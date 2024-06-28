@@ -30,7 +30,7 @@ use crate::{
     utils::choose_idx_weighted,
 };
 use arbitrary::{Arbitrary, Result, Unstructured};
-use log::{trace, warn};
+use log::{info, trace, warn};
 use num_bigint::BigUint;
 use std::{
     cell::{Ref, RefCell, RefMut},
@@ -111,10 +111,12 @@ impl MoveSmith {
             self.modules
                 .push(RefCell::new(self.generate_module_skeleton(u)?));
         }
+        info!("Done generating skeletons");
 
         for m in self.modules.iter() {
             self.fill_module(u, m)?;
         }
+        info!("Done fill in skeletons");
 
         // Disable script generation for now since intermediate states are not compared
         self.script = None;
@@ -163,21 +165,25 @@ impl MoveSmith {
 
         // Generate a struct with all abilities to avoid having no type to choose for some type parameters
         let (struct_name, _) = self.get_next_identifier(IDKinds::Struct, &scope);
+        let struct_typ = Type::new_struct(&struct_name, None);
         self.env_mut()
             .type_pool
-            .register_type(Type::new_struct(&struct_name, None));
+            .insert_mapping(&struct_name, &struct_typ);
+        self.env_mut().type_pool.register_type(struct_typ);
         structs.push(RefCell::new(StructDefinition {
             name: struct_name,
             abilities: Vec::from(Ability::ALL),
             type_parameters: TypeParameters::default(),
             fields: Vec::new(),
         }));
+        info!("Done generating struct skeletons");
 
         // Function signatures
         let mut functions = Vec::new();
         for _ in 0..u.int_in_range(1..=self.config.borrow().max_num_functions_in_module)? {
             functions.push(RefCell::new(self.generate_function_skeleton(u, &scope)?));
         }
+        info!("Done generating function skeletons");
 
         Ok(Module {
             name,
@@ -322,9 +328,9 @@ impl MoveSmith {
             abilities.push(ability_choices.remove(idx));
         }
 
-        self.env_mut()
-            .type_pool
-            .register_type(Type::new_struct(&name, Some(&type_parameters)));
+        let struct_typ = Type::new_struct(&name, Some(&type_parameters));
+        self.env_mut().type_pool.insert_mapping(&name, &struct_typ);
+        self.env_mut().type_pool.register_type(struct_typ);
         Ok(StructDefinition {
             name,
             abilities,
@@ -358,7 +364,27 @@ impl MoveSmith {
                         );
                         if !candidates.is_empty() {
                             let struc_def = u.choose(&candidates)?;
-                            break struc_def.get_type();
+
+                            let constraints = st.borrow().abilities.clone();
+                            let mut new_typ = struc_def.get_type();
+
+                            if self.is_type_concretizable(&new_typ, &struct_scope) {
+                                new_typ = self
+                                    .concretize_type(
+                                        u,
+                                        &new_typ,
+                                        &struct_scope,
+                                        constraints,
+                                        Some(&st.borrow().get_type()),
+                                    )
+                                    .unwrap();
+                            }
+
+                            if let Type::StructConcrete(_) = &new_typ {
+                                if !self.check_struct_reachable(&new_typ, &st.borrow().name, None) {
+                                    break new_typ;
+                                }
+                            }
                         }
                     },
                     _ => panic!("Invalid type"),
@@ -396,7 +422,8 @@ impl MoveSmith {
                 {
                     return None;
                 }
-                if self.check_struct_reachable(&struct_def.name, parent_struct_id) {
+                let source_typ = self.env().type_pool.get_type(s).unwrap();
+                if self.check_struct_reachable(&source_typ, parent_struct_id, None) {
                     return None;
                 }
                 Some(struct_def)
@@ -405,24 +432,68 @@ impl MoveSmith {
     }
 
     /// Check if the struct is reachable from another struct.
-    fn check_struct_reachable(&self, source: &Identifier, sink: &Identifier) -> bool {
-        if source == sink {
+    fn check_struct_reachable(
+        &self,
+        source: &Type,
+        sink: &Identifier,
+        checked: Option<&mut BTreeSet<Type>>,
+    ) -> bool {
+        if source.get_name() == *sink {
             return true;
         }
-        let source_struct = self.get_struct_definition_with_identifier(source).unwrap();
-        for (_, typ) in source_struct.fields.iter() {
-            let name = match typ {
-                Type::Struct(st) => &st.name,
-                _ => continue,
-            };
-            if name == sink {
+
+        let mut tmp_binding = BTreeSet::new();
+        let checked = match checked {
+            Some(c) => c,
+            None => &mut tmp_binding,
+        };
+
+        if checked.contains(source) {
+            return false;
+        } else {
+            checked.insert(source.clone());
+        }
+
+        let mut reached_sts = BTreeSet::new();
+        self.get_all_used_struct_in_type(source, &mut reached_sts);
+
+        for st in reached_sts.iter() {
+            if st.get_name() == *sink {
                 return true;
             }
-            if self.check_struct_reachable(name, sink) {
+            if self.check_struct_reachable(st, sink, Some(checked)) {
                 return true;
             }
         }
         false
+    }
+
+    fn get_all_used_struct_in_type(&self, typ: &Type, reached: &mut BTreeSet<Type>) {
+        if reached.contains(typ) {
+            return;
+        }
+
+        // Process fields
+        let st_name = match typ {
+            Type::Struct(st) => &st.name,
+            Type::StructConcrete(st) => &st.name,
+            _ => return,
+        };
+        let st_def = self.get_struct_definition_with_identifier(st_name).unwrap();
+        for (_, field_typ) in st_def.fields.iter() {
+            if !reached.contains(field_typ) {
+                reached.insert(field_typ.clone());
+                self.get_all_used_struct_in_type(field_typ, reached);
+            }
+        }
+
+        // Process type arguments
+        if let Type::StructConcrete(st) = typ {
+            for arg in st.type_args.type_args.iter() {
+                reached.insert(arg.clone());
+                self.get_all_used_struct_in_type(arg, reached);
+            }
+        }
     }
 
     /// Get the struct definition with the given identifier.
@@ -521,7 +592,7 @@ impl MoveSmith {
         // More chance to have return type than not
         // so that we can compare the the return value
         let return_type = match u.int_in_range(0..=10)? > 2 {
-            true => Some(self.get_random_type(u, parent_scope, true, true, true, false)?),
+            true => Some(self.get_random_type(u, parent_scope, true, false, true, false)?),
             false => None,
         };
 
@@ -708,13 +779,19 @@ impl MoveSmith {
         self.env_mut().live_vars.mark_alive(parent_scope, &name);
 
         // TODO: we should not omit type parameter as we can call a function to get an object of that type
-        let typ = self.get_random_type(u, parent_scope, true, true, false, false)?;
-        trace!("Generating declaration of type: {:?}", typ);
-        // let value = match bool::arbitrary(u)? {
-        //     true => Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?),
-        //     false => None,
-        // };
-        // TODO: disabled declaration without value for now, need to keep track of initialization
+        let mut typ = self.get_random_type(u, parent_scope, true, true, false, false)?;
+        trace!(
+            "Generating declaration for {} of type: {:?}",
+            name.inline(),
+            typ.inline()
+        );
+
+        if self.is_type_concretizable(&typ, parent_scope) {
+            typ = self
+                .concretize_type(u, &typ, parent_scope, vec![], None)
+                .unwrap();
+        }
+
         let value = Some(self.generate_expression_of_type(u, parent_scope, &typ, true, true)?);
         // Keeps track of the type of the newly created variable
         self.env_mut().type_pool.insert_mapping(&name, &typ);
@@ -828,6 +905,7 @@ impl MoveSmith {
         typ: &Type,
         parent_scope: &Scope,
         constraints: Vec<Ability>,
+        parent_type: Option<&Type>,
     ) -> Option<Type> {
         trace!("Concretizing type: {:?} in scope: {:?}", typ, parent_scope);
         if !self.is_type_concretizable(typ, parent_scope) {
@@ -839,7 +917,7 @@ impl MoveSmith {
 
         let concretized = match typ {
             Type::TypeParameter(tp) => {
-                self.concretize_type_parameter(u, tp, parent_scope, constraints)
+                self.concretize_type_parameter(u, tp, parent_scope, constraints, parent_type)
             },
             Type::Struct(st) => self.concretize_struct(u, parent_scope, st, constraints),
             _ => panic!("{:?} cannot be concretized.", typ),
@@ -858,7 +936,7 @@ impl MoveSmith {
         constraints: Vec<Ability>,
     ) -> Type {
         if st.type_parameters.type_parameters.is_empty() {
-            return Type::Struct(st.clone());
+            return Type::new_concrete_struct(&st.name, None);
         }
 
         let mut type_args = Vec::new();
@@ -870,14 +948,26 @@ impl MoveSmith {
                 }
             }
 
-            let concretized = self.concretize_type(
-                u,
-                &Type::TypeParameter(tp.clone()),
-                parent_scope,
-                constraint_union,
-            );
+            let concretized = loop {
+                let candidate = self.concretize_type(
+                    u,
+                    &Type::TypeParameter(tp.clone()),
+                    parent_scope,
+                    constraint_union.clone(),
+                    Some(&Type::Struct(st.clone())),
+                );
+                match &candidate {
+                    Some(c) => {
+                        if !self.check_struct_reachable(c, &st.name, None) {
+                            break candidate;
+                        }
+                    },
+                    None => break candidate,
+                }
+            };
             match concretized {
                 Some(c) => type_args.push(c),
+                // TP is not concretizable
                 None => type_args.push(Type::TypeParameter(tp.clone())),
             }
         }
@@ -904,6 +994,7 @@ impl MoveSmith {
         tp: &TypeParameter,
         parent_scope: &Scope,
         mut constraints: Vec<Ability>,
+        parent_type: Option<&Type>,
     ) -> Type {
         // TODO: better to use set... but this will never get large
         for ability in tp.abilities.iter() {
@@ -920,13 +1011,18 @@ impl MoveSmith {
         let mut choices = self.get_types_with_abilities(parent_scope, &constraints, true);
         if self.env().reached_type_depth_limit() {
             warn!("Max type depth reached, choosing concrete types");
-            choices = choices.into_iter().filter(|t| t.is_concrete()).collect();
+            choices.retain(|t| t.is_concrete())
+        }
+        // When concretizing a field whose type is a type parameter, we need to make sure
+        // the concretized type does not create a loop
+        if let Some(parent_typ) = parent_type {
+            choices.retain(|t| !self.check_struct_reachable(t, &parent_typ.get_name(), None))
         }
         let chosen = u.choose(&choices).unwrap().clone();
 
         match self.is_type_concretizable(&chosen, parent_scope) {
             true => self
-                .concretize_type(u, &chosen, parent_scope, constraints)
+                .concretize_type(u, &chosen, parent_scope, constraints, parent_type)
                 .unwrap(),
             false => chosen,
         }
@@ -1021,7 +1117,8 @@ impl MoveSmith {
             // creating new object or from variables.
             // However, we must assert that `allow_var` is enabled.
             Type::TypeParameter(_) => {
-                if let Some(concretized) = self.concretize_type(u, typ, parent_scope, vec![]) {
+                if let Some(concretized) = self.concretize_type(u, typ, parent_scope, vec![], None)
+                {
                     Some(self.generate_expression_of_type(
                         u,
                         parent_scope,
@@ -1408,10 +1505,15 @@ impl MoveSmith {
             typ
         );
         let op = EqualityBinaryOperator::arbitrary(u)?;
-        let chosen_typ = match typ {
+        let mut chosen_typ = match typ {
             Some(t) => t,
             None => self.get_random_type(u, parent_scope, true, true, true, true)?,
         };
+        if self.is_type_concretizable(&chosen_typ, parent_scope) {
+            chosen_typ = self
+                .concretize_type(u, &chosen_typ, parent_scope, vec![], None)
+                .unwrap();
+        }
         trace!("Chosen operand type for equality check: {:?}", chosen_typ);
         let lhs = self.generate_expression_of_type(u, parent_scope, &chosen_typ, true, true)?;
         let rhs = self.generate_expression_of_type(u, parent_scope, &chosen_typ, true, true)?;
@@ -1430,12 +1532,18 @@ impl MoveSmith {
         parent_scope: &Scope,
         struct_name: &Identifier,
     ) -> Result<Expression> {
+        trace!("Generating struct pack for {:?}", struct_name.inline());
         let struct_def = self
             .get_struct_definition_with_identifier(struct_name)
             .unwrap();
 
-        let (type_args, unregister) =
-            self.concretize_type_parameters(u, parent_scope, &struct_def.type_parameters, None)?;
+        let (type_args, unregister) = self.concretize_type_parameters(
+            u,
+            parent_scope,
+            &struct_def.type_parameters,
+            None,
+            Some(&struct_def.get_type()),
+        )?;
 
         let mut fields = Vec::new();
         for (name, typ) in struct_def.fields.iter() {
@@ -1458,12 +1566,19 @@ impl MoveSmith {
         parent_scope: &Scope,
         st_concrete: &StructTypeConcrete,
     ) -> Result<Expression> {
+        trace!(
+            "Generating concrete struct pack for {:?}",
+            st_concrete.inline()
+        );
+
         let struct_def = self
             .get_struct_definition_with_identifier(&st_concrete.name)
             .unwrap();
 
         let mut fields = Vec::new();
 
+        // TODO: known issue: if one field is a struct with type parameters unconcretized,
+        // TODO: we need to concretize them according to the type parameters of this parent struct
         for (name, typ) in struct_def.fields.iter() {
             let expr = match typ {
                 Type::TypeParameter(param) => {
@@ -1515,7 +1630,7 @@ impl MoveSmith {
         desired_ret_type: Option<&Type>,
         allow_var: bool,
     ) -> Result<FunctionCall> {
-        trace!("Generating call to function: {:?}", func.name);
+        trace!("Generating call to function: {:?}", func.name.inline());
 
         // Check if return type is a type parameter
         let desired_types = func
@@ -1539,7 +1654,13 @@ impl MoveSmith {
             parent_scope,
             &func.type_parameters,
             Some(desired_types),
+            None,
         )?;
+        trace!(
+            "Generated concrete type args for function call to {:?}: {:?}",
+            func.name.inline(),
+            type_args.inline()
+        );
 
         // Generate arguments using the selected concrete types
         let mut args = Vec::new();
@@ -1575,6 +1696,7 @@ impl MoveSmith {
         parent_scope: &Scope,
         params: &TypeParameters,
         desired_types: Option<Vec<Option<Type>>>,
+        parent_type: Option<&Type>,
     ) -> Result<(TypeArgs, Box<dyn FnOnce() + '_>)> {
         let desired_types = match desired_types {
             Some(types) => types,
@@ -1591,7 +1713,7 @@ impl MoveSmith {
             let concrete_type = match desired {
                 Some(t) => t,
                 None => self
-                    .concretize_type(u, &typ_param, parent_scope, vec![])
+                    .concretize_type(u, &typ_param, parent_scope, vec![], parent_type)
                     .unwrap_or(typ_param.clone()),
             };
             trace!("Got concretized type: {:?}", concrete_type);
@@ -1684,14 +1806,14 @@ impl MoveSmith {
             (Type::U8, 15),
             (Type::U16, 15),
             (Type::U32, 15),
-            (Type::U64, 2),
-            (Type::U128, 2),
-            (Type::U256, 2),
+            (Type::U64, 1),
+            (Type::U128, 1),
+            (Type::U256, 1),
             (Type::Bool, bool_weight),
         ];
 
         let mut categories = vec![basics];
-        let mut category_weights = vec![1];
+        let mut category_weights = vec![10];
 
         // Choose struct types in scope
         // Every struct has the same weight
@@ -1708,7 +1830,7 @@ impl MoveSmith {
                 .collect::<Vec<(Type, u32)>>();
             if !structs.is_empty() {
                 categories.push(structs);
-                category_weights.push(5);
+                category_weights.push(10);
             }
         }
 
