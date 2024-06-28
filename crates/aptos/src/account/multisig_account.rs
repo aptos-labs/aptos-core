@@ -40,6 +40,8 @@ pub struct Create {
     pub(crate) additional_owners: Vec<AccountAddress>,
     /// The number of signatures (approvals or rejections) required to execute or remove a proposed
     /// transaction.
+	#[clap(long)]
+	pub(crate) timeout_duration: u64,
     #[clap(long)]
     pub(crate) num_signatures_required: u64,
     #[clap(flatten)]
@@ -99,6 +101,7 @@ impl CliCommand<CreateSummary> for Create {
                 // TODO: Support passing in custom metadata.
                 vec![],
                 vec![],
+				self.timeout_duration,
             ))
             .await
             .map(CreateSummary::from)

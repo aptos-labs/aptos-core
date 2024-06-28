@@ -419,7 +419,7 @@ impl TestContext {
             create_multisig_account_address(account.address(), account.sequence_number());
         let create_multisig_txn = account.sign_with_transaction_builder(
             factory
-                .create_multisig_account(additional_owners, signatures_required)
+                .create_multisig_account(additional_owners, signatures_required,u64::MAX)
                 .expiration_timestamp_secs(u64::MAX),
         );
         self.commit_block(&vec![

@@ -617,7 +617,7 @@ module supra_framework::genesis {
         chain_status::set_genesis_end(supra_framework);
     }
 
-    #[verify_only]
+    #[test_only]
     use std::features;
 
     #[verify_only]
@@ -660,7 +660,7 @@ module supra_framework::genesis {
             rewards_rate_denominator,
             voting_power_increase_limit
         );
-        features::change_feature_flags(supra_framework, vector[1, 2], vector[]);
+        features::change_feature_flags(supra_framework, vector[1, 2, 11], vector[]);
         initialize_supra_coin(supra_framework);
         aptos_governance::initialize_for_verification(
             supra_framework,
@@ -676,7 +676,6 @@ module supra_framework::genesis {
 
     #[test_only]
     const ONE_APT: u64 = 100000000;
-
     #[test_only]
     public fun setup() {
         initialize(
@@ -694,6 +693,7 @@ module supra_framework::genesis {
             1,
             30,
         )
+		
     }
 
     #[test]
@@ -758,6 +758,7 @@ module supra_framework::genesis {
     #[test(supra_framework = @0x1)]
     fun test_create_delegation_pool(supra_framework: &signer) {
         setup();
+		features::change_feature_flags(supra_framework,vector[11],vector[]);
         initialize_supra_coin(supra_framework);
         let owner = @0x121341;
         create_account(supra_framework, owner, 0);
@@ -802,6 +803,7 @@ module supra_framework::genesis {
     #[test(supra_framework = @0x1)]
     fun test_create_delegation_pools(supra_framework: &signer) {
         setup();
+		features::change_feature_flags(supra_framework,vector[11],vector[]);
         initialize_supra_coin(supra_framework);
         let owner1 = @0x121341;
         create_account(supra_framework, owner1, 0);
@@ -879,6 +881,9 @@ module supra_framework::genesis {
     #[test(supra_framework = @0x1)]
     fun test_create_pbo_delegation_pool(supra_framework: &signer) {
         setup();
+		
+		features::change_feature_flags(supra_framework,vector[11],vector[]);
+
         initialize_supra_coin(supra_framework);
         let owner = @0x121341;
 		let (_, pk_1) = stake::generate_identity();
@@ -927,6 +932,7 @@ module supra_framework::genesis {
     #[test(supra_framework = @0x1)]
     fun test_create_pbo_delegation_pools(supra_framework: &signer) {
         setup();
+		features::change_feature_flags(supra_framework,vector[11],vector[]);
         initialize_supra_coin(supra_framework);
         let owner1 = @0x121341;
 		create_account(supra_framework,@0x121341,0);
