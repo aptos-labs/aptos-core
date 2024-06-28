@@ -9,14 +9,16 @@ use crate::{
     },
     pruner::{PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
-        stale_node_index::StaleNodeIndexSchema, stale_state_value_index::StaleStateValueIndexSchema,
+        stale_node_index::StaleNodeIndexSchema,
+        stale_state_value_index::StaleStateValueIndexSchema,
+        stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
     },
     state_merkle_db::StateMerkleDb,
     state_store::StateStore,
     utils::new_sharded_kv_schema_batch,
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 use aptos_temppath::TempPath;
@@ -24,7 +26,7 @@ use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
-        state_value::{StaleStateValueIndex, StateValue},
+        state_value::{StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue},
     },
     transaction::Version,
 };
@@ -58,6 +60,7 @@ fn put_value_set(
     let ledger_batch = SchemaBatch::new();
     let sharded_state_kv_batches = new_sharded_kv_schema_batch();
     let state_kv_metadata_batch = SchemaBatch::new();
+    let enable_sharding = state_store.state_kv_db.enabled_sharding();
     state_store
         .put_value_sets(
             vec![&sharded_value_set],
@@ -67,7 +70,7 @@ fn put_value_set(
             &ledger_batch,
             &sharded_state_kv_batches,
             &state_kv_metadata_batch,
-            /*put_state_value_indices=*/ false,
+            enable_sharding,
             /*skip_usage=*/ false,
             /*last_checkpoint_index=*/ None,
         )
@@ -405,17 +408,31 @@ fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a (Version, Option
     for (k, (old_version, v)) in kvs {
         let v_from_db = state_store.get_state_value_by_version(k, version).unwrap();
         assert_eq!(&v_from_db, if pruned { &None } else { v });
+        let enable_sharding = state_store.state_kv_db.enabled_sharding();
         if pruned {
-            assert!(state_store
-                .state_kv_db
-                .db_shard(k.get_shard_id())
-                .get::<StaleStateValueIndexSchema>(&StaleStateValueIndex {
-                    stale_since_version: version,
-                    version: *old_version,
-                    state_key: k.clone()
-                })
-                .unwrap()
-                .is_none());
+            if !enable_sharding {
+                assert!(state_store
+                    .state_kv_db
+                    .db_shard(k.get_shard_id())
+                    .get::<StaleStateValueIndexSchema>(&StaleStateValueIndex {
+                        stale_since_version: version,
+                        version: *old_version,
+                        state_key: k.clone()
+                    })
+                    .unwrap()
+                    .is_none());
+            } else {
+                assert!(state_store
+                    .state_kv_db
+                    .db_shard(k.get_shard_id())
+                    .get::<StaleStateValueIndexByKeyHashSchema>(&StaleStateValueByKeyHashIndex {
+                        stale_since_version: version,
+                        version: *old_version,
+                        state_key_hash: k.hash()
+                    })
+                    .unwrap()
+                    .is_none());
+            }
         }
     }
 }

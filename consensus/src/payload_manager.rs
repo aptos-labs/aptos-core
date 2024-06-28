@@ -137,6 +137,9 @@ impl PayloadManager {
     pub fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64) {
         let request_txns_and_update_status =
             move |proof_with_status: &ProofWithData, batch_reader: Arc<dyn BatchReader>| {
+                if proof_with_status.status.lock().is_some() {
+                    return;
+                }
                 let receivers = PayloadManager::request_transactions(
                     proof_with_status.proofs.clone(),
                     timestamp,
@@ -212,7 +215,7 @@ impl PayloadManager {
                     block_transaction_payload.transactions.clone(),
                     block_transaction_payload.limit,
                 );
-                consensus_publisher.publish_message(message);
+                consensus_publisher.publish_message(message).await;
             }
             return Ok((
                 block_transaction_payload.transactions,
@@ -351,7 +354,7 @@ impl PayloadManager {
                 result.0.clone(),
                 result.1,
             );
-            consensus_publisher.publish_message(message);
+            consensus_publisher.publish_message(message).await;
         }
         Ok(result)
     }

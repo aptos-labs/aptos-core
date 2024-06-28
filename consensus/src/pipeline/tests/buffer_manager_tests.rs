@@ -255,16 +255,24 @@ async fn assert_results(
     batches: Vec<Vec<PipelinedBlock>>,
     result_rx: &mut Receiver<OrderedBlocks>,
 ) {
-    for (i, batch) in enumerate(batches) {
+    let total_batches = batches.iter().flatten().count();
+    let mut blocks: Vec<PipelinedBlock> = Vec::new();
+    while blocks.len() < total_batches {
         let OrderedBlocks { ordered_blocks, .. } = result_rx.next().await.unwrap();
-        assert_eq!(
-            ordered_blocks.last().unwrap().id(),
-            batch.last().unwrap().id(),
-            "Inconsistent Block IDs (expected {} got {}) for {}-th block",
-            batch.last().unwrap().id(),
-            ordered_blocks.last().unwrap().id(),
-            i,
-        );
+        blocks.extend(ordered_blocks.into_iter());
+    }
+
+    for (i, batch) in enumerate(batches) {
+        for (idx, ordered_block) in blocks.drain(..batch.len()).enumerate() {
+            assert_eq!(
+                ordered_block.id(),
+                batch[idx].id(),
+                "Inconsistent Block IDs (expected {} got {}) for {}-th block",
+                batch[idx].id(),
+                ordered_block.id(),
+                i,
+            );
+        }
     }
 }
 
@@ -320,8 +328,9 @@ fn buffer_manager_happy_path_test() {
                 .ok();
         }
 
-        // commit decision will be sent too, so 3 * 2
-        for _ in 0..6 {
+        // Only commit votes are sent, so 3 commit votes are expected
+        // Commit decision is no longer broadcasted
+        for _ in 0..3 {
             if let Some(msg) = self_loop_rx.next().await {
                 loopback_commit_vote(msg, &msg_tx, &verifier).await;
             }

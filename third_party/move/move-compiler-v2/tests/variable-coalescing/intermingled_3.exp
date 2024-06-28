@@ -18,6 +18,14 @@ fun m::test(): u64 {
   7: return $t0
 }
 
+
+Diagnostics:
+warning: Unused assignment to `t`. Consider removing or prefixing with an underscore: `_t`
+  ┌─ tests/variable-coalescing/intermingled_3.move:5:9
+  │
+5 │         t = t + 1;
+  │         ^^^^^^^^^
+
 ============ after DeadStoreElimination: ================
 
 [variant baseline]

@@ -164,11 +164,11 @@ fn test_get_transaction_auxiliary_data() {
     put_transaction_auxiliary_data(&db, 0, &txns);
     assert_eq!(
         db.get_transaction_auxiliary_data_by_version(0).unwrap(),
-        aux_1
+        Some(aux_1)
     );
     assert_eq!(
         db.get_transaction_auxiliary_data_by_version(1).unwrap(),
-        aux_2
+        Some(aux_2)
     );
 }
 

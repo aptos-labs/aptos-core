@@ -26,7 +26,7 @@ module 0x2::M {
         {
           let v: Container::T<M::Box<u64>> = Container::new<M::Box<u64>>();
           {
-            let M::Box<u64>{ f1: f1: u64, f2: f2: u64 }: M::Box<u64> = Container::get<M::Box<u64>>(Borrow(Immutable)(v));
+            let M::Box<u64>{ f1, f2 } = Container::get<M::Box<u64>>(Borrow(Immutable)(v));
             f2;
             Container::put<M::Box<u64>>(Borrow(Mutable)(v), pack M::Box<u64>(0, 0));
             f1
@@ -37,7 +37,7 @@ module 0x2::M {
         {
           let v: Container::T<M::Box<M::Box<M::Box<u64>>>> = Container::new<M::Box<M::Box<M::Box<u64>>>>();
           {
-            let M::Box<M::Box<M::Box<u64>>>{ f1: f1: M::Box<M::Box<u64>>, f2: f2: M::Box<M::Box<u64>> }: M::Box<M::Box<M::Box<u64>>> = Container::get<M::Box<M::Box<M::Box<u64>>>>(Borrow(Immutable)(v));
+            let M::Box<M::Box<M::Box<u64>>>{ f1, f2 } = Container::get<M::Box<M::Box<M::Box<u64>>>>(Borrow(Immutable)(v));
             Container::put<M::Box<M::Box<M::Box<u64>>>>(Borrow(Mutable)(v), pack M::Box<M::Box<M::Box<u64>>>(Deref(Borrow(Immutable)(f1)), f2));
             f1
           }

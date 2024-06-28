@@ -1,0 +1,5 @@
+warning: Unused assignment to `old_features`. Consider removing or prefixing with an underscore: `_old_features`
+   ┌─ tests/sources/functional/bitwise_features.move:50:28
+   │
+50 │         let old_features = *features; // ghost var
+   │                            ^^^^^^^^^

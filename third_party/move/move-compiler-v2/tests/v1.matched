@@ -138,6 +138,7 @@ move-compiler/tests/move_check/translated_ir_tests/move/commands/continue_outsid
 move-compiler/tests/move_check/translated_ir_tests/move/commands/else_assigns_if_doesnt.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/else_assigns_if_doesnt.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/if_assigns_else_doesnt.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/if_assigns_else_doesnt.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/if_assigns_no_else.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/if_assigns_no_else.exp
+move-compiler/tests/move_check/translated_ir_tests/move/commands/mixed_lvalue.exp   move-compiler-v2/tests/unused-assignment/v1-commands/mixed_lvalue.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/move_before_assign.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/move_before_assign.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/no_let_outside_if.exp   move-compiler-v2/tests/checking/typing/v1-commands/no_let_outside_if.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/pop_negative.exp   move-compiler-v2/tests/checking/typing/v1-commands/pop_negative.exp
@@ -205,9 +206,16 @@ move-compiler/tests/move_check/translated_ir_tests/move/generics/instantiation_l
 move-compiler/tests/move_check/translated_ir_tests/move/generics/instantiation_loops/two_loops.exp   move-compiler-v2/tests/cyclic-instantiation-checker/v1-tests/two_loops.exp
 move-compiler/tests/move_check/liveness/mut_inline.exp   move-compiler-v2/tests/live-var/mut_inline.exp
 move-compiler/tests/move_check/liveness/mut_ref.exp   move-compiler-v2/tests/live-var/mut_ref.exp
+move-compiler/tests/move_check/liveness/unused_assignment.exp   move-compiler-v2/tests/unused-assignment/v1-liveness/unused_assignment.exp
+move-compiler/tests/move_check/locals/assign_partial_resource.exp   move-compiler-v2/tests/unused-assignment/v1-locals/assign_partial_resource.exp
+move-compiler/tests/move_check/locals/assign_resource.exp   move-compiler-v2/tests/unused-assignment/v1-locals/assign_resource.exp
 move-compiler/tests/move_check/locals/drop_conditional.exp   move-compiler-v2/tests/ability-check/v1-locals/drop_conditional.exp
 move-compiler/tests/move_check/locals/eliminate_temps.exp   move-compiler-v2/tests/reference-safety/v1-locals/eliminate_temps.exp
 move-compiler/tests/move_check/locals/reassign_parameter.exp   move-compiler-v2/tests/ability-check/v1-locals/reassign_parameter.exp
+move-compiler/tests/move_check/locals/struct_use_before_assign.exp   move-compiler-v2/tests/unused-assignment/v1-locals/struct_use_before_assign.exp
+move-compiler/tests/move_check/locals/unused_copyable.exp   move-compiler-v2/tests/unused-assignment/v1-locals/unused_copyable.exp
+move-compiler/tests/move_check/locals/unused_resource.exp   move-compiler-v2/tests/unused-assignment/v1-locals/unused_resource.exp
+move-compiler/tests/move_check/locals/unused_resource_explicit_return.exp   move-compiler-v2/tests/unused-assignment/v1-locals/unused_resource_explicit_return.exp
 move-compiler/tests/move_check/locals/use_before_assign_if.exp   move-compiler-v2/tests/uninit-use-checker/v1-locals/use_before_assign_if.exp
 move-compiler/tests/move_check/locals/use_before_assign_if_else.exp   move-compiler-v2/tests/uninit-use-checker/v1-locals/use_before_assign_if_else.exp
 move-compiler/tests/move_check/locals/use_before_assign_loop.exp   move-compiler-v2/tests/uninit-use-checker/v1-locals/use_before_assign_loop.exp

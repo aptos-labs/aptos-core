@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::test::CliTestFramework;
+use aptos::{common::types::GasOptions, test::CliTestFramework};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -45,7 +45,7 @@ use std::{fmt::Debug, time::Duration};
 
 #[tokio::test]
 async fn test_keyless_oidc_txn_verifies() {
-    let (_, _, mut swarm, signed_txn) = get_transaction(get_sample_openid_sig_and_pk).await;
+    let (_, _, swarm, signed_txn) = get_transaction(get_sample_openid_sig_and_pk).await;
 
     info!("Submit OpenID transaction");
     let result = swarm
@@ -61,7 +61,7 @@ async fn test_keyless_oidc_txn_verifies() {
 
 #[tokio::test]
 async fn test_keyless_rotate_vk() {
-    let (tw_sk, config, jwk, mut swarm, mut cli, root_idx) = setup_local_net().await;
+    let (tw_sk, config, jwk, swarm, mut cli, root_idx) = setup_local_net().await;
     let mut info = swarm.aptos_public_info();
 
     let (old_sig, old_pk) = get_sample_groth16_sig_and_pk();
@@ -164,7 +164,7 @@ async fn test_keyless_secure_test_jwk_initialized_at_genesis() {
 
 #[tokio::test]
 async fn test_keyless_oidc_txn_with_bad_jwt_sig() {
-    let (tw_sk, config, jwk, mut swarm, _, _) = setup_local_net().await;
+    let (tw_sk, config, jwk, swarm, _, _) = setup_local_net().await;
     let (mut sig, pk) = get_sample_openid_sig_and_pk();
 
     match &mut sig.cert {
@@ -190,7 +190,7 @@ async fn test_keyless_oidc_txn_with_bad_jwt_sig() {
 
 #[tokio::test]
 async fn test_keyless_oidc_txn_with_expired_epk() {
-    let (tw_sk, config, jwk, mut swarm, _, _) = setup_local_net().await;
+    let (tw_sk, config, jwk, swarm, _, _) = setup_local_net().await;
     let (mut sig, pk) = get_sample_openid_sig_and_pk();
 
     sig.exp_date_secs = 1; // This should fail the verification since the expiration date is way in the past
@@ -211,7 +211,7 @@ async fn test_keyless_oidc_txn_with_expired_epk() {
 
 #[tokio::test]
 async fn test_keyless_groth16_verifies() {
-    let (_, _, mut swarm, signed_txn) = get_transaction(get_sample_groth16_sig_and_pk).await;
+    let (_, _, swarm, signed_txn) = get_transaction(get_sample_groth16_sig_and_pk).await;
 
     info!("Submit keyless Groth16 transaction");
     let result = swarm
@@ -227,7 +227,7 @@ async fn test_keyless_groth16_verifies() {
 
 #[tokio::test]
 async fn test_keyless_no_extra_field_groth16_verifies() {
-    let (_, _, mut swarm, signed_txn) =
+    let (_, _, swarm, signed_txn) =
         get_transaction(get_sample_groth16_sig_and_pk_no_extra_field).await;
 
     info!("Submit keyless Groth16 transaction");
@@ -244,7 +244,7 @@ async fn test_keyless_no_extra_field_groth16_verifies() {
 
 #[tokio::test]
 async fn test_keyless_no_training_wheels_groth16_verifies() {
-    let (_tw_sk, config, jwk, mut swarm, mut cli, root_idx) = setup_local_net().await;
+    let (_tw_sk, config, jwk, swarm, mut cli, root_idx) = setup_local_net().await;
     let (sig, pk) = get_sample_groth16_sig_and_pk();
 
     let mut info = swarm.aptos_public_info();
@@ -267,7 +267,7 @@ async fn test_keyless_no_training_wheels_groth16_verifies() {
 
 #[tokio::test]
 async fn test_keyless_groth16_with_mauled_proof() {
-    let (tw_sk, config, jwk, mut swarm, _, _) = setup_local_net().await;
+    let (tw_sk, config, jwk, swarm, _, _) = setup_local_net().await;
     let (sig, pk) = get_sample_groth16_sig_and_pk();
 
     let mut info = swarm.aptos_public_info();
@@ -287,7 +287,7 @@ async fn test_keyless_groth16_with_mauled_proof() {
 
 #[tokio::test]
 async fn test_keyless_groth16_with_bad_tw_signature() {
-    let (_tw_sk, config, jwk, mut swarm, _, _) = setup_local_net().await;
+    let (_tw_sk, config, jwk, swarm, _, _) = setup_local_net().await;
     let (sig, pk) = get_sample_groth16_sig_and_pk();
 
     let mut info = swarm.aptos_public_info();
@@ -318,7 +318,7 @@ async fn test_keyless_groth16_with_bad_tw_signature() {
 }
 
 async fn sign_transaction<'a>(
-    info: &mut AptosPublicInfo<'a>,
+    info: &mut AptosPublicInfo,
     mut sig: KeylessSignature,
     pk: KeylessPublicKey,
     jwk: &RSA_JWK,
@@ -438,7 +438,7 @@ async fn get_transaction(
     LocalSwarm,
     SignedTransaction,
 ) {
-    let (tw_sk, config, jwk, mut swarm, _, _) = setup_local_net().await;
+    let (tw_sk, config, jwk, swarm, _, _) = setup_local_net().await;
 
     let (sig, pk) = get_pk_and_sig_func();
 
@@ -477,7 +477,7 @@ async fn setup_local_net() -> (
 
 async fn remove_training_wheels<'a>(
     cli: &mut CliTestFramework,
-    info: &mut AptosPublicInfo<'a>,
+    info: &mut AptosPublicInfo,
     root_idx: usize,
 ) {
     let script = format!(
@@ -495,7 +495,15 @@ fun main(core_resources: &signer) {{
 "#,
         KEYLESS_ACCOUNT_MODULE_NAME, KEYLESS_ACCOUNT_MODULE_NAME
     );
-    let txn_summary = cli.run_script(root_idx, &script).await.unwrap();
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(2000000),
+        expiration_secs: 60,
+    };
+    let txn_summary = cli
+        .run_script_with_gas_options(root_idx, &script, Some(gas_options))
+        .await
+        .unwrap();
     debug!("txn_summary={:?}", txn_summary);
 
     // Increment sequence number as we ran a governance proposal
@@ -596,7 +604,15 @@ fun main(core_resources: &signer) {{
         hex::encode(training_wheels_pk.to_bytes())
     );
 
-    let txn_summary = cli.run_script(root_idx, &script).await.unwrap();
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(2000000),
+        expiration_secs: 60,
+    };
+    let txn_summary = cli
+        .run_script_with_gas_options(root_idx, &script, Some(gas_options))
+        .await
+        .unwrap();
     debug!("txn_summary={:?}", txn_summary);
 
     info!("Use resource API to check the patch result.");
@@ -642,7 +658,7 @@ async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {
 
 async fn rotate_vk_by_governance<'a>(
     cli: &mut CliTestFramework,
-    info: &mut AptosPublicInfo<'a>,
+    info: &mut AptosPublicInfo,
     vk: &Groth16VerificationKey,
     root_idx: usize,
 ) {
@@ -680,7 +696,15 @@ script {{
     )
     .await;
 
-    let txn_summary = cli.run_script(root_idx, &script).await.unwrap();
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(2000000),
+        expiration_secs: 60,
+    };
+    let txn_summary = cli
+        .run_script_with_gas_options(root_idx, &script, Some(gas_options))
+        .await
+        .unwrap();
     debug!("txn_summary={:?}", txn_summary);
 
     // Increment sequence number as we ran a governance proposal

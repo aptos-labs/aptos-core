@@ -42,7 +42,7 @@ use std::{
 
 #[tokio::test]
 async fn test_analyze_validators() {
-    let (mut swarm, cli, _faucet) = SwarmBuilder::new_local(1)
+    let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .with_init_genesis_stake(Arc::new(|_i, genesis_stake_amount| {
             *genesis_stake_amount = 100000;
@@ -545,7 +545,7 @@ pub(crate) fn generate_blob(data: &[u8]) -> String {
 async fn test_large_total_stake() {
     // just barelly below u64::MAX
     const BASE: u64 = 10_000_000_000_000_000_000;
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_init_genesis_stake(Arc::new(|_, genesis_stake_amount| {
             // make sure we have quorum
             *genesis_stake_amount = BASE;
@@ -613,7 +613,7 @@ async fn test_nodes_rewards() {
     // with 10% APY, BASE amount gives 100 rewards per second
     const BASE: u64 = 3600u64 * 24 * 365 * 10 * 100;
 
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_init_config(Arc::new(|_, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
@@ -946,7 +946,7 @@ async fn test_nodes_rewards() {
 
 #[tokio::test]
 async fn test_register_and_update_validator() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .build_with_cli(0)
         .await;
@@ -1042,7 +1042,7 @@ async fn test_register_and_update_validator() {
 
 #[tokio::test]
 async fn test_join_and_leave_validator() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .with_init_config(Arc::new(|_i, conf, _| {
             // reduce timeout, as we will have dead node during rounds
@@ -1207,7 +1207,7 @@ async fn test_join_and_leave_validator() {
 
 #[tokio::test]
 async fn test_owner_create_and_delegate_flow() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .with_init_config(Arc::new(|_i, conf, _| {
             // reduce timeout, as we will have dead node during rounds

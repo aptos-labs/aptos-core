@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Copyright © Aptos Foundation
-
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 

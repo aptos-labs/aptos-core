@@ -54,6 +54,46 @@ fun m::g() {
   5: return ()
 }
 
+
+Diagnostics:
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+  ┌─ tests/ability-transform/destroy_after_call.move:8:9
+  │
+8 │         r = f(r);
+  │         ^^^^^^^^
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::f($t0: &mut u64): &mut u64 {
+     var $t1: &mut u64
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::g() {
+     var $t0: u64
+     var $t1: &mut u64
+     var $t2: &mut u64
+     var $t3: &u64
+     # live vars:
+  0: $t0 := 22
+     # live vars: $t0
+  1: $t1 := borrow_local($t0)
+     # live vars: $t0, $t1
+  2: $t2 := m::f($t1)
+     # live vars: $t0, $t2
+  3: $t1 := infer($t2)
+     # live vars: $t0
+  4: $t3 := borrow_local($t0)
+     # live vars:
+  5: return ()
+}
+
 ============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]

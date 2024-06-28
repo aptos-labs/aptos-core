@@ -100,6 +100,9 @@ static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
         // Map file v2../unit_test/test/foo.move
         //   to file v1../unit_test/foo.unit_test.move.
         ("unit_test/test", "unit_test.unit_test"),
+        ("unused-assignment/v1-locals", "locals"),
+        ("unused-assignment/v1-liveness", "liveness"),
+        ("unused-assignment/v1-commands", "commands"),
         ("checking-lang-v1/v1-typing", "typing"),
         ("ability-check/v1-typing", "typing"),
         ("ability-check/v1-signer", "signer"),

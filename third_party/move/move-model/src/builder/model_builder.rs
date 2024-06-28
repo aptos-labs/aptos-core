@@ -12,8 +12,8 @@ use crate::{
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, QualifiedInstId,
-        SpecFunId, SpecVarId, StructId, TypeParameter,
+        FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
+        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
     ty::{Constraint, Type, TypeDisplayContext},
@@ -119,11 +119,29 @@ pub(crate) struct StructEntry {
     pub struct_id: StructId,
     pub type_params: Vec<TypeParameter>,
     pub abilities: AbilitySet,
-    pub fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
+    pub layout: StructLayout,
     pub attributes: Vec<Attribute>,
     /// Maps simple function names to the qualified symbols of receiver functions. The
     /// symbol can be used to index the global function table.
     pub receiver_functions: BTreeMap<Symbol, QualifiedSymbol>,
+    /// Whether the struct is originally empty
+    /// always false when it is enum
+    pub is_empty_struct: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum StructLayout {
+    Singleton(BTreeMap<Symbol, FieldData>),
+    Variants(Vec<StructVariant>),
+    None,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct StructVariant {
+    pub loc: Loc,
+    pub name: Symbol,
+    pub attributes: Vec<Attribute>,
+    pub fields: BTreeMap<Symbol, FieldData>,
 }
 
 /// A declaration of a function.
@@ -335,7 +353,7 @@ impl<'env> ModelBuilder<'env> {
         struct_id: StructId,
         abilities: AbilitySet,
         type_params: Vec<TypeParameter>,
-        fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
+        layout: StructLayout,
     ) {
         let entry = StructEntry {
             loc,
@@ -344,8 +362,9 @@ impl<'env> ModelBuilder<'env> {
             struct_id,
             abilities,
             type_params,
-            fields,
+            layout,
             receiver_functions: BTreeMap::new(),
+            is_empty_struct: false,
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table
@@ -483,18 +502,37 @@ impl<'env> ModelBuilder<'env> {
             })
     }
 
-    /// Looks up the fields of a structure, with instantiated field types.
-    pub fn lookup_struct_fields(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
+    /// Looks up the fields of a structure, with instantiated field types. Returns empty
+    /// map if the struct has variants.
+    pub fn lookup_struct_fields(
+        &self,
+        id: &QualifiedInstId<StructId>,
+    ) -> (BTreeMap<Symbol, Type>, bool) {
         let entry = self.lookup_struct_entry(id.to_qualified_id());
-        entry
-            .fields
-            .as_ref()
-            .map(|f| {
-                f.iter()
-                    .map(|(n, (_, _, field_ty))| (*n, field_ty.instantiate(&id.inst)))
-                    .collect::<BTreeMap<_, _>>()
-            })
-            .unwrap_or_default()
+        let instantiate_fields = |fields: &BTreeMap<Symbol, FieldData>, common_only: bool| {
+            fields
+                .values()
+                .filter_map(|f| {
+                    if !common_only || f.common_for_variants {
+                        Some((f.name, f.ty.instantiate(&id.inst)))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
+        match &entry.layout {
+            StructLayout::Singleton(fields) => (instantiate_fields(fields, false), false),
+            StructLayout::Variants(variants) => (
+                if variants.is_empty() {
+                    BTreeMap::new()
+                } else {
+                    instantiate_fields(&variants[0].fields, true)
+                },
+                true,
+            ),
+            _ => (BTreeMap::new(), false),
+        }
     }
 
     /// Looks up a receiver function for a given type.
@@ -513,6 +551,11 @@ impl<'env> ModelBuilder<'env> {
     /// Looks up the StructEntry for a qualified id.
     pub fn lookup_struct_entry(&self, id: QualifiedId<StructId>) -> &StructEntry {
         let struct_name = self.get_struct_name(id);
+        self.lookup_struct_entry_by_name(struct_name)
+    }
+
+    /// Looks up the StructEntry by `struct_name`
+    pub fn lookup_struct_entry_by_name(&self, struct_name: &QualifiedSymbol) -> &StructEntry {
         self.struct_table
             .get(struct_name)
             .expect("invalid Type::Struct")

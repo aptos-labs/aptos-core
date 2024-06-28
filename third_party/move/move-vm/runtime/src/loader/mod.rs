@@ -1754,7 +1754,7 @@ impl Loader {
         &self,
         struct_name: &StructIdentifier,
     ) -> Option<IdentifierMappingKind> {
-        if !self.vm_config.aggregator_v2_type_tagging {
+        if !self.vm_config.delayed_field_optimization_enabled {
             return None;
         }
 
