@@ -1545,6 +1545,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-hexy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-experimental-layered-map",
+ "aptos-metrics-core",
+ "criterion",
+ "itertools 0.13.0",
+ "jemallocator",
+ "once_cell",
+ "proptest",
+ "rand 0.7.3",
+]
+
+[[package]]
 name = "aptos-experimental-layered-map"
 version = "0.1.0"
 dependencies = [
