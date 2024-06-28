@@ -2,16 +2,15 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use bytes::Bytes;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
-    resolver::ModuleResolver,
 };
 use serde::{Deserialize, Serialize};
-use std::{any, collections::BTreeMap, str::FromStr};
-use wasm_bindgen::{module, prelude::*};
+use serde_json::Value;
+use std::{collections::BTreeMap, str::FromStr};
+use wasm_bindgen::prelude::*;
 
 mod codegen;
 
@@ -108,7 +107,10 @@ impl BatchedFunctionCallBuilder {
         self.calls.push(BatchedFunctionCall {
             module: ModuleId::from_str(&module)?,
             function: Identifier::new(function.clone())?,
-            ty_args: ty_args.iter().map(|s| TypeTag::from_str(s)).collect::<anyhow::Result<Vec<_>>>()?,
+            ty_args: ty_args
+                .iter()
+                .map(|s| TypeTag::from_str(s))
+                .collect::<anyhow::Result<Vec<_>>>()?,
             args,
         });
         let return_count = self.num_of_returns(
@@ -150,11 +152,15 @@ impl BatchedFunctionCallBuilder {
         .map_err(|err| JsValue::from(format!("{:?}", err)))
     }
 
-    async fn load_module_impl(&mut self, module_name: String) -> anyhow::Result<()> {
-        let module_id = ModuleId::from_str(&module_name)?;
+    async fn load_module_impl(
+        &mut self,
+        network: String,
+        module_name: String,
+    ) -> anyhow::Result<String, String> {
+        let module_id = ModuleId::from_str(&module_name).unwrap();
         let url = format!(
-            "https://api.testnet.aptoslabs.com/v1/accounts/{}/module/{}",
-            &module_id.address, &module_id.name
+            "https://api.{}.aptoslabs.com/v1/accounts/{}/module/{}",
+            network, &module_id.address, &module_id.name
         );
         let response = reqwest::get(url).await.unwrap();
         let result = if response.status().is_success() {
@@ -163,11 +169,24 @@ impl BatchedFunctionCallBuilder {
             Err(response.text().await.unwrap())
         };
 
-        unimplemented!()
+        match result {
+            Ok(json_string) => {
+                let v: Value = serde_json::from_str(&json_string).unwrap();
+                Ok(v["bytecode"].to_string())
+            },
+            Err(json_string) => {
+                let v: Value = serde_json::from_str(&json_string).unwrap();
+                Err(v["message"].to_string())
+            },
+        }
     }
 
-    pub async fn load_module(&mut self, module_name: String) -> Result<(), JsValue> {
-        self.load_module_impl(module_name)
+    pub async fn load_module(
+        &mut self,
+        network: String,
+        module_name: String,
+    ) -> Result<String, JsValue> {
+        self.load_module_impl(network, module_name)
             .await
             .map_err(|err| JsValue::from(format!("{:?}", err)))
     }
