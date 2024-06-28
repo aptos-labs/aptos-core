@@ -112,7 +112,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let recv_condition_clone = self.recv_condition.clone();
             let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
             let kv_int_rxs_i_clone = kv_int_rxs[i].clone();
-            rayon::spawn(move || {
+            thread_pool_clone.spawn(move || {
                 Self::priority_handler(state_view_clone.clone(),
                                        kv_tx_clone.clone(),
                                        kv_int_rxs_i_clone,
