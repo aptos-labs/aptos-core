@@ -44,6 +44,32 @@ fun m::g<#0>($t0: &mut vector<#0>) {
   0: return ()
 }
 
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::singleton<#0>($t0: #0): vector<#0> {
+     var $t1: vector<#0>
+     var $t2: vector<#0>
+     var $t3: &mut vector<#0>
+     # live vars: $t0
+  0: $t2 := vector($t0)
+     # live vars: $t2
+  1: $t3 := borrow_local($t2)
+     # live vars: $t2, $t3
+  2: m::g<#0>($t3)
+     # live vars: $t2
+  3: $t1 := infer($t2)
+     # live vars: $t1
+  4: return $t1
+}
+
+
+[variant baseline]
+fun m::g<#0>($t0: &mut vector<#0>) {
+     # live vars: $t0
+  0: return ()
+}
+
 ============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]

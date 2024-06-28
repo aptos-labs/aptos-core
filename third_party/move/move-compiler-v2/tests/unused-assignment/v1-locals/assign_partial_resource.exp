@@ -1,0 +1,25 @@
+
+Diagnostics:
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+  ┌─ tests/unused-assignment/v1-locals/assign_partial_resource.move:6:21
+  │
+6 │         if (cond) { r = R{}; };
+  │                     ^^^^^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/unused-assignment/v1-locals/assign_partial_resource.move:13:29
+   │
+13 │         if (cond) {} else { r = R{}; };
+   │                             ^^^^^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/unused-assignment/v1-locals/assign_partial_resource.move:20:24
+   │
+20 │         while (cond) { r = R{} };
+   │                        ^^^^^^^
+
+warning: Unused assignment to `r`. Consider removing or prefixing with an underscore: `_r`
+   ┌─ tests/unused-assignment/v1-locals/assign_partial_resource.move:27:16
+   │
+27 │         loop { r = R{} }
+   │                ^^^^^^^
