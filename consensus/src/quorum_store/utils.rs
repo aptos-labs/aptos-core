@@ -331,8 +331,8 @@ impl ProofQueue {
                         .or_default()
                         .insert(batch_key.clone());
                 }
+                self.batches_with_txn_summary.insert(batch_key);
             }
-            self.batches_with_txn_summary.insert(batch_key);
         }
         counters::PROOF_QUEUE_ADD_BATCH_SUMMARIES_DURATION.observe_duration(start.elapsed());
     }
