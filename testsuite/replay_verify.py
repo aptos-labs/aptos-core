@@ -12,29 +12,32 @@ from typing import Tuple
 from collections import deque
 
 
-from verify_core.common import clear_artifacts, query_backup_latest_version
+from verify_core.common import (
+    clear_artifacts,
+    warm_cache_and_get_latest_backup_version,
+)
 
 
 TESTNET_RANGES = [
-    (962_000_000, 978_000_000),
-    (978_000_000, 994_000_000),
-    (994_000_000, 1_009_000_000),
-    (1_009_000_000, 1_025_000_000),
-    (1_025_000_000, 1_041_000_000),
-    (1_041_000_000, 1_057_000_000),
-    (1_057_000_000, 1_073_000_000),
-    (1_073_000_000, 1_088_000_000),
-    (1_088_000_000, 1_104_000_000),
-    (1_104_000_000, 1_120_000_000),
-    (1_120_000_000, 1_136_000_000),
-    (1_136_000_000, 1_151_000_000),
-    (1_151_000_000, 1_167_000_000),
-    (1_167_000_000, 1_183_000_000),
-    (1_183_000_000, 1_199_000_000),
-    (1_199_000_000, 1_215_000_000),
-    (1_215_000_000, 1_230_000_000),
-    (1_230_000_000, 1_246_000_000),
-    (1_246_000_000, 1_262_000_000),
+    (862_000_000, 878_000_000),
+    (878_000_000, 894_000_000),
+    (894_000_000, 910_000_000),
+    (910_000_000, 926_000_000),
+    (942_000_000, 958_000_000),
+    (958_000_000, 974_000_000),
+    (974_000_000, 990_000_000),
+    (990_000_000, 1_006_000_000),
+    (1_006_000_000, 1_022_000_000),
+    (1_022_000_000, 1_038_000_000),
+    (1_038_000_000, 1_054_000_000),
+    (1_054_000_000, 1_070_000_000),
+    (1_070_000_000, 1_086_000_000),
+    (1_086_000_000, 1_102_000_000),
+    (1_102_000_000, 1_115_000_000),
+    (1_115_000_000, 1_128_000_000),
+    (1_128_000_000, 1_141_000_000),
+    (1_141_000_000, 1_154_000_000),
+    (1_154_000_000, 1_167_000_000),
 ]
 
 MAINNET_RANGES = [
@@ -196,9 +199,8 @@ def main(runner_no=None, runner_cnt=None, start_version=None, end_version=None):
     ), "runner_cnt must match the number of runners in the mapping"
     runner_start = runner_mapping[runner_no][0]
     runner_end = runner_mapping[runner_no][1]
-    latest_version = query_backup_latest_version(BACKUP_CONFIG_TEMPLATE_PATH)
+    warm_cache_and_get_latest_backup_version(BACKUP_CONFIG_TEMPLATE_PATH)
     if runner_no == runner_cnt - 1:
-        runner_end = latest_version
         if runner_end is None:
             raise Exception("Failed to query latest version from backup")
     print("runner start %d end %d" % (runner_start, runner_end))
