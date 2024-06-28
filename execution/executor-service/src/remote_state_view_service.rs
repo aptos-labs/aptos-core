@@ -16,6 +16,8 @@ use std::sync::{Condvar, Mutex};
 use cpq::ConcurrentPriorityQueue;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator};
+use rayon::iter::ParallelIterator;
 use tokio::runtime;
 use tokio::runtime::Runtime;
 use aptos_drop_helper::DEFAULT_DROPPER;
@@ -256,19 +258,20 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             shard_id,
             state_keys.len()
         );
-        let resp = state_keys
-            .into_iter()
-            .map(|state_key| {
-                let state_value = state_view
-                    .read()
-                    .unwrap()
-                    .as_ref()
-                    .unwrap()
-                    .get_state_value(&state_key)
-                    .unwrap();
-                (state_key, state_value)
-            })
-            .collect_vec();
+        let mut resp = vec![]; 
+        state_keys
+        .into_par_iter()
+        .map(|state_key| {
+            let state_value = state_view
+                .read()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .get_state_value(&state_key)
+                .unwrap();
+            (state_key, state_value)
+        })
+        .collect_into_vec(&mut resp);
         drop(timer_2);
 
         let timer_3 = REMOTE_EXECUTOR_TIMER
