@@ -871,7 +871,7 @@ impl Context {
         } else {
             (u64::MAX, Order::Descending)
         };
-        let res = if !db_sharding_enabled(&self.node_config) {
+        let mut res = if !db_sharding_enabled(&self.node_config) {
             self.db
                 .get_events(event_key, start, order, limit as u64, ledger_version)?
         } else {
@@ -880,7 +880,12 @@ impl Context {
                 .ok_or(anyhow!("Internal indexer reader doesn't exist"))?
                 .get_events(event_key, start, order, limit as u64, ledger_version)?
         };
-        Ok(res)
+        if order == Order::Descending {
+            res.reverse();
+            Ok(res)
+        } else {
+            Ok(res)
+        }
     }
 
     fn next_bucket(&self, gas_unit_price: u64) -> u64 {
