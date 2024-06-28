@@ -76,7 +76,7 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
 
 #[test]
 fn move_framework_unit_tests() {
-    run_tests_for_pkg("aptos-framework");
+    run_tests_for_pkg("supra-framework");
 }
 
 #[test]
