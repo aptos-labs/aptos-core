@@ -47,6 +47,10 @@ start_time=$(date +%s)
 rm -rf $OUTPUT_DIR
 cargo_start_time=$(date +%s)
 cargo run --bin generator -- -o $OUTPUT_DIR -s 1234 -p -n $NUM_PROG
+if [ $? -ne 0 ]; then
+  echo "Failed to generate Move packages"
+  exit 1
+fi
 cargo_end_time=$(date +%s)
 
 N=8
@@ -58,9 +62,11 @@ wait
 compile_end_time=$(date +%s)
 
 # Run transactional tests
-cargo build --bin run_transactional
+echo "Building run_transactional binary"
+cargo build --bin run_transactional > /dev/null 2>&1
 RT_BIN=$(realpath $(find $APTOS_DIR/target/ -name "run_transactional"))
 
+transactional_start_time=$(date +%s)
 for p in $OUTPUT_DIR/*; do
   ((i=i%N)); ((i++==0)) && wait
   check_run_transactional $p $RT_BIN &
@@ -85,7 +91,7 @@ fi
 total_time=$((end_time - start_time))
 cargo_time=$((cargo_end_time - cargo_start_time))
 compile_time=$((compile_end_time - cargo_end_time))
-transactional_time=$((end_time - compile_end_time))
+transactional_time=$((end_time - transactional_start_time))
 
 # Print out time profiling results
 echo

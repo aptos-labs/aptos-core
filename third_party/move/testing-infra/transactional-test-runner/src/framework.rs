@@ -477,6 +477,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                             .add_and_generate_interface_file(module);
                     },
                 };
+                // TODO: warnings are ignored for the fuzzing, this should be reverted
                 Ok(merge_output(None, output))
             },
             TaskCommand::Run(

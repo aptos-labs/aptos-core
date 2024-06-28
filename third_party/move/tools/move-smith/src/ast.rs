@@ -49,10 +49,8 @@ pub struct Script {
 /// generated function has a valid return.
 #[derive(Debug, Clone)]
 pub struct Function {
-    // pub attributes: Vec<Attributes>,
     pub visibility: Visibility,
     pub signature: FunctionSignature,
-    // pub access_specifiers: Option<Vec<AccessSpecifier>>,
     // pub inline: bool,
     pub body: Option<Block>,
 }
@@ -85,7 +83,6 @@ pub struct Block {
 #[derive(Debug, Clone)]
 pub struct StructDefinition {
     pub name: Identifier,
-    // pub attributes: Vec<Attributes>,
     pub abilities: Vec<Ability>,
     pub type_parameters: TypeParameters,
     pub fields: Vec<(Identifier, Type)>,

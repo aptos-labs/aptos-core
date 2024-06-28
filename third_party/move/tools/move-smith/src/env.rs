@@ -12,6 +12,7 @@ use arbitrary::Unstructured;
 use log::trace;
 use std::collections::{BTreeMap, BTreeSet};
 
+/// The meta store for all the information during generation
 #[derive(Debug, Default)]
 pub struct Env {
     pub id_pool: IdentifierPool,
@@ -23,13 +24,18 @@ pub struct Env {
     max_expr_depth: usize,
     max_expr_depth_history: Vec<usize>,
 
+    /// The current depth of the generated expressions
     expr_depth: usize,
     expr_depth_history: Vec<usize>,
 
+    /// The current depth of the generated types
     type_depth: usize,
     type_depth_history: Vec<usize>,
 }
 
+/// NOTE: This is unused for now to avoid the situation where the fuzzer cannot
+/// find any expression for a type. Now everything is copy+drop.
+///
 /// Keep track of if a variable is still alive within a certain scope
 ///
 /// If a variable might be dead, it is dead.
@@ -86,14 +92,6 @@ impl LiveVarPool {
             }
         });
     }
-
-    // pub fn merge_live_vars(&mut self, parent: &Scope, left: &Scope, right: &Scope) {
-    //     let left_live_vars = self.scopes.get(left).unwrap();
-    //     let right_live_vars = self.scopes.get(right).unwrap();
-    //     let parent_live_vars = self.scopes.entry(parent.clone()).or_insert(BTreeSet::new());
-    //     parent_live_vars.extend(left_live_vars.iter());
-    //     parent_live_vars.extend(right_live_vars.iter());
-    // }
 }
 
 impl Env {
@@ -162,7 +160,7 @@ impl Env {
             .collect()
     }
 
-    ///
+    /// Return the list of live variables of type `typ` in the given scope
     pub fn live_variables(&self, scope: &Scope, typ: Option<&Type>) -> Vec<Identifier> {
         let ids = self.get_identifiers(typ, Some(IDKind::Var), Some(scope));
         self.live_vars.filter_live_vars(scope, ids)

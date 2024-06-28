@@ -117,7 +117,9 @@ They can be viewed at `<output_dir>/index.html`.
 ### Compilation
 
 The script `./scripts/check_output.sh` is a helper for checking the generated programs.
-By default it generates 10 Move packages stored in `output/`, compiles them with compiler V1, and reports any error encountered.
+By default it generates 10 Move packages stored in `output/`, compiles with both compilers, run transactional tests,
+and reports any error encountered.
+
 Use `./scripts/check_output.sh N` to generate `N` packages instead.
 
 ### Transactional test
@@ -187,7 +189,7 @@ rustup component add --toolchain nightly llvm-tools-preview
 │       ├── compile_only.rs       # Generates and compiles a module with both compiler V1 and V2
 │       └── transactional.rs      # Run the generated Move programs as transactional tests to cover V1, V2, and the VM
 ├── scripts
-│   ├── check_artifacts.sh
+│   ├── check_artifacts.sh        # Parse, compile, and run a raw input file
 │   ├── check_output.sh           # Generate Move programs/packages and try to compile them
 │   ├── coverage.sh               # Collect coverage and generate human-readable reports.
 │   ├── coverage_graph.py         # Parses libfuzzer output and draw a coverage-over-time graph.

@@ -47,6 +47,8 @@ fn append_code_lines_with_indentation(
     }
 }
 
+/// Append a block: concatenate the first line in block with the last line of the existing code
+/// For the rest of block, append them with the given indentation.
 fn append_block(program: &mut Vec<String>, mut block: Vec<String>, indentation: usize) {
     if program.is_empty() || block.is_empty() {
         return;
@@ -279,7 +281,6 @@ impl CodeGenerator for Block {
         }
 
         if let Some(ref expr) = self.return_expr {
-            // body.push(format!("{}", expr.emit_code()));
             body.extend(expr.emit_code_lines());
         }
 
