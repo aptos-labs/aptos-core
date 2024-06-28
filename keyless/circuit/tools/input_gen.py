@@ -20,14 +20,14 @@ import pprint
 
 
 def calc_string_bodies(string):
-    string_bodies = [False] * len(string)
+    string_bodies = [0] * len(string)
     string_bodies[1] = string[0] == '"'
 
     for i in range(2,len(string)):
         if not string_bodies[i-2] and string[i-1] == '"' and string[i-2] != '\\':
-            string_bodies[i] = True
+            string_bodies[i] = 1
         elif string_bodies[i-1] and string[i] == '"' and string[i-1] != '\\':
-            string_bodies[i] = False
+            string_bodies[i] = 0
         else:
             string_bodies[i] = string_bodies[i-1]
     return string_bodies
@@ -61,7 +61,10 @@ def pad_string(string, maxLen, n="", use_ord=False):
 
     result = "["
     for c in string:
-        result = result + '"' + str(ord(c)) + '",'
+        if use_ord:
+            result = result + '"' + str(ord(c)) + '",'
+        else:
+            result = result + '"' + str(c) + '",'
 
     for i in range(string_to_pad):
         result = result + '"' + '0' + '",'
@@ -203,7 +206,7 @@ maxAudValueLen = 120
 # aud_field_string = "\"aud\":\"407408718192.apps.googleusercontent.com\","
 aud_field_string = "\"aud\":\"511276456880-i7i4787c1863damto6899ts989j2e35r.apps.googleusercontent.com\","
 aud_string_bodies = calc_string_bodies(aud_field_string)
-aud_string_bodies_value = pad_string(aud_string_bodies, maxAudKVPairLen)
+aud_string_bodies_value = pad_string(aud_string_bodies, maxAudKVPairLen, False)
 aud_field_value = pad_string(aud_field_string, maxAudKVPairLen)
 aud_field_len_value = '"' + str(len(aud_field_string)) + '"'
 aud_index_value = '"' + str(jwt_payload.index("aud") - 1) + '"'  # First '"' character in aud field index in payload
@@ -248,7 +251,7 @@ maxUidValueLen = 330
 # uid_field_string = "\"sub\":\"113990307082899718775\","
 uid_field_string = "\"sub\":\"102904630171592520592\","
 uid_string_bodies = calc_string_bodies(uid_field_string)
-uid_string_bodies_value = pad_string(uid_string_bodies, maxUidKVPairLen)
+uid_string_bodies_value = pad_string(uid_string_bodies, maxUidKVPairLen, False)
 uid_field_value = pad_string(uid_field_string, maxUidKVPairLen)
 uid_field_len_value = '"' + str(len(uid_field_string)) + '"'
 uid_index_value = '"' + str(jwt_payload.index("sub") - 1) + '"'  # This doesn't work for non-sub user id fields
@@ -308,7 +311,7 @@ maxIssValueLen = 120
 # iss_field_string = "\"iss\":\"https://accounts.google.com\","
 iss_field_string = "\"iss\":\"test.oidc.provider\","
 iss_string_bodies = calc_string_bodies(iss_field_string)
-iss_string_bodies_value = pad_string(iss_string_bodies, maxIssKVPairLen)
+iss_string_bodies_value = pad_string(iss_string_bodies, maxIssKVPairLen, False)
 iss_field_value = pad_string(iss_field_string, maxIssKVPairLen)
 iss_field_len_value = '"' + str(len(iss_field_string)) + '"'
 iss_index_value = '"' + str(jwt_payload.index("iss") - 1) + '"'
@@ -339,7 +342,8 @@ maxNonceKVPairLen = 105
 maxNonceNameLen = 10
 maxNonceValueLen = 100
 nonce_field_string = "\"nonce\":\"" + nonce_value + "\"}"
-nonce_string_bodies = calc_string_bodies(nonce_field_string, maxNonceKVPairLen)
+nonce_string_bodies = calc_string_bodies(nonce_field_string)
+nonce_string_bodies_value = pad_string(nonce_string_bodies, maxNonceKVPairLen, False)
 nonce_field_value = pad_string(nonce_field_string, maxNonceKVPairLen)
 nonce_field_len_value = '"' + str(len(nonce_field_string)) + '"'
 nonce_index_value = '"' + str(jwt_payload.index("nonce") - 1) + '"'
