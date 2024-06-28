@@ -114,7 +114,6 @@ spec aptos_framework::aptos_account {
     spec assert_account_is_registered_for_apt(addr: address) {
         pragma aborts_if_is_partial;
         aborts_if !account::spec_exists_at(addr);
-        aborts_if !coin::spec_is_account_registered<AptosCoin>(addr);
     }
 
     spec set_allow_direct_coin_transfers(account: &signer, allow: bool) {

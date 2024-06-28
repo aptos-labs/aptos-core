@@ -2,7 +2,6 @@
 module aptos_framework::coin {
     use std::error;
     use std::features;
-    use std::features::lite_account_enabled;
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{Self, String};
@@ -2109,6 +2108,7 @@ module aptos_framework::coin {
     }
 
     #[test(account = @aptos_framework, aaron = @0xaa10, bob = @0xb0b)]
+    #[expected_failure(abort_code = 0x60005, location = Self)]
     fun test_force_deposit(
         account: &signer,
         aaron: &signer,

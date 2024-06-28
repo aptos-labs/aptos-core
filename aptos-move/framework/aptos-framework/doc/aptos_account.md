@@ -1087,7 +1087,6 @@ Check if the AptosCoin under the address existed.
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>aborts_if</b> !<a href="account.md#0x1_account_spec_exists_at">account::spec_exists_at</a>(addr);
-<b>aborts_if</b> !<a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;AptosCoin&gt;(addr);
 </code></pre>
 
 
