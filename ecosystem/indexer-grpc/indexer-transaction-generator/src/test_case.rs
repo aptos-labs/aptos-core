@@ -28,17 +28,23 @@ pub struct TestCase {
     // Ordered steps from setup to action.
     pub steps: Vec<Step>,
     // Test case configuration.
-    pub test_config: TestCaseConfig,
+    pub test_config: Option<TestCaseConfig>,
 }
 
 impl TestCase {
     pub fn load(test_case_path: PathBuf) -> Result<Self, anyhow::Error> {
         // Load the test case configuration.
         let test_config_path = test_case_path.join(TEST_CONFIG_FILE);
-        let test_config_raw_string = std::fs::read_to_string(test_config_path)
-            .context("Failed to read test config file.")?;
-        let test_config: TestCaseConfig = serde_json::from_str(&test_config_raw_string)
-            .context("Failed to parse test config file.")?;
+        let test_config = match test_config_path.exists() {
+            true => {
+                let test_config_raw_string = std::fs::read_to_string(test_config_path)
+                    .context("Failed to read test config file.")?;
+                let test_config: TestCaseConfig = serde_json::from_str(&test_config_raw_string)
+                    .context("Failed to parse test config file.")?;
+                Some(test_config)
+            },
+            false => None,
+        };
 
         // Get steps.
         let mut steps = vec![];
@@ -250,7 +256,7 @@ mod tests {
         let test_case = TestCase::load(test_case_path).unwrap();
         assert_eq!(test_case.name, "simple_test");
         assert_eq!(test_case.steps.len(), 4);
-        assert_eq!(test_case.test_config.fund_amount, Some(100));
+        assert_eq!(test_case.test_config.unwrap().fund_amount, Some(100));
     }
 
     #[test]
