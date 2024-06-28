@@ -98,28 +98,22 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn start(&self) {
         //let (signal_tx, signal_rx) = unbounded();
         let thread_pool_clone = self.thread_pool.clone();
-        info!("Num handlers created is {}", thread_pool_clone.current_num_threads());
-
-        let (kv_int_txs, kv_int_rxs) : (Vec<Sender<Message>>, Vec<Arc<Receiver<Message>>>) = (0..thread_pool_clone.current_num_threads()).enumerate().map(|_| {
-            let (kv_int_tx, kv_int_rx) : (Sender<Message>, Receiver<Message>) = unbounded();
-            (kv_int_tx, Arc::new(kv_int_rx))
-        }).unzip();
-
-        for i in 0..thread_pool_clone.current_num_threads() {
+        let num_handlers = 120;
+        info!("Num handlers created is {}", num_handlers);
+        for i in 0..num_handlers {
             let state_view_clone = self.state_view.clone();
             let kv_tx_clone = self.kv_tx.clone();
             let kv_unprocessed_pq_clone = self.kv_unprocessed_pq.clone();
             let recv_condition_clone = self.recv_condition.clone();
             let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
-            let kv_int_rxs_i_clone = kv_int_rxs[i].clone();
             thread_pool_clone.spawn(move || {
                 Self::priority_handler(state_view_clone.clone(),
                                        kv_tx_clone.clone(),
-                                       kv_int_rxs_i_clone,
+                                       kv_unprocessed_pq_clone,
+                                        recv_condition_clone.clone(),
                                        outbound_rpc_runtime_clone)
             });
         }
-        let mut rng = StdRng::from_entropy();
         while let Ok(message) = self.kv_rx.recv() {
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
             let mut delta = 0.0;
@@ -134,92 +128,91 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 .start_timer();
 
             let priority = message.seq_num.unwrap();
-            // let rt_kv_proc_runtime_clone = self.rt_kv_proc_runtime.clone();
-            let state_view_clone = self.state_view.clone();
-            let kv_tx_clone = self.kv_tx.clone();
-            let outbound_rpc_runtime_clone = self.outbound_rpc_runtime.clone();
-            let rand_send_thread_idx = rng.gen_range(0, self.kv_tx[0].len());
-            let priority_pool = 1 * kv_int_txs.len() / 2;
-            //info!("Received message with priority {}", priority);
-            if priority == 1 {
-                kv_int_txs[rng.gen_range(0, 8)].send(message);
+            {
+                let (lock, cvar) = &*self.recv_condition;
+                let _lg = lock.lock().unwrap();
+                self.kv_unprocessed_pq.push(message, priority);
+                self.recv_condition.1.notify_all();
             }
-            else {
-                kv_int_txs[rng.gen_range(8, kv_int_txs.len())].send(message);
-            }
-            // tokio::spawn(async move {
-            //     handle_message(message,
-            //                          state_view_clone,
-            //                          kv_tx_clone,
-            //                          rand_send_thread_idx,
-            //                          outbound_rpc_runtime_clone).await;
-            //     });
-            // {
-            //     let (lock, cvar) = &*self.recv_condition;
-            //     let _lg = lock.lock().unwrap();
-            //     self.kv_unprocessed_pq.push(message, priority);
-            //     self.recv_condition.1.notify_all();
-            // }
-            // REMOTE_EXECUTOR_TIMER
-            //     .with_label_values(&["0", "kv_req_pq_size"])
-            //     .observe(self.kv_unprocessed_pq.len() as f64);
-        }
-    }
-
-    pub fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
-                            kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
-                            kv_int_rx: Arc<Receiver<Message>>,
-                            outbound_rpc_runtime: Arc<Runtime>) {
-        let mut rng = StdRng::from_entropy();
-        let mut curr_time;
-        let mut prev_time = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-        while let Ok(message) = kv_int_rx.recv() {
-            curr_time = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64;
             REMOTE_EXECUTOR_TIMER
-                .with_label_values(&["0", "kv_proc_thread_waiting_time"])
-                .observe(((curr_time - prev_time) / 1000) as f64);
-
-            let state_view = state_view.clone();
-            let kv_txs = kv_tx.clone();
-
-            let outbound_rpc_runtime_clone = outbound_rpc_runtime.clone();
-            Self::handle_message(message, state_view, kv_txs, rng.gen_range(0, kv_tx[0].len()), outbound_rpc_runtime_clone);
-
-            prev_time = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+                .with_label_values(&["0", "kv_req_pq_size"])
+                .observe(self.kv_unprocessed_pq.len() as f64);
         }
     }
 
     // pub fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
     //                         kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
-    //                         pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
-    //                         recv_condition: Arc<(Mutex<bool>, Condvar)>,
+    //                         kv_int_rx: Arc<Receiver<Message>>,
     //                         outbound_rpc_runtime: Arc<Runtime>) {
     //     let mut rng = StdRng::from_entropy();
-    //     loop {
-    //         let (lock, cvar) = &*recv_condition;
-    //         let mut lg = lock.lock().unwrap();
-    //         if pq.is_empty() {
-    //             lg = cvar.wait(lg).unwrap();
-    //         }
-    //         drop(lg);
-    //         if let Some(message) = pq.pop() {
-    //             let state_view = state_view.clone();
-    //             let kv_txs = kv_tx.clone();
+    //     let mut curr_time;
+    //     let mut prev_time = SystemTime::now()
+    //         .duration_since(SystemTime::UNIX_EPOCH)
+    //         .unwrap()
+    //         .as_millis() as u64;
+    //     while let Ok(message) = kv_int_rx.recv() {
+    //         curr_time = SystemTime::now()
+    //             .duration_since(SystemTime::UNIX_EPOCH)
+    //             .unwrap()
+    //             .as_millis() as u64;
+    //         REMOTE_EXECUTOR_TIMER
+    //             .with_label_values(&["0", "kv_proc_thread_waiting_time"])
+    //             .observe(((curr_time - prev_time) / 1000) as f64);
     //
-    //             let outbound_rpc_runtime_clone = outbound_rpc_runtime.clone();
-    //             Self::handle_message(message, state_view, kv_txs, &mut rng, outbound_rpc_runtime_clone);
-    //         }
+    //         let state_view = state_view.clone();
+    //         let kv_txs = kv_tx.clone();
+    //
+    //         let outbound_rpc_runtime_clone = outbound_rpc_runtime.clone();
+    //         Self::handle_message(message, state_view, kv_txs, rng.gen_range(0, kv_tx[0].len()), outbound_rpc_runtime_clone);
+    //
+    //         prev_time = SystemTime::now()
+    //         .duration_since(SystemTime::UNIX_EPOCH)
+    //         .unwrap()
+    //         .as_millis() as u64;
     //     }
     // }
+
+    pub fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
+                            kv_tx: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
+                            pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
+                            recv_condition: Arc<(Mutex<bool>, Condvar)>,
+                            outbound_rpc_runtime: Arc<Runtime>) {
+        let mut rng = StdRng::from_entropy();
+        let mut curr_time;
+            let mut prev_time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+        loop {
+
+            let (lock, cvar) = &*recv_condition;
+            let mut lg = lock.lock().unwrap();
+            if pq.is_empty() {
+                lg = cvar.wait(lg).unwrap();
+            }
+            drop(lg);
+            curr_time = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64;
+                    REMOTE_EXECUTOR_TIMER
+                        .with_label_values(&["0", "kv_proc_thread_waiting_time"])
+                        .observe(((curr_time - prev_time) / 1000) as f64);
+
+            if let Some(message) = pq.pop() {
+                let state_view = state_view.clone();
+                let kv_txs = kv_tx.clone();
+
+                let outbound_rpc_runtime_clone = outbound_rpc_runtime.clone();
+                Self::handle_message(message, state_view, kv_txs, rng.gen_range(0, kv_tx[0].len()), outbound_rpc_runtime_clone);
+
+                prev_time = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64;
+            }
+        }
+    }
 
     pub fn handle_message(
         message: Message,

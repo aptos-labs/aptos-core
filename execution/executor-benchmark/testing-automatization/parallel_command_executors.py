@@ -153,7 +153,7 @@ git_update_command = [
 ]
 
 git_update_command = [
-    f"cd aptos-core/ && git pull && git checkout multi_machine_sharding_async_kv_send && git pull",
+    f"cd aptos-core/ && git pull && git checkout multi_machine_sharding_async_cmd_kv_send_cpq && git pull",
 ]
 
 def get_external_ip(instance):

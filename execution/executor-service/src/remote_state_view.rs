@@ -144,22 +144,15 @@ impl RemoteStateViewClient {
         state_keys.clone().into_iter().for_each(|state_key| {
             state_view_clone.read().unwrap().insert_state_key(state_key);
         });
-        //let mut seq_num = 0;
+        let mut seq_num = 0;
 
         state_keys
             .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
-                // if state_keys.len() > 1 {
-                //     seq_num += 1;
-                // }
-                let seq_num;
                 if state_keys.len() > 1 {
-                    seq_num = 2;
-                }
-                else {
-                    seq_num = 1;
+                    seq_num += 1;
                 }
                 thread_pool.spawn_fifo(move || {
                     let mut rng = StdRng::from_entropy();
