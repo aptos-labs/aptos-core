@@ -280,13 +280,15 @@ impl Loader {
         let main = match scripts.get(&hash_value) {
             Some(cached) => cached,
             None => {
-                let ver_script = self.deserialize_and_verify_script(
-                    script_blob,
-                    hash_value,
-                    data_store,
+                // FIXME(George): Script caching should be performed on adapter side.
+                let ver_script =
+                    self.deserialize_and_verify_script(script_blob, data_store, module_store)?;
+                let script = Script::new(
+                    Arc::new(ver_script),
+                    &hash_value,
                     module_store,
+                    &self.name_cache,
                 )?;
-                let script = Script::new(ver_script, &hash_value, module_store, &self.name_cache)?;
                 scripts.insert(hash_value, script)
             },
         };
@@ -331,18 +333,28 @@ impl Loader {
     fn deserialize_and_verify_script(
         &self,
         script: &[u8],
-        hash_value: [u8; 32],
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-    ) -> VMResult<Arc<CompiledScript>> {
-        let script = data_store.load_compiled_script_to_cache(script, hash_value)?;
+    ) -> VMResult<CompiledScript> {
+        let script = match CompiledScript::deserialize_with_config(
+            script,
+            &self.vm_config.deserializer_config,
+        ) {
+            Ok(script) => script,
+            Err(err) => {
+                let msg = format!("[VM] deserializer for script returned error: {:?}", err);
+                return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Script));
+            },
+        };
 
         // Verification:
         //   - Local, using a bytecode verifier.
         //   - Global, loading & verifying module dependencies.
         move_bytecode_verifier::verify_script_with_config(
             &self.vm_config.verifier_config,
-            script.as_ref(),
+            &script,
         )?;
         let loaded_deps = script
             .immediate_dependencies()

@@ -8,9 +8,7 @@ use crate::{
 };
 use bytes::Bytes;
 use move_binary_format::{
-    deserializer::DeserializerConfig,
-    errors::*,
-    file_format::{CompiledModule, CompiledScript},
+    deserializer::DeserializerConfig, errors::*, file_format::CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -66,8 +64,6 @@ pub(crate) struct TransactionDataCache<'r> {
 
     deserializer_config: DeserializerConfig,
 
-    // Caches to help avoid duplicate deserialization calls.
-    compiled_scripts: BTreeMap<[u8; 32], Arc<CompiledScript>>,
     compiled_modules: BTreeMap<ModuleId, (Arc<CompiledModule>, usize, [u8; 32])>,
 }
 
@@ -82,7 +78,6 @@ impl<'r> TransactionDataCache<'r> {
             remote,
             account_map: BTreeMap::new(),
             deserializer_config,
-            compiled_scripts: BTreeMap::new(),
             compiled_modules: BTreeMap::new(),
         }
     }
@@ -235,32 +230,6 @@ impl<'r> TransactionDataCache<'r> {
                 .expect("global value must exist"),
             load_res,
         ))
-    }
-
-    pub(crate) fn load_compiled_script_to_cache(
-        &mut self,
-        script_blob: &[u8],
-        hash_value: [u8; 32],
-    ) -> VMResult<Arc<CompiledScript>> {
-        let cache = &mut self.compiled_scripts;
-        match cache.entry(hash_value) {
-            btree_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
-            btree_map::Entry::Vacant(entry) => {
-                let script = match CompiledScript::deserialize_with_config(
-                    script_blob,
-                    &self.deserializer_config,
-                ) {
-                    Ok(script) => script,
-                    Err(err) => {
-                        let msg = format!("[VM] deserializer for script returned error: {:?}", err);
-                        return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                            .with_message(msg)
-                            .finish(Location::Script));
-                    },
-                };
-                Ok(entry.insert(Arc::new(script)).clone())
-            },
-        }
     }
 
     pub(crate) fn load_compiled_module_to_cache(
