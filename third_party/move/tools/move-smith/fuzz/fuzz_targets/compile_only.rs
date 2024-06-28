@@ -5,7 +5,7 @@
 
 use arbitrary::Unstructured;
 use libfuzzer_sys::fuzz_target;
-use move_smith::{utils::compile_modules, CodeGenerator, MoveSmith};
+use move_smith::{utils::compile_move_code, CodeGenerator, MoveSmith};
 
 fuzz_target!(|data: &[u8]| {
     let u = &mut Unstructured::new(data);
@@ -15,5 +15,8 @@ fuzz_target!(|data: &[u8]| {
         Err(_) => return,
     };
     let code = smith.get_compile_unit().emit_code();
-    compile_modules(code);
+    match compile_move_code(code, true, true) {
+        true => (),
+        false => panic!("Compilation results are different"),
+    }
 });

@@ -6,9 +6,14 @@
 //! Ideally when the fuzzer becomes more mature, this AST will converge to the
 //! parser's AST and we might be able to reuse the parser's AST directly.
 
-use crate::{names::Identifier, types::Type};
+use crate::{
+    names::{Identifier, IdentifierKind as IDKind},
+    types::{Ability, HasType, Type, TypeArgs, TypeParameters},
+    CodeGenerator,
+};
 use arbitrary::Arbitrary;
 use num_bigint::BigUint;
+use std::cell::RefCell;
 
 /// The collection of modules and scripts that make up a Move program.
 /// This is the final output of the MoveSmith fuzzer.
@@ -17,6 +22,7 @@ use num_bigint::BigUint;
 pub struct CompileUnit {
     pub modules: Vec<Module>,
     pub scripts: Vec<Script>,
+    pub runs: Vec<Identifier>,
 }
 
 /// A Move module.
@@ -25,13 +31,9 @@ pub struct Module {
     // pub attributes: Vec<Attributes>,
     // pub address: Option<LeadingNameAccess>,
     pub name: Identifier,
-    // pub is_spec_module: bool,
-    pub functions: Vec<Function>,
-    pub structs: Vec<StructDefinition>,
-    // pub uses: Vec<UseDecl>,
-    // pub friends: Vec<FriendDecl>,
+    pub functions: Vec<RefCell<Function>>,
+    pub structs: Vec<RefCell<StructDefinition>>,
     // pub constants: Vec<Constant>,
-    // pub specs: Vec<SpecBlock>,
 }
 
 /// A simplified Move Script.
@@ -39,7 +41,6 @@ pub struct Module {
 /// The `main` function only consists of a sequence of function calls.
 #[derive(Debug, Clone)]
 pub struct Script {
-    // pub uses: Vec<UseDecl>,
     pub main: Vec<FunctionCall>,
 }
 
@@ -48,38 +49,32 @@ pub struct Script {
 /// generated function has a valid return.
 #[derive(Debug, Clone)]
 pub struct Function {
-    // pub attributes: Vec<Attributes>,
     pub visibility: Visibility,
     pub signature: FunctionSignature,
-    /// `None` indicates no specifiers given, `Some([])` indicates the `pure` keyword has been
-    /// used.
-    // pub access_specifiers: Option<Vec<AccessSpecifier>>,
-    pub name: Identifier,
     // pub inline: bool,
-    pub body: Option<FunctionBody>,
-
-    pub return_stmt: Option<Expression>,
+    pub body: Option<Block>,
 }
 
 /// The Visibility
 #[derive(Debug, Clone)]
 pub struct Visibility {
-    // TODO: add friend
     pub public: bool,
 }
 
 /// A function signature.
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
-    // pub type_parameters: Vec<(Name, Vec<Ability>)>,
+    pub type_parameters: TypeParameters,
+    pub name: Identifier,
     pub parameters: Vec<(Identifier, Type)>,
     pub return_type: Option<Type>,
 }
 
-/// The body of a function excluding the return statement.
+/// An expression block
 #[derive(Debug, Clone)]
-pub struct FunctionBody {
+pub struct Block {
     pub stmts: Vec<Statement>,
+    pub return_expr: Option<Expression>,
 }
 
 /// The definition of a struct.
@@ -88,33 +83,42 @@ pub struct FunctionBody {
 #[derive(Debug, Clone)]
 pub struct StructDefinition {
     pub name: Identifier,
-    // pub attributes: Vec<Attributes>,
     pub abilities: Vec<Ability>,
-    // pub type_parameters: Vec<StructTypeParameter>,
+    pub type_parameters: TypeParameters,
     pub fields: Vec<(Identifier, Type)>,
 }
 
-/// Abilities of a struct.
-/// Key requires storage.
-#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
-pub enum Ability {
-    Copy,
-    Drop,
-    Store,
-    Key,
+impl HasType for StructDefinition {
+    fn get_type(&self) -> Type {
+        Type::new_struct(&self.name, Some(&self.type_parameters))
+    }
 }
 
 /// A statement in a function body.
 #[derive(Debug, Clone)]
 pub enum Statement {
-    // If(If),
     // While(While),
     // For(For),
     // Break,
     // Continue,
-    // Assign(Assign),
     Decl(Declaration),
     Expr(Expression),
+}
+
+/// An inline struct initialization.
+#[derive(Debug, Clone)]
+pub struct StructPack {
+    pub name: Identifier,
+    pub type_args: TypeArgs,
+    pub fields: Vec<(Identifier, Expression)>,
+}
+
+impl HasType for StructPack {
+    fn get_type(&self) -> Type {
+        let name = format!("{}{}", self.name.inline(), self.type_args.inline());
+        let kind = IDKind::StructConcrete;
+        Type::new_concrete_struct(&Identifier::new(name, kind), Some(&self.type_args))
+    }
 }
 
 /// Declare a new variable.
@@ -133,10 +137,88 @@ pub struct Declaration {
 #[derive(Debug, Clone)]
 pub enum Expression {
     NumberLiteral(NumberLiteral),
-    Variable(Identifier),
+    Variable(VariableAccess),
     Boolean(bool),
     FunctionCall(FunctionCall),
-    StructInitialization(StructInitialization),
+    StructPack(StructPack),
+    Block(Box<Block>),
+    Assign(Box<Assignment>),
+    BinaryOperation(Box<BinaryOperation>),
+    IfElse(Box<IfExpr>),
+}
+
+/// Represents a variable access
+#[derive(Debug, Clone)]
+pub struct VariableAccess {
+    pub name: Identifier,
+    pub copy: bool,
+}
+
+// If Expression
+#[derive(Debug, Clone)]
+pub struct IfExpr {
+    pub condition: Expression,
+    pub body: Block,
+    pub else_expr: Option<ElseExpr>,
+}
+
+// Else Expression
+// Should only be contained in an IfExpr
+#[derive(Debug, Clone)]
+pub struct ElseExpr {
+    pub typ: Option<Type>,
+    pub body: Block,
+}
+
+#[derive(Debug, Clone)]
+pub struct BinaryOperation {
+    pub op: BinaryOperator,
+    pub lhs: Expression,
+    pub rhs: Expression,
+}
+
+#[derive(Debug, Clone)]
+pub enum BinaryOperator {
+    Numerical(NumericalBinaryOperator),
+    Boolean(BooleanBinaryOperator),
+    Equality(EqualityBinaryOperator),
+}
+
+#[derive(Debug, Clone, Arbitrary)]
+pub enum NumericalBinaryOperator {
+    Add,
+    Sub,
+    Mul,
+    Mod,
+    Div,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
+    Le,
+    Ge,
+    Leq,
+    Geq,
+}
+
+#[derive(Debug, Clone, Arbitrary)]
+pub enum BooleanBinaryOperator {
+    And,
+    Or,
+}
+
+#[derive(Debug, Clone, Arbitrary)]
+pub enum EqualityBinaryOperator {
+    Eq,
+    Neq,
+}
+
+/// An assignment expression
+#[derive(Debug, Clone)]
+pub struct Assignment {
+    pub name: Identifier,
+    pub value: Expression,
 }
 
 /// A number literal.
@@ -147,17 +229,11 @@ pub struct NumberLiteral {
     pub typ: Type,
 }
 
-/// An inline struct initialization.
-#[derive(Debug, Clone)]
-pub struct StructInitialization {
-    pub name: Identifier,
-    pub fields: Vec<(Identifier, Expression)>,
-}
-
 /// A function call.
 /// Currently the generated doesn't allow the argument to be another function call.
 #[derive(Debug, Clone)]
 pub struct FunctionCall {
     pub name: Identifier,
+    pub type_args: TypeArgs,
     pub args: Vec<Expression>,
 }
