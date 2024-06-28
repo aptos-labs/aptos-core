@@ -469,7 +469,11 @@ impl AptosVM {
         }
     }
 
-    fn inject_abort_info_if_available(&self, status: ExecutionStatus) -> ExecutionStatus {
+    fn inject_abort_info_if_available(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        status: ExecutionStatus,
+    ) -> ExecutionStatus {
         match status {
             ExecutionStatus::MoveAbort {
                 location: AbortLocation::Module(module),
@@ -477,7 +481,7 @@ impl AptosVM {
                 ..
             } => {
                 let info = self
-                    .extract_module_metadata(&module)
+                    .extract_module_metadata(resolver, &module)
                     .and_then(|m| m.extract_abort_info(code));
                 ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(module),
@@ -518,7 +522,7 @@ impl AptosVM {
             let mut abort_hook_session =
                 AbortHookSession::new(self, txn_data, resolver, prologue_change_set);
             // Abort information is injected using the user defined error in the Move contract.
-            let status = self.inject_abort_info_if_available(status);
+            let status = self.inject_abort_info_if_available(resolver, status);
 
             abort_hook_session.execute(|session| {
                 create_account_if_does_not_exist(
@@ -612,7 +616,7 @@ impl AptosVM {
                 prologue_change_set,
             );
 
-            let status = self.inject_abort_info_if_available(status);
+            let status = self.inject_abort_info_if_available(resolver, status);
 
             let fee_statement =
                 AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
@@ -786,7 +790,7 @@ impl AptosVM {
 
         // The `has_randomness_attribute()` should have been feature-gated in 1.11...
         if function.is_friend_or_private()
-            && get_randomness_annotation(resolver, session, entry_fn)?.is_some()
+            && get_randomness_annotation(resolver, entry_fn)?.is_some()
         {
             let txn_context = session
                 .get_native_extensions()
@@ -1460,7 +1464,7 @@ impl AptosVM {
                 }
 
                 // Validate the module bundle
-                self.validate_publish_request(session, modules, expected_modules, allowed_deps)?;
+                self.validate_publish_request(resolver, modules, expected_modules, allowed_deps)?;
 
                 // Check what modules exist before publishing.
                 let mut exists = BTreeSet::new();
@@ -1522,7 +1526,7 @@ impl AptosVM {
     /// Validate a publish request.
     fn validate_publish_request(
         &self,
-        session: &mut SessionExt,
+        resolver: &impl AptosMoveResolver,
         modules: &[CompiledModule],
         mut expected_modules: BTreeSet<String>,
         allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
@@ -1560,12 +1564,12 @@ impl AptosVM {
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
         verifier::resource_groups::validate_resource_groups(
-            session,
+            resolver,
             modules,
             self.features()
                 .is_enabled(FeatureFlag::SAFER_RESOURCE_GROUPS),
         )?;
-        verifier::event_validation::validate_module_events(session, modules)?;
+        verifier::event_validation::validate_module_events(resolver, modules)?;
 
         if !expected_modules.is_empty() {
             return Err(Self::metadata_validation_error(
@@ -2163,11 +2167,18 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    fn extract_module_metadata(&self, module: &ModuleId) -> Option<Arc<RuntimeModuleMetadataV1>> {
+    fn extract_module_metadata(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        module: &ModuleId,
+    ) -> Option<Arc<RuntimeModuleMetadataV1>> {
+        let md = resolver
+            .fetch_module_metadata(module.address(), module.name())
+            .ok()?;
         if self.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
-            aptos_framework::get_vm_metadata(&self.move_vm, module)
+            aptos_framework::get_metadata(md)
         } else {
-            aptos_framework::get_vm_metadata_v0(&self.move_vm, module)
+            aptos_framework::get_metadata_v0(md)
         }
     }
 
@@ -2206,9 +2217,8 @@ impl AptosVM {
         );
 
         let resolver = state_view.as_move_resolver();
-        let mut session = vm.new_session(&resolver, SessionId::Void, None);
         let execution_result = Self::execute_view_function_in_vm(
-            &mut session,
+            &resolver,
             &vm,
             module_id,
             func_name,
@@ -2231,7 +2241,7 @@ impl AptosVM {
     }
 
     fn execute_view_function_in_vm(
-        session: &mut SessionExt,
+        resolver: &impl AptosMoveResolver,
         vm: &AptosVM,
         module_id: ModuleId,
         func_name: Identifier,
@@ -2239,10 +2249,12 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         gas_meter: &mut impl AptosGasMeter,
     ) -> anyhow::Result<Vec<Vec<u8>>> {
+        let mut session = vm.new_session(resolver, SessionId::Void, None);
+
         let func = session.load_function(&module_id, &func_name, &type_args)?;
-        let metadata = vm.extract_module_metadata(&module_id);
+        let metadata = vm.extract_module_metadata(resolver, &module_id);
         let arguments = verifier::view_function::validate_view_function(
-            session,
+            &mut session,
             arguments,
             func_name.as_ident_str(),
             &func,

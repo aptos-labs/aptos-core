@@ -31,10 +31,10 @@ use aptos_vm_types::{
     },
 };
 use bytes::Bytes;
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::{errors::PartialVMResult, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::StructTag,
-    value::MoveTypeLayout,
+    metadata::Metadata, value::MoveTypeLayout,
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
@@ -323,6 +323,24 @@ impl<'r> AptosModuleStorage for ExecutorViewWithChangeSet<'r> {
     ) -> PartialVMResult<bool> {
         self.base_executor_view
             .check_module_exists(address, module_name)
+    }
+
+    fn fetch_compiled_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Arc<CompiledModule>> {
+        self.base_executor_view
+            .fetch_compiled_module(address, module_name)
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<&[Metadata]> {
+        self.base_executor_view
+            .fetch_module_metadata(address, module_name)
     }
 
     fn fetch_module_bytes(

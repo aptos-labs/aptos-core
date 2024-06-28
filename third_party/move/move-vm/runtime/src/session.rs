@@ -319,13 +319,6 @@ impl<'r, 'l> Session<'r, 'l> {
             .load_resource(self.move_vm.runtime.loader(), addr, ty, &self.module_store)
     }
 
-    /// Get the serialized format of a `CompiledModule` given a `ModuleId`.
-    pub fn load_module(&self, module_id: &ModuleId) -> VMResult<Bytes> {
-        self.data_cache
-            .load_module(module_id)
-            .map_err(|e| e.finish(Location::Undefined))
-    }
-
     /// Load a script and all of its types into cache
     pub fn load_script(
         &mut self,
@@ -416,10 +409,6 @@ impl<'r, 'l> Session<'r, 'l> {
     /// Gets the underlying native extensions.
     pub fn get_native_extensions(&mut self) -> &mut NativeContextExtensions<'r> {
         &mut self.native_extensions
-    }
-
-    pub fn get_move_vm(&self) -> &'l MoveVM {
-        self.move_vm
     }
 
     pub fn get_vm_config(&self) -> &'l VMConfig {

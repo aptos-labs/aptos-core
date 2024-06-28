@@ -17,13 +17,10 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    errmap::ErrorDescription,
-    identifier::Identifier,
-    language_storage::{ModuleId, StructTag},
+    errmap::ErrorDescription, identifier::Identifier, language_storage::StructTag,
     metadata::Metadata,
 };
 use move_model::metadata::{CompilationMetadata, COMPILATION_METADATA_KEY};
-use move_vm_runtime::move_vm::MoveVM;
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::BTreeMap, env, sync::Arc};
 use thiserror::Error;
@@ -227,19 +224,6 @@ pub fn get_metadata_v0(md: &[Metadata]) -> Option<Arc<RuntimeModuleMetadataV1>> 
     }
 }
 
-/// Extract metadata from the VM, upgrading V0 to V1 representation as needed
-pub fn get_vm_metadata(vm: &MoveVM, module_id: &ModuleId) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    vm.with_module_metadata(module_id, get_metadata)
-}
-
-/// Extract metadata from the VM, legacy V0 format upgraded to V1
-pub fn get_vm_metadata_v0(
-    vm: &MoveVM,
-    module_id: &ModuleId,
-) -> Option<Arc<RuntimeModuleMetadataV1>> {
-    vm.with_module_metadata(module_id, get_metadata_v0)
-}
-
 /// Check if the metadata has unknown key/data types
 pub fn check_metadata_format(
     module: &CompiledModule,
@@ -286,6 +270,8 @@ pub fn get_metadata_from_compiled_module(
         let mut metadata = bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok();
         // Clear out metadata for v5, since it shouldn't have existed in the first place and isn't
         // being used. Note, this should have been gated in the verify module metadata.
+
+        // FIXME(George): This is a problem, we really need to cache V1 metadata?
         if module.version == 5 {
             if let Some(metadata) = metadata.as_mut() {
                 metadata.struct_attributes.clear();

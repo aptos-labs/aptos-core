@@ -3,8 +3,9 @@
 
 use aptos_types::state_store::state_value::StateValueMetadata;
 use bytes::Bytes;
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use move_binary_format::{errors::PartialVMResult, CompiledModule};
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
+use std::sync::Arc;
 
 pub trait AptosModuleStorage {
     fn check_module_exists(
@@ -12,6 +13,18 @@ pub trait AptosModuleStorage {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<bool>;
+
+    fn fetch_compiled_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Arc<CompiledModule>>;
+
+    fn fetch_module_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<&[Metadata]>;
 
     fn fetch_module_bytes(
         &self,

@@ -17,7 +17,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-    metadata::Metadata, resolver::MoveResolver,
+    resolver::MoveResolver,
 };
 use std::sync::Arc;
 
@@ -171,30 +171,5 @@ impl MoveVM {
             self.runtime.module_cache.flush();
         };
         self.runtime.loader().flush_if_invalidated()
-    }
-
-    /// Attempts to discover metadata in a given module with given key. Availability
-    /// of this data may depend on multiple aspects. In general, no hard assumptions of
-    /// availability should be made, but typically, one can expect that
-    /// the modules which have been involved in the execution of the last session are available.
-    ///
-    /// This is called by an adapter to extract, for example, debug information out of
-    /// the metadata section of the code for post mortem analysis. Notice that because
-    /// of ownership of the underlying binary representation of modules hidden behind an rwlock,
-    /// this actually has to hand back a copy of the associated metadata, so metadata should
-    /// be organized keeping this in mind.
-    ///
-    /// TODO: in the new loader architecture, as the loader is visible to the adapter, one would
-    ///   call this directly via the loader instead of the VM.
-    pub fn with_module_metadata<T, F>(&self, module: &ModuleId, f: F) -> Option<T>
-    where
-        F: FnOnce(&[Metadata]) -> Option<T>,
-    {
-        f(&self
-            .runtime
-            .module_cache
-            .fetch_module(module)?
-            .module()
-            .metadata)
     }
 }

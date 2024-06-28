@@ -54,10 +54,13 @@ use aptos_vm_types::{
 };
 use bytes::Bytes;
 use claims::assert_ok;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
 use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, value::MoveTypeLayout,
-    vm_status::StatusCode,
+    account_address::AccountAddress, identifier::IdentStr, metadata::Metadata,
+    value::MoveTypeLayout, vm_status::StatusCode,
 };
 use move_vm_types::{
     delayed_values::delayed_field_id::ExtractUniqueIndex,
@@ -1576,6 +1579,22 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> PartialVMResult<bool> {
+        todo!()
+    }
+
+    fn fetch_compiled_module(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Arc<CompiledModule>> {
+        todo!()
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<&[Metadata]> {
         todo!()
     }
 

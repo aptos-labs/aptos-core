@@ -1,20 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::{AptosMoveResolver, SessionExt};
+use crate::move_vm_ext::AptosMoveResolver;
 use aptos_framework::{KnownAttribute, RandomnessAnnotation};
 use aptos_types::transaction::EntryFunction;
-use move_binary_format::errors::VMResult;
+use move_binary_format::errors::{Location, VMResult};
 
 pub(crate) fn get_randomness_annotation(
     resolver: &impl AptosMoveResolver,
-    session: &mut SessionExt,
     entry_fn: &EntryFunction,
 ) -> VMResult<Option<RandomnessAnnotation>> {
-    let module = session
-        .get_move_vm()
-        .load_module(entry_fn.module(), resolver)?;
-    let metadata = aptos_framework::get_metadata_from_compiled_module(&module);
+    let md = resolver
+        .fetch_module_metadata(entry_fn.module().address(), entry_fn.module().name())
+        .map_err(|e| e.finish(Location::Undefined))?;
+    let metadata = aptos_framework::get_metadata(md);
     if let Some(metadata) = metadata {
         let maybe_annotation = metadata
             .fun_attributes

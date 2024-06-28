@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::SessionExt;
+use crate::move_vm_ext::AptosMoveResolver;
 use aptos_framework::RuntimeModuleMetadataV1;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -35,7 +35,7 @@ fn metadata_validation_error(msg: &str) -> VMError {
 /// * Extract the event metadata
 /// * Verify all changes are compatible upgrades (existing event attributes cannot be removed)
 pub(crate) fn validate_module_events(
-    session: &mut SessionExt,
+    resolver: &impl AptosMoveResolver,
     modules: &[CompiledModule],
 ) -> VMResult<()> {
     for module in modules {
@@ -50,7 +50,7 @@ pub(crate) fn validate_module_events(
         validate_emit_calls(&new_event_structs, module)?;
 
         let original_event_structs =
-            extract_event_metadata_from_module(session, &module.self_id())?;
+            extract_event_metadata_from_module(resolver, &module.self_id())?;
 
         for member in original_event_structs {
             // Fail if we see a removal of an event attribute.
@@ -118,18 +118,14 @@ pub(crate) fn validate_emit_calls(
 
 /// Given a module id extract all event metadata
 pub(crate) fn extract_event_metadata_from_module(
-    session: &mut SessionExt,
+    resolver: &impl AptosMoveResolver,
     module_id: &ModuleId,
 ) -> VMResult<HashSet<String>> {
-    let metadata = session.load_module(module_id).map(|module| {
-        CompiledModule::deserialize_with_config(
-            &module,
-            &session.get_vm_config().deserializer_config,
-        )
-        .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
-    });
-
-    if let Ok(Ok(Some(metadata))) = metadata {
+    let maybe_metadata = resolver
+        .fetch_module_metadata(module_id.address(), module_id.name())
+        .ok();
+    let metadata = maybe_metadata.and_then(aptos_framework::get_metadata);
+    if let Some(metadata) = metadata {
         extract_event_metadata(&metadata)
     } else {
         Ok(HashSet::new())

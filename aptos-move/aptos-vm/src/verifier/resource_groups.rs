@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::SessionExt;
+use crate::move_vm_ext::AptosMoveResolver;
 use aptos_framework::{ResourceGroupScope, RuntimeModuleMetadataV1};
 use move_binary_format::{
     access::ModuleAccess,
@@ -32,7 +32,7 @@ fn metadata_validation_error(msg: &str) -> VMError {
 /// * Ensure that each group has a scope and that it does not become more restrictive
 /// * For any new members, verify that they are in a valid resource group
 pub(crate) fn validate_resource_groups(
-    session: &mut SessionExt,
+    resolver: &impl AptosMoveResolver,
     modules: &[CompiledModule],
     safer_resource_groups: bool,
 ) -> Result<(), VMError> {
@@ -41,7 +41,7 @@ pub(crate) fn validate_resource_groups(
 
     for module in modules {
         let (new_groups, new_members) =
-            validate_module_and_extract_new_entries(session, module, safer_resource_groups)?;
+            validate_module_and_extract_new_entries(resolver, module, safer_resource_groups)?;
         groups.insert(module.self_id(), new_groups);
         members.insert(module.self_id(), new_members);
     }
@@ -51,7 +51,7 @@ pub(crate) fn validate_resource_groups(
             let value_module_id = value.module_id();
             if !groups.contains_key(&value_module_id) {
                 let (inner_groups, _, _) =
-                    extract_resource_group_metadata_from_module(session, &value_module_id)?;
+                    extract_resource_group_metadata_from_module(resolver, &value_module_id)?;
                 groups.insert(value.module_id(), inner_groups);
             }
 
@@ -77,7 +77,7 @@ pub(crate) fn validate_resource_groups(
 /// * Verify all changes are compatible upgrades
 /// * Return any new members to validate correctness and all groups to assist in validation
 pub(crate) fn validate_module_and_extract_new_entries(
-    session: &mut SessionExt,
+    resolver: &impl AptosMoveResolver,
     module: &CompiledModule,
     safer_resource_groups: bool,
 ) -> VMResult<(
@@ -92,7 +92,7 @@ pub(crate) fn validate_module_and_extract_new_entries(
         };
 
     let (original_groups, original_members, mut structs) =
-        extract_resource_group_metadata_from_module(session, &module.self_id())?;
+        extract_resource_group_metadata_from_module(resolver, &module.self_id())?;
 
     for (member, value) in original_members {
         // We don't need to re-validate new_members above.
@@ -144,28 +144,23 @@ pub(crate) fn validate_module_and_extract_new_entries(
 
 /// Given a module id extract all resource group metadata
 pub(crate) fn extract_resource_group_metadata_from_module(
-    session: &mut SessionExt,
+    resolver: &impl AptosMoveResolver,
     module_id: &ModuleId,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
     BTreeMap<String, StructTag>,
     BTreeSet<String>,
 )> {
-    let module = session.load_module(module_id).map(|module| {
-        CompiledModule::deserialize_with_config(
-            &module,
-            &session.get_vm_config().deserializer_config,
-        )
-    });
-    let (metadata, module) = if let Ok(Ok(module)) = module {
-        (
-            aptos_framework::get_metadata_from_compiled_module(&module),
-            module,
-        )
-    } else {
-        // Maintaining backwards compatibility with no validation of deserialization.
-        return Ok((BTreeMap::new(), BTreeMap::new(), BTreeSet::new()));
-    };
+    let (metadata, module) =
+        if let Ok(module) = resolver.fetch_compiled_module(module_id.address(), module_id.name()) {
+            (
+                aptos_framework::get_metadata_from_compiled_module(&module),
+                module,
+            )
+        } else {
+            // Maintaining backwards compatibility with no validation of deserialization.
+            return Ok((BTreeMap::new(), BTreeMap::new(), BTreeSet::new()));
+        };
 
     if let Some(metadata) = metadata {
         let (groups, members) = extract_resource_group_metadata(&metadata)?;

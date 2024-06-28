@@ -15,13 +15,19 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::StructTag,
-    value::MoveTypeLayout, vm_status::StatusCode,
+    metadata::Metadata, value::MoveTypeLayout, vm_status::StatusCode,
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 /// Allows to query resources from the state.
 pub trait TResourceView {
@@ -245,6 +251,22 @@ where
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> PartialVMResult<bool> {
+        todo!()
+    }
+
+    fn fetch_compiled_module(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Arc<CompiledModule>> {
+        todo!()
+    }
+
+    fn fetch_module_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<&[Metadata]> {
         todo!()
     }
 

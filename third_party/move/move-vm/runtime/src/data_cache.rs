@@ -237,13 +237,6 @@ impl<'r> TransactionDataCache<'r> {
         ))
     }
 
-    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<Bytes> {
-        self.remote.get_module(module_id)?.ok_or_else(|| {
-            PartialVMError::new(StatusCode::LINKER_ERROR)
-                .with_message(format!("Linker Error: Module {} doesn't exist", module_id))
-        })
-    }
-
     pub(crate) fn load_compiled_script_to_cache(
         &mut self,
         script_blob: &[u8],

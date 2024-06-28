@@ -117,8 +117,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         configs: &ChangeSetConfigs,
         module_write_vec: Vec<(ModuleId, Bytes, bool)>,
     ) -> VMResult<(VMChangeSet, BTreeMap<StateKey, WriteOp>)> {
-        let move_vm = self.inner.get_move_vm();
-
         let resource_converter = |value: Value,
                                   layout: MoveTypeLayout,
                                   has_aggregator_lifting: bool|
@@ -147,7 +145,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .finish_with_extensions_with_custom_effects(&resource_converter)?;
 
         let (change_set, resource_group_change_set) =
-            Self::split_and_merge_resource_groups(move_vm, self.resolver, change_set)
+            Self::split_and_merge_resource_groups(self.resolver, change_set)
                 .map_err(|e| e.finish(Location::Undefined))?;
 
         let table_context: NativeTableContext = extensions.remove();
@@ -259,7 +257,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
     /// merging them into the a single op corresponding to the whole resource group (V0).
     fn split_and_merge_resource_groups(
-        runtime: &MoveVM,
         resolver: &dyn AptosMoveResolver,
         change_set: ChangeSet,
     ) -> PartialVMResult<(ChangeSet, ResourceGroupChangeSet)> {
@@ -289,10 +286,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             let mut resources_filtered = BTreeMap::new();
 
             for (struct_tag, blob_op) in account_changeset.into_resources() {
-                let resource_group_tag = runtime
-                    .with_module_metadata(&struct_tag.module_id(), |md| {
-                        get_resource_group_member_from_metadata(&struct_tag, md)
-                    });
+                let md = resolver.fetch_module_metadata(&struct_tag.address, &struct_tag.name)?;
+                let resource_group_tag = get_resource_group_member_from_metadata(&struct_tag, md);
 
                 if let Some(resource_group_tag) = resource_group_tag {
                     if resource_groups
