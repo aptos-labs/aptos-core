@@ -13,7 +13,7 @@ use aptos_crypto::hash::HashValue;
 use aptos_executor_types::StateComputeResult;
 use aptos_types::{
     block_info::BlockInfo, contract_event::ContractEvent, randomness::Randomness,
-    transaction::SignedTransaction, validator_txn::ValidatorTransaction,
+    transaction::{SignedTransaction, TransactionStatus}, validator_txn::ValidatorTransaction,
 };
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -38,7 +38,7 @@ pub struct PipelinedBlock {
     state_compute_result: StateComputeResult,
     randomness: OnceCell<Randomness>,
     pipeline_insertion_time: OnceCell<Instant>,
-    execution_time: Arc<OnceCell<Duration>>,
+    execution_summary: Arc<OnceCell<ExecutionSummary>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -92,7 +92,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             state_compute_result,
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
-            execution_time: Arc::new(OnceCell::new()),
+            execution_summary: Arc::new(OnceCell::new()),
         };
         if let Some(r) = randomness {
             block.set_randomness(r);
@@ -110,7 +110,24 @@ impl PipelinedBlock {
     ) -> Self {
         self.state_compute_result = result;
         self.input_transactions = input_transactions;
-        assert!(self.execution_time.set(execution_time).is_ok());
+
+        let mut to_commit = 0;
+        let mut to_retry = 0;
+        for txn in self.state_compute_result.compute_status_for_input_txns() {
+            match txn {
+                TransactionStatus::Keep(_) => to_commit += 1,
+                TransactionStatus::Retry => to_retry += 1,
+                _ => {}
+            }
+        }
+
+        assert!(self.execution_summary.set(ExecutionSummary {
+            payload_len: self.block.payload().map_or(0, |payload| payload.len_for_execution()),
+            to_commit,
+            to_retry,
+            execution_time,
+        }).is_ok());
+
         self
     }
 
@@ -147,7 +164,7 @@ impl PipelinedBlock {
             state_compute_result,
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
-            execution_time: Arc::new(OnceCell::new()),
+            execution_summary: Arc::new(OnceCell::new()),
         }
     }
 
@@ -158,7 +175,7 @@ impl PipelinedBlock {
             state_compute_result: StateComputeResult::new_dummy(),
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
-            execution_time: Arc::new(OnceCell::new()),
+            execution_summary: Arc::new(OnceCell::new()),
         }
     }
 
@@ -257,9 +274,15 @@ impl PipelinedBlock {
         self.pipeline_insertion_time.get().map(|t| t.elapsed())
     }
 
-    pub fn get_execution_time_and_size(&self) -> Option<(u64, Duration)> {
-        self.execution_time
-            .get()
-            .map(|v| (self.block.payload().map_or(0, |payload| payload.len_for_execution()), *v))
+    pub fn get_execution_summary(&self) -> Option<ExecutionSummary> {
+        self.execution_summary.get().cloned()
     }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ExecutionSummary {
+    pub payload_len: u64,
+    pub to_commit: u64,
+    pub to_retry: u64,
+    pub execution_time: Duration,
 }

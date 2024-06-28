@@ -19,7 +19,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_consensus_types::{
-    block::Block, common::Round, pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
+    block::Block, common::Round, pipelined_block::{ExecutionSummary, PipelinedBlock}, quorum_cert::QuorumCert,
     sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
@@ -613,13 +613,13 @@ impl BlockReader for BlockStore {
         }
     }
 
-    fn get_recent_block_execution_times(&self, num_blocks: usize) -> Vec<(u64, Duration)> {
+    fn get_recent_block_execution_times(&self, num_blocks: usize) -> Vec<ExecutionSummary> {
         let mut res = vec![];
         let mut cur_block = Some(self.ordered_root());
         loop {
             match cur_block {
                 Some(block) => {
-                    if let Some(execution_time_and_size) = block.get_execution_time_and_size() {
+                    if let Some(execution_time_and_size) = block.get_execution_summary() {
                         info!(
                             "Found execution time for {}, {:?}",
                             block.id(),
