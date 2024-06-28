@@ -112,7 +112,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         let num_threads = num_threads.unwrap_or_else(num_cpus::get);
         let thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
-                .num_threads(4)
+                .num_threads(8)
                 .build()
                 .unwrap(),
         );
