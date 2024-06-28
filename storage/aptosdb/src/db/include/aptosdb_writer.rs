@@ -212,17 +212,19 @@ impl DbWriter for AptosDB {
         let latest_version = self.get_synced_version()?;
         let target_version = ledger_info_with_sigs.ledger_info().version();
 
+        // Update the provided ledger info and the overall commit progress
+        let new_root_hash = ledger_info_with_sigs.commit_info().executed_state_id();
+        self.commit_ledger_info(
+            target_version,
+            new_root_hash,
+            Some(&ledger_info_with_sigs),
+        )?;
+
         let ledger_batch = SchemaBatch::new();
 
         // Revert the ledger commit progress
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::LedgerCommitProgress,
-            &DbMetadataValue::Version(target_version),
-        )?;
-
-        // Revert the overall commit progress
-        ledger_batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::OverallCommitProgress,
             &DbMetadataValue::Version(target_version),
         )?;
 
@@ -281,14 +283,6 @@ impl DbWriter for AptosDB {
         self.state_store
             .state_kv_db
             .revert_state_kv_and_ledger_metadata(target_version)?;
-
-        // Update the provided ledger info
-        let new_root_hash = ledger_info_with_sigs.commit_info().executed_state_id();
-        self.commit_ledger_info(
-            target_version,
-            new_root_hash,
-            Some(&ledger_info_with_sigs),
-        )?;
 
         Ok(())
     }
