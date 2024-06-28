@@ -355,7 +355,6 @@ impl Mempool {
                 while skipped.remove(&skipped_txn) {
                     inserted.insert(skipped_txn);
                     result.push(skipped_txn);
-                    skipped.remove(&skipped_txn);
                     if (result.len() as u64) == max_txns {
                         break 'main;
                     }
