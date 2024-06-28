@@ -160,6 +160,38 @@ function run_afl() {
     tmux attach-session -t $TMUX_SESSION
 }
 
+function check_existing() {
+    dirs=(
+        "$MOVE_SMITH_DIR/fuzz/corpus"
+        "$MOVE_SMITH_DIR/fuzz/artifacts"
+        "$MOVE_SMITH_DIR/fuzz/coverage"
+        "$MOVE_SMITH_DIR/coverage"
+        "$MOVE_SMITH_DIR/afl"
+        "$MOVE_SMITH_DIR/logs"
+    )
+
+    exists=false
+    for dir in "${dirs[@]}"; do
+        if [ -d "$dir" ]; then
+            exists=true
+            break
+        fi
+    done
+
+    if $exists; then
+        remove_command="rm -rf ${dirs[@]}"
+        echo "Found previous fuzzing sessions."
+        echo "To remove them, run: $remove_command"
+
+        read -p "Do you confirm to run a new fuzzing session? Type 'y' to continue: " user_input
+        if [ "$user_input" != "y" ]; then
+            echo "Exiting."
+            exit 1
+        fi
+    fi
+
+}
+
 if [ "$#" -gt 3 ]; then
     echo "Usage: ./scripts/fuzz.sh <fuzz_target> [total_hour] [max_input_len]"
     exit 1
@@ -168,6 +200,8 @@ fi
 fuzz_target=${1:-"transactional"}
 total_hour=${2:-24} # Default to 24 hours
 input_len=${3:-4}   # Default to 4 KB
+
+check_existing
 
 # Check if the fuzz target is libfuzzer or afl
 if [[ $fuzz_target == "afl"* ]]; then
