@@ -1016,9 +1016,10 @@ impl FakeExecutor {
                 }
             }
             let (change_set, module_write_set) = session
-                .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
-                    LATEST_GAS_FEATURE_VERSION,
-                ))
+                .finish(
+                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+                    vec![],
+                )
                 .expect("Failed to generate txn effects");
             change_set
                 .try_combine_into_storage_change_set(module_write_set)
@@ -1072,9 +1073,10 @@ impl FakeExecutor {
                     )
                 });
             let (change_set, module_write_set) = session
-                .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
-                    LATEST_GAS_FEATURE_VERSION,
-                ))
+                .finish(
+                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+                    vec![],
+                )
                 .expect("Failed to generate txn effects");
             change_set
                 .try_combine_into_storage_change_set(module_write_set)
@@ -1124,9 +1126,10 @@ impl FakeExecutor {
             .map_err(|e| e.into_vm_status())?;
 
         let (change_set, module_write_set) = session
-            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
-                LATEST_GAS_FEATURE_VERSION,
-            ))
+            .finish(
+                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+                vec![],
+            )
             .expect("Failed to generate txn effects");
         let (write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)

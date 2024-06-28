@@ -120,9 +120,11 @@ where
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();
+
+        // FIXME(George): more of a note: do we need this at all?
         session
             .0
-            .finish(&vm.genesis_change_set_configs())
+            .finish(&vm.genesis_change_set_configs(), vec![])
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
             .unwrap()
     };

@@ -89,7 +89,6 @@ use claims::assert_err;
 use fail::fail_point;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
-    compatibility::Compatibility,
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
     file_format::CompiledScript,
@@ -153,7 +152,7 @@ pub(crate) fn get_system_transaction_output(
     session: SessionExt,
     change_set_configs: &ChangeSetConfigs,
 ) -> Result<VMOutput, VMStatus> {
-    let (change_set, module_write_set) = session.finish(change_set_configs)?;
+    let (change_set, module_write_set) = session.finish(change_set_configs, vec![])?;
     Ok(VMOutput::new(
         change_set,
         module_write_set,
@@ -1367,7 +1366,7 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
-        session.execute(|session| {
+        let module_write_vec = session.execute(|session| {
             if let Some(publish_request) = session.extract_publish_request() {
                 let PublishRequest {
                     destination,
@@ -1477,18 +1476,30 @@ impl AptosVM {
                 // Publish the bundle and execute initializers
                 // publish_module_bundle doesn't actually load the published module into
                 // the loader cache. It only puts the module data in the data cache.
-                session.publish_module_bundle_with_compat_config(
-                    bundle.into_inner(),
-                    destination,
-                    gas_meter,
-                    Compatibility::new(
-                        true,
-                        true,
-                        !self
-                            .features()
-                            .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-                    ),
-                )?;
+
+                // FIXME(George): Here - verify instead of publish.
+                // session.publish_module_bundle_with_compat_config(
+                //     bundle.into_inner(),
+                //     destination,
+                //     gas_meter,
+                //     Compatibility::new(
+                //         true,
+                //         true,
+                //         !self
+                //             .features()
+                //             .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                //     ),
+                // )?;
+
+                let mut module_write_set = vec![];
+                for (module, blob) in modules.iter().zip(bundle.into_inner().into_iter()) {
+                    let is_republishing = resolver
+                        .check_module_exists(module.self_addr(), module.self_name())
+                        .map_err(|e| e.finish(Location::Undefined))?;
+                    module_write_set.push((module.self_id(), blob.into(), is_republishing))
+                }
+
+                // FIXME(George): Create module temporary storage, which implements traits we need
 
                 self.execute_module_initialization(
                     session,
@@ -1499,10 +1510,13 @@ impl AptosVM {
                     new_published_modules_loaded,
                     traversal_context,
                 )?;
+
+                Ok::<_, VMError>(module_write_set)
+            } else {
+                Ok::<_, VMError>(vec![])
             }
-            Ok::<(), VMError>(())
         })?;
-        session.finish(change_set_configs)
+        session.finish(change_set_configs, module_write_vec)
     }
 
     /// Validate a publish request.
@@ -1927,7 +1941,10 @@ impl AptosVM {
 
                 let change_set_configs =
                     ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version);
-                let (change_set, module_write_set) = tmp_session.finish(&change_set_configs)?;
+
+                // FIXME(George) how do we publish modules here?
+                let (change_set, module_write_set) =
+                    tmp_session.finish(&change_set_configs, vec![])?;
 
                 Ok((change_set, module_write_set))
             },

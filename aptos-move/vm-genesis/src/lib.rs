@@ -161,7 +161,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = vm.genesis_change_set_configs();
-    let (mut change_set, module_write_set) = session.finish(&configs).unwrap();
+    let (mut change_set, module_write_set) = session.finish(&configs, vec![]).unwrap();
     assert!(
         module_write_set.is_empty(),
         "Modules cannot be published in this session"
@@ -174,8 +174,11 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let mut new_id = [0u8; 32];
     new_id[31] = 1;
     let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
+
+    // FIXME(George): Instead, we should return modules here
     publish_framework(&mut session, framework);
-    let (additional_change_set, module_write_set) = session.finish(&configs).unwrap();
+    let (additional_change_set, module_write_set) = session.finish(&configs, vec![]).unwrap();
+
     change_set
         .squash_additional_change_set(additional_change_set)
         .unwrap();
@@ -292,7 +295,7 @@ pub fn encode_genesis_change_set(
     emit_new_block_and_epoch_event(&mut session);
 
     let configs = vm.genesis_change_set_configs();
-    let (mut change_set, module_write_set) = session.finish(&configs).unwrap();
+    let (mut change_set, module_write_set) = session.finish(&configs, vec![]).unwrap();
     assert!(
         module_write_set.is_empty(),
         "Modules cannot be published in this session"
@@ -305,8 +308,11 @@ pub fn encode_genesis_change_set(
     let mut new_id = [0u8; 32];
     new_id[31] = 1;
     let mut session = vm.new_genesis_session(&resolver, HashValue::new(new_id));
+
+    // FIXME(George) same as above
     publish_framework(&mut session, framework);
-    let (additional_change_set, module_write_set) = session.finish(&configs).unwrap();
+    let (additional_change_set, module_write_set) = session.finish(&configs, vec![]).unwrap();
+
     change_set
         .squash_additional_change_set(additional_change_set)
         .unwrap();
@@ -770,6 +776,9 @@ fn publish_package(session: &mut SessionExt, pack: &ReleasePackage) {
                 e
             )
         });
+
+    // FIXME(George): create temporary view? I think because we are in the loop we first need to publish all
+    //   and then initialize all.
 
     // Call the initialize function with the metadata.
     exec_function(session, CODE_MODULE_NAME, "initialize", vec![], vec![

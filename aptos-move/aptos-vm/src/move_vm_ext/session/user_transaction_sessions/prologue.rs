@@ -63,7 +63,7 @@ impl<'r, 'l> PrologueSession<'r, 'l> {
             //               of MoveVM, we do not need to use _ here, as modules will only be visible
             //               in user session.
             let (change_set, _) =
-                session.finish_with_squashed_change_set(change_set_configs, false)?;
+                session.finish_with_squashed_change_set(change_set_configs, false, vec![])?;
             change_set_configs.check_change_set(&change_set)?;
             resolver.release_resource_group_cache();
 

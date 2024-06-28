@@ -14,9 +14,8 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChanges, ChangeSet, Changes, Op},
+    effects::{AccountChanges, ChangeSet, Changes},
     gas_algebra::NumBytes,
-    identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
     resolver::MoveResolver,
@@ -38,32 +37,14 @@ pub struct AccountDataCache {
     // The bool flag in the `data_map` indicates whether the resource contains
     // an aggregator or snapshot.
     data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
-    module_map: BTreeMap<Identifier, (Bytes, bool)>,
 }
 
 impl AccountDataCache {
     fn new() -> Self {
         Self {
             data_map: BTreeMap::new(),
-            module_map: BTreeMap::new(),
         }
     }
-}
-
-fn load_module_impl(
-    remote: &dyn MoveResolver<PartialVMError>,
-    account_map: &BTreeMap<AccountAddress, AccountDataCache>,
-    module_id: &ModuleId,
-) -> PartialVMResult<Bytes> {
-    if let Some(account_cache) = account_map.get(module_id.address()) {
-        if let Some((blob, _is_republishing)) = account_cache.module_map.get(module_id.name()) {
-            return Ok(blob.clone());
-        }
-    }
-    remote.get_module(module_id)?.ok_or_else(|| {
-        PartialVMError::new(StatusCode::LINKER_ERROR)
-            .with_message(format!("Linker Error: Module {} doesn't exist", module_id))
-    })
 }
 
 /// Transaction data cache. Keep updates within a transaction so they can all be published at
@@ -133,16 +114,6 @@ impl<'r> TransactionDataCache<'r> {
     ) -> PartialVMResult<Changes<Bytes, Resource>> {
         let mut change_set = Changes::<Bytes, Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
-            let mut modules = BTreeMap::new();
-            for (module_name, (module_blob, is_republishing)) in account_data_cache.module_map {
-                let op = if is_republishing {
-                    Op::Modify(module_blob)
-                } else {
-                    Op::New(module_blob)
-                };
-                modules.insert(module_name, op);
-            }
-
             let mut resources = BTreeMap::new();
             for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map {
                 if let Some(op) = gv.into_effect_with_layout(layout) {
@@ -158,11 +129,11 @@ impl<'r> TransactionDataCache<'r> {
                     );
                 }
             }
-            if !modules.is_empty() || !resources.is_empty() {
+            if !resources.is_empty() {
                 change_set
                     .add_account_changeset(
                         addr,
-                        AccountChanges::from_modules_resources(modules, resources),
+                        AccountChanges::from_modules_resources(BTreeMap::new(), resources),
                     )
                     .expect("accounts should be unique");
             }
@@ -267,7 +238,10 @@ impl<'r> TransactionDataCache<'r> {
     }
 
     pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<Bytes> {
-        load_module_impl(self.remote, &self.account_map, module_id)
+        self.remote.get_module(module_id)?.ok_or_else(|| {
+            PartialVMError::new(StatusCode::LINKER_ERROR)
+                .with_message(format!("Linker Error: Module {} doesn't exist", module_id))
+        })
     }
 
     pub(crate) fn load_compiled_script_to_cache(
@@ -306,7 +280,17 @@ impl<'r> TransactionDataCache<'r> {
             btree_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
             btree_map::Entry::Vacant(entry) => {
                 // bytes fetching, allow loading to fail if the flag is set
-                let bytes = match load_module_impl(self.remote, &self.account_map, entry.key())
+                let module_id = entry.key();
+                let bytes = match self
+                    .remote
+                    .get_module(module_id)
+                    .map_err(|err| err.finish(Location::Undefined))?
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::LINKER_ERROR).with_message(format!(
+                            "Linker Error: Module {} doesn't exist",
+                            module_id
+                        ))
+                    })
                     .map_err(|err| err.finish(Location::Undefined))
                 {
                     Ok(bytes) => bytes,

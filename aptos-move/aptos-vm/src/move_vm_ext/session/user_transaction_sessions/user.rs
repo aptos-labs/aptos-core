@@ -16,9 +16,12 @@ use aptos_vm_types::{
     resolver::ExecutorView,
     storage::change_set_configs::ChangeSetConfigs,
 };
+use bytes::Bytes;
 use derive_more::{Deref, DerefMut};
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::{account_address::AccountAddress, ident_str, vm_status::VMStatus};
+use move_core_types::{
+    account_address::AccountAddress, ident_str, language_storage::ModuleId, vm_status::VMStatus,
+};
 use std::collections::BTreeMap;
 
 pub struct UserSessionChangeSet {
@@ -113,10 +116,11 @@ impl<'r, 'l> UserSession<'r, 'l> {
     pub fn finish(
         self,
         change_set_configs: &ChangeSetConfigs,
+        module_write_vec: Vec<(ModuleId, Bytes, bool)>,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         let Self { session } = self;
         let (change_set, module_write_set) =
-            session.finish_with_squashed_change_set(change_set_configs, false)?;
+            session.finish_with_squashed_change_set(change_set_configs, false, module_write_vec)?;
         let user_session_change_set = UserSessionChangeSet {
             change_set,
             module_write_set,

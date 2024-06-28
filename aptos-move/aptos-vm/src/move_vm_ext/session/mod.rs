@@ -28,7 +28,7 @@ use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     effects::{AccountChanges, Changes, Op as MoveStorageOp},
-    language_storage::StructTag,
+    language_storage::{ModuleId, StructTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -115,6 +115,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     pub fn finish(
         self,
         configs: &ChangeSetConfigs,
+        module_write_vec: Vec<(ModuleId, Bytes, bool)>,
     ) -> VMResult<(VMChangeSet, BTreeMap<StateKey, WriteOp>)> {
         let move_vm = self.inner.get_move_vm();
 
@@ -172,6 +173,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             table_change_set,
             aggregator_change_set,
             configs.legacy_resource_creation_as_modification(),
+            module_write_vec,
         )
         .map_err(|e| e.finish(Location::Undefined))?;
 
@@ -285,9 +287,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
             > = BTreeMap::new();
             let mut resources_filtered = BTreeMap::new();
-            let (modules, resources) = account_changeset.into_inner();
 
-            for (struct_tag, blob_op) in resources {
+            for (struct_tag, blob_op) in account_changeset.into_resources() {
                 let resource_group_tag = runtime
                     .with_module_metadata(&struct_tag.module_id(), |md| {
                         get_resource_group_member_from_metadata(&struct_tag, md)
@@ -310,7 +311,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             change_set_filtered
                 .add_account_changeset(
                     addr,
-                    AccountChangeSet::from_modules_resources(modules, resources_filtered),
+                    AccountChangeSet::from_modules_resources(BTreeMap::new(), resources_filtered),
                 )
                 .map_err(|_| common_error())?;
 
@@ -359,6 +360,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         legacy_resource_creation_as_modification: bool,
+        module_write_vec: Vec<(ModuleId, Bytes, bool)>,
     ) -> PartialVMResult<(VMChangeSet, BTreeMap<StateKey, WriteOp>)> {
         let mut resource_write_set = BTreeMap::new();
         let mut resource_group_write_set = BTreeMap::new();
@@ -367,8 +369,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let mut aggregator_v1_delta_set = BTreeMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
-            let (modules, resources) = account_changeset.into_inner();
-            for (struct_tag, blob_and_layout_op) in resources {
+            for (struct_tag, blob_and_layout_op) in account_changeset.into_resources() {
                 let state_key = resource_state_key(&addr, &struct_tag)?;
                 let op = woc.convert_resource(
                     &state_key,
@@ -378,12 +379,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
                 resource_write_set.insert(state_key, op);
             }
+        }
 
-            for (name, blob_op) in modules {
-                let op = woc.convert_module(&addr, &name, blob_op, false)?;
-                let state_key = StateKey::module(&addr, &name);
-                module_write_set.insert(state_key, op);
-            }
+        for (module_id, blob, is_republishing) in module_write_vec {
+            let blob_op = if is_republishing {
+                MoveStorageOp::Modify(blob)
+            } else {
+                MoveStorageOp::New(blob)
+            };
+            let op = woc.convert_module(module_id.address(), module_id.name(), blob_op, false)?;
+            let state_key = StateKey::module(module_id.address(), module_id.name());
+            module_write_set.insert(state_key, op);
         }
 
         match resource_group_change_set {
