@@ -116,6 +116,7 @@ codes!(
         InvalidSpecBlockMember: { msg: "invalid spec block member", severity: NonblockingError },
         InvalidAccessSpecifier: { msg: "invalid access specifier", severity: NonblockingError },
         UnsupportedLanguageItem: { msg: "unsupported language construct", severity: BlockingError },
+        InvalidVariantAccess: { msg: "invalid variant name", severity: BlockingError },
     ],
     // errors for any rules around declaration items
     Declarations: [

@@ -10,4 +10,4 @@ error: unbound module
    ┌─ tests/unit_test/notest/cross_module_test_only_module.move:13:9
    │
 13 │         M::foo()
-   │         ^ Unbound module alias 'M'
+   │         ^ Unbound module or type alias 'M'

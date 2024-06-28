@@ -339,8 +339,7 @@ impl IndexerStreamCoordinator {
 
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
         let state_view = context.latest_state_view().unwrap();
-        let converter =
-            state_view.as_converter(context.db.clone(), context.table_info_reader.clone());
+        let converter = state_view.as_converter(context.db.clone(), context.indexer_reader.clone());
 
         // Enrich data with block metadata
         let (_, _, block_event) = context
@@ -409,8 +408,9 @@ impl IndexerStreamCoordinator {
                             bet.info.epoch = Some(epoch_bcs);
                         },
                         APITransaction::ValidatorTransaction(ref mut vt) => {
-                            vt.info.block_height = Some(block_height_bcs);
-                            vt.info.epoch = Some(epoch_bcs);
+                            let info = vt.transaction_info_mut();
+                            info.block_height = Some(block_height_bcs);
+                            info.epoch = Some(epoch_bcs);
                         },
                     };
                     txn

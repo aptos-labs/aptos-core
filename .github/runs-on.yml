@@ -1,0 +1,5 @@
+images:
+  aptos-ubuntu-x64:
+    platform: "linux"
+    arch: "x64"
+    ami: "ami-03b93e88e2d195770"

@@ -46,7 +46,7 @@ fn leak_with_abort() {
     };
 
     move_bytecode_verifier::verify_script(&cs).expect("verify failed");
-    let vm = MoveVM::new(vec![]).unwrap();
+    let vm = MoveVM::new(vec![]);
 
     let storage: InMemoryStorage = InMemoryStorage::new();
     let mut session = vm.new_session(&storage);

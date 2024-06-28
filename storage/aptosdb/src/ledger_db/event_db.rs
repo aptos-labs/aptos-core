@@ -7,8 +7,6 @@ use crate::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         event::EventSchema,
         event_accumulator::EventAccumulatorSchema,
-        event_by_key::EventByKeySchema,
-        event_by_version::EventByVersionSchema,
     },
     utils::iterators::EventsByVersionIter,
 };
@@ -16,6 +14,9 @@ use aptos_accumulator::MerkleAccumulator;
 use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,
+};
+use aptos_db_indexer_schemas::schema::{
+    event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
 };
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{AptosDbError, Result};

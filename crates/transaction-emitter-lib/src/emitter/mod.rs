@@ -17,7 +17,7 @@ use crate::emitter::{
 use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
-use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
+use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -649,7 +649,7 @@ impl EmitJob {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TxnEmitter {
     txn_factory: TransactionFactory,
     rng: StdRng,
@@ -673,7 +673,7 @@ impl TxnEmitter {
 
     pub async fn start_job(
         &mut self,
-        root_account: &LocalAccount,
+        root_account: Arc<LocalAccount>,
         req: EmitJobRequest,
         stats_tracking_phases: usize,
     ) -> Result<EmitJob> {
@@ -708,7 +708,7 @@ impl TxnEmitter {
         let account_generator = create_account_generator(req.account_type);
 
         let mut all_accounts = create_accounts(
-            root_account,
+            root_account.clone(),
             &init_txn_factory,
             account_generator,
             &req,
@@ -730,7 +730,7 @@ impl TxnEmitter {
             retry_after: req.init_retry_interval,
         };
         let source_account_manager = SourceAccountManager {
-            source_account: root_account,
+            source_account: root_account.clone(),
             txn_executor: &txn_executor,
             req: &req,
             txn_factory: init_txn_factory.clone(),
@@ -819,7 +819,7 @@ impl TxnEmitter {
 
     async fn emit_txn_for_impl(
         mut self,
-        source_account: &LocalAccount,
+        source_account: Arc<LocalAccount>,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         print_stats_interval: Option<u64>,
@@ -855,7 +855,7 @@ impl TxnEmitter {
 
     pub async fn emit_txn_for(
         self,
-        source_account: &mut LocalAccount,
+        source_account: Arc<LocalAccount>,
         emit_job_request: EmitJobRequest,
         duration: Duration,
     ) -> Result<TxnStats> {
@@ -865,7 +865,7 @@ impl TxnEmitter {
 
     pub async fn emit_txn_for_with_stats(
         self,
-        source_account: &LocalAccount,
+        source_account: Arc<LocalAccount>,
         emit_job_request: EmitJobRequest,
         duration: Duration,
         interval_secs: u64,
@@ -982,78 +982,6 @@ async fn wait_for_accounts_sequence(
     (latest_fetched_counts, sum_of_completion_timestamps_millis)
 }
 
-fn update_seq_num_and_get_num_expired(
-    accounts: &mut [LocalAccount],
-    account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
-    latest_fetched_counts: HashMap<AccountAddress, u64>,
-) -> (usize, usize) {
-    accounts.iter_mut().for_each(|account| {
-        let (start_seq_num, end_seq_num) =
-            if let Some(pair) = account_to_start_and_end_seq_num.get(&account.address()) {
-                pair
-            } else {
-                return;
-            };
-        assert!(account.sequence_number() == *end_seq_num);
-
-        match latest_fetched_counts.get(&account.address()) {
-            Some(count) => {
-                if *count != account.sequence_number() {
-                    assert!(account.sequence_number() > *count);
-                    debug!(
-                        "Stale sequence_number for {}, expected {}, setting to {}",
-                        account.address(),
-                        account.sequence_number(),
-                        count
-                    );
-                    account.set_sequence_number(*count);
-                }
-            },
-            None => {
-                debug!(
-                    "Couldn't fetch sequence_number for {}, expected {}, setting to {}",
-                    account.address(),
-                    account.sequence_number(),
-                    start_seq_num
-                );
-                account.set_sequence_number(*start_seq_num);
-            },
-        }
-    });
-
-    account_to_start_and_end_seq_num
-        .iter()
-        .map(
-            |(address, (start_seq_num, end_seq_num))| match latest_fetched_counts.get(address) {
-                Some(count) => {
-                    assert!(
-                        *count <= *end_seq_num,
-                        "{address} :: {count} > {end_seq_num}"
-                    );
-                    if *count >= *start_seq_num {
-                        (
-                            (*count - *start_seq_num) as usize,
-                            (*end_seq_num - *count) as usize,
-                        )
-                    } else {
-                        debug!(
-                            "Stale sequence_number fetched for {}, start_seq_num {}, fetched {}",
-                            address, start_seq_num, *count
-                        );
-                        (0, (*end_seq_num - *start_seq_num) as usize)
-                    }
-                },
-                None => (0, (end_seq_num - start_seq_num) as usize),
-            },
-        )
-        .fold(
-            (0, 0),
-            |(committed, expired), (cur_committed, cur_expired)| {
-                (committed + cur_committed, expired + cur_expired)
-            },
-        )
-}
-
 pub async fn query_sequence_number(client: &RestClient, address: AccountAddress) -> Result<u64> {
     Ok(query_sequence_numbers(client, [address].iter()).await?.0[0].1)
 }
@@ -1133,7 +1061,7 @@ pub fn parse_seed(seed_string: &str) -> [u8; 32] {
 }
 
 pub async fn create_accounts(
-    root_account: &LocalAccount,
+    root_account: Arc<LocalAccount>,
     txn_factory: &TransactionFactory,
     account_generator: Box<dyn LocalAccountGenerator>,
     req: &EmitJobRequest,

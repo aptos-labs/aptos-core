@@ -4,8 +4,8 @@
 
 use crate::{
     ast::{
-        Condition, Exp, ExpData, MemoryLabel, Operation, Pattern, Spec, SpecBlockTarget, TempIndex,
-        Value,
+        Condition, Exp, ExpData, MatchArm, MemoryLabel, Operation, Pattern, Spec, SpecBlockTarget,
+        TempIndex, Value,
     },
     model::{GlobalEnv, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
@@ -454,6 +454,34 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
+            Match(id, disc, arms) => {
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
+                let (disc_changed, new_disc) = self.internal_rewrite_exp(disc);
+                let (mut arms_changed, mut new_arms) = (false, vec![]);
+                for arm in arms {
+                    let (pat_changed, new_pat) = self.internal_rewrite_pattern(&arm.pattern, true);
+                    self.rewrite_enter_block_scope(new_id, &new_pat, &None);
+                    let (cond_changed, new_cond) = if let Some(c) = &arm.condition {
+                        let (c, e) = self.internal_rewrite_exp(c);
+                        (c, Some(e))
+                    } else {
+                        (false, arm.condition.clone())
+                    };
+                    let (body_changed, new_body) = self.internal_rewrite_exp(&arm.body);
+                    new_arms.push(MatchArm {
+                        loc: arm.loc.clone(),
+                        pattern: new_pat,
+                        condition: new_cond,
+                        body: new_body,
+                    });
+                    arms_changed = arms_changed || pat_changed || cond_changed || body_changed;
+                }
+                if id_changed || disc_changed || arms_changed {
+                    Match(*id, new_disc, new_arms).into_exp()
+                } else {
+                    exp
+                }
+            },
             Sequence(id, es) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let changed_vec = self.internal_rewrite_vec(es);
@@ -549,14 +577,14 @@ pub trait ExpRewriterFunctions {
 
     fn internal_rewrite_pattern(&mut self, pat: &Pattern, creating_scope: bool) -> (bool, Pattern) {
         match pat {
-            Pattern::Tuple(_, pattern_vec) | Pattern::Struct(_, _, pattern_vec) => {
+            Pattern::Tuple(_, pattern_vec) | Pattern::Struct(_, _, _, pattern_vec) => {
                 let (changed, final_pattern_vec) =
                     self.internal_rewrite_pattern_vector(pattern_vec, creating_scope);
                 if changed {
                     let new_pat = match pat {
                         Pattern::Tuple(id, _) => Pattern::Tuple(*id, final_pattern_vec),
-                        Pattern::Struct(id, struct_id, _) => {
-                            Pattern::Struct(*id, struct_id.clone(), final_pattern_vec)
+                        Pattern::Struct(id, struct_id, variant, _) => {
+                            Pattern::Struct(*id, struct_id.clone(), *variant, final_pattern_vec)
                         },
                         _ => unreachable!(),
                     };

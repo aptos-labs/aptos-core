@@ -68,10 +68,10 @@ impl AsyncVM {
             .collect();
         Ok(AsyncVM {
             move_vm: MoveVM::new(
-                natives.into_iter().chain(
-                    natives::actor_natives(async_lib_addr, actor_gas_parameters).into_iter(),
-                ),
-            )?,
+                natives
+                    .into_iter()
+                    .chain(natives::actor_natives(async_lib_addr, actor_gas_parameters)),
+            ),
             actor_metadata,
             message_table,
         })

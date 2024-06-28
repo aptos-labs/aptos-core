@@ -21,7 +21,6 @@ move-compiler/tests/move_check/commands/{
   invalid_fallthrough2.move,
   invalid_fallthrough3.move,
   join_failure.move,
-  mixed_lvalue.move,
   while_move_local.move,
   while_move_local_2.move,
 }
@@ -66,15 +65,8 @@ move-compiler/tests/move_check/liveness/{
   move_in_infinite_loop_branched.move,
   trailing_semi.move,
   trailing_semi_loops.move,
-  unused_assignment.move,
 }
 move-compiler/tests/move_check/locals/{
-  assign_partial_resource.move,
-  assign_resource.move,
-  struct_use_before_assign.move,
-  unused_copyable.move,
-  unused_resource.move,
-  unused_resource_explicit_return.move,
   use_after_move_if.move,
   use_after_move_if_else.move,
   use_after_move_loop.move,

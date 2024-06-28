@@ -7,11 +7,7 @@
 pub use crate::protocols::rpc::error::RpcError;
 use crate::{
     error::NetworkError,
-    peer_manager::{
-        ConnectionNotification, ConnectionRequestSender, PeerManagerNotification,
-        PeerManagerRequestSender,
-    },
-    transport::ConnectionMetadata,
+    peer_manager::{ConnectionRequestSender, PeerManagerNotification, PeerManagerRequestSender},
     ProtocolId,
 };
 use aptos_channels::aptos_channel;
@@ -21,9 +17,10 @@ use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{
     channel::oneshot,
-    stream::{FusedStream, Map, Select, Stream, StreamExt},
+    stream::{FusedStream, Stream, StreamExt},
     task::{Context, Poll},
 };
+use futures_util::ready;
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cmp::min, fmt::Debug, future, marker::PhantomData, pin::Pin, time::Duration};
@@ -53,10 +50,6 @@ pub enum Event<TMessage> {
         ProtocolId,
         oneshot::Sender<Result<Bytes, RpcError>>,
     ),
-    /// Peer which we have a newly established connection with.
-    NewPeer(ConnectionMetadata),
-    /// Peer with which we've lost our connection.
-    LostPeer(ConnectionMetadata),
 }
 
 /// impl PartialEq for simpler testing
@@ -69,8 +62,6 @@ impl<TMessage: PartialEq> PartialEq for Event<TMessage> {
             (RpcRequest(pid1, msg1, proto1, _), RpcRequest(pid2, msg2, proto2, _)) => {
                 pid1 == pid2 && msg1 == msg2 && proto1 == proto2
             },
-            (NewPeer(metadata1), NewPeer(metadata2)) => metadata1 == metadata2,
-            (LostPeer(metadata1), LostPeer(metadata2)) => metadata1 == metadata2,
             _ => false,
         }
     }
@@ -152,13 +143,8 @@ impl NetworkApplicationConfig {
 #[pin_project]
 pub struct NetworkEvents<TMessage> {
     #[pin]
-    event_stream: Select<
-        Pin<Box<dyn Stream<Item = Event<TMessage>> + Send + Sync + 'static>>,
-        Map<
-            aptos_channel::Receiver<PeerId, ConnectionNotification>,
-            fn(ConnectionNotification) -> Event<TMessage>,
-        >,
-    >,
+    event_stream: Pin<Box<dyn Stream<Item = Event<TMessage>> + Send + Sync + 'static>>,
+    done: bool,
     _marker: PhantomData<TMessage>,
 }
 
@@ -166,7 +152,6 @@ pub struct NetworkEvents<TMessage> {
 pub trait NewNetworkEvents {
     fn new(
         peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-        connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
         max_parallel_deserialization_tasks: Option<usize>,
         allow_out_of_order_delivery: bool,
     ) -> Self;
@@ -175,7 +160,6 @@ pub trait NewNetworkEvents {
 impl<TMessage: Message + Send + Sync + 'static> NewNetworkEvents for NetworkEvents<TMessage> {
     fn new(
         peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-        connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
         max_parallel_deserialization_tasks: Option<usize>,
         allow_out_of_order_delivery: bool,
     ) -> Self {
@@ -202,12 +186,9 @@ impl<TMessage: Message + Send + Sync + 'static> NewNetworkEvents for NetworkEven
             )
         };
 
-        // Process the control messages
-        let control_event_stream = connection_notifs_rx
-            .map(control_msg_to_event as fn(ConnectionNotification) -> Event<TMessage>);
-
         Self {
-            event_stream: ::futures::stream::select(data_event_stream, control_event_stream),
+            event_stream: data_event_stream,
+            done: false,
             _marker: PhantomData,
         }
     }
@@ -217,7 +198,15 @@ impl<TMessage> Stream for NetworkEvents<TMessage> {
     type Item = Event<TMessage>;
 
     fn poll_next(self: Pin<&mut Self>, context: &mut Context) -> Poll<Option<Self::Item>> {
-        self.project().event_stream.poll_next(context)
+        let this = self.project();
+        if *this.done {
+            return Poll::Ready(None);
+        }
+        let item = ready!(this.event_stream.poll_next(context));
+        if item.is_none() {
+            *this.done = true;
+        }
+        Poll::Ready(item)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -262,16 +251,9 @@ fn request_to_network_event<TMessage: Message, Request: SerializedRequest>(
     }
 }
 
-fn control_msg_to_event<TMessage>(notif: ConnectionNotification) -> Event<TMessage> {
-    match notif {
-        ConnectionNotification::NewPeer(metadata, _context) => Event::NewPeer(metadata),
-        ConnectionNotification::LostPeer(metadata, _context, _reason) => Event::LostPeer(metadata),
-    }
-}
-
 impl<TMessage> FusedStream for NetworkEvents<TMessage> {
     fn is_terminated(&self) -> bool {
-        self.event_stream.is_terminated()
+        self.done
     }
 }
 
@@ -342,7 +324,18 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
         message: TMessage,
     ) -> Result<(), NetworkError> {
         let mdata = protocol.to_bytes(&message)?.into();
-        self.peer_mgr_reqs_tx.send_to(recipient, protocol, mdata)?;
+        self.send_to_raw(recipient, protocol, mdata)
+    }
+
+    /// Sends a raw message to a single recipient
+    pub fn send_to_raw(
+        &self,
+        recipient: PeerId,
+        protocol: ProtocolId,
+        message: Bytes,
+    ) -> Result<(), NetworkError> {
+        self.peer_mgr_reqs_tx
+            .send_to(recipient, protocol, message)?;
         Ok(())
     }
 
@@ -377,14 +370,8 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
             .into();
 
         // Send the request and wait for the response
-        let res_data = self
-            .peer_mgr_reqs_tx
-            .send_rpc(recipient, protocol, req_data, timeout)
-            .await?;
-
-        // Deserialize the response using a blocking task
-        let res_msg = tokio::task::spawn_blocking(move || protocol.from_bytes(&res_data)).await??;
-        Ok(res_msg)
+        self.send_rpc_raw(recipient, protocol, req_data, timeout)
+            .await
     }
 
     /// Send a protobuf rpc request to a single recipient while handling

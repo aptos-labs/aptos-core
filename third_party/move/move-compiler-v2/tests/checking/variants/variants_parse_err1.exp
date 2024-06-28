@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/variants/variants_parse_err1.move:7:9
+  │
+7 │         Blue,
+  │         ^^^^
+  │         │
+  │         Unexpected 'Blue'
+  │         Expected ','

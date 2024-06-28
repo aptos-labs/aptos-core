@@ -32,10 +32,7 @@ use aptos_framework::{
 };
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
-use aptos_gas_schedule::{
-    gas_feature_versions::RELEASE_V1_15, AptosGasParameters, TransactionGasParameters,
-    VMGasParameters,
-};
+use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
@@ -50,12 +47,10 @@ use aptos_types::{
     block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
     chain_id::ChainId,
     fee_statement::FeeStatement,
-    invalid_signature,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, ConfigurationResource,
-        FeatureFlag, Features, OnChainConfig, TimedFeatureOverride, TimedFeatures,
-        TimedFeaturesBuilder,
+        new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features,
+        OnChainConfig, TimedFeatures,
     },
     randomness::Randomness,
     state_store::{StateView, TStateView},
@@ -66,7 +61,6 @@ use aptos_types::{
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
-    vm::configs::{aptos_prod_deserializer_config, RandomnessConfig},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::{aptos_try, return_on_failure};
@@ -74,6 +68,7 @@ use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculat
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp,
     change_set::VMChangeSet,
+    environment::Environment,
     output::VMOutput,
     resolver::{ExecutorView, ResourceGroupView},
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
@@ -85,6 +80,7 @@ use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
+    deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
     CompiledModule,
 };
@@ -102,12 +98,9 @@ use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
 };
-use move_vm_types::{
-    gas::{GasMeter, UnmeteredGasMeter},
-    loaded_data::runtime_types::TypeBuilder,
-};
+use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::OnceCell;
 use std::{
     cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
@@ -118,21 +111,8 @@ use std::{
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
-static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static DISCARD_FAILED_BLOCKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
-static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
-
-// TODO: Don't expose this in AptosVM, and use only in BlockAptosVM!
-pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .thread_name(|index| format!("par_exec-{}", index))
-            .build()
-            .unwrap(),
-    )
-});
 
 macro_rules! deprecated_module_bundle {
     () => {
@@ -221,95 +201,41 @@ fn is_approved_gov_script(
     }
 }
 
-// TODO(George): move to config file when it is moved from types crate.
-pub fn aptos_prod_ty_builder(
-    features: &Features,
-    gas_feature_version: u64,
-    gas_params: &AptosGasParameters,
-) -> TypeBuilder {
-    if features.is_limit_type_size_enabled() && gas_feature_version >= RELEASE_V1_15 {
-        let max_ty_size = gas_params.vm.txn.max_ty_size;
-        let max_ty_depth = gas_params.vm.txn.max_ty_depth;
-        TypeBuilder::with_limits(max_ty_size.into(), max_ty_depth.into())
-    } else {
-        aptos_default_ty_builder(features)
-    }
-}
-
-pub fn aptos_default_ty_builder(features: &Features) -> TypeBuilder {
-    if features.is_limit_type_size_enabled() {
-        // Type builder to use when:
-        //   1. Type size gas parameters are not yet in gas schedule (before V14).
-        //   2. No gas parameters are found on-chain.
-        TypeBuilder::with_limits(128, 20)
-    } else {
-        TypeBuilder::Legacy
-    }
-}
-
 pub struct AptosVM {
     is_simulation: bool,
     move_vm: MoveVmExt,
     pub(crate) gas_feature_version: u64,
     gas_params: Result<AptosGasParameters, String>,
     pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
-    timed_features: TimedFeatures,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
-    randomness_config: RandomnessConfig,
 }
 
 impl AptosVM {
-    pub fn new(
-        resolver: &impl AptosMoveResolver,
-        override_is_delayed_field_optimization_capable: Option<bool>,
-    ) -> Self {
+    /// Creates a new VM instance, initializing the runtime environment from the state.
+    pub fn new(state_view: &impl StateView) -> Self {
+        let env = Arc::new(Environment::new(state_view));
+        Self::new_with_environment(env, state_view)
+    }
+
+    /// Creates a new VM instance based on the runtime environment, and used by block
+    /// executor to create multiple tasks sharing the same execution configurations.
+    // TODO: Passing `state_view` is not needed once we move keyless and gas-related
+    //       configs to the environment.
+    pub(crate) fn new_with_environment(env: Arc<Environment>, state_view: &impl StateView) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
-        let features = Features::fetch_config(resolver).unwrap_or_default();
-        let randomness_config = RandomnessConfig::fetch(resolver);
+
         let (gas_params, storage_gas_params, gas_feature_version) =
-            get_gas_parameters(&features, resolver);
+            get_gas_parameters(env.features(), state_view);
 
-        // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
-        let chain_id = ChainId::fetch_config(resolver).unwrap_or_else(ChainId::test);
-
-        let timestamp = ConfigurationResource::fetch_config(resolver)
-            .map(|config| config.last_reconfiguration_time())
-            .unwrap_or(0);
-
-        let mut timed_features_builder = TimedFeaturesBuilder::new(chain_id, timestamp);
-        if let Some(profile) = Self::get_timed_feature_override() {
-            timed_features_builder = timed_features_builder.with_override_profile(profile)
-        }
-        let timed_features = timed_features_builder.build();
-
-        // If aggregator execution is enabled, we need to tag aggregator_v2 types,
-        // so they can be exchanged with identifiers during VM execution.
-        let override_is_delayed_field_optimization_capable =
-            override_is_delayed_field_optimization_capable
-                .unwrap_or_else(|| resolver.is_delayed_field_optimization_capable());
-        let aggregator_v2_type_tagging = override_is_delayed_field_optimization_capable
-            && features.is_aggregator_v2_delayed_fields_enabled();
-
-        let move_vm = MoveVmExt::new(
-            gas_feature_version,
-            gas_params.as_ref(),
-            chain_id.id(),
-            features,
-            timed_features.clone(),
-            resolver,
-            aggregator_v2_type_tagging,
-        )
-        .expect("should be able to create Move VM; check if there are duplicated natives");
+        let resolver = state_view.as_move_resolver();
+        let move_vm = MoveVmExt::new(gas_feature_version, gas_params.as_ref(), env, &resolver);
 
         // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
         // via governance (although, currently, we do check for that in `keyless_account.move`).
-        let pvk = keyless_validation::get_groth16_vk_onchain(resolver)
+        let pvk = keyless_validation::get_groth16_vk_onchain(&resolver)
             .ok()
-            .and_then(|vk| {
-                // println!("[aptos-vm][groth16] PVK cached in VM: {}", vk.hash());
-                vk.try_into().ok()
-            });
+            .and_then(|vk| vk.try_into().ok());
 
         Self {
             is_simulation: false,
@@ -317,9 +243,7 @@ impl AptosVM {
             gas_feature_version,
             gas_params,
             storage_gas_params,
-            timed_features,
             pvk,
-            randomness_config,
         }
     }
 
@@ -335,7 +259,22 @@ impl AptosVM {
 
     #[inline(always)]
     fn features(&self) -> &Features {
-        self.move_vm.features()
+        self.move_vm.env.features()
+    }
+
+    #[inline(always)]
+    fn timed_features(&self) -> &TimedFeatures {
+        self.move_vm.env.timed_features()
+    }
+
+    #[inline(always)]
+    fn deserializer_config(&self) -> &DeserializerConfig {
+        &self.move_vm.env.vm_config().deserializer_config
+    }
+
+    #[inline(always)]
+    fn chain_id(&self) -> ChainId {
+        self.move_vm.env.chain_id()
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -370,20 +309,6 @@ impl AptosVM {
     }
 
     /// Sets runtime config when invoked the first time.
-    pub fn set_paranoid_type_checks(enable: bool) {
-        // Only the first call succeeds, due to OnceCell semantics.
-        PARANOID_TYPE_CHECKS.set(enable).ok();
-    }
-
-    /// Get the paranoid type check flag if already set, otherwise return default true
-    pub fn get_paranoid_checks() -> bool {
-        match PARANOID_TYPE_CHECKS.get() {
-            Some(enable) => *enable,
-            None => true,
-        }
-    }
-
-    /// Sets runtime config when invoked the first time.
     pub fn set_discard_failed_blocks(enable: bool) {
         // Only the first call succeeds, due to OnceCell semantics.
         DISCARD_FAILED_BLOCKS.set(enable).ok();
@@ -395,15 +320,6 @@ impl AptosVM {
             Some(enable) => *enable,
             None => false,
         }
-    }
-
-    // Set the override profile for timed features.
-    pub fn set_timed_feature_override(profile: TimedFeatureOverride) {
-        TIMED_FEATURE_OVERRIDE.set(profile).ok();
-    }
-
-    pub fn get_timed_feature_override() -> Option<TimedFeatureOverride> {
-        TIMED_FEATURE_OVERRIDE.get().cloned()
     }
 
     /// Sets the # of async proof reading threads.
@@ -515,6 +431,7 @@ impl AptosVM {
                 );
             }
         }
+
         let (txn_status, txn_aux_data) = TransactionStatus::from_vm_status(
             error_vm_status.clone(),
             self.features()
@@ -795,7 +712,7 @@ impl AptosVM {
         // TODO(Gerardo): consolidate the extended validation to verifier.
         verifier::event_validation::verify_no_event_emission_in_script(
             script.code(),
-            &session.get_vm_config().deserializer_config,
+            self.deserializer_config(),
         )?;
 
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
@@ -1410,12 +1327,12 @@ impl AptosVM {
 
     /// Deserialize a module bundle.
     fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
-        let deserializer_config = aptos_prod_deserializer_config(self.features());
-
         let mut result = vec![];
         for module_blob in modules.iter() {
-            match CompiledModule::deserialize_with_config(module_blob.code(), &deserializer_config)
-            {
+            match CompiledModule::deserialize_with_config(
+                module_blob.code(),
+                self.deserializer_config(),
+            ) {
                 Ok(module) => {
                     result.push(module);
                 },
@@ -1582,7 +1499,7 @@ impl AptosVM {
                     }
                 }
             }
-            aptos_framework::verify_module_metadata(m, self.features(), &self.timed_features)
+            aptos_framework::verify_module_metadata(m, self.features(), self.timed_features())
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
         verifier::resource_groups::validate_resource_groups(
@@ -1603,7 +1520,7 @@ impl AptosVM {
 
     /// Check whether the bytecode can be published to mainnet based on the unstable tag in the metadata
     fn reject_unstable_bytecode(&self, modules: &[CompiledModule]) -> VMResult<()> {
-        if self.move_vm.chain_id().is_mainnet() {
+        if self.chain_id().is_mainnet() {
             for module in modules {
                 if let Some(metadata) =
                     aptos_framework::get_compilation_metadata_from_compiled_module(module)
@@ -1649,23 +1566,13 @@ impl AptosVM {
             .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, None))?;
 
         // If there are keyless TXN authenticators, validate them all.
-        if !keyless_authenticators.is_empty() {
-            // This should only happen if we incorrectly enable the feature without setting the VK.
-            // Or, if we spawn a network without initializing the VK in genesis. Either way, it must
-            // be handled here.
-            if self.pvk.is_none() {
-                // println!("[aptos-vm][groth16] PVK has not been set on-chain");
-                return Err(invalid_signature!("Groth16 VK has not been set on-chain"));
-            }
-
-            if !self.is_simulation {
-                keyless_validation::validate_authenticators(
-                    self.pvk.as_ref().unwrap(),
-                    &keyless_authenticators,
-                    self.features(),
-                    resolver,
-                )?;
-            }
+        if !keyless_authenticators.is_empty() && !self.is_simulation {
+            keyless_validation::validate_authenticators(
+                &self.pvk,
+                &keyless_authenticators,
+                self.features(),
+                resolver,
+            )?;
         }
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
@@ -1721,7 +1628,7 @@ impl AptosVM {
         &self,
         resolver: &impl AptosMoveResolver,
         txn: &SignedTransaction,
-        mut txn_data: TransactionMetadata,
+        txn_data: TransactionMetadata,
         is_approved_gov_script: bool,
         gas_meter: &mut impl AptosGasMeter,
         log_context: &AdapterLogSchema,
@@ -1734,14 +1641,6 @@ impl AptosVM {
             unwrap_or_discard!(PrologueSession::new(self, &txn_data, resolver));
 
         let exec_result = prologue_session.execute(|session| {
-            let required_deposit = self.get_required_deposit(
-                session,
-                resolver,
-                &gas_meter.vm_gas_params().txn,
-                &txn_data,
-                txn.payload(),
-            )?;
-            txn_data.set_required_deposit(required_deposit);
             self.validate_signed_transaction(
                 session,
                 resolver,
@@ -2058,7 +1957,7 @@ impl AptosVM {
         let change_set = self.execute_write_set(
             resolver,
             &write_set_payload,
-            Some(aptos_types::account_config::reserved_vm_address()),
+            Some(account_config::reserved_vm_address()),
             SessionId::genesis(genesis_id),
         )?;
 
@@ -2223,11 +2122,7 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
-        let resolver = state_view.as_move_resolver();
-        let vm = AptosVM::new(
-            &resolver,
-            /*override_is_delayed_field_optimization_capable=*/ Some(false),
-        );
+        let vm = AptosVM::new(state_view);
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
@@ -2253,6 +2148,7 @@ impl AptosVM {
             max_gas_amount.into(),
         );
 
+        let resolver = state_view.as_move_resolver();
         let mut session = vm.new_session(&resolver, SessionId::Void, None);
         let execution_result = Self::execute_view_function_in_vm(
             &mut session,
@@ -2516,52 +2412,6 @@ impl AptosVM {
             },
         })
     }
-
-    #[allow(clippy::manual_filter)]
-    pub fn get_required_deposit(
-        &self,
-        session: &mut SessionExt,
-        resolver: &impl AptosMoveResolver,
-        _txn_gas_params: &TransactionGasParameters,
-        txn_metadata: &TransactionMetadata,
-        payload: &TransactionPayload,
-    ) -> Result<Option<u64>, VMStatus> {
-        match payload {
-            TransactionPayload::EntryFunction(entry_func) => {
-                if let Some(annotation) =
-                    get_randomness_annotation(resolver, session, entry_func).unwrap_or(None)
-                {
-                    if let Some(default_gas_amount) =
-                        self.randomness_config.randomness_api_v0_required_deposit
-                    {
-                        let required_gas_amount =
-                            if self.randomness_config.allow_rand_contract_custom_max_gas {
-                                annotation.max_gas.unwrap_or(default_gas_amount)
-                            } else {
-                                default_gas_amount
-                            };
-                        let txn_max_gas = u64::from(txn_metadata.max_gas_amount);
-                        if required_gas_amount != txn_max_gas {
-                            return Err(VMStatus::error(
-                                StatusCode::REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS,
-                                None,
-                            ));
-                        }
-                        let octa_amount =
-                            u64::from(txn_metadata.max_gas_amount * txn_metadata.gas_unit_price);
-                        Ok(Some(octa_amount))
-                    } else {
-                        Ok(None)
-                    }
-                } else {
-                    Ok(None)
-                }
-            },
-            TransactionPayload::Script(_)
-            | TransactionPayload::ModuleBundle(_)
-            | TransactionPayload::Multisig(_) => Ok(None),
-        }
-    }
 }
 
 // Executor external API
@@ -2594,7 +2444,6 @@ impl VMExecutor for AptosVM {
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
-            Arc::clone(&RAYON_EXEC_POOL),
             transactions,
             state_view,
             BlockExecutorConfig {
@@ -2642,7 +2491,6 @@ impl VMExecutor for AptosVM {
     }
 }
 
-// VMValidator external API
 impl VMValidator for AptosVM {
     /// Determine if a transaction is valid. Will return `None` if the transaction is accepted,
     /// `Some(Err)` if the VM rejects it, with `Err` as an error code. Verification performs the
@@ -2693,7 +2541,7 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
         };
-        let mut txn_data = TransactionMetadata::new(&txn);
+        let txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
@@ -2703,25 +2551,6 @@ impl VMValidator for AptosVM {
             SessionId::prologue_meta(&txn_data),
             Some(txn_data.as_user_transaction_context()),
         );
-        let required_deposit = if let Ok(gas_params) = &self.gas_params {
-            let maybe_required_deposit = self.get_required_deposit(
-                &mut session,
-                &resolver,
-                &gas_params.vm.txn,
-                &txn_data,
-                txn.payload(),
-            );
-            match maybe_required_deposit {
-                Ok(required_deposit) => required_deposit,
-                Err(vm_status) => {
-                    return VMValidatorResult::error(vm_status.status_code());
-                },
-            }
-        } else {
-            return VMValidatorResult::error(StatusCode::GAS_PARAMS_MISSING);
-        };
-
-        txn_data.set_required_deposit(required_deposit);
 
         let storage = TraversalStorage::new();
 
@@ -2757,11 +2586,8 @@ impl VMValidator for AptosVM {
 pub struct AptosSimulationVM(AptosVM);
 
 impl AptosSimulationVM {
-    pub fn new(resolver: &impl AptosMoveResolver) -> Self {
-        let mut vm = AptosVM::new(
-            resolver,
-            /*override_is_delayed_field_optimization_capable=*/ Some(false),
-        );
+    pub fn new(state_view: &impl StateView) -> Self {
+        let mut vm = AptosVM::new(state_view);
         vm.is_simulation = true;
         Self(vm)
     }
@@ -2778,10 +2604,10 @@ impl AptosSimulationVM {
             "Simulated transaction should not have a valid signature"
         );
 
-        let resolver = state_view.as_move_resolver();
-        let vm = Self::new(&resolver);
+        let vm = Self::new(state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
+        let resolver = state_view.as_move_resolver();
         let (vm_status, vm_output) =
             vm.0.execute_user_transaction(&resolver, transaction, &log_context);
         let txn_output = vm_output

@@ -142,6 +142,16 @@ impl LocalAccount {
         Ok(Self::new(address, key, sequence_number))
     }
 
+    /// Create a new account from the given private key in hex literal.
+    pub fn from_private_key(private_key: &str, sequence_number: u64) -> Result<Self> {
+        let key = AccountKey::from_private_key(Ed25519PrivateKey::try_from(
+            hex::decode(private_key.trim_start_matches("0x"))?.as_ref(),
+        )?);
+        let address = key.authentication_key().account_address();
+
+        Ok(Self::new(address, key, sequence_number))
+    }
+
     /// Generate a new account locally. Note: This function does not actually
     /// create an account on the Aptos blockchain, it just generates a new
     /// account locally.
@@ -596,5 +606,26 @@ mod tests {
 
         // Return an error for empty mnemonic phrase.
         assert!(LocalAccount::from_derive_path(derive_path, "", 0).is_err());
+    }
+
+    #[test]
+    fn test_create_account_from_private_key() {
+        let key = AccountKey::generate(&mut rand::rngs::OsRng);
+        let (private_key_hex_literal, public_key_hex_literal) = (
+            hex::encode(key.private_key().to_bytes().as_ref()),
+            key.authentication_key().account_address().to_hex_literal(),
+        );
+
+        // Test private key hex literal without `0x` prefix.
+        let account = LocalAccount::from_private_key(&private_key_hex_literal, 0).unwrap();
+        assert_eq!(account.address().to_hex_literal(), public_key_hex_literal);
+
+        // Test private key hex literal with `0x` prefix.
+        let account =
+            LocalAccount::from_private_key(&format!("0x{}", private_key_hex_literal), 0).unwrap();
+        assert_eq!(account.address().to_hex_literal(), public_key_hex_literal);
+
+        // Test invalid private key hex literal.
+        assert!(LocalAccount::from_private_key("invalid_private_key", 0).is_err());
     }
 }

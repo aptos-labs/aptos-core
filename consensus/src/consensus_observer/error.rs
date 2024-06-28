@@ -12,6 +12,15 @@ pub enum Error {
     #[error("Aptos network rpc error: {0}")]
     RpcError(#[from] RpcError),
 
+    #[error("Subscription disconnected: {0}")]
+    SubscriptionDisconnected(String),
+
+    #[error("Subscription progress stopped: {0}")]
+    SubscriptionProgressStopped(String),
+
+    #[error("Subscription suboptimal: {0}")]
+    SubscriptionSuboptimal(String),
+
     #[error("Subscription timeout: {0}")]
     SubscriptionTimeout(String),
 
@@ -25,6 +34,9 @@ impl Error {
         match self {
             Self::NetworkError(_) => "network_error",
             Self::RpcError(_) => "rpc_error",
+            Self::SubscriptionDisconnected(_) => "subscription_disconnected",
+            Self::SubscriptionProgressStopped(_) => "subscription_progress_stopped",
+            Self::SubscriptionSuboptimal(_) => "subscription_suboptimal",
             Self::SubscriptionTimeout(_) => "subscription_timeout",
             Self::UnexpectedError(_) => "unexpected_error",
         }

@@ -5,7 +5,8 @@
 use crate::{
     parser::ast::{
         self as P, Ability, Ability_, BinOp, CallKind, ConstantName, Field, FunctionName,
-        ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, ENTRY_MODIFIER,
+        ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, VariantName,
+        ENTRY_MODIFIER,
     },
     shared::{
         ast_debug::*,
@@ -165,13 +166,22 @@ pub struct StructDefinition {
     pub loc: Loc,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
-    pub fields: StructFields,
+    pub layout: StructLayout,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum StructFields {
-    Defined(Fields<Type>),
+pub enum StructLayout {
+    Singleton(Fields<Type>),
+    Variants(Vec<StructVariant>),
     Native(Loc),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StructVariant {
+    pub attributes: Attributes,
+    pub loc: Loc,
+    pub name: VariantName,
+    pub fields: Fields<Type>,
 }
 
 //**************************************************************************************************
@@ -363,7 +373,8 @@ pub struct AbilitySet(UniqueSet<Ability>);
 #[allow(clippy::large_enum_variant)]
 pub enum ModuleAccess_ {
     Name(Name),
-    ModuleAccess(ModuleIdent, Name),
+    // ModuleAccess(module_ident, member_ident, optional_variant_ident)
+    ModuleAccess(ModuleIdent, Name, Option<Name>),
 }
 pub type ModuleAccess = Spanned<ModuleAccess_>;
 
@@ -443,6 +454,7 @@ pub enum Exp_ {
     Vector(Loc, Option<Vec<Type>>, Spanned<Vec<Exp>>),
 
     IfElse(Box<Exp>, Box<Exp>, Box<Exp>),
+    Match(Box<Exp>, Vec<Spanned<(LValueList, Option<Exp>, Exp)>>),
     While(Box<Exp>, Box<Exp>),
     Loop(Box<Exp>),
     Block(Sequence),
@@ -818,7 +830,17 @@ impl fmt::Display for ModuleAccess_ {
         use ModuleAccess_::*;
         match self {
             Name(n) => write!(f, "{}", n),
-            ModuleAccess(m, n) => write!(f, "{}::{}", m, n),
+            ModuleAccess(m, n, opt_v) => write!(
+                f,
+                "{}::{}{}",
+                m,
+                n,
+                if let Some(v) = opt_v {
+                    format!("::{}", v)
+                } else {
+                    "".to_string()
+                }
+            ),
         }
     }
 }
@@ -1046,20 +1068,20 @@ impl AstDebug for (StructName, &StructDefinition) {
                 loc: _loc,
                 abilities,
                 type_parameters,
-                fields,
+                layout: fields,
             },
         ) = self;
 
         attributes.ast_debug(w);
 
-        if let StructFields::Native(_) = fields {
+        if let StructLayout::Native(_) = fields {
             w.write("native ");
         }
 
         w.write(&format!("struct {}", name));
         type_parameters.ast_debug(w);
         ability_modifiers_ast_debug(w, abilities);
-        if let StructFields::Defined(fields) = fields {
+        if let StructLayout::Singleton(fields) = fields {
             w.block(|w| {
                 w.list(fields, ",", |w, (_, f, idx_st)| {
                     let (idx, st) = idx_st;
@@ -1443,7 +1465,16 @@ impl AstDebug for ModuleAccess_ {
     fn ast_debug(&self, w: &mut AstWriter) {
         w.write(&match self {
             ModuleAccess_::Name(n) => format!("{}", n),
-            ModuleAccess_::ModuleAccess(m, n) => format!("{}::{}", m, n),
+            ModuleAccess_::ModuleAccess(m, n, opt_v) => format!(
+                "{}::{}{}",
+                m,
+                n,
+                if let Some(v) = opt_v {
+                    format!("::{}", v)
+                } else {
+                    "".to_string()
+                }
+            ),
         })
     }
 }
@@ -1568,6 +1599,20 @@ impl AstDebug for Exp_ {
             E::Loop(e) => {
                 w.write("loop ");
                 e.ast_debug(w);
+            },
+            E::Match(e, arms) => {
+                w.write("match (");
+                e.ast_debug(w);
+                w.write(") {");
+                for arm in arms {
+                    arm.value.0.ast_debug(w);
+                    if let Some(cond) = &arm.value.1 {
+                        w.write(" if ");
+                        cond.ast_debug(w);
+                    }
+                    w.write(" => ");
+                    arm.value.2.ast_debug(w)
+                }
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
             E::Lambda(sp!(_, bs), e) => {
