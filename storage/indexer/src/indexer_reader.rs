@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{db_indexer::DBIndexer, db_v2::IndexerAsyncV2};
-use anyhow::{anyhow, ensure};
+use anyhow::anyhow;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::EventWithVersion,
@@ -57,11 +57,6 @@ impl IndexerReader for IndexerReaders {
     ) -> anyhow::Result<Vec<EventWithVersion>> {
         if let Some(db_indexer_reader) = &self.db_indexer_reader {
             if db_indexer_reader.event_enabled() {
-                let indexer_latest_version = db_indexer_reader.get_persisted_version()?;
-                ensure!(
-                    indexer_latest_version >= ledger_version,
-                    "Ledger version too new"
-                );
                 return Ok(db_indexer_reader.get_events(
                     event_key,
                     start,
@@ -86,11 +81,6 @@ impl IndexerReader for IndexerReaders {
     ) -> anyhow::Result<Vec<EventWithVersion>> {
         if let Some(db_indexer_reader) = &self.db_indexer_reader {
             if db_indexer_reader.event_enabled() {
-                let indexer_latest_version = db_indexer_reader.get_persisted_version()?;
-                ensure!(
-                    indexer_latest_version >= ledger_version,
-                    "Ledger version too new"
-                );
                 return Ok(db_indexer_reader.get_events_by_event_key(
                     event_key,
                     start_seq_num,
@@ -115,11 +105,6 @@ impl IndexerReader for IndexerReaders {
     ) -> anyhow::Result<AccountTransactionsWithProof> {
         if let Some(db_indexer_reader) = &self.db_indexer_reader {
             if db_indexer_reader.transaction_enabled() {
-                let indexer_latest_version = db_indexer_reader.get_persisted_version()?;
-                ensure!(
-                    indexer_latest_version >= ledger_version,
-                    "Ledger version too new"
-                );
                 return Ok(db_indexer_reader.get_account_transactions(
                     address,
                     start_seq_num,
@@ -142,11 +127,6 @@ impl IndexerReader for IndexerReaders {
     ) -> anyhow::Result<Box<dyn Iterator<Item = anyhow::Result<(StateKey, StateValue)>> + '_>> {
         if let Some(db_indexer_reader) = &self.db_indexer_reader {
             if db_indexer_reader.statekeys_enabled() {
-                let indexer_latest_version = db_indexer_reader.get_persisted_version()?;
-                ensure!(
-                    indexer_latest_version >= ledger_version,
-                    "Ledger version too new"
-                );
                 return Ok(Box::new(
                     db_indexer_reader
                         .get_prefixed_state_value_iterator(key_prefix, cursor, ledger_version)

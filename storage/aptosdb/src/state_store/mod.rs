@@ -573,10 +573,6 @@ impl StateStore {
         first_key_opt: Option<&StateKey>,
         desired_version: Version,
     ) -> Result<PrefixedStateValueIterator> {
-        ensure!(
-            !self.state_db.state_kv_db.enabled_sharding(),
-            "This API is not supported for sharded db."
-        );
         // this can only handle non-sharded db scenario.
         // For sharded db, should look at API side using internal indexer to handle this request
         PrefixedStateValueIterator::new(
