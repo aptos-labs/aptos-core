@@ -19,6 +19,7 @@ use tokio::{
 };
 
 const DEFAULT_SEED: [u8; 32] = [123; 32];
+use url::Url;
 /// Use a subfolder to store the indexer testing data, this is to avoid conflicts with localnet testing.
 const INDEXER_TESTING_FOLDER: &str = "indexer-testing";
 const FAUCET_DEFAULT_PORT: u16 = 8081;
@@ -67,6 +68,8 @@ enum LocalnetNodeType {
 #[derive(Debug)]
 pub struct ManagedNode {
     node: LocalnetNodeType,
+
+    pub transaction_stream_url: Url,
 }
 
 impl ManagedNode {
@@ -132,8 +135,14 @@ impl ManagedNode {
                 LocalnetNodeType::BuiltIn(join_set)
             },
         };
+
+        let transaction_stream_url = Url::parse("http://localhost:50051").unwrap();
+
         println!("\nTransaction generator is ready to execute.\n");
-        Ok(Self { node: result })
+        Ok(Self {
+            node: result,
+            transaction_stream_url,
+        })
     }
 
     /// Stops the node and the faucet.
