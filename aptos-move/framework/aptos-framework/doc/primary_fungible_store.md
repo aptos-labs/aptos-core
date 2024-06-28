@@ -938,7 +938,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <pre><code><b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_spec_primary_store_exists">spec_primary_store_exists</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): bool {
    <a href="fungible_asset.md#0x1_fungible_asset_store_exists">fungible_asset::store_exists</a>(
        <a href="primary_fungible_store.md#0x1_primary_fungible_store_spec_primary_store_address">spec_primary_store_address</a>(<a href="account.md#0x1_account">account</a>, metadata)
-   ) || <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_lite_account_enabled">features::spec_lite_account_enabled</a>()
+   )
 }
 </code></pre>
 
