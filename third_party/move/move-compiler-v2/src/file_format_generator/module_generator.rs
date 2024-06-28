@@ -105,7 +105,7 @@ impl ModuleGenerator {
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
         let options = module_env.env.get_extension::<Options>().expect("options");
         let language_version = options.language_version.unwrap_or_default();
-        let gen_access_specifiers = language_version >= LanguageVersion::V2_0
+        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_0)
             && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
         let compilation_metadata =
             CompilationMetadata::new(CompilerVersion::V2_0, language_version);

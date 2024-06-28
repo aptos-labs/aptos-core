@@ -519,7 +519,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let params = et.analyze_and_add_params(&def.signature.parameters, true);
         let result_type = et.translate_type(&def.signature.return_type);
         let kind = if def.entry.is_some() {
-            if et.env().language_version == LanguageVersion::V2_0 && def.inline {
+            if et.env().language_version.is_at_least(LanguageVersion::V2_0) && def.inline {
                 et.error(&et.to_loc(&def.loc), "An entry function cannot be inlined.");
             }
             FunctionKind::Entry
