@@ -156,7 +156,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .set_experiment(Experiment::UNUSED_ASSIGNMENT_CHECK, true),
             stop_after: StopAfter::BytecodePipeline(Some("UnusedAssignmentChecker")),
             dump_ast: DumpLevel::None,
-            dump_bytecode: DumpLevel::None,
+            dump_bytecode: DumpLevel::AllStages,
             dump_bytecode_filter: None,
         },
         // Tests for lambda lifting
