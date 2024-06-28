@@ -15,12 +15,14 @@ cargo fuzz run <fuzz_target>
 
 To run more advanced session that runs 10 workers in parallel, use the `fuzz.sh` script:
 ```bash
-./scripts/fuzz.sh <fuzz_target> [total_hour] [max_input_len]
+./scripts/fuzz.sh <fuzz_target> [total_hour] [max_input_len] [timeout]
+# If `max_input_len` is 0, initial random corpus will be generated.
 
 # For example
-./scripts/fuzz.sh transactional 24 4
+./scripts/fuzz.sh transactional 24 4 3
 # This will run the `transactional` target for 24 hours with randomly created
 # seeds whose size doesn't exceed 4KB.
+# For each input, it will timeout after 3 seconds.
 
 
 # If a fuzz target starts with `afl++`, the script will spawn nodes in a tmux session:

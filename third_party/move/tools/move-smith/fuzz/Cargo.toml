@@ -12,6 +12,7 @@ afl = "*"
 arbitrary = { workspace = true }
 libfuzzer-sys = { workspace = true }
 move-smith = { path = ".." }
+rand = { workspace = true }
 
 [[bin]]
 name = "compile_only"
@@ -30,6 +31,13 @@ bench = false
 [[bin]]
 name = "afl-transactional"
 path = "fuzz_targets/afl_transactional.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "random"
+path = "fuzz_targets/random.rs"
 test = false
 doc = false
 bench = false

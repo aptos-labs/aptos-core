@@ -4,6 +4,7 @@
 *.profdata
 *.log
 *.svg
+*.txt
 coverage/
 output/
 *logs/

@@ -11018,6 +11018,7 @@ dependencies = [
  "arbitrary",
  "libfuzzer-sys",
  "move-smith",
+ "rand 0.7.3",
 ]
 
 [[package]]

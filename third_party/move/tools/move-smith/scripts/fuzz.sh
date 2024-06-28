@@ -31,6 +31,12 @@ function create_initial_corpus() {
 
     mkdir -p $corpus_dir
 
+    # Ignore corpus generation if len is 0
+    if [ $input_len -eq 0 ]; then
+        echo "Ignore corpus generation for $corpus_dir"
+        return
+    fi
+
     for i in {0..9}; do
         large=$corpus_dir/random_input_large_$i
         mid=$corpus_dir/random_input_mid_$i
@@ -45,6 +51,7 @@ function run_libfuzzer() {
     local fuzz_target=$1
     local total_hour=$2
     local input_len=$3
+    local timeout =$4
 
     # Convert hours to seconds, convert to integer
     local total_seconds=$(echo "$total_hour * 3600" | bc)
@@ -71,7 +78,7 @@ function run_libfuzzer() {
         -max_len=819200 \
         -keep_seed=1 \
         -fork=$JOBS \
-        -timeout=3 \
+        -timeout=$timeout \
         -ignore_timeouts=1 \
         -ignore_crashes=1 \
         -print_final_stats=1 2>&1 | tee -a $log_file
@@ -99,6 +106,7 @@ function run_afl() {
     local fuzz_target=$1
     local total_hour=$2
     local input_len=$3
+    local timeout=$4
 
     local total_seconds=$(echo "$total_hour * 3600" | bc)
     local log_file=$(create_log "$MOVE_SMITH_DIR/logs")
@@ -141,7 +149,9 @@ function run_afl() {
         afl_flags="AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 AFL_SKIP_CPUFREQ=1"
     fi
 
-    afl_prefix="$afl_flags AFL_AUTORESUME=1 cargo afl fuzz -i $input_dir -o $output_dir -V $total_seconds -t 3000 -m 2048"
+    timeout=$((timeout * 1000))
+
+    afl_prefix="$afl_flags AFL_AUTORESUME=1 cargo afl fuzz -i $input_dir -o $output_dir -V $total_seconds -t $timeout -m 2048"
     afl_suffix="-- $TARGET_BIN"
 
     echo "Running AFL Main node, for $total_hour hours"
@@ -200,12 +210,13 @@ fi
 fuzz_target=${1:-"transactional"}
 total_hour=${2:-24} # Default to 24 hours
 input_len=${3:-4}   # Default to 4 KB
+timeout=${4:-3}     # Default to 3 seconds
 
 check_existing
 
 # Check if the fuzz target is libfuzzer or afl
 if [[ $fuzz_target == "afl"* ]]; then
-    run_afl $fuzz_target $total_hour $input_len
+    run_afl $fuzz_target $total_hour $input_len $timeout
 else
-    run_libfuzzer $fuzz_target $total_hour $input_len
+    run_libfuzzer $fuzz_target $total_hour $input_len $timeout
 fi
