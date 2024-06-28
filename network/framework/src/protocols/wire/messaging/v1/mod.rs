@@ -26,6 +26,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use serde::de::DeserializeOwned;
 use thiserror::Error;
 use tokio_util::{
     codec::{FramedRead, FramedWrite, LengthDelimitedCodec},
@@ -103,6 +104,17 @@ pub type RequestId = u32;
 /// Create alias Priority for u8.
 pub type Priority = u8;
 
+pub trait IncomingRequest {
+    fn protocol_id(&self) -> crate::ProtocolId;
+    fn data(&self) -> &Vec<u8>;
+
+    /// Converts the `SerializedMessage` into its deserialized version of `TMessage` based on the
+    /// `ProtocolId`.  See: [`crate::ProtocolId::from_bytes`]
+    fn to_message<TMessage: DeserializeOwned>(&self) -> anyhow::Result<TMessage> {
+        self.protocol_id().from_bytes(self.data())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct RpcRequest {
@@ -115,6 +127,16 @@ pub struct RpcRequest {
     /// Request payload. This will be parsed by the application-level handler.
     #[serde(with = "serde_bytes")]
     pub raw_request: Vec<u8>,
+}
+
+impl IncomingRequest for RpcRequest {
+    fn protocol_id(&self) -> crate::ProtocolId {
+        self.protocol_id
+    }
+
+    fn data(&self) -> &Vec<u8> {
+        &self.raw_request
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -140,6 +162,16 @@ pub struct DirectSendMsg {
     /// Message payload.
     #[serde(with = "serde_bytes")]
     pub raw_msg: Vec<u8>,
+}
+
+impl IncomingRequest for DirectSendMsg {
+    fn protocol_id(&self) -> crate::ProtocolId {
+        self.protocol_id
+    }
+
+    fn data(&self) -> &Vec<u8> {
+        &self.raw_msg
+    }
 }
 
 /// Errors from reading and deserializing network messages off the wire.

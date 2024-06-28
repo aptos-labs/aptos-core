@@ -17,8 +17,9 @@
 
 use crate::{
     counters::{
-        self, network_application_inbound_traffic, network_application_outbound_traffic,
-        FAILED_LABEL, RECEIVED_LABEL, SENT_LABEL,
+        self, network_application_outbound_traffic,
+        FAILED_LABEL, SENT_LABEL,
+        // network_application_inbound_traffic, RECEIVED_LABEL, // TODO: bring back
     },
     logging::NetworkSchema,
     peer_manager::{PeerManagerError, TransportNotification},
@@ -35,12 +36,11 @@ use crate::{
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkContext;
+use aptos_config::network_id::{NetworkContext, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::PeerId;
-use bytes::Bytes;
 use futures::{
     self,
     channel::oneshot,
@@ -51,10 +51,13 @@ use futures::{
 use futures_util::stream::select;
 use serde::Serialize;
 use std::{fmt, panic, time::Duration};
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::{runtime::Handle, time::timeout};
 use tokio_util::compat::{
     FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt,
 };
+use crate::protocols::network::ReceivedMessage;
 
 #[cfg(test)]
 mod test;
@@ -124,8 +127,8 @@ pub struct Peer<TSocket> {
     connection_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
     /// Channel to receive requests from PeerManager to send messages and rpcs.
     peer_reqs_rx: aptos_channel::Receiver<ProtocolId, PeerRequest>,
-    /// Channel to notifty PeerManager of new inbound messages and rpcs.
-    peer_notifs_tx: aptos_channel::Sender<ProtocolId, PeerNotification>,
+    /// Where to send inbound messages and rpcs.
+    upstream_handlers: Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
     /// Inbound rpc request queue for handling requests from remote peer.
     inbound_rpcs: InboundRpcs,
     /// Outbound rpc request queue for sending requests to remote peer and handling responses.
@@ -152,7 +155,7 @@ where
         connection: Connection<TSocket>,
         connection_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
         peer_reqs_rx: aptos_channel::Receiver<ProtocolId, PeerRequest>,
-        peer_notifs_tx: aptos_channel::Sender<ProtocolId, PeerNotification>,
+        upstream_handlers: Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
         inbound_rpc_timeout: Duration,
         max_concurrent_inbound_rpcs: u32,
         max_concurrent_outbound_rpcs: u32,
@@ -173,7 +176,7 @@ where
             connection: Some(socket),
             connection_notifs_tx,
             peer_reqs_rx,
-            peer_notifs_tx,
+            upstream_handlers,
             inbound_rpcs: InboundRpcs::new(
                 network_context,
                 time_service.clone(),
@@ -447,8 +450,23 @@ where
         &mut self,
         message: NetworkMessage,
     ) -> Result<(), PeerManagerError> {
-        match message {
-            NetworkMessage::DirectSendMsg(message) => self.handle_inbound_direct_send(message),
+        match &message {
+            NetworkMessage::DirectSendMsg(direct) => {
+                // self.handle_inbound_direct_send(message)
+                match self.upstream_handlers.get(&direct.protocol_id) {
+                    None => {
+                        // TODO: count error
+                    }
+                    Some(handler) => {
+                        let key = (self.connection_metadata.remote_peer_id, direct.protocol_id);
+                        let sender = self.connection_metadata.remote_peer_id;
+                        let network_id = self.network_context.network_id();
+                        let sender = PeerNetworkId::new(network_id, sender);
+                        // TODO: ensure that this is non-blocking, channel must drop if full
+                        handler.push(key, ReceivedMessage::new(message, sender))?
+                    }
+                }
+            },
             NetworkMessage::Error(error_msg) => {
                 warn!(
                     NetworkSchema::new(&self.network_context)
@@ -461,21 +479,29 @@ where
                 );
             },
             NetworkMessage::RpcRequest(request) => {
-                if let Err(err) = self
-                    .inbound_rpcs
-                    .handle_inbound_request(&mut self.peer_notifs_tx, request)
-                {
-                    warn!(
-                        NetworkSchema::new(&self.network_context)
-                            .connection_metadata(&self.connection_metadata),
-                        error = %err,
-                        "{} Error handling inbound rpc request: {}",
-                        self.network_context,
-                        err
-                    );
+                match self.upstream_handlers.get(&request.protocol_id) {
+                    None => {
+                        // TODO: count error
+                    }
+                    Some(handler) => {
+                        let sender = self.connection_metadata.remote_peer_id;
+                        let network_id = self.network_context.network_id();
+                        let sender = PeerNetworkId::new(network_id, sender);
+                        if let Err(err) = self.inbound_rpcs.handle_inbound_request(handler, ReceivedMessage::new(message, sender)) {
+                            warn!(
+                                NetworkSchema::new(&self.network_context)
+                                    .connection_metadata(&self.connection_metadata),
+                                error = %err,
+                                "{} Error handling inbound rpc request: {}",
+                                self.network_context,
+                                err
+                            );
+                        }
+                    }
                 }
             },
-            NetworkMessage::RpcResponse(response) => {
+            NetworkMessage::RpcResponse(_) => {
+                let NetworkMessage::RpcResponse(response) = message else { panic!() };
                 self.outbound_rpcs.handle_inbound_response(response)
             },
         };
@@ -544,6 +570,7 @@ where
     /// Handle an inbound DirectSendMsg from the remote peer. There's not much to
     /// do here other than bump some counters and forward the message up to the
     /// PeerManager.
+    #[cfg(obsolete)]
     fn handle_inbound_direct_send(&mut self, message: DirectSendMsg) {
         let peer_id = self.remote_peer_id();
         let protocol_id = message.protocol_id;
@@ -576,6 +603,7 @@ where
     }
 
     /// Updates the inbound direct send metrics (e.g., messages and bytes received)
+    #[cfg(obsolete)]
     fn update_inbound_direct_send_metrics(&self, protocol_id: ProtocolId, data_len: u64) {
         // Update the metrics for the received direct send message
         counters::direct_send_messages(&self.network_context, RECEIVED_LABEL).inc();

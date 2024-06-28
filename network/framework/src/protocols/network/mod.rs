@@ -7,10 +7,12 @@
 pub use crate::protocols::rpc::error::RpcError;
 use crate::{
     error::NetworkError,
-    peer_manager::{ConnectionRequestSender, PeerManagerNotification, PeerManagerRequestSender},
+    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     ProtocolId,
+    protocols::wire::messaging::v1::NetworkMessage,
 };
 use aptos_channels::aptos_channel;
+use aptos_config::network_id::PeerNetworkId;
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{network_address::NetworkAddress, PeerId};
@@ -24,6 +26,8 @@ use futures_util::ready;
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cmp::min, fmt::Debug, future, marker::PhantomData, pin::Pin, time::Duration};
+use std::sync::Arc;
+use crate::protocols::wire::messaging::v1::IncomingRequest;
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
@@ -133,6 +137,60 @@ impl NetworkApplicationConfig {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ReceivedMessage {
+    pub message: NetworkMessage,
+    pub sender: PeerNetworkId,
+
+    // unix microseconds
+    pub rx_at: u64,
+
+    pub rpc_replier: Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>>,
+}
+
+impl ReceivedMessage {
+    pub fn new(message: NetworkMessage, sender: PeerNetworkId) -> Self {
+        let now = std::time::SystemTime::now();
+        let rx_at = now
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+        Self {
+            message,
+            sender,
+            rx_at,
+            rpc_replier: None,
+        }
+    }
+
+    pub fn protocol_id(&self) -> Option<ProtocolId> {
+        match &self.message {
+            NetworkMessage::Error(_e) => None,
+            NetworkMessage::RpcRequest(req) => Some(req.protocol_id),
+            NetworkMessage::RpcResponse(_response) => {
+                // design of RpcResponse lacking ProtocolId requires global rpc counter (or at least per-peer) and requires reply matching globally or per-peer
+                None
+            },
+            NetworkMessage::DirectSendMsg(msg) => Some(msg.protocol_id),
+        }
+    }
+
+    pub fn protocol_id_as_str(&self) -> &'static str {
+        match &self.message {
+            NetworkMessage::Error(_) => "error",
+            NetworkMessage::RpcRequest(rr) => rr.protocol_id.as_str(),
+            NetworkMessage::RpcResponse(_) => "rpc response",
+            NetworkMessage::DirectSendMsg(dm) => dm.protocol_id.as_str(),
+        }
+    }
+}
+
+impl PartialEq for ReceivedMessage {
+    fn eq(&self, other: &Self) -> bool {
+        (self.message == other.message) && (self.rx_at == other.rx_at) && (self.sender == other.sender)
+    }
+}
+
 /// A `Stream` of `Event<TMessage>` from the lower network layer to an upper
 /// network application that deserializes inbound network direct-send and rpc
 /// messages into `TMessage`. Inbound messages that fail to deserialize are logged
@@ -151,7 +209,7 @@ pub struct NetworkEvents<TMessage> {
 /// Trait specifying the signature for `new()` `NetworkEvents`
 pub trait NewNetworkEvents {
     fn new(
-        peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+        peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage>,
         max_parallel_deserialization_tasks: Option<usize>,
         allow_out_of_order_delivery: bool,
     ) -> Self;
@@ -159,7 +217,7 @@ pub trait NewNetworkEvents {
 
 impl<TMessage: Message + Send + Sync + 'static> NewNetworkEvents for NetworkEvents<TMessage> {
     fn new(
-        peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+        peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage>,
         max_parallel_deserialization_tasks: Option<usize>,
         allow_out_of_order_delivery: bool,
     ) -> Self {
@@ -167,7 +225,7 @@ impl<TMessage: Message + Send + Sync + 'static> NewNetworkEvents for NetworkEven
         let max_parallel_deserialization_tasks = max_parallel_deserialization_tasks.unwrap_or(1);
 
         let data_event_stream = peer_mgr_notifs_rx.map(|notification| {
-            tokio::task::spawn_blocking(move || peer_mgr_notif_to_event(notification))
+            tokio::task::spawn_blocking(move || received_message_to_event(notification))
         });
 
         let data_event_stream: Pin<
@@ -216,29 +274,33 @@ impl<TMessage> Stream for NetworkEvents<TMessage> {
 
 /// Deserialize inbound direct send and rpc messages into the application `TMessage`
 /// type, logging and dropping messages that fail to deserialize.
-fn peer_mgr_notif_to_event<TMessage: Message>(
-    notification: PeerManagerNotification,
+fn received_message_to_event<TMessage: Message>(
+    message: ReceivedMessage,
 ) -> Option<Event<TMessage>> {
-    match notification {
-        PeerManagerNotification::RecvRpc(peer_id, rpc_req) => {
+    let peer_id = message.sender.peer_id();
+    let ReceivedMessage { message, sender: _sender, rx_at: _rx_at, rpc_replier } = message;
+    match message {
+        NetworkMessage::RpcRequest(rpc_req) => {
+            let rpc_replier = Arc::into_inner(rpc_replier.unwrap()).unwrap();
             request_to_network_event(peer_id, &rpc_req)
-                .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_req.res_tx))
+                .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_replier))
         },
-        PeerManagerNotification::RecvMessage(peer_id, request) => {
+        NetworkMessage::DirectSendMsg(request) => {
             request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
         },
+        _ => None,
     }
 }
 
 /// Converts a `SerializedRequest` into a network `Event` for sending to other nodes
-fn request_to_network_event<TMessage: Message, Request: SerializedRequest>(
+fn request_to_network_event<TMessage: Message, Request: IncomingRequest>(
     peer_id: PeerId,
     request: &Request,
 ) -> Option<TMessage> {
     match request.to_message() {
         Ok(msg) => Some(msg),
         Err(err) => {
-            let data = &request.data();
+            let data = request.data();
             warn!(
                 SecurityEvent::InvalidNetworkEvent,
                 error = ?err,

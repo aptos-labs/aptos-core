@@ -15,7 +15,7 @@ use crate::{
     constants,
     counters::{self},
     logging::*,
-    peer::{Peer, PeerNotification, PeerRequest},
+    peer::{Peer, PeerRequest},
     transport::{
         Connection, ConnectionId, ConnectionMetadata, TSocket as TransportTSocket,
         TRANSPORT_TIMEOUT,
@@ -62,6 +62,7 @@ use aptos_config::config::PeerRole;
 use aptos_types::account_address::AccountAddress;
 pub use senders::*;
 pub use types::*;
+use crate::protocols::network::ReceivedMessage;
 
 /// Responsible for handling and maintaining connections to other Peers
 pub struct PeerManager<TTransport, TSocket>
@@ -93,7 +94,7 @@ where
     /// Upstream handlers for RPC and DirectSend protocols. The handlers are promised fair delivery
     /// of messages across (PeerId, ProtocolId).
     upstream_handlers:
-        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        Arc<HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>>,
     /// Channels to send NewPeer/LostPeer notifications to.
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
     /// Channel used to send Dial requests to the ConnectionHandler actor
@@ -109,7 +110,8 @@ where
         HashMap<ConnectionId, oneshot::Sender<Result<(), PeerManagerError>>>,
     /// Pin the transport type corresponding to this PeerManager instance
     phantom_transport: PhantomData<TTransport>,
-    /// Maximum concurrent network requests to any peer.
+    /// Maximum concurrent network requests to any peer. // TODO: bring back usage?
+    #[allow(dead_code)]
     max_concurrent_network_reqs: usize,
     /// Size of channels between different actors.
     channel_size: usize,
@@ -139,7 +141,7 @@ where
         connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
         upstream_handlers: HashMap<
             ProtocolId,
-            aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+            aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
         >,
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
         channel_size: usize,
@@ -182,7 +184,7 @@ where
             transport_notifs_rx,
             outstanding_disconnect_requests: HashMap::new(),
             phantom_transport: PhantomData,
-            upstream_handlers,
+            upstream_handlers: Arc::new(upstream_handlers),
             connection_event_handlers,
             max_concurrent_network_reqs,
             channel_size,
@@ -650,12 +652,6 @@ where
             self.channel_size,
             Some(&counters::PENDING_NETWORK_REQUESTS),
         );
-        // TODO: Add label for peer.
-        let (peer_notifs_tx, peer_notifs_rx) = aptos_channel::new(
-            QueueStyle::FIFO,
-            self.channel_size,
-            Some(&counters::PENDING_NETWORK_NOTIFICATIONS),
-        );
 
         // Initialize a new Peer actor for this connection.
         let peer = Peer::new(
@@ -665,7 +661,7 @@ where
             connection,
             self.transport_notifs_tx.clone(),
             peer_reqs_rx,
-            peer_notifs_tx,
+            self.upstream_handlers.clone(),
             Duration::from_millis(constants::INBOUND_RPC_TIMEOUT_MS),
             constants::MAX_CONCURRENT_INBOUND_RPCS,
             constants::MAX_CONCURRENT_OUTBOUND_RPCS,
@@ -674,9 +670,6 @@ where
         );
         self.executor.spawn(peer.start());
 
-        // Start background task to handle events (RPCs and DirectSend messages) received from
-        // peer.
-        self.spawn_peer_network_events_handler(peer_id, peer_notifs_rx);
         // Save PeerRequest sender to `active_peers`.
         self.active_peers
             .insert(peer_id, (conn_meta.clone(), peer_reqs_tx));
@@ -713,6 +706,7 @@ where
         }
     }
 
+    #[cfg(obsolete)]
     fn spawn_peer_network_events_handler(
         &self,
         peer_id: PeerId,
@@ -736,13 +730,14 @@ where
 }
 
 /// A task for consuming inbound network messages
+#[cfg(obsolete)]
 fn handle_inbound_request(
     network_context: NetworkContext,
     inbound_event: PeerNotification,
     peer_id: PeerId,
     upstream_handlers: &mut HashMap<
         ProtocolId,
-        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
     >,
 ) {
     let (protocol_id, notification) = match inbound_event {

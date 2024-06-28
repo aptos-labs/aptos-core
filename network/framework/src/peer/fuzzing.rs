@@ -2,16 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    constants,
-    peer::Peer,
-    protocols::wire::{
-        handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
-        messaging::v1::{MultiplexMessage, MultiplexMessageSink},
-    },
-    testutils::fake_socket::ReadOnlyTestSocketVec,
-    transport::{Connection, ConnectionId, ConnectionMetadata},
-};
+use std::collections::HashMap;
+use std::sync::Arc;
+use crate::{constants, peer::Peer, protocols::wire::{
+    handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
+    messaging::v1::{MultiplexMessage, MultiplexMessageSink},
+}, testutils::fake_socket::ReadOnlyTestSocketVec, transport::{Connection, ConnectionId, ConnectionMetadata}};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::PeerRole, network_id::NetworkContext};
 use aptos_memsocket::MemorySocket;
@@ -92,7 +88,7 @@ pub fn fuzz(data: &[u8]) {
     let channel_size = 8;
 
     let (peer_reqs_tx, peer_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, channel_size, None);
-    let (peer_notifs_tx, peer_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, channel_size, None);
+    let upstream_handlers = Arc::new(HashMap::new());
 
     // Spin up a new `Peer` actor
     let peer = Peer::new(
@@ -102,7 +98,7 @@ pub fn fuzz(data: &[u8]) {
         connection,
         connection_notifs_tx,
         peer_reqs_rx,
-        peer_notifs_tx,
+        upstream_handlers,
         Duration::from_millis(constants::INBOUND_RPC_TIMEOUT_MS),
         constants::MAX_CONCURRENT_INBOUND_RPCS,
         constants::MAX_CONCURRENT_OUTBOUND_RPCS,
@@ -120,7 +116,6 @@ pub fn fuzz(data: &[u8]) {
         // ACK the "remote" d/c and drop our handle to the Peer actor. Then wait
         // for all network notifs to drain out and finish.
         drop(peer_reqs_tx);
-        peer_notifs_rx.collect::<Vec<_>>().await;
     });
 }
 

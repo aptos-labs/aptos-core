@@ -8,7 +8,7 @@ use crate::{
     noise::{stream::NoiseStream, HandshakeAuthMode},
     peer_manager::{
         conn_notifs_channel, ConnectionRequest, ConnectionRequestSender, PeerManager,
-        PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
+        PeerManagerRequest, PeerManagerRequestSender,
     },
     protocols::{
         network::{NetworkClientConfig, NetworkServiceConfig},
@@ -31,6 +31,7 @@ use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use std::{clone::Clone, collections::HashMap, fmt::Debug, sync::Arc};
 use tokio::runtime::Handle;
+use crate::protocols::network::ReceivedMessage;
 
 /// Inbound and Outbound connections are always secured with NoiseIK.  The dialer
 /// will always verify the listener.
@@ -70,7 +71,7 @@ struct PeerManagerContext {
 
     peers_and_metadata: Arc<PeersAndMetadata>,
     upstream_handlers:
-        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>>,
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
     max_concurrent_network_reqs: usize,
@@ -92,7 +93,7 @@ impl PeerManagerContext {
         peers_and_metadata: Arc<PeersAndMetadata>,
         upstream_handlers: HashMap<
             ProtocolId,
-            aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+            aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
         >,
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
@@ -125,7 +126,7 @@ impl PeerManagerContext {
     fn add_upstream_handler(
         &mut self,
         protocol_id: ProtocolId,
-        channel: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        channel: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
     ) -> &mut Self {
         self.upstream_handlers.insert(protocol_id, channel);
         self
@@ -417,7 +418,7 @@ impl PeerManagerBuilder {
     pub fn add_service(
         &mut self,
         config: &NetworkServiceConfig,
-    ) -> aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification> {
+    ) -> aptos_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage> {
         // Register the direct send and rpc protocols
         self.transport_context()
             .add_protocols(&config.direct_send_protocols_and_preferences);
