@@ -5,12 +5,13 @@
 use crate::generate_traffic;
 use anyhow::bail;
 use aptos_forge::{
-    get_highest_synced_epoch, get_highest_synced_version, NetworkContext, NetworkTest, Result,
-    SwarmExt, Test,
+    get_highest_synced_epoch, get_highest_synced_version, NetworkContext,
+    NetworkContextSynchronizer, NetworkTest, Result, SwarmExt, Test,
 };
 use aptos_logger::info;
 use aptos_sdk::move_types::account_address::AccountAddress;
-use std::time::Instant;
+use async_trait::async_trait;
+use std::{ops::DerefMut, time::Instant};
 use tokio::{runtime::Runtime, time::Duration};
 
 const MAX_EPOCH_CHANGE_SECS: u64 = 300; // Max amount of time (in seconds) to wait for an epoch change
@@ -27,15 +28,18 @@ impl Test for StateSyncFullnodePerformance {
     }
 }
 
+#[async_trait]
 impl NetworkTest for StateSyncFullnodePerformance {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
-        let all_fullnodes = get_fullnodes_and_check_setup(ctx, self.name())?;
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
+        let all_fullnodes = get_fullnodes_and_check_setup(ctx, self.name()).await?;
 
         // Emit a lot of traffic and ensure the fullnodes can all sync
-        emit_traffic_and_ensure_bounded_sync(ctx, &all_fullnodes)?;
+        emit_traffic_and_ensure_bounded_sync(ctx, &all_fullnodes).await?;
 
         // Stop and reset the fullnodes so they start syncing from genesis
-        stop_and_reset_nodes(ctx, &all_fullnodes, &[])?;
+        stop_and_reset_nodes(ctx, &all_fullnodes, &[]).await?;
 
         // Wait for all nodes to catch up to the highest synced version
         // then calculate and display the throughput results.
@@ -53,28 +57,32 @@ impl Test for StateSyncFullnodeFastSyncPerformance {
     }
 }
 
+#[async_trait]
 impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
-        let all_fullnodes = get_fullnodes_and_check_setup(ctx, self.name())?;
+    async fn run<'a>(&self, ctxa: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctxa.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
+        let all_fullnodes = get_fullnodes_and_check_setup(ctx, self.name()).await?;
 
         // Emit a lot of traffic and ensure the fullnodes can all sync
-        emit_traffic_and_ensure_bounded_sync(ctx, &all_fullnodes)?;
+        emit_traffic_and_ensure_bounded_sync(ctx, &all_fullnodes).await?;
 
         // Wait for an epoch change to ensure fast sync can download all the latest states
         info!("Waiting for an epoch change.");
-        let runtime = Runtime::new().unwrap();
-        runtime.block_on(async {
-            ctx.swarm()
-                .wait_for_all_nodes_to_change_epoch(Duration::from_secs(MAX_EPOCH_CHANGE_SECS))
+        {
+            ctx.swarm
+                .read()
                 .await
-        })?;
+                .wait_for_all_nodes_to_change_epoch(Duration::from_secs(MAX_EPOCH_CHANGE_SECS))
+                .await?;
+        }
 
         // Get the highest known epoch in the chain
-        let highest_synced_epoch = runtime.block_on(async {
-            get_highest_synced_epoch(&ctx.swarm().get_all_nodes_clients_with_names())
+        let highest_synced_epoch = {
+            get_highest_synced_epoch(&ctx.swarm.read().await.get_all_nodes_clients_with_names())
                 .await
                 .unwrap_or(0)
-        });
+        };
         if highest_synced_epoch == 0 {
             return Err(anyhow::format_err!(
                 "The swarm has synced 0 epochs! Something has gone wrong!"
@@ -82,12 +90,19 @@ impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
         }
 
         // Fetch the number of state values held on-chain
-        let fullnode_name = ctx.swarm().full_nodes().next().unwrap().name();
-        let prom_query = format!(
-            "{}{{instance=\"{}\"}}",
-            NUM_STATE_VALUE_COUNTER_NAME, &fullnode_name
-        );
-        let promql_result = runtime.block_on(ctx.swarm().query_metrics(&prom_query, None, None))?;
+        let prom_query = {
+            let swarm = ctx.swarm.read().await;
+            let fullnode_name = swarm.full_nodes().next().unwrap().name();
+            format!(
+                "{}{{instance=\"{}\"}}",
+                NUM_STATE_VALUE_COUNTER_NAME, &fullnode_name
+            )
+        };
+
+        let promql_result = {
+            let swarm = ctx.swarm.read().await;
+            swarm.query_metrics(&prom_query, None, None).await?
+        };
         let number_of_state_values = match promql_result.as_instant().unwrap().first() {
             Some(instant_vector) => instant_vector.sample().value() as u64,
             None => {
@@ -103,7 +118,7 @@ impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
         );
 
         // Stop and reset the fullnodes so they start syncing from genesis
-        stop_and_reset_nodes(ctx, &all_fullnodes, &[])?;
+        stop_and_reset_nodes(ctx, &all_fullnodes, &[]).await?;
 
         // Wait for all nodes to catch up to the highest synced epoch
         // then calculate and display the throughput results.
@@ -129,15 +144,21 @@ impl Test for StateSyncValidatorPerformance {
     }
 }
 
+#[async_trait]
 impl NetworkTest for StateSyncValidatorPerformance {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    async fn run<'a>(&self, ctxa: NetworkContextSynchronizer<'a>) -> Result<()> {
+        let mut ctx_locker = ctxa.ctx.lock().await;
+        let ctx = ctx_locker.deref_mut();
         // Verify we have at least 7 validators (i.e., 3f+1, where f is 2)
         // so we can kill 2 validators but still make progress.
-        let all_validators = ctx
-            .swarm()
-            .validators()
-            .map(|v| v.peer_id())
-            .collect::<Vec<_>>();
+        let all_validators = {
+            ctx.swarm
+                .read()
+                .await
+                .validators()
+                .map(|v| v.peer_id())
+                .collect::<Vec<_>>()
+        };
         let num_validators = all_validators.len();
         if num_validators < 7 {
             return Err(anyhow::format_err!(
@@ -155,12 +176,12 @@ impl NetworkTest for StateSyncValidatorPerformance {
         );
 
         // Generate some traffic through the validators.
-        emit_traffic_and_ensure_bounded_sync(ctx, &all_validators)?;
+        emit_traffic_and_ensure_bounded_sync(ctx, &all_validators).await?;
 
         // Stop and reset two validators so they start syncing from genesis
         info!("Deleting data for two validators!");
         let validators_to_reset = &all_validators[0..2];
-        stop_and_reset_nodes(ctx, &[], validators_to_reset)?;
+        stop_and_reset_nodes(ctx, &[], validators_to_reset).await?;
 
         // Wait for all nodes to catch up to the highest synced version
         // then calculate and display the throughput results.
@@ -170,16 +191,19 @@ impl NetworkTest for StateSyncValidatorPerformance {
 
 /// Verifies the setup for the given fullnode test and returns the
 /// set of fullnodes.
-fn get_fullnodes_and_check_setup(
-    ctx: &mut NetworkContext,
+async fn get_fullnodes_and_check_setup<'a>(
+    ctx: &mut NetworkContext<'a>,
     test_name: &'static str,
 ) -> Result<Vec<AccountAddress>> {
     // Verify we have at least 1 fullnode
-    let all_fullnodes = ctx
-        .swarm()
-        .full_nodes()
-        .map(|v| v.peer_id())
-        .collect::<Vec<_>>();
+    let all_fullnodes = {
+        ctx.swarm
+            .read()
+            .await
+            .full_nodes()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>()
+    };
     if all_fullnodes.is_empty() {
         return Err(anyhow::format_err!(
             "Fullnode test {} requires at least 1 fullnode!",
@@ -191,7 +215,7 @@ fn get_fullnodes_and_check_setup(
     info!(
         "Running state sync test {:?} with {:?} validators and {:?} fullnodes.",
         test_name,
-        ctx.swarm().validators().count(),
+        ctx.swarm.read().await.validators().count(),
         all_fullnodes.len()
     );
 
@@ -200,8 +224,8 @@ fn get_fullnodes_and_check_setup(
 
 /// Emits traffic through all specified nodes and ensures all nodes can
 /// sync within a reasonable time bound.
-fn emit_traffic_and_ensure_bounded_sync(
-    ctx: &mut NetworkContext,
+async fn emit_traffic_and_ensure_bounded_sync<'a>(
+    ctx: &mut NetworkContext<'a>,
     nodes_to_send_traffic: &[AccountAddress],
 ) -> Result<()> {
     // Generate some traffic through the specified nodes.
@@ -211,52 +235,54 @@ fn emit_traffic_and_ensure_bounded_sync(
         "Generating the initial traffic for {:?} seconds.",
         emit_txn_duration.as_secs()
     );
-    let _txn_stat = generate_traffic(ctx, nodes_to_send_traffic, emit_txn_duration)?;
+    let _txn_stat = generate_traffic(ctx, nodes_to_send_traffic, emit_txn_duration).await?;
 
     // Wait for all nodes to synchronize. We time bound this to ensure
     // nodes don't fall too far behind.
     info!("Waiting for the validators and fullnodes to be synchronized.");
-    Runtime::new().unwrap().block_on(async {
-        ctx.swarm()
-            .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
-            .await
-    })?;
+    ctx.swarm
+        .read()
+        .await
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_NODE_LAG_SECS))
+        .await?;
 
     Ok(())
 }
 
 /// Stops and resets all specified nodes
-fn stop_and_reset_nodes(
-    ctx: &mut NetworkContext,
+async fn stop_and_reset_nodes<'a>(
+    ctx: &mut NetworkContext<'a>,
     fullnodes_to_reset: &[AccountAddress],
     validators_to_reset: &[AccountAddress],
 ) -> Result<()> {
-    let runtime = Runtime::new().unwrap();
-
     // Stop and reset all fullnodes
     info!("Deleting all fullnode data!");
     for fullnode_id in fullnodes_to_reset {
-        let fullnode = ctx.swarm().full_node_mut(*fullnode_id).unwrap();
-        runtime.block_on(async { fullnode.clear_storage().await })?;
+        let swarm = ctx.swarm.read().await;
+        let fullnode = swarm.full_node(*fullnode_id).unwrap();
+        fullnode.clear_storage().await?;
     }
 
     // Stop and reset all validators
     info!("Deleting all validator data!");
     for valdiator_id in validators_to_reset {
-        let validator = ctx.swarm().validator_mut(*valdiator_id).unwrap();
-        runtime.block_on(async { validator.clear_storage().await })?;
+        let swarm = ctx.swarm.read().await;
+        let validator = swarm.validator(*valdiator_id).unwrap();
+        validator.clear_storage().await?;
     }
 
     // Restart the fullnodes so they start syncing from a fresh state
     for fullnode_id in fullnodes_to_reset {
-        let fullnode = ctx.swarm().full_node_mut(*fullnode_id).unwrap();
-        runtime.block_on(async { fullnode.start().await })?;
+        let swarm = ctx.swarm.read().await;
+        let fullnode = swarm.full_node(*fullnode_id).unwrap();
+        fullnode.start().await?;
     }
 
     // Restart the validators so they start syncing from a fresh state
     for valdiator_id in validators_to_reset {
-        let validator = ctx.swarm().validator_mut(*valdiator_id).unwrap();
-        runtime.block_on(async { validator.start().await })?;
+        let swarm = ctx.swarm.read().await;
+        let validator = swarm.validator(*valdiator_id).unwrap();
+        validator.start().await?;
     }
 
     Ok(())
@@ -278,7 +304,9 @@ fn display_state_sync_state_throughput(
     // We allow up to half the test time to do this.
     let node_sync_duration = ctx.global_duration.checked_div(2).unwrap();
     runtime.block_on(async {
-        ctx.swarm()
+        ctx.swarm
+            .read()
+            .await
             .wait_for_all_nodes_to_catchup_to_epoch(highest_synced_epoch, node_sync_duration)
             .await
     })?;
@@ -320,7 +348,7 @@ fn ensure_state_sync_transaction_throughput(
     // Get the highest synced version for the chain
     let runtime = Runtime::new().unwrap();
     let highest_synced_version = runtime.block_on(async {
-        get_highest_synced_version(&ctx.swarm().get_all_nodes_clients_with_names())
+        get_highest_synced_version(&ctx.swarm.read().await.get_all_nodes_clients_with_names())
             .await
             .unwrap_or(0)
     });
@@ -334,7 +362,9 @@ fn ensure_state_sync_transaction_throughput(
     // We allow up to half the test time to do this.
     let node_sync_duration = ctx.global_duration.checked_div(2).unwrap();
     runtime.block_on(async {
-        ctx.swarm()
+        ctx.swarm
+            .read()
+            .await
             .wait_for_all_nodes_to_catchup(node_sync_duration)
             .await
     })?;

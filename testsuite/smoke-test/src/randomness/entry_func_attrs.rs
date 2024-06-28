@@ -5,8 +5,7 @@ use crate::{
     randomness::{
         e2e_basic_consumption::publish_on_chain_dice_module,
         entry_func_attrs::TxnResult::{
-            CommittedSucceeded, CommittedWithBiasableAbort, CommittedWithNoSeedAbort,
-            DiscardedWithMaxGasCheck,
+            CommittedWithBiasableAbort, CommittedWithNoSeedAbort, DiscardedWithMaxGasCheck,
         },
     },
     smoke_test_environment::SwarmBuilder,
@@ -137,130 +136,6 @@ async fn randomness_attr_000() {
     .await;
 }
 
-#[tokio::test]
-async fn randomness_attr_010() {
-    common(TestParams {
-        chain_generates_randomness_seed: false,
-        chain_requires_deposit_for_randtxn: true,
-        chain_allows_custom_max_gas_for_randtxn: false,
-        rolls: vec![
-            RollParams::new(RollFunc::NoAttr, 10000, CommittedWithBiasableAbort),
-            RollParams::new(RollFunc::NoAttr, 45678, CommittedWithBiasableAbort),
-            RollParams::new(RollFunc::NoAttr, 56789, CommittedWithBiasableAbort),
-            RollParams::new(RollFunc::AttrOnly, 10000, CommittedWithNoSeedAbort),
-            RollParams::new(RollFunc::AttrOnly, 45678, DiscardedWithMaxGasCheck),
-            RollParams::new(RollFunc::AttrOnly, 56789, DiscardedWithMaxGasCheck),
-            RollParams::new(
-                RollFunc::AttrWithMaxGasProp,
-                10000,
-                CommittedWithNoSeedAbort,
-            ),
-            RollParams::new(
-                RollFunc::AttrWithMaxGasProp,
-                45678,
-                DiscardedWithMaxGasCheck,
-            ),
-            RollParams::new(
-                RollFunc::AttrWithMaxGasProp,
-                56789,
-                DiscardedWithMaxGasCheck,
-            ),
-        ],
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn randomness_attr_110() {
-    common(TestParams {
-        chain_generates_randomness_seed: true,
-        chain_requires_deposit_for_randtxn: true,
-        chain_allows_custom_max_gas_for_randtxn: false,
-        rolls: vec![
-            RollParams::new(RollFunc::NoAttr, 10000, CommittedWithBiasableAbort),
-            RollParams::new(RollFunc::NoAttr, 45678, CommittedWithBiasableAbort),
-            RollParams::new(RollFunc::NoAttr, 56789, CommittedWithBiasableAbort),
-            RollParams::new(RollFunc::AttrOnly, 10000, CommittedSucceeded),
-            RollParams::new(RollFunc::AttrOnly, 45678, DiscardedWithMaxGasCheck),
-            RollParams::new(RollFunc::AttrOnly, 56789, DiscardedWithMaxGasCheck),
-            RollParams::new(RollFunc::AttrWithMaxGasProp, 10000, CommittedSucceeded),
-            RollParams::new(
-                RollFunc::AttrWithMaxGasProp,
-                45678,
-                DiscardedWithMaxGasCheck,
-            ),
-            RollParams::new(
-                RollFunc::AttrWithMaxGasProp,
-                56789,
-                DiscardedWithMaxGasCheck,
-            ),
-        ],
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn randomness_attr_011() {
-    common(TestParams {
-        chain_generates_randomness_seed: false,
-        chain_requires_deposit_for_randtxn: true,
-        chain_allows_custom_max_gas_for_randtxn: true,
-        rolls: vec![
-            RollParams::new(RollFunc::NoAttr, 10000, CommittedWithBiasableAbort),
-            RollParams::new(RollFunc::NoAttr, 45678, CommittedWithBiasableAbort),
-            RollParams::new(RollFunc::NoAttr, 56789, CommittedWithBiasableAbort),
-            RollParams::new(RollFunc::AttrOnly, 10000, CommittedWithNoSeedAbort),
-            RollParams::new(RollFunc::AttrOnly, 45678, DiscardedWithMaxGasCheck),
-            RollParams::new(RollFunc::AttrOnly, 56789, DiscardedWithMaxGasCheck),
-            RollParams::new(
-                RollFunc::AttrWithMaxGasProp,
-                10000,
-                DiscardedWithMaxGasCheck,
-            ),
-            RollParams::new(
-                RollFunc::AttrWithMaxGasProp,
-                45678,
-                DiscardedWithMaxGasCheck,
-            ),
-            RollParams::new(
-                RollFunc::AttrWithMaxGasProp,
-                56789,
-                CommittedWithNoSeedAbort,
-            ),
-        ],
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn randomness_attr_111() {
-    common(TestParams {
-        chain_generates_randomness_seed: true,
-        chain_requires_deposit_for_randtxn: true,
-        chain_allows_custom_max_gas_for_randtxn: true,
-        rolls: vec![
-            RollParams::new(RollFunc::NoAttr, 10000, CommittedWithBiasableAbort),
-            RollParams::new(RollFunc::NoAttr, 45678, CommittedWithBiasableAbort),
-            RollParams::new(RollFunc::NoAttr, 56789, CommittedWithBiasableAbort),
-            RollParams::new(RollFunc::AttrOnly, 10000, CommittedSucceeded),
-            RollParams::new(RollFunc::AttrOnly, 45678, DiscardedWithMaxGasCheck),
-            RollParams::new(RollFunc::AttrOnly, 56789, DiscardedWithMaxGasCheck),
-            RollParams::new(
-                RollFunc::AttrWithMaxGasProp,
-                10000,
-                DiscardedWithMaxGasCheck,
-            ),
-            RollParams::new(
-                RollFunc::AttrWithMaxGasProp,
-                45678,
-                DiscardedWithMaxGasCheck,
-            ),
-            RollParams::new(RollFunc::AttrWithMaxGasProp, 56789, CommittedSucceeded),
-        ],
-    })
-    .await;
-}
-
 async fn common(params: TestParams) {
     let TestParams {
         chain_generates_randomness_seed,
@@ -271,7 +146,7 @@ async fn common(params: TestParams) {
     let epoch_duration_secs = 20;
     let estimated_dkg_latency_secs = 30;
 
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
