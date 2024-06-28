@@ -1,3 +1,14 @@
+
+Diagnostics:
+warning: Unnecessary trailing semicolon
+  ┌─ tests/checking/typing/continue_any_type.move:6:25
+  │
+6 │             0 + continue;
+  │             ------------^
+  │             │           │
+  │             │           A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.
+  │             Any code after this expression will not be reached
+
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct Coin {

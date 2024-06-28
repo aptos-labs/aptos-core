@@ -30,14 +30,17 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{self, AbilitySet};
 use move_compiler::{
-    expansion::ast as EA,
+    expansion::ast::{self as EA, SequenceItem},
     hlir::ast as HA,
     naming::ast as NA,
-    parser::{ast as PA, ast::CallKind},
+    parser::ast::{self as PA, CallKind},
     shared::{Identifier, Name},
 };
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
-use move_ir_types::location::{sp, Spanned};
+use move_ir_types::{
+    location::{sp, Spanned},
+    sp,
+};
 use num::{BigInt, FromPrimitive, Zero};
 use std::{
     collections::{BTreeMap, BTreeSet, LinkedList},
@@ -2924,7 +2927,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         context: &ErrorMessageContext,
     ) -> ExpData {
         let items = seq.iter().collect_vec();
-        let seq_exp = self.translate_seq_recursively(loc, &items, expected_type, context);
+        let seq_exp = self.translate_seq_recursively(loc, &items, expected_type, context, None);
         if seq_exp.is_directly_borrowable() {
             // Avoid unwrapping a borrowable item, in case context is a `Borrow`.
             let node_id = self.new_node_id_with_type_loc(expected_type, loc);
@@ -2945,6 +2948,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         items: &[&EA::SequenceItem],
         expected_type: &Type,
         context: &ErrorMessageContext,
+        last_item: Option<&Exp>,
     ) -> ExpData {
         if items.is_empty() {
             self.require_impl_language(loc);
@@ -2994,7 +2998,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         self.check_type(loc, expected_type, &Type::unit(), context);
                         self.new_unit_exp(loc)
                     } else {
-                        self.translate_seq_recursively(loc, &items[1..], expected_type, context)
+                        self.translate_seq_recursively(
+                            loc,
+                            &items[1..],
+                            expected_type,
+                            context,
+                            None,
+                        )
                     };
                     // Return result
                     self.exit_scope();
@@ -3003,7 +3013,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 Seq(_) if items.len() > 1 => {
                     self.translate_seq_items(loc, items, expected_type, context)
                 },
-                Seq(exp) => self.translate_exp_in_context(exp, expected_type, context),
+                Seq(exp) => {
+                    if let sp!(semicolon_loc, EA::Exp_::Unit { trailing: true }) = exp {
+                        if let Some(last_exp) = last_item {
+                            if !last_exp.has_reachable_successor() {
+                                // Last expression was divergent.
+                                let last_id = last_exp.node_id();
+                                let last_loc = self.env().get_node_loc(last_id);
+                                let msg = "Unnecessary trailing semicolon";
+                                let msg1 = "A trailing `;` in an expression block implicitly adds a `()` value expression after the semicolon.";
+                                let msg2 = "Any code after this expression will not be reached";
+                                let semicolon_loc = self.to_loc(semicolon_loc);
+                                self.env().diag_with_labels(
+                                    Severity::Warning,
+                                    &semicolon_loc,
+                                    msg,
+                                    vec![
+                                        (semicolon_loc.clone(), msg1.to_owned()),
+                                        (last_loc, msg2.to_owned()),
+                                    ],
+                                );
+                            }
+                        }
+                    }
+                    self.translate_exp_in_context(exp, expected_type, context)
+                },
             }
         }
     }
@@ -3039,6 +3073,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         Some(ConstraintContext::inferred()),
                     )
                     .expect("success on fresh var");
+                    // Item type is unconstrained, use `Type::Error` as a marker.
                 }
                 if let ExpData::Sequence(_, mut es) = exp {
                     exps.append(&mut es);
@@ -3050,7 +3085,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
             k += 1;
         }
-        let rest = self.translate_seq_recursively(loc, &items[k..], expected_type, context);
+        let rest =
+            self.translate_seq_recursively(loc, &items[k..], expected_type, context, exps.last());
         exps.push(rest.into_exp());
         let id = self.new_node_id_with_type_loc(expected_type, loc);
         ExpData::Sequence(id, exps)
