@@ -221,18 +221,18 @@ impl DbWriter for AptosDB {
         let latest_version = self.get_latest_version()?;
         let target_version = ledger_info_with_sigs.ledger_info().version();
 
-        // Update in-memory state first, as this is what
-        // concurrent readers would use for the latest ledger info.
-        self.pre_revert(latest_version, &ledger_info_with_sigs);
+        // Update the provided ledger info and the overall commit progress
+        let new_root_hash = ledger_info_with_sigs.commit_info().executed_state_id();
+        self.commit_ledger_info(
+            target_version,
+            new_root_hash,
+            Some(&ledger_info_with_sigs),
+        )?;
+
+        let ledger_batch = SchemaBatch::new();
 
         // Lock buffered state in the state store
         let state_lock = self.state_store.reset_lock();
-
-        // Revert the overall commit progress
-        ledger_batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::OverallCommitProgress,
-            &DbMetadataValue::Version(target_version),
-        )?;
 
         // Write ledger metadata db changes
         self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
@@ -289,31 +289,6 @@ impl DbWriter for AptosDB {
         self.state_store
             .state_kv_db
             .revert_state_kv_and_ledger_metadata(target_version)?;
-
-        // Update the provided ledger info
-        let new_root_hash = ledger_info_with_sigs.commit_info().executed_state_id();
-        self.commit_ledger_info(target_version, new_root_hash, Some(&ledger_info_with_sigs))?;
-
-        // Truncate the ledger and state dbs
-        truncate_ledger_db(self.ledger_db.clone(), target_version)?;
-        truncate_state_kv_db_shards(
-            &self.state_store.state_kv_db,
-            target_version,
-            Some(latest_version),
-        )?;
-        truncate_state_merkle_db(&self.state_store.state_merkle_db, target_version)?;
-
-        // Reset buffered state after truncation
-        state_lock.reset();
-
-        // Revert block index if event index is skipped.
-        if self.skip_index_and_usage {
-            let batch = SchemaBatch::new();
-            self.ledger_db
-                .metadata_db()
-                .truncate_block_info(target_version, &batch)?;
-            self.ledger_db.metadata_db().write_schemas(batch)?;
-        }
 
         Ok(())
     }
