@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: enable_limit_vm_type_size
+proposals:
+  - name: enable_limit_vm_type_size
+    metadata:
+      title: "Enable limiting of MoveVM type sizes"
+      description: "Enables new type builder with corrected type size computations"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - limit_v_m_type_size
