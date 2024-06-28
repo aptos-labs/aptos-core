@@ -14,6 +14,7 @@ pub mod data_cache;
 mod interpreter;
 mod loader;
 pub mod logging;
+pub mod module_storage;
 pub mod move_vm;
 pub mod native_extensions;
 pub mod native_functions;

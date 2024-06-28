@@ -1466,9 +1466,11 @@ impl AptosVM {
                 // Check what modules exist before publishing.
                 let mut exists = BTreeSet::new();
                 for m in modules {
-                    let id = m.self_id();
-                    if session.exists_module(&id)? {
-                        exists.insert(id);
+                    if resolver
+                        .check_module_exists(m.self_addr(), m.self_name())
+                        .map_err(|e| e.finish(Location::Undefined))?
+                    {
+                        exists.insert(m.self_id());
                     }
                 }
 

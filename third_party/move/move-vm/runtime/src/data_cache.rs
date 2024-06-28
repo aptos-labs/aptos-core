@@ -171,17 +171,6 @@ impl<'r> TransactionDataCache<'r> {
         Ok(change_set)
     }
 
-    pub(crate) fn num_mutated_accounts(&self, sender: &AccountAddress) -> u64 {
-        // The sender's account will always be mutated.
-        let mut total_mutated_accounts: u64 = 1;
-        for (addr, entry) in self.account_map.iter() {
-            if addr != sender && entry.data_map.values().any(|(_, v, _)| v.is_mutated()) {
-                total_mutated_accounts += 1;
-            }
-        }
-        total_mutated_accounts
-    }
-
     fn get_mut_or_insert_with<'a, K, V, F>(map: &'a mut BTreeMap<K, V>, k: &K, gen: F) -> &'a mut V
     where
         F: FnOnce() -> (K, V),
@@ -348,36 +337,5 @@ impl<'r> TransactionDataCache<'r> {
                     .clone())
             },
         }
-    }
-
-    pub(crate) fn publish_module(
-        &mut self,
-        module_id: &ModuleId,
-        blob: Vec<u8>,
-        is_republishing: bool,
-    ) -> VMResult<()> {
-        let account_cache =
-            Self::get_mut_or_insert_with(&mut self.account_map, module_id.address(), || {
-                (*module_id.address(), AccountDataCache::new())
-            });
-
-        account_cache
-            .module_map
-            .insert(module_id.name().to_owned(), (blob.into(), is_republishing));
-
-        Ok(())
-    }
-
-    pub(crate) fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
-        if let Some(account_cache) = self.account_map.get(module_id.address()) {
-            if account_cache.module_map.contains_key(module_id.name()) {
-                return Ok(true);
-            }
-        }
-        Ok(self
-            .remote
-            .get_module(module_id)
-            .map_err(|e| e.finish(Location::Undefined))?
-            .is_some())
     }
 }

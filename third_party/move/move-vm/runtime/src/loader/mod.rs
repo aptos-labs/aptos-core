@@ -549,6 +549,7 @@ impl Loader {
     //
     // All modules in the bundle to be published must be loadable. This function performs all
     // verification steps to load these modules without actually loading them into the code cache.
+    #[allow(dead_code)]
     pub(crate) fn verify_module_bundle_for_publication(
         &self,
         modules: &[CompiledModule],
@@ -586,6 +587,7 @@ impl Loader {
     //   bundle. Basically, this represents the modules appears before `M` in the bundle vector.
     // - the `bundle_unverified` argument tracks the modules that have not been verified when `M`
     //   is being verified, i.e., the modules appears after `M` in the bundle vector.
+    #[allow(dead_code)]
     fn verify_module_for_publication(
         &self,
         module: &CompiledModule,

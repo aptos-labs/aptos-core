@@ -209,56 +209,55 @@ impl<'r, 'l> Session<'r, 'l> {
     /// `move_binary_format::compatibility`.
     pub fn publish_module_bundle(
         &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
+        _modules: Vec<Vec<u8>>,
+        _sender: AccountAddress,
+        _gas_meter: &mut impl GasMeter,
     ) -> VMResult<()> {
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            Compatibility::full_check(),
-        )
+        unimplemented!()
+        // self.move_vm.runtime.publish_module_bundle(
+        //     modules,
+        //     sender,
+        //     &mut self.data_cache,
+        //     &self.module_store,
+        //     gas_meter,
+        //     Compatibility::full_check(),
+        // )
     }
 
     /// Same like `publish_module_bundle` but with a custom compatibility check.
     pub fn publish_module_bundle_with_compat_config(
         &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-        compat_config: Compatibility,
+        _modules: Vec<Vec<u8>>,
+        _sender: AccountAddress,
+        _gas_meter: &mut impl GasMeter,
+        _compat_config: Compatibility,
     ) -> VMResult<()> {
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            compat_config,
-        )
+        unimplemented!()
+        // self.move_vm.runtime.publish_module_bundle(
+        //     modules,
+        //     sender,
+        //     &mut self.data_cache,
+        //     &self.module_store,
+        //     gas_meter,
+        //     compat_config,
+        // )
     }
 
     pub fn publish_module_bundle_relax_compatibility(
         &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
+        _modules: Vec<Vec<u8>>,
+        _sender: AccountAddress,
+        _gas_meter: &mut impl GasMeter,
     ) -> VMResult<()> {
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            Compatibility::no_check(),
-        )
-    }
-
-    pub fn num_mutated_accounts(&self, sender: &AccountAddress) -> u64 {
-        self.data_cache.num_mutated_accounts(sender)
+        unimplemented!()
+        // self.move_vm.runtime.publish_module_bundle(
+        //     modules,
+        //     sender,
+        //     &mut self.data_cache,
+        //     &self.module_store,
+        //     gas_meter,
+        //     Compatibility::no_check(),
+        // )
     }
 
     /// Finish up the session and produce the side effects.
@@ -325,11 +324,6 @@ impl<'r, 'l> Session<'r, 'l> {
         self.data_cache
             .load_module(module_id)
             .map_err(|e| e.finish(Location::Undefined))
-    }
-
-    /// Check if this module exists.
-    pub fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
-        self.data_cache.exists_module(module_id)
     }
 
     /// Load a script and all of its types into cache
