@@ -91,7 +91,7 @@ pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
     network_controller: NetworkController,
     state_view_service: Arc<RemoteStateViewService<S>>,
     // Channels to send execute block commands to the executor shards.
-    command_txs: Arc<Vec<Vec<tokio::sync::Mutex<OutboundRpcHelper>>>>,
+    command_txs: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
     // Channels to receive execution results from the executor shards.
     result_rxs: Vec<Arc<Receiver<Message>>>,
     // Thread pool used to pre-fetch the state values for the block in parallel and create an in-memory state view.
@@ -130,7 +130,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             let execute_result_type = format!("execute_result_{}", shard_id);
             let mut command_tx = vec![];
             for _ in 0..num_threads/(2 * num_shards) {
-                command_tx.push(tokio::sync::Mutex::new(OutboundRpcHelper::new(self_addr, *address, outbound_rpc_runtime.clone())));
+                command_tx.push(Mutex::new(OutboundRpcHelper::new(self_addr, *address, outbound_rpc_runtime.clone())));
             }
             let result_rx = Arc::new(controller_mut_ref.create_inbound_channel(execute_result_type));
             command_txs.push(command_tx);
@@ -155,7 +155,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         let cmd_tx_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("rmt-exe-cli-cmd-tx-{}", index))
-                .num_threads(60)//num_cpus::get() / 2)
+                .num_threads(30)//num_cpus::get() / 2)
                 .build()
                 .unwrap(),
         );
@@ -392,12 +392,17 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                     let execute_command_type = format!("execute_command_{}", shard_id);
                     let mut rng = StdRng::from_entropy();
                     let rand_send_thread_idx = rng.gen_range(0, senders[shard_id].len());
-                    rpc_outbound_runtime_clone.spawn(async move {
-                        senders[shard_id][rand_send_thread_idx]
-                            .lock()
-                            .await
-                            .send_async(msg, &MessageType::new(execute_command_type)).await;
-                    });
+                    senders[shard_id][rand_send_thread_idx]
+                        .lock()
+                        .unwrap()
+                        .send(msg, &MessageType::new(execute_command_type));
+
+                        // rpc_outbound_runtime_clone.spawn(async move {
+                    //     senders[shard_id][rand_send_thread_idx]
+                    //         .lock()
+                    //         .await
+                    //         .send_async(msg, &MessageType::new(execute_command_type)).await;
+                    // });
                 });
             }
         }
