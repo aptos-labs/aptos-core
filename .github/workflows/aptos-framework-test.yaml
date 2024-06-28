@@ -4,7 +4,7 @@ on:
   push:
     branches: 
         - master
-        - integrate_supra_framework
+        - integrate_consensus_key
   pull_request:
     branches:
         - master
@@ -36,5 +36,5 @@ jobs:
  
     - name: Run tests
       run: |
-        ${{ env.CARGO_BIN }} test --release -p aptos-framework -- --skip prover
+        ${{ env.CARGO_BIN }} test --release -p supra-framework -- --skip prover
         ${{ env.CARGO_BIN }} nextest run -p e2e-move-tests
