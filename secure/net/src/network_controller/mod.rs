@@ -83,7 +83,7 @@ impl Message {
 
 /// NetworkController is the main entry point for sending and receiving messages over the network.
 /// 1. If a node acts as both client and server, albeit in different contexts, GRPC needs separate
-///    runtimes for client context and server context. Otherwise we a hang in GRPC. This seems to be
+///    runtimes for client context and server context. Otherwise we hang in GRPC. This seems to be
 ///    an internal bug in GRPC.
 /// 2. We want to use tokio runtimes because it is best for async IO and tonic GRPC
 ///    implementation is async. However, we want the rest of the system (remote executor service)
