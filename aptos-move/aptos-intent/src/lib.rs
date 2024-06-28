@@ -3,16 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use bytes::Bytes;
-use move_binary_format::{access::ModuleAccess, errors::PartialVMResult, CompiledModule};
+use move_binary_format::{access::ModuleAccess, CompiledModule};
 use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
     resolver::ModuleResolver,
 };
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::JsFuture;
+use std::{any, collections::BTreeMap, str::FromStr};
+use wasm_bindgen::{module, prelude::*};
 
 mod codegen;
 
@@ -56,9 +55,9 @@ pub enum ArgumentOperation {
 /// Call a Move entry function.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BatchedFunctionCall {
-    module: String,
-    function: String,
-    ty_args: Vec<String>,
+    module: ModuleId,
+    function: Identifier,
+    ty_args: Vec<TypeTag>,
     args: Vec<BatchArgument>,
 }
 
@@ -66,15 +65,13 @@ pub struct BatchedFunctionCall {
 pub struct BatchedFunctionCallBuilder {
     calls: Vec<BatchedFunctionCall>,
     num_signers: u16,
-    resolver: NullResolver,
+    modules: BTreeMap<ModuleId, CompiledModule>,
 }
 
 #[wasm_bindgen]
 impl BatchedFunctionCallBuilder {
     fn num_of_returns(&self, module_id: &ModuleId, func_name: &IdentStr) -> anyhow::Result<u16> {
-        if let Some(bytes) = self.resolver.get_module(module_id)? {
-            let module =
-                CompiledModule::deserialize(&bytes).map_err(|err| anyhow::anyhow!("{:?}", err))?;
+        if let Some(module) = self.modules.get(module_id) {
             for def in module.function_defs() {
                 let handle = module.function_handle_at(def.function);
                 if module.identifier_at(handle.name) == func_name {
@@ -89,7 +86,7 @@ impl BatchedFunctionCallBuilder {
         Self {
             calls: vec![],
             num_signers: 1,
-            resolver: NullResolver(),
+            modules: BTreeMap::new(),
         }
     }
 
@@ -97,7 +94,7 @@ impl BatchedFunctionCallBuilder {
         Self {
             calls: vec![],
             num_signers: signer_count,
-            resolver: NullResolver(),
+            modules: BTreeMap::new(),
         }
     }
 
@@ -109,9 +106,9 @@ impl BatchedFunctionCallBuilder {
         args: Vec<BatchArgument>,
     ) -> anyhow::Result<Vec<BatchArgument>> {
         self.calls.push(BatchedFunctionCall {
-            module: module.clone(),
-            function: function.clone(),
-            ty_args,
+            module: ModuleId::from_str(&module)?,
+            function: Identifier::new(function.clone())?,
+            ty_args: ty_args.iter().map(|s| TypeTag::from_str(s)).collect::<anyhow::Result<Vec<_>>>()?,
             args,
         });
         let return_count = self.num_of_returns(
@@ -148,9 +145,31 @@ impl BatchedFunctionCallBuilder {
         crate::codegen::generate_script_from_batched_calls(
             &self.calls,
             self.num_signers,
-            &NullResolver(),
+            &self.modules,
         )
         .map_err(|err| JsValue::from(format!("{:?}", err)))
+    }
+
+    async fn load_module_impl(&mut self, module_name: String) -> anyhow::Result<()> {
+        let module_id = ModuleId::from_str(&module_name)?;
+        let url = format!(
+            "https://api.testnet.aptoslabs.com/v1/accounts/{}/module/{}",
+            &module_id.address, &module_id.name
+        );
+        let response = reqwest::get(url).await.unwrap();
+        let result = if response.status().is_success() {
+            Ok(response.text().await.unwrap())
+        } else {
+            Err(response.text().await.unwrap())
+        };
+
+        unimplemented!()
+    }
+
+    pub async fn load_module(&mut self, module_name: String) -> Result<(), JsValue> {
+        self.load_module_impl(module_name)
+            .await
+            .map_err(|err| JsValue::from(format!("{:?}", err)))
     }
 }
 
@@ -209,39 +228,5 @@ impl BatchArgument {
                 "Unexpected argument type, can only borrow from previous function results",
             )),
         }
-    }
-}
-
-#[wasm_bindgen]
-struct NullResolver();
-
-impl ModuleResolver for NullResolver {
-    type Error = anyhow::Error;
-
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
-        let code = get_module(id.address().to_hex(), id.name().to_string());
-
-        anyhow::bail!("non")
-    }
-
-    fn get_module_metadata(
-        &self,
-        module_id: &ModuleId,
-    ) -> Vec<move_core_types::metadata::Metadata> {
-        vec![]
-    }
-}
-
-#[wasm_bindgen]
-pub async fn get_module(account: String, module_name: String) -> Result<String, String> {
-    let url = format!(
-        "https://api.testnet.aptoslabs.com/v1/accounts/{}/module/{}",
-        account, module_name
-    );
-    let response = reqwest::get(url).await.unwrap();
-    if response.status().is_success() {
-        Ok(response.text().await.unwrap())
-    } else {
-        Err(response.text().await.unwrap())
     }
 }

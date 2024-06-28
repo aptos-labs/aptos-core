@@ -26,5 +26,5 @@ serde_bytes = { workspace = true }
 getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4.42"
-reqwest-wasm = { version = "*", features = [] }
-reqwest = { version = "*", features = [] }
+reqwest-wasm = { version = "*", features = ["blocking"] }
+reqwest = { version = "*", features = ["blocking"] }

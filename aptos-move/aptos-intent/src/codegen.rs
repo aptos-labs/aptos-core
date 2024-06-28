@@ -268,10 +268,7 @@ impl Context {
                 return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
             }
             for ty_arg in call.ty_args.iter() {
-                self.ty_args.push(
-                    TypeTag::from_str(ty_arg)
-                        .map_err(|_| PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE))?,
-                );
+                self.ty_args.push(ty_arg.clone());
             }
         }
         Ok(())
@@ -281,18 +278,15 @@ impl Context {
         &mut self,
         module_id: &ModuleId,
         ident: &IdentStr,
-        module_resolver: &impl ModuleResolver,
+        module_resolver: &BTreeMap<ModuleId, CompiledModule>,
     ) -> PartialVMResult<FunctionHandleIndex> {
         let module_handle = self.import_module_by_id(module_id)?;
         let name = self.import_identifier_by_name(ident)?;
         if let Some(result) = self.function_pool.get(&(module_handle, name)) {
             return Ok(*result);
         }
-        let module = if let Some(bytes) = module_resolver
-            .get_module(module_id)
-            .map_err(|_| PartialVMError::new(StatusCode::LOOKUP_FAILED))?
-        {
-            CompiledModule::deserialize(&bytes)?
+        let module = if let Some(module) = module_resolver.get(module_id) {
+            module
         } else {
             return Err(PartialVMError::new(StatusCode::LOOKUP_FAILED));
         };
@@ -329,13 +323,11 @@ impl Context {
     fn compile_batched_call(
         &mut self,
         call: &BatchedFunctionCall,
-        module_resolver: &impl ModuleResolver,
+        module_resolver: &BTreeMap<ModuleId, CompiledModule>,
     ) -> PartialVMResult<()> {
         let func_id = self.import_call(
-            &ModuleId::from_str(&call.module)
-                .map_err(|_| PartialVMError::new(StatusCode::INVALID_MODULE_HANDLE))?,
-            &Identifier::new(call.function.clone())
-                .map_err(|_| PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE))?,
+            &call.module,
+            &call.function,
             module_resolver,
         )?;
         self.returned_val_to_local
@@ -470,7 +462,7 @@ pub struct Script {
 pub fn generate_script_from_batched_calls(
     calls: &[BatchedFunctionCall],
     signer_count: u16,
-    module_resolver: &impl ModuleResolver,
+    module_resolver: &BTreeMap<ModuleId, CompiledModule>,
 ) -> PartialVMResult<Vec<u8>> {
     let mut context = Context::default();
     context.script = empty_script();
