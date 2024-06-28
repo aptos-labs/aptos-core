@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_indexer_transaction_generator::managed_node::ManagedNode;
+use aptos_indexer_transaction_generator::transaction_generator::TransactionGeneratorArgs;
+use clap::Parser;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut managed_node = ManagedNode::start(&None, None, None).await?;
-    managed_node.stop().await?;
-    println!("Transaction generator finished.");
-    Ok(())
+    // Parse the command line arguments.
+    let args = TransactionGeneratorArgs::parse();
+    args.run().await
 }
