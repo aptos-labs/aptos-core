@@ -5,13 +5,44 @@ use anyhow::Context;
 use aptos::node::local_testnet::{
     faucet::FaucetManager, get_derived_test_dir, node::NodeManager, traits::ServiceManager,
 };
+use clap::Parser;
 use std::path::PathBuf;
 use tokio::{
     fs::{create_dir_all, remove_dir_all},
     process::Child,
     task::JoinSet,
 };
+/// Use a subfolder to store the indexer testing data, this is to avoid conflicts with localnet testing.
+const INDEXER_TESTING_FOLDER: &str = "indexer-testing";
+const FAUCET_DEFAULT_PORT: u16 = 8081;
+
+#[derive(Parser)]
+pub struct LocalnetNodeArgs {
+    /// Path to the node config file, `fullnode.yaml`.
+    #[clap(long)]
+    node_config_path: Option<PathBuf>,
+    /// Path to the custom CLI binary to run a localnode.
+    /// If this is set, the node will be started as a separate process.
+    #[clap(long)]
+    cli_binary_path: Option<PathBuf>,
+    /// Path to the data directory for the node.
+    #[clap(long)]
+    node_data_dir: Option<PathBuf>,
+}
+
+impl LocalnetNodeArgs {
+    pub async fn start_node(&self) -> anyhow::Result<ManagedNode> {
+        ManagedNode::start(
+            &self.node_config_path,
+            self.cli_binary_path.clone(),
+            self.node_data_dir.clone(),
+        )
+        .await
+    }
+}
+
 /// Internal node type to manage the node lifecycle.
+#[derive(Debug)]
 enum LocalnetNodeType {
     // Node built from current source code.
     // It's managed under a JoinSet.
@@ -26,6 +57,7 @@ enum LocalnetNodeType {
 ///   - BuiltIn: running in a different thread. If the transaction generation is done, abort the thread and exit.
 ///   - CustomBinary: running in another process. If the transaction generation is done, the process is killed.
 /// Both include a faucet service for funding accounts.
+#[derive(Debug)]
 pub struct ManagedNode {
     node: LocalnetNodeType,
 }
@@ -34,33 +66,33 @@ impl ManagedNode {
     pub async fn start(
         node_config_path: &Option<PathBuf>,
         binary_path: Option<PathBuf>,
-        input_test_dir: Option<PathBuf>,
+        node_data_dir: Option<PathBuf>,
     ) -> anyhow::Result<Self> {
         let result = match binary_path {
             Some(_path) => {
-                unimplemented!("Custom binary node is not supported yet");
+                unimplemented!("Custom CLI binary is not supported yet");
             },
             None => {
-                let test_dir = get_derived_test_dir(&input_test_dir)?;
+                let node_dir = get_derived_test_dir(&node_data_dir)?.join(INDEXER_TESTING_FOLDER);
                 // By default, we don't reuse the testnet folder.
-                if test_dir.exists() {
-                    remove_dir_all(test_dir.as_path()).await.context(format!(
+                if node_dir.exists() {
+                    remove_dir_all(node_dir.as_path()).await.context(format!(
                         "Failed to remove testnet folder at {:?}",
-                        &test_dir
+                        &node_dir
                     ))?;
                 }
-                create_dir_all(test_dir.as_path()).await.context(format!(
+                create_dir_all(node_dir.as_path()).await.context(format!(
                     "Failed to create testnet folder at {:?}",
-                    &test_dir
+                    &node_dir
                 ))?;
                 let node_manager =
-                    NodeManager::new_for_indexer_testing(node_config_path, test_dir.clone())
+                    NodeManager::new_for_indexer_testing(node_config_path, node_dir.clone())
                         .context("Failed to start node service manager")?;
                 let node_health_checkers = node_manager.get_health_checkers();
                 let faucet_manager = FaucetManager::new_for_indexer_testing(
                     node_health_checkers.clone(),
-                    8081,
-                    test_dir.clone(),
+                    FAUCET_DEFAULT_PORT,
+                    node_dir.clone(),
                     node_manager.get_node_api_url(),
                 )
                 .context("Failed to build faucet service manager")?;
