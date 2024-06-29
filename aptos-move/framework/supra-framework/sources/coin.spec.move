@@ -63,11 +63,13 @@ spec supra_framework::coin {
         global supply<CoinType>: num;
         global aggregate_supply<CoinType>: num;
         apply TotalSupplyTracked<CoinType> to *<CoinType> except
-            initialize, initialize_internal, initialize_with_parallelizable_supply;
+            initialize, initialize_internal, initialize_internal_with_limit, initialize_with_parallelizable_supply,
+        initialize_with_parallelizable_supply_with_limit;
         /// [high-level-req-4]
         /// [high-level-req-9]
         apply TotalSupplyNoChange<CoinType> to *<CoinType> except mint,
-            burn, burn_from, initialize, initialize_internal, initialize_with_parallelizable_supply;
+            burn, burn_from, initialize, initialize_internal, initialize_internal_with_limit,
+        initialize_with_parallelizable_supply, initialize_with_parallelizable_supply_with_limit;
     }
 
     spec fun spec_fun_supply_tracked<CoinType>(val: u64, supply: Option<OptionalAggregator>): bool {

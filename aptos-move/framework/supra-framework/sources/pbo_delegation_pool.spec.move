@@ -1,4 +1,4 @@
-spec supra_framework::delegation_pool {
+spec supra_framework::pbo_delegation_pool {
     /// <high-level-req>
     /// No.: 1
     /// Requirement: Every DelegationPool has only one corresponding StakePool stored at the same address.
@@ -91,6 +91,6 @@ spec supra_framework::delegation_pool {
     ///
     spec module {
         // TODO: verification disabled until this module is specified.
-        pragma verify=false;
+        pragma verify = false;
     }
 }

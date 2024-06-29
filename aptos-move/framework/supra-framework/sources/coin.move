@@ -15,7 +15,6 @@ module supra_framework::coin {
     use aptos_std::type_info;
 
 	friend supra_framework::supra_coin;
-    //friend supra_framework::supra_coin;
     friend supra_framework::genesis;
     friend supra_framework::transaction_fee;
 

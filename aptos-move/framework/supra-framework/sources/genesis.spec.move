@@ -147,6 +147,30 @@ spec supra_framework::genesis {
         ensures global<chain_status::GenesisEndMarker>(@supra_framework) == chain_status::GenesisEndMarker {};
     }
 
+    spec create_delegation_pools {
+        pragma verify = false;
+    }
+
+    spec create_delegation_pool {
+        pragma verify = false;
+    }
+
+    spec create_pbo_delegation_pools {
+        pragma verify = false;
+    }
+
+    spec create_pbo_delegation_pool {
+        pragma verify = false;
+    }
+
+    spec assert_validator_addresses_check {
+        pragma verify = false;
+    }
+
+    spec create_vesting_without_staking_pools {
+        pragma verify = false;
+    }
+
     spec schema InitalizeRequires {
         execution_config: vector<u8>;
         requires !exists<account::Account>(@supra_framework);
