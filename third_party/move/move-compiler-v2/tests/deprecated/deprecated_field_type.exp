@@ -1,7 +1,7 @@
 
 Diagnostics:
 warning: Use of deprecated struct
-   ┌─ tests/more-v1/deprecated/deprecated_field_type.move:17:22
+   ┌─ tests/deprecated/deprecated_field_type.move:17:22
    │
  3 │     #[deprecated]
    │       ---------- Struct 'EventHandle' in module '0x42::event' deprecated here
@@ -10,7 +10,7 @@ warning: Use of deprecated struct
    │                      ^^^^^^^^^^^ Use of deprecated struct 'EventHandle' from module '0x42::event'
 
 warning: Use of deprecated struct
-   ┌─ tests/more-v1/deprecated/deprecated_field_type.move:27:25
+   ┌─ tests/deprecated/deprecated_field_type.move:27:25
    │
  3 │     #[deprecated]
    │       ---------- Struct 'EventHandle' in module '0x42::event' deprecated here
@@ -19,7 +19,7 @@ warning: Use of deprecated struct
    │                         ^^^^^^^^^^^ Use of deprecated struct 'EventHandle' from module '0x42::event'
 
 warning: Use of deprecated struct
-   ┌─ tests/more-v1/deprecated/deprecated_field_type.move:28:26
+   ┌─ tests/deprecated/deprecated_field_type.move:28:26
    │
  3 │     #[deprecated]
    │       ---------- Struct 'EventHandle' in module '0x42::event' deprecated here

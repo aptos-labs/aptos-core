@@ -1,7 +1,7 @@
 
 Diagnostics:
 error: duplicate declaration, item, or annotation
-  ┌─ tests/more-v1/verification/verify/double_annotation.move:8:7
+  ┌─ tests/verification/verify/double_annotation.move:8:7
   │
 7 │     #[verify_only]
   │       ----------- Attribute previously given here
@@ -9,7 +9,7 @@ error: duplicate declaration, item, or annotation
   │       ^^^^^^^^^^^ Duplicate attribute 'verify_only' attached to the same item
 
 error: duplicate declaration, item, or annotation
-   ┌─ tests/more-v1/verification/verify/double_annotation.move:18:7
+   ┌─ tests/verification/verify/double_annotation.move:18:7
    │
 17 │     #[verify_only]
    │       ----------- Attribute previously given here

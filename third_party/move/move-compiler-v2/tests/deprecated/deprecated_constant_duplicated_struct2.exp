@@ -1,7 +1,7 @@
 
 Diagnostics:
 error: duplicate declaration, item, or annotation
-  ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:5:11
+  ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:5:11
   │
 3 │     struct C { }
   │            - Alias previously defined here
@@ -10,13 +10,13 @@ error: duplicate declaration, item, or annotation
   │           ^ Duplicate module member or alias 'C'. Top level names in a namespace must be unique
 
 warning: unused alias
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:12:15
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:12:15
    │
 12 │     use 0x42::mod1;
    │               ^^^^ Unused 'use' of alias 'mod1'. Consider removing it
 
 warning: Use of deprecated constant
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:13:21
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:13:21
    │
  4 │     #[deprecated]
    │       ---------- Constant 'C' in module '0x42::mod1' deprecated here
@@ -25,7 +25,7 @@ warning: Use of deprecated constant
    │                     ^ Use of deprecated constant 'C' from module '0x42::mod1'
 
 warning: Use of deprecated constant
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:14:21
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:14:21
    │
  4 │     #[deprecated]
    │       ---------- Constant 'C' in module '0x42::mod1' deprecated here
@@ -34,7 +34,7 @@ warning: Use of deprecated constant
    │                     ^ Use of deprecated constant 'C' from module '0x42::mod1'
 
 warning: Use of deprecated struct
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:17:27
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:17:27
    │
  4 │     #[deprecated]
    │       ---------- Struct 'C' in module '0x42::mod1' deprecated here
@@ -43,7 +43,7 @@ warning: Use of deprecated struct
    │                           ^ Use of deprecated struct 'C' from module '0x42::mod1'
 
 warning: Use of deprecated member
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:19:2
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:19:2
    │
  4 │     #[deprecated]
    │       ---------- Member 'C' in module '0x42::mod1' deprecated here
@@ -52,7 +52,7 @@ warning: Use of deprecated member
    │     ^ Use of deprecated member 'C' from module '0x42::mod1'
 
 warning: Use of deprecated constant
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:21:22
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:21:22
    │
  4 │     #[deprecated]
    │       ---------- Constant 'C' in module '0x42::mod1' deprecated here
@@ -61,7 +61,7 @@ warning: Use of deprecated constant
    │                         ^ Use of deprecated constant 'C' from module '0x42::mod1'
 
 warning: Use of deprecated member
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:22:6
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:22:6
    │
  4 │     #[deprecated]
    │       ---------- Member 'C' in module '0x42::mod1' deprecated here
@@ -70,7 +70,7 @@ warning: Use of deprecated member
    │         ^ Use of deprecated member 'C' from module '0x42::mod1'
 
 warning: Use of deprecated member
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:24:2
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:24:2
    │
  4 │     #[deprecated]
    │       ---------- Member 'C' in module '0x42::mod1' deprecated here
@@ -79,13 +79,13 @@ warning: Use of deprecated member
    │     ^ Use of deprecated member 'C' from module '0x42::mod1'
 
 warning: unused alias
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:31:15
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:31:15
    │
 31 │     use 0x42::mod1;
    │               ^^^^ Unused 'use' of alias 'mod1'. Consider removing it
 
 warning: Use of deprecated constant
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:32:21
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:32:21
    │
  4 │     #[deprecated]
    │       ---------- Constant 'C' in module '0x42::mod1' deprecated here
@@ -94,13 +94,13 @@ warning: Use of deprecated constant
    │                     ^ Use of deprecated constant 'C' from module '0x42::mod1'
 
 error: invalid name
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:32:26
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:32:26
    │
 32 │     use 0x42::mod1::C as mod1;
    │                          ^^^^ Invalid constant alias name 'mod1'. Constant alias names must start with 'A'..'Z'
 
 warning: Use of deprecated constant
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:33:21
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:33:21
    │
  4 │     #[deprecated]
    │       ---------- Constant 'C' in module '0x42::mod1' deprecated here
@@ -109,7 +109,7 @@ warning: Use of deprecated constant
    │                     ^ Use of deprecated constant 'C' from module '0x42::mod1'
 
 warning: Use of deprecated struct
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:36:27
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:36:27
    │
  4 │     #[deprecated]
    │       ---------- Struct 'C' in module '0x42::mod1' deprecated here
@@ -118,7 +118,7 @@ warning: Use of deprecated struct
    │                           ^ Use of deprecated struct 'C' from module '0x42::mod1'
 
 warning: Use of deprecated member
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:38:2
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:38:2
    │
  4 │     #[deprecated]
    │       ---------- Member 'C' in module '0x42::mod1' deprecated here
@@ -127,7 +127,7 @@ warning: Use of deprecated member
    │     ^ Use of deprecated member 'C' from module '0x42::mod1'
 
 warning: Use of deprecated constant
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:40:22
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:40:22
    │
  4 │     #[deprecated]
    │       ---------- Constant 'C' in module '0x42::mod1' deprecated here
@@ -136,7 +136,7 @@ warning: Use of deprecated constant
    │                         ^ Use of deprecated constant 'C' from module '0x42::mod1'
 
 warning: Use of deprecated member
-   ┌─ tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.move:41:6
+   ┌─ tests/deprecated/deprecated_constant_duplicated_struct2.move:41:6
    │
  4 │     #[deprecated]
    │       ---------- Member 'C' in module '0x42::mod1' deprecated here

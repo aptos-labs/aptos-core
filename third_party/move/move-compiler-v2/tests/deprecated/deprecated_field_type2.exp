@@ -1,7 +1,7 @@
 
 Diagnostics:
 warning: Use of deprecated struct
-   ┌─ tests/more-v1/deprecated/deprecated_field_type2.move:29:38
+   ┌─ tests/deprecated/deprecated_field_type2.move:29:38
    │
 22 │     #[deprecated]
    │       ---------- Struct 'WithdrawEvent' in module '0x41::coin' deprecated here

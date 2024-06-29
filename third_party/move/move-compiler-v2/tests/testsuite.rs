@@ -198,26 +198,12 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::None, // do not dump anything
             dump_bytecode_filter: None,
         },
-        // Tests for more-v1 tests
-        TestConfig {
-            name: "more-v1",
-            runner: |p| run_test(p, get_config_by_name("more-v1")),
-            include: vec!["/more-v1/"],
-            exclude: vec![],
-            exp_suffix: None,
-            options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
-            // Run the entire compiler pipeline to double-check the result
-            stop_after: StopAfter::FileFormat,
-            dump_ast: DumpLevel::None,
-            dump_bytecode: DumpLevel::None, // do not dump anything
-            dump_bytecode_filter: None,
-        },
-        // Tests for inlining, simplifier, and folding
+        // Tests for front-end, diagnostics (inlining, simplifier, folding, etc.)
         TestConfig {
             name: "inlining-et-al",
             runner: |p| run_test(p, get_config_by_name("inlining-et-al")),
-            include: vec!["/inlining/", "/folding/", "/simplifier/", "/more-v1/"],
-            exclude: vec!["/more-v1/verification/"],
+            include: vec!["/inlining/", "/folding/", "/simplifier/"],
+            exclude: vec![],
             exp_suffix: None,
             options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
             // Run the entire compiler pipeline to double-check the result
@@ -237,6 +223,20 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             // Run the entire compiler pipeline to double-check the result
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::None, // do not dump anything
+            dump_bytecode_filter: None,
+        },
+        // Tests for diagnostics, where dumping AST isn't useful.
+        TestConfig {
+            name: "diagnostics",
+            runner: |p| run_test(p, get_config_by_name("diagnostics")),
+            include: vec!["/deprecated/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None, // do not dump anything
             dump_bytecode_filter: None,
         },

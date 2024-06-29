@@ -1,7 +1,7 @@
 
 Diagnostics:
 warning: Use of deprecated module
-   ┌─ tests/more-v1/deprecated/deprecated_placement_module2.move:3:9
+   ┌─ tests/deprecated/deprecated_placement_module2.move:3:9
    │
  3 │     use 0x41::N;
    │         ^^^^^^^ Use of deprecated module '0x41::N'
@@ -10,7 +10,7 @@ warning: Use of deprecated module
    │   ---------- Module '0x41::N' deprecated here
 
 warning: Use of deprecated module
-   ┌─ tests/more-v1/deprecated/deprecated_placement_module2.move:9:23
+   ┌─ tests/deprecated/deprecated_placement_module2.move:9:23
    │
  9 │     public fun foo(): N::S { let _foo = C + 3; N::bar() }
    │                       ^ Use of deprecated module '0x41::N'
@@ -19,7 +19,7 @@ warning: Use of deprecated module
    │   ---------- Module '0x41::N' deprecated here
 
 warning: Use of deprecated module
-   ┌─ tests/more-v1/deprecated/deprecated_placement_module2.move:9:48
+   ┌─ tests/deprecated/deprecated_placement_module2.move:9:48
    │
  9 │     public fun foo(): N::S { let _foo = C + 3; N::bar() }
    │                                                ^ Use of deprecated module '0x41::N'
@@ -28,7 +28,7 @@ warning: Use of deprecated module
    │   ---------- Module '0x41::N' deprecated here
 
 warning: Use of deprecated module
-   ┌─ tests/more-v1/deprecated/deprecated_placement_module2.move:26:9
+   ┌─ tests/deprecated/deprecated_placement_module2.move:26:9
    │
 15 │ #[deprecated]
    │   ---------- Module '0x41::N' deprecated here
@@ -37,7 +37,7 @@ warning: Use of deprecated module
    │         ^^^^^^^ Use of deprecated module '0x41::N'
 
 warning: Use of deprecated module
-   ┌─ tests/more-v1/deprecated/deprecated_placement_module2.move:30:2
+   ┌─ tests/deprecated/deprecated_placement_module2.move:30:2
    │
 15 │ #[deprecated]
    │   ---------- Module '0x41::N' deprecated here
