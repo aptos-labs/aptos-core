@@ -4,7 +4,8 @@
 use crate::{
     check_aptos_packages_availability, compile_aptos_packages, compile_package,
     data_state_view::DataStateView, generate_compiled_blob, is_aptos_package, CompilationCache,
-    DataManager, IndexReader, PackageInfo, TxnIndex, APTOS_COMMONS,
+    DataManager, IndexReader, PackageInfo, TxnIndex, APTOS_COMMONS, DISABLE_REF_CHECK,
+    DISABLE_SPEC_CHECK, ENABLE_REF_CHECK,
 };
 use anyhow::Result;
 use aptos_framework::APTOS_PACKAGES;
@@ -22,7 +23,7 @@ use clap::ValueEnum;
 use itertools::Itertools;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use move_model::metadata::CompilerVersion;
-use std::{cmp, collections::HashMap, path::PathBuf, sync::Arc};
+use std::{cmp, collections::HashMap, env, path::PathBuf, sync::Arc};
 
 fn load_packages_to_executor(
     executor: &mut FakeExecutor,
@@ -91,18 +92,34 @@ pub struct Execution {
     input_path: PathBuf,
     pub execution_mode: ExecutionMode,
     pub bytecode_version: u32,
+    pub skip_ref_packages: Option<String>,
 }
 
 impl Execution {
+    pub fn check_package_skip(&self, package_name: &str) -> bool {
+        println!("package name:{}", package_name);
+        if let Some(p) = &self.skip_ref_packages {
+            let packages = p.split(',').collect_vec();
+            packages.contains(&package_name)
+        } else {
+            false
+        }
+    }
+
     pub fn output_result_str(&self, msg: String) {
         eprintln!("{}", msg);
     }
 
-    pub fn new(input_path: PathBuf, execution_mode: ExecutionMode) -> Self {
+    pub fn new(
+        input_path: PathBuf,
+        execution_mode: ExecutionMode,
+        skip_ref_packages: Option<String>,
+    ) -> Self {
         Self {
             input_path,
             execution_mode,
             bytecode_version: 6,
+            skip_ref_packages,
         }
     }
 
@@ -221,6 +238,17 @@ impl Execution {
             if compiled_cache.failed_packages_v2.contains(&package_info) {
                 v2_failed = true;
             } else {
+                if self.check_package_skip(&package_info.package_name) {
+                    env::set_var(
+                        "MOVE_COMPILER_EXP",
+                        format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
+                    );
+                } else {
+                    env::set_var(
+                        "MOVE_COMPILER_EXP",
+                        format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
+                    );
+                }
                 let compiled_res_v2 =
                     compile_package(package_dir, &package_info, Some(CompilerVersion::V2_0));
                 if let Ok(compiled_res) = compiled_res_v2 {
@@ -238,7 +266,10 @@ impl Execution {
             }
         }
         if v1_failed || v2_failed {
-            let mut err_msg = "compilation failed at ".to_string();
+            let mut err_msg = format!(
+                "compilation for the package {} failed at",
+                package_info.package_name
+            );
             if v1_failed {
                 err_msg = format!("{} v1", err_msg);
             }
@@ -263,11 +294,9 @@ impl Execution {
             {
                 let compiled_result = self.compile_code(&txn_idx, compiled_cache);
                 if compiled_result.is_err() {
-                    self.output_result_str(format!(
-                        "compilation failed for the package:{} at version:{}",
-                        txn_idx.package_info.package_name, cur_version
-                    ));
-                    return compiled_result;
+                    let err = compiled_result.unwrap_err();
+                    self.output_result_str(format!("{} at version:{}", err, cur_version));
+                    return Err(err);
                 }
             }
             // read the state data;
