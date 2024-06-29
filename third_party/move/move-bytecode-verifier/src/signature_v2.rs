@@ -1029,16 +1029,13 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 &context_all_abilities,
                 fields.iter(),
             ),
-            StructFieldInformation::DeclaredVariants(fields, variants) => self
-                .verify_fields_of_struct(
-                    &struct_handle,
-                    &context,
-                    required_abilities_conditional,
-                    &context_all_abilities,
-                    fields
-                        .iter()
-                        .chain(variants.iter().flat_map(|v| v.fields.iter())),
-                ),
+            StructFieldInformation::DeclaredVariants(variants) => self.verify_fields_of_struct(
+                &struct_handle,
+                &context,
+                required_abilities_conditional,
+                &context_all_abilities,
+                variants.iter().flat_map(|v| v.fields.iter()),
+            ),
         }
     }
 

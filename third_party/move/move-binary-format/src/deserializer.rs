@@ -1379,9 +1379,8 @@ fn load_struct_def(cursor: &mut VersionedCursor) -> BinaryLoaderResult<StructDef
         },
         SerializedNativeStructFlag::DECLARED_VARIANTS => {
             if cursor.version() >= VERSION_7 {
-                let common_fields = load_field_defs(cursor)?;
                 let variants = load_variants(cursor)?;
-                StructFieldInformation::DeclaredVariants(common_fields, variants)
+                StructFieldInformation::DeclaredVariants(variants)
             } else {
                 return Err(
                     PartialVMError::new(StatusCode::MALFORMED).with_message(format!(

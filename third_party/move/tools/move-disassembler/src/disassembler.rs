@@ -1398,7 +1398,7 @@ impl<'a> Disassembler<'a> {
                 abilities,
                 self.print_fields(struct_source_map, fields.iter())
             )),
-            StructFieldInformation::DeclaredVariants(fields, variants) => {
+            StructFieldInformation::DeclaredVariants(variants) => {
                 let variant_strs = variants
                     .iter()
                     .map(|v| {
@@ -1406,10 +1406,7 @@ impl<'a> Disassembler<'a> {
                         format!(
                             " {}{{\n{}\n }}",
                             name_str,
-                            self.print_fields(
-                                struct_source_map,
-                                fields.iter().chain(v.fields.iter())
-                            )
+                            self.print_fields(struct_source_map, v.fields.iter())
                         )
                     })
                     .collect::<Vec<_>>()

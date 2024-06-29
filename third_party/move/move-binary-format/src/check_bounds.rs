@@ -257,11 +257,7 @@ impl<'a> BoundsChecker<'a> {
             .struct_defs()
             .and_then(|d| d.get(field_handle.owner.into_index()))
         {
-            let fields_count = match &struct_def.field_information {
-                StructFieldInformation::Native => 0,
-                StructFieldInformation::Declared(fields)
-                | StructFieldInformation::DeclaredVariants(fields, ..) => fields.len(),
-            };
+            let fields_count = struct_def.field_information.field_count(None);
             if field_handle.field as usize >= fields_count {
                 return Err(bounds_error(
                     StatusCode::INDEX_OUT_OF_BOUNDS,
@@ -388,11 +384,8 @@ impl<'a> BoundsChecker<'a> {
                     self.check_field_def(type_param_count, field)?;
                 }
             },
-            StructFieldInformation::DeclaredVariants(fields, variants) => {
-                for field in fields
-                    .iter()
-                    .chain(variants.iter().flat_map(|v| v.fields.iter()))
-                {
+            StructFieldInformation::DeclaredVariants(variants) => {
+                for field in variants.iter().flat_map(|v| v.fields.iter()) {
                     self.check_field_def(type_param_count, field)?;
                 }
                 if variants.is_empty() {

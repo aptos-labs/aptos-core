@@ -160,14 +160,14 @@ impl<'a> LimitsVerifier<'a> {
                     match &def.field_information {
                         StructFieldInformation::Native => {},
                         StructFieldInformation::Declared(fields) => max += fields.len(),
-                        StructFieldInformation::DeclaredVariants(fields, variants) => {
+                        StructFieldInformation::DeclaredVariants(variants) => {
                             // Notice we interpret the bound as a maximum of the combined
-                            // size of common fields and fields of a given variant, not the
+                            // size of fields of a given variant, not the
                             // sum of all fields in all variants. An upper bound for
                             // overall fields of a variant struct is given by
                             // `max_fields_in_struct * max_struct_variants`
                             for variant in variants {
-                                let count = fields.len() + variant.fields.len();
+                                let count = variant.fields.len();
                                 max = cmp::max(max, count)
                             }
                         },
@@ -182,7 +182,7 @@ impl<'a> LimitsVerifier<'a> {
             if let Some(max_struct_variants) = config.max_struct_variants {
                 for def in defs {
                     if matches!(&def.field_information,
-                        StructFieldInformation::DeclaredVariants(_, variants) if variants.len() > max_struct_variants)
+                        StructFieldInformation::DeclaredVariants(variants) if variants.len() > max_struct_variants)
                     {
                         return Err(PartialVMError::new(StatusCode::MAX_STRUCT_VARIANTS_REACHED));
                     }

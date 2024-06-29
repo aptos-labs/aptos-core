@@ -89,17 +89,19 @@ impl<'a> SignatureChecker<'a> {
                 StructFieldInformation::Declared(fields) => {
                     self.verify_fields_of_struct(struct_def_idx, struct_def, None, fields.iter())?
                 },
-                StructFieldInformation::DeclaredVariants(fields, variants) => variants
-                    .iter()
-                    .enumerate()
-                    .try_for_each(|(variant_offset, variant)| {
-                        self.verify_fields_of_struct(
-                            struct_def_idx,
-                            struct_def,
-                            Some(variant_offset),
-                            fields.iter().chain(variant.fields.iter()),
-                        )
-                    })?,
+                StructFieldInformation::DeclaredVariants(variants) => {
+                    variants
+                        .iter()
+                        .enumerate()
+                        .try_for_each(|(variant_offset, variant)| {
+                            self.verify_fields_of_struct(
+                                struct_def_idx,
+                                struct_def,
+                                Some(variant_offset),
+                                variant.fields.iter(),
+                            )
+                        })?
+                },
             };
         }
         Ok(())

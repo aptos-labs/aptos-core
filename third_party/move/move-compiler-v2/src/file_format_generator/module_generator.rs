@@ -238,31 +238,17 @@ impl ModuleGenerator {
         }
         let struct_handle = self.struct_index(ctx, loc, struct_env);
         let field_information = if struct_env.has_variants() {
-            let variants = struct_env.get_variants().collect_vec();
-            // Extract common fields, can use any of the variants, which are known to be not
-            // empty.
-            let common_fields = struct_env
-                .get_fields_of_variant(variants[0])
-                .filter_map(|f| {
-                    if f.is_common_variant_field() {
-                        Some(self.field(ctx, def_idx, &f))
-                    } else {
-                        None
-                    }
-                })
-                .collect_vec();
-            let variants = variants
-                .into_iter()
+            let variants = struct_env
+                .get_variants()
                 .map(|v| FF::VariantDefinition {
                     name: self.name_index(ctx, struct_env.get_variant_loc(v), v),
                     fields: struct_env
                         .get_fields_of_variant(v)
-                        .skip(common_fields.len())
                         .map(|f| self.field(ctx, def_idx, &f))
                         .collect_vec(),
                 })
                 .collect_vec();
-            FF::StructFieldInformation::DeclaredVariants(common_fields, variants)
+            FF::StructFieldInformation::DeclaredVariants(variants)
         } else {
             let fields = struct_env.get_fields();
             FF::StructFieldInformation::Declared(

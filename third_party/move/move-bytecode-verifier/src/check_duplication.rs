@@ -221,9 +221,9 @@ impl<'a> DuplicationChecker<'a> {
                     }
                     Self::check_duplicate_fields(fields.iter())?
                 },
-                StructFieldInformation::DeclaredVariants(fields, variants) => {
+                StructFieldInformation::DeclaredVariants(variants) => {
                     for variant in variants {
-                        Self::check_duplicate_fields(fields.iter().chain(variant.fields.iter()))?
+                        Self::check_duplicate_fields(variant.fields.iter())?
                     }
                 },
             };

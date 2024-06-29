@@ -642,10 +642,9 @@ fn serialize_struct_definition(
             binary.push(SerializedNativeStructFlag::DECLARED as u8)?;
             serialize_field_definitions(binary, fields)
         },
-        StructFieldInformation::DeclaredVariants(fields, variants) => {
+        StructFieldInformation::DeclaredVariants(variants) => {
             if major_version >= VERSION_7 {
                 binary.push(SerializedNativeStructFlag::DECLARED_VARIANTS as u8)?;
-                serialize_field_definitions(binary, fields)?;
                 serialize_variant_count(binary, variants.len())?;
                 for variant in variants {
                     serialize_variant_definition(binary, variant)?

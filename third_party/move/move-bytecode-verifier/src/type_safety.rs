@@ -312,13 +312,13 @@ fn type_fields_signature(
                 .map(|field_def| instantiate(&field_def.signature.0, type_args))
                 .collect(),
         )),
-        (StructFieldInformation::DeclaredVariants(fields, variants), Some(variant))
+        (StructFieldInformation::DeclaredVariants(variants), Some(variant))
             if (variant as usize) < variants.len() =>
         {
             Ok(Signature(
-                fields
+                variants[variant as usize]
+                    .fields
                     .iter()
-                    .chain(variants[variant as usize].fields.iter())
                     .map(|field_def| instantiate(&field_def.signature.0, type_args))
                     .collect(),
             ))

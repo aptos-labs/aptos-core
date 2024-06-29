@@ -379,30 +379,23 @@ pub struct StructVariantHandle {
 pub enum StructFieldInformation {
     Native,
     Declared(Vec<FieldDefinition>),
-    DeclaredVariants(
-        /*common fields*/ Vec<FieldDefinition>,
-        /*variants*/ Vec<VariantDefinition>,
-    ),
+    DeclaredVariants(Vec<VariantDefinition>),
 }
 
 impl StructFieldInformation {
     /// Returns the fields described by this field information. If no variant is
-    /// provided, this returns all fields of a struct, or common fields of a variant struct.
-    /// Otherwise, for variant structs, the fields of the variant are returned in addition
-    /// to the common fields.
+    /// provided, this returns all fields of a struct. Otherwise, the fields of the
+    /// variant are returned.
     pub fn fields(&self, variant: Option<VariantCount>) -> Vec<&FieldDefinition> {
         use StructFieldInformation::*;
         match self {
             Native => vec![],
             Declared(fields) => fields.iter().collect(),
-            DeclaredVariants(fields, variants) => {
+            DeclaredVariants(variants) => {
                 if let Some(variant) = variant.filter(|v| (*v as usize) < variants.len()) {
-                    fields
-                        .iter()
-                        .chain(variants[variant as usize].fields.iter())
-                        .collect()
+                    variants[variant as usize].fields.iter().collect()
                 } else {
-                    fields.iter().collect()
+                    vec![]
                 }
             },
         }
@@ -415,11 +408,11 @@ impl StructFieldInformation {
         match self {
             Native => 0,
             Declared(fields) => fields.len(),
-            DeclaredVariants(fields, variants) => {
+            DeclaredVariants(variants) => {
                 if let Some(variant) = variant.filter(|v| (*v as usize) < variants.len()) {
-                    fields.len() + variants[variant as usize].fields.len()
+                    variants[variant as usize].fields.len()
                 } else {
-                    fields.len()
+                    0
                 }
             },
         }
@@ -431,7 +424,7 @@ impl StructFieldInformation {
         use StructFieldInformation::*;
         match self {
             Native | Declared(_) => &[],
-            DeclaredVariants(_, variants) => variants,
+            DeclaredVariants(variants) => variants,
         }
     }
 
@@ -439,7 +432,7 @@ impl StructFieldInformation {
     pub fn variant_count(&self) -> usize {
         match self {
             StructFieldInformation::Native | StructFieldInformation::Declared(_) => 0,
-            StructFieldInformation::DeclaredVariants(_, variants) => variants.len(),
+            StructFieldInformation::DeclaredVariants(variants) => variants.len(),
         }
     }
 }

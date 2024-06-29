@@ -44,14 +44,12 @@ fn verify_module_impl(module: &CompiledModule) -> PartialVMResult<()> {
                 &type_parameter_abilities,
                 fields.iter(),
             )?,
-            StructFieldInformation::DeclaredVariants(fields, variants) => check_field_abilities(
+            StructFieldInformation::DeclaredVariants(variants) => check_field_abilities(
                 view,
                 idx,
                 required_abilities,
                 &type_parameter_abilities,
-                fields
-                    .iter()
-                    .chain(variants.iter().flat_map(|v| v.fields.iter())),
+                variants.iter().flat_map(|v| v.fields.iter()),
             )?,
         }
     }
