@@ -145,10 +145,10 @@ impl ProofManager {
         back_pressure_total_proof_limit: u64,
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
-        max_txn_summary_storage: usize,
+        max_txn_summaries_in_proof_queue: u64,
     ) -> Self {
         Self {
-            proofs_for_consensus: ProofQueue::new(my_peer_id, max_txn_summary_storage),
+            proofs_for_consensus: ProofQueue::new(my_peer_id, max_txn_summaries_in_proof_queue),
             batch_queue: BatchQueue::new(batch_store),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,

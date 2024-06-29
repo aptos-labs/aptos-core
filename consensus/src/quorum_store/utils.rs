@@ -210,11 +210,11 @@ pub struct ProofQueue {
     remaining_proofs: u64,
     remaining_local_txns: u64,
     remaining_local_proofs: u64,
-    max_txn_summary_storage: usize,
+    max_txn_summary_storage: u64,
 }
 
 impl ProofQueue {
-    pub(crate) fn new(my_peer_id: PeerId, max_txn_summary_storage: usize) -> Self {
+    pub(crate) fn new(my_peer_id: PeerId, max_txn_summary_storage: u64) -> Self {
         Self {
             my_peer_id,
             author_to_batches: HashMap::new(),
@@ -324,7 +324,7 @@ impl ProofQueue {
         let start = Instant::now();
         for (batch_info, txn_summaries) in batch_summaries {
             let batch_key = BatchKey::from_info(&batch_info);
-            if self.txn_summary_to_batches.len() < self.max_txn_summary_storage {
+            if (self.txn_summary_to_batches.len() as u64) < self.max_txn_summary_storage {
                 for txn_summary in txn_summaries {
                     self.txn_summary_to_batches
                         .entry(txn_summary)
