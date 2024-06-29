@@ -5,4 +5,6 @@ mod config;
 mod metrics;
 mod service;
 
+mod test_lib;
+
 pub use config::{IndexerGrpcDataServiceConfig, NonTlsConfig, SERVER_NAME};
