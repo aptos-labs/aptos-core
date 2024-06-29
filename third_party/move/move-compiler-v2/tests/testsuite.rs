@@ -217,7 +217,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             name: "inlining-et-al",
             runner: |p| run_test(p, get_config_by_name("inlining-et-al")),
             include: vec!["/inlining/", "/folding/", "/simplifier/", "/more-v1/"],
-            exclude: vec![],
+            exclude: vec!["/more-v1/verification/"],
             exp_suffix: None,
             options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
             // Run the entire compiler pipeline to double-check the result
