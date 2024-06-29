@@ -185,7 +185,10 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             &options.known_attributes
         },
         options.language_version.unwrap_or_default(),
+        options.warn_deprecated,
+        options.warn_of_deprecation_use_in_aptos_libs,
         options.compile_test_code,
+        options.compile_verify_code,
     )?;
     // Store address aliases
     let map = addrs
