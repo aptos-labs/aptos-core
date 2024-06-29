@@ -156,28 +156,39 @@ impl BatchedFunctionCallBuilder {
         &mut self,
         network: String,
         module_name: String,
-    ) -> anyhow::Result<String, String> {
+    ) -> anyhow::Result<()> {
         let module_id = ModuleId::from_str(&module_name).unwrap();
         let url = format!(
             "https://api.{}.aptoslabs.com/v1/accounts/{}/module/{}",
             network, &module_id.address, &module_id.name
         );
-        let response = reqwest::get(url).await.unwrap();
+        let response = reqwest::get(url).await?;
         let result = if response.status().is_success() {
-            Ok(response.text().await.unwrap())
+            Ok(response.text().await?)
         } else {
-            Err(response.text().await.unwrap())
+            Err(response.text().await?)
         };
 
-        match result {
+        let bytes_result = match result {
             Ok(json_string) => {
-                let v: Value = serde_json::from_str(&json_string).unwrap();
+                let v: Value = serde_json::from_str(&json_string)?;
                 Ok(v["bytecode"].to_string())
             },
             Err(json_string) => {
-                let v: Value = serde_json::from_str(&json_string).unwrap();
+                let v: Value = serde_json::from_str(&json_string)?;
                 Err(v["message"].to_string())
             },
+        };
+
+        match bytes_result {
+            Ok(bytes_hex) => {
+                self.modules.insert(
+                    module_id,
+                    CompiledModule::deserialize(hex::decode(bytes_hex)?.as_slice())?,
+                );
+                Ok(())
+            },
+            Err(message) => Ok(()),
         }
     }
 
@@ -185,7 +196,7 @@ impl BatchedFunctionCallBuilder {
         &mut self,
         network: String,
         module_name: String,
-    ) -> Result<String, JsValue> {
+    ) -> Result<(), JsValue> {
         self.load_module_impl(network, module_name)
             .await
             .map_err(|err| JsValue::from(format!("{:?}", err)))
