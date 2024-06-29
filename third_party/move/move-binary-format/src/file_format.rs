@@ -349,7 +349,12 @@ pub struct FieldHandle {
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct VariantFieldHandle {
-    pub owner: StructVariantHandleIndex,
+    /// The structure which defines the variant.
+    pub owner: StructDefinitionIndex,
+    /// The sequence of variants which share the field at the given
+    /// field offset.
+    pub variants: Vec<VariantCount>,
+    /// The field offset.
     pub field: MemberCount,
 }
 

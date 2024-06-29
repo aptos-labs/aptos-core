@@ -161,11 +161,12 @@ pub enum Operation {
     Exists(ModuleId, StructId, Vec<Type>),
 
     // Variants
-    // Below the `Symbol` is the name of the variant.
+    // Below the `Symbol` is the name of the variant. In the case of `Vec<Symbol>`,
+    // it is a list of variants the value needs to have
     TestVariant(ModuleId, StructId, Symbol, Vec<Type>),
     PackVariant(ModuleId, StructId, Symbol, Vec<Type>),
     UnpackVariant(ModuleId, StructId, Symbol, Vec<Type>),
-    BorrowFieldVariant(ModuleId, StructId, Symbol, Vec<Type>, usize),
+    BorrowVariantField(ModuleId, StructId, Vec<Symbol>, Vec<Type>, usize),
 
     // Borrow
     BorrowLoc,
@@ -263,7 +264,7 @@ impl Operation {
             Operation::TestVariant(_, _, _, _) => false,
             Operation::PackVariant(_, _, _, _) => false,
             Operation::UnpackVariant(_, _, _, _) => true, // aborts if not given variant
-            Operation::BorrowFieldVariant(_, _, _, _, _) => true, // aborts if not given variant
+            Operation::BorrowVariantField(_, _, _, _, _) => true, // aborts if not given variant
             Operation::MoveTo(_, _, _) => true,
             Operation::MoveFrom(_, _, _) => true,
             Operation::Exists(_, _, _) => false,
@@ -1158,12 +1159,17 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     field_env.get_name().display(struct_env.symbol_pool())
                 )?;
             },
-            BorrowFieldVariant(mid, sid, variant, targs, offset) => {
+            BorrowVariantField(mid, sid, variants, targs, offset) => {
+                assert!(!variants.is_empty());
+                let variants_str = variants
+                    .iter()
+                    .map(|v| v.display(self.func_target.symbol_pool()))
+                    .join("|");
                 write!(
                     f,
-                    "borrow_field_variant<{}::{}>",
+                    "borrow_variant_field<{}::{}>",
                     self.struct_str(*mid, *sid, targs),
-                    variant.display(self.func_target.symbol_pool())
+                    variants_str,
                 )?;
                 let struct_env = self
                     .func_target
@@ -1171,7 +1177,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     .get_module(*mid)
                     .into_struct(*sid);
                 let field_env =
-                    struct_env.get_field_by_offset_optional_variant(Some(*variant), *offset);
+                    struct_env.get_field_by_offset_optional_variant(Some(variants[0]), *offset);
                 write!(
                     f,
                     ".{}",

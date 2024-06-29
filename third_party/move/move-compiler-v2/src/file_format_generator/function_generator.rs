@@ -489,13 +489,13 @@ impl<'a> FunctionGenerator<'a> {
                     source,
                 );
             },
-            Operation::BorrowFieldVariant(mid, sid, variant, inst, offset) => {
+            Operation::BorrowVariantField(mid, sid, variants, inst, offset) => {
                 self.gen_borrow_field(
                     ctx,
                     dest,
                     mid.qualified(*sid),
                     inst.clone(),
-                    Some(*variant),
+                    Some(variants),
                     *offset,
                     source,
                 );
@@ -720,22 +720,26 @@ impl<'a> FunctionGenerator<'a> {
         dest: &[TempIndex],
         id: QualifiedId<StructId>,
         inst: Vec<Type>,
-        variant: Option<Symbol>,
+        variants: Option<&[Symbol]>,
         offset: usize,
         source: &[TempIndex],
     ) {
         let fun_ctx = ctx.fun_ctx;
         self.abstract_push_args(ctx, source, None);
         let struct_env = &fun_ctx.module.env.get_struct(id);
-        let field_env = &struct_env.get_field_by_offset_optional_variant(variant, offset);
-        let requires_variant_borrow =
-            field_env.get_variant().is_some() && !field_env.is_common_variant_field();
         let is_mut = fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference();
-        if requires_variant_borrow {
+
+        if let Some(variants) = variants {
+            assert!(!variants.is_empty());
+            let field_env =
+                &struct_env.get_field_by_offset_optional_variant(Some(variants[0]), offset);
             if inst.is_empty() {
-                let idx = self
-                    .gen
-                    .variant_field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
+                let idx = self.gen.variant_field_index(
+                    &fun_ctx.module,
+                    &fun_ctx.loc,
+                    variants,
+                    field_env,
+                );
                 if is_mut {
                     self.emit(FF::Bytecode::MutBorrowVariantField(idx))
                 } else {
@@ -745,6 +749,7 @@ impl<'a> FunctionGenerator<'a> {
                 let idx = self.gen.variant_field_inst_index(
                     &fun_ctx.module,
                     &fun_ctx.loc,
+                    variants,
                     field_env,
                     inst,
                 );
@@ -754,23 +759,26 @@ impl<'a> FunctionGenerator<'a> {
                     self.emit(FF::Bytecode::ImmBorrowVariantFieldGeneric(idx))
                 }
             }
-        } else if inst.is_empty() {
-            let idx = self
-                .gen
-                .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
-            if is_mut {
-                self.emit(FF::Bytecode::MutBorrowField(idx))
-            } else {
-                self.emit(FF::Bytecode::ImmBorrowField(idx))
-            }
         } else {
-            let idx = self
-                .gen
-                .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
-            if is_mut {
-                self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
+            let field_env = &struct_env.get_field_by_offset_optional_variant(None, offset);
+            if inst.is_empty() {
+                let idx = self
+                    .gen
+                    .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowField(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowField(idx))
+                }
             } else {
-                self.emit(FF::Bytecode::ImmBorrowFieldGeneric(idx))
+                let idx = self
+                    .gen
+                    .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
+                if is_mut {
+                    self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
+                } else {
+                    self.emit(FF::Bytecode::ImmBorrowFieldGeneric(idx))
+                }
             }
         }
         self.abstract_pop_n(ctx, source.len());

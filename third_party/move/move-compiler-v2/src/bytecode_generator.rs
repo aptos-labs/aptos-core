@@ -10,7 +10,7 @@ use move_model::{
     ast::{Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{
-        FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
+        FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
         QualifiedInstId, StructId,
     },
     symbol::Symbol,
@@ -1109,11 +1109,6 @@ impl<'env> Generator<'env> {
         field_id: FieldId,
         oper: &Exp,
     ) {
-        let field_offset = {
-            let struct_env = self.env().get_struct(struct_id);
-            let field_env = struct_env.get_field(field_id);
-            field_env.get_offset()
-        };
         let temp = self.gen_auto_ref_arg(oper, kind);
         // Get instantiation of field. It is not contained in the select expression but in the
         // type of its operand.
@@ -1122,15 +1117,12 @@ impl<'env> Generator<'env> {
             .skip_reference()
             .get_struct(self.env())
         {
+            let struct_env = self.env().get_struct(struct_id);
+            let field_env = struct_env.get_field(field_id);
             self.emit_call(
                 id,
                 vec![target],
-                BytecodeOperation::BorrowField(
-                    struct_id.module_id,
-                    struct_id.id,
-                    inst.to_vec(),
-                    field_offset,
-                ),
+                self.borrow_field_operation(struct_id.instantiate(inst.to_vec()), &field_env),
                 vec![temp],
             );
         } else {
@@ -1155,9 +1147,6 @@ impl<'env> Generator<'env> {
         field: FieldId,
         oper: &Exp,
     ) {
-        let struct_env = self.env().get_struct(str.to_qualified_id());
-        let field_offset = struct_env.get_field(field).get_offset();
-
         // Compile operand in reference mode, defaulting to immutable mode.
         let oper_temp = self.gen_auto_ref_arg(oper, ReferenceKind::Immutable);
         let oper_type = self.get_node_type(oper.node_id());
@@ -1194,16 +1183,48 @@ impl<'env> Generator<'env> {
         } else {
             target
         };
+        let struct_env = self.env().get_struct(str.to_qualified_id());
+        let field_env = struct_env.get_field(field);
         self.emit_call(
             id,
             vec![borrow_dest],
-            BytecodeOperation::BorrowField(str.module_id, str.id, str.inst, field_offset),
+            self.borrow_field_operation(str, &field_env),
             vec![oper_temp],
         );
         if need_read_ref {
             self.emit_call(id, vec![target], BytecodeOperation::ReadRef, vec![
                 borrow_dest,
             ])
+        }
+    }
+
+    fn borrow_field_operation(
+        &self,
+        str: QualifiedInstId<StructId>,
+        field_env: &FieldEnv,
+    ) -> BytecodeOperation {
+        let struct_env = &field_env.struct_env;
+        if struct_env.has_variants() {
+            // Need to generate a BorrowVariantField, specifying all the variants in
+            // which the field is defined.
+            let variants_with_field = struct_env
+                .get_variants()
+                .filter(|v| {
+                    struct_env.get_fields_of_variant(*v).any(|f| {
+                        f.get_name() == field_env.get_name() && f.get_type() == field_env.get_type()
+                    })
+                })
+                .collect_vec();
+            BytecodeOperation::BorrowVariantField(
+                str.module_id,
+                str.id,
+                variants_with_field,
+                str.inst,
+                field_env.get_offset(),
+            )
+        } else {
+            // Regular BorrowField
+            BytecodeOperation::BorrowField(str.module_id, str.id, str.inst, field_env.get_offset())
         }
     }
 }
@@ -1678,10 +1699,10 @@ impl<'env> Generator<'env> {
                     *id,
                     vec![*temp],
                     if let Some(var) = variant {
-                        BytecodeOperation::BorrowFieldVariant(
+                        BytecodeOperation::BorrowVariantField(
                             str.module_id,
                             str.id,
-                            var,
+                            vec![var],
                             str.inst.to_owned(),
                             field_offset,
                         )

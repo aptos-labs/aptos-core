@@ -144,20 +144,17 @@ fn borrow_field(
     // check the reference on the stack is the expected type.
     // Load the type that owns the field according to the instruction.
     // For generic fields access, this step materializes that type
-    let (struct_def_index, variant_opt, field_idx) = match field_handle_index {
+    let (struct_def_index, variants, field_idx) = match field_handle_index {
         FieldOrVariantIndex::FieldIndex(idx) => {
             let field_handle = verifier.resolver.field_handle_at(idx)?;
             (field_handle.owner, None, field_handle.field as usize)
         },
         FieldOrVariantIndex::VariantFieldIndex(idx) => {
-            let field_variant_handle = verifier.resolver.variant_field_handle_at(idx)?;
-            let struct_variant = verifier
-                .resolver
-                .struct_variant_handle_at(field_variant_handle.owner)?;
+            let field_handle = verifier.resolver.variant_field_handle_at(idx)?;
             (
-                struct_variant.struct_index,
-                Some(struct_variant.variant),
-                field_variant_handle.field as usize,
+                field_handle.owner,
+                Some(field_handle.variants.clone()),
+                field_handle.field as usize,
             )
         },
     };
@@ -168,35 +165,49 @@ fn borrow_field(
         _ => return Err(verifier.error(StatusCode::BORROWFIELD_TYPE_MISMATCH_ERROR, offset)),
     }
 
-    let field_def = match (&struct_def.field_information, variant_opt) {
-        (
-            StructFieldInformation::Declared(fields)
-            | StructFieldInformation::DeclaredVariants(fields, _),
-            None,
-        ) => fields.get(field_idx),
-        (StructFieldInformation::DeclaredVariants(fields, variants), Some(variant)) => {
-            if field_idx < fields.len() {
-                // Common field
-                fields.get(field_idx)
-            } else {
-                // Field specific to variant
-                variants
-                    .get(variant as usize)
-                    .and_then(|v| v.fields.get(field_idx.wrapping_sub(fields.len())))
+    // Check and determine the type loaded onto the stack
+    let field_ty = if let Some(variants) = variants {
+        if variants.is_empty() {
+            // It is not allowed to have no variants provided here, otherwise we cannot
+            // determine the type.
+            return Err(verifier.error(StatusCode::ZERO_VARIANTS_ERROR, offset));
+        }
+        // For all provided variants, the field type must be the same.
+        let mut field_ty = None;
+        for variant in variants {
+            if let Some(field_def) = struct_def
+                .field_information
+                .fields(Some(variant))
+                .get(field_idx)
+            {
+                let ty = instantiate(&field_def.signature.0, type_args);
+                if let Some(field_ty) = &field_ty {
+                    // More than one field possible, compare types.
+                    if &ty != field_ty {
+                        return Err(
+                            verifier.error(StatusCode::BORROWFIELD_TYPE_MISMATCH_ERROR, offset)
+                        );
+                    }
+                } else {
+                    field_ty = Some(ty)
+                }
             }
-        },
-        _ => {
-            return Err(verifier.error(StatusCode::BORROWFIELD_BAD_FIELD_ERROR, offset));
-        },
+        }
+        field_ty
+    } else {
+        struct_def
+            .field_information
+            .fields(None)
+            .get(field_idx)
+            .map(|field_def| instantiate(&field_def.signature.0, type_args))
     };
-    if let Some(field_def) = field_def {
-        let field_type = Box::new(instantiate(&field_def.signature.0, type_args));
+    if let Some(field_ty) = field_ty {
         verifier.push(
             meter,
             if mut_ {
-                ST::MutableReference(field_type)
+                ST::MutableReference(Box::new(field_ty))
             } else {
-                ST::Reference(field_type)
+                ST::Reference(Box::new(field_ty))
             },
         )?;
     } else {

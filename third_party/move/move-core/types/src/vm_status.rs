@@ -723,19 +723,17 @@ pub enum StatusCode {
     UNSTABLE_BYTECODE_REJECTED = 1125,
     // Bound on the number of struct variants per struct exceeded.
     MAX_STRUCT_VARIANTS_REACHED = 1126,
-    // A variant is accessed which does not exist
-    UNKNOWN_STRUCT_VARIANT = 1127,
-    // A field is accessed which does not exist
-    UNKNOWN_STRUCT_FIELD = 1128,
     // A variant test has wrong argument type
-    TEST_VARIANT_TYPE_MISMATCH_ERROR = 1129,
+    TEST_VARIANT_TYPE_MISMATCH_ERROR = 1127,
+    // A variant list is empty
+    ZERO_VARIANTS_ERROR = 1128,
 
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_1 = 1130,
-    RESERVED_VERIFICATION_ERROR_2 = 1131,
-    RESERVED_VERIFICATION_ERROR_3 = 1132,
-    RESERVED_VERIFICATION_ERROR_4 = 1133,
-    RESERVED_VERIFICATION_ERROR_5 = 1134,
+    RESERVED_VERIFICATION_ERROR_1 = 1129,
+    RESERVED_VERIFICATION_ERROR_2 = 1130,
+    RESERVED_VERIFICATION_ERROR_3 = 1131,
+    RESERVED_VERIFICATION_ERROR_4 = 1132,
+    RESERVED_VERIFICATION_ERROR_5 = 1133,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.

@@ -170,7 +170,7 @@ impl<'a> InstructionConsistency<'a> {
         generic: bool,
     ) -> PartialVMResult<()> {
         let field_handle = self.resolver.variant_field_handle_at(field_handle_index)?;
-        self.check_variant_op(offset, field_handle.owner, generic)
+        self.check_struct_op(offset, field_handle.owner, generic)
     }
 
     fn current_function(&self) -> FunctionDefinitionIndex {

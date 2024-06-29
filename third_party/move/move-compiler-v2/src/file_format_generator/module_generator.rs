@@ -79,9 +79,14 @@ pub struct ModuleGenerator {
     /// A mapping from constants sequences (with the corresponding type information) to pool indices.
     cons_to_idx: BTreeMap<(Constant, Type), FF::ConstantPoolIndex>,
     variant_field_to_idx:
-        BTreeMap<(QualifiedId<StructId>, Symbol, usize), FF::VariantFieldHandleIndex>,
+        BTreeMap<(QualifiedId<StructId>, Vec<Symbol>, usize), FF::VariantFieldHandleIndex>,
     variant_field_inst_to_idx: BTreeMap<
-        (QualifiedId<StructId>, Symbol, usize, FF::SignatureIndex),
+        (
+            QualifiedId<StructId>,
+            Vec<Symbol>,
+            usize,
+            FF::SignatureIndex,
+        ),
         FF::VariantFieldInstantiationIndex,
     >,
     struct_variant_to_idx: BTreeMap<(QualifiedId<StructId>, Symbol), FF::StructVariantHandleIndex>,
@@ -816,16 +821,12 @@ impl ModuleGenerator {
         &mut self,
         ctx: &ModuleContext,
         loc: &Loc,
+        variants: &[Symbol],
         field_env: &FieldEnv,
     ) -> FF::VariantFieldHandleIndex {
-        debug_assert!(
-            !field_env.is_common_variant_field() && field_env.get_variant().is_some(),
-            "expected a non-common variant field"
-        );
-        let variant = field_env.get_variant().expect("variannt");
         let key = (
             field_env.struct_env.get_qualified_id(),
-            variant,
+            variants.to_vec(),
             field_env.get_offset(),
         );
         if let Some(idx) = self.variant_field_to_idx.get(&key) {
@@ -837,11 +838,16 @@ impl ModuleGenerator {
             MAX_FIELD_COUNT,
             "variant field",
         ));
-        let owner = self.struct_variant_index(ctx, loc, &field_env.struct_env, variant);
+        let variant_offsets = variants
+            .iter()
+            .filter_map(|v| field_env.struct_env.get_variant_idx(*v))
+            .collect_vec();
+        let owner = self.struct_def_index(ctx, loc, &field_env.struct_env);
         self.module
             .variant_field_handles
             .push(FF::VariantFieldHandle {
                 owner,
+                variants: variant_offsets,
                 field: field_env.get_offset() as FF::MemberCount,
             });
         self.variant_field_to_idx.insert(key, field_idx);
@@ -853,14 +859,14 @@ impl ModuleGenerator {
         &mut self,
         ctx: &ModuleContext,
         loc: &Loc,
+        variants: &[Symbol],
         field_env: &FieldEnv,
         inst: Vec<Type>,
     ) -> FF::VariantFieldInstantiationIndex {
-        let variant = field_env.get_variant().expect("field variant");
         let type_parameters = self.signature(ctx, loc, inst);
         let key = (
             field_env.struct_env.get_qualified_id(),
-            variant,
+            variants.to_vec(),
             field_env.get_offset(),
             type_parameters,
         );
@@ -873,7 +879,7 @@ impl ModuleGenerator {
             MAX_FIELD_INST_COUNT,
             "variant field instantiation",
         ));
-        let handle = self.variant_field_index(ctx, loc, field_env);
+        let handle = self.variant_field_index(ctx, loc, variants, field_env);
         self.module
             .variant_field_instantiations
             .push(FF::VariantFieldInstantiation {

@@ -12,7 +12,7 @@ use move_binary_format::{
         Ability, AbilitySet, Bytecode, CodeUnit, FieldDefinition, FunctionDefinition,
         FunctionDefinitionIndex, FunctionHandle, ModuleHandle, Signature, SignatureIndex,
         SignatureToken, StructDefinition, StructDefinitionIndex, StructFieldInformation,
-        StructTypeParameter, StructVariantHandleIndex, TableIndex, Visibility,
+        StructTypeParameter, StructVariantHandleIndex, TableIndex, VariantCount, Visibility,
     },
     views::FieldOrVariantIndex,
 };
@@ -307,18 +307,27 @@ impl<'a> Disassembler<'a> {
         let code = self.source_mapper.bytecode;
         let struct_variant_handle = code.struct_variant_handle_at(idx)?;
         let struct_name = self.name_for_struct(struct_variant_handle.struct_index)?;
-        let struct_def = code.struct_def_at(struct_variant_handle.struct_index)?;
+        let variant_name = self.name_for_variant(
+            struct_variant_handle.struct_index,
+            struct_variant_handle.variant,
+        )?;
+        Ok(format!("{}/{}", struct_name, variant_name))
+    }
+
+    fn name_for_variant(
+        &self,
+        idx: StructDefinitionIndex,
+        variant: VariantCount,
+    ) -> Result<String> {
+        let code = self.source_mapper.bytecode;
+        let struct_def = code.struct_def_at(idx)?;
         let variant_name = struct_def
             .field_information
             .variants()
-            .get(struct_variant_handle.variant as usize)
+            .get(variant as usize)
             .ok_or_else(|| anyhow!("Inconsistent variant offset"))?
             .name;
-        Ok(format!(
-            "{}/{}",
-            struct_name,
-            code.identifier_at(variant_name)
-        ))
+        Ok(format!("{}", code.identifier_at(variant_name)))
     }
 
     fn name_for_field(&self, field_idx: FieldOrVariantIndex) -> Result<String> {
@@ -342,20 +351,27 @@ impl<'a> Disassembler<'a> {
             },
             FieldOrVariantIndex::VariantFieldIndex(idx) => {
                 let field_handle = code.variant_field_handle_at(idx)?;
-                let struct_variant_name = self.name_for_struct_variant(field_handle.owner)?;
-                let struct_variant_handle = code.struct_variant_handle_at(field_handle.owner)?;
-                let struct_def = code.struct_def_at(struct_variant_handle.struct_index)?;
-                let field_name = struct_def
-                    .field_information
-                    .fields(Some(struct_variant_handle.variant))
-                    .get(field_handle.field as usize)
-                    .ok_or_else(|| anyhow!("Inconsistent field offset"))?
-                    .name;
-                Ok(format!(
-                    "{}.{}",
-                    struct_variant_name,
-                    code.identifier_at(field_name)
-                ))
+                let struct_def = code.struct_def_at(field_handle.owner)?;
+                Ok(field_handle
+                    .variants
+                    .iter()
+                    .map(|v| {
+                        let variant_name = self.name_for_variant(field_handle.owner, *v)?;
+                        let field_name = struct_def
+                            .field_information
+                            .fields(Some(*v))
+                            .get(field_handle.field as usize)
+                            .map(|f| {
+                                self.source_mapper
+                                    .bytecode
+                                    .identifier_at(f.name)
+                                    .to_string()
+                            })
+                            .ok_or_else(|| anyhow!("Inconsistent field offset"))?;
+                        Ok(format!("{}.{}", variant_name, field_name))
+                    })
+                    .collect::<Result<Vec<String>>>()?
+                    .join("|"))
             },
         }
     }
@@ -380,18 +396,21 @@ impl<'a> Disassembler<'a> {
             },
             FieldOrVariantIndex::VariantFieldIndex(idx) => {
                 let field_handle = code.variant_field_handle_at(idx)?;
-                let struct_variant_handle = code.struct_variant_handle_at(field_handle.owner)?;
-                let struct_def = code.struct_def_at(struct_variant_handle.struct_index)?;
+                // We can take any representative for verified code.
+                let Some(variant) = field_handle.variants.first().cloned() else {
+                    bail!("Inconsistent empty variant field list")
+                };
+                let struct_def = code.struct_def_at(field_handle.owner)?;
                 (
                     struct_def
                         .field_information
-                        .fields(Some(struct_variant_handle.variant))
+                        .fields(Some(variant))
                         .get(field_handle.field as usize)
                         .ok_or_else(|| anyhow!("Inconsistent field offset"))?
                         .signature
                         .0
                         .clone(),
-                    struct_variant_handle.struct_index,
+                    field_handle.owner,
                 )
             },
         };

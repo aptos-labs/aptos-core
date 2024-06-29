@@ -1122,7 +1122,7 @@ impl<'env> FunctionTranslator<'env> {
                     TestVariant(..)
                     | PackVariant(..)
                     | UnpackVariant(..)
-                    | BorrowFieldVariant(..) => {
+                    | BorrowVariantField(..) => {
                         let loc = self.fun_target.get_bytecode_loc(attr_id);
                         self.parent.env.error(&loc, "variants not yet implemented")
                     },

@@ -226,9 +226,7 @@ impl<'a> SignatureChecker<'a> {
                 ImmBorrowVariantFieldGeneric(idx) | MutBorrowVariantFieldGeneric(idx) => {
                     let field_inst = self.resolver.variant_field_instantiation_at(*idx)?;
                     let field_handle = self.resolver.variant_field_handle_at(field_inst.handle)?;
-                    let variant_handle =
-                        self.resolver.struct_variant_handle_at(field_handle.owner)?;
-                    let struct_def = self.resolver.struct_def_at(variant_handle.struct_index)?;
+                    let struct_def = self.resolver.struct_def_at(field_handle.owner)?;
                     let struct_handle = self.resolver.struct_handle_at(struct_def.struct_handle);
                     let type_arguments = &self.resolver.signature_at(field_inst.type_parameters).0;
                     self.check_signature_tokens(type_arguments)?;

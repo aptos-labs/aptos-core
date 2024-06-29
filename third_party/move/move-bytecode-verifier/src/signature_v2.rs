@@ -720,12 +720,10 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 let field_handle = self
                     .resolver
                     .variant_field_handle_at(variant_field_inst.handle)?;
-                let struct_variant_handle =
-                    self.resolver.struct_variant_handle_at(field_handle.owner)?;
                 let constraints = self
                     .verify_struct_type_params(
                         AbilitySet::EMPTY,
-                        struct_variant_handle.struct_index,
+                        field_handle.owner,
                         variant_field_inst.type_parameters,
                     )
                     .map_err(|err| {

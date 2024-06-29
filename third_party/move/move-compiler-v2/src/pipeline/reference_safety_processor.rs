@@ -2009,11 +2009,13 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                             src,
                         );
                     },
-                    BorrowFieldVariant(mid, sid, variant, inst, field_offs) => {
+                    BorrowVariantField(mid, sid, variants, inst, field_offs) => {
                         let (dest, src) = (dests[0], srcs[0]);
+
                         step.borrow_field(
                             mid.qualified_inst(*sid, inst.clone()),
-                            Some(*variant),
+                            // Use one representative variant
+                            Some(variants[0]),
                             field_offs,
                             dest,
                             src,

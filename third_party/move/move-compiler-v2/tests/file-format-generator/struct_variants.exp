@@ -177,7 +177,7 @@ B2:
 	10: BrFalse(20)
 B3:
 	11: CopyLoc[0](Arg0: &Option<Option<u64>>)
-	12: ImmBorrowVariantFieldGeneric[0](Option/Some.value: Ty0)
+	12: ImmBorrowVariantFieldGeneric[0](Some.value: Ty0)
 	13: TestVariantGeneric[4](Option/None<u64>)
 	14: BrFalse(20)
 B4:
@@ -192,7 +192,7 @@ B5:
 	22: BrFalse(30)
 B6:
 	23: MoveLoc[0](Arg0: &Option<Option<u64>>)
-	24: ImmBorrowVariantFieldGeneric[0](Option/Some.value: Ty0)
+	24: ImmBorrowVariantFieldGeneric[0](Some.value: Ty0)
 	25: TestVariantGeneric[5](Option/Some<u64>)
 	26: BrFalse(30)
 B7:
@@ -282,7 +282,7 @@ B2:
 	14: BrFalse(26)
 B3:
 	15: CopyLoc[1](loc0: &Outer)
-	16: ImmBorrowVariantField[1](Outer/One.i: Inner)
+	16: ImmBorrowVariantField[1](One.i: Inner)
 	17: TestVariant[0](Inner/Inner1)
 	18: BrFalse(26)
 B4:
@@ -352,7 +352,7 @@ B2:
 	14: BrFalse(30)
 B3:
 	15: CopyLoc[1](loc0: &Outer)
-	16: ImmBorrowVariantField[1](Outer/One.i: Inner)
+	16: ImmBorrowVariantField[1](One.i: Inner)
 	17: StLoc[3](loc2: &Inner)
 	18: MoveLoc[3](loc2: &Inner)
 	19: Call is_inner1(&Inner): bool
@@ -419,7 +419,7 @@ B2:
 	10: BrFalse(20)
 B3:
 	11: CopyLoc[0](Arg0: &Outer)
-	12: ImmBorrowVariantField[1](Outer/One.i: Inner)
+	12: ImmBorrowVariantField[1](One.i: Inner)
 	13: Call is_inner1(&Inner): bool
 	14: BrFalse(20)
 B4:
@@ -434,7 +434,7 @@ B5:
 	22: BrFalse(28)
 B6:
 	23: MoveLoc[0](Arg0: &Outer)
-	24: ImmBorrowVariantField[1](Outer/One.i: Inner)
+	24: ImmBorrowVariantField[1](One.i: Inner)
 	25: Call is_inner1(&Inner): bool
 	26: StLoc[1](loc0: bool)
 	27: Branch(40)
@@ -444,7 +444,7 @@ B7:
 	30: BrFalse(36)
 B8:
 	31: MoveLoc[0](Arg0: &Outer)
-	32: ImmBorrowVariantField[2](Outer/Two.i: Inner)
+	32: ImmBorrowVariantField[2](Two.i: Inner)
 	33: Call is_inner1(&Inner): bool
 	34: StLoc[1](loc0: bool)
 	35: Branch(40)
@@ -464,7 +464,7 @@ L3:	loc2: u64
 L4:	loc3: u64
 B0:
 	0: ImmBorrowLoc[0](Arg0: CommonFields)
-	1: ImmBorrowField[1](CommonFields.x: u64)
+	1: ImmBorrowVariantField[3](Foo.x|Bar.x: u64)
 	2: ReadRef
 	3: ImmBorrowLoc[0](Arg0: CommonFields)
 	4: StLoc[1](loc0: &CommonFields)

@@ -204,8 +204,8 @@ fn serialize_field_offset(binary: &mut BinaryData, offset: u16) -> Result<()> {
     write_as_uleb128(binary, offset, FIELD_OFFSET_MAX)
 }
 
-fn serialize_variant_offset(binary: &mut BinaryData, offset: &u16) -> Result<()> {
-    write_as_uleb128(binary, *offset, VARIANT_OFFSET_MAX)
+fn serialize_variant_offset(binary: &mut BinaryData, offset: u16) -> Result<()> {
+    write_as_uleb128(binary, offset, VARIANT_OFFSET_MAX)
 }
 
 fn serialize_acquires_count(binary: &mut BinaryData, len: usize) -> Result<()> {
@@ -715,7 +715,11 @@ fn serialize_variant_field_handle(
     binary: &mut BinaryData,
     handle: &VariantFieldHandle,
 ) -> Result<()> {
-    serialize_struct_variant_handle_index(binary, &handle.owner)?;
+    serialize_struct_def_index(binary, &handle.owner)?;
+    serialize_variant_count(binary, handle.variants.len())?;
+    for variant in &handle.variants {
+        serialize_variant_offset(binary, *variant)?
+    }
     serialize_field_offset(binary, handle.field)?;
     Ok(())
 }
@@ -734,7 +738,7 @@ fn serialize_struct_variant_handle(
     handle: &StructVariantHandle,
 ) -> Result<()> {
     serialize_struct_def_index(binary, &handle.struct_index)?;
-    serialize_variant_offset(binary, &handle.variant)?;
+    serialize_variant_offset(binary, handle.variant)?;
     Ok(())
 }
 

@@ -1454,10 +1454,16 @@ fn load_field_instantiation(
 fn load_variant_field_handle(
     cursor: &mut VersionedCursor,
 ) -> Result<VariantFieldHandle, PartialVMError> {
-    let owner = load_struct_variant_handle_index(cursor)?;
+    let owner = load_struct_def_index(cursor)?;
     let offset = load_field_offset(cursor)?;
+    let variant_count = load_variant_count(cursor)?;
+    let mut variants = vec![];
+    for _ in 0..variant_count {
+        variants.push(load_variant_offset(cursor)?)
+    }
     Ok(VariantFieldHandle {
         owner,
+        variants,
         field: offset,
     })
 }
