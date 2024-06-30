@@ -508,11 +508,12 @@ impl ConsensusObserver {
     }
 
     /// Processes the commit decision for the pending block and returns true iff
-    /// the commit decision was successfully processed.
+    /// the commit decision was successfully processed. Note: this function
+    /// assumes the commit decision has already been verified.
     fn process_commit_decision_for_pending_block(&self, commit_decision: &CommitDecision) -> bool {
         let pending_block = self
             .pending_ordered_blocks
-            .get_pending_block(commit_decision.round());
+            .get_verified_pending_block(commit_decision.epoch(), commit_decision.round());
         if let Some(pending_block) = pending_block {
             // If the payload exists, add the commit decision to the pending blocks
             if self
@@ -666,7 +667,7 @@ impl ConsensusObserver {
             self.pending_ordered_blocks
                 .insert_ordered_block(ordered_block, verified_ordered_proof);
 
-            // If we verified the proof, and we're not in sync mode, forward the blocks to execution
+            // If we verified the proof, and we're not in sync mode, finalized the ordered blocks
             if verified_ordered_proof && self.sync_handle.is_none() {
                 debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
@@ -746,15 +747,18 @@ impl ConsensusObserver {
             self.execution_client.end_epoch().await;
             self.wait_for_epoch_start().await;
 
-            //
+            // Verify the pending blocks for the new epoch
+            self.pending_ordered_blocks
+                .verify_pending_blocks(&self.get_epoch_state());
         }
 
         // Reset and drop the sync handle
         self.sync_handle = None;
 
         // Process all the pending blocks. These were all buffered during the state sync process.
-        for (_, (ordered_block, commit_decision)) in
-            self.pending_ordered_blocks.get_all_pending_blocks()
+        for (_, (ordered_block, commit_decision)) in self
+            .pending_ordered_blocks
+            .get_all_verified_pending_blocks()
         {
             // Unpack the ordered block
             let OrderedBlock {
@@ -904,8 +908,8 @@ impl ConsensusObserver {
             })
     }
 
-    /// Verifies the ordered blocks and returns an error if the data
-    /// is invalid. Note: this does not check the ordered proof.
+    /// Verifies the ordered blocks and returns an error if the data is invalid.
+    /// Note: this does not check the ordered proof (that occurs separately).
     fn verify_ordered_blocks(
         &self,
         blocks: &[Arc<PipelinedBlock>],

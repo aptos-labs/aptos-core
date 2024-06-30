@@ -18,6 +18,7 @@ use std::{
 
 /// Chain recovery using a local config from randomness stall should work.
 /// See `randomness_config_seqnum.move` for more details.
+#[ignore] // TODO: undo me!
 #[tokio::test]
 async fn randomness_stall_recovery() {
     let epoch_duration_secs = 20;

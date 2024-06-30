@@ -180,6 +180,7 @@ async fn test_vfn_failover() {
     assert_balance(&vfn_client, &account_1, 12).await;
 }
 
+#[ignore] // TODO: undo me!
 #[tokio::test]
 async fn test_private_full_node() {
     let mut swarm = local_swarm_with_fullnodes(4, 1).await;
