@@ -69,6 +69,7 @@ EOF
       GIT_CHECKS=1
       ;;
     a)
+      TEST=1
       INTEGRATION_TEST=1
       COMPILER_V2_TEST=1
       CHECK=1

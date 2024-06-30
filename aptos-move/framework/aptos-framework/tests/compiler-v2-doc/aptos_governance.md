@@ -61,7 +61,6 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `get_signer`](#0x1_aptos_governance_get_signer)
 -  [Function `create_proposal_metadata`](#0x1_aptos_governance_create_proposal_metadata)
 -  [Function `assert_voting_initialization`](#0x1_aptos_governance_assert_voting_initialization)
--  [Function `initialize_for_verification`](#0x1_aptos_governance_initialize_for_verification)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -96,7 +95,6 @@ on a proposal multiple times as long as the total voting power of these votes do
     -  [Function `get_signer`](#@Specification_1_get_signer)
     -  [Function `create_proposal_metadata`](#@Specification_1_create_proposal_metadata)
     -  [Function `assert_voting_initialization`](#@Specification_1_assert_voting_initialization)
-    -  [Function `initialize_for_verification`](#@Specification_1_initialize_for_verification)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -2016,36 +2014,6 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 
 </details>
 
-<a id="0x1_aptos_governance_initialize_for_verification"></a>
-
-## Function `initialize_for_verification`
-
-
-
-<pre><code>#[verify_only]
-<b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_initialize_for_verification">initialize_for_verification</a>(aptos_framework: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_initialize_for_verification">initialize_for_verification</a>(
-    aptos_framework: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>,
-    min_voting_threshold: u128,
-    required_proposer_stake: u64,
-    voting_duration_secs: u64,
-) {
-    <a href="aptos_governance.md#0x1_aptos_governance_initialize">initialize</a>(aptos_framework, min_voting_threshold, required_proposer_stake, voting_duration_secs);
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="@Specification_1"></a>
 
 ## Specification
@@ -3162,24 +3130,6 @@ pool_address must exist in StakePool.
 
 
 <pre><code><b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingInitializationAbortIfs">VotingInitializationAbortIfs</a>;
-</code></pre>
-
-
-
-<a id="@Specification_1_initialize_for_verification"></a>
-
-### Function `initialize_for_verification`
-
-
-<pre><code>#[verify_only]
-<b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_initialize_for_verification">initialize_for_verification</a>(aptos_framework: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64)
-</code></pre>
-
-
-verify_only
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

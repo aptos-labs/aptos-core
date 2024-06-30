@@ -36,7 +36,6 @@ Security holds under the same proof-of-stake assumption that secures the Aptos n
 -  [Function `u256_range`](#0x1_randomness_u256_range)
 -  [Function `permutation`](#0x1_randomness_permutation)
 -  [Function `safe_add_mod`](#0x1_randomness_safe_add_mod)
--  [Function `safe_add_mod_for_verification`](#0x1_randomness_safe_add_mod_for_verification)
 -  [Function `fetch_and_increment_txn_counter`](#0x1_randomness_fetch_and_increment_txn_counter)
 -  [Function `is_unbiasable`](#0x1_randomness_is_unbiasable)
 -  [Specification](#@Specification_1)
@@ -54,7 +53,6 @@ Security holds under the same proof-of-stake assumption that secures the Aptos n
     -  [Function `u64_range`](#@Specification_1_u64_range)
     -  [Function `u256_range`](#@Specification_1_u256_range)
     -  [Function `permutation`](#@Specification_1_permutation)
-    -  [Function `safe_add_mod_for_verification`](#@Specification_1_safe_add_mod_for_verification)
     -  [Function `fetch_and_increment_txn_counter`](#@Specification_1_fetch_and_increment_txn_counter)
     -  [Function `is_unbiasable`](#@Specification_1_is_unbiasable)
 
@@ -905,36 +903,6 @@ Compute <code>(a + b) % m</code>, assuming <code>m &gt;= 1, 0 &lt;= a &lt; m, 0&
 
 </details>
 
-<a id="0x1_randomness_safe_add_mod_for_verification"></a>
-
-## Function `safe_add_mod_for_verification`
-
-
-
-<pre><code>#[verify_only]
-<b>fun</b> <a href="randomness.md#0x1_randomness_safe_add_mod_for_verification">safe_add_mod_for_verification</a>(a: u256, b: u256, m: u256): u256
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_safe_add_mod_for_verification">safe_add_mod_for_verification</a>(a: u256, b: u256, m: u256): u256 {
-    <b>let</b> neg_b = m - b;
-    <b>if</b> (a &lt; neg_b) {
-        a + b
-    } <b>else</b> {
-        a - neg_b
-    }
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_randomness_fetch_and_increment_txn_counter"></a>
 
 ## Function `fetch_and_increment_txn_counter`
@@ -1272,25 +1240,6 @@ function as its payload.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-</code></pre>
-
-
-
-<a id="@Specification_1_safe_add_mod_for_verification"></a>
-
-### Function `safe_add_mod_for_verification`
-
-
-<pre><code>#[verify_only]
-<b>fun</b> <a href="randomness.md#0x1_randomness_safe_add_mod_for_verification">safe_add_mod_for_verification</a>(a: u256, b: u256, m: u256): u256
-</code></pre>
-
-
-
-
-<pre><code><b>aborts_if</b> m &lt; b;
-<b>aborts_if</b> a &lt; m - b && a + b &gt; <a href="randomness.md#0x1_randomness_MAX_U256">MAX_U256</a>;
-<b>ensures</b> result == <a href="randomness.md#0x1_randomness_spec_safe_add_mod">spec_safe_add_mod</a>(a, b, m);
 </code></pre>
 
 
