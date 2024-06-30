@@ -149,3 +149,38 @@ impl TStateView for FakeDataStore {
         InMemoryStateView::new(self.state_data.clone())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use aptos_types::on_chain_config::{FeatureFlag, Features};
+    use claims::*;
+
+    #[test]
+    fn test_features_can_be_set() {
+        let mut data_store = FakeDataStore::default();
+        assert_none!(Features::fetch_config(&data_store));
+
+        data_store.set_features(Features::default());
+        let features = assert_some!(Features::fetch_config(&data_store));
+        assert_eq!(features, Features::default())
+    }
+
+    #[test]
+    fn test_features_can_be_reset() {
+        use claims::*;
+
+        let mut data_store = FakeDataStore::default();
+        data_store.add_write_set(GENESIS_CHANGE_SET_HEAD.write_set());
+
+        // Reset the feature.
+        let mut features = assert_some!(Features::fetch_config(&data_store));
+        assert!(features.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA));
+        features.disable(FeatureFlag::STORAGE_SLOT_METADATA);
+        data_store.set_features(features.clone());
+
+        let reset_features = assert_some!(Features::fetch_config(&data_store));
+        assert!(!reset_features.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA));
+        assert_eq!(reset_features, features)
+    }
+}
