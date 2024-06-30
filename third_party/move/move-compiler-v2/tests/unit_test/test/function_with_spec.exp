@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unresolved spec target
+   ┌─ tests/unit_test/test/function_with_spec.move:18:10
+   │
+18 │     spec baz {
+   │          ^^^
+
+
+============ bytecode verification succeeded ========

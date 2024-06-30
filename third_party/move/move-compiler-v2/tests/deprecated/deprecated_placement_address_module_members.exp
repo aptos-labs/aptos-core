@@ -1,0 +1,76 @@
+
+Diagnostics:
+warning: Use of deprecated module
+   ┌─ tests/deprecated/deprecated_placement_address_module_members.move:33:9
+   │
+ 1 │ #[deprecated]  // Think about using 0x43 instead
+   │   ---------- Module '0x42::M' deprecated here
+   ·
+33 │     use 0x42::M;
+   │         ^^^^^^^ Use of deprecated module '0x42::M'
+
+warning: Use of deprecated module
+   ┌─ tests/deprecated/deprecated_placement_address_module_members.move:34:9
+   │
+20 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+   ·
+34 │     use 0x41::N::S;
+   │         ^^^^^^^ Use of deprecated module '0x41::N'
+
+warning: Use of deprecated struct
+   ┌─ tests/deprecated/deprecated_placement_address_module_members.move:34:18
+   │
+22 │     #[deprecated]
+   │       ---------- Struct 'S' in module '0x41::N' deprecated here
+   ·
+34 │     use 0x41::N::S;
+   │                  ^ Use of deprecated struct 'S' from module '0x41::N'
+
+warning: Use of deprecated struct
+   ┌─ tests/deprecated/deprecated_placement_address_module_members.move:37:11
+   │
+22 │     #[deprecated]
+   │       ---------- Struct 'S' in module '0x41::N' deprecated here
+   ·
+37 │     let foo: S = M::foo();
+   │              ^ Use of deprecated struct 'S' from module '0x41::N'
+
+warning: Use of deprecated module
+   ┌─ tests/deprecated/deprecated_placement_address_module_members.move:37:15
+   │
+ 1 │ #[deprecated]  // Think about using 0x43 instead
+   │   ---------- Module '0x42::M' deprecated here
+   ·
+37 │     let foo: S = M::foo();
+   │                  ^ Use of deprecated module '0x42::M'
+
+warning: Use of deprecated function
+   ┌─ tests/deprecated/deprecated_placement_address_module_members.move:37:18
+   │
+13 │     #[deprecated]
+   │       ---------- Function 'foo' in module '0x42::M' deprecated here
+   ·
+37 │     let foo: S = M::foo();
+   │                     ^^^ Use of deprecated function 'foo' from module '0x42::M'
+
+warning: Use of deprecated module
+   ┌─ tests/deprecated/deprecated_placement_address_module_members.move:38:2
+   │
+20 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+   ·
+38 │     0x41::N::consume(foo);
+   │     ^^^^^^^ Use of deprecated module '0x41::N'
+
+warning: Use of deprecated function
+   ┌─ tests/deprecated/deprecated_placement_address_module_members.move:38:11
+   │
+28 │     #[deprecated]
+   │       ---------- Function 'consume' in module '0x41::N' deprecated here
+   ·
+38 │     0x41::N::consume(foo);
+   │              ^^^^^^^ Use of deprecated function 'consume' from module '0x41::N'
+
+
+============ bytecode verification succeeded ========

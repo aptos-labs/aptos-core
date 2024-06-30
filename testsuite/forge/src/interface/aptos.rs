@@ -25,6 +25,7 @@ use aptos_sdk::{
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[async_trait::async_trait]
 pub trait AptosTest: Test {
@@ -34,14 +35,14 @@ pub trait AptosTest: Test {
 
 pub struct AptosContext<'t> {
     core: CoreContext,
-    public_info: AptosPublicInfo<'t>,
+    public_info: AptosPublicInfo,
     pub report: &'t mut TestReport,
 }
 
 impl<'t> AptosContext<'t> {
     pub fn new(
         core: CoreContext,
-        public_info: AptosPublicInfo<'t>,
+        public_info: AptosPublicInfo,
         report: &'t mut TestReport,
     ) -> Self {
         Self {
@@ -107,26 +108,26 @@ impl<'t> AptosContext<'t> {
         self.public_info.get_balance(address).await
     }
 
-    pub fn root_account(&mut self) -> &mut LocalAccount {
-        self.public_info.root_account
+    pub fn root_account(&mut self) -> Arc<LocalAccount> {
+        self.public_info.root_account.clone()
     }
 }
 
-pub struct AptosPublicInfo<'t> {
+pub struct AptosPublicInfo {
     chain_id: ChainId,
     inspection_service_url: Url,
     rest_api_url: Url,
     rest_client: RestClient,
-    root_account: &'t mut LocalAccount,
+    root_account: Arc<LocalAccount>,
     rng: ::rand::rngs::StdRng,
 }
 
-impl<'t> AptosPublicInfo<'t> {
+impl AptosPublicInfo {
     pub fn new(
         chain_id: ChainId,
         inspection_service_url_str: String,
         rest_api_url_str: String,
-        root_account: &'t mut LocalAccount,
+        root_account: Arc<LocalAccount>,
     ) -> Self {
         let rest_api_url = Url::parse(&rest_api_url_str).unwrap();
         let inspection_service_url = Url::parse(&inspection_service_url_str).unwrap();
@@ -152,8 +153,8 @@ impl<'t> AptosPublicInfo<'t> {
         self.inspection_service_url.as_str()
     }
 
-    pub fn root_account(&mut self) -> &mut LocalAccount {
-        self.root_account
+    pub fn root_account(&mut self) -> Arc<LocalAccount> {
+        self.root_account.clone()
     }
 
     pub async fn create_user_account(&mut self, pubkey: &Ed25519PublicKey) -> Result<()> {
@@ -300,12 +301,12 @@ impl<'t> AptosPublicInfo<'t> {
         Ok(account)
     }
 
-    pub async fn reconfig(&mut self) -> State {
+    pub async fn reconfig(&self) -> State {
         // dedupe with smoke-test::test_utils::reconfig
         reconfig(
             &self.rest_client,
             &self.transaction_factory(),
-            self.root_account,
+            self.root_account.clone(),
         )
         .await
     }
@@ -328,21 +329,23 @@ impl<'t> AptosPublicInfo<'t> {
 pub async fn reconfig(
     client: &RestClient,
     transaction_factory: &TransactionFactory,
-    root_account: &mut LocalAccount,
+    root_account: Arc<LocalAccount>,
 ) -> State {
     let aptos_version = client.get_aptos_version().await.unwrap();
     let current = aptos_version.into_inner();
     let current_version = *current.major.inner();
-    let txns = vec![
-        root_account.sign_with_transaction_builder(transaction_factory.clone().payload(
-            aptos_stdlib::version_set_for_next_epoch(current_version + 1),
-        )),
-        root_account.sign_with_transaction_builder(
-            transaction_factory
-                .clone()
-                .payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
-        ),
-    ];
+    let txns = {
+        vec![
+            root_account.sign_with_transaction_builder(transaction_factory.clone().payload(
+                aptos_stdlib::version_set_for_next_epoch(current_version + 1),
+            )),
+            root_account.sign_with_transaction_builder(
+                transaction_factory
+                    .clone()
+                    .payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+            ),
+        ]
+    };
 
     submit_and_wait_reconfig(client, txns).await
 }

@@ -17,7 +17,7 @@ async fn enable_feature_2() {
     let epoch_duration_secs = 20;
     let estimated_dkg_latency_secs = 40;
 
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_num_fullnodes(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {

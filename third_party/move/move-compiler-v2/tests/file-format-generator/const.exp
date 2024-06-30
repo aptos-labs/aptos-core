@@ -67,6 +67,74 @@ warning: Unused local variable `s`. Consider removing or prefixing with an under
    │             ^
 
 
+Diagnostics:
+warning: Unused assignment to `const_true`. Consider removing or prefixing with an underscore: `_const_true`
+  ┌─ tests/file-format-generator/const.move:3:26
+  │
+3 │         let const_true = u(true);
+  │                          ^^^^^^^
+
+warning: Unused assignment to `const_false`. Consider removing or prefixing with an underscore: `_const_false`
+  ┌─ tests/file-format-generator/const.move:4:27
+  │
+4 │         let const_false = u(false);
+  │                           ^^^^^^^^
+
+warning: Unused assignment to `hex_u8`. Consider removing or prefixing with an underscore: `_hex_u8`
+  ┌─ tests/file-format-generator/const.move:5:26
+  │
+5 │         let hex_u8: u8 = u(0x1);
+  │                          ^^^^^^
+
+warning: Unused assignment to `hex_u16`. Consider removing or prefixing with an underscore: `_hex_u16`
+  ┌─ tests/file-format-generator/const.move:6:28
+  │
+6 │         let hex_u16: u16 = u(0x1BAE);
+  │                            ^^^^^^^^^
+
+warning: Unused assignment to `hex_u32`. Consider removing or prefixing with an underscore: `_hex_u32`
+  ┌─ tests/file-format-generator/const.move:7:28
+  │
+7 │         let hex_u32: u32 = u(0xDEAD80);
+  │                            ^^^^^^^^^^^
+
+warning: Unused assignment to `hex_u64`. Consider removing or prefixing with an underscore: `_hex_u64`
+  ┌─ tests/file-format-generator/const.move:8:28
+  │
+8 │         let hex_u64: u64 = u(0xCAFE);
+  │                            ^^^^^^^^^
+
+warning: Unused assignment to `hex_u128`. Consider removing or prefixing with an underscore: `_hex_u128`
+  ┌─ tests/file-format-generator/const.move:9:30
+  │
+9 │         let hex_u128: u128 = u(0xDEADBEEF);
+  │                              ^^^^^^^^^^^^^
+
+warning: Unused assignment to `hex_u256`. Consider removing or prefixing with an underscore: `_hex_u256`
+   ┌─ tests/file-format-generator/const.move:10:30
+   │
+10 │         let hex_u256: u256 = u(0x1123_456A_BCDE_F);
+   │                              ^^^^^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `a`. Consider removing or prefixing with an underscore: `_a`
+   ┌─ tests/file-format-generator/const.move:11:17
+   │
+11 │         let a = u(@0x42);
+   │                 ^^^^^^^^
+
+warning: Unused assignment to `vec`. Consider removing or prefixing with an underscore: `_vec`
+   ┌─ tests/file-format-generator/const.move:12:19
+   │
+12 │         let vec = u(vector[1, 2, 3]);
+   │                   ^^^^^^^^^^^^^^^^^^
+
+warning: Unused assignment to `s`. Consider removing or prefixing with an underscore: `_s`
+   ┌─ tests/file-format-generator/const.move:13:17
+   │
+13 │         let s = u(b"Hello!\n");
+   │                 ^^^^^^^^^^^^^^
+
+
 ============ disassembled file-format ==================
 // Move bytecode v7
 module 42.constant {

@@ -84,9 +84,12 @@ pub fn run_move_prover_v2<W: WriteColor>(
         experiment_cache: Default::default(),
         sources: cloned_options.move_sources,
         sources_deps: vec![],
+        warn_deprecated: false,
+        warn_of_deprecation_use_in_aptos_libs: false,
         warn_unused: false,
         whole_program: false,
         compile_test_code: false,
+        compile_verify_code: true,
     };
 
     let mut env = move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)?;

@@ -134,7 +134,8 @@ async fn run_fail_point_test(
     >,
     // (cycle, executed_epochs, executed_rounds, executed_transactions, current_state, previous_state)
     check_cycle: Box<
-        dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> anyhow::Result<()>,
+        dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> anyhow::Result<()>
+            + Send,
     >,
 ) {
     let mut swarm = create_swarm(num_validators, max_block_size).await;
@@ -145,8 +146,15 @@ async fn run_fail_point_test(
             finish_traffic: Arc::new(AtomicBool::new(false)),
         }
     };
+    let (validator_clients, public_info) = {
+        (
+            swarm.get_validator_clients_with_names(),
+            swarm.aptos_public_info(),
+        )
+    };
     test_consensus_fault_tolerance(
-        &mut swarm,
+        validator_clients,
+        public_info,
         cycles,
         cycle_duration_s,
         parts_in_cycle,
@@ -177,10 +185,17 @@ fn successful_criteria(executed_epochs: u64, executed_rounds: u64, executed_tran
 async fn test_no_failures() {
     let num_validators = 3;
 
-    let mut swarm = create_swarm(num_validators, 1).await;
+    let swarm = create_swarm(num_validators, 1).await;
 
+    let (validator_clients, public_info) = {
+        (
+            swarm.get_validator_clients_with_names(),
+            swarm.aptos_public_info(),
+        )
+    };
     test_consensus_fault_tolerance(
-        &mut swarm,
+        validator_clients,
+        public_info,
         3,
         5.0,
         1,
@@ -202,10 +217,17 @@ async fn test_no_failures() {
 async fn test_ordered_only_cert() {
     let num_validators = 3;
 
-    let mut swarm = create_swarm(num_validators, 1).await;
+    let swarm = create_swarm(num_validators, 1).await;
 
+    let (validator_clients, public_info) = {
+        (
+            swarm.get_validator_clients_with_names(),
+            swarm.aptos_public_info(),
+        )
+    };
     test_consensus_fault_tolerance(
-        &mut swarm,
+        validator_clients,
+        public_info,
         3,
         5.0,
         1,
@@ -236,10 +258,16 @@ async fn test_ordered_only_cert() {
 async fn test_execution_retry() {
     let num_validators = 4;
 
-    let mut swarm = create_swarm(num_validators, 1).await;
-
+    let swarm = create_swarm(num_validators, 1).await;
+    let (validator_clients, public_info) = {
+        (
+            swarm.get_validator_clients_with_names(),
+            swarm.aptos_public_info(),
+        )
+    };
     test_consensus_fault_tolerance(
-        &mut swarm,
+        validator_clients,
+        public_info,
         3,
         5.0,
         1,

@@ -10,7 +10,7 @@ use aptos_forge::{
     test_utils::consensus_utils::{
         no_failure_injection, test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
     },
-    LocalSwarm,
+    LocalSwarm, Swarm, SwarmExt,
 };
 use aptos_types::on_chain_config::{
     ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, ValidatorTxnConfig,
@@ -61,10 +61,16 @@ pub async fn create_dag_swarm(num_nodes: usize) -> LocalSwarm {
 async fn test_no_failures() {
     let num_validators = 3;
 
-    let mut swarm = create_dag_swarm(num_validators).await;
-
+    let swarm = create_dag_swarm(num_validators).await;
+    let (validator_clients, public_info) = {
+        (
+            swarm.get_validator_clients_with_names(),
+            swarm.aptos_public_info(),
+        )
+    };
     test_consensus_fault_tolerance(
-        &mut swarm,
+        validator_clients,
+        public_info,
         3,
         5.0,
         1,
@@ -97,7 +103,8 @@ async fn run_dag_fail_point_test(
     >,
     // (cycle, executed_epochs, executed_rounds, executed_transactions, current_state, previous_state)
     check_cycle: Box<
-        dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> anyhow::Result<()>,
+        dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> anyhow::Result<()>
+            + Send,
     >,
 ) {
     let mut swarm = create_dag_swarm(num_validators).await;
@@ -108,8 +115,15 @@ async fn run_dag_fail_point_test(
             finish_traffic: Arc::new(AtomicBool::new(false)),
         }
     };
+    let (validator_clients, public_info) = {
+        (
+            swarm.get_validator_clients_with_names(),
+            swarm.aptos_public_info(),
+        )
+    };
     test_consensus_fault_tolerance(
-        &mut swarm,
+        validator_clients,
+        public_info,
         cycles,
         cycle_duration_s,
         parts_in_cycle,

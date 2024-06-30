@@ -6,7 +6,6 @@ use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_rest_client::Client;
-use aptos_vm::AptosVM;
 use clap::Parser;
 use std::path::PathBuf;
 use url::Url;
@@ -42,8 +41,6 @@ pub struct Command {
 
 impl Command {
     pub async fn run(self) -> Result<()> {
-        AptosVM::set_concurrency_level_once(self.opts.concurrency_level);
-
         let debugger = if let Some(rest_endpoint) = self.opts.target.rest_endpoint {
             AptosDebugger::rest_client(Client::new(Url::parse(&rest_endpoint)?))?
         } else if let Some(db_path) = self.opts.target.db_path {
@@ -91,6 +88,7 @@ impl Command {
             self.begin_version,
             block,
             self.repeat_execution_times.unwrap_or(1),
+            &self.opts.concurrency_level,
         )?;
         println!("{txn_outputs:#?}");
 
