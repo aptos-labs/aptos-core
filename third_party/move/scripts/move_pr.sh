@@ -11,6 +11,7 @@
 set -e
 
 MOVE_PR_PROFILE="${MOVE_PR_PROFILE:-ci}"
+MOVE_PR_NEXTEST_PROFILE="${MOVE_PR_NEXTEST_PROFILE:-ci}"
 
 BASE=$(git rev-parse --show-toplevel)
 
@@ -147,7 +148,7 @@ if [ ! -z "$CHECK" ]; then
 fi
 
 CARGO_OP_PARAMS="--locked --profile $MOVE_PR_PROFILE"
-CARGO_NEXTEST_PARAMS="--locked --cargo-profile $MOVE_PR_PROFILE"
+CARGO_NEXTEST_PARAMS="--locked --profile $MOVE_PR_NEXTEST_PROFILE --cargo-profile $MOVE_PR_PROFILE"
 
 # Artifact generation needs to be run before testing as tests may depend on its result
 if [ ! -z "$GEN_ARTIFACTS" ]; then
