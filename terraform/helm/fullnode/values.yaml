@@ -101,6 +101,10 @@ logging:
   # -- Address for remote logging
   address:
 
+metrics:
+  # -- The upstream sink for metrics. Supported values are "dev" and "prod"
+  destination: dev
+
 backup:
   image:
     # -- Image repo to use for backup images

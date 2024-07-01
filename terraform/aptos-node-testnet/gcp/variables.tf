@@ -271,6 +271,18 @@ variable "cluster_ipv4_cidr_block" {
   default     = ""
 }
 
+variable "router_nat_ip_allocate_option" {
+  description = "The method of NAT IP allocation for the cluster. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#router_nat_ip_allocate_option"
+  type        = string
+  default     = "MANUAL_ONLY"
+}
+
+variable "enable_endpoint_independent_mapping" {
+  description = "Enable endpoint independent mapping for the NAT router"
+  type        = bool
+  default     = true
+}
+
 variable "enable_clouddns" {
   description = "Enable CloudDNS (Google-managed cluster DNS)"
   type        = bool

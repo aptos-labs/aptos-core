@@ -44,8 +44,10 @@ module "validator" {
   validator_name = "aptos-node"
 
   # K8s config
-  k8s_api_sources         = var.k8s_api_sources
-  cluster_ipv4_cidr_block = var.cluster_ipv4_cidr_block
+  k8s_api_sources                     = var.k8s_api_sources
+  cluster_ipv4_cidr_block             = var.cluster_ipv4_cidr_block
+  router_nat_ip_allocate_option       = var.router_nat_ip_allocate_option
+  enable_endpoint_independent_mapping = var.enable_endpoint_independent_mapping
 
   # autoscaling
   gke_enable_node_autoprovisioning     = var.gke_enable_node_autoprovisioning

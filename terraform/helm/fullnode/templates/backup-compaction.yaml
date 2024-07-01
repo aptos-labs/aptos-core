@@ -17,6 +17,10 @@ spec:
           labels:
             {{- include "backup.selectorLabels" . | nindent 12 }}
             app.kubernetes.io/name: backup-compaction
+          annotations:
+            {{- if $.Values.metrics.destination }}
+            aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
+            {{- end}}
         spec:
           restartPolicy: Never
           terminationGracePeriodSeconds: 0

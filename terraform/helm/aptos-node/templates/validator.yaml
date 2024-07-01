@@ -77,10 +77,16 @@ spec:
         {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
         app.kubernetes.io/name: validator
         app.kubernetes.io/instance: validator-{{$i}}
+        {{- if $.Values.chain.name }}
+        chain_name: {{ $.Values.chain.name }}
+        {{- end}}
       annotations:
         checksum/validator.yaml: {{ tpl ($.Files.Get "files/configs/validator.yaml") $ | sha256sum }}
         prometheus.io/scrape: "true"
         prometheus.io/port: "9101"
+        {{- if $.Values.metrics.destination }}
+        aptos.dev/metrics-destination: {{ $.Values.metrics.destination }}
+        {{- end}}
     spec:
       terminationGracePeriodSeconds: 0
       securityContext:
