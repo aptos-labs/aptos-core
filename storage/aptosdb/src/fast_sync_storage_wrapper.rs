@@ -5,6 +5,7 @@ use crate::AptosDB;
 use anyhow::anyhow;
 use aptos_config::config::{NodeConfig, StorageDirPaths};
 use aptos_crypto::HashValue;
+use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
     cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter, Result,
@@ -40,7 +41,10 @@ pub struct FastSyncStorageWrapper {
 impl FastSyncStorageWrapper {
     /// If the db is empty and configured to do fast sync, we return a FastSyncStorageWrapper
     /// Otherwise, we returns AptosDB directly and the FastSyncStorageWrapper is None
-    pub fn initialize_dbs(config: &NodeConfig) -> Result<Either<AptosDB, Self>> {
+    pub fn initialize_dbs(
+        config: &NodeConfig,
+        internal_indexer_db: Option<InternalIndexerDB>,
+    ) -> Result<Either<AptosDB, Self>> {
         let db_main = AptosDB::open(
             config.storage.get_dir_paths(),
             /*readonly=*/ false,
@@ -49,6 +53,7 @@ impl FastSyncStorageWrapper {
             config.storage.enable_indexer,
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
+            internal_indexer_db,
         )
         .map_err(|err| anyhow!("fast sync DB failed to open {}", err))?;
 
@@ -75,6 +80,7 @@ impl FastSyncStorageWrapper {
                 config.storage.enable_indexer,
                 config.storage.buffered_state_target_items,
                 config.storage.max_num_nodes_per_lru_cache_shard,
+                None,
             )
             .map_err(|err| anyhow!("Secondary DB failed to open {}", err))?;
 

@@ -1380,6 +1380,7 @@ dependencies = [
  "aptos-executor-types",
  "aptos-experimental-runtimes",
  "aptos-genesis",
+ "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",

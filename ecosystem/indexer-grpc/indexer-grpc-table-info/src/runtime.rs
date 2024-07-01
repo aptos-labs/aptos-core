@@ -6,9 +6,12 @@ use crate::{
 };
 use aptos_api::context::Context;
 use aptos_config::config::NodeConfig;
-use aptos_db_indexer::{db_indexer::DBIndexer, db_ops::open_db, db_v2::IndexerAsyncV2};
+use aptos_db_indexer::{
+    db_indexer::{DBIndexer, InternalIndexerDB},
+    db_ops::open_db,
+    db_v2::IndexerAsyncV2,
+};
 use aptos_mempool::MempoolClientSender;
-use aptos_schemadb::DB;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::chain_id::ChainId;
 use std::sync::Arc;
@@ -19,7 +22,7 @@ const INDEX_ASYNC_V2_DB_NAME: &str = "index_indexer_async_v2_db";
 pub fn bootstrap_internal_indexer_db(
     config: &NodeConfig,
     db_rw: DbReaderWriter,
-    internal_indexer_db: Option<Arc<DB>>,
+    internal_indexer_db: Option<InternalIndexerDB>,
 ) -> Option<(Runtime, Arc<DBIndexer>)> {
     if !config.indexer_db_config.is_internal_indexer_db_enabled() || internal_indexer_db.is_none() {
         return None;
@@ -27,7 +30,7 @@ pub fn bootstrap_internal_indexer_db(
     let runtime = aptos_runtimes::spawn_named_runtime("index-db".to_string(), None);
     // Set up db config and open up the db initially to read metadata
     let mut indexer_service =
-        InternalIndexerDBService::new(db_rw.reader, config, internal_indexer_db.unwrap());
+        InternalIndexerDBService::new(db_rw.reader, internal_indexer_db.unwrap());
     let db_indexer = indexer_service.get_db_indexer();
     // Spawn task for db indexer
     runtime.spawn(async move {

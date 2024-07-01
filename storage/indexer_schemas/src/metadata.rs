@@ -22,4 +22,6 @@ impl MetadataValue {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub enum MetadataKey {
     LatestVersion,
+    EventPrunerProgress,
+    TransactionPrunerProgress,
 }
