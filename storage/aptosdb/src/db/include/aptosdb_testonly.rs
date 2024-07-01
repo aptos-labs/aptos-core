@@ -39,6 +39,7 @@ impl AptosDB {
             false, /* indexer */
             BUFFERED_STATE_TARGET_ITEMS,
             max_node_cache,
+            None,
         )
         .expect("Unable to open AptosDB")
     }

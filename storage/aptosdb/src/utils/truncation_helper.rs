@@ -408,9 +408,15 @@ fn delete_event_data(
                 latest_version = latest_version,
                 "Truncate event data."
             );
-            ledger_db
-                .event_db()
-                .prune_events(start_version, latest_version + 1, batch)?;
+            ledger_db.event_db().prune_events(
+                start_version,
+                latest_version + 1,
+                batch,
+                &SchemaBatch::new(),
+                ledger_db.enable_storage_sharding(),
+                false,
+            )?;
+            // we don't need to delete from internal indexer when syncing main db.
         }
     }
     Ok(())
