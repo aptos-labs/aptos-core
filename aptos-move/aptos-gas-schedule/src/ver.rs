@@ -8,6 +8,8 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V21
+///   - Fix type to type tag conversion in MoveVM
 /// - V20
 ///   - Limits for bounding MoveVM type sizes
 /// - V19
@@ -64,7 +66,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 20;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_16;
 
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
@@ -76,4 +78,5 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_13: u64 = 18;
     pub const RELEASE_V1_14: u64 = 19;
     pub const RELEASE_V1_15: u64 = 20;
+    pub const RELEASE_V1_16: u64 = 21;
 }
