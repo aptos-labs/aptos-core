@@ -2736,8 +2736,18 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
             && txn_data.fee_payer.is_some()
             && txn_data.sequence_number == 0
             && resolver
-                .get_resource(&txn_data.sender(), &AccountResource::struct_tag())
-                .map(|data| data.is_none())
+                .get_resource_bytes_with_metadata_and_layout(
+                    &txn_data.sender(),
+                    &AccountResource::struct_tag(),
+                    resolver
+                        .fetch_module_metadata(
+                            &txn_data.sender(),
+                            &AccountResource::module_identifier(),
+                        )
+                        .map_err(|e| e.finish(Location::Undefined))?,
+                    None,
+                )
+                .map(|(data, _)| data.is_none())
                 .map_err(|e| e.finish(Location::Undefined))?,
     )
 }

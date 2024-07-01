@@ -47,7 +47,7 @@ use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
     InMemoryStorage,
 };
-use move_vm_types::resolver::MoveResolver;
+use move_vm_types::resolver::ResourceResolver;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -344,7 +344,12 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             name: resource.to_owned(),
             type_args,
         };
-        match self.storage.get_resource(&address, &tag).unwrap() {
+        match self
+            .storage
+            .get_resource_bytes_with_metadata_and_layout(&address, &tag, &[], None)
+            .unwrap()
+            .0
+        {
             None => Ok("[No Resource Exists]".to_owned()),
             Some(data) => {
                 let annotated =

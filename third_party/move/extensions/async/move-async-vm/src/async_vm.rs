@@ -25,7 +25,7 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::gas_schedule::{Gas, GasStatus};
 use move_vm_types::{
-    resolver::MoveResolver,
+    resolver::ResourceResolver,
     values::{Reference, Value},
 };
 use std::{
@@ -84,7 +84,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r impl MoveResolver,
+        move_resolver: &'r impl ResourceResolver,
     ) -> AsyncSession<'r, 'l> {
         self.new_session_with_extensions(
             for_actor,
@@ -99,7 +99,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r impl MoveResolver,
+        resolver: &'r impl ResourceResolver,
         ext: NativeContextExtensions<'r>,
     ) -> AsyncSession<'r, 'l> {
         let extensions = make_extensions(ext, for_actor, virtual_time, true);
@@ -107,7 +107,7 @@ impl AsyncVM {
             vm: self,
             vm_session: self
                 .move_vm
-                .new_session_with_extensions(move_resolver, extensions),
+                .new_session_with_extensions(resolver, extensions),
         }
     }
 

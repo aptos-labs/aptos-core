@@ -39,7 +39,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
-use move_vm_types::{gas::UnmeteredGasMeter, resolver::MoveResolver};
+use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceResolver};
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{fs, io::Write, panic, thread};
@@ -131,7 +131,7 @@ fn execute_function_in_module(
     idx: FunctionDefinitionIndex,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
-    storage: &impl MoveResolver,
+    storage: &impl ResourceResolver,
 ) -> Result<(), VMStatus> {
     let module_id = module.self_id();
     let entry_name = {

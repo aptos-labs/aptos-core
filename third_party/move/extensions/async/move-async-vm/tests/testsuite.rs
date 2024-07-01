@@ -27,7 +27,7 @@ use move_core_types::{
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_vm_test_utils::gas_schedule::GasStatus;
-use move_vm_types::resolver::{resource_size, ModuleResolver, ResourceResolver};
+use move_vm_types::resolver::{resource_size, ResourceResolver};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -382,20 +382,6 @@ impl Harness {
 /// simplifies things in this test.
 struct HarnessProxy<'a> {
     harness: &'a Harness,
-}
-
-impl<'a> ModuleResolver for HarnessProxy<'a> {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
-    }
-
-    fn get_module(&self, id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        Ok(self
-            .harness
-            .module_cache
-            .get(id.name())
-            .map(|c| c.serialize(None).into()))
-    }
 }
 
 impl<'a> ResourceResolver for HarnessProxy<'a> {

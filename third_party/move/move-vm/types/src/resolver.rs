@@ -5,28 +5,11 @@
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
-    account_address::AccountAddress,
-    language_storage::{ModuleId, StructTag},
-    metadata::Metadata,
+    account_address::AccountAddress, language_storage::StructTag, metadata::Metadata,
     value::MoveTypeLayout,
 };
 
-/// Traits for resolving Move modules and resources from persistent storage
-
-/// A persistent storage backend that can resolve modules by address + name.
-/// Storage backends should return
-///   - Ok(Some(..)) if the data exists
-///   - Ok(None)     if the data does not exist
-///   - Err(..)      only when something really wrong happens, for example
-///                    - invariants are broken and observable from the storage side
-///                      (this is not currently possible as ModuleId and StructTag
-///                       are always structurally valid)
-///                    - storage encounters internal error
-pub trait ModuleResolver {
-    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata>;
-
-    fn get_module(&self, id: &ModuleId) -> PartialVMResult<Option<Bytes>>;
-}
+/// Traits for resolving Move resources from persistent storage
 
 pub fn resource_size(resource: &Option<Bytes>) -> usize {
     resource.as_ref().map(|bytes| bytes.len()).unwrap_or(0)
@@ -50,31 +33,3 @@ pub trait ResourceResolver {
         layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)>;
 }
-
-/// A persistent storage implementation that can resolve both resources and modules
-pub trait MoveResolver: ModuleResolver + ResourceResolver {
-    fn get_resource(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> PartialVMResult<Option<Bytes>> {
-        Ok(self
-            .get_resource_with_metadata(
-                address,
-                struct_tag,
-                &self.get_module_metadata(&struct_tag.module_id()),
-            )?
-            .0)
-    }
-
-    fn get_resource_with_metadata(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-        metadata: &[Metadata],
-    ) -> PartialVMResult<(Option<Bytes>, usize)> {
-        self.get_resource_bytes_with_metadata_and_layout(address, struct_tag, metadata, None)
-    }
-}
-
-impl<T: ModuleResolver + ResourceResolver + ?Sized> MoveResolver for T {}

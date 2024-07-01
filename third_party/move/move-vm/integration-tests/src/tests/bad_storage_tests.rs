@@ -16,10 +16,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
-use move_vm_types::{
-    gas::UnmeteredGasMeter,
-    resolver::{ModuleResolver, ResourceResolver},
-};
+use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceResolver};
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
@@ -542,15 +539,15 @@ struct BogusStorage {
     bad_status_code: StatusCode,
 }
 
-impl ModuleResolver for BogusStorage {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
-    }
-
-    fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        Err(PartialVMError::new(self.bad_status_code))
-    }
-}
+// impl ModuleResolver for BogusStorage {
+//     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
+//         vec![]
+//     }
+//
+//     fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
+//         Err(PartialVMError::new(self.bad_status_code))
+//     }
+// }
 
 impl ResourceResolver for BogusStorage {
     fn get_resource_bytes_with_metadata_and_layout(

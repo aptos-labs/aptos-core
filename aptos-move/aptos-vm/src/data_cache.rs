@@ -37,16 +37,13 @@ use aptos_vm_types::{
 use bytes::Bytes;
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::IdentStr,
-    language_storage::{ModuleId, StructTag},
-    metadata::Metadata,
-    value::MoveTypeLayout,
+    account_address::AccountAddress, identifier::IdentStr, language_storage::StructTag,
+    metadata::Metadata, value::MoveTypeLayout,
 };
 use move_vm_runtime::module_storage::ModuleStorage;
 use move_vm_types::{
     delayed_values::delayed_field_id::DelayedFieldID,
-    resolver::{resource_size, ModuleResolver, ResourceResolver},
+    resolver::{resource_size, ResourceResolver},
 };
 use std::{
     cell::RefCell,
@@ -251,35 +248,6 @@ impl<'e, E: ExecutorView> AptosModuleStorage for StorageAdapter<'e, E> {
     ) -> PartialVMResult<StateValueMetadata> {
         self.executor_view
             .fetch_module_state_value_metadata(address, module_name)
-    }
-}
-
-impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
-    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
-        let address = module_id.address();
-        let module_name = module_id.name();
-
-        self.executor_view
-            .fetch_module_metadata(address, module_name)
-            .map(|md| md.to_vec())
-            .unwrap_or_default()
-    }
-
-    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        let address = module_id.address();
-        let module_name = module_id.name();
-
-        let module_exists = self
-            .executor_view
-            .check_module_exists(address, module_name)?;
-        Ok(if module_exists {
-            Some(
-                self.executor_view
-                    .fetch_module_bytes(address, module_name)?,
-            )
-        } else {
-            None
-        })
     }
 }
 

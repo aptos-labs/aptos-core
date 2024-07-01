@@ -21,7 +21,7 @@ use move_core_types::{
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
-use move_vm_types::resolver::{resource_size, ModuleResolver, MoveResolver, ResourceResolver};
+use move_vm_types::resolver::{resource_size, ResourceResolver};
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
@@ -34,16 +34,6 @@ pub struct BlankStorage;
 impl BlankStorage {
     pub fn new() -> Self {
         Self
-    }
-}
-
-impl ModuleResolver for BlankStorage {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
-    }
-
-    fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        Ok(None)
     }
 }
 
@@ -77,22 +67,6 @@ impl TableResolver for BlankStorage {
 pub struct DeltaStorage<'a, 'b, S> {
     base: &'a S,
     change_set: &'b ChangeSet,
-}
-
-impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
-    }
-
-    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.change_set.accounts().get(module_id.address()) {
-            if let Some(blob_opt) = account_storage.modules().get(module_id.name()) {
-                return Ok(blob_opt.clone().ok());
-            }
-        }
-
-        self.base.get_module(module_id)
-    }
 }
 
 impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
@@ -129,7 +103,7 @@ impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
     }
 }
 
-impl<'a, 'b, S: MoveResolver> DeltaStorage<'a, 'b, S> {
+impl<'a, 'b, S: ResourceResolver> DeltaStorage<'a, 'b, S> {
     pub fn new(base: &'a S, delta: &'b ChangeSet) -> Self {
         Self {
             base,
@@ -156,14 +130,16 @@ pub struct InMemoryStorage {
 impl CompiledModuleView for InMemoryStorage {
     type Item = CompiledModule;
 
-    fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
-        Ok(match self.get_module(id)? {
-            Some(bytes) => {
+    fn view_compiled_module(&self, module_id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
+        if let Some(account_storage) = self.accounts.get(module_id.address()) {
+            if let Some(bytes) = account_storage.modules.get(module_id.name()) {
                 let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
-                Some(CompiledModule::deserialize_with_config(&bytes, &config)?)
-            },
-            None => None,
-        })
+                return Ok(Some(CompiledModule::deserialize_with_config(
+                    bytes, &config,
+                )?));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -317,19 +293,6 @@ impl InMemoryStorage {
     ) {
         let account = get_or_insert(&mut self.accounts, addr, InMemoryAccountStorage::new);
         account.resources.insert(struct_tag, blob.into());
-    }
-}
-
-impl ModuleResolver for InMemoryStorage {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
-    }
-
-    fn get_module(&self, module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
-        if let Some(account_storage) = self.accounts.get(module_id.address()) {
-            return Ok(account_storage.modules.get(module_id.name()).cloned());
-        }
-        Ok(None)
     }
 }
 

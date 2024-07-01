@@ -11,7 +11,7 @@ use aptos_vm_types::{
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::language_storage::StructTag;
-use move_vm_types::resolver::MoveResolver;
+use move_vm_types::resolver::ResourceResolver;
 use std::collections::{BTreeMap, HashMap};
 
 /// A general resolver used by AptosVM. Allows to implement custom hooks on
@@ -21,7 +21,7 @@ pub trait AptosMoveResolver:
     AggregatorV1Resolver
     + ConfigStorage
     + DelayedFieldResolver
-    + MoveResolver
+    + ResourceResolver
     + ResourceGroupResolver
     + StateStorageView
     + TableResolver
