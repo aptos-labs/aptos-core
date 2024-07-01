@@ -8,6 +8,7 @@ use crate::{
     loaded_data::runtime_types::Type,
     views::{ValueView, ValueVisitor},
 };
+use itertools::Itertools;
 use move_binary_format::{
     errors::*,
     file_format::{Constant, SignatureToken},
@@ -980,6 +981,37 @@ impl ContainerRef {
 impl StructRef {
     pub fn borrow_field(&self, idx: usize) -> PartialVMResult<Value> {
         Ok(Value(self.0.borrow_elem(idx)?))
+    }
+
+    pub fn borrow_variant_field(
+        &self,
+        allowed: &[VariantCount],
+        idx: usize,
+        variant_to_str: &impl Fn(VariantCount) -> String,
+    ) -> PartialVMResult<Value> {
+        let tag = self.get_variant_tag()?;
+        if allowed.contains(&tag) {
+            Ok(Value(self.0.borrow_elem(idx + 1)?))
+        } else {
+            Err(
+                PartialVMError::new(StatusCode::STRUCT_VARIANT_MISMATCH).with_message(format!(
+                    "expected struct variant {}, found `{}`",
+                    allowed.iter().cloned().map(variant_to_str).join(" or "),
+                    variant_to_str(tag)
+                )),
+            )
+        }
+    }
+
+    pub fn test_variant(&self, variant: VariantCount) -> PartialVMResult<Value> {
+        let tag = self.get_variant_tag()?;
+        Ok(Value::bool(variant == tag))
+    }
+
+    fn get_variant_tag(&self) -> PartialVMResult<VariantCount> {
+        let tag_ref = Value(self.0.borrow_elem(0)?).value_as::<Reference>()?;
+        let tag_value = tag_ref.read_ref()?;
+        tag_value.value_as::<u16>()
     }
 }
 
@@ -2489,6 +2521,43 @@ impl Struct {
     pub fn unpack(self) -> PartialVMResult<impl Iterator<Item = Value>> {
         Ok(self.fields.into_iter().map(Value))
     }
+
+    pub fn pack_variant<I: IntoIterator<Item = Value>>(variant: VariantCount, vals: I) -> Self {
+        Self {
+            fields: iter::once(Value::u16(variant))
+                .chain(vals)
+                .map(|v| v.0)
+                .collect(),
+        }
+    }
+
+    pub fn unpack_variant(
+        self,
+        variant: VariantCount,
+        variant_to_str: impl Fn(VariantCount) -> String,
+    ) -> PartialVMResult<impl Iterator<Item = Value>> {
+        let Self { fields } = self;
+        if fields.is_empty() {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("invalid empty struct variant".to_string()),
+            );
+        }
+        let mut values = fields.into_iter();
+        let tag_value = Value(values.next().unwrap());
+        let tag = tag_value.value_as::<u16>()?;
+        if tag == variant {
+            Ok(values.map(Value))
+        } else {
+            Err(
+                PartialVMError::new(StatusCode::STRUCT_VARIANT_MISMATCH).with_message(format!(
+                    "expected struct variant {}, found {}",
+                    variant_to_str(variant),
+                    variant_to_str(tag)
+                )),
+            )
+        }
+    }
 }
 
 /***************************************************************************************
@@ -3028,6 +3097,7 @@ pub mod debug {
  *
  **************************************************************************************/
 use crate::value_serde::{CustomDeserializer, CustomSerializer, RelaxedCustomSerDe};
+use move_binary_format::file_format::VariantCount;
 use serde::{
     de::Error as DeError,
     ser::{Error as SerError, SerializeSeq, SerializeTuple},

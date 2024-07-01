@@ -10,6 +10,7 @@ use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Ability, AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
+        VariantCount,
     },
 };
 #[cfg(test)]
@@ -128,8 +129,7 @@ impl DepthFormula {
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct StructType {
     pub idx: StructNameIndex,
-    pub field_tys: Vec<Type>,
-    pub field_names: Vec<Identifier>,
+    pub layout: StructLayout,
     pub phantom_ty_params_mask: SmallBitVec,
     pub abilities: AbilitySet,
     pub ty_params: Vec<StructTypeParameter>,
@@ -137,7 +137,55 @@ pub struct StructType {
     pub module: ModuleId,
 }
 
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub enum StructLayout {
+    Single(Vec<(Identifier, Type)>),
+    Variants(Vec<(Identifier, Vec<(Identifier, Type)>)>),
+}
+
 impl StructType {
+    /// Get the fields from this struct type. If this is a proper struct, the `variant`
+    /// must be None. Otherwise if its a variant struct, the variant for which the fields
+    /// are requested must be given. For non-matching parameters, the function returns
+    /// an empty list.
+    pub fn fields(&self, variant: Option<VariantCount>) -> &[(Identifier, Type)] {
+        match (&self.layout, variant) {
+            (StructLayout::Single(fields), None) => fields.as_slice(),
+            (StructLayout::Variants(variants), Some(variant))
+                if (variant as usize) < variants.len() =>
+            {
+                variants[variant as usize].1.as_slice()
+            },
+            _ => &[],
+        }
+    }
+
+    /// Same as `struct_type.fields(variant_opt).len()`
+    pub fn field_count(&self, variant: Option<VariantCount>) -> u16 {
+        match (&self.layout, variant) {
+            (StructLayout::Single(fields), None) => fields.len() as u16,
+            (StructLayout::Variants(variants), Some(variant))
+                if (variant as usize) < variants.len() =>
+            {
+                variants[variant as usize].1.len() as u16
+            },
+            _ => 0,
+        }
+    }
+
+    /// Returns a string for the variant for error messages. If this is
+    /// not a type with this variant, returns a string anyway indicating
+    /// its undefined.
+    pub fn variant_name_for_message(&self, variant: VariantCount) -> String {
+        let variant = variant as usize;
+        match &self.layout {
+            StructLayout::Variants(variants) if variant < variants.len() => {
+                variants[variant].0.to_string()
+            },
+            _ => "<undefined>".to_string(),
+        }
+    }
+
     pub fn ty_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
         self.ty_params.iter().map(|param| &param.constraints)
     }
@@ -174,8 +222,7 @@ impl StructType {
     pub fn for_test() -> StructType {
         Self {
             idx: StructNameIndex(0),
-            field_tys: vec![],
-            field_names: vec![],
+            layout: StructLayout::Single(vec![]),
             phantom_ty_params_mask: SmallBitVec::new(),
             abilities: AbilitySet::EMPTY,
             ty_params: vec![],

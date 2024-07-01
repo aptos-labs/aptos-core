@@ -1837,6 +1837,10 @@ impl TableType {
             0xE => Ok(TableType::FIELD_INST),
             0xF => Ok(TableType::FRIEND_DECLS),
             0x10 => Ok(TableType::METADATA),
+            0x11 => Ok(TableType::VARIANT_FIELD_HANDLE),
+            0x12 => Ok(TableType::VARIANT_FIELD_INST),
+            0x13 => Ok(TableType::STRUCT_VARIANT_HANDLE),
+            0x14 => Ok(TableType::STRUCT_VARIANT_INST),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_TABLE_TYPE)),
         }
     }
@@ -1995,6 +1999,17 @@ impl Opcodes {
             0x4B => Ok(Opcodes::CAST_U16),
             0x4C => Ok(Opcodes::CAST_U32),
             0x4D => Ok(Opcodes::CAST_U256),
+            // Since v7
+            0x4E => Ok(Opcodes::IMM_BORROW_VARIANT_FIELD),
+            0x4F => Ok(Opcodes::MUT_BORROW_VARIANT_FIELD),
+            0x50 => Ok(Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC),
+            0x51 => Ok(Opcodes::MUT_BORROW_VARIANT_FIELD_GENERIC),
+            0x52 => Ok(Opcodes::PACK_VARIANT),
+            0x53 => Ok(Opcodes::PACK_VARIANT_GENERIC),
+            0x54 => Ok(Opcodes::UNPACK_VARIANT),
+            0x55 => Ok(Opcodes::UNPACK_VARIANT_GENERIC),
+            0x56 => Ok(Opcodes::TEST_VARIANT),
+            0x57 => Ok(Opcodes::TEST_VARIANT_GENERIC),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)),
         }
     }

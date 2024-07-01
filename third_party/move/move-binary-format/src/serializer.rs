@@ -715,11 +715,11 @@ fn serialize_variant_field_handle(
     handle: &VariantFieldHandle,
 ) -> Result<()> {
     serialize_struct_def_index(binary, &handle.owner)?;
+    serialize_field_offset(binary, handle.field)?;
     serialize_variant_count(binary, handle.variants.len())?;
     for variant in &handle.variants {
         serialize_variant_offset(binary, *variant)?
     }
-    serialize_field_offset(binary, handle.field)?;
     Ok(())
 }
 

@@ -16,9 +16,10 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Bytecode, CompiledModule, FieldHandleIndex, FieldInstantiationIndex,
+        Bytecode, CompiledModule, FieldDefinition, FieldHandleIndex, FieldInstantiationIndex,
         FunctionDefinitionIndex, SignatureIndex, StructDefinition, StructDefinitionIndex,
-        StructFieldInformation, TableIndex,
+        StructFieldInformation, StructVariantHandleIndex, StructVariantInstantiationIndex,
+        TableIndex, VariantCount, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
     },
 };
 use move_core_types::{
@@ -28,7 +29,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::runtime_types::{
-    StructIdentifier, StructNameIndex, StructType, Type,
+    StructIdentifier, StructLayout, StructNameIndex, StructType, Type,
 };
 use parking_lot::RwLock;
 use std::{
@@ -209,6 +210,9 @@ pub struct Module {
     pub(crate) structs: Vec<StructDef>,
     // materialized instantiations, whether partial or not
     pub(crate) struct_instantiations: Vec<StructInstantiation>,
+    // same for struct variants
+    pub(crate) struct_variant_infos: Vec<StructVariantInfo>,
+    pub(crate) struct_variant_instantiation_infos: Vec<StructVariantInfo>,
 
     // functions as indexes into the Loader function list
     // That is effectively an indirection over the ref table:
@@ -224,6 +228,9 @@ pub struct Module {
     pub(crate) field_handles: Vec<FieldHandle>,
     // materialized instantiations, whether partial or not
     pub(crate) field_instantiations: Vec<FieldInstantiation>,
+    // Information about variant fields.
+    pub(crate) variant_field_infos: Vec<VariantFieldInfo>,
+    pub(crate) variant_field_instantiation_infos: Vec<VariantFieldInfo>,
 
     // function name to index into the Loader function list.
     // This allows a direct access from function name to `Function`
@@ -254,10 +261,20 @@ pub(crate) struct StructInstantiation {
     pub(crate) instantiation: Vec<Type>,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct StructVariantInfo {
+    // struct field count
+    pub(crate) field_count: u16,
+    pub(crate) variant: VariantCount,
+    pub(crate) definition_struct_type: Arc<StructType>,
+    pub(crate) instantiation: Vec<Type>,
+}
+
 // A field handle. The offset is the only used information when operating on a field
 #[derive(Clone, Debug)]
 pub(crate) struct FieldHandle {
     pub(crate) offset: usize,
+    pub(crate) ty: Type,
     pub(crate) definition_struct_type: Arc<StructType>,
 }
 
@@ -265,6 +282,17 @@ pub(crate) struct FieldHandle {
 #[derive(Clone, Debug)]
 pub(crate) struct FieldInstantiation {
     pub(crate) offset: usize,
+    pub(crate) uninstantiated_ty: Type,
+    pub(crate) definition_struct_type: Arc<StructType>,
+    pub(crate) instantiation: Vec<Type>,
+}
+
+// Information about to support both generic and non-generic variant fields.
+#[derive(Clone, Debug)]
+pub(crate) struct VariantFieldInfo {
+    pub(crate) offset: usize,
+    pub(crate) uninstantiated_ty: Type,
+    pub(crate) variants: Vec<VariantCount>,
     pub(crate) definition_struct_type: Arc<StructType>,
     pub(crate) instantiation: Vec<Type>,
 }
@@ -281,11 +309,15 @@ impl Module {
 
         let mut structs = vec![];
         let mut struct_instantiations = vec![];
+        let mut struct_variant_infos = vec![];
+        let mut struct_variant_instantiation_infos = vec![];
         let mut function_refs = vec![];
         let mut function_defs = vec![];
         let mut function_instantiations = vec![];
         let mut field_handles = vec![];
         let mut field_instantiations: Vec<FieldInstantiation> = vec![];
+        let mut variant_field_infos = vec![];
+        let mut variant_field_instantiation_infos = vec![];
         let mut function_map = HashMap::new();
         let mut struct_map = HashMap::new();
         let mut single_signature_token_map = BTreeMap::new();
@@ -330,7 +362,7 @@ impl Module {
                 let definition_struct_type =
                     Arc::new(Self::make_struct_type(&module, struct_def, &struct_idxs)?);
                 structs.push(StructDef {
-                    field_count: definition_struct_type.field_tys.len() as u16,
+                    field_count: definition_struct_type.field_count(None),
                     definition_struct_type,
                 });
                 let name =
@@ -341,12 +373,35 @@ impl Module {
             for struct_inst in module.struct_instantiations() {
                 let def = struct_inst.def.0 as usize;
                 let struct_def = &structs[def];
-                let field_count = struct_def.field_count;
                 struct_instantiations.push(StructInstantiation {
-                    field_count,
+                    field_count: struct_def.definition_struct_type.field_count(None),
                     instantiation: signature_table[struct_inst.type_parameters.0 as usize].clone(),
                     definition_struct_type: struct_def.definition_struct_type.clone(),
                 });
+            }
+
+            for struct_variant in module.struct_variant_handles() {
+                let definition_struct_type = structs[struct_variant.struct_index.0 as usize]
+                    .definition_struct_type
+                    .clone();
+                let variant = struct_variant.variant;
+                struct_variant_infos.push(StructVariantInfo {
+                    field_count: definition_struct_type.field_count(Some(variant)),
+                    variant,
+                    definition_struct_type,
+                    instantiation: vec![],
+                })
+            }
+
+            for struct_variant_inst in module.struct_variant_instantiations() {
+                let variant = &struct_variant_infos[struct_variant_inst.handle.0 as usize];
+                struct_variant_instantiation_infos.push(StructVariantInfo {
+                    field_count: variant.field_count,
+                    variant: variant.variant,
+                    definition_struct_type: variant.definition_struct_type.clone(),
+                    instantiation: signature_table[struct_variant_inst.type_parameters.0 as usize]
+                        .clone(),
+                })
             }
 
             for (idx, func) in module.function_defs().iter().enumerate() {
@@ -433,13 +488,15 @@ impl Module {
                 });
             }
 
-            for func_handle in module.field_handles() {
-                let def_idx = func_handle.owner;
+            for field_handle in module.field_handles() {
+                let def_idx = field_handle.owner;
                 let definition_struct_type =
                     structs[def_idx.0 as usize].definition_struct_type.clone();
-                let offset = func_handle.field as usize;
+                let offset = field_handle.field as usize;
+                let ty = definition_struct_type.fields(None)[offset].1.clone();
                 field_handles.push(FieldHandle {
                     offset,
+                    ty,
                     definition_struct_type,
                 });
             }
@@ -448,10 +505,54 @@ impl Module {
                 let fh_idx = field_inst.handle;
                 let offset = field_handles[fh_idx.0 as usize].offset;
                 let owner_struct_def = &structs[module.field_handle_at(fh_idx).owner.0 as usize];
+                let uninstantiated_ty = owner_struct_def.definition_struct_type.fields(None)
+                    [offset]
+                    .1
+                    .clone();
                 field_instantiations.push(FieldInstantiation {
                     offset,
+                    uninstantiated_ty,
                     instantiation: signature_table[field_inst.type_parameters.0 as usize].clone(),
                     definition_struct_type: owner_struct_def.definition_struct_type.clone(),
+                });
+            }
+
+            for variant_handle in module.variant_field_handles() {
+                let def_idx = variant_handle.owner;
+                let definition_struct_type =
+                    structs[def_idx.0 as usize].definition_struct_type.clone();
+                let offset = variant_handle.field as usize;
+                let variants = variant_handle.variants.clone();
+                let ty = definition_struct_type.fields(Some(variants[0]))[offset]
+                    .1
+                    .clone();
+                variant_field_infos.push(VariantFieldInfo {
+                    offset,
+                    variants,
+                    definition_struct_type,
+                    uninstantiated_ty: ty,
+                    instantiation: vec![],
+                });
+            }
+
+            for variant_inst in module.variant_field_instantiations() {
+                let variant_info = &variant_field_infos[variant_inst.handle.0 as usize];
+                let definition_struct_type = variant_info.definition_struct_type.clone();
+                let variants = variant_info.variants.clone();
+                let offset = variant_info.offset;
+                let instantiation =
+                    signature_table[variant_inst.type_parameters.0 as usize].clone();
+                // We can select one representative variant for finding the field type, all
+                // must have the same type as the verifier ensured.
+                let uninstantiated_ty = definition_struct_type.fields(Some(variants[0]))[offset]
+                    .1
+                    .clone();
+                variant_field_instantiation_infos.push(VariantFieldInfo {
+                    offset,
+                    uninstantiated_ty,
+                    variants,
+                    definition_struct_type,
+                    instantiation,
                 });
             }
 
@@ -465,11 +566,15 @@ impl Module {
                 module,
                 structs,
                 struct_instantiations,
+                struct_variant_infos,
+                struct_variant_instantiation_infos,
                 function_refs,
                 function_defs,
                 function_instantiations,
                 field_handles,
                 field_instantiations,
+                variant_field_infos,
+                variant_field_instantiation_infos,
                 function_map,
                 struct_map,
                 single_signature_token_map,
@@ -484,46 +589,42 @@ impl Module {
         struct_name_table: &[StructNameIndex],
     ) -> PartialVMResult<StructType> {
         let struct_handle = module.struct_handle_at(struct_def.struct_handle);
-        let field_names = match &struct_def.field_information {
-            StructFieldInformation::Native => vec![],
-            StructFieldInformation::Declared(field_info) => field_info
-                .iter()
-                .map(|f| module.identifier_at(f.name).to_owned())
-                .collect(),
-            StructFieldInformation::DeclaredVariants(..) => {
-                return Err(Self::variants_not_supported_err())
-            },
-        };
         let abilities = struct_handle.abilities;
         let name = module.identifier_at(struct_handle.name).to_owned();
         let ty_params = struct_handle.type_parameters.clone();
-        let fields = match &struct_def.field_information {
+        let layout = match &struct_def.field_information {
             StructFieldInformation::Native => unreachable!("native structs have been removed"),
-            StructFieldInformation::Declared(fields) => fields,
-            StructFieldInformation::DeclaredVariants(..) => {
-                return Err(Self::variants_not_supported_err())
+            StructFieldInformation::Declared(fields) => {
+                let fields: PartialVMResult<Vec<(Identifier, Type)>> = fields
+                    .iter()
+                    .map(|f| Self::make_field(module, f, struct_name_table))
+                    .collect();
+                StructLayout::Single(fields?)
+            },
+            StructFieldInformation::DeclaredVariants(variants) => {
+                let variants: PartialVMResult<Vec<(Identifier, Vec<(Identifier, Type)>)>> =
+                    variants
+                        .iter()
+                        .map(|v| {
+                            let fields: PartialVMResult<Vec<(Identifier, Type)>> = v
+                                .fields
+                                .iter()
+                                .map(|f| Self::make_field(module, f, struct_name_table))
+                                .collect();
+                            fields.map(|fields| (module.identifier_at(v.name).to_owned(), fields))
+                        })
+                        .collect();
+                StructLayout::Variants(variants?)
             },
         };
 
-        let mut field_tys = vec![];
-        for field in fields {
-            let ty = intern_type(
-                BinaryIndexedView::Module(module),
-                &field.signature.0,
-                struct_name_table,
-            )?;
-            debug_assert!(field_tys.len() < usize::max_value());
-            field_tys.push(ty);
-        }
-
         Ok(StructType {
-            field_tys,
+            layout,
             phantom_ty_params_mask: struct_handle
                 .type_parameters
                 .iter()
                 .map(|ty| ty.is_phantom)
                 .collect(),
-            field_names,
             abilities,
             ty_params,
             idx: struct_name_table[struct_def.struct_handle.0 as usize],
@@ -532,9 +633,17 @@ impl Module {
         })
     }
 
-    fn variants_not_supported_err() -> PartialVMError {
-        PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
-            .with_message("Struct variants not yet supported in VM".to_string())
+    fn make_field(
+        module: &CompiledModule,
+        field: &FieldDefinition,
+        struct_name_table: &[StructNameIndex],
+    ) -> PartialVMResult<(Identifier, Type)> {
+        let ty = intern_type(
+            BinaryIndexedView::Module(module),
+            &field.signature.0,
+            struct_name_table,
+        )?;
+        Ok((module.identifier_at(field.name).to_owned(), ty))
     }
 
     pub(crate) fn struct_at(&self, idx: StructDefinitionIndex) -> Arc<StructType> {
@@ -543,6 +652,17 @@ impl Module {
 
     pub(crate) fn struct_instantiation_at(&self, idx: u16) -> &StructInstantiation {
         &self.struct_instantiations[idx as usize]
+    }
+
+    pub(crate) fn struct_variant_at(&self, idx: StructVariantHandleIndex) -> &StructVariantInfo {
+        &self.struct_variant_infos[idx.0 as usize]
+    }
+
+    pub(crate) fn struct_variant_instantiation_at(
+        &self,
+        idx: StructVariantInstantiationIndex,
+    ) -> &StructVariantInfo {
+        &self.struct_variant_instantiation_infos[idx.0 as usize]
     }
 
     pub(crate) fn function_at(&self, idx: u16) -> &FunctionHandle {
@@ -575,6 +695,17 @@ impl Module {
 
     pub(crate) fn field_instantiation_offset(&self, idx: FieldInstantiationIndex) -> usize {
         self.field_instantiations[idx.0 as usize].offset
+    }
+
+    pub(crate) fn variant_field_info_at(&self, idx: VariantFieldHandleIndex) -> &VariantFieldInfo {
+        &self.variant_field_infos[idx.0 as usize]
+    }
+
+    pub(crate) fn variant_field_instantiation_info_at(
+        &self,
+        idx: VariantFieldInstantiationIndex,
+    ) -> &VariantFieldInfo {
+        &self.variant_field_instantiation_infos[idx.0 as usize]
     }
 
     pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {

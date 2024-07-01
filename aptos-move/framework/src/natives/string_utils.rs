@@ -308,6 +308,31 @@ fn native_format_impl(
             )?;
             out.push('}');
         },
+        MoveTypeLayout::Struct(MoveStructLayout::RuntimeVariants(variants)) => {
+            let strct = val.value_as::<Struct>()?;
+            let mut elems = strct.unpack()?.collect::<Vec<_>>();
+            if elems.is_empty() {
+                return Err(SafeNativeError::Abort {
+                    abort_code: EARGS_MISMATCH,
+                });
+            }
+            let tag = elems.pop().unwrap().value_as::<u32>()? as usize;
+            if tag >= variants.len() {
+                return Err(SafeNativeError::Abort {
+                    abort_code: EINVALID_FORMAT,
+                });
+            }
+            out.push_str(&format!("#{}{{", tag));
+            format_vector(
+                context,
+                variants[tag].iter(),
+                elems,
+                depth,
+                !context.single_line,
+                out,
+            )?;
+            out.push('}');
+        },
 
         // This is unreachable because we check layout at the start. Still, return
         // an error to be safe.
