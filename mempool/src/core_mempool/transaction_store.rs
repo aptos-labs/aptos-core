@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use super::index::TxnPointer;
 use crate::{
     core_mempool::{
         index::{
@@ -17,6 +18,7 @@ use crate::{
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::MempoolConfig;
+use aptos_consensus_types::common::TransactionSummary;
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Level};
 use aptos_types::{
@@ -26,7 +28,7 @@ use aptos_types::{
 };
 use std::{
     cmp::max,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     mem::size_of,
     ops::Bound,
     time::{Duration, Instant, SystemTime},
@@ -183,6 +185,34 @@ impl TransactionStore {
         self.sequence_numbers.get(address)
     }
 
+    pub(crate) fn total_num_transactions(&self) -> u64 {
+        self.transactions
+            .values()
+            .map(|txns| txns.len() as u64)
+            .sum()
+    }
+
+    pub(crate) fn get_account_sequence_numbers(&self, address: &AccountAddress) -> HashSet<u64> {
+        self.transactions
+            .get(address)
+            .map(|txns| txns.keys().copied().collect())
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn total_num_transactions_excluding(
+        &self,
+        excluded_transactions: &[TransactionSummary],
+    ) -> u64 {
+        self.transactions
+            .values()
+            .map(|txns| {
+                txns.iter()
+                    .filter(|(_, txn)| !excluded_transactions.contains(&TxnPointer::from(*txn)))
+                    .count() as u64
+            })
+            .sum()
+    }
+
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
     pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
         let address = txn.get_sender();
@@ -262,6 +292,12 @@ impl TransactionStore {
                 .insert(txn.get_committed_hash(), (txn.get_sender(), txn_seq_num));
             self.sequence_numbers.insert(txn.get_sender(), acc_seq_num);
             self.size_bytes += txn.get_estimated_bytes();
+            info!(
+                "insert address: {}, sequence_num: {}, acc_seq_num: {}",
+                txn.get_sender(),
+                txn_seq_num,
+                acc_seq_num
+            );
             txns.insert(txn_seq_num, txn);
             self.track_indices();
         }
@@ -411,13 +447,20 @@ impl TransactionStore {
     ///   TimelineIndex (txns for SharedMempool).
     /// - Other txns are considered to be "non-ready" and should be added to ParkingLotIndex.
     fn process_ready_transactions(&mut self, address: &AccountAddress, sequence_num: u64) {
+        info!(
+            "process_ready_transactions: address: {}, sequence_num: {}",
+            address, sequence_num
+        );
         if let Some(txns) = self.transactions.get_mut(address) {
             let mut min_seq = sequence_num;
 
             while let Some(txn) = txns.get_mut(&min_seq) {
                 let process_ready = !self.priority_index.contains(txn);
                 self.priority_index.insert(txn);
-
+                info!(
+                    "Priority index inserted: address: {}, sequence_num: {}, min_seq {}",
+                    address, txn.sequence_info.transaction_sequence_number, min_seq
+                );
                 let process_broadcast_ready = txn.timeline_state == TimelineState::NotReady;
                 if process_broadcast_ready {
                     self.timeline_index.insert(txn);
@@ -435,6 +478,10 @@ impl TransactionStore {
                 // Remove txn from parking lot after it has been promoted to
                 // priority_index / timeline_index, i.e., txn status is ready.
                 self.parking_lot_index.remove(txn);
+                info!(
+                    "process ready txns Parking lot index removed: address: {}, sequence_num: {}",
+                    address, min_seq
+                );
                 min_seq += 1;
             }
 
@@ -443,6 +490,7 @@ impl TransactionStore {
                 match txn.timeline_state {
                     TimelineState::Ready(_) => {},
                     _ => {
+                        info!("process ready txns Parking lot index inserted: address: {}, sequence_num: {}", address, txn.sequence_info.transaction_sequence_number);
                         self.parking_lot_index.insert(txn);
                         parking_lot_txns += 1;
                     },
@@ -536,8 +584,18 @@ impl TransactionStore {
         self.system_ttl_index.remove(txn);
         self.expiration_time_index.remove(txn);
         self.priority_index.remove(txn);
+        info!(
+            "priority index remove address: {}, sequence_num: {}",
+            txn.get_sender(),
+            txn.sequence_info.transaction_sequence_number
+        );
         self.timeline_index.remove(txn);
         self.parking_lot_index.remove(txn);
+        info!(
+            "parking lot index remove address: {}, sequence_num: {}",
+            txn.get_sender(),
+            txn.sequence_info.transaction_sequence_number
+        );
         self.hash_index.remove(&txn.get_committed_hash());
         self.size_bytes -= txn.get_estimated_bytes();
 
@@ -698,7 +756,17 @@ impl TransactionStore {
                 // mark all following txns as non-ready, i.e. park them
                 for (_, t) in txns.range_mut((park_range_start, park_range_end)) {
                     self.parking_lot_index.insert(t);
+                    info!(
+                        "gc parking lot insert address: {}, sequence_num: {}",
+                        t.get_sender(),
+                        t.sequence_info.transaction_sequence_number
+                    );
                     self.priority_index.remove(t);
+                    info!(
+                        "garbage collect remove address: {}, sequence_num: {}",
+                        t.get_sender(),
+                        t.sequence_info.transaction_sequence_number
+                    );
                     self.timeline_index.remove(t);
                     if let TimelineState::Ready(_) = t.timeline_state {
                         t.timeline_state = TimelineState::NotReady;

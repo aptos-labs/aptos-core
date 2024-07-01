@@ -23,7 +23,7 @@ use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
 use rayon::prelude::*;
 use std::{
-    collections::{btree_map::Entry, BTreeMap, HashMap},
+    collections::{btree_map::Entry, BTreeMap, HashMap, VecDeque},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -231,6 +231,7 @@ impl BatchGenerator {
             if num_batch_txns > 0 {
                 let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
                 let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
+                counters::BATCH_SIZE_IN_BYTES.observe(batch.batch_info().num_bytes() as f64);
                 batches.push(batch);
                 *total_batches_remaining = total_batches_remaining.saturating_sub(1);
                 txns_remaining -= num_batch_txns;
@@ -326,12 +327,15 @@ impl BatchGenerator {
     }
 
     pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
+        counters::SCHEDULED_BATCH_PULLS.inc();
+        counters::QS_MAX_PULL_TXNS.observe(max_count as f64);
         counters::BATCH_PULL_EXCLUDED_TXNS.observe(self.txns_in_progress_sorted.len() as f64);
         trace!(
             "QS: excluding txs len: {:?}",
             self.txns_in_progress_sorted.len()
         );
 
+        let pull_start_time = Instant::now();
         let mut pulled_txns = self
             .mempool_proxy
             .pull_internal(
@@ -341,6 +345,7 @@ impl BatchGenerator {
             )
             .await
             .unwrap_or_default();
+        counters::MEMPOOL_PULL_DURATION.observe_duration(pull_start_time.elapsed());
 
         trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
 
@@ -356,6 +361,7 @@ impl BatchGenerator {
         } else {
             counters::PULLED_TXNS_COUNT.inc();
             counters::PULLED_TXNS_NUM.observe(pulled_txns.len() as f64);
+            counters::PULLED_TXNS_TOTAL_COUNT.inc_by(pulled_txns.len() as u64);
             if pulled_txns.len() as u64 == max_count {
                 counters::BATCH_PULL_FULL_TXNS.observe(max_count as f64)
             }
@@ -391,6 +397,8 @@ impl BatchGenerator {
         mut interval: Interval,
     ) {
         let start = Instant::now();
+        let mut last_pulled_num_txns = 0;
+        let mut last_pulled_max_txn = 0;
 
         let mut last_non_empty_pull = start;
         let back_pressure_decrease_duration =
@@ -399,10 +407,8 @@ impl BatchGenerator {
             Duration::from_millis(self.config.back_pressure.increase_duration_ms);
         let mut back_pressure_decrease_latest = start;
         let mut back_pressure_increase_latest = start;
-        let mut dynamic_pull_txn_per_s = (self.config.back_pressure.dynamic_min_txn_per_s
-            + self.config.back_pressure.dynamic_max_txn_per_s)
-            / 2;
-
+        let mut dynamic_pull_txn_per_s = self.config.back_pressure.dynamic_max_txn_per_s;
+        let mut pulled_txns_window: VecDeque<(Instant, u64)> = VecDeque::new();
         loop {
             let _timer = counters::BATCH_GENERATOR_MAIN_LOOP.start_timer();
 
@@ -431,7 +437,7 @@ impl BatchGenerator {
                         if back_pressure_increase_latest.elapsed() >= back_pressure_increase_duration {
                             back_pressure_increase_latest = tick_start;
                             dynamic_pull_txn_per_s = std::cmp::min(
-                                dynamic_pull_txn_per_s + self.config.back_pressure.dynamic_min_txn_per_s,
+                                (dynamic_pull_txn_per_s as f64 * self.config.back_pressure.increase_fraction) as u64,
                                 self.config.back_pressure.dynamic_max_txn_per_s,
                             );
                             trace!("QS: dynamic_max_pull_txn_per_s: {}", dynamic_pull_txn_per_s);
@@ -450,15 +456,39 @@ impl BatchGenerator {
                     ) as usize;
                     if (!self.back_pressure.proof_count
                         && since_last_non_empty_pull_ms >= self.config.batch_generation_min_non_empty_interval_ms)
-                        || since_last_non_empty_pull_ms == self.config.batch_generation_max_interval_ms {
+                        || since_last_non_empty_pull_ms == self.config.batch_generation_max_interval_ms
+                        || last_pulled_num_txns >= 50_u64
+                        || last_pulled_num_txns > (last_pulled_max_txn as f64 / 2.0) as u64 {
 
-                        let dynamic_pull_max_txn = std::cmp::max(
-                            (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
+                        while let Some(&(tick_start, _)) = pulled_txns_window.front() {
+                            if tick_start.elapsed() > Duration::from_secs(1) {
+                                pulled_txns_window.pop_front();
+                            } else {
+                                break;
+                            }
+                        }
+                        info!("pulled_txns_window: {:?}, current_time: {:?}", pulled_txns_window, Instant::now());
+                        let pulled_in_last_sec = pulled_txns_window.iter().map(|(_, txns)| txns).sum();
+                        info!("pulled_in_last_sec: {}", pulled_in_last_sec);
+                        let dynamic_pull_max_txn = dynamic_pull_txn_per_s.saturating_sub(pulled_in_last_sec);
+                        // let dynamic_pull_max_txn = std::cmp::max(
+                        //     (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
+                        counters::QS_SINCE_LAST_NON_EMPTY_PULL_TIME.observe_duration(Duration::from_millis(since_last_non_empty_pull_ms as u64));
+                        counters::QS_DYNAMIC_MAX_PULL_TXNS.observe(dynamic_pull_max_txn as f64);
                         let pull_max_txn = std::cmp::min(
                             dynamic_pull_max_txn,
                             self.config.sender_max_total_txns as u64,
                         );
+                        info!("pull_max_txn: {}", pull_max_txn);
+                        last_pulled_max_txn = pull_max_txn;
+                        let pull_start_time = Instant::now();
                         let batches = self.handle_scheduled_pull(pull_max_txn).await;
+                        counters::MEMPOOL_PULL_AND_CREATE_BATCHES_DURATION.observe_duration(pull_start_time.elapsed());
+
+                        last_pulled_num_txns = batches.iter().map(|b| b.batch_info().num_txns()).sum();
+                        pulled_txns_window.push_back((Instant::now(), last_pulled_num_txns));
+                        counters::LAST_PULLED_NUM_TXNS.observe(last_pulled_num_txns as f64);
+
                         if !batches.is_empty() {
                             last_non_empty_pull = tick_start;
 

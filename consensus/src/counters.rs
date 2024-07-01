@@ -224,6 +224,25 @@ pub static PROPOSER_COLLECTED_TIMEOUT_VOTING_POWER: Lazy<Counter> = Lazy::new(||
         .unwrap()
 });
 
+/// Histogram for the number of txns per (committed) blocks.
+pub static NUM_INPUT_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_num_input_txns_per_block",
+        "Histogram for the number of input txns per (committed) blocks.",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static NUM_BYTES_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_num_bytes_per_block",
+        "Histogram for the number of bytes per (committed) blocks.",
+        exponential_buckets(/*start=*/ 500.0, /*factor=*/ 1.4, /*count=*/ 32).unwrap()
+    )
+    .unwrap()
+});
+
 /// Committed proposals map when using LeaderReputation as the ProposerElection
 pub static COMMITTED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
@@ -1064,7 +1083,10 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlo
         COMMITTED_BLOCKS_COUNT.inc();
         LAST_COMMITTED_ROUND.set(block.round() as i64);
         LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
-
+        NUM_INPUT_TXNS_PER_BLOCK
+            .observe(block.block().payload().map_or(0, |payload| payload.len()) as f64);
+        NUM_BYTES_PER_BLOCK
+            .observe(block.block().payload().map_or(0, |payload| payload.size()) as f64);
         let failed_rounds = block
             .block()
             .block_data()
@@ -1133,3 +1155,52 @@ pub static RAND_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_payload_manager_request_transactions_duration",
+        "Histogram of the time it takes to request transactions from the payload manager.",
+        [
+            0.005, 0.010, 0.015, 0.020, 0.025, 0.030, 0.035, 0.040, 0.045, 0.050, 0.055, 0.060,
+            0.065, 0.070, 0.075, 0.080, 0.085, 0.090, 0.095, 0.100, 0.110, 0.120, 0.130, 0.140,
+            0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.225, 0.250
+        ]
+        .to_vec()
+    )
+    .unwrap()
+});
+
+pub static PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_PROOF_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_payload_manager_request_transactions_proof_count",
+        "Count of the number of times a proof is requested for transactions."
+    )
+    .unwrap()
+});
+
+pub static PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_PROOF_COUNT_PURPOSE_1: Lazy<IntCounter> =
+    Lazy::new(|| {
+        register_int_counter!(
+            "aptos_consensus_payload_manager_request_transactions_proof_count_purpose_1",
+            "Count of the number of times a proof is requested for transactions for purpose 1."
+        )
+        .unwrap()
+    });
+
+pub static PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_PROOF_COUNT_PURPOSE_2: Lazy<IntCounter> =
+    Lazy::new(|| {
+        register_int_counter!(
+            "aptos_consensus_payload_manager_request_transactions_proof_count_purpose_2",
+            "Count of the number of times a proof is requested for transactions for purpose 2."
+        )
+        .unwrap()
+    });
+
+pub static PAYLOAD_MANAGER_REQUEST_TRANSACTIONS_PROOF_COUNT_PURPOSE_3: Lazy<IntCounter> =
+    Lazy::new(|| {
+        register_int_counter!(
+            "aptos_consensus_payload_manager_request_transactions_proof_count_purpose_3",
+            "Count of the number of times a proof is requested for transactions for purpose 3."
+        )
+        .unwrap()
+    });

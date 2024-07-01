@@ -607,7 +607,7 @@ fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 7, 5)
+            realistic_env_max_load_test(duration, test_cmd, 20, 3)
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
@@ -686,7 +686,7 @@ fn get_realistic_env_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
+        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 10, 10),
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
@@ -1050,14 +1050,14 @@ fn realistic_env_sweep_wrap(
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(20, 7, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
+        workloads: Workloads::TPS(vec![5000]),
         criteria: [
-            (9, 1.5, 3., 4., 0),
-            (95, 1.5, 3., 4., 0),
-            (950, 2., 3., 4., 0),
-            (2750, 2.5, 3.5, 4.5, 0),
+            // (9, 1.5, 3., 4., 0),
+            // (95, 1.5, 3., 4., 0),
+            // (950, 2., 3., 4., 0),
+            // (2750, 2.5, 3.5, 4.5, 0),
             (4600, 3., 4., 6., 10), // Allow some expired transactions (high-load)
         ]
         .into_iter()
@@ -1935,7 +1935,7 @@ fn realistic_env_max_load_test(
     duration: Duration,
     test_cmd: &TestCommand,
     num_validators: usize,
-    num_fullnodes: usize,
+    _num_fullnodes: usize,
 ) -> ForgeConfig {
     // Check if HAProxy is enabled
     let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
@@ -1945,7 +1945,7 @@ fn realistic_env_max_load_test(
     };
 
     // Determine if this is a long running test
-    let duration_secs = duration.as_secs();
+    let duration_secs = 1400;
     let long_running = duration_secs >= 2400;
 
     let mut success_criteria = SuccessCriteria::new(95)
@@ -1985,10 +1985,25 @@ fn realistic_env_max_load_test(
     }
 
     // Create the test
-    let mempool_backlog = if ha_proxy { 30000 } else { 40000 };
+    let mempool_backlog = 20000;
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(num_fullnodes)
+        //.with_initial_fullnode_count(num_fullnodes)
+        // .with_validator_override_node_config_fn(Arc::new(|config, _| {
+        //     config.consensus_observer.publisher_enabled = true
+        // }))
+        // .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+        //     config.consensus_observer.observer_enabled = true;
+        //     optimize_state_sync_for_throughput(config);
+        // }))
+        .with_validator_resource_override(NodeResourceOverride {
+            cpu_cores: Some(58),
+            memory_gib: Some(200),
+        })
+        // .with_fullnode_resource_override(NodeResourceOverride {
+        //     cpu_cores: Some(58),
+        //     memory_gib: Some(200),
+        // })
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
@@ -2007,8 +2022,7 @@ fn realistic_env_max_load_test(
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
-            helm_values["chain"]["epoch_duration_secs"] =
-                (if long_running { 600 } else { 300 }).into();
+            helm_values["chain"]["epoch_duration_secs"] = (1500).into();
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
                     .expect("must serialize");

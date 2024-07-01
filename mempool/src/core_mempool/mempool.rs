@@ -143,6 +143,26 @@ impl Mempool {
                 .consensus_pulled_counter
                 .fetch_add(1, Ordering::Relaxed);
             Self::log_txn_latency(insertion_info, bucket, counters::CONSENSUS_PULLED_LABEL);
+            if let Some(prioritized_time) = insertion_info.priority_index_inserted_time {
+                if let Ok(time_delta) = SystemTime::now().duration_since(prioritized_time) {
+                    counters::core_mempool_txn_commit_latency(
+                        counters::CONSENSUS_PULLED_FROM_PRIORITY_INDEX_INSERTED_LABEL,
+                        insertion_info.submitted_by_label(),
+                        bucket,
+                        time_delta,
+                    );
+                }
+                if let Ok(time_delta) =
+                    prioritized_time.duration_since(insertion_info.insertion_time)
+                {
+                    counters::core_mempool_txn_commit_latency(
+                        counters::INSERTED_TO_PRIORITY_INDEX_LABEL,
+                        insertion_info.submitted_by_label(),
+                        bucket,
+                        time_delta,
+                    );
+                }
+            }
             counters::CORE_MEMPOOL_TXN_CONSENSUS_PULLED.observe((prev_count + 1) as f64);
         }
     }
@@ -296,13 +316,317 @@ impl Mempool {
             .is_some()
     }
 
-    /// Fetches next block of transactions for consensus.
-    /// `return_non_full` - if false, only return transactions when max_txns or max_bytes is reached
-    ///                     Should always be true for Quorum Store.
-    /// `include_gas_upgraded` - Return transactions that had gas upgraded, even if they are in
-    ///                          exclude_transactions. Should only be true for Quorum Store.
-    /// `exclude_transactions` - transactions that were sent to Consensus but were not committed yet
-    ///  mempool should filter out such transactions.
+    // /// Fetches next block of transactions for consensus.
+    // /// `return_non_full` - if false, only return transactions when max_txns or max_bytes is reached
+    // ///                     Should always be true for Quorum Store.
+    // /// `include_gas_upgraded` - Return transactions that had gas upgraded, even if they are in
+    // ///                          exclude_transactions. Should only be true for Quorum Store.
+    // /// `exclude_transactions` - transactions that were sent to Consensus but were not committed yet
+    // ///  mempool should filter out such transactions.
+    // #[allow(clippy::explicit_counter_loop)]
+    // pub(crate) fn get_batch(
+    //     &self,
+    //     max_txns: u64,
+    //     max_bytes: u64,
+    //     return_non_full: bool,
+    //     exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
+    // ) -> Vec<SignedTransaction> {
+    //     counters::MEMPOOL_GET_BATCH_REQUESTS.inc();
+    //     counters::MEMPOOL_TOTAL_NUM_TXNS.observe(self.transactions.total_num_transactions() as f64);
+    //     counters::MEMPOOL_REQUESTED_TXNS_IN_GET_BATCH.observe(max_txns as f64);
+    //     counters::MEMPOOL_REQUESTED_BYTES_IN_GET_BATCH.observe(max_bytes as f64);
+    //     let mempool_total_txns_excluding_progressing =
+    //         self.transactions.total_num_transactions_excluding(
+    //             &exclude_transactions
+    //                 .keys()
+    //                 .cloned()
+    //                 .collect::<Vec<TransactionSummary>>(),
+    //         );
+    //     counters::MEMPOOL_TXNS_EXCLUDING_PROGRESING
+    //         .observe(mempool_total_txns_excluding_progressing as f64);
+    //     let start_time = Instant::now();
+    //     let exclude_size = exclude_transactions.len();
+    //     let mut inserted = HashSet::new();
+
+    //     let gas_end_time = start_time.elapsed();
+    //     info!("MempoolGetBatchRequest");
+
+    //     // let mut txn_walked_first_time = 0usize;
+    //     // let mut non_excluded_txns = 0usize;
+    //     // for txn in self.transactions.iter_queue() {
+    //     //     txn_walked_first_time += 1;
+    //     //     let txn_ptr = TxnPointer::from(txn);
+
+    //     //     // TODO: removed gas upgraded logic. double check if it's needed
+    //     //     if exclude_transactions.contains_key(&txn_ptr) {
+    //     //         continue;
+    //     //     }
+    //     //     non_excluded_txns += 1;
+    //     // }
+    //     // counters::MEMPOOL_TRANSACTIONS_WALKED.observe(txn_walked_first_time as f64);
+    //     // counters::MEMPOOL_NON_EXCLUDED_TRANSACTIONS.observe(non_excluded_txns as f64);
+    //     // counters::MEMPOOL_DIFFERENCE_BETWEEN_TWO_EXCLUDED_CALCULATIONS
+    //     //     .observe((mempool_total_txns_excluding_progressing - non_excluded_txns as u64) as f64);
+
+    //     let mut result = vec![];
+    //     // Helper DS. Helps to mitigate scenarios where account submits several transactions
+    //     // with increasing gas price (e.g. user submits transactions with sequence number 1, 2
+    //     // and gas_price 1, 10 respectively)
+    //     // Later txn has higher gas price and will be observed first in priority index iterator,
+    //     // but can't be executed before first txn. Once observed, such txn will be saved in
+    //     // `skipped` DS and rechecked once it's ancestor becomes available
+    //     let mut skipped = HashSet::new();
+    //     let mut total_bytes = 0;
+    //     let mut txn_walked = 0usize;
+    //     // iterate over the queue of transactions based on gas price
+    //     'main: for txn in self.transactions.iter_queue() {
+    //         txn_walked += 1;
+    //         let txn_ptr = TxnPointer::from(txn);
+
+    //         // TODO: removed gas upgraded logic. double check if it's needed
+    //         if exclude_transactions.contains_key(&txn_ptr) {
+    //             continue;
+    //         }
+    //         let tx_seq = txn.sequence_number.transaction_sequence_number;
+    //         let txn_in_sequence = tx_seq > 0
+    //             && Self::txn_was_chosen(txn.address, tx_seq - 1, &inserted, &exclude_transactions);
+    //         let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
+    //         // include transaction if it's "next" for given account or
+    //         // we've already sent its ancestor to Consensus.
+    //         if txn_in_sequence || account_sequence_number == Some(&tx_seq) {
+    //             inserted.insert((txn.address, tx_seq));
+    //             result.push((txn.address, tx_seq));
+    //             if (result.len() as u64) == max_txns {
+    //                 break;
+    //             }
+
+    //             // check if we can now include some transactions
+    //             // that were skipped before for given account
+    //             let mut skipped_txn = (txn.address, tx_seq + 1);
+    //             while skipped.contains(&skipped_txn) {
+    //                 inserted.insert(skipped_txn);
+    //                 result.push(skipped_txn);
+    //                 skipped.remove(&skipped_txn);
+    //                 if (result.len() as u64) == max_txns {
+    //                     break 'main;
+    //                 }
+    //                 skipped_txn = (skipped_txn.0, skipped_txn.1 + 1);
+    //             }
+    //         } else {
+    //             info!(
+    //                 "txn_in_sequence: {}, account_sequence_number: {:?}, txn_seq: {}, txn_seq_numbers: {:?}, txn_address: {:?}",
+    //                 txn_in_sequence, account_sequence_number, tx_seq, self.transactions.get_account_sequence_numbers(&txn.address), txn.address
+    //             );
+    //             skipped.insert((txn.address, tx_seq));
+    //         }
+    //     }
+    //     counters::MEMPOOL_SKIPPED_TXNS.set(skipped.len() as i64);
+    //     counters::MEMPOOL_GET_BATCH_INITIAL_NUM_TXNS.observe(result.len() as f64);
+    //     counters::MEMPOOL_GET_BATCH_INITIAL_NUM_BYTES.observe(
+    //         result
+    //             .iter()
+    //             .map(|(sender, sequence_number)| {
+    //                 if let Some((txn, _)) = self
+    //                     .transactions
+    //                     .get_with_ranking_score(sender, *sequence_number)
+    //                 {
+    //                     txn.txn_bytes_len()
+    //                 } else {
+    //                     0
+    //                 }
+    //             })
+    //             .sum::<usize>() as f64,
+    //     );
+    //     let result_size = result.len();
+    //     let result_end_time = start_time.elapsed();
+    //     let result_time = result_end_time.saturating_sub(gas_end_time);
+
+    //     let mut block = Vec::with_capacity(result_size);
+    //     let mut full_bytes = false;
+    //     let mut unable_to_get_txns = 0;
+    //     for (sender, sequence_number) in result {
+    //         if let Some((txn, ranking_score)) = self
+    //             .transactions
+    //             .get_with_ranking_score(&sender, sequence_number)
+    //         {
+    //             let txn_size = txn.txn_bytes_len() as u64;
+    //             if total_bytes + txn_size > max_bytes {
+    //                 full_bytes = true;
+    //                 break;
+    //             }
+    //             total_bytes += txn_size;
+    //             block.push(txn);
+    //             if total_bytes == max_bytes {
+    //                 full_bytes = true;
+    //             }
+    //             counters::core_mempool_txn_ranking_score(
+    //                 counters::CONSENSUS_PULLED_LABEL,
+    //                 counters::CONSENSUS_PULLED_LABEL,
+    //                 self.transactions.get_bucket(ranking_score),
+    //                 ranking_score,
+    //             );
+    //         } else {
+    //             unable_to_get_txns += 1;
+    //         }
+    //     }
+    //     counters::MEMPOOL_UNABLE_TO_FIND_TXNS.set(unable_to_get_txns as i64);
+    //     let block_end_time = start_time.elapsed();
+    //     let block_time = block_end_time.saturating_sub(result_end_time);
+
+    //     if result_size > 0 {
+    //         debug!(
+    //             LogSchema::new(LogEntry::GetBlock),
+    //             seen_consensus = exclude_size,
+    //             walked = txn_walked,
+    //             // before size and non full check
+    //             result_size = result_size,
+    //             // before non full check
+    //             byte_size = total_bytes,
+    //             block_size = block.len(),
+    //             return_non_full = return_non_full,
+    //             result_time_ms = result_time.as_millis(),
+    //             block_time_ms = block_time.as_millis(),
+    //         );
+    //     } else {
+    //         sample!(
+    //             SampleRate::Duration(Duration::from_secs(60)),
+    //             debug!(
+    //                 LogSchema::new(LogEntry::GetBlock),
+    //                 seen_consensus = exclude_size,
+    //                 walked = txn_walked,
+    //                 // before size and non full check
+    //                 result_size = result_size,
+    //                 // before non full check
+    //                 byte_size = total_bytes,
+    //                 block_size = block.len(),
+    //                 return_non_full = return_non_full,
+    //                 result_time_ms = result_time.as_millis(),
+    //                 block_time_ms = block_time.as_millis(),
+    //             )
+    //         );
+    //     }
+
+    //     if !return_non_full && !full_bytes && (block.len() as u64) < max_txns {
+    //         block.clear();
+    //     }
+
+    //     counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
+    //     counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);
+    //     for transaction in &block {
+    //         self.log_consensus_pulled_latency(transaction.sender(), transaction.sequence_number());
+    //     }
+    //     counters::MEMPOOL_GET_BATCH_FINAL_NUM_TXNS.observe(block.len() as f64);
+    //     counters::MEMPOOL_GET_BATCH_FINAL_NUM_BYTES.observe(total_bytes as f64);
+    //     counters::MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH.set(
+    //         if mempool_total_txns_excluding_progressing > (block.len() as u64) {
+    //             (mempool_total_txns_excluding_progressing - block.len() as u64) as i64
+    //         } else {
+    //             0
+    //         },
+    //     );
+    //     // counters::MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH_SECOND_WAY.set(
+    //     //     if non_excluded_txns > block.len() {
+    //     //         (non_excluded_txns - block.len()) as i64
+    //     //     } else {
+    //     //         0
+    //     //     },
+    //     // );
+    //     counters::MEMPOOL_BLOCK_BIGGER_THAN_MEMPOOL.observe(
+    //         if block.len() as u64 > mempool_total_txns_excluding_progressing {
+    //             1.0
+    //         } else {
+    //             0.0
+    //         },
+    //     );
+    //     if self.transactions.total_num_transactions()
+    //         != (block.len() + skipped.len() + exclude_transactions.len()) as u64
+    //     {
+    //         info!("Total_num_transactions = {}, block len = {}, skipped len = {},  excluded transactions = {}, difference = {}",
+    //             self.transactions.total_num_transactions(), block.len(), skipped.len(), exclude_transactions.len(),
+    //             (self.transactions.total_num_transactions() as i64 - (block.len()  + skipped.len() + exclude_transactions.len()) as i64)
+    //         );
+    //     }
+    //     counters::MEMPOOL_DIFFERENCE_BETWEEN_TWO_EXCLUDED_CALCULATIONS.observe(
+    //         if self.transactions.total_num_transactions()
+    //             > block.len() as u64 + skipped.len() as u64 + exclude_transactions.len() as u64
+    //         {
+    //             (self.transactions.total_num_transactions()
+    //                 - block.len() as u64
+    //                 - skipped.len() as u64
+    //                 - exclude_transactions.len() as u64) as f64
+    //         } else {
+    //             0.0
+    //         },
+    //     );
+
+    //     counters::MEMPOOL_DIFFERENCE_BETWEEN_TWO_EXCLUDED_CALCULATIONS_NEGATIVE.observe(
+    //         if block.len() as u64 + skipped.len() as u64 + exclude_transactions.len() as u64
+    //             > self.transactions.total_num_transactions()
+    //         {
+    //             (block.len() as u64 + skipped.len() as u64 + exclude_transactions.len() as u64
+    //                 - self.transactions.total_num_transactions()) as f64
+    //         } else {
+    //             0.0
+    //         },
+    //     );
+
+    //     counters::MEMPOOL_BLOCK_AND_SKIPPED
+    //         .set(((block.len() as u64) + (skipped.len() as u64)) as i64);
+    //     counters::MEMPOOL_BLOCK_AND_SKIPPED_BIGGER_THAN_MEMPOOL.observe(
+    //         if (block.len() as u64) + (skipped.len() as u64)
+    //             > mempool_total_txns_excluding_progressing
+    //         {
+    //             1.0
+    //         } else {
+    //             0.0
+    //         },
+    //     );
+
+    //     // let mut actual_remaining_txns = 0;
+    //     // for txn in self.transactions.iter_queue() {
+    //     //     let txn_ptr = TxnPointer::from(txn);
+    //     //     if exclude_transactions.contains_key(&txn_ptr) {
+    //     //         continue;
+    //     //     }
+    //     //     if block.iter().any(|t| {
+    //     //         t.sender() == txn_ptr.sender && t.sequence_number() == txn_ptr.sequence_number
+    //     //     }) {
+    //     //         continue;
+    //     //     }
+    //     //     actual_remaining_txns += 1;
+    //     // }
+
+    //     let mut total_exclude_transactions: Vec<TransactionSummary> = exclude_transactions
+    //         .keys()
+    //         .cloned()
+    //         .collect::<Vec<TransactionSummary>>();
+    //     for txn in block.iter() {
+    //         let txn_ptr = TransactionSummary {
+    //             sender: txn.sender(),
+    //             hash: txn.committed_hash(),
+    //             sequence_number: txn.sequence_number(),
+    //         };
+    //         total_exclude_transactions.push(txn_ptr);
+    //     }
+    //     let actual_remaining_txns = self
+    //         .transactions
+    //         .total_num_transactions_excluding(&total_exclude_transactions);
+    //     counters::MEMPOOL_ACTUAL_REMAINING_TXNS.observe(actual_remaining_txns as f64);
+    //     counters::MEMPOOL_ACTUAL_REMAINING_TXNS_SAME_AS_SKIPPED.observe(
+    //         if actual_remaining_txns == (skipped.len() as u64) {
+    //             1.0
+    //         } else {
+    //             0.0
+    //         },
+    //     );
+
+    //     counters::MEMPOOL_UNFILLED_TXNS_IN_GET_BATCH
+    //         .observe((max_txns.saturating_sub(block.len() as u64)) as f64);
+    //     counters::MEMPOOL_UNFILLED_BYTES_IN_GET_BATCH
+    //         .observe((max_bytes.saturating_sub(total_bytes)) as f64);
+    //     block
+    // }
+
     #[allow(clippy::explicit_counter_loop)]
     pub(crate) fn get_batch(
         &self,
@@ -314,8 +638,9 @@ impl Mempool {
         let start_time = Instant::now();
         let exclude_size = exclude_transactions.len();
         let mut inserted = HashSet::new();
+        let total_num_txns = self.transactions.total_num_transactions();
 
-        let gas_end_time = start_time.elapsed();
+        let gas_end_time: Duration = start_time.elapsed();
 
         let mut result = vec![];
         // Helper DS. Helps to mitigate scenarios where account submits several transactions
@@ -325,26 +650,52 @@ impl Mempool {
         // but can't be executed before first txn. Once observed, such txn will be saved in
         // `skipped` DS and rechecked once it's ancestor becomes available
         let mut skipped = HashSet::new();
+        let mut first_skipped = HashSet::new();
         let mut total_bytes = 0;
         let mut txn_walked = 0usize;
+        let mut txns_not_excluded: usize = 0;
+        let mut initially_skipped = 0usize;
+        let mut result_pushed: usize = 0;
+        let mut txns_walked = Vec::new();
+
         // iterate over the queue of transactions based on gas price
         'main: for txn in self.transactions.iter_queue() {
             txn_walked += 1;
             let txn_ptr = TxnPointer::from(txn);
-
+            txns_walked.push((txn.address, txn.sequence_number.transaction_sequence_number));
             // TODO: removed gas upgraded logic. double check if it's needed
             if exclude_transactions.contains_key(&txn_ptr) {
                 continue;
             }
+            txns_not_excluded += 1;
             let tx_seq = txn.sequence_number.transaction_sequence_number;
             let txn_in_sequence = tx_seq > 0
                 && Self::txn_was_chosen(txn.address, tx_seq - 1, &inserted, &exclude_transactions);
             let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
+
+            // let mut bypass = false;
+            // if let Some(account_sequence_number) = account_sequence_number {
+            //     if *account_sequence_number == tx_seq - 1 {
+            //         let min_inclusive =
+            //             TxnPointer::new(txn.address, *account_sequence_number, HashValue::zero());
+            //         let max_exclusive = TxnPointer::new(
+            //             txn.address,
+            //             account_sequence_number.saturating_add(1),
+            //             HashValue::zero(),
+            //         );
+            //         bypass = exclude_transactions
+            //             .range(min_inclusive..max_exclusive)
+            //             .next()
+            //             .is_some();
+            //     }
+            // }
+
             // include transaction if it's "next" for given account or
             // we've already sent its ancestor to Consensus.
             if txn_in_sequence || account_sequence_number == Some(&tx_seq) {
                 inserted.insert((txn.address, tx_seq));
                 result.push((txn.address, tx_seq));
+                result_pushed += 1;
                 if (result.len() as u64) == max_txns {
                     break;
                 }
@@ -355,6 +706,8 @@ impl Mempool {
                 while skipped.remove(&skipped_txn) {
                     inserted.insert(skipped_txn);
                     result.push(skipped_txn);
+                    result_pushed += 1;
+                    skipped.remove(&skipped_txn);
                     if (result.len() as u64) == max_txns {
                         break 'main;
                     }
@@ -362,9 +715,73 @@ impl Mempool {
                 }
             } else {
                 skipped.insert((txn.address, tx_seq));
+                first_skipped.insert((txn.address, tx_seq));
+                initially_skipped += 1;
             }
         }
+        counters::MEMPOOL_SKIPPED_TXNS.observe(skipped.len() as f64);
+        for txn in &skipped {
+            let account_exluded = if let Some(account_seq_num) =
+                self.transactions.get_sequence_number(&txn.0)
+            {
+                let min_inclusive = TxnPointer::new(txn.0, *account_seq_num, HashValue::zero());
+                let max_exclusive =
+                    TxnPointer::new(txn.0, account_seq_num.saturating_add(1), HashValue::zero());
+                Some(
+                    exclude_transactions
+                        .range(min_inclusive..max_exclusive)
+                        .next()
+                        .is_some(),
+                )
+            } else {
+                None
+            };
+
+            let mut excluded_seq_numbers = exclude_transactions
+                .keys()
+                .filter(|t| t.sender == txn.0)
+                .map(|t| t.sequence_number)
+                .collect::<Vec<u64>>();
+            excluded_seq_numbers.sort();
+
+            let mut account_seq_numbers = self
+                .transactions
+                .get_account_sequence_numbers(&txn.0)
+                .into_iter()
+                .collect::<Vec<u64>>();
+            account_seq_numbers.sort();
+
+            let mut inserted_seq_numbers = inserted
+                .iter()
+                .filter(|(sender, _)| *sender == txn.0)
+                .map(|(_, seq)| seq)
+                .collect::<Vec<&u64>>();
+            inserted_seq_numbers.sort();
+
+            let mut skipped_seq_numbers = skipped
+                .iter()
+                .filter(|(sender, _)| *sender == txn.0)
+                .map(|(_, seq)| seq)
+                .collect::<Vec<&u64>>();
+            skipped_seq_numbers.sort();
+
+            let mut first_skipped_seq_numbers = first_skipped
+                .iter()
+                .filter(|(sender, _)| *sender == txn.0)
+                .map(|(_, seq)| seq)
+                .collect::<Vec<&u64>>();
+            first_skipped_seq_numbers.sort();
+
+            let txns_walked_seq_numbers = txns_walked
+                .iter()
+                .filter(|(sender, _)| *sender == txn.0)
+                .map(|(_, seq)| seq)
+                .collect::<Vec<&u64>>();
+
+            info!("Skipped txn: {:?}, account sequence number: {:?}, existing sequence numbers: {:?}, was_chosen: {}, account_sequence_number in excluded: {:?}, sequence numbers in excluded: {:?}, sequence numbers inserted: {:?}, sequence numbers skipped: {:?}, sequence numbers originally skipped: {:?}, sequence numbers walked: {:?}, result length: {:?}, inserted length: {:?}, max_txns: {:?}, inserted < max_txns: {}", txn, self.transactions.get_sequence_number(&txn.0), account_seq_numbers, Self::txn_was_chosen(txn.0, txn.1 - 1, &inserted, &exclude_transactions), account_exluded, excluded_seq_numbers, inserted_seq_numbers, skipped_seq_numbers, first_skipped_seq_numbers, txns_walked_seq_numbers, result.len(), inserted.len(), max_txns, (inserted.len() as u64) < max_txns);
+        }
         let result_size = result.len();
+        let inserted_size = inserted.len();
         let result_end_time = start_time.elapsed();
         let result_time = result_end_time.saturating_sub(gas_end_time);
 
@@ -432,6 +849,45 @@ impl Mempool {
         if !return_non_full && !full_bytes && (block.len() as u64) < max_txns {
             block.clear();
         }
+
+        let mut total_exclude_transactions: Vec<TransactionSummary> = exclude_transactions
+            .keys()
+            .cloned()
+            .collect::<Vec<TransactionSummary>>();
+        for txn in block.iter() {
+            let txn_ptr = TransactionSummary {
+                sender: txn.sender(),
+                hash: txn.committed_hash(),
+                sequence_number: txn.sequence_number(),
+            };
+            total_exclude_transactions.push(txn_ptr);
+        }
+
+        let actual_remaining_txns = self
+            .transactions
+            .total_num_transactions_excluding(&total_exclude_transactions);
+        counters::MEMPOOL_ACTUAL_REMAINING_TXNS.observe(actual_remaining_txns as f64);
+        counters::MEMPOOL_ACTUAL_REMAINING_TXNS_SAME_AS_SKIPPED.observe(
+            if actual_remaining_txns == (skipped.len() as u64) {
+                1.0
+            } else {
+                0.0
+            },
+        );
+
+        // counters::MEMPOOL_GET_BATCH_FINAL_NUM_TXNS.observe(block.len() as f64);
+        // counters::MEMPOOL_GET_BATCH_FINAL_NUM_BYTES.observe(total_bytes as f64);
+        // counters::MEMPOOL_REMAINING_TXNS_AFTER_GET_BATCH.set(
+        //     if mempool_total_txns_excluding_progressing > (block.len() as u64) {
+        //         (mempool_total_txns_excluding_progressing - block.len() as u64) as i64
+        //     } else {
+        //         0
+        //     },
+        // );
+
+        info!("MempoolGetBatchRequest: Block size: {}, Block bytes: {}, return_non_full: {}, full_bytes: {}, block_len < max_txns: {}, block_cleared: {}, total_num_txns: {}, txns_walked: {}, excluded_txns: {}, skipped: {}, actual_remaining_txns: {}, initial_picked_txns: {}, txns_not_excluded: {}, inserted_size: {}, initially_skipped: {}, result_pushed: {}, inserted != result: {}, block != result: {}, max_txns: {}", block.len(), total_bytes, return_non_full, full_bytes, (block.len() as u64) < max_txns, !return_non_full && !full_bytes && (block.len() as u64) < max_txns, total_num_txns, txn_walked, exclude_transactions.len(),  skipped.len(), actual_remaining_txns, result_size, txns_not_excluded, inserted_size, initially_skipped, result_pushed, inserted_size != result_size, block.len() != result_size, max_txns);
+        // info!("MempoolGetBatchRequest: Block size: {}, Block bytes: {}, return_non_full: {}, full_bytes: {}, block_len < max_txns: {}, block_cleared: {}, txns_walked: {}, excluded_txns: {}, txns_walked - excluded: {}, skipped: {}, actual_remaining_txns: {}, initial_picked_txns: {}", block.len(), total_bytes, return_non_full, full_bytes, (block.len() as u64) < max_txns, !return_non_full && !full_bytes && (block.len() as u64) < max_txns, txn_walked, exclude_transactions.len(), txn_walked - exclude_transactions.len(), skipped.len(), actual_remaining_txns, result_size);
+        // info!("MempoolGetBatchRequest: Block size: {}, Block bytes: {}, return_non_full: {}, full_bytes: {}, block_len < max_txns: {}, block_cleared: {}, total_num_txns: {}, txns_walked: {}, excluded_txns: {}, num_txns - exlcuded: {}, txns_walked - excluded: {}, skipped: {}, initial_picked_txns: {}", block.len(), total_bytes, return_non_full, full_bytes, (block.len() as u64) < max_txns, !return_non_full && !full_bytes && (block.len() as u64) < max_txns, total_num_txns, txn_walked, exclude_transactions.len(), total_num_txns - exclude_transactions.len() as u64, txn_walked - exclude_transactions.len(), skipped.len(), result_size);
 
         counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
         counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);
