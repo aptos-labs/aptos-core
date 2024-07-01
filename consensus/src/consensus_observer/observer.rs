@@ -122,7 +122,7 @@ impl ConsensusObserver {
             consensus_observer_client,
             epoch_state: None,
             root: Arc::new(Mutex::new(root)),
-            pending_ordered_blocks: PendingOrderedBlocks::new(),
+            pending_ordered_blocks: PendingOrderedBlocks::new(consensus_observer_config),
             execution_client,
             block_payload_store: BlockPayloadStore::new(),
             sync_handle: None,

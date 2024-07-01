@@ -5,19 +5,22 @@ use crate::consensus_observer::{
     logging::{LogEntry, LogSchema},
     network_message::OrderedBlock,
 };
+use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{common::Round, pipeline::commit_decision::CommitDecision};
 use aptos_infallible::Mutex;
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, error, warn};
 use aptos_types::{
     block_info::BlockInfo, epoch_change::Verifier, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
 };
 use std::{collections::BTreeMap, sync::Arc};
-use num_traits::Saturating;
 
 /// A simple struct to store the block payloads of ordered and committed blocks
 #[derive(Clone)]
 pub struct PendingOrderedBlocks {
+    // The configuration of the consensus observer
+    consensus_observer_config: ConsensusObserverConfig,
+
     // Verified pending ordered blocks (for the current epoch)
     verified_pending_blocks:
         Arc<Mutex<BTreeMap<(u64, Round), (OrderedBlock, Option<CommitDecision>)>>>,
@@ -28,8 +31,9 @@ pub struct PendingOrderedBlocks {
 }
 
 impl PendingOrderedBlocks {
-    pub fn new() -> Self {
+    pub fn new(consensus_observer_config: ConsensusObserverConfig) -> Self {
         Self {
+            consensus_observer_config,
             verified_pending_blocks: Arc::new(Mutex::new(BTreeMap::new())),
             unverified_pending_blocks: Arc::new(Mutex::new(BTreeMap::new())),
         }
@@ -74,6 +78,27 @@ impl PendingOrderedBlocks {
     /// Inserts the given ordered block into the pending blocks. This function
     /// assumes the block has already been checked to extend the current pending blocks.
     pub fn insert_ordered_block(&self, ordered_block: OrderedBlock, verified_ordered_proof: bool) {
+        // Verify that the number of pending blocks doesn't exceed the maximum
+        let max_num_pending_blocks = self.consensus_observer_config.max_num_pending_blocks as usize;
+        let pending_ordered_blocks = if verified_ordered_proof {
+            &self.verified_pending_blocks
+        } else {
+            &self.unverified_pending_blocks
+        };
+        if pending_ordered_blocks.lock().len() >= max_num_pending_blocks {
+            // Log a warning and return early
+            warn!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Exceeded the maximum number of pending blocks: {:?}. Block verification: {:?}, block: {:?}.",
+                    max_num_pending_blocks,
+                    verified_ordered_proof,
+                    ordered_block.ordered_proof.commit_info()
+                ))
+            );
+            return;
+        }
+
+        // Otherwise, we can add the block to the pending blocks
         debug!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                 "Adding ordered block to the pending blocks: {}. Verified ordered proof: {:?}",
@@ -87,12 +112,7 @@ impl PendingOrderedBlocks {
         let last_block_epoch = last_block.epoch();
         let last_block_round = last_block.round();
 
-        // Insert the pending block (depending on if the proof is verified)
-        let pending_ordered_blocks = if verified_ordered_proof {
-            &self.verified_pending_blocks
-        } else {
-            &self.unverified_pending_blocks
-        };
+        // Insert the pending block
         pending_ordered_blocks
             .lock()
             .insert((last_block_epoch, last_block_round), (ordered_block, None));
@@ -188,12 +208,6 @@ impl PendingOrderedBlocks {
     }
 }
 
-impl Default for PendingOrderedBlocks {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -215,7 +229,7 @@ mod test {
     #[test]
     pub fn test_get_last_pending_block() {
         // Create new pending ordered blocks
-        let pending_ordered_blocks = PendingOrderedBlocks::new();
+        let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
         // Verify that we have no last pending block
         assert!(pending_ordered_blocks.get_last_pending_block().is_none());
@@ -269,7 +283,7 @@ mod test {
     #[test]
     pub fn test_get_verified_pending_block() {
         // Create new pending ordered blocks
-        let pending_ordered_blocks = PendingOrderedBlocks::new();
+        let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
         // Insert several verified blocks for the current epoch
         let current_epoch = 0;
@@ -305,9 +319,63 @@ mod test {
     }
 
     #[test]
+    pub fn test_insert_ordered_block_limit() {
+        // Create a consensus observer config with a maximum of 10 pending blocks
+        let max_num_pending_blocks = 10;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks: max_num_pending_blocks as u64,
+            ..ConsensusObserverConfig::default()
+        };
+
+        // Create new pending ordered blocks
+        let pending_ordered_blocks = PendingOrderedBlocks::new(consensus_observer_config);
+
+        // Insert several verified blocks for the current epoch
+        let current_epoch = 0;
+        let num_verified_blocks = max_num_pending_blocks * 2; // Insert more than the maximum
+        create_and_add_pending_blocks(
+            &pending_ordered_blocks,
+            num_verified_blocks,
+            current_epoch,
+            true,
+        );
+
+        // Verify the verified pending blocks were inserted up to the maximum
+        let all_verified_blocks = pending_ordered_blocks.get_all_verified_pending_blocks();
+        assert_eq!(all_verified_blocks.len(), max_num_pending_blocks);
+
+        // Insert several unverified blocks for the next epoch
+        let next_epoch = current_epoch + 1;
+        let num_unverified_blocks = max_num_pending_blocks - 1; // Insert less than the maximum
+        create_and_add_pending_blocks(
+            &pending_ordered_blocks,
+            num_unverified_blocks,
+            next_epoch,
+            false,
+        );
+
+        // Verify the unverified pending blocks were inserted
+        let num_pending_blocks = get_num_unverified_blocks(&pending_ordered_blocks);
+        assert_eq!(num_pending_blocks, num_unverified_blocks);
+
+        // Insert more unverified blocks for the next epoch
+        let num_unverified_blocks = max_num_pending_blocks; // Insert more than the maximum
+        create_and_add_pending_blocks(
+            &pending_ordered_blocks,
+            num_unverified_blocks,
+            next_epoch,
+            false,
+        );
+
+        // Verify the unverified pending blocks were inserted up to the maximum
+        let num_pending_blocks = get_num_unverified_blocks(&pending_ordered_blocks);
+        assert_eq!(num_pending_blocks, max_num_pending_blocks);
+    }
+
+    #[test]
     pub fn test_remove_blocks_for_commit() {
         // Create new pending ordered blocks
-        let pending_ordered_blocks = PendingOrderedBlocks::new();
+        let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
         // Insert several verified blocks for the current epoch
         let current_epoch = 10;
@@ -406,7 +474,7 @@ mod test {
     #[test]
     pub fn test_update_commit_decision() {
         // Create new pending ordered blocks
-        let pending_ordered_blocks = PendingOrderedBlocks::new();
+        let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
         // Insert several verified blocks for the current epoch
         let current_epoch = 0;
@@ -495,7 +563,7 @@ mod test {
     #[test]
     fn test_verify_pending_blocks() {
         // Create new pending ordered blocks
-        let pending_ordered_blocks = PendingOrderedBlocks::new();
+        let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
         // Insert several verified blocks for the current epoch
         let current_epoch = 0;
@@ -561,7 +629,7 @@ mod test {
     #[test]
     fn test_verify_pending_blocks_failure() {
         // Create new pending ordered blocks
-        let pending_ordered_blocks = PendingOrderedBlocks::new();
+        let pending_ordered_blocks = PendingOrderedBlocks::new(ConsensusObserverConfig::default());
 
         // Insert several verified blocks for the current epoch
         let current_epoch = 0;
