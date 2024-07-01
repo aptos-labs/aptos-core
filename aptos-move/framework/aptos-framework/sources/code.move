@@ -215,8 +215,8 @@ module aptos_framework::code {
 
         let registry = borrow_global_mut<PackageRegistry>(code_object_addr);
         vector::for_each_mut<PackageMetadata>(&mut registry.packages, |pack| {
-            let package_: &mut PackageMetadata = pack;
-            package_.upgrade_policy = upgrade_policy_immutable();
+            let package: &mut PackageMetadata = pack;
+            package.upgrade_policy = upgrade_policy_immutable();
         });
     }
 
