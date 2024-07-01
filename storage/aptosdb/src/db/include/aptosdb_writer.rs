@@ -217,7 +217,7 @@ impl DbWriter for AptosDB {
             .try_lock()
             .expect("Concurrent committing detected.");
 
-        let latest_version = self.get_latest_version()?;
+        let latest_version = self.get_latest_ledger_info_version()?;
         let target_version = ledger_info_with_sigs.ledger_info().version();
 
         // Update the provided ledger info and the overall commit progress
