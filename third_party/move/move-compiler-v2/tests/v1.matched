@@ -1,6 +1,6 @@
-WARNING: test `move-compiler-v2/tests/more-v1/verification/cross_module_valid.verification.move` and `move-compiler-v2/tests/more-v1/verification/verify/cross_module_valid.move` share common key `verification/cross_module_valid.verification.move`, discarding former one
-WARNING: test `move-compiler-v2/tests/more-v1/verification/double_annotation.verification.move` and `move-compiler-v2/tests/more-v1/verification/verify/double_annotation.move` share common key `verification/double_annotation.verification.move`, discarding former one
-WARNING: test `move-compiler-v2/tests/more-v1/verification/single_module_valid.verification.move` and `move-compiler-v2/tests/more-v1/verification/verify/single_module_valid.move` share common key `verification/single_module_valid.verification.move`, discarding former one
+WARNING: test `move-compiler-v2/tests/verification/cross_module_valid.verification.move` and `move-compiler-v2/tests/verification/verify/cross_module_valid.move` share common key `verification/cross_module_valid.verification.move`, discarding former one
+WARNING: test `move-compiler-v2/tests/verification/double_annotation.verification.move` and `move-compiler-v2/tests/verification/verify/double_annotation.move` share common key `verification/double_annotation.verification.move`, discarding former one
+WARNING: test `move-compiler-v2/tests/verification/single_module_valid.verification.move` and `move-compiler-v2/tests/verification/verify/single_module_valid.move` share common key `verification/single_module_valid.verification.move`, discarding former one
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/borrow_global_acquires_1.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_1.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/borrow_global_acquires_2.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_2.exp
 move-compiler/tests/move_check/translated_ir_tests/move/borrow_tests/borrow_global_acquires_3.exp   move-compiler-v2/tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_3.exp
@@ -155,17 +155,19 @@ move-compiler/tests/move_check/translated_ir_tests/move/commands/use_before_assi
 move-compiler/tests/move_check/control_flow/for_loop_empty_novar.exp   move-compiler-v2/tests/checking/control_flow/for_loop_empty_novar.exp
 move-compiler/tests/move_check/control_flow/for_type_mismatch.exp   move-compiler-v2/tests/checking/control_flow/for_type_mismatch.exp
 move-compiler/tests/move_check/control_flow/loop_after_loop.exp   move-compiler-v2/tests/checking/control_flow/loop_after_loop.exp
-move-compiler/tests/move_check/deprecated/deprecated_constant_duplicated_struct.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_constant_duplicated_struct.exp
-move-compiler/tests/move_check/deprecated/deprecated_constant_duplicated_struct2.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_constant_duplicated_struct2.exp
-move-compiler/tests/move_check/deprecated/deprecated_field_type.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_field_type.exp
-move-compiler/tests/move_check/deprecated/deprecated_field_type2.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_field_type2.exp
-move-compiler/tests/move_check/deprecated/deprecated_placement_address.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_placement_address.exp
-move-compiler/tests/move_check/deprecated/deprecated_placement_address_module_members.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_placement_address_module_members.exp
-move-compiler/tests/move_check/deprecated/deprecated_placement_members.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_placement_members.exp
-move-compiler/tests/move_check/deprecated/deprecated_placement_module.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_placement_module.exp
-move-compiler/tests/move_check/deprecated/deprecated_placement_module2.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_placement_module2.exp
-move-compiler/tests/move_check/deprecated/deprecated_placement_module_members.exp   move-compiler-v2/tests/more-v1/deprecated/deprecated_placement_module_members.exp
-move-compiler/tests/move_check/deprecated/public_script.exp   move-compiler-v2/tests/more-v1/deprecated/public_script.exp
+move-compiler/tests/move_check/deprecated/deprecated_constant_duplicated_struct.exp   move-compiler-v2/tests/deprecated/deprecated_constant_duplicated_struct.exp
+move-compiler/tests/move_check/deprecated/deprecated_constant_duplicated_struct2.exp   move-compiler-v2/tests/deprecated/deprecated_constant_duplicated_struct2.exp
+move-compiler/tests/move_check/deprecated/deprecated_field_type.exp   move-compiler-v2/tests/deprecated/deprecated_field_type.exp
+move-compiler/tests/move_check/deprecated/deprecated_field_type2.exp   move-compiler-v2/tests/deprecated/deprecated_field_type2.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_address.exp   move-compiler-v2/tests/deprecated/deprecated_placement_address.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_address_module_members.exp   move-compiler-v2/tests/deprecated/deprecated_placement_address_module_members.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_members.exp   move-compiler-v2/tests/deprecated/deprecated_placement_members.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_module.exp   move-compiler-v2/tests/deprecated/deprecated_placement_module.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_module2.exp   move-compiler-v2/tests/deprecated/deprecated_placement_module2.exp
+move-compiler/tests/move_check/deprecated/deprecated_placement_module_members.exp   move-compiler-v2/tests/deprecated/deprecated_placement_module_members.exp
+move-compiler/tests/move_check/deprecated/public_script.exp   move-compiler-v2/tests/deprecated/public_script.exp
+move-compiler/tests/move_check/examples/multi_pool_money_market_token.exp   move-compiler-v2/tests/checking/typing/v1-examples/multi_pool_money_market_token.exp
+move-compiler/tests/move_check/examples/simple_money_market_token.exp   move-compiler-v2/tests/checking/typing/v1-examples/simple_money_market_token.exp
 move-compiler/tests/move_check/folding/empty_vectors.exp   move-compiler-v2/tests/folding/empty_vectors.exp
 move-compiler/tests/move_check/folding/empty_vectors2.exp   move-compiler-v2/tests/folding/empty_vectors2.exp
 move-compiler/tests/move_check/folding/non_constant_empty_vec.exp   move-compiler-v2/tests/folding/non_constant_empty_vec.exp
@@ -637,12 +639,12 @@ move-compiler/tests/move_check/unit_test/test_filter_function.exp   move-compile
 move-compiler/tests/move_check/unit_test/test_filter_struct.exp   move-compiler-v2/tests/unit_test/notest/test_filter_struct.exp
 move-compiler/tests/move_check/unit_test/valid_test_module.exp   move-compiler-v2/tests/unit_test/notest/valid_test_module.exp
 move-compiler/tests/move_check/unit_test/valid_test_module.unit_test.exp   move-compiler-v2/tests/unit_test/test/valid_test_module.exp
-move-compiler/tests/move_check/verification/cross_module_invalid.exp   move-compiler-v2/tests/more-v1/verification/noverify/cross_module_invalid.exp
-move-compiler/tests/move_check/verification/cross_module_valid.exp   move-compiler-v2/tests/more-v1/verification/noverify/cross_module_valid.exp
-move-compiler/tests/move_check/verification/cross_module_valid.verification.exp   move-compiler-v2/tests/more-v1/verification/verify/cross_module_valid.exp
-move-compiler/tests/move_check/verification/double_annotation.exp   move-compiler-v2/tests/more-v1/verification/noverify/double_annotation.exp
-move-compiler/tests/move_check/verification/double_annotation.verification.exp   move-compiler-v2/tests/more-v1/verification/verify/double_annotation.exp
-move-compiler/tests/move_check/verification/single_module_invalid.exp   move-compiler-v2/tests/more-v1/verification/noverify/single_module_invalid.exp
-move-compiler/tests/move_check/verification/single_module_invalid.verification.exp   move-compiler-v2/tests/more-v1/verification/single_module_invalid.verification.exp
-move-compiler/tests/move_check/verification/single_module_valid.exp   move-compiler-v2/tests/more-v1/verification/noverify/single_module_valid.exp
-move-compiler/tests/move_check/verification/single_module_valid.verification.exp   move-compiler-v2/tests/more-v1/verification/verify/single_module_valid.exp
+move-compiler/tests/move_check/verification/cross_module_invalid.exp   move-compiler-v2/tests/verification/noverify/cross_module_invalid.exp
+move-compiler/tests/move_check/verification/cross_module_valid.exp   move-compiler-v2/tests/verification/noverify/cross_module_valid.exp
+move-compiler/tests/move_check/verification/cross_module_valid.verification.exp   move-compiler-v2/tests/verification/verify/cross_module_valid.exp
+move-compiler/tests/move_check/verification/double_annotation.exp   move-compiler-v2/tests/verification/noverify/double_annotation.exp
+move-compiler/tests/move_check/verification/double_annotation.verification.exp   move-compiler-v2/tests/verification/verify/double_annotation.exp
+move-compiler/tests/move_check/verification/single_module_invalid.exp   move-compiler-v2/tests/verification/noverify/single_module_invalid.exp
+move-compiler/tests/move_check/verification/single_module_invalid.verification.exp   move-compiler-v2/tests/verification/single_module_invalid.verification.exp
+move-compiler/tests/move_check/verification/single_module_valid.exp   move-compiler-v2/tests/verification/noverify/single_module_valid.exp
+move-compiler/tests/move_check/verification/single_module_valid.verification.exp   move-compiler-v2/tests/verification/verify/single_module_valid.exp
