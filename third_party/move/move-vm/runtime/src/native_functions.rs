@@ -63,11 +63,13 @@ pub fn make_table_from_iter<S: Into<Box<str>>>(
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub(crate) struct NativeFunctions(
     HashMap<AccountAddress, HashMap<String, HashMap<String, NativeFunction>>>,
 );
 
 impl NativeFunctions {
+    #[allow(dead_code)]
     pub fn resolve(
         &self,
         addr: &AccountAddress,
@@ -134,15 +136,16 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub fn exists_at(
         &mut self,
         address: AccountAddress,
-        type_: &Type,
+        ty: &Type,
     ) -> VMResult<(bool, Option<NumBytes>)> {
         let (value, num_bytes) = self
             .data_store
             .load_resource(
                 self.resolver.loader(),
                 address,
-                type_,
-                self.resolver.module_store(),
+                ty,
+                // FIXME(George)
+                &(),
             )
             .map_err(|err| err.finish(Location::Undefined))?;
         let exists = value
@@ -195,24 +198,28 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
 
     pub fn load_function(
         &mut self,
-        module: &ModuleId,
-        function_name: &Identifier,
+        _module: &ModuleId,
+        _function_name: &Identifier,
     ) -> PartialVMResult<Arc<Function>> {
         // Load the module that contains this function regardless of the traversal context.
         //
         // This is just a precautionary step to make sure that caching status of the VM will not alter execution
         // result in case framework code forgot to use LoadFunction result to load the modules into cache
         // and charge properly.
-        self.resolver
-            .loader()
-            .load_module(module, self.resolver.module_store())
-            .map_err(|_| {
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(format!("Module {} doesn't exist", module))
-            })?;
 
-        self.resolver
-            .module_store()
-            .resolve_function_by_name(function_name, module)
+        // FIXME(george): We already have the same code in interpreter?????
+        todo!()
+
+        // self.resolver
+        //     .loader()
+        //     .load_module(module, self.resolver.module_store())
+        //     .map_err(|_| {
+        //         PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+        //             .with_message(format!("Module {} doesn't exist", module))
+        //     })?;
+        //
+        // self.resolver
+        //     .module_store()
+        //     .resolve_function_by_name(function_name, module)
     }
 }

@@ -723,7 +723,7 @@ impl AptosVM {
             )?;
         }
 
-        let func = session.load_script(script.code(), script.ty_args())?;
+        let func = session.load_script(script.code(), script.ty_args(), resolver)?;
 
         // TODO(Gerardo): consolidate the extended validation to verifier.
         verifier::event_validation::verify_no_event_emission_in_script(

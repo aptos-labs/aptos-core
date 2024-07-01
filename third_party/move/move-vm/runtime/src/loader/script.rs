@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation,
-    ModuleStorageAdapter, Scope, ScriptHash, StructNameCache,
+    intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation, Scope, ScriptHash,
+    StructNameCache,
 };
 use move_binary_format::{
     access::ScriptAccess,
@@ -43,7 +43,6 @@ impl Script {
     pub(crate) fn new(
         script: Arc<CompiledScript>,
         script_hash: &ScriptHash,
-        cache: &ModuleStorageAdapter,
         name_cache: &StructNameCache,
     ) -> VMResult<Self> {
         let mut struct_names = vec![];
@@ -51,11 +50,13 @@ impl Script {
             let struct_name = script.identifier_at(struct_handle.name);
             let module_handle = script.module_handle_at(struct_handle.module);
             let module_id = script.module_id_for_handle(module_handle);
-            cache
-                .get_struct_type_by_identifier(struct_name, &module_id)
-                .map_err(|err| err.finish(Location::Script))?
-                .check_compatibility(struct_handle)
-                .map_err(|err| err.finish(Location::Script))?;
+
+            // FIXME(George)!
+            // cache
+            //     .get_struct_type_by_identifier(struct_name, &module_id)
+            //     .map_err(|err| err.finish(Location::Script))?
+            //     .check_compatibility(struct_handle)
+            //     .map_err(|err| err.finish(Location::Script))?;
 
             struct_names.push(name_cache.insert_or_get(StructIdentifier {
                 module: module_id,

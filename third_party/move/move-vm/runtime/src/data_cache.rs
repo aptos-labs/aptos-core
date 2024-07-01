@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::loader::{Loader, ModuleStorageAdapter};
+use crate::{loader::Loader, module_storage::ModuleStorage};
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -10,7 +10,6 @@ use move_core_types::{
     effects::{AccountChanges, ChangeSet, Changes},
     gas_algebra::NumBytes,
     language_storage::TypeTag,
-    metadata::Metadata,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -87,6 +86,7 @@ impl<'r> TransactionDataCache<'r> {
     pub(crate) fn into_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+        // FIXME(George): This does not need to take loader: ty tag conversion can be its own dedicated method, it depends on the cache!
         loader: &Loader,
     ) -> PartialVMResult<Changes<Bytes, Resource>> {
         let mut change_set = Changes::<Bytes, Resource>::new();
@@ -139,7 +139,7 @@ impl<'r> TransactionDataCache<'r> {
         loader: &Loader,
         addr: AccountAddress,
         ty: &Type,
-        module_store: &ModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         let account_cache = Self::get_mut_or_insert_with(&mut self.account_map, &addr, || {
             (addr, AccountDataCache::new())
@@ -157,13 +157,8 @@ impl<'r> TransactionDataCache<'r> {
             };
             // TODO(Gas): Shall we charge for this?
             let (ty_layout, has_aggregator_lifting) =
-                loader.type_to_type_layout_with_identifier_mappings(ty, module_store)?;
-
-            let module = module_store.module_at(&ty_tag.module_id());
-            let metadata: &[Metadata] = match &module {
-                Some(module) => &module.module().metadata,
-                None => &[],
-            };
+                module_storage.fetch_type_layout(ty, false)?;
+            let metadata = module_storage.fetch_module_metadata(&ty_tag.address, &ty_tag.module)?;
 
             // If we need to process aggregator lifting, we pass type layout to remote.
             // Remote, in turn ensures that all aggregator values are lifted if the resolved

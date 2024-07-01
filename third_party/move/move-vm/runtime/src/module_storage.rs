@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::{errors::PartialVMResult, CompiledModule};
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr, metadata::Metadata};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, metadata::Metadata,
+    value::MoveTypeLayout,
+};
+use move_vm_types::loaded_data::runtime_types::Type;
 use std::sync::Arc;
 
 pub trait ModuleStorage {
@@ -41,6 +45,14 @@ pub trait ModuleStorage {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Vec<(&AccountAddress, &IdentStr)>>;
+
+    fn fetch_type_layout(
+        &self,
+        _ty: &Type,
+        _is_fully_annotated: bool,
+    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
+        todo!()
+    }
 }
 
 impl ModuleStorage for () {

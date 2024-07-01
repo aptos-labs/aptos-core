@@ -3,17 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig,
-    data_cache::TransactionDataCache,
-    loader::{ModuleStorage, ModuleStorageAdapter},
-    native_extensions::NativeContextExtensions,
-    native_functions::NativeFunction,
-    runtime::VMRuntime,
-    session::Session,
+    config::VMConfig, data_cache::TransactionDataCache, native_extensions::NativeContextExtensions,
+    native_functions::NativeFunction, runtime::VMRuntime, session::Session,
 };
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_types::resolver::ResourceResolver;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct MoveVM {
@@ -77,22 +71,6 @@ impl MoveVM {
         Session {
             move_vm: self,
             data_cache: TransactionDataCache::new(remote),
-            module_store: ModuleStorageAdapter::new(self.runtime.module_storage()),
-            native_extensions,
-        }
-    }
-
-    /// Create a new session, as in `new_session`, but provide native context extensions and custome storage for resolved modules.
-    pub fn new_session_with_extensions_and_modules<'r>(
-        &self,
-        remote: &'r impl ResourceResolver,
-        module_storage: Arc<dyn ModuleStorage>,
-        native_extensions: NativeContextExtensions<'r>,
-    ) -> Session<'r, '_> {
-        Session {
-            move_vm: self,
-            data_cache: TransactionDataCache::new(remote),
-            module_store: ModuleStorageAdapter::new(module_storage),
             native_extensions,
         }
     }
@@ -121,9 +99,6 @@ impl MoveVM {
         //   Thus if an module invalidation event happens (e.g, by upgrade request), we will need to flush this internal cache as well.
         // - If we can deprecate this session api, we will be able to get rid of this internal loaded cache and make the MoveVM "stateless" and
         //   invulnerable to module invalidation.
-        if self.runtime.loader().is_invalidated() {
-            self.runtime.module_cache.flush();
-        };
         self.runtime.loader().flush_if_invalidated()
     }
 }

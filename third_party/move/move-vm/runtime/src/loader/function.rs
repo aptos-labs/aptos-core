@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{
-        access_specifier_loader::load_access_specifier, Loader, ModuleStorageAdapter, Resolver,
-        ScriptHash,
-    },
+    loader::{access_specifier_loader::load_access_specifier, Loader, Resolver, ScriptHash},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
 };
 use move_binary_format::{
@@ -26,7 +23,7 @@ use std::{fmt::Debug, sync::Arc};
 #[derive(Clone, Debug)]
 pub(crate) enum Scope {
     Module(ModuleId),
-    Script(ScriptHash),
+    Script(#[allow(dead_code)] ScriptHash),
 }
 
 // A runtime function representation.
@@ -181,23 +178,22 @@ impl Function {
         self.index
     }
 
-    pub(crate) fn get_resolver<'a>(
-        &self,
-        loader: &'a Loader,
-        module_store: &'a ModuleStorageAdapter,
-    ) -> Resolver<'a> {
-        match &self.scope {
-            Scope::Module(module_id) => {
-                let module = module_store
-                    .module_at(module_id)
-                    .expect("ModuleId on Function must exist");
-                Resolver::for_module(loader, module_store, module)
-            },
-            Scope::Script(script_hash) => {
-                let script = loader.get_script(script_hash);
-                Resolver::for_script(loader, module_store, script)
-            },
-        }
+    pub(crate) fn get_resolver<'a>(&self, _loader: &'a Loader) -> Resolver<'a> {
+        // FIXME(George)
+        todo!()
+
+        // match &self.scope {
+        //     Scope::Module(module_id) => {
+        //         let module = module_store
+        //             .module_at(module_id)
+        //             .expect("ModuleId on Function must exist");
+        //         Resolver::for_module(loader, module_store)
+        //     },
+        //     Scope::Script(script_hash) => {
+        //         let script = loader.get_script(script_hash);
+        //         Resolver::for_script(loader, module_store)
+        //     },
+        // }
     }
 
     pub(crate) fn local_count(&self) -> usize {
@@ -276,11 +272,13 @@ impl Function {
 #[derive(Clone, Debug)]
 pub(crate) struct FunctionInstantiation {
     // index to `ModuleCache::functions` global table
+    #[allow(dead_code)]
     pub(crate) handle: FunctionHandle,
     pub(crate) instantiation: Vec<Type>,
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub(crate) enum FunctionHandle {
     Local(Arc<Function>),
     Remote { module: ModuleId, name: Identifier },
