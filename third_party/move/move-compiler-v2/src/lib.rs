@@ -310,7 +310,10 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         );
     }
 
-    let check_seqs_in_binops = options.language_version.unwrap_or_default() < LanguageVersion::V2_0
+    let check_seqs_in_binops = !options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::V2_0)
         && options.experiment_on(Experiment::SEQS_IN_BINOPS_CHECK);
 
     if !for_v1_model && check_seqs_in_binops {

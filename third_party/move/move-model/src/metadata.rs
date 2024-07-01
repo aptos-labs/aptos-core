@@ -215,6 +215,11 @@ impl LanguageVersion {
             LanguageVersion::V2_0 => true,
         }
     }
+
+    /// Whether the language version is equal to greater than `ver`
+    pub fn is_at_least(&self, ver: LanguageVersion) -> bool {
+        *self >= ver
+    }
 }
 
 impl Display for LanguageVersion {
