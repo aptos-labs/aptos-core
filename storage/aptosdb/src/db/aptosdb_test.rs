@@ -23,33 +23,26 @@ use aptos_crypto::{
     hash::CryptoHash,
     HashValue, PrivateKey, Uniform,
 };
-use aptos_executor_types::StateComputeResult;
 use aptos_proptest_helpers::ValueGenerator;
-use aptos_storage_interface::{DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order};
+use aptos_storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
 use aptos_temppath::TempPath;
 use aptos_types::{
     chain_id::ChainId,
-    ledger_info::{generate_ledger_info_with_sig, LedgerInfoWithSignatures},
-    on_chain_config::ValidatorSet,
-    proof::{position::Position, SparseMerkleLeafNode},
-    proptest_types::{
-        AccountInfoUniverse, BlockInfoGen, LedgerInfoGen, LedgerInfoWithSignaturesGen,
-        ValidatorSetGen,
-    },
+    ledger_info::LedgerInfoWithSignatures,
+    proof::SparseMerkleLeafNode,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionAuxiliaryData, TransactionAuxiliaryDataV1, TransactionInfo, TransactionPayload,
-        TransactionToCommit, VMErrorDetail, Version,
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, TransactionAuxiliaryData,
+        TransactionAuxiliaryDataV1, TransactionInfo, TransactionPayload, TransactionToCommit,
+        VMErrorDetail, Version,
     },
     vm_status::StatusCode,
-    write_set::WriteSet,
 };
-use move_core_types::{account_address::AccountAddress, vm_status::StatusType::Execution};
-use proptest::{prelude::*, std_facade::HashMap, test_runner::TestRunner};
-use std::{collections::HashSet, default, ops::DerefMut, sync::Arc};
+use move_core_types::account_address::AccountAddress;
+use proptest::{prelude::*, std_facade::HashMap};
+use std::{collections::HashSet, sync::Arc};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
 proptest! {
