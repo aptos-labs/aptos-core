@@ -37,7 +37,10 @@ fuzz_target!(|data: &[u8]| {
             Ok(()) => break smith.get_compile_unit().emit_code(),
             Err(_) => {
                 if buffer_size >= MAX_BUFFER_SIZE {
-                    panic!("Failed to generate a module with {} bytes input", buffer_size);
+                    panic!(
+                        "Failed to generate a module with {} bytes input",
+                        buffer_size
+                    );
                 }
             },
         };

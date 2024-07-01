@@ -41,6 +41,8 @@ pub struct Config {
 
     pub max_num_type_params_in_func: usize,
     pub max_num_type_params_in_struct: usize,
+
+    pub timeout_sec: usize,
 }
 
 impl Default for Config {
@@ -55,42 +57,44 @@ impl Default for Config {
             ],
 
             experiment_combos: vec![
-                ("optimize".to_string(), vec![
-                    (Experiment::OPTIMIZE.to_string(), true),
-                    (Experiment::ACQUIRES_CHECK.to_string(), false),
-                ]),
-                ("no-optimize".to_string(), vec![
-                    (Experiment::OPTIMIZE.to_string(), false),
-                    (Experiment::ACQUIRES_CHECK.to_string(), false),
-                ]),
-                // TODO: comment out for now for performance
-                // TODO: should read configs from a file or command line arguments
-                // ("optimize-no-simplify".to_string(), vec![
+                // ("optimize".to_string(), vec![
                 //     (Experiment::OPTIMIZE.to_string(), true),
-                //     (Experiment::AST_SIMPLIFY.to_string(), false),
                 //     (Experiment::ACQUIRES_CHECK.to_string(), false),
                 // ]),
+                // ("no-optimize".to_string(), vec![
+                //     (Experiment::OPTIMIZE.to_string(), false),
+                //     (Experiment::ACQUIRES_CHECK.to_string(), false),
+                // ]),
+                // TODO: comment out for now for performance
+                // TODO: should read configs from a file or command line arguments
+                ("optimize-no-simplify".to_string(), vec![
+                    (Experiment::OPTIMIZE.to_string(), true),
+                    (Experiment::AST_SIMPLIFY.to_string(), false),
+                    (Experiment::ACQUIRES_CHECK.to_string(), false),
+                ]),
             ],
 
             num_runs_per_func: 3,
 
             max_num_modules: 1,
             max_num_functions_in_module: 10,
-            max_num_structs_in_module: 5,
+            max_num_structs_in_module: 8,
 
-            max_num_fields_in_struct: 5,
+            max_num_fields_in_struct: 6,
 
-            max_num_stmts_in_func: 5,
+            max_num_stmts_in_func: 10,
             max_num_params_in_func: 7,
 
             max_num_stmts_in_block: 5,
 
             max_num_calls_in_script: 20,
 
-            max_expr_depth: 3,
-            max_type_depth: 3,
+            max_expr_depth: 5,
+            max_type_depth: 5,
             max_num_type_params_in_func: 3,
             max_num_type_params_in_struct: 2,
+
+            timeout_sec: 5,
         }
     }
 }

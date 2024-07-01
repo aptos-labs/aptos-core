@@ -29,7 +29,8 @@ struct Args {
     package: bool,
 }
 
-const BUFFER_SIZE_START: usize = 1024 * 4;
+const BUFFER_SIZE_START: usize = 1024 * 8;
+const BUFFER_SIZE_MAX: usize = 1024 * 32;
 const MOVE_TOML_TEMPLATE: &str = r#"[package]
 name = "test"
 version = "0.0.0"
@@ -47,7 +48,7 @@ fn main() {
         println!("MoveSmith: generating file #{}", i);
         let mut buffer_size = BUFFER_SIZE_START;
         let mut buffer = vec![];
-        let module = loop {
+        let code = loop {
             if buffer_size > buffer.len() {
                 let diff = buffer_size - buffer.len();
                 let mut new_buffer = vec![0u8; diff];
@@ -56,10 +57,11 @@ fn main() {
             }
 
             match raw_to_compile_unit(&buffer) {
-                Ok(module) => break module,
+                Ok(module) => break module.emit_code(),
                 Err(e) => {
-                    if buffer_size > BUFFER_SIZE_START * 1024 {
-                        panic!("Failed to parse raw bytes: {}", e);
+                    if buffer_size > BUFFER_SIZE_MAX {
+                        println!("Failed to parse raw bytes: {}", e);
+                        break String::from("not enough data");
                     }
                 },
             }
@@ -69,7 +71,6 @@ fn main() {
         };
         println!("Generated MoveSmith instance with {} bytes", buffer_size);
 
-        let code = module.emit_code();
         let file_name = format!("Output_{}.move", i);
         let file_path = match args.package {
             true => {

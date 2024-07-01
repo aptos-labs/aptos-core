@@ -13,7 +13,7 @@ use log::trace;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// The meta store for all the information during generation
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Env {
     pub id_pool: IdentifierPool,
     pub type_pool: TypePool,
@@ -31,6 +31,10 @@ pub struct Env {
     /// The current depth of the generated types
     type_depth: usize,
     type_depth_history: Vec<usize>,
+
+    /// Timeout
+    start_time: std::time::Instant,
+    timeout: std::time::Duration,
 }
 
 /// NOTE: This is unused for now to avoid the situation where the fuzzer cannot
@@ -109,7 +113,15 @@ impl Env {
             expr_depth_history: vec![],
             type_depth: 0,
             type_depth_history: vec![],
+
+            start_time: std::time::Instant::now(),
+            timeout: std::time::Duration::from_secs(config.timeout_sec as u64),
         }
+    }
+
+    /// Check if the current generation has reached the timeout
+    pub fn check_timeout(&self) -> bool {
+        self.start_time.elapsed() > self.timeout
     }
 
     /// Return a list of identifiers fileterd by the given type and scope

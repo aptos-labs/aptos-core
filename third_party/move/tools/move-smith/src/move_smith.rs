@@ -29,7 +29,7 @@ use crate::{
     },
     utils::choose_idx_weighted,
 };
-use arbitrary::{Arbitrary, Result, Unstructured};
+use arbitrary::{Arbitrary, Error, Result, Unstructured};
 use log::{info, trace, warn};
 use num_bigint::BigUint;
 use std::{
@@ -1083,6 +1083,10 @@ impl MoveSmith {
         allow_var: bool,
         allow_call: bool,
     ) -> Result<Expression> {
+        if self.env().check_timeout() {
+            // Just return a random error...
+            return Err(Error::IncorrectFormat);
+        }
         trace!(
             "Generating expression of type {:?} in scope {:?}",
             typ,

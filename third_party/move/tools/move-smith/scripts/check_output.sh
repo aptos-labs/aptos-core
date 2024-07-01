@@ -14,7 +14,7 @@ APTOS_DIR=$(realpath $MOVE_SMITH_DIR/../../../..)
 function get_error() {
   find $1 -name compile.log | while read f; do
     grep "error\[E" $f
-  done | sort | uniq
+  done | sort | uniq -c | sort -nr
 }
 
 function check_compile() {
