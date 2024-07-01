@@ -220,7 +220,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
         unreachable!()
     };
 
-    assert_eq!(1, pulled_validator_txns.len());
+    assert_eq!(2, pulled_validator_txns.len());
     assert_eq!(0, pulled_user_txns.len());
 
     let (pulled_validator_txns, Payload::DirectMempool(pulled_user_txns)) = client
