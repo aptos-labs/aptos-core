@@ -43,6 +43,7 @@ use aptos_types::{
     transaction::{Transaction, TransactionArgument, TransactionPayload, TransactionStatus},
 };
 use aptos_vm::data_cache::AsMoveResolver;
+use aptos_vm_types::resolver::StateViewAdapter;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
 use itertools::Itertools;
@@ -1634,6 +1635,7 @@ impl CliCommand<TransactionSummary> for Replay {
 
         // Materialize into transaction output and check if the outputs match.
         let state_view = debugger.state_view_at_version(self.txn_id);
+        let state_view = StateViewAdapter::new(&state_view);
         let resolver = state_view.as_move_resolver();
 
         let txn_output = vm_output

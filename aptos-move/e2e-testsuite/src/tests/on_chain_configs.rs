@@ -9,15 +9,16 @@ use aptos_types::{
     on_chain_config::{AptosVersion, OnChainConfig},
     transaction::TransactionStatus,
 };
-use aptos_vm::data_cache::AsMoveResolver;
 
 #[test]
 fn initial_aptos_version() {
     let mut executor = FakeExecutor::from_head_genesis();
-    let resolver = executor.get_state_view().as_move_resolver();
     let version = aptos_types::on_chain_config::APTOS_MAX_KNOWN_VERSION;
 
-    assert_eq!(AptosVersion::fetch_config(&resolver).unwrap(), version);
+    assert_eq!(
+        AptosVersion::fetch_config(executor.get_state_view()).unwrap(),
+        version
+    );
     let account = executor.new_account_at(CORE_CODE_ADDRESS);
     let txn_0 = account
         .transaction()
@@ -34,9 +35,8 @@ fn initial_aptos_version() {
     executor.new_block();
     executor.execute_and_apply(txn_1);
 
-    let resolver = executor.get_state_view().as_move_resolver();
     assert_eq!(
-        AptosVersion::fetch_config(&resolver).unwrap(),
+        AptosVersion::fetch_config(executor.get_state_view()).unwrap(),
         AptosVersion {
             major: version.major + 1
         }
@@ -46,9 +46,11 @@ fn initial_aptos_version() {
 #[test]
 fn drop_txn_after_reconfiguration() {
     let mut executor = FakeExecutor::from_head_genesis();
-    let resolver = executor.get_state_view().as_move_resolver();
     let version = aptos_types::on_chain_config::APTOS_MAX_KNOWN_VERSION;
-    assert_eq!(AptosVersion::fetch_config(&resolver).unwrap(), version);
+    assert_eq!(
+        AptosVersion::fetch_config(executor.get_state_view()).unwrap(),
+        version
+    );
 
     let txn = executor
         .new_account_at(CORE_CODE_ADDRESS)

@@ -80,7 +80,7 @@ use aptos_vm_types::{
     },
     environment::Environment,
     output::VMOutput,
-    resolver::{ExecutorView, ResourceGroupView},
+    resolver::{ExecutorView, ResourceGroupView, StateViewAdapter},
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
 use ark_bn254::Bn254;
@@ -221,6 +221,7 @@ impl AptosVM {
         let (gas_params, storage_gas_params, gas_feature_version) =
             get_gas_parameters(env.features(), state_view);
 
+        let state_view = StateViewAdapter::new(state_view);
         let resolver = state_view.as_move_resolver();
         let move_vm = MoveVmExt::new(gas_feature_version, gas_params.as_ref(), env, &resolver);
 
@@ -2216,6 +2217,7 @@ impl AptosVM {
             max_gas_amount.into(),
         );
 
+        let state_view = StateViewAdapter::new(state_view);
         let resolver = state_view.as_move_resolver();
         let execution_result = Self::execute_view_function_in_vm(
             &resolver,
@@ -2611,6 +2613,7 @@ impl VMValidator for AptosVM {
         };
         let txn_data = TransactionMetadata::new(&txn);
 
+        let state_view = StateViewAdapter::new(state_view);
         let resolver = self.as_move_resolver(&state_view);
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
 
@@ -2675,6 +2678,7 @@ impl AptosSimulationVM {
         let vm = Self::new(state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
+        let state_view = StateViewAdapter::new(state_view);
         let resolver = state_view.as_move_resolver();
         let (vm_status, vm_output) =
             vm.0.execute_user_transaction(&resolver, transaction, &log_context);

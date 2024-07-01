@@ -2,8 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::module_storage::AptosModuleStorage;
-use aptos_aggregator::resolver::{TAggregatorV1View, TDelayedFieldView};
+use aptos_aggregator::{
+    bounded_math::SignedU128,
+    resolver::{TAggregatorV1View, TDelayedFieldView},
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
+};
 use aptos_types::{
+    delayed_fields::PanicError,
+    on_chain_config::ConfigStorage,
     serde_helper::bcs_utils::size_u32_as_uleb128,
     state_store::{
         errors::StateviewError,
@@ -23,9 +29,10 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::StructTag,
     metadata::Metadata, value::MoveTypeLayout, vm_status::StatusCode,
 };
+use move_vm_runtime::module_storage::ModuleStorage;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -180,6 +187,7 @@ pub trait TExecutorView<K, T, L, I, V>:
     + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
     + StateStorageView
     + AptosModuleStorage
+    + ConfigStorage
 {
 }
 
@@ -189,6 +197,7 @@ impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
         + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
         + StateStorageView
         + AptosModuleStorage
+        + ConfigStorage
 {
 }
 
@@ -212,11 +221,18 @@ impl<T> ResourceGroupView for T where
 {
 }
 
-/// Direct implementations for StateView.
-impl<S> TResourceView for S
-where
-    S: StateView,
-{
+/// FIXME(George): We do not need executor view, all we need is to implement aptos move resolver!
+pub struct StateViewAdapter<'s, S: StateView> {
+    state_view: &'s S,
+}
+
+impl<'s, S: StateView> StateViewAdapter<'s, S> {
+    pub fn new(state_view: &'s S) -> Self {
+        Self { state_view }
+    }
+}
+
+impl<'s, S: StateView> TResourceView for StateViewAdapter<'s, S> {
     type Key = StateKey;
     type Layout = MoveTypeLayout;
 
@@ -225,7 +241,7 @@ where
         state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
-        self.get_state_value(state_key).map_err(|e| {
+        self.state_view.get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
                 "Unexpected storage error for resource at {:?}: {:?}",
                 state_key, e
@@ -234,18 +250,15 @@ where
     }
 }
 
-impl<S> AptosModuleStorage for S
-where
-    S: StateView,
-{
-    // FIXME(George): Use this implementation for default S
-    // self.get_state_value(state_key).map_err(|e| {
-    //     PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-    //     "Unexpected storage error for module at {:?}: {:?}",
-    //     state_key, e
-    //     ))
-    // })
+// FIXME(George): Use this implementation for default
+// self.get_state_value(state_key).map_err(|e| {
+//     PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+//     "Unexpected storage error for module at {:?}: {:?}",
+//     state_key, e
+//     ))
+// })
 
+impl<'s, S: StateView> ModuleStorage for StateViewAdapter<'s, S> {
     fn check_module_exists(
         &self,
         _address: &AccountAddress,
@@ -270,27 +283,11 @@ where
         todo!()
     }
 
-    fn fetch_module_bytes(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> PartialVMResult<Bytes> {
-        todo!()
-    }
-
     fn fetch_module_size_in_bytes(
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> PartialVMResult<usize> {
-        todo!()
-    }
-
-    fn fetch_module_state_value_metadata(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> PartialVMResult<StateValueMetadata> {
         todo!()
     }
 
@@ -311,16 +308,114 @@ where
     }
 }
 
-impl<S> StateStorageView for S
-where
-    S: StateView,
-{
+impl<'s, S: StateView> AptosModuleStorage for StateViewAdapter<'s, S> {
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Bytes> {
+        todo!()
+    }
+
+    fn fetch_module_state_value_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<StateValueMetadata> {
+        todo!()
+    }
+}
+
+impl<'s, S: StateView> StateStorageView for StateViewAdapter<'s, S> {
     fn id(&self) -> StateViewId {
-        self.id()
+        self.state_view.id()
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
-        self.get_usage().map_err(Into::into)
+        self.state_view.get_usage().map_err(Into::into)
+    }
+}
+
+impl<'s, S: StateView> TAggregatorV1View for StateViewAdapter<'s, S> {
+    type Identifier = StateKey;
+
+    fn get_aggregator_v1_state_value(
+        &self,
+        state_key: &Self::Identifier,
+    ) -> PartialVMResult<Option<StateValue>> {
+        self.state_view.get_state_value(state_key).map_err(|e| {
+            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                "Aggregator value not found for {:?}: {:?}",
+                state_key, e
+            ))
+        })
+    }
+}
+
+impl<'s, S: StateView> ConfigStorage for StateViewAdapter<'s, S> {
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
+        self.state_view
+            .get_state_value_bytes(state_key)
+            .ok()
+            .flatten()
+    }
+}
+
+impl<'s, S: StateView> TDelayedFieldView for StateViewAdapter<'s, S> {
+    type Identifier = DelayedFieldID;
+    type ResourceGroupTag = StructTag;
+    type ResourceKey = StateKey;
+
+    fn get_delayed_field_value(
+        &self,
+        _id: &Self::Identifier,
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        unimplemented!("get_delayed_field_value not implemented")
+    }
+
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        _id: &Self::Identifier,
+        _base_delta: &SignedU128,
+        _delta: &SignedU128,
+        _max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+        unimplemented!("delayed_field_try_add_delta_outcome not implemented")
+    }
+
+    /// Returns a unique per-block identifier that can be used when creating a
+    /// new aggregator V2.
+    fn generate_delayed_field_id(&self, _width: u32) -> Self::Identifier {
+        unimplemented!("generate_delayed_field_id not implemented")
+    }
+
+    fn validate_delayed_field_id(&self, _id: &Self::Identifier) -> Result<(), PanicError> {
+        unimplemented!()
+    }
+
+    // get_reads_needing_exchange is local (looks at in-MVHashMap information only)
+    // and all failures are code invariant failures - so we return PanicError.
+    // get_group_reads_needing_exchange needs to additionally get the metadata of the
+    // whole group, which can additionally fail with speculative / storage errors,
+    // so we return PartialVMResult, to be able to distinguish/propagate those errors.
+
+    fn get_reads_needing_exchange(
+        &self,
+        _delayed_write_set_ids: &HashSet<Self::Identifier>,
+        _skip: &HashSet<Self::ResourceKey>,
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
+        unimplemented!("get_reads_needing_exchange not implemented")
+    }
+
+    fn get_group_reads_needing_exchange(
+        &self,
+        _delayed_write_set_ids: &HashSet<Self::Identifier>,
+        _skip: &HashSet<Self::ResourceKey>,
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
+        unimplemented!("get_group_reads_needing_exchange not implemented")
     }
 }
 

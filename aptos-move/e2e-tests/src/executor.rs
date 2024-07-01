@@ -57,6 +57,7 @@ use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, Genes
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     environment::Environment,
+    resolver::StateViewAdapter,
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
 use bytes::Bytes;
@@ -288,8 +289,7 @@ impl FakeExecutor {
         //  - the e2e test outputs a golden file, and
         //  - the environment variable is properly set
         if let Some(env_trace_dir) = env::var_os(ENV_TRACE_DIR) {
-            let aptos_version = AptosVersion::fetch_config(&self.data_store.as_move_resolver())
-                .map_or(0, |v| v.major);
+            let aptos_version = AptosVersion::fetch_config(&self.data_store).map_or(0, |v| v.major);
 
             let trace_dir = Path::new(&env_trace_dir).join(file_name);
             if trace_dir.exists() {
@@ -675,7 +675,8 @@ impl FakeExecutor {
         // TODO(Gas): revisit this.
         let vm = AptosVM::new(self.get_state_view());
 
-        let resolver = self.data_store.as_move_resolver();
+        let state_view = StateViewAdapter::new(&self.data_store);
+        let resolver = state_view.as_move_resolver();
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
             &txn,
@@ -757,7 +758,7 @@ impl FakeExecutor {
     pub fn new_block_with_timestamp(&mut self, time_microseconds: u64) {
         self.block_time = time_microseconds;
 
-        let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
+        let validator_set = ValidatorSet::fetch_config(&self.data_store)
             .expect("Unable to retrieve the validator set from storage");
         let proposer = *validator_set.payload().next().unwrap().account_address();
         // when updating time, proposer cannot be ZERO.
@@ -772,7 +773,7 @@ impl FakeExecutor {
     ) -> Vec<(TransactionStatus, u64)> {
         let mut txn_block: Vec<Transaction> =
             txns.into_iter().map(Transaction::UserTransaction).collect();
-        let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
+        let validator_set = ValidatorSet::fetch_config(&self.data_store)
             .expect("Unable to retrieve the validator set from storage");
         let new_block_metadata = BlockMetadata::new(
             HashValue::zero(),
@@ -856,7 +857,8 @@ impl FakeExecutor {
             _ => vec![],
         };
 
-        let resolver = self.data_store.as_move_resolver();
+        let state_view = StateViewAdapter::new(&self.data_store);
+        let resolver = state_view.as_move_resolver();
 
         let (gas_params, storage_gas_params) = match gas_meter_type {
             GasMeterType::RegularGasMeter => (
@@ -974,7 +976,8 @@ impl FakeExecutor {
         let a2 = Arc::clone(&a1);
 
         let (write_set, _events) = {
-            let resolver = self.data_store.as_move_resolver();
+            let state_view = StateViewAdapter::new(&self.data_store);
+            let resolver = state_view.as_move_resolver();
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new_with_gas_hook(
@@ -1044,7 +1047,8 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) {
         let (write_set, events) = {
-            let resolver = self.data_store.as_move_resolver();
+            let state_view = StateViewAdapter::new(&self.data_store);
+            let resolver = state_view.as_move_resolver();
 
             let vm = MoveVmExt::new(
                 LATEST_GAS_FEATURE_VERSION,
@@ -1104,7 +1108,8 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-        let resolver = self.data_store.as_move_resolver();
+        let state_view = StateViewAdapter::new(&self.data_store);
+        let resolver = state_view.as_move_resolver();
         let vm = MoveVmExt::new(
             LATEST_GAS_FEATURE_VERSION,
             Ok(&AptosGasParameters::initial()),

@@ -363,7 +363,10 @@ mod tests {
             state_value::StateValue, TStateView,
         },
     };
-    use aptos_vm_types::resource_group_adapter::{group_size_as_sum, GroupSizeKind};
+    use aptos_vm_types::{
+        resolver::StateViewAdapter,
+        resource_group_adapter::{group_size_as_sum, GroupSizeKind},
+    };
     use claims::{assert_none, assert_some_eq};
     use move_core_types::{
         identifier::Identifier,
@@ -450,7 +453,8 @@ mod tests {
         .unwrap();
 
         let s = MockStateView::new(data);
-        let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
+        let s_adapter = StateViewAdapter::new(&s);
+        let resolver = as_resolver_with_group_size_kind(&s_adapter, GroupSizeKind::AsSum);
 
         assert_eq!(resolver.resource_group_size(&key).unwrap(), expected_size);
         // TODO[agg_v2](test): Layout hardcoded to None. Test with layout = Some(..)
@@ -501,7 +505,8 @@ mod tests {
         )]);
 
         let s = MockStateView::new(data);
-        let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
+        let s_adapter = StateViewAdapter::new(&s);
+        let resolver = as_resolver_with_group_size_kind(&s_adapter, GroupSizeKind::AsSum);
 
         let group_changes = BTreeMap::from([(
             mock_tag_2(),
@@ -530,7 +535,8 @@ mod tests {
     #[allow(unused)]
     fn size_computation_new_group() {
         let s = MockStateView::new(BTreeMap::new());
-        let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
+        let s_adapter = StateViewAdapter::new(&s);
+        let resolver = as_resolver_with_group_size_kind(&s_adapter, GroupSizeKind::AsSum);
 
         // TODO[agg_v2](test): Layout hardcoded to None. Test with layout = Some(..)
         let group_changes =
@@ -568,7 +574,9 @@ mod tests {
         )]);
 
         let s = MockStateView::new(data);
-        let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
+        let s_adapter = StateViewAdapter::new(&s);
+
+        let resolver = as_resolver_with_group_size_kind(&s_adapter, GroupSizeKind::AsSum);
         let group_changes = BTreeMap::from([
             (mock_tag_0(), MoveStorageOp::Delete),
             (mock_tag_1(), MoveStorageOp::Delete),

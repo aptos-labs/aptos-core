@@ -19,6 +19,7 @@ aptos-framework =  { workspace = true }
 aptos-gas-schedule = { workspace = true } 
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 move-core-types = { workspace = true }

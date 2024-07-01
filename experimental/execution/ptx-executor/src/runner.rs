@@ -21,6 +21,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::resolver::StateViewAdapter;
 use rayon::Scope;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
@@ -258,6 +259,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     trace!("worker {} gonna run txn {}", self.worker_index, txn_idx);
                     let state_view =
                         OverlayedStateView::new_with_overlay(self.base_view, dependencies);
+                    let state_view = StateViewAdapter::new(&state_view);
                     let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
 
                     let vm_output = {

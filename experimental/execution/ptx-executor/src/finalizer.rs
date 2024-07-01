@@ -15,7 +15,7 @@ use aptos_types::{
     transaction::TransactionOutput,
     write_set::TransactionWrite,
 };
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{output::VMOutput, resolver::StateViewAdapter};
 use once_cell::sync::Lazy;
 use rayon::Scope;
 use std::{
@@ -119,8 +119,9 @@ impl<'view> Worker<'view> {
 
     fn finalize_one(&mut self) {
         let vm_output = self.buffer.pop_front().unwrap().unwrap();
+        let state_view = StateViewAdapter::new(&self.state_view);
         let txn_out = vm_output
-            .try_materialize_into_transaction_output(&self.state_view)
+            .try_materialize_into_transaction_output(&state_view)
             .unwrap();
         for (key, op) in txn_out.write_set() {
             // TODO(ptx): hack: deal only with the total supply

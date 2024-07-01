@@ -11,6 +11,7 @@ use crate::{
 use aptos_types::{state_store::StateView, transaction::SignedTransaction};
 #[cfg(any(test, feature = "testing"))]
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::resolver::StateViewAdapter;
 #[cfg(any(test, feature = "testing"))]
 use aptos_vm_types::{change_set::VMChangeSet, output::VMOutput};
 use move_binary_format::errors::VMResult;
@@ -100,6 +101,7 @@ impl AptosVM {
             .expect("Storage gas parameters should exist for tests")
             .change_set_configs;
 
+        let state_view = StateViewAdapter::new(state_view);
         let resolver = state_view.as_move_resolver();
         let storage = TraversalStorage::new();
         self.failed_transaction_cleanup(

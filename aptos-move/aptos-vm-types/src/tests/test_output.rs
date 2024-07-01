@@ -3,6 +3,7 @@
 
 use crate::{
     output::VMOutput,
+    resolver::StateViewAdapter,
     tests::utils::{as_state_key, build_vm_output, mock_add, mock_create_with_layout, mock_modify},
 };
 use aptos_aggregator::delta_change_set::serialize;
@@ -37,6 +38,8 @@ fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
 #[test]
 fn test_ok_output_equality_no_deltas() {
     let state_view = FakeDataStore::default();
+    let state_view = StateViewAdapter::new(&state_view);
+
     let vm_output = build_vm_output(
         vec![mock_create_with_layout("0", 0, None)],
         vec![mock_modify("1", 1)],
@@ -71,6 +74,7 @@ fn test_ok_output_equality_with_deltas() {
     let delta_key = "3";
     let mut state_view = FakeDataStore::default();
     state_view.set_legacy(as_state_key!(delta_key), serialize(&100));
+    let state_view = StateViewAdapter::new(&state_view);
 
     let vm_output = build_vm_output(
         vec![mock_create_with_layout("0", 0, None)],
@@ -122,6 +126,7 @@ fn test_err_output_equality_with_deltas() {
     let delta_key = "3";
     let mut state_view = FakeDataStore::default();
     state_view.set_legacy(as_state_key!(delta_key), serialize(&900));
+    let state_view = StateViewAdapter::new(&state_view);
 
     let vm_output = build_vm_output(vec![], vec![], vec![], vec![], vec![mock_add(
         delta_key, 300,

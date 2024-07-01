@@ -42,6 +42,7 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{GenesisMoveVM, SessionExt},
 };
+use aptos_vm_types::resolver::StateViewAdapter;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -128,6 +129,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     }
 
     let vm = GenesisMoveVM::new(chain_id);
+    let state_view = StateViewAdapter::new(&state_view);
     let resolver = state_view.as_move_resolver();
     let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
 
@@ -169,6 +171,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     // Publish the framework, using a different session id, in case both scripts create tables.
     let state_view = GenesisStateView::new();
+    let state_view = StateViewAdapter::new(&state_view);
     let resolver = state_view.as_move_resolver();
 
     let mut new_id = [0u8; 32];
@@ -241,6 +244,7 @@ pub fn encode_genesis_change_set(
         state_view.add_module(&module.self_id(), module_bytes);
     }
 
+    let state_view = StateViewAdapter::new(&state_view);
     let resolver = state_view.as_move_resolver();
     let vm = GenesisMoveVM::new(chain_id);
     let mut session = vm.new_genesis_session(&resolver, HashValue::zero());
@@ -302,6 +306,7 @@ pub fn encode_genesis_change_set(
     );
 
     let state_view = GenesisStateView::new();
+    let state_view = StateViewAdapter::new(&state_view);
     let resolver = state_view.as_move_resolver();
 
     // Publish the framework, using a different id, in case both scripts create tables.
@@ -1076,6 +1081,7 @@ pub fn test_genesis_module_publishing() {
     }
 
     let vm = GenesisMoveVM::new(ChainId::test());
+    let state_view = StateViewAdapter::new(&state_view);
     let resolver = state_view.as_move_resolver();
 
     let mut session = vm.new_genesis_session(&resolver, HashValue::zero());

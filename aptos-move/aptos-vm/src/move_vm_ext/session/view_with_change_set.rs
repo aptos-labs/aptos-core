@@ -12,6 +12,7 @@ use aptos_aggregator::{
 };
 use aptos_types::{
     delayed_fields::PanicError,
+    on_chain_config::ConfigStorage,
     state_store::{
         errors::StateviewError,
         state_key::StateKey,
@@ -36,6 +37,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::StructTag,
     metadata::Metadata, value::MoveTypeLayout,
 };
+use move_vm_runtime::module_storage::ModuleStorage;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -315,7 +317,13 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     }
 }
 
-impl<'r> AptosModuleStorage for ExecutorViewWithChangeSet<'r> {
+impl<'r> ConfigStorage for ExecutorViewWithChangeSet<'r> {
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
+        self.get_resource_bytes(state_key, None).ok().flatten()
+    }
+}
+
+impl<'r> ModuleStorage for ExecutorViewWithChangeSet<'r> {
     fn check_module_exists(
         &self,
         address: &AccountAddress,
@@ -343,15 +351,6 @@ impl<'r> AptosModuleStorage for ExecutorViewWithChangeSet<'r> {
             .fetch_module_metadata(address, module_name)
     }
 
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<Bytes> {
-        self.base_executor_view
-            .fetch_module_bytes(address, module_name)
-    }
-
     fn fetch_module_size_in_bytes(
         &self,
         address: &AccountAddress,
@@ -359,15 +358,6 @@ impl<'r> AptosModuleStorage for ExecutorViewWithChangeSet<'r> {
     ) -> PartialVMResult<usize> {
         self.base_executor_view
             .fetch_module_size_in_bytes(address, module_name)
-    }
-
-    fn fetch_module_state_value_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<StateValueMetadata> {
-        self.base_executor_view
-            .fetch_module_state_value_metadata(address, module_name)
     }
 
     fn fetch_module_immediate_dependencies(
@@ -386,6 +376,26 @@ impl<'r> AptosModuleStorage for ExecutorViewWithChangeSet<'r> {
     ) -> PartialVMResult<Vec<(&AccountAddress, &IdentStr)>> {
         self.base_executor_view
             .fetch_module_immediate_friends(address, module_name)
+    }
+}
+
+impl<'r> AptosModuleStorage for ExecutorViewWithChangeSet<'r> {
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Bytes> {
+        self.base_executor_view
+            .fetch_module_bytes(address, module_name)
+    }
+
+    fn fetch_module_state_value_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<StateValueMetadata> {
+        self.base_executor_view
+            .fetch_module_state_value_metadata(address, module_name)
     }
 }
 
@@ -411,7 +421,7 @@ mod test {
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
-    use aptos_vm_types::abstract_write_op::GroupWrite;
+    use aptos_vm_types::{abstract_write_op::GroupWrite, resolver::StateViewAdapter};
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
@@ -556,6 +566,7 @@ mod test {
         )
         .unwrap();
 
+        let state_view = StateViewAdapter::new(&state_view);
         let resolver = state_view.as_move_resolver();
         let view = ExecutorViewWithChangeSet::new(
             resolver.as_executor_view(),

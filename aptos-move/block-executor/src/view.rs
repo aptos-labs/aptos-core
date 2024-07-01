@@ -38,8 +38,10 @@ use aptos_mvhashmap::{
 use aptos_types::{
     delayed_fields::PanicError,
     executable::{Executable, ModulePath},
+    on_chain_config::ConfigStorage,
     state_store::{
         errors::StateviewError,
+        state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
@@ -62,6 +64,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, metadata::Metadata,
     value::MoveTypeLayout, vm_status::StatusCode,
 };
+use move_vm_runtime::module_storage::ModuleStorage;
 use move_vm_types::{
     delayed_values::delayed_field_id::ExtractUniqueIndex,
     value_serde::{
@@ -1571,7 +1574,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
 //     Ok(None)
 // }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModuleStorage
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ConfigStorage
+    for LatestView<'a, T, S, X>
+{
+    fn fetch_config_bytes(&self, _state_key: &StateKey) -> Option<Bytes> {
+        todo!()
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleStorage
     for LatestView<'a, T, S, X>
 {
     fn check_module_exists(
@@ -1598,27 +1609,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
         todo!()
     }
 
-    fn fetch_module_bytes(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> PartialVMResult<Bytes> {
-        todo!()
-    }
-
     fn fetch_module_size_in_bytes(
         &self,
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> PartialVMResult<usize> {
-        todo!()
-    }
-
-    fn fetch_module_state_value_metadata(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &IdentStr,
-    ) -> PartialVMResult<StateValueMetadata> {
         todo!()
     }
 
@@ -1635,6 +1630,26 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
         _address: &AccountAddress,
         _module_name: &IdentStr,
     ) -> PartialVMResult<Vec<(&AccountAddress, &IdentStr)>> {
+        todo!()
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModuleStorage
+    for LatestView<'a, T, S, X>
+{
+    fn fetch_module_bytes(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Bytes> {
+        todo!()
+    }
+
+    fn fetch_module_state_value_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<StateValueMetadata> {
         todo!()
     }
 }

@@ -24,7 +24,7 @@ use aptos_types::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
-        StateView, StateViewId,
+        StateViewId,
     },
 };
 use aptos_vm_types::{
@@ -44,6 +44,7 @@ use move_core_types::{
     resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
 };
+use move_vm_runtime::module_storage::ModuleStorage;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
@@ -179,7 +180,7 @@ impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
     }
 }
 
-impl<'e, E: ExecutorView> AptosModuleStorage for StorageAdapter<'e, E> {
+impl<'e, E: ExecutorView> ModuleStorage for StorageAdapter<'e, E> {
     fn check_module_exists(
         &self,
         address: &AccountAddress,
@@ -206,14 +207,6 @@ impl<'e, E: ExecutorView> AptosModuleStorage for StorageAdapter<'e, E> {
             .fetch_module_metadata(address, module_name)
     }
 
-    fn fetch_module_bytes(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<Bytes> {
-        self.executor_view.fetch_module_bytes(address, module_name)
-    }
-
     fn fetch_module_size_in_bytes(
         &self,
         address: &AccountAddress,
@@ -221,15 +214,6 @@ impl<'e, E: ExecutorView> AptosModuleStorage for StorageAdapter<'e, E> {
     ) -> PartialVMResult<usize> {
         self.executor_view
             .fetch_module_size_in_bytes(address, module_name)
-    }
-
-    fn fetch_module_state_value_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> PartialVMResult<StateValueMetadata> {
-        self.executor_view
-            .fetch_module_state_value_metadata(address, module_name)
     }
 
     fn fetch_module_immediate_dependencies(
@@ -248,6 +232,25 @@ impl<'e, E: ExecutorView> AptosModuleStorage for StorageAdapter<'e, E> {
     ) -> PartialVMResult<Vec<(&AccountAddress, &IdentStr)>> {
         self.executor_view
             .fetch_module_immediate_friends(address, module_name)
+    }
+}
+
+impl<'e, E: ExecutorView> AptosModuleStorage for StorageAdapter<'e, E> {
+    fn fetch_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<Bytes> {
+        self.executor_view.fetch_module_bytes(address, module_name)
+    }
+
+    fn fetch_module_state_value_metadata(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> PartialVMResult<StateValueMetadata> {
+        self.executor_view
+            .fetch_module_state_value_metadata(address, module_name)
     }
 }
 
@@ -372,7 +375,7 @@ pub trait AsMoveResolver<S> {
     fn as_move_resolver(&self) -> StorageAdapter<S>;
 }
 
-impl<S: StateView> AsMoveResolver<S> for S {
+impl<S: ExecutorView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
         let features = Features::fetch_config(self).unwrap_or_default();
         let (_, gas_feature_version) = get_gas_config_from_storage(self);
@@ -416,7 +419,7 @@ pub(crate) mod tests {
     use aptos_vm_types::resource_group_adapter::GroupSizeKind;
 
     // Expose a method to create a storage adapter with a provided group size kind.
-    pub(crate) fn as_resolver_with_group_size_kind<S: StateView>(
+    pub(crate) fn as_resolver_with_group_size_kind<S: ExecutorView>(
         state_view: &S,
         group_size_kind: GroupSizeKind,
     ) -> StorageAdapter<S> {

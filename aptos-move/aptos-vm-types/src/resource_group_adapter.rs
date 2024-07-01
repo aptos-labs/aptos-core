@@ -276,7 +276,10 @@ impl TResourceGroupView for ResourceGroupAdapter<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::utils::{mock_tag_0, mock_tag_1, mock_tag_2};
+    use crate::{
+        resolver::StateViewAdapter,
+        tests::utils::{mock_tag_0, mock_tag_1, mock_tag_2},
+    };
     use aptos_types::state_store::{
         errors::StateviewError, state_storage_usage::StateStorageUsage, state_value::StateValue,
         TStateView,
@@ -439,6 +442,7 @@ mod tests {
     #[test]
     fn load_to_cache() {
         let state_view = MockStateView::new();
+        let state_view = StateViewAdapter::new(&state_view);
         let adapter = ResourceGroupAdapter::new(None, &state_view, 3, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
@@ -453,7 +457,8 @@ mod tests {
     #[test]
     fn test_get_resource_by_tag() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 5, false);
+        let state_view_adapter = StateViewAdapter::new(&state_view);
+        let adapter = ResourceGroupAdapter::new(None, &state_view_adapter, 5, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
         let key_0 = StateKey::raw(&[0]);
@@ -514,9 +519,10 @@ mod tests {
         resource_groups_split_in_vm_change_set_enabled: bool,
     ) {
         let state_view = MockStateView::new();
+        let state_view_adapter = StateViewAdapter::new(&state_view);
         let adapter = ResourceGroupAdapter::new(
             None,
-            &state_view,
+            &state_view_adapter,
             gas_feature_version,
             resource_groups_split_in_vm_change_set_enabled,
         );
@@ -555,17 +561,19 @@ mod tests {
     #[test]
     fn set_group_view_forwarding() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(Some(&state_view), &state_view, 12, true);
+        let state_view_adapter = StateViewAdapter::new(&state_view);
+        let adapter = ResourceGroupAdapter::new(Some(&state_view), &state_view_adapter, 12, true);
         assert_some!(adapter.maybe_resource_group_view);
         let adapter_with_forwarding =
-            ResourceGroupAdapter::new(Some(&adapter), &state_view, 12, true);
+            ResourceGroupAdapter::new(Some(&adapter), &state_view_adapter, 12, true);
         assert_some!(adapter_with_forwarding.maybe_resource_group_view);
     }
 
     #[test]
     fn size_as_sum() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(Some(&state_view), &state_view, 12, true);
+        let state_view_adapter = StateViewAdapter::new(&state_view);
+        let adapter = ResourceGroupAdapter::new(Some(&state_view), &state_view_adapter, 12, true);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::AsSum);
 
         let key_0 = StateKey::raw(&[0]);
@@ -605,6 +613,7 @@ mod tests {
     #[test]
     fn size_as_none() {
         let state_view = MockStateView::new();
+        let state_view = StateViewAdapter::new(&state_view);
         let adapter = ResourceGroupAdapter::new(None, &state_view, 8, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
@@ -641,6 +650,7 @@ mod tests {
     #[test]
     fn exists_resource_in_group() {
         let state_view = MockStateView::new();
+        let state_view = StateViewAdapter::new(&state_view);
         let adapter = ResourceGroupAdapter::new(None, &state_view, 0, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
@@ -672,6 +682,7 @@ mod tests {
     #[test]
     fn resource_size_in_group() {
         let state_view = MockStateView::new();
+        let state_view = StateViewAdapter::new(&state_view);
         let adapter = ResourceGroupAdapter::new(None, &state_view, 3, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 

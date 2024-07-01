@@ -653,6 +653,7 @@ dependencies = [
  "itertools 0.12.1",
  "move-binary-format",
  "move-core-types",
+ "move-vm-runtime",
  "move-vm-types",
  "num_cpus",
  "once_cell",
@@ -4313,6 +4314,7 @@ dependencies = [
  "aptos-proptest-helpers",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
  "move-core-types",
@@ -4424,19 +4426,6 @@ dependencies = [
  "serde",
  "serde_json",
  "warp",
-]
-
-[[package]]
-name = "aptos-writeset-generator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-types",
- "aptos-vm",
- "move-core-types",
- "move-vm-runtime",
- "move-vm-types",
 ]
 
 [[package]]

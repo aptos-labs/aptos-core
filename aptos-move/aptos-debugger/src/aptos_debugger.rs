@@ -27,7 +27,7 @@ use aptos_vm::{
     AptosVM,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{output::VMOutput, resolver::StateViewAdapter};
 use itertools::Itertools;
 use std::{path::Path, sync::Arc, time::Instant};
 
@@ -119,6 +119,7 @@ impl AptosDebugger {
         }
 
         let vm = AptosVM::new(&state_view);
+        let state_view = StateViewAdapter::new(&state_view);
         let resolver = state_view.as_move_resolver();
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
