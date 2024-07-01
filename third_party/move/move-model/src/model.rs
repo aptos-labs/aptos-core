@@ -2679,10 +2679,10 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns true if both modules are defined in the same package.
+    /// Requires: `self` or `other` is a primary target.
     pub fn in_same_package(&self, other: &'env Self) -> bool {
-        let self_path = Path::new(self.get_source_path());
-        let other_path = Path::new(other.get_source_path());
-        self_path.parent().expect("parent") == other_path.parent().expect("parent")
+        debug_assert!(self.is_primary_target() || other.is_primary_target());
+        self.is_primary_target() == other.is_primary_target()
     }
 
     /// Returns the path to source file of this module.
