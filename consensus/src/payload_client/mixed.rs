@@ -203,7 +203,7 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
         .pull_payload(
             Duration::from_secs(1), // max_poll_time
             2,                      // max_items
-            1,                      // max_unique_items
+            2,                      // max_unique_items
             1048576,                // size limit: 1MB
             0,
             0, // inline limit: 0
