@@ -4,6 +4,7 @@
 use crate::{
     abstract_write_op::AbstractResourceWriteOp,
     change_set::{ChangeSetInterface, VMChangeSet},
+    module_write_set::ModuleWriteSet,
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::AggregatorV1Resolver,
@@ -15,7 +16,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
-    write_set::{TransactionWrite, WriteOp},
+    write_set::WriteOp,
 };
 use move_core_types::{
     value::MoveTypeLayout,
@@ -31,7 +32,7 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMOutput {
     change_set: VMChangeSet,
-    module_write_set: BTreeMap<StateKey, WriteOp>,
+    module_write_set: ModuleWriteSet,
     fee_statement: FeeStatement,
     status: TransactionStatus,
     auxiliary_data: TransactionAuxiliaryData,
@@ -40,7 +41,7 @@ pub struct VMOutput {
 impl VMOutput {
     pub fn new(
         change_set: VMChangeSet,
-        module_write_set: BTreeMap<StateKey, WriteOp>,
+        module_write_set: ModuleWriteSet,
         fee_statement: FeeStatement,
         status: TransactionStatus,
         auxiliary_data: TransactionAuxiliaryData,
@@ -57,7 +58,7 @@ impl VMOutput {
     pub fn empty_with_status(status: TransactionStatus) -> Self {
         Self {
             change_set: VMChangeSet::empty(),
-            module_write_set: BTreeMap::new(),
+            module_write_set: ModuleWriteSet::empty(),
             fee_statement: FeeStatement::zero(),
             status,
             auxiliary_data: TransactionAuxiliaryData::default(),
@@ -77,7 +78,7 @@ impl VMOutput {
     }
 
     pub fn module_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
-        &self.module_write_set
+        self.module_write_set.write_ops()
     }
 
     pub fn delayed_field_change_set(
@@ -108,11 +109,11 @@ impl VMOutput {
 
     pub fn materialized_size(&self) -> u64 {
         let mut size = 0;
-        for (state_key, write_size) in self.change_set.write_set_size_iter().chain(
-            self.module_write_set
-                .iter()
-                .map(|(k, w)| (k, w.write_op_size())),
-        ) {
+        for (state_key, write_size) in self
+            .change_set
+            .write_set_size_iter()
+            .chain(self.module_write_set.write_set_size_iter())
+        {
             size += state_key.size() as u64 + write_size.write_len().unwrap_or(0);
         }
 
@@ -123,9 +124,12 @@ impl VMOutput {
     }
 
     pub fn concrete_write_set_iter(&self) -> impl Iterator<Item = (&StateKey, Option<&WriteOp>)> {
-        self.change_set
-            .concrete_write_set_iter()
-            .chain(self.module_write_set.iter().map(|(k, v)| (k, Some(v))))
+        self.change_set.concrete_write_set_iter().chain(
+            self.module_write_set
+                .write_ops()
+                .iter()
+                .map(|(k, v)| (k, Some(v))),
+        )
     }
 
     /// Materializes delta sets.

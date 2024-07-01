@@ -86,7 +86,6 @@ impl ChangeSetConfigs {
     pub fn check_change_set(&self, change_set: &impl ChangeSetInterface) -> Result<(), VMStatus> {
         let storage_write_limit_reached = || {
             Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED)
-                .with_message("Too many write ops.".to_string())
                 .finish(Location::Undefined)
                 .into_vm_status())
         };
@@ -94,7 +93,10 @@ impl ChangeSetConfigs {
         if self.max_write_ops_per_transaction != 0
             && change_set.num_write_ops() as u64 > self.max_write_ops_per_transaction
         {
-            return storage_write_limit_reached();
+            return Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED)
+                .with_message("Too many write ops.".to_string())
+                .finish(Location::Undefined)
+                .into_vm_status());
         }
 
         let mut write_set_size = 0;

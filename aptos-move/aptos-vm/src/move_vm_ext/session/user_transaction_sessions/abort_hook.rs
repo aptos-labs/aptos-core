@@ -8,6 +8,7 @@ use crate::{
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use derive_more::{Deref, DerefMut};
+use move_binary_format::errors::Location;
 use move_core_types::vm_status::VMStatus;
 
 #[derive(Deref, DerefMut)]
@@ -39,11 +40,19 @@ impl<'r, 'l> AbortHookSession<'r, 'l> {
 
     pub fn finish(self, change_set_configs: &ChangeSetConfigs) -> Result<VMChangeSet, VMStatus> {
         let Self { session } = self;
+        let (change_set, module_write_set) =
+            session.finish_with_squashed_change_set(change_set_configs, false)?;
 
-        // TODO(George): Abort hook can never publish modules! When we move publishing outside
-        //               of MoveVM, we do not need to use _ here, as modules will only be visible
-        //               in user session.
-        let (change_set, _) = session.finish_with_squashed_change_set(change_set_configs, false)?;
+        // Abort hook can never publish modules (just like epilogue)! When we move publishing
+        // outside MoveVM, we do not need to have a check here.
+        module_write_set
+            .is_empty_or_invariant_violation()
+            .map_err(|e| {
+                e.with_message("Non-empty module write set in epilogue session".to_string())
+                    .finish(Location::Undefined)
+                    .into_vm_status()
+            })?;
+
         change_set_configs.check_change_set(&change_set)?;
         Ok(change_set)
     }

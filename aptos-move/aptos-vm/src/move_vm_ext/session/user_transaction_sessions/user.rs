@@ -7,58 +7,47 @@ use crate::{
     AptosVM,
 };
 use aptos_types::{
-    contract_event::ContractEvent,
-    state_store::state_key::StateKey,
-    write_set::{TransactionWrite, WriteOp, WriteOpSize},
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
 use aptos_vm_types::{
     change_set::{ChangeSetInterface, VMChangeSet, WriteOpInfo},
+    module_write_set::ModuleWriteSet,
     resolver::ExecutorView,
     storage::change_set_configs::ChangeSetConfigs,
 };
 use derive_more::{Deref, DerefMut};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::vm_status::VMStatus;
-use std::collections::BTreeMap;
 
 pub struct UserSessionChangeSet {
     change_set: VMChangeSet,
-    module_write_set: BTreeMap<StateKey, WriteOp>,
+    module_write_set: ModuleWriteSet,
 }
 
 impl UserSessionChangeSet {
-    pub(crate) fn unpack(self) -> (VMChangeSet, BTreeMap<StateKey, WriteOp>) {
+    pub(crate) fn unpack(self) -> (VMChangeSet, ModuleWriteSet) {
         (self.change_set, self.module_write_set)
     }
 }
 
 impl ChangeSetInterface for UserSessionChangeSet {
     fn num_write_ops(&self) -> usize {
-        self.change_set.num_write_ops() + self.module_write_set.len()
+        self.change_set.num_write_ops() + self.module_write_set.num_write_ops()
     }
 
     fn write_set_size_iter(&self) -> impl Iterator<Item = (&StateKey, WriteOpSize)> {
-        self.change_set.write_set_size_iter().chain(
-            self.module_write_set
-                .iter()
-                .map(|(k, v)| (k, v.write_op_size())),
-        )
+        self.change_set
+            .write_set_size_iter()
+            .chain(self.module_write_set.write_set_size_iter())
     }
 
-    fn write_op_info_iter_mut(
-        &mut self,
-        executor_view: &dyn ExecutorView,
+    fn write_op_info_iter_mut<'a>(
+        &'a mut self,
+        executor_view: &'a dyn ExecutorView,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
-        self.change_set.write_op_info_iter_mut(executor_view).chain(
-            self.module_write_set.iter_mut().map(|(key, op)| {
-                Ok(WriteOpInfo {
-                    key,
-                    op_size: op.write_op_size(),
-                    prev_size: executor_view.get_module_state_value_size(key)?.unwrap_or(0),
-                    metadata_mut: op.get_metadata_mut(),
-                })
-            }),
-        )
+        self.change_set
+            .write_op_info_iter_mut(executor_view)
+            .chain(self.module_write_set.write_op_info_iter_mut(executor_view))
     }
 
     fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {

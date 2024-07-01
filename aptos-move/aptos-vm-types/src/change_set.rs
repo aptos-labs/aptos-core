@@ -6,6 +6,7 @@ use crate::{
         AbstractResourceWriteOp, GroupWrite, InPlaceDelayedFieldChangeOp,
         ResourceGroupInPlaceDelayedFieldChangeOp, WriteWithDelayedFieldsOp,
     },
+    module_write_set::ModuleWriteSet,
     resolver::ExecutorView,
 };
 use aptos_aggregator::{
@@ -216,7 +217,7 @@ impl VMChangeSet {
     /// In addition, the caller can include changes to published modules.
     pub fn try_combine_into_storage_change_set(
         self,
-        module_write_set: BTreeMap<StateKey, WriteOp>,
+        module_write_set: ModuleWriteSet,
     ) -> Result<StorageChangeSet, PanicError> {
         // Converting VMChangeSet into TransactionOutput (i.e. storage change set), can
         // be done here only if dynamic_change_set_optimizations have not been used/produced
@@ -259,7 +260,7 @@ impl VMChangeSet {
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         );
-        write_set_mut.extend(module_write_set);
+        write_set_mut.extend(module_write_set.into_write_ops());
         write_set_mut.extend(aggregator_v1_write_set);
 
         let events = events.into_iter().map(|(e, _)| e).collect();
@@ -787,19 +788,19 @@ impl VMChangeSet {
 /// support transactions with write-set payload.
 ///
 /// Note: does not separate out individual resource group updates.
-pub fn create_vm_change_set_with_modules_when_delayed_field_optimization_disabled(
+pub fn create_vm_change_set_with_module_write_set_when_delayed_field_optimization_disabled(
     change_set: StorageChangeSet,
-) -> (VMChangeSet, BTreeMap<StateKey, WriteOp>) {
+) -> (VMChangeSet, ModuleWriteSet) {
     let (write_set, events) = change_set.into_inner();
 
     // There should be no aggregator writes if we have a change set from
     // storage.
     let mut resource_write_set = BTreeMap::new();
-    let mut module_write_set = BTreeMap::new();
+    let mut module_write_ops = BTreeMap::new();
 
     for (state_key, write_op) in write_set {
         if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
-            module_write_set.insert(state_key, write_op);
+            module_write_ops.insert(state_key, write_op);
         } else {
             // TODO[agg_v1](fix) While everything else must be a resource, first
             // version of aggregators is implemented as a table item. Revisit when
@@ -819,6 +820,7 @@ pub fn create_vm_change_set_with_modules_when_delayed_field_optimization_disable
         BTreeMap::new(),
         BTreeMap::new(),
     );
+    let module_write_set = ModuleWriteSet::new(module_write_ops);
     (change_set, module_write_set)
 }
 
@@ -840,9 +842,9 @@ pub trait ChangeSetInterface {
 
     fn events_iter(&self) -> impl Iterator<Item = &ContractEvent>;
 
-    fn write_op_info_iter_mut(
-        &mut self,
-        executor_view: &dyn ExecutorView,
+    fn write_op_info_iter_mut<'a>(
+        &'a mut self,
+        executor_view: &'a dyn ExecutorView,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>>;
 }
 
@@ -864,9 +866,9 @@ impl ChangeSetInterface for VMChangeSet {
             )
     }
 
-    fn write_op_info_iter_mut(
-        &mut self,
-        executor_view: &dyn ExecutorView,
+    fn write_op_info_iter_mut<'a>(
+        &'a mut self,
+        executor_view: &'a dyn ExecutorView,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
         let resources = self.resource_write_set.iter_mut().map(|(key, op)| {
             Ok(WriteOpInfo {
