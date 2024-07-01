@@ -1,5 +1,13 @@
 module B::B {
-	public(package) fun foo() {
+    use B::C;
 
-	}
+    public(package) fun foo() {
+        C::bar()
+    }
+}
+
+module B::C {
+    public(package) fun bar() {
+
+    }
 }
