@@ -105,10 +105,6 @@ template identity(
 
 
     signal string_bodies[max_ascii_jwt_payload_len] <== StringBodies(max_ascii_jwt_payload_len)(ascii_jwt_payload);
-    for (var i = 0; i < max_ascii_jwt_payload_len; i++) {
-        log("payload ", i, " is: ", ascii_jwt_payload[i]);
-        log("string body ", i, " is: ", string_bodies[i]);
-    }
 
     // Check aud field is in the JWT
     signal input aud_field[maxAudKVPairLen]; // ASCII
