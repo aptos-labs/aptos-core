@@ -42,6 +42,7 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{GenesisMoveVM, SessionExt},
 };
+use claims::assert_ok;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -162,8 +163,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     let configs = vm.genesis_change_set_configs();
     let (mut change_set, module_write_set) = session.finish(&configs).unwrap();
-    assert!(
-        module_write_set.is_empty(),
+    assert_ok!(
+        module_write_set.is_empty_or_invariant_violation(),
         "Modules cannot be published in this session"
     );
 
@@ -293,8 +294,8 @@ pub fn encode_genesis_change_set(
 
     let configs = vm.genesis_change_set_configs();
     let (mut change_set, module_write_set) = session.finish(&configs).unwrap();
-    assert!(
-        module_write_set.is_empty(),
+    assert_ok!(
+        module_write_set.is_empty_or_invariant_violation(),
         "Modules cannot be published in this session"
     );
 

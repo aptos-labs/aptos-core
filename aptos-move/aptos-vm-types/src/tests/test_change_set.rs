@@ -5,8 +5,10 @@ use super::utils::{mock_tag_0, VMChangeSetBuilder};
 use crate::{
     abstract_write_op::{AbstractResourceWriteOp, GroupWrite},
     change_set::{
-        create_vm_change_set_with_modules_when_delayed_field_optimization_disabled, VMChangeSet,
+        create_vm_change_set_with_module_write_set_when_delayed_field_optimization_disabled,
+        VMChangeSet,
     },
+    module_write_set::ModuleWriteSet,
     resolver::ResourceGroupSize,
     tests::utils::{
         as_bytes, as_state_key, mock_add, mock_create, mock_create_with_layout, mock_delete,
@@ -321,7 +323,7 @@ fn test_roundtrip_to_storage_change_set() {
 
     let storage_change_set_before = StorageChangeSet::new(write_set, vec![]);
     let (change_set, module_write_set) =
-        create_vm_change_set_with_modules_when_delayed_field_optimization_disabled(
+        create_vm_change_set_with_module_write_set_when_delayed_field_optimization_disabled(
             storage_change_set_before.clone(),
         );
 
@@ -340,7 +342,7 @@ fn test_failed_conversion_to_change_set() {
         .build();
 
     // Unchecked conversion ignores deltas.
-    let vm_status = change_set.try_combine_into_storage_change_set(BTreeMap::new());
+    let vm_status = change_set.try_combine_into_storage_change_set(ModuleWriteSet::empty());
     assert_matches!(vm_status, Err(PanicError::CodeInvariantError(_)));
 }
 
@@ -355,7 +357,7 @@ fn test_conversion_to_change_set_fails() {
 
     assert_err!(change_set
         .clone()
-        .try_combine_into_storage_change_set(BTreeMap::new()));
+        .try_combine_into_storage_change_set(ModuleWriteSet::empty()));
 }
 
 #[test]

@@ -47,6 +47,7 @@ macro_rules! as_bytes {
     };
 }
 
+use crate::module_write_set::ModuleWriteSet;
 pub(crate) use as_bytes;
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
@@ -237,7 +238,7 @@ pub(crate) fn build_vm_output(
             .with_aggregator_v1_write_set(aggregator_v1_write_set)
             .with_aggregator_v1_delta_set(aggregator_v1_delta_set)
             .build(),
-        module_write_set.into_iter().collect(),
+        ModuleWriteSet::new(module_write_set.into_iter().collect()),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
         TransactionAuxiliaryData::default(),

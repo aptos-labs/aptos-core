@@ -56,7 +56,7 @@ use aptos_types::{
         OnChainConfig, TimedFeatures,
     },
     randomness::Randomness,
-    state_store::{state_key::StateKey, StateView, TStateView},
+    state_store::{StateView, TStateView},
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
@@ -65,17 +65,17 @@ use aptos_types::{
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
-    write_set::WriteOp,
 };
 use aptos_utils::aptos_try;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp,
     change_set::{
-        create_vm_change_set_with_modules_when_delayed_field_optimization_disabled,
+        create_vm_change_set_with_module_write_set_when_delayed_field_optimization_disabled,
         ChangeSetInterface, VMChangeSet,
     },
     environment::Environment,
+    module_write_set::ModuleWriteSet,
     output::VMOutput,
     resolver::{ExecutorView, ResourceGroupView},
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
@@ -496,18 +496,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
-    ) -> Result<
-        (
-            VMChangeSet,
-            BTreeMap<StateKey, WriteOp>,
-            FeeStatement,
-            ExecutionStatus,
-        ),
-        VMStatus,
-    > {
-        // Storage refund is zero since no slots are deleted in aborted transactions.
-        const ZERO_STORAGE_REFUND: u64 = 0;
-
+    ) -> Result<(VMChangeSet, ModuleWriteSet, FeeStatement, ExecutionStatus), VMStatus> {
         let is_account_init_for_sponsored_transaction =
             is_account_init_for_sponsored_transaction(txn_data, self.features(), resolver)?;
 
@@ -553,8 +542,9 @@ impl AptosVM {
                 );
             };
 
-            let fee_statement =
-                AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+            let fee_statement = AptosVM::fee_statement_from_gas_meter(
+                txn_data, gas_meter, /*storage_fee_refund = */ 0,
+            );
 
             // Verify we charged sufficiently for creating an account slot
             let gas_params = get_or_vm_startup_failure(&self.gas_params, log_context)?;
@@ -611,8 +601,9 @@ impl AptosVM {
 
             let status = self.inject_abort_info_if_available(status);
 
-            let fee_statement =
-                AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+            let fee_statement = AptosVM::fee_statement_from_gas_meter(
+                txn_data, gas_meter, /*storage_fee_refund = */ 0,
+            );
             epilogue_session.execute(|session| {
                 transaction_validation::run_failure_epilogue(
                     session,
@@ -1824,14 +1815,14 @@ impl AptosVM {
         write_set_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
-    ) -> Result<(VMChangeSet, BTreeMap<StateKey, WriteOp>), VMStatus> {
+    ) -> Result<(VMChangeSet, ModuleWriteSet), VMStatus> {
         match write_set_payload {
             WriteSetPayload::Direct(change_set) => {
                 // this transaction is never delayed field capable.
                 // it requires restarting execution afterwards,
                 // which allows it to be used as last transaction in delayed_field_enabled context.
                 let (change_set, module_write_set) =
-                    create_vm_change_set_with_modules_when_delayed_field_optimization_disabled(
+                    create_vm_change_set_with_module_write_set_when_delayed_field_optimization_disabled(
                         change_set.clone(),
                     );
 
@@ -1880,7 +1871,7 @@ impl AptosVM {
         executor_view: &dyn ExecutorView,
         resource_group_view: &dyn ResourceGroupView,
         change_set: &VMChangeSet,
-        module_write_set: &BTreeMap<StateKey, WriteOp>,
+        module_write_set: &ModuleWriteSet,
     ) -> PartialVMResult<()> {
         assert!(
             change_set.aggregator_v1_write_set().is_empty(),
@@ -1889,7 +1880,7 @@ impl AptosVM {
 
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
-        for state_key in module_write_set.keys() {
+        for state_key in module_write_set.write_ops().keys() {
             executor_view.get_module_state_value(state_key)?;
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {

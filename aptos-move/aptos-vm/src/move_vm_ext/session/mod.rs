@@ -21,9 +21,12 @@ use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     chain_id::ChainId, contract_event::ContractEvent, on_chain_config::Features,
     state_store::state_key::StateKey,
-    transaction::user_transaction_context::UserTransactionContext, write_set::WriteOp,
+    transaction::user_transaction_context::UserTransactionContext,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
+use aptos_vm_types::{
+    change_set::VMChangeSet, module_write_set::ModuleWriteSet,
+    storage::change_set_configs::ChangeSetConfigs,
+};
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
@@ -112,10 +115,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
     }
 
-    pub fn finish(
-        self,
-        configs: &ChangeSetConfigs,
-    ) -> VMResult<(VMChangeSet, BTreeMap<StateKey, WriteOp>)> {
+    pub fn finish(self, configs: &ChangeSetConfigs) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
         let move_vm = self.inner.get_move_vm();
 
         let resource_converter = |value: Value,
@@ -359,10 +359,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         legacy_resource_creation_as_modification: bool,
-    ) -> PartialVMResult<(VMChangeSet, BTreeMap<StateKey, WriteOp>)> {
+    ) -> PartialVMResult<(VMChangeSet, ModuleWriteSet)> {
         let mut resource_write_set = BTreeMap::new();
         let mut resource_group_write_set = BTreeMap::new();
-        let mut module_write_set = BTreeMap::new();
+        let mut module_write_ops = BTreeMap::new();
         let mut aggregator_v1_write_set = BTreeMap::new();
         let mut aggregator_v1_delta_set = BTreeMap::new();
 
@@ -382,7 +382,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             for (name, blob_op) in modules {
                 let state_key = StateKey::module(&addr, &name);
                 let op = woc.convert_module(&state_key, blob_op, false)?;
-                module_write_set.insert(state_key, op);
+                module_write_ops.insert(state_key, op);
             }
         }
 
@@ -449,6 +449,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             group_reads_needing_change,
             events,
         )?;
+        let module_write_set = ModuleWriteSet::new(module_write_ops);
+
         Ok((change_set, module_write_set))
     }
 }

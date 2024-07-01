@@ -9,13 +9,12 @@ use crate::{
     },
     AptosVM,
 };
-use aptos_types::{
-    state_store::state_key::StateKey,
-    transaction::user_transaction_context::UserTransactionContext, write_set::WriteOp,
+use aptos_types::transaction::user_transaction_context::UserTransactionContext;
+use aptos_vm_types::{
+    change_set::VMChangeSet, module_write_set::ModuleWriteSet,
+    storage::change_set_configs::ChangeSetConfigs,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
-use std::collections::BTreeMap;
 
 fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VMStatus> {
     value
@@ -76,7 +75,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         mut self,
         change_set_configs: &ChangeSetConfigs,
         assert_no_additional_creation: bool,
-    ) -> Result<(VMChangeSet, BTreeMap<StateKey, WriteOp>), VMStatus> {
+    ) -> Result<(VMChangeSet, ModuleWriteSet), VMStatus> {
         let (additional_change_set, module_write_set) = self.with_session_mut(|session| {
             unwrap_or_invariant_violation(
                 session.take(),
