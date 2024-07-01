@@ -1010,15 +1010,50 @@ fn strip_transactions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_lib::create_test_transaction;
     use aptos_protos::transaction::v1::{
-        transaction::TxnData, Event, Signature, Transaction, TransactionInfo, TransactionPayload,
+        transaction::TxnData, transaction_payload::Payload, EntryFunctionId, EntryFunctionPayload,
+        Event, MoveModuleId, Signature, Transaction, TransactionInfo, TransactionPayload,
         UserTransaction, UserTransactionRequest, WriteSetChange,
     };
     use aptos_transaction_filter::{
         boolean_transaction_filter::APIFilter, filters::UserTransactionFilterBuilder,
         EntryFunctionFilterBuilder, UserTransactionPayloadFilterBuilder,
     };
+
+    fn create_test_transaction(
+        module_address: String,
+        module_name: String,
+        function_name: String,
+    ) -> Transaction {
+        Transaction {
+            version: 1,
+            txn_data: Some(TxnData::User(UserTransaction {
+                request: Some(UserTransactionRequest {
+                    payload: Some(TransactionPayload {
+                        r#type: 1,
+                        payload: Some(Payload::EntryFunctionPayload(EntryFunctionPayload {
+                            function: Some(EntryFunctionId {
+                                module: Some(MoveModuleId {
+                                    address: module_address,
+                                    name: module_name,
+                                }),
+                                name: function_name,
+                            }),
+                            ..Default::default()
+                        })),
+                    }),
+                    signature: Some(Signature::default()),
+                    ..Default::default()
+                }),
+                events: vec![Event::default()],
+            })),
+            info: Some(TransactionInfo {
+                changes: vec![WriteSetChange::default()],
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
 
     #[test]
     fn test_ensure_sequential_transactions_merges_and_sorts() {
