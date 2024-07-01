@@ -198,8 +198,8 @@ pub struct ProofQueue {
     author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
     // ProofOfStore and insertion_time. None if committed
     batch_to_proof: HashMap<BatchKey, Option<(ProofOfStore, Instant)>>,
-    // Number of batches in which the txn_summary = (sender, sequence number, hash) has been included
-    txn_summary_num_occurrences: HashMap<TransactionSummary, u64>,
+    // Number of batches in which the txn_synopsis = (sender, sequence number, hash, expiration) has been included
+    txn_summary_num_occurrences: HashMap<TransactionSynopsis, u64>,
     // List of transaction summaries for each batch
     batch_to_txn_summaries: HashMap<BatchKey, Vec<TransactionSynopsis>>,
     // Expiration index
