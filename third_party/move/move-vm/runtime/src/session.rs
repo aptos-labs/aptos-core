@@ -100,7 +100,6 @@ impl<'r, 'l> Session<'r, 'l> {
             module,
             function_name,
             &ty_args,
-            &mut self.data_cache,
             &self.module_store,
         )?;
 
@@ -312,12 +311,10 @@ impl<'r, 'l> Session<'r, 'l> {
         script: impl Borrow<[u8]>,
         ty_args: &[TypeTag],
     ) -> VMResult<LoadedFunction> {
-        self.move_vm.runtime.loader().load_script(
-            script.borrow(),
-            ty_args,
-            &mut self.data_cache,
-            &self.module_store,
-        )
+        self.move_vm
+            .runtime
+            .loader()
+            .load_script(script.borrow(), ty_args, &self.module_store)
     }
 
     /// Load a module, a function, and all of its types into cache
@@ -335,7 +332,6 @@ impl<'r, 'l> Session<'r, 'l> {
                 module_id,
                 function_name,
                 expected_return_type,
-                &mut self.data_cache,
                 &self.module_store,
             )
     }
@@ -352,34 +348,29 @@ impl<'r, 'l> Session<'r, 'l> {
             module_id,
             function_name,
             ty_args,
-            &mut self.data_cache,
             &self.module_store,
         )
     }
 
-    pub fn load_type(&mut self, type_tag: &TypeTag) -> VMResult<Type> {
+    pub fn load_type(&self, type_tag: &TypeTag) -> VMResult<Type> {
         self.move_vm
             .runtime
             .loader()
-            .load_type(type_tag, &mut self.data_cache, &self.module_store)
+            .load_type(type_tag, &self.module_store)
     }
 
-    pub fn get_type_layout(&mut self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
-        self.move_vm.runtime.loader().get_type_layout(
-            type_tag,
-            &mut self.data_cache,
-            &self.module_store,
-        )
-    }
-
-    pub fn get_fully_annotated_type_layout(
-        &mut self,
-        type_tag: &TypeTag,
-    ) -> VMResult<MoveTypeLayout> {
+    pub fn get_type_layout(&self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
         self.move_vm
             .runtime
             .loader()
-            .get_fully_annotated_type_layout(type_tag, &mut self.data_cache, &self.module_store)
+            .get_type_layout(type_tag, &self.module_store)
+    }
+
+    pub fn get_fully_annotated_type_layout(&self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
+        self.move_vm
+            .runtime
+            .loader()
+            .get_fully_annotated_type_layout(type_tag, &self.module_store)
     }
 
     pub fn get_type_tag(&self, ty: &Type) -> VMResult<TypeTag> {

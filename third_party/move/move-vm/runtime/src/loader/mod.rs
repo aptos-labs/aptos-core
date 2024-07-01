@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
-    native_functions::NativeFunctions,
+    config::VMConfig, logging::expect_no_verification_errors, native_functions::NativeFunctions,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -268,7 +267,6 @@ impl Loader {
         &self,
         script_blob: &[u8],
         ty_args: &[TypeTag],
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<LoadedFunction> {
         // Retrieve or load the script.
@@ -281,8 +279,7 @@ impl Loader {
             Some(cached) => cached,
             None => {
                 // FIXME(George): Script caching should be performed on adapter side.
-                let ver_script =
-                    self.deserialize_and_verify_script(script_blob, data_store, module_store)?;
+                let ver_script = self.deserialize_and_verify_script(script_blob, module_store)?;
                 let script = Script::new(
                     Arc::new(ver_script),
                     &hash_value,
@@ -295,7 +292,7 @@ impl Loader {
 
         let ty_args = ty_args
             .iter()
-            .map(|ty| self.load_type(ty, data_store, module_store))
+            .map(|ty| self.load_type(ty, module_store))
             .collect::<VMResult<Vec<_>>>()?;
 
         #[allow(clippy::collapsible_if)]
@@ -333,7 +330,6 @@ impl Loader {
     fn deserialize_and_verify_script(
         &self,
         script: &[u8],
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<CompiledScript> {
         let script = match CompiledScript::deserialize_with_config(
@@ -359,7 +355,7 @@ impl Loader {
         let loaded_deps = script
             .immediate_dependencies()
             .into_iter()
-            .map(|module_id| self.load_module(&module_id, data_store, module_store))
+            .map(|module_id| self.load_module(&module_id, module_store))
             .collect::<VMResult<Vec<_>>>()?;
         dependencies::verify_script(&script, loaded_deps.iter().map(|m| m.module()))?;
         Ok(script)
@@ -374,11 +370,10 @@ impl Loader {
         &self,
         module_id: &ModuleId,
         function_name: &IdentStr,
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<Arc<Function>> {
         // Need to load the module first, before resolving the function.
-        self.load_module(module_id, data_store, module_store)?;
+        self.load_module(module_id, module_store)?;
         module_store
             .resolve_function_by_name(function_name, module_id)
             .map_err(|err| err.finish(Location::Undefined))
@@ -476,15 +471,10 @@ impl Loader {
         module_id: &ModuleId,
         function_name: &IdentStr,
         expected_return_type: &Type,
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<LoadedFunction> {
-        let function = self.load_function_without_type_args(
-            module_id,
-            function_name,
-            data_store,
-            module_store,
-        )?;
+        let function =
+            self.load_function_without_type_args(module_id, function_name, module_store)?;
 
         if function.return_tys().len() != 1 {
             // For functions that are marked constructor this should not happen.
@@ -529,19 +519,14 @@ impl Loader {
         module_id: &ModuleId,
         function_name: &IdentStr,
         ty_args: &[TypeTag],
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<LoadedFunction> {
-        let function = self.load_function_without_type_args(
-            module_id,
-            function_name,
-            data_store,
-            module_store,
-        )?;
+        let function =
+            self.load_function_without_type_args(module_id, function_name, module_store)?;
 
         let ty_args = ty_args
             .iter()
-            .map(|ty_arg| self.load_type(ty_arg, data_store, module_store))
+            .map(|ty_arg| self.load_type(ty_arg, module_store))
             .collect::<VMResult<Vec<_>>>()
             .map_err(|mut err| {
                 // User provided type argument failed to load. Set extra sub status to distinguish from internal type loading error.
@@ -565,7 +550,6 @@ impl Loader {
     pub(crate) fn verify_module_bundle_for_publication(
         &self,
         modules: &[CompiledModule],
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<()> {
         fail::fail_point!("verifier-failpoint-1", |_| { Ok(()) });
@@ -580,7 +564,6 @@ impl Loader {
                 module,
                 &bundle_verified,
                 &bundle_unverified,
-                data_store,
                 module_store,
             )?;
             bundle_verified.insert(module_id.clone(), module.clone());
@@ -605,7 +588,6 @@ impl Loader {
         module: &CompiledModule,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<()> {
         // Performs all verification steps to load the module without loading it, i.e., the new
@@ -626,7 +608,6 @@ impl Loader {
         self.load_and_verify_dependencies(
             module,
             bundle_verified,
-            data_store,
             module_store,
             &mut visited,
             &mut friends_discovered,
@@ -640,7 +621,6 @@ impl Loader {
             friends_discovered,
             bundle_verified,
             bundle_unverified,
-            data_store,
             module_store,
             /* allow_friend_loading_failure */ true,
         )?;
@@ -723,12 +703,11 @@ impl Loader {
     pub(crate) fn load_type(
         &self,
         ty_tag: &TypeTag,
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<Type> {
         let resolver = |struct_tag: &StructTag| -> VMResult<Arc<StructType>> {
             let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
-            self.load_module(&module_id, data_store, module_store)?;
+            self.load_module(&module_id, module_store)?;
             module_store
                 .get_struct_type_by_identifier(&struct_tag.name, &module_id)
                 .map_err(|e| e.finish(Location::Undefined))
@@ -741,7 +720,6 @@ impl Loader {
     pub(crate) fn load_module(
         &self,
         id: &ModuleId,
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<Arc<Module>> {
         // if the module is already in the code cache, load the cached version
@@ -755,7 +733,6 @@ impl Loader {
             id,
             &BTreeMap::new(),
             &BTreeSet::new(),
-            data_store,
             module_store,
             /* allow_module_loading_failure */ true,
         )?;
@@ -774,37 +751,37 @@ impl Loader {
     // Load, deserialize, and check the module with the bytecode verifier, without linking
     fn load_and_verify_module(
         &self,
-        id: &ModuleId,
-        data_store: &mut TransactionDataCache,
-        allow_loading_failure: bool,
+        _id: &ModuleId,
+        _allow_loading_failure: bool,
     ) -> VMResult<(Arc<CompiledModule>, usize)> {
-        let (module, size, hash_value) =
-            data_store.load_compiled_module_to_cache(id.clone(), allow_loading_failure)?;
+        todo!()
 
-        fail::fail_point!("verifier-failpoint-2", |_| { Ok((module.clone(), size)) });
+        // FIXME(George): This should be moved out, we can fetch compiled module directly!
 
-        if self.vm_config.paranoid_type_checks && &module.self_id() != id {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Module self id mismatch with storage".to_string())
-                    .finish(Location::Module(id.clone())),
-            );
-        }
-
-        // Verify the module if it hasn't been verified before.
-        if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
-            move_bytecode_verifier::verify_module_with_config(
-                &self.vm_config.verifier_config,
-                &module,
-            )
-            .map_err(expect_no_verification_errors)?;
-
-            VERIFIED_MODULES.lock().put(hash_value, ());
-        }
-
-        self.check_natives(&module)
-            .map_err(expect_no_verification_errors)?;
-        Ok((module, size))
+        // fail::fail_point!("verifier-failpoint-2", |_| { Ok((module.clone(), size)) });
+        //
+        // if self.vm_config.paranoid_type_checks && &module.self_id() != id {
+        //     return Err(
+        //         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+        //             .with_message("Module self id mismatch with storage".to_string())
+        //             .finish(Location::Module(id.clone())),
+        //     );
+        // }
+        //
+        // // Verify the module if it hasn't been verified before.
+        // if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
+        //     move_bytecode_verifier::verify_module_with_config(
+        //         &self.vm_config.verifier_config,
+        //         &module,
+        //     )
+        //     .map_err(expect_no_verification_errors)?;
+        //
+        //     VERIFIED_MODULES.lock().put(hash_value, ());
+        // }
+        //
+        // self.check_natives(&module)
+        //     .map_err(expect_no_verification_errors)?;
+        // Ok((module, size))
     }
 
     // Everything in `load_and_verify_module` and also recursively load and verify all the
@@ -813,7 +790,6 @@ impl Loader {
         &self,
         id: &ModuleId,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         visited: &mut BTreeSet<ModuleId>,
         friends_discovered: &mut BTreeSet<ModuleId>,
@@ -826,8 +802,7 @@ impl Loader {
         }
 
         // module self-check
-        let (module, size) =
-            self.load_and_verify_module(id, data_store, allow_module_loading_failure)?;
+        let (module, size) = self.load_and_verify_module(id, allow_module_loading_failure)?;
         visited.insert(id.clone());
         friends_discovered.extend(module.immediate_friends());
 
@@ -836,7 +811,6 @@ impl Loader {
         self.load_and_verify_dependencies(
             &module,
             bundle_verified,
-            data_store,
             module_store,
             visited,
             friends_discovered,
@@ -855,7 +829,6 @@ impl Loader {
         &self,
         module: &CompiledModule,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         visited: &mut BTreeSet<ModuleId>,
         friends_discovered: &mut BTreeSet<ModuleId>,
@@ -875,7 +848,6 @@ impl Loader {
                     None => self.load_and_verify_module_and_dependencies(
                         &module_id,
                         bundle_verified,
-                        data_store,
                         module_store,
                         visited,
                         friends_discovered,
@@ -912,7 +884,6 @@ impl Loader {
         id: &ModuleId,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         allow_module_loading_failure: bool,
     ) -> VMResult<Arc<Module>> {
@@ -922,7 +893,6 @@ impl Loader {
         let module_ref = self.load_and_verify_module_and_dependencies(
             id,
             bundle_verified,
-            data_store,
             module_store,
             &mut visited,
             &mut friends_discovered,
@@ -936,7 +906,6 @@ impl Loader {
             friends_discovered,
             bundle_verified,
             bundle_unverified,
-            data_store,
             module_store,
             /* allow_friend_loading_failure */ false,
         )?;
@@ -949,7 +918,6 @@ impl Loader {
         friends_discovered: BTreeSet<ModuleId>,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
-        data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         allow_friend_loading_failure: bool,
     ) -> VMResult<()> {
@@ -983,7 +951,6 @@ impl Loader {
                 &module_id,
                 bundle_verified,
                 bundle_unverified,
-                data_store,
                 module_store,
                 allow_friend_loading_failure,
             )?;
@@ -1994,10 +1961,9 @@ impl Loader {
     pub(crate) fn get_type_layout(
         &self,
         type_tag: &TypeTag,
-        move_storage: &mut TransactionDataCache,
         module_storage: &ModuleStorageAdapter,
     ) -> VMResult<MoveTypeLayout> {
-        let ty = self.load_type(type_tag, move_storage, module_storage)?;
+        let ty = self.load_type(type_tag, module_storage)?;
         self.type_to_type_layout(&ty, module_storage)
             .map_err(|e| e.finish(Location::Undefined))
     }
@@ -2005,10 +1971,9 @@ impl Loader {
     pub(crate) fn get_fully_annotated_type_layout(
         &self,
         type_tag: &TypeTag,
-        move_storage: &mut TransactionDataCache,
         module_storage: &ModuleStorageAdapter,
     ) -> VMResult<MoveTypeLayout> {
-        let ty = self.load_type(type_tag, move_storage, module_storage)?;
+        let ty = self.load_type(type_tag, module_storage)?;
         self.type_to_fully_annotated_layout(&ty, module_storage)
             .map_err(|e| e.finish(Location::Undefined))
     }

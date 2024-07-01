@@ -588,7 +588,7 @@ impl Interpreter {
                 // and charge properly.
                 resolver
                     .loader()
-                    .load_module(&module_name, data_store, module_store)
+                    .load_module(&module_name, module_store)
                     .map_err(|_| {
                         PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                             .with_message(format!("Module {} doesn't exist", module_name))
@@ -659,7 +659,7 @@ impl Interpreter {
                     ))?;
                 resolver
                     .loader()
-                    .load_module(&module_name, data_store, module_store)
+                    .load_module(&module_name, module_store)
                     .map_err(|_| {
                         PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                             .with_message(format!("Module {} doesn't exist", module_name))

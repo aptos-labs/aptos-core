@@ -205,7 +205,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         // and charge properly.
         self.resolver
             .loader()
-            .load_module(module, self.data_store, self.resolver.module_store())
+            .load_module(module, self.resolver.module_store())
             .map_err(|_| {
                 PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
                     .with_message(format!("Module {} doesn't exist", module))

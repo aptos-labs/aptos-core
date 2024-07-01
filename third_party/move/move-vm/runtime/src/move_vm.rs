@@ -12,7 +12,7 @@ use crate::{
     session::Session,
 };
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-use move_vm_types::resolver::MoveResolver;
+use move_vm_types::resolver::ResourceResolver;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -64,26 +64,19 @@ impl MoveVM {
     ///     cases where this may not be necessary, with the most notable one being the common module
     ///     publishing flow: you can keep using the same Move VM if you publish some modules in a Session
     ///     and apply the effects to the storage when the Session ends.
-    pub fn new_session<'r>(&self, remote: &'r impl MoveResolver) -> Session<'r, '_> {
+    pub fn new_session<'r>(&self, remote: &'r impl ResourceResolver) -> Session<'r, '_> {
         self.new_session_with_extensions(remote, NativeContextExtensions::default())
     }
 
     /// Create a new session, as in `new_session`, but provide native context extensions.
     pub fn new_session_with_extensions<'r>(
         &self,
-        remote: &'r impl MoveResolver,
+        remote: &'r impl ResourceResolver,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,
-            data_cache: TransactionDataCache::new(
-                self.runtime
-                    .loader()
-                    .vm_config()
-                    .deserializer_config
-                    .clone(),
-                remote,
-            ),
+            data_cache: TransactionDataCache::new(remote),
             module_store: ModuleStorageAdapter::new(self.runtime.module_storage()),
             native_extensions,
         }
@@ -92,20 +85,13 @@ impl MoveVM {
     /// Create a new session, as in `new_session`, but provide native context extensions and custome storage for resolved modules.
     pub fn new_session_with_extensions_and_modules<'r>(
         &self,
-        remote: &'r impl MoveResolver,
+        remote: &'r impl ResourceResolver,
         module_storage: Arc<dyn ModuleStorage>,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,
-            data_cache: TransactionDataCache::new(
-                self.runtime
-                    .loader()
-                    .vm_config()
-                    .deserializer_config
-                    .clone(),
-                remote,
-            ),
+            data_cache: TransactionDataCache::new(remote),
             module_store: ModuleStorageAdapter::new(module_storage),
             native_extensions,
         }
