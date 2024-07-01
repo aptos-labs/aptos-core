@@ -1122,7 +1122,7 @@ impl<'env> FunctionTranslator<'env> {
                     TestVariant(..)
                     | PackVariant(..)
                     | UnpackVariant(..)
-                    | BorrowFieldVariant(..) => {
+                    | BorrowVariantField(..) => {
                         let loc = self.fun_target.get_bytecode_loc(attr_id);
                         self.parent.env.error(&loc, "variants not yet implemented")
                     },
@@ -1143,7 +1143,7 @@ impl<'env> FunctionTranslator<'env> {
                                 .flatten()
                                 .into_iter()
                                 .filter_map(|e| match e {
-                                    BorrowEdge::Field(_, offset) => Some(format!("{}", offset)),
+                                    BorrowEdge::Field(_, _, offset) => Some(format!("{}", offset)),
                                     BorrowEdge::Index(_) => Some("-1".to_owned()),
                                     BorrowEdge::Direct => None,
                                     _ => unreachable!(),
@@ -2365,10 +2365,11 @@ impl<'env> FunctionTranslator<'env> {
                 BorrowEdge::Direct => {
                     self.translate_write_back_update(mk_dest, get_path_index, src, edges, at + 1)
                 },
-                BorrowEdge::Field(memory, offset) => {
+                BorrowEdge::Field(memory, variant, offset) => {
                     let memory = memory.to_owned().instantiate(self.type_inst);
                     let struct_env = &self.parent.env.get_struct_qid(memory.to_qualified_id());
-                    let field_env = &struct_env.get_field_by_offset(*offset);
+                    let field_env =
+                        &struct_env.get_field_by_offset_optional_variant(*variant, *offset);
                     let field_sel = boogie_field_sel(field_env);
                     let new_dest = format!("{}->{}", (*mk_dest)(), field_sel);
                     let mut new_dest_needed = false;

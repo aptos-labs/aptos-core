@@ -9,6 +9,7 @@ use move_binary_format::{
     IndexKind,
 };
 use move_core_types::vm_status::StatusCode;
+use std::cmp;
 
 pub struct LimitsVerifier<'a> {
     resolver: BinaryIndexedView<'a>,
@@ -155,15 +156,35 @@ impl<'a> LimitsVerifier<'a> {
             }
             if let Some(max_fields_in_struct) = config.max_fields_in_struct {
                 for def in defs {
+                    let mut max = 0;
                     match &def.field_information {
-                        StructFieldInformation::Native => (),
-                        StructFieldInformation::Declared(fields) => {
-                            if fields.len() > max_fields_in_struct {
-                                return Err(PartialVMError::new(
-                                    StatusCode::MAX_FIELD_DEFINITIONS_REACHED,
-                                ));
+                        StructFieldInformation::Native => {},
+                        StructFieldInformation::Declared(fields) => max += fields.len(),
+                        StructFieldInformation::DeclaredVariants(variants) => {
+                            // Notice we interpret the bound as a maximum of the combined
+                            // size of fields of a given variant, not the
+                            // sum of all fields in all variants. An upper bound for
+                            // overall fields of a variant struct is given by
+                            // `max_fields_in_struct * max_struct_variants`
+                            for variant in variants {
+                                let count = variant.fields.len();
+                                max = cmp::max(max, count)
                             }
                         },
+                    }
+                    if max > max_fields_in_struct {
+                        return Err(PartialVMError::new(
+                            StatusCode::MAX_FIELD_DEFINITIONS_REACHED,
+                        ));
+                    }
+                }
+            }
+            if let Some(max_struct_variants) = config.max_struct_variants {
+                for def in defs {
+                    if matches!(&def.field_information,
+                        StructFieldInformation::DeclaredVariants(variants) if variants.len() > max_struct_variants)
+                    {
+                        return Err(PartialVMError::new(StatusCode::MAX_STRUCT_VARIANTS_REACHED));
                     }
                 }
             }

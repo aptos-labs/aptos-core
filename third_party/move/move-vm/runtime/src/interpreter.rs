@@ -1606,6 +1606,24 @@ impl Frame {
             | Bytecode::VecPopBack(_)
             | Bytecode::VecUnpack(_, _)
             | Bytecode::VecSwap(_) => (),
+
+            Bytecode::PackVariant(_)
+            | Bytecode::PackVariantGeneric(_)
+            | Bytecode::UnpackVariant(_)
+            | Bytecode::UnpackVariantGeneric(_)
+            | Bytecode::TestVariant(_)
+            | Bytecode::TestVariantGeneric(_)
+            | Bytecode::MutBorrowVariantField(_)
+            | Bytecode::MutBorrowVariantFieldGeneric(_)
+            | Bytecode::ImmBorrowVariantField(_)
+            | Bytecode::ImmBorrowVariantFieldGeneric(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "Struct variants not yet implemented for paranoid mode".to_string(),
+                        ),
+                );
+            },
         };
         Ok(())
     }
@@ -2084,6 +2102,23 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_vec_ref_ty(ty, true)?;
+            },
+            Bytecode::PackVariant(_)
+            | Bytecode::PackVariantGeneric(_)
+            | Bytecode::UnpackVariant(_)
+            | Bytecode::UnpackVariantGeneric(_)
+            | Bytecode::TestVariant(_)
+            | Bytecode::TestVariantGeneric(_)
+            | Bytecode::MutBorrowVariantField(_)
+            | Bytecode::MutBorrowVariantFieldGeneric(_)
+            | Bytecode::ImmBorrowVariantField(_)
+            | Bytecode::ImmBorrowVariantFieldGeneric(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "Struct variants not yet implemented for paranoid mode".to_string(),
+                        ),
+                );
             },
         }
         Ok(())
@@ -2796,6 +2831,23 @@ impl Frame {
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_swap(make_ty!(ty))?;
                         vec_ref.swap(idx1, idx2, ty)?;
+                    },
+                    Bytecode::PackVariant(_)
+                    | Bytecode::PackVariantGeneric(_)
+                    | Bytecode::UnpackVariant(_)
+                    | Bytecode::UnpackVariantGeneric(_)
+                    | Bytecode::TestVariant(_)
+                    | Bytecode::TestVariantGeneric(_)
+                    | Bytecode::MutBorrowVariantField(_)
+                    | Bytecode::MutBorrowVariantFieldGeneric(_)
+                    | Bytecode::ImmBorrowVariantField(_)
+                    | Bytecode::ImmBorrowVariantFieldGeneric(_) => {
+                        return Err(PartialVMError::new(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                        )
+                        .with_message(
+                            "Struct variants not yet implemented for execution".to_string(),
+                        ));
                     },
                 }
                 if interpreter.paranoid_type_checks {

@@ -133,6 +133,7 @@ static VALID_GROUPS: Lazy<BTreeMap<&str, ()>> = Lazy::new(|| {
         "comparison",
         "boolean",
         "struct",
+        "variant",
         "global",
         "vector",
     ]

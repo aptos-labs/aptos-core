@@ -103,6 +103,7 @@ impl Compatibility {
                 struct_and_pub_function_linking = false;
             }
             if new_struct.fields != old_struct.fields {
+                // TODO(#13806): implement struct variants
                 // Fields changed. Code in this module will fail at runtime if it tries to
                 // read a previously published struct value
                 // TODO: this is a stricter definition than required. We could in principle

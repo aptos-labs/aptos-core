@@ -305,6 +305,11 @@ impl Struct {
             StructFieldInformation::Declared(fields) => {
                 fields.iter().map(|f| Field::new(m, f)).collect()
             },
+            StructFieldInformation::DeclaredVariants(..) => {
+                // TODO(#13806): consider implementing (probably not as long we do not
+                //  know whether normalized.rs will be retired)
+                panic!("variants not implemented")
+            },
         };
         let name = m.identifier_at(handle.name).to_owned();
         let s = Struct {

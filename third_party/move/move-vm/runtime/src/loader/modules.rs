@@ -490,6 +490,9 @@ impl Module {
                 .iter()
                 .map(|f| module.identifier_at(f.name).to_owned())
                 .collect(),
+            StructFieldInformation::DeclaredVariants(..) => {
+                return Err(Self::variants_not_supported_err())
+            },
         };
         let abilities = struct_handle.abilities;
         let name = module.identifier_at(struct_handle.name).to_owned();
@@ -497,6 +500,9 @@ impl Module {
         let fields = match &struct_def.field_information {
             StructFieldInformation::Native => unreachable!("native structs have been removed"),
             StructFieldInformation::Declared(fields) => fields,
+            StructFieldInformation::DeclaredVariants(..) => {
+                return Err(Self::variants_not_supported_err())
+            },
         };
 
         let mut field_tys = vec![];
@@ -524,6 +530,11 @@ impl Module {
             module: module.self_id(),
             name,
         })
+    }
+
+    fn variants_not_supported_err() -> PartialVMError {
+        PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+            .with_message("Struct variants not yet supported in VM".to_string())
     }
 
     pub(crate) fn struct_at(&self, idx: StructDefinitionIndex) -> Arc<StructType> {

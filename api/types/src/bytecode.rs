@@ -109,6 +109,10 @@ pub trait Bytecode {
                     .map(|f| self.new_move_struct_field(f))
                     .collect(),
             ),
+            StructFieldInformation::DeclaredVariants(..) => {
+                // TODO(#13806): implement for struct variants
+                panic!("enums/struct variants not yet supported by the API")
+            },
         };
         let name = self.identifier_at(handle.name).to_owned();
         let abilities = handle

@@ -70,6 +70,9 @@ fn mk_script_function_module() -> CompiledModule {
                 }),
             },
         ],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
         signatures: vec![
             Signature(vec![]), // void
         ],
@@ -82,6 +85,7 @@ fn mk_script_function_module() -> CompiledModule {
         struct_def_instantiations: vec![],
         function_instantiations: vec![],
         field_instantiations: vec![],
+        variant_field_instantiations: vec![],
     };
     move_bytecode_verifier::verify_module(&m).unwrap();
     m
@@ -165,6 +169,9 @@ fn mk_invoking_module(use_generic: bool, valid: bool) -> CompiledModule {
                 }),
             },
         ],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
         signatures: vec![
             Signature(vec![]),                    // void
             Signature(vec![SignatureToken::U64]), // u64
@@ -177,6 +184,7 @@ fn mk_invoking_module(use_generic: bool, valid: bool) -> CompiledModule {
         friend_decls: vec![],
         struct_def_instantiations: vec![],
         field_instantiations: vec![],
+        variant_field_instantiations: vec![],
     };
     move_bytecode_verifier::verify_module(&m).unwrap();
     m

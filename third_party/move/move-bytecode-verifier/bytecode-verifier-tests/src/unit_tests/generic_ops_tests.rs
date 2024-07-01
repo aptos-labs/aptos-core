@@ -166,6 +166,9 @@ fn make_module() -> CompiledModule {
                 }),
             },
         ],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
         signatures: vec![
             Signature(vec![]),                       // void
             Signature(vec![SignatureToken::Signer]), // Signer
@@ -183,6 +186,7 @@ fn make_module() -> CompiledModule {
         struct_def_instantiations: vec![],
         function_instantiations: vec![],
         field_instantiations: vec![],
+        variant_field_instantiations: vec![],
     }
 }
 

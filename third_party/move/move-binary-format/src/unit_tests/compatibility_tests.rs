@@ -64,6 +64,10 @@ fn mk_module(vis: u8) -> normalized::Module {
         struct_def_instantiations: vec![],
         function_instantiations: vec![],
         field_instantiations: vec![],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
     };
     normalized::Module::new(&m)
 }

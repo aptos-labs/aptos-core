@@ -9,7 +9,9 @@ use crate::{
         FunctionDefinition, FunctionHandle, FunctionHandleIndex, FunctionInstantiation,
         FunctionInstantiationIndex, IdentifierIndex, LocalIndex, ModuleHandleIndex, Signature,
         SignatureIndex, SignatureToken, StructDefInstantiation, StructDefInstantiationIndex,
-        StructDefinition, StructDefinitionIndex, StructHandle, TableIndex, Visibility,
+        StructDefinition, StructDefinitionIndex, StructHandle, StructVariantHandle,
+        StructVariantInstantiation, TableIndex, VariantFieldHandle, VariantFieldInstantiation,
+        Visibility,
     },
     internals::ModuleIndex,
     proptest_types::{
@@ -251,6 +253,10 @@ pub struct FnDefnMaterializeState<'a> {
     type_instantiations: InstantiationState<StructDefInstantiation>,
     function_instantiations: InstantiationState<FunctionInstantiation>,
     field_instantiations: InstantiationState<FieldInstantiation>,
+    variant_field_handles: InstantiationState<VariantFieldHandle>,
+    variant_field_instantiations: InstantiationState<VariantFieldInstantiation>,
+    struct_variant_handles: InstantiationState<StructVariantHandle>,
+    struct_variant_instantiations: InstantiationState<StructVariantInstantiation>,
 }
 
 impl<'a> FnDefnMaterializeState<'a> {
@@ -278,6 +284,10 @@ impl<'a> FnDefnMaterializeState<'a> {
             type_instantiations: InstantiationState::new(),
             function_instantiations: InstantiationState::new(),
             field_instantiations: InstantiationState::new(),
+            variant_field_handles: InstantiationState::new(),
+            variant_field_instantiations: InstantiationState::new(),
+            struct_variant_handles: InstantiationState::new(),
+            struct_variant_instantiations: InstantiationState::new(),
         }
     }
 
@@ -290,6 +300,10 @@ impl<'a> FnDefnMaterializeState<'a> {
         Vec<StructDefInstantiation>,
         Vec<FunctionInstantiation>,
         Vec<FieldInstantiation>,
+        Vec<VariantFieldHandle>,
+        Vec<VariantFieldInstantiation>,
+        Vec<StructVariantHandle>,
+        Vec<StructVariantInstantiation>,
     ) {
         (
             self.signatures.signatures(),
@@ -298,6 +312,10 @@ impl<'a> FnDefnMaterializeState<'a> {
             self.type_instantiations.instantiations(),
             self.function_instantiations.instantiations(),
             self.field_instantiations.instantiations(),
+            self.variant_field_handles.instantiations(),
+            self.variant_field_instantiations.instantiations(),
+            self.struct_variant_handles.instantiations(),
+            self.struct_variant_instantiations.instantiations(),
         )
     }
 
