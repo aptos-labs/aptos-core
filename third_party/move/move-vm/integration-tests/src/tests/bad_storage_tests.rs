@@ -4,20 +4,22 @@
 
 use crate::compiler::{as_module, as_script, compile_units};
 use bytes::Bytes;
-use move_binary_format::errors::PartialVMError;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{ModuleResolver, ResourceResolver},
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
-use move_vm_types::gas::UnmeteredGasMeter;
+use move_vm_types::{
+    gas::UnmeteredGasMeter,
+    resolver::{ModuleResolver, ResourceResolver},
+};
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
@@ -528,27 +530,23 @@ struct BogusStorage {
 }
 
 impl ModuleResolver for BogusStorage {
-    type Error = PartialVMError;
-
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(&self, _module_id: &ModuleId) -> PartialVMResult<Option<Bytes>> {
         Err(PartialVMError::new(self.bad_status_code))
     }
 }
 
 impl ResourceResolver for BogusStorage {
-    type Error = PartialVMError;
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         Err(PartialVMError::new(self.bad_status_code))
     }
 }

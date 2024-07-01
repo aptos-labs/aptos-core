@@ -11244,6 +11244,7 @@ name = "move-vm-types"
 version = "0.1.0"
 dependencies = [
  "bcs 0.1.4",
+ "bytes",
  "claims",
  "derivative",
  "itertools 0.12.1",
