@@ -983,13 +983,13 @@ impl StateStore {
     pub fn get_state_key_and_value_iter(
         self: &Arc<Self>,
         version: Version,
-        start_hashed_key: HashValue,
+        start_idx: usize,
     ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync> {
         let store = Arc::clone(self);
-        Ok(JellyfishMerkleIterator::new(
+        Ok(JellyfishMerkleIterator::new_by_index(
             Arc::clone(&self.state_merkle_db),
             version,
-            start_hashed_key,
+            start_idx,
         )?
         .map(|it| it.map_err(Into::into))
         .map(move |res| match res {

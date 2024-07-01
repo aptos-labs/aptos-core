@@ -2,17 +2,17 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_db::backup::backup_handler::BackupHandler;
+use crate::handlers::bytes_sender;
+use aptos_db::{backup::backup_handler::BackupHandler, metrics::BACKUP_TIMER};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
+    register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec, TimerHelper,
 };
-use aptos_storage_interface::{AptosDbError, Result};
-use bytes::Bytes;
+use aptos_storage_interface::Result as DbResult;
 use hyper::Body;
 use once_cell::sync::Lazy;
 use serde::Serialize;
-use std::{convert::Infallible, future::Future};
+use std::convert::Infallible;
 use warp::{reply::Response, Rejection, Reply};
 
 pub(super) static LATENCY_HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
@@ -36,7 +36,7 @@ pub(super) static THROUGHPUT_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
 pub(super) fn reply_with_bcs_bytes<R: Serialize>(
     endpoint: &str,
     record: &R,
-) -> Result<Box<dyn Reply>> {
+) -> DbResult<Box<dyn Reply>> {
     let bytes = bcs::to_bytes(record)?;
     THROUGHPUT_COUNTER
         .with_label_values(&[endpoint])
@@ -44,83 +44,44 @@ pub(super) fn reply_with_bcs_bytes<R: Serialize>(
     Ok(Box::new(bytes))
 }
 
-pub(super) struct BytesSender {
-    endpoint: &'static str,
-    inner: hyper::body::Sender,
-}
-
-impl BytesSender {
-    fn new(endpoint: &'static str, inner: hyper::body::Sender) -> Self {
-        Self { endpoint, inner }
-    }
-
-    async fn send_data(&mut self, chunk: Bytes) -> Result<()> {
-        let n_bytes = chunk.len();
-        self.inner
-            .send_data(chunk)
-            .await
-            .map_err(|e| AptosDbError::Other(e.to_string()))?;
-        THROUGHPUT_COUNTER
-            .with_label_values(&[self.endpoint])
-            .inc_by(n_bytes as u64);
-        Ok(())
-    }
-
-    fn abort(self) {
-        self.inner.abort()
-    }
-}
-
-pub(super) fn reply_with_async_channel_writer<G, F>(
+pub(super) fn reply_with_bytes_sender<F>(
     backup_handler: &BackupHandler,
     endpoint: &'static str,
-    get_channel_writer: G,
+    f: F,
 ) -> Box<dyn Reply>
 where
-    G: FnOnce(BackupHandler, BytesSender) -> F,
-    F: Future<Output = ()> + Send + 'static,
+    F: FnOnce(BackupHandler, &mut bytes_sender::BytesSender) -> DbResult<()> + Send + 'static,
 {
-    let (sender, body) = Body::channel();
-    let sender = BytesSender::new(endpoint, sender);
+    let (sender, stream) = bytes_sender::BytesSender::new(endpoint);
+
+    // spawn and forget, error propagates through the `stream: TryStream<_>`
     let bh = backup_handler.clone();
-    tokio::spawn(get_channel_writer(bh, sender));
+    let _join_handle = tokio::task::spawn_blocking(move || {
+        let _timer =
+            BACKUP_TIMER.timer_with(&[&format!("backup_service_bytes_sender_{}", endpoint)]);
+        abort_on_error(f)(bh, sender)
+    });
 
-    Box::new(Response::new(body))
+    Box::new(Response::new(Body::wrap_stream(stream)))
 }
 
-pub(super) async fn send_size_prefixed_bcs_bytes<I, R>(iter_res: Result<I>, mut sender: BytesSender)
+pub(super) fn abort_on_error<F>(
+    f: F,
+) -> impl FnOnce(BackupHandler, bytes_sender::BytesSender) + Send + 'static
 where
-    I: Iterator<Item = Result<R>>,
-    R: Serialize,
+    F: FnOnce(BackupHandler, &mut bytes_sender::BytesSender) -> DbResult<()> + Send + 'static,
 {
-    send_size_prefixed_bcs_bytes_impl(iter_res, &mut sender)
-        .await
-        .unwrap_or_else(|e| {
-            warn!("Failed writing to output http body: {:?}", e);
-            sender.abort()
-        });
-}
-
-async fn send_size_prefixed_bcs_bytes_impl<I, R>(
-    iter_res: Result<I>,
-    sender: &mut BytesSender,
-) -> Result<()>
-where
-    I: Iterator<Item = Result<R>>,
-    R: Serialize,
-{
-    for record_res in iter_res? {
-        let record = record_res?;
-        let record_bytes = bcs::to_bytes(&record)?;
-        let size_bytes = (record_bytes.len() as u32).to_be_bytes();
-        sender.send_data(Bytes::from(size_bytes.to_vec())).await?;
-        sender.send_data(Bytes::from(record_bytes)).await?;
+    move |bh: BackupHandler, mut sender: bytes_sender::BytesSender| {
+        // ignore error from finish() and abort()
+        let _res = match f(bh, &mut sender) {
+            Ok(()) => sender.finish(),
+            Err(e) => sender.abort(e),
+        };
     }
-    Ok(())
 }
 
 /// Return 500 on any error raised by the request handler.
-pub(super) fn unwrap_or_500(result: Result<Box<dyn Reply>>) -> Box<dyn Reply> {
+pub(super) fn unwrap_or_500(result: DbResult<Box<dyn Reply>>) -> Box<dyn Reply> {
     match result {
         Ok(resp) => resp,
         Err(e) => {
@@ -131,7 +92,7 @@ pub(super) fn unwrap_or_500(result: Result<Box<dyn Reply>>) -> Box<dyn Reply> {
 }
 
 /// Return 400 on any rejections (parameter parsing errors).
-pub(super) async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
+pub(super) async fn handle_rejection(err: Rejection) -> DbResult<impl Reply, Infallible> {
     warn!("bad request: {:?}", err);
     Ok(warp::http::StatusCode::BAD_REQUEST)
 }

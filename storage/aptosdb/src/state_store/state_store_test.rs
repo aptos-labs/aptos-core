@@ -354,7 +354,7 @@ proptest! {
         for i in 0..kvs.len() {
             let actual_values = db
                 .get_backup_handler()
-                .get_account_iter(i as Version)
+                .get_state_item_iter(i as Version, 0, usize::MAX)
                 .unwrap()
                 .collect::<Result<Vec<_>>>()
                 .unwrap();
@@ -531,7 +531,7 @@ proptest! {
             let last_version = next_version - 1;
             let snapshot = db
                 .get_backup_handler()
-                .get_account_iter(last_version)
+                .get_state_item_iter(last_version, 0, usize::MAX)
                 .unwrap()
                 .collect::<Result<Vec<_>>>()
                 .unwrap();

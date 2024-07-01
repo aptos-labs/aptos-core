@@ -64,6 +64,7 @@ fn end_to_end() {
                 StateSnapshotBackupOpt { epoch },
                 GlobalBackupOpt {
                     max_chunk_size: 500,
+                    concurrent_data_requests: 2,
                 },
                 client,
                 Arc::clone(&store),
