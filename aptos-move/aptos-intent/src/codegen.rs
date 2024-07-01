@@ -37,6 +37,8 @@ struct Context {
     type_params_per_call: Vec<u16>,
     return_counts: Vec<u16>,
     signer_counts: u16,
+    locals: Vec<SignatureToken>,
+    parameters: Vec<SignatureToken>,
 }
 
 fn instantiate(token: &SignatureToken, offset: u16) -> SignatureToken {
@@ -237,18 +239,15 @@ impl Context {
     }
 
     fn add_signers(&mut self, signer_counts: u16) -> PartialVMResult<()> {
-        let local_idx = self.script.parameters.0 as usize;
         for _ in 0..signer_counts {
-            self.script.signatures[local_idx]
-                .0
-                .push(SignatureToken::Reference(Box::new(SignatureToken::Signer)));
+            self.parameters.push(SignatureToken::Reference(Box::new(SignatureToken::Signer)));
         }
         self.signer_counts = signer_counts;
         Ok(())
     }
 
     fn allocate_parameters(&mut self, calls: &[BatchedFunctionCall]) -> PartialVMResult<()> {
-        let mut total_args_count = self.script.signature_at(self.script.parameters).0.len() as u16;
+        let mut total_args_count = self.parameters.len() as u16;
         for call in calls {
             self.args_to_local.push(total_args_count);
             for arg in call.args.iter() {
@@ -332,7 +331,7 @@ impl Context {
     ) -> PartialVMResult<()> {
         let func_id = self.import_call(&call.module, &call.function, module_resolver)?;
         self.returned_val_to_local
-            .push(self.script.signature_at(self.script.code.locals).0.len() as u16);
+            .push(self.locals.len() as u16);
 
         let func_handle = self.script.function_handle_at(func_id).clone();
         let type_args_offset = self.script.type_parameters.len() as u16;
@@ -382,11 +381,8 @@ impl Context {
                     } else {
                         instantiate(type_, type_args_offset)
                     };
-                    let param_idx =
-                        self.script.signatures[self.script.parameters.0 as usize].len() as u8;
-                    self.script.signatures[self.script.parameters.0 as usize]
-                        .0
-                        .push(inst_ty);
+                    let param_idx = self.parameters.len() as u8;
+                    self.parameters.push(inst_ty);
                     self.script.code.code.push(Bytecode::MoveLoc(param_idx));
                 },
             }
@@ -416,7 +412,7 @@ impl Context {
         }
 
         self.returned_val_to_local
-            .push(self.script.signatures[self.script.code.locals.0 as usize].len() as u16);
+            .push(self.locals.len() as u16);
         self.return_counts
             .push(self.script.signature_at(func_handle.return_).0.len() as u16);
 
@@ -436,14 +432,13 @@ impl Context {
             .collect::<Vec<_>>();
 
         for ret_ty in ret_locals {
-            let local_idx = self.script.signatures[self.script.code.locals.0 as usize].len()
+            let local_idx = self.locals.len()
                 + self.args.len()
                 + self.signer_counts as usize;
             if local_idx >= u8::MAX as usize {
                 return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
             }
-            self.script.signatures[self.script.code.locals.0 as usize]
-                .0
+            self.locals
                 .push(ret_ty);
             self.script.code.code.push(Bytecode::StLoc(local_idx as u8));
         }
@@ -468,6 +463,7 @@ pub fn generate_script_from_batched_calls(
     let mut context = Context::default();
     context.script = empty_script();
     context.script.code.code = vec![];
+    context.script.signatures = vec![];
     context.add_signers(signer_count)?;
     context.allocate_parameters(calls)?;
     context.allocate_type_parameters(calls)?;
@@ -475,6 +471,8 @@ pub fn generate_script_from_batched_calls(
         context.compile_batched_call(call, module_resolver)?;
     }
     context.script.code.code.push(Bytecode::Ret);
+    context.script.parameters = context.add_signature(Signature(context.parameters.clone()))?;
+    context.script.code.locals = context.add_signature(Signature(context.locals.clone()))?;
     let mut bytes = vec![];
     context
         .script
