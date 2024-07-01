@@ -9,7 +9,7 @@ use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::SignedTransaction, transaction::TransactionPayload, LocalAccount},
 };
 use args::TransactionTypeArg;
 use async_trait::async_trait;
@@ -31,6 +31,7 @@ pub mod args;
 mod batch_transfer;
 mod bounded_batch_wrapper;
 mod call_custom_modules;
+mod from_payload;
 mod entry_points;
 mod p2p_transaction_generator;
 pub mod publish_modules;
@@ -43,6 +44,7 @@ use self::{
     p2p_transaction_generator::P2PTransactionGeneratorCreator,
     publish_modules::PublishPackageCreator,
     transaction_mix_generator::PhasedTxnMixGeneratorCreator,
+    from_payload::FromPayloadGeneratorCreator,
 };
 use crate::{
     accounts_pool_wrapper::AccountsPoolWrapperCreator,
@@ -54,7 +56,7 @@ pub use publishing::module_simple::EntryPoints;
 
 pub const SEND_AMOUNT: u64 = 1;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum TransactionType {
     NonConflictingCoinTransfer {
         invalid_transaction_ratio: usize,
@@ -85,6 +87,10 @@ pub enum TransactionType {
         num_modules: usize,
         use_account_pool: bool,
         progress_type: WorkflowProgress,
+    },
+    FromPayload {
+        payload: TransactionPayload,
+        use_account_pool: bool,
     },
 }
 
@@ -381,6 +387,19 @@ pub async fn create_txn_generator_creator(
                         *progress_type,
                     )
                     .await,
+                ),
+                TransactionType::FromPayload {
+                    payload,
+                    use_account_pool,
+                } => wrap_accounts_pool(
+                    Box::new(
+                        FromPayloadGeneratorCreator::new(
+                            txn_factory.clone(),
+                            payload.clone(),
+                        ),
+                    ),
+                    *use_account_pool,
+                    &accounts_pool,
                 ),
             };
             txn_generator_creator_mix.push((txn_generator_creator, *weight));

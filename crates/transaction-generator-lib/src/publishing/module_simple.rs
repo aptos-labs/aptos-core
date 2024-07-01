@@ -238,6 +238,8 @@ pub enum EntryPoints {
     // register if not registered already
     CoinInitAndMint,
     FungibleAssetMint,
+    FungibleAssetUpgradeToConcurrent,
+    FungibleAssetNopFeePayer,
 
     TokenV2AmbassadorMint {
         numbered: bool,
@@ -309,7 +311,9 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. }
             | EntryPoints::CoinInitAndMint
-            | EntryPoints::FungibleAssetMint => "framework_usecases",
+            | EntryPoints::FungibleAssetMint
+            | EntryPoints::FungibleAssetUpgradeToConcurrent
+            | EntryPoints::FungibleAssetNopFeePayer => "framework_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
@@ -366,7 +370,9 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "resource_groups_example",
             EntryPoints::CoinInitAndMint => "coin_example",
-            EntryPoints::FungibleAssetMint => "fungible_asset_example",
+            EntryPoints::FungibleAssetMint
+            | EntryPoints::FungibleAssetUpgradeToConcurrent
+            | EntryPoints::FungibleAssetNopFeePayer => "fungible_asset_example",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador"
             },
@@ -620,6 +626,12 @@ impl EntryPoints {
                     bcs::to_bytes(&1000u64).unwrap(), // amount
                 ])
             },
+            EntryPoints::FungibleAssetUpgradeToConcurrent => {
+                get_payload(module_id, ident_str!("upgrade_to_concurrent_balance").to_owned(), vec![])
+            },
+            EntryPoints::FungibleAssetNopFeePayer => {
+                get_payload(module_id, ident_str!("no_op").to_owned(), vec![])
+            },
             EntryPoints::TokenV2AmbassadorMint { numbered: true } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
@@ -749,13 +761,15 @@ impl EntryPoints {
                     milestone_every: *milestone_every,
                 })
             },
+            EntryPoints::FungibleAssetNopFeePayer => Some(EntryPoints::FungibleAssetUpgradeToConcurrent),
             _ => None,
         }
     }
 
     pub fn multi_sig_additional_num(&self) -> MultiSigConfig {
         match self {
-            EntryPoints::NopFeePayer => MultiSigConfig::FeePayerPublisher,
+            EntryPoints::NopFeePayer
+            | EntryPoints::FungibleAssetNopFeePayer => MultiSigConfig::FeePayerPublisher,
             EntryPoints::Nop2Signers => MultiSigConfig::Random(1),
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
             EntryPoints::ResourceGroupsGlobalWriteTag { .. }
@@ -815,6 +829,8 @@ impl EntryPoints {
             EntryPoints::CoinInitAndMint | EntryPoints::FungibleAssetMint => {
                 AutomaticArgs::SignerAndMultiSig
             },
+            EntryPoints::FungibleAssetUpgradeToConcurrent => AutomaticArgs::Signer,
+            EntryPoints::FungibleAssetNopFeePayer => AutomaticArgs::None,
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 AutomaticArgs::SignerAndMultiSig
             },

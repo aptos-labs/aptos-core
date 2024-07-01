@@ -8,6 +8,11 @@ use crate::{
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
+use aptos_sdk::bcs;
+use aptos_sdk::move_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
+use aptos_sdk::types::transaction::TransactionPayload;
+use aptos_sdk::types::transaction::EntryFunction;
+
 /// Utility class for specifying transaction type with predefined configurations through CLI
 #[derive(Debug, Copy, Clone, ValueEnum, Default, Deserialize, Parser, Serialize)]
 pub enum TransactionTypeArg {
@@ -23,6 +28,7 @@ pub enum TransactionTypeArg {
     // Simple EntryPoints
     NoOp,
     NoOpFeePayer,
+    FungibleAssetNoOpFeePayer,
     NoOp2Signers,
     NoOp5Signers,
     AccountResource32B,
@@ -71,6 +77,8 @@ pub enum TransactionTypeArg {
     SmartTablePicture1BWith256Change,
     SmartTablePicture1MWith1KChangeExceedsLimit,
     DeserializeU256,
+
+    TaposV2,
 }
 
 impl TransactionTypeArg {
@@ -85,6 +93,20 @@ impl TransactionTypeArg {
         workflow_progress_type: WorkflowProgress,
     ) -> TransactionType {
         match self {
+            TransactionTypeArg::TaposV2 => TransactionType::FromPayload {
+                payload: TransactionPayload::EntryFunction(EntryFunction::new(
+                    ModuleId::new(
+                        AccountAddress::from_str_strict("0xe20af97eaaf8cc006c397b75afb8da4806b944b8b30e5c47e259f2f23a1e2ddd").unwrap(),
+                        ident_str!("tapos_game_2").to_owned(),
+                    ),
+                    ident_str!("play").to_owned(),
+                    vec![],
+                    vec![
+                        bcs::to_bytes(&true).unwrap()
+                    ],
+                )),
+                use_account_pool: sender_use_account_pool
+            },
             TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool,
@@ -171,6 +193,11 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::NoOpFeePayer => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::NopFeePayer,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::FungibleAssetNoOpFeePayer => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::FungibleAssetNopFeePayer,
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },

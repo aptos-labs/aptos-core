@@ -1,4 +1,6 @@
 module 0xABCD::fungible_asset_example {
+    use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::coin;
     use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata};
     use aptos_framework::object::{Self, Object};
     use aptos_framework::primary_fungible_store;
@@ -71,6 +73,14 @@ module 0xABCD::fungible_asset_example {
         let from_wallet = primary_fungible_store::primary_store(from_address, asset);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
         fungible_asset::transfer(from, from_wallet, to_wallet, amount);
+    }
+
+    public entry fun upgrade_to_concurrent_balance(user: &signer) {
+        coin::migrate_to_fungible_store<AptosCoin>(user);
+        fungible_asset::upgrade_store_to_concurrent(user, primary_fungible_store::primary_store(signer::address_of(user), object::address_to_object<Metadata>(@aptos_fungible_asset)))
+    }
+
+    public entry fun no_op() {
     }
 
     /// Borrow the immutable reference of the refs of `metadata`.

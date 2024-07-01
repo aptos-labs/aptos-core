@@ -259,7 +259,10 @@ pub async fn query_sequence_number_with_client(
     let result = RETRY_POLICY
         .retry_if(
             move || rest_client.get_account_bcs(account_address),
-            |error: &RestError| !is_account_not_found(error),
+            |error: &RestError| {
+                println!("{}: {:?}", account_address, error);
+                !is_account_not_found(error)
+            },
         )
         .await;
     match result {
