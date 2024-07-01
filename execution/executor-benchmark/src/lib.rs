@@ -233,17 +233,19 @@ pub fn run_benchmark<V>(
         }
     );
 
-    let num_txns = db.reader.get_synced_version().unwrap() - version - num_blocks_created as u64;
-    overall_measuring.print_end("Overall", num_txns);
+    if !pipeline_config.skip_commit {
+        let num_txns =
+            db.reader.get_synced_version().unwrap() - version - num_blocks_created as u64;
+        overall_measuring.print_end("Overall", num_txns);
 
-    if verify_sequence_numbers {
-        generator.verify_sequence_numbers(db.reader.clone());
+        if verify_sequence_numbers {
+            generator.verify_sequence_numbers(db.reader.clone());
+        }
+        log_total_supply(&db.reader);
     }
 
     // Assert there were no error log lines in the run.
     assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
-
-    log_total_supply(&db.reader);
 }
 
 fn init_workload<V>(
