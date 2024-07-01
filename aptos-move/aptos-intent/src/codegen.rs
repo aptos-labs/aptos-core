@@ -27,6 +27,7 @@ struct Context {
     module_pool: BTreeMap<(AddressIdentifierIndex, IdentifierIndex), ModuleHandleIndex>,
     function_pool: BTreeMap<(ModuleHandleIndex, IdentifierIndex), FunctionHandleIndex>,
     struct_pool: BTreeMap<(ModuleHandleIndex, IdentifierIndex), StructHandleIndex>,
+    signature_pool: BTreeMap<Signature, SignatureIndex>,
     script: CompiledScript,
     args: Vec<Vec<u8>>,
     ty_args: Vec<TypeTag>,
@@ -223,11 +224,15 @@ impl Context {
     }
 
     fn add_signature(&mut self, signature: Signature) -> PartialVMResult<SignatureIndex> {
+        if let Some(idx) = self.signature_pool.get(&signature) {
+            return Ok(*idx);
+        }
         if self.script.signatures.len() >= TableIndex::MAX as usize {
             return Err(PartialVMError::new(StatusCode::INDEX_OUT_OF_BOUNDS));
         }
         let return_idx = SignatureIndex(self.script.signatures.len() as u16);
-        self.script.signatures.push(signature);
+        self.script.signatures.push(signature.clone());
+        self.signature_pool.insert(signature, return_idx);
         Ok(return_idx)
     }
 
@@ -325,11 +330,7 @@ impl Context {
         call: &BatchedFunctionCall,
         module_resolver: &BTreeMap<ModuleId, CompiledModule>,
     ) -> PartialVMResult<()> {
-        let func_id = self.import_call(
-            &call.module,
-            &call.function,
-            module_resolver,
-        )?;
+        let func_id = self.import_call(&call.module, &call.function, module_resolver)?;
         self.returned_val_to_local
             .push(self.script.signature_at(self.script.code.locals).0.len() as u16);
 
@@ -482,6 +483,11 @@ pub fn generate_script_from_batched_calls(
     Ok(bcs::to_bytes(&Script {
         code: bytes,
         ty_args: context.ty_args,
-        args: context.args.into_iter().map(TransactionArgument::Raw).collect(),
-    }).unwrap())
+        args: context
+            .args
+            .into_iter()
+            .map(TransactionArgument::Raw)
+            .collect(),
+    })
+    .unwrap())
 }
