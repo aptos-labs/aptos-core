@@ -184,6 +184,24 @@ pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static TOTAL_BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_total_block_size_when_pull",
+        "Histogram for the total size of transactions per block when pulled for consensus.",
+        BYTE_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static KNOWN_DUPLICATE_TXNS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_known_duplicate_txns_when_pull",
+        "Histogram for the number of known duplicate transactions in a block when pulled for consensus.",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
 pub static NUM_INLINE_BATCHES: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "num_inline_batches_in_block_proposal",

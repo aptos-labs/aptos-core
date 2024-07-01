@@ -839,6 +839,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.time_service.clone(),
             Duration::from_millis(self.config.quorum_store_poll_time_ms),
             self.config.max_sending_block_txns,
+            self.config.max_sending_block_unique_txns,
             self.config.max_sending_block_bytes,
             self.config.max_sending_inline_txns,
             self.config.max_sending_inline_bytes,
