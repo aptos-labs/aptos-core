@@ -5,6 +5,7 @@
 use crate::{
     access_control::AccessControlState,
     data_cache::TransactionDataCache,
+    dependencies::check_dependencies_and_charge_gas,
     loader::{Function, Loader, ModuleStorageAdapter, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
@@ -643,26 +644,19 @@ impl Interpreter {
                 .map_err(|err| err.to_partial())
             },
             NativeResult::LoadModule { module_name } => {
-                // FIXME(George): introduce a trait ModuleStorage to replace ModuleResolver, and use
-                //   it to shift the check back to Move repo!
-                // let arena_id = traversal_context
-                //     .referenced_module_ids
-                //     .alloc(module_name.clone());
-                // resolver
-                //     .loader()
-                //     .check_dependencies_and_charge_gas(
-                //         module_store,
-                //         data_store,
-                //         gas_meter,
-                //         &mut traversal_context.visited,
-                //         traversal_context.referenced_modules,
-                //         [(arena_id.address(), arena_id.name())],
-                //     )
-                //     .map_err(|err| err
-                //         .to_partial()
-                //         .append_message_with_separator('.',
-                //             format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
-                //         ))?;
+                let arena_id = traversal_context
+                    .referenced_module_ids
+                    .alloc(module_name.clone());
+                check_dependencies_and_charge_gas(
+                    &(),
+                    gas_meter,
+                    &mut traversal_context.visited,
+                    [(arena_id.address(), arena_id.name())],
+                ).map_err(|err| err
+                    .to_partial()
+                    .append_message_with_separator('.',
+                                                   format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
+                    ))?;
                 resolver
                     .loader()
                     .load_module(&module_name, data_store, module_store)

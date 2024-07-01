@@ -7,10 +7,7 @@ use crate::{
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::{discarded_output, expect_only_successful_execution},
-    gas::{
-        check_dependencies_and_charge_gas, check_gas, get_gas_parameters, make_prod_gas_meter,
-        ProdGasMeter,
-    },
+    gas::{check_gas, get_gas_parameters, make_prod_gas_meter, ProdGasMeter},
     keyless_validation,
     move_vm_ext::{
         session::user_transaction_sessions::{
@@ -105,6 +102,7 @@ use move_core_types::{
     vm_status::StatusType,
 };
 use move_vm_runtime::{
+    dependencies,
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
 };
@@ -717,7 +715,7 @@ impl AptosVM {
             // Fixme(George): ensure dependencies exist!
 
             // TODO(Gas): Should we charge dependency gas for the script itself?
-            check_dependencies_and_charge_gas(
+            dependencies::check_dependencies_and_charge_gas(
                 resolver,
                 gas_meter,
                 &mut traversal_context.visited,
@@ -778,7 +776,7 @@ impl AptosVM {
             let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
-            check_dependencies_and_charge_gas(
+            dependencies::check_dependencies_and_charge_gas(
                 resolver,
                 gas_meter,
                 &mut traversal_context.visited,
@@ -1447,7 +1445,7 @@ impl AptosVM {
                         .map(|module| (module.self_addr(), module.self_name()))
                         .collect::<BTreeSet<_>>();
 
-                    check_dependencies_and_charge_gas(
+                    dependencies::check_dependencies_and_charge_gas(
                         resolver,
                         gas_meter,
                         &mut traversal_context.visited,
