@@ -11,7 +11,7 @@ use once_cell::sync::{Lazy, OnceCell};
 use rayon::ThreadPool;
 use std::cmp::max;
 
-pub static MAX_THREAD_POOL_SIZE: usize = 60;// 32;
+pub static MAX_THREAD_POOL_SIZE: usize = 200;// 32;
 
 pub static THREAD_MANAGER: Lazy<Box<dyn ThreadManager>> = Lazy::new(|| {
     ThreadManagerBuilder::create_thread_manager(ThreadManagerBuilder::get_thread_config_strategy())
