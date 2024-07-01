@@ -105,7 +105,7 @@ impl ModuleGenerator {
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
         let options = module_env.env.get_extension::<Options>().expect("options");
         let language_version = options.language_version.unwrap_or_default();
-        let gen_access_specifiers = language_version >= LanguageVersion::V2_0
+        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_0)
             && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
         let compilation_metadata =
             CompilationMetadata::new(CompilerVersion::V2_0, language_version);
@@ -217,20 +217,24 @@ impl ModuleGenerator {
         }
         let struct_handle = self.struct_index(ctx, loc, struct_env);
         let fields = struct_env.get_fields();
-        let field_information = FF::StructFieldInformation::Declared(
-            fields
-                .map(|f| {
-                    let field_loc = f.get_loc();
-                    self.source_map
-                        .add_struct_field_mapping(def_idx, ctx.env.to_ir_loc(field_loc))
-                        .expect(SOURCE_MAP_OK);
-                    let name = self.name_index(ctx, field_loc, f.get_name());
-                    let signature =
-                        FF::TypeSignature(self.signature_token(ctx, loc, &f.get_type()));
-                    FF::FieldDefinition { name, signature }
-                })
-                .collect(),
-        );
+        let field_information = if struct_env.is_native() {
+            FF::StructFieldInformation::Native
+        } else {
+            FF::StructFieldInformation::Declared(
+                fields
+                    .map(|f| {
+                        let field_loc = f.get_loc();
+                        self.source_map
+                            .add_struct_field_mapping(def_idx, ctx.env.to_ir_loc(field_loc))
+                            .expect(SOURCE_MAP_OK);
+                        let name = self.name_index(ctx, field_loc, f.get_name());
+                        let signature =
+                            FF::TypeSignature(self.signature_token(ctx, loc, &f.get_type()));
+                        FF::FieldDefinition { name, signature }
+                    })
+                    .collect(),
+            )
+        };
         let def = FF::StructDefinition {
             struct_handle,
             field_information,

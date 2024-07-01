@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: An entry function cannot be inlined.
+  ┌─ tests/checking/typing/entry_inline_err.move:2:5
+  │
+2 │     public(friend) entry inline fun a(){}
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: An entry function cannot be inlined.
+  ┌─ tests/checking/typing/entry_inline_err.move:6:5
+  │
+6 │     entry inline fun a(){}
+  │     ^^^^^^^^^^^^^^^^^^^^^^

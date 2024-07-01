@@ -2033,6 +2033,17 @@ impl Transaction {
             | Transaction::ValidatorTransaction(_) => false,
         }
     }
+
+    pub fn is_block_start(&self) -> bool {
+        match self {
+            Transaction::BlockMetadata(_) | Transaction::BlockMetadataExt(_) => true,
+            Transaction::StateCheckpoint(_)
+            | Transaction::BlockEpilogue(_)
+            | Transaction::UserTransaction(_)
+            | Transaction::GenesisTransaction(_)
+            | Transaction::ValidatorTransaction(_) => false,
+        }
+    }
 }
 
 impl TryFrom<Transaction> for SignedTransaction {

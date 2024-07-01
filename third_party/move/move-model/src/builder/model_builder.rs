@@ -127,6 +127,7 @@ pub(crate) struct StructEntry {
     /// Whether the struct is originally empty
     /// always false when it is enum
     pub is_empty_struct: bool,
+    pub is_native: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -354,6 +355,7 @@ impl<'env> ModelBuilder<'env> {
         abilities: AbilitySet,
         type_params: Vec<TypeParameter>,
         layout: StructLayout,
+        is_native: bool,
     ) {
         let entry = StructEntry {
             loc,
@@ -365,6 +367,7 @@ impl<'env> ModelBuilder<'env> {
             layout,
             receiver_functions: BTreeMap::new(),
             is_empty_struct: false,
+            is_native,
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table

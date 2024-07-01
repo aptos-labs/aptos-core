@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unresolved spec target
+   ┌─ tests/verification/noverify/function_with_spec.move:15:10
+   │
+15 │     spec baz {
+   │          ^^^

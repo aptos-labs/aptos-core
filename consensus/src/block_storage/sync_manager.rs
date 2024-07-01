@@ -23,7 +23,7 @@ use crate::{
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::TExecutionClient,
 };
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, Context};
 use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
@@ -47,7 +47,7 @@ use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use futures_channel::oneshot;
 use rand::{prelude::*, Rng};
 use std::{clone::Clone, cmp::min, sync::Arc, time::Duration};
-use tokio::time;
+use tokio::{time, time::timeout};
 
 #[derive(Debug, PartialEq, Eq)]
 /// Whether we need to do block retrieval if we want to insert a Quorum Cert.
@@ -568,15 +568,14 @@ impl BlockRetriever {
                 let author = self.network.author();
                 futures.push(
                     async move {
-                        let response = rx
-                            .await
-                            .map(|block| {
-                                BlockRetrievalResponse::new(
-                                    BlockRetrievalStatus::SucceededWithTarget,
-                                    vec![block],
-                                )
-                            })
-                            .map_err(|_| anyhow::anyhow!("self retrieval failed"));
+                        let response = match timeout(rpc_timeout, rx).await {
+                            Ok(Ok(block)) => Ok(BlockRetrievalResponse::new(
+                                BlockRetrievalStatus::SucceededWithTarget,
+                                vec![block],
+                            )),
+                            Ok(Err(_)) => Err(anyhow!("self retrieval cancelled")),
+                            Err(_) => Err(anyhow!("self retrieval timeout")),
+                        };
                         (author, response)
                     }
                     .boxed(),

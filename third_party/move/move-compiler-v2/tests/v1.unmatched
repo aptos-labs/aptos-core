@@ -1,3 +1,6 @@
+WARNING: test `move-compiler-v2/tests/verification/cross_module_valid.verification.move` and `move-compiler-v2/tests/verification/verify/cross_module_valid.move` share common key `verification/cross_module_valid.verification.move`, discarding former one
+WARNING: test `move-compiler-v2/tests/verification/double_annotation.verification.move` and `move-compiler-v2/tests/verification/verify/double_annotation.move` share common key `verification/double_annotation.verification.move`, discarding former one
+WARNING: test `move-compiler-v2/tests/verification/single_module_valid.verification.move` and `move-compiler-v2/tests/verification/verify/single_module_valid.move` share common key `verification/single_module_valid.verification.move`, discarding former one
 move-compiler/tests/move_check/borrow_tests/{
   borrow_global_acquires_duplicate_annotation.move,
   eq_bad.move,
@@ -21,7 +24,6 @@ move-compiler/tests/move_check/commands/{
   invalid_fallthrough2.move,
   invalid_fallthrough3.move,
   join_failure.move,
-  mixed_lvalue.move,
   while_move_local.move,
   while_move_local_2.move,
 }
@@ -32,22 +34,7 @@ move-compiler/tests/move_check/control_flow/{
 }
 move-compiler/tests/move_check/deprecated/{
   assert_function.move,
-  deprecated_constant_duplicated_struct.move,
-  deprecated_constant_duplicated_struct2.move,
-  deprecated_field_type.move,
-  deprecated_field_type2.move,
-  deprecated_placement_address.move,
-  deprecated_placement_address_module_members.move,
   deprecated_placement_basecase.move,
-  deprecated_placement_members.move,
-  deprecated_placement_module.move,
-  deprecated_placement_module2.move,
-  deprecated_placement_module_members.move,
-  public_script.move,
-}
-move-compiler/tests/move_check/examples/{
-  multi_pool_money_market_token.move,
-  simple_money_market_token.move,
 }
 move-compiler/tests/move_check/liveness/{
   copy_after_move.move,
@@ -66,15 +53,8 @@ move-compiler/tests/move_check/liveness/{
   move_in_infinite_loop_branched.move,
   trailing_semi.move,
   trailing_semi_loops.move,
-  unused_assignment.move,
 }
 move-compiler/tests/move_check/locals/{
-  assign_partial_resource.move,
-  assign_resource.move,
-  struct_use_before_assign.move,
-  unused_copyable.move,
-  unused_resource.move,
-  unused_resource_explicit_return.move,
   use_after_move_if.move,
   use_after_move_if_else.move,
   use_after_move_loop.move,
@@ -286,11 +266,4 @@ move-compiler/tests/move_check/typing/{
 }
 move-compiler/tests/move_check/v2-not-supported/{
   no_receiver_calls.move,
-}
-move-compiler/tests/move_check/verification/{
-  cross_module_invalid.move,
-  cross_module_valid.move,
-  double_annotation.move,
-  single_module_invalid.move,
-  single_module_valid.move,
 }

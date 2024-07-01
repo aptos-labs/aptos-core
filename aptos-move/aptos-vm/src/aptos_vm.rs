@@ -100,7 +100,7 @@ use move_vm_runtime::{
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::OnceCell;
 use std::{
     cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
@@ -113,17 +113,6 @@ static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static DISCARD_FAILED_BLOCKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
-
-// TODO: Don't expose this in AptosVM, and use only in BlockAptosVM!
-pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .thread_name(|index| format!("par_exec-{}", index))
-            .build()
-            .unwrap(),
-    )
-});
 
 macro_rules! deprecated_module_bundle {
     () => {
@@ -2455,7 +2444,6 @@ impl VMExecutor for AptosVM {
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
-            Arc::clone(&RAYON_EXEC_POOL),
             transactions,
             state_view,
             BlockExecutorConfig {
