@@ -3,7 +3,7 @@
 
 use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
-    common::{TransactionInProgress, TransactionSummary},
+    common::{TransactionInProgress, TransactionSummary, TransactionSynopsis},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
 };
 use aptos_logger::prelude::*;
@@ -198,11 +198,11 @@ pub struct ProofQueue {
     author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
     // ProofOfStore and insertion_time. None if committed
     batch_to_proof: HashMap<BatchKey, Option<(ProofOfStore, Instant)>>,
-    // Map of txn_summary = (sender, sequence number, hash) to all the batches that contain
+    // Map of txn_summary = (sender, sequence number, expiration_timestamp_secs, hash) to all the batches that contain
     // the transaction. This helps in counting the number of unique transactions in the pipeline.
-    txn_summary_to_batches: HashMap<TransactionSummary, HashSet<BatchKey>>,
-    // List of batches for which we received txn summaries from the batch coordinator
-    batches_with_txn_summary: HashSet<BatchKey>,
+    txn_summary_to_batches: HashMap<TransactionSynopsis, HashSet<BatchKey>>,
+    // List of transaction summaries for each batch
+    batch_to_txn_summaries: HashMap<BatchKey, Vec<TransactionSynopsis>>,
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
@@ -219,7 +219,7 @@ impl ProofQueue {
             author_to_batches: HashMap::new(),
             batch_to_proof: HashMap::new(),
             txn_summary_to_batches: HashMap::new(),
-            batches_with_txn_summary: HashSet::new(),
+            batch_to_txn_summaries: HashMap::new(),
             expirations: TimeExpirations::new(),
             latest_block_timestamp: 0,
             remaining_txns_with_duplicates: 0,
@@ -273,7 +273,7 @@ impl ProofQueue {
             .batch_to_proof
             .iter()
             .filter_map(|(batch_key, proof)| {
-                if proof.is_some() && !self.batches_with_txn_summary.contains(batch_key) {
+                if proof.is_some() && !self.batch_to_txn_summaries.contains_key(batch_key) {
                     Some(proof.as_ref().unwrap().0.num_txns())
                 } else {
                     None
@@ -317,18 +317,18 @@ impl ProofQueue {
 
     pub(crate) fn add_batch_summaries(
         &mut self,
-        batch_summaries: Vec<(BatchInfo, Vec<TransactionSummary>)>,
+        batch_summaries: Vec<(BatchInfo, Vec<TransactionSynopsis>)>,
     ) {
         let start = Instant::now();
         for (batch_info, txn_summaries) in batch_summaries {
             let batch_key = BatchKey::from_info(&batch_info);
-            for txn_summary in txn_summaries {
+            for txn_summary in &txn_summaries {
                 self.txn_summary_to_batches
-                    .entry(txn_summary)
+                    .entry(*txn_summary)
                     .or_default()
                     .insert(batch_key.clone());
             }
-            self.batches_with_txn_summary.insert(batch_key);
+            self.batch_to_txn_summaries.insert(batch_key, txn_summaries);
         }
         counters::PROOF_QUEUE_ADD_BATCH_SUMMARIES_DURATION.observe_duration(start.elapsed());
     }
@@ -374,18 +374,32 @@ impl ProofQueue {
     // The flag in the second return argument is true iff the entire proof queue is fully utilized
     // when pulling the proofs. If any proof from proof queue cannot be included due to size limits,
     // this flag is set false.
+    // Returns the proofs, the number of unique transactions in the proofs, and a flag indicating
+    // whether the proof queue is fully utilized.
     pub(crate) fn pull_proofs(
         &mut self,
         excluded_batches: &HashSet<BatchInfo>,
         max_txns: u64,
+        max_unique_txns: u64,
         max_bytes: u64,
         return_non_full: bool,
-    ) -> (Vec<ProofOfStore>, bool) {
+    ) -> (Vec<ProofOfStore>, u64, bool) {
         let mut ret = vec![];
         let mut cur_bytes = 0;
-        let mut cur_txns = 0;
+        let mut cur_unique_txns = 0;
+        let mut cur_all_txns = 0;
         let mut excluded_txns = 0;
         let mut full = false;
+        // Set of all the excluded transactions and all the transactions included in the result
+        let mut filtered_txns = HashSet::new();
+        for batch_info in excluded_batches {
+            let batch_key = BatchKey::from_info(batch_info);
+            if let Some(txn_summaries) = self.batch_to_txn_summaries.get(&batch_key) {
+                for txn_summary in txn_summaries {
+                    filtered_txns.insert(*txn_summary);
+                }
+            }
+        }
 
         let mut iters = vec![];
         for (_, batches) in self.author_to_batches.iter() {
@@ -401,19 +415,50 @@ impl ProofQueue {
                     } else if let Some(Some((proof, insertion_time))) =
                         self.batch_to_proof.get(&sort_key.batch_key)
                     {
+                        // Calculate the number of unique transactions if this batch is included in the result
+                        let temp_unique_txns = if let Some(txn_summaries) =
+                            self.batch_to_txn_summaries.get(&sort_key.batch_key)
+                        {
+                            cur_unique_txns
+                                + txn_summaries
+                                    .iter()
+                                    .filter(|txn_summary| {
+                                        !filtered_txns.contains(txn_summary)
+                                            && txn_summary.expiration_timestamp_secs
+                                                > self.latest_block_timestamp
+                                    })
+                                    .count() as u64
+                        } else {
+                            cur_unique_txns + batch.num_txns()
+                        };
                         if cur_bytes + batch.num_bytes() > max_bytes
-                            || cur_txns + batch.num_txns() > max_txns
+                            || temp_unique_txns > max_unique_txns
+                            || cur_all_txns + batch.num_txns() > max_txns
                         {
                             // Exceeded the limit for requested bytes or number of transactions.
                             full = true;
                             return false;
                         }
                         cur_bytes += batch.num_bytes();
-                        cur_txns += batch.num_txns();
+                        cur_all_txns += batch.num_txns();
+                        // Add this batch to filtered_txns and calculate the number of
+                        // unique transactions added in the result so far.
+                        cur_unique_txns += self
+                            .batch_to_txn_summaries
+                            .get(&sort_key.batch_key)
+                            .map_or(batch.num_txns(), |summaries| {
+                                summaries
+                                    .iter()
+                                    .filter(|summary| filtered_txns.insert(**summary))
+                                    .count() as u64
+                            });
                         let bucket = proof.gas_bucket_start();
                         ret.push(proof.clone());
                         counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
-                        if cur_bytes == max_bytes || cur_txns == max_txns {
+                        if cur_bytes == max_bytes
+                            || cur_all_txns == max_txns
+                            || cur_unique_txns == max_unique_txns
+                        {
                             full = true;
                             return false;
                         }
@@ -427,7 +472,8 @@ impl ProofQueue {
         info!(
             // before non full check
             byte_size = cur_bytes,
-            block_size = cur_txns,
+            block_total_txns = cur_all_txns,
+            block_unique_txns = cur_unique_txns,
             batch_count = ret.len(),
             full = full,
             return_non_full = return_non_full,
@@ -435,7 +481,10 @@ impl ProofQueue {
         );
 
         if full || return_non_full {
-            counters::BLOCK_SIZE_WHEN_PULL.observe(cur_txns as f64);
+            counters::BLOCK_SIZE_WHEN_PULL.observe(cur_unique_txns as f64);
+            counters::TOTAL_BLOCK_SIZE_WHEN_PULL.observe(cur_all_txns as f64);
+            counters::KNOWN_DUPLICATE_TXNS_WHEN_PULL
+                .observe((cur_all_txns.saturating_sub(cur_unique_txns)) as f64);
             counters::BLOCK_BYTES_WHEN_PULL.observe(cur_bytes as f64);
             counters::PROOF_SIZE_WHEN_PULL.observe(ret.len() as f64);
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
@@ -443,9 +492,9 @@ impl ProofQueue {
             self.log_remaining_data_after_pull(excluded_batches, &ret);
             // Stable sort, so the order of proofs within an author will not change.
             ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
-            (ret, !full)
+            (ret, cur_unique_txns, !full)
         } else {
-            (Vec::new(), !full)
+            (Vec::new(), 0, !full)
         }
     }
 
@@ -476,7 +525,7 @@ impl ProofQueue {
                             batches.remove(&key.batch_key);
                             !batches.is_empty()
                         });
-                        self.batches_with_txn_summary.remove(&key.batch_key);
+                        self.batch_to_txn_summaries.remove(&key.batch_key);
                         self.dec_remaining(&batch.author(), batch.num_txns());
                     }
                     claims::assert_some!(self.batch_to_proof.remove(&key.batch_key));
@@ -514,7 +563,7 @@ impl ProofQueue {
             self.batch_to_proof
                 .iter()
                 .map(|(batch_key, proof)| {
-                    if proof.is_some() && !self.batches_with_txn_summary.contains(batch_key) {
+                    if proof.is_some() && !self.batch_to_txn_summaries.contains_key(batch_key) {
                         1
                     } else {
                         0
@@ -546,7 +595,7 @@ impl ProofQueue {
                 self.dec_remaining(&batch.author(), batch.num_txns());
             }
             self.batch_to_proof.insert(batch_key.clone(), None);
-            self.batches_with_txn_summary.remove(&batch_key);
+            self.batch_to_txn_summaries.remove(&batch_key);
         }
         let batch_keys = batches
             .iter()

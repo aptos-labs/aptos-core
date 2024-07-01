@@ -51,6 +51,36 @@ impl fmt::Display for TransactionSummary {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, Hash, Ord, PartialOrd)]
+pub struct TransactionSynopsis {
+    pub sender: AccountAddress,
+    pub sequence_number: u64,
+    pub expiration_timestamp_secs: u64,
+    pub hash: HashValue,
+}
+
+impl TransactionSynopsis {
+    pub fn new(
+        sender: AccountAddress,
+        sequence_number: u64,
+        expiration_timestamp_secs: u64,
+        hash: HashValue,
+    ) -> Self {
+        Self {
+            sender,
+            sequence_number,
+            expiration_timestamp_secs,
+            hash,
+        }
+    }
+}
+
+impl fmt::Display for TransactionSynopsis {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.sender, self.sequence_number,)
+    }
+}
+
 #[derive(Clone)]
 pub struct TransactionInProgress {
     pub gas_unit_price: u64,
