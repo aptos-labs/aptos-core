@@ -115,7 +115,7 @@ def replay_verify_partition(
             "target/release/aptos-debugger",
             "aptos-db",
             "replay-verify",
-            # "--enable-storage-sharding",
+            "--enable-storage-sharding",
             *txns_to_skip_args,
             "--concurrent-downloads",
             "8",
