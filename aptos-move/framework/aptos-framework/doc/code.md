@@ -688,8 +688,8 @@ package.
 
     <b>let</b> registry = <b>borrow_global_mut</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(code_object_addr);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_mut">vector::for_each_mut</a>&lt;<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>&gt;(&<b>mut</b> registry.packages, |pack| {
-        <b>let</b> package_: &<b>mut</b> <a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a> = pack;
-        package_.upgrade_policy = <a href="code.md#0x1_code_upgrade_policy_immutable">upgrade_policy_immutable</a>();
+        <b>let</b> <b>package</b>: &<b>mut</b> <a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a> = pack;
+        <b>package</b>.upgrade_policy = <a href="code.md#0x1_code_upgrade_policy_immutable">upgrade_policy_immutable</a>();
     });
 }
 </code></pre>
