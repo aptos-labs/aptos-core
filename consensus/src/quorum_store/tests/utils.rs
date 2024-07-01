@@ -3,7 +3,7 @@
 
 use crate::quorum_store::utils::ProofQueue;
 use aptos_consensus_types::{
-    common::TransactionSynopsis,
+    common::TxnSummaryWithExpiration,
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
 };
 use aptos_crypto::HashValue;
@@ -116,7 +116,7 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     ];
     let info_1 = author_0_batches[0].info().clone();
     let info_2 = author_0_batches[3].info().clone();
-    proof_queue.add_batch_summaries(vec![(info_1, vec![TransactionSynopsis::new(
+    proof_queue.add_batch_summaries(vec![(info_1, vec![TxnSummaryWithExpiration::new(
         PeerId::ONE,
         1,
         10,
@@ -139,7 +139,7 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     }
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (8, 8));
 
-    proof_queue.add_batch_summaries(vec![(info_3, vec![TransactionSynopsis::new(
+    proof_queue.add_batch_summaries(vec![(info_3, vec![TxnSummaryWithExpiration::new(
         PeerId::ONE,
         1,
         10,
@@ -148,7 +148,7 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
 
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (7, 8));
 
-    proof_queue.add_batch_summaries(vec![(info_2, vec![TransactionSynopsis::new(
+    proof_queue.add_batch_summaries(vec![(info_2, vec![TxnSummaryWithExpiration::new(
         PeerId::ONE,
         2,
         10,
@@ -157,7 +157,7 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
 
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (7, 8));
 
-    proof_queue.add_batch_summaries(vec![(info_4, vec![TransactionSynopsis::new(
+    proof_queue.add_batch_summaries(vec![(info_4, vec![TxnSummaryWithExpiration::new(
         PeerId::ONE,
         2,
         10,
@@ -173,10 +173,10 @@ fn test_proof_pull_proofs_with_duplicates() {
     let mut proof_queue = ProofQueue::new(my_peer_id);
 
     let txns = vec![
-        TransactionSynopsis::new(PeerId::ONE, 0, 10, HashValue::zero()),
-        TransactionSynopsis::new(PeerId::ONE, 1, 10, HashValue::zero()),
-        TransactionSynopsis::new(PeerId::ONE, 2, 10, HashValue::zero()),
-        TransactionSynopsis::new(PeerId::ONE, 3, 10, HashValue::zero()),
+        TxnSummaryWithExpiration::new(PeerId::ONE, 0, 10, HashValue::zero()),
+        TxnSummaryWithExpiration::new(PeerId::ONE, 1, 10, HashValue::zero()),
+        TxnSummaryWithExpiration::new(PeerId::ONE, 2, 10, HashValue::zero()),
+        TxnSummaryWithExpiration::new(PeerId::ONE, 3, 10, HashValue::zero()),
     ];
 
     let author_0 = PeerId::random();

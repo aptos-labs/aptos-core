@@ -3,7 +3,7 @@
 
 use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
-    common::{TransactionInProgress, TransactionSummary, TransactionSynopsis},
+    common::{TransactionInProgress, TransactionSummary, TxnSummaryWithExpiration},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
 };
 use aptos_logger::prelude::*;
@@ -199,9 +199,9 @@ pub struct ProofQueue {
     // ProofOfStore and insertion_time. None if committed
     batch_to_proof: HashMap<BatchKey, Option<(ProofOfStore, Instant)>>,
     // Number of batches in which the txn_synopsis = (sender, sequence number, hash, expiration) has been included
-    txn_summary_num_occurrences: HashMap<TransactionSynopsis, u64>,
+    txn_summary_num_occurrences: HashMap<TxnSummaryWithExpiration, u64>,
     // List of transaction summaries for each batch
-    batch_to_txn_summaries: HashMap<BatchKey, Vec<TransactionSynopsis>>,
+    batch_to_txn_summaries: HashMap<BatchKey, Vec<TxnSummaryWithExpiration>>,
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
@@ -301,7 +301,7 @@ impl ProofQueue {
 
     pub(crate) fn add_batch_summaries(
         &mut self,
-        batch_summaries: Vec<(BatchInfo, Vec<TransactionSynopsis>)>,
+        batch_summaries: Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>,
     ) {
         let start = Instant::now();
         for (batch_info, txn_summaries) in batch_summaries {

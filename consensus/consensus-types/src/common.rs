@@ -52,14 +52,14 @@ impl fmt::Display for TransactionSummary {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, Hash, Ord, PartialOrd)]
-pub struct TransactionSynopsis {
+pub struct TxnSummaryWithExpiration {
     pub sender: AccountAddress,
     pub sequence_number: u64,
     pub expiration_timestamp_secs: u64,
     pub hash: HashValue,
 }
 
-impl TransactionSynopsis {
+impl TxnSummaryWithExpiration {
     pub fn new(
         sender: AccountAddress,
         sequence_number: u64,
@@ -75,7 +75,7 @@ impl TransactionSynopsis {
     }
 }
 
-impl fmt::Display for TransactionSynopsis {
+impl fmt::Display for TxnSummaryWithExpiration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.sender, self.sequence_number,)
     }
