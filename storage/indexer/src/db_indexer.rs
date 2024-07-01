@@ -245,7 +245,6 @@ impl DBIndexer {
         num_versions: u64,
         ledger_version: Version,
     ) -> Result<AccountTransactionVersionIter> {
-        self.ensure_cover_ledger_version(ledger_version)?;
         let mut iter = self.db.iter::<TransactionByAccountSchema>()?;
         iter.seek(&(address, min_seq_num))?;
         Ok(AccountTransactionVersionIter::new(
@@ -263,8 +262,6 @@ impl DBIndexer {
         ledger_version: Version,
         event_key: &EventKey,
     ) -> Result<Option<u64>> {
-        self.ensure_cover_ledger_version(ledger_version)?;
-
         let mut iter = self.db.iter::<EventByVersionSchema>()?;
         iter.seek_for_prev(&(*event_key, ledger_version, u64::max_value()))?;
 
@@ -289,7 +286,6 @@ impl DBIndexer {
             u64,     // index among events for the same transaction
         )>,
     > {
-        self.ensure_cover_ledger_version(ledger_version)?;
         let mut iter = self.db.iter::<EventByKeySchema>()?;
         iter.seek(&(*event_key, start_seq_num))?;
 
@@ -345,7 +341,6 @@ impl DBIndexer {
         limit: u64,
         ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
-        self.ensure_cover_ledger_version(ledger_version)?;
         self.get_events_by_event_key(event_key, start, order, limit, ledger_version)
     }
 
@@ -357,7 +352,6 @@ impl DBIndexer {
         limit: u64,
         ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
-        self.ensure_cover_ledger_version(ledger_version)?;
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
         let get_latest = order == Order::Descending && start_seq_num == u64::max_value();
 
@@ -425,7 +419,6 @@ impl DBIndexer {
         include_events: bool,
         ledger_version: Version,
     ) -> Result<AccountTransactionsWithProof> {
-        self.ensure_cover_ledger_version(ledger_version)?;
         error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
 
         let txns_with_proofs = self
@@ -449,7 +442,6 @@ impl DBIndexer {
         cursor: Option<&StateKey>,
         ledger_version: Version,
     ) -> Result<impl Iterator<Item = anyhow::Result<(StateKey, StateValue)>> + '_> {
-        self.ensure_cover_ledger_version(ledger_version)?;
         PrefixedStateValueIterator::new(
             self.main_db_reader.clone(),
             self.db.as_ref(),
