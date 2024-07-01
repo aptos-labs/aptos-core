@@ -547,6 +547,7 @@ impl Module {
         &self.module
     }
 
+    #[allow(dead_code)]
     pub(crate) fn arc_module(&self) -> Arc<CompiledModule> {
         self.module.clone()
     }

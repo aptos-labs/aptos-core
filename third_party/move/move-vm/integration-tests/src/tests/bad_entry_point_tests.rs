@@ -32,6 +32,7 @@ fn call_non_existent_module() {
             &fun_name,
             vec![],
             serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
+            &(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
         )
@@ -69,6 +70,7 @@ fn call_non_existent_function() {
             &fun_name,
             vec![],
             serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
+            &(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&storage),
         )

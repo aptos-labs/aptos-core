@@ -144,23 +144,26 @@ impl Harness {
 
     fn publish_module(
         &self,
-        session: &mut AsyncSession,
+        _session: &mut AsyncSession,
         id: &IdentStr,
-        gas: &mut GasStatus,
+        _gas: &mut GasStatus,
         done: &mut BTreeSet<Identifier>,
     ) -> anyhow::Result<()> {
         if done.insert(id.to_owned()) {
             let cu = self.module_cache.get(id).unwrap();
             if let CompiledUnit::Module(m) = cu {
                 for dep in &m.module.module_handles {
-                    let dep_id = m.module.identifier_at(dep.name);
-                    self.publish_module(session, dep_id, gas, done)?
+                    let _dep_id = m.module.identifier_at(dep.name);
+                    // FIXME(George): figure out what to do with async session -> it is an adapter!
+                    // self.publish_module(session, dep_id, gas, done)?
                 }
             }
             self.log(format!("publishing {}", id));
-            session
-                .get_move_session()
-                .publish_module(cu.serialize(None), test_account(), gas)?
+
+            // FIXME(George): same as above
+            // session
+            //     .get_move_session()
+            //     .verify_module_for_publication(cu.serialize(None), test_account(), gas)?
         }
         Ok(())
     }

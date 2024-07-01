@@ -6,16 +6,13 @@ use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
     loader::{LoadedFunction, ModuleStorageAdapter},
+    module_storage::ModuleStorage,
     module_traversal::TraversalContext,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    compatibility::Compatibility,
-    errors::*,
-    file_format::{AbilitySet, LocalIndex},
-};
+use move_binary_format::{compatibility::Compatibility, errors::*, file_format::LocalIndex};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
@@ -62,6 +59,7 @@ impl<'r, 'l> Session<'r, 'l> {
         &mut self,
         func: LoadedFunction,
         args: Vec<impl Borrow<[u8]>>,
+        _module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<()> {
@@ -94,6 +92,7 @@ impl<'r, 'l> Session<'r, 'l> {
         function_name: &IdentStr,
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
+        _module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<SerializedReturnValues> {
@@ -120,6 +119,7 @@ impl<'r, 'l> Session<'r, 'l> {
         &mut self,
         func: LoadedFunction,
         args: Vec<impl Borrow<[u8]>>,
+        _module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<SerializedReturnValues> {
@@ -155,6 +155,7 @@ impl<'r, 'l> Session<'r, 'l> {
         script: impl Borrow<[u8]>,
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
+        _module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<()> {
@@ -183,13 +184,14 @@ impl<'r, 'l> Session<'r, 'l> {
     ///
     /// In case an invariant violation occurs, the whole Session should be considered corrupted and
     /// one shall not proceed with effect generation.
-    pub fn publish_module(
+    pub fn verify_module_for_publication(
         &mut self,
         module: Vec<u8>,
         sender: AccountAddress,
+        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<()> {
-        self.publish_module_bundle(vec![module], sender, gas_meter)
+        self.verify_module_bundle_for_publication(vec![module], sender, module_storage, gas_meter)
     }
 
     /// Publish a series of modules.
@@ -207,10 +209,11 @@ impl<'r, 'l> Session<'r, 'l> {
     ///
     /// This operation performs compatibility checks if a module is replaced. See also
     /// `move_binary_format::compatibility`.
-    pub fn publish_module_bundle(
+    pub fn verify_module_bundle_for_publication(
         &mut self,
         _modules: Vec<Vec<u8>>,
         _sender: AccountAddress,
+        _module_storage: &impl ModuleStorage,
         _gas_meter: &mut impl GasMeter,
     ) -> VMResult<()> {
         unimplemented!()
@@ -225,10 +228,11 @@ impl<'r, 'l> Session<'r, 'l> {
     }
 
     /// Same like `publish_module_bundle` but with a custom compatibility check.
-    pub fn publish_module_bundle_with_compat_config(
+    pub fn verify_module_bundle_for_publication_with_compat_config(
         &mut self,
         _modules: Vec<Vec<u8>>,
         _sender: AccountAddress,
+        _module_storage: &impl ModuleStorage,
         _gas_meter: &mut impl GasMeter,
         _compat_config: Compatibility,
     ) -> VMResult<()> {
@@ -240,23 +244,6 @@ impl<'r, 'l> Session<'r, 'l> {
         //     &self.module_store,
         //     gas_meter,
         //     compat_config,
-        // )
-    }
-
-    pub fn publish_module_bundle_relax_compatibility(
-        &mut self,
-        _modules: Vec<Vec<u8>>,
-        _sender: AccountAddress,
-        _gas_meter: &mut impl GasMeter,
-    ) -> VMResult<()> {
-        unimplemented!()
-        // self.move_vm.runtime.publish_module_bundle(
-        //     modules,
-        //     sender,
-        //     &mut self.data_cache,
-        //     &self.module_store,
-        //     gas_meter,
-        //     Compatibility::no_check(),
         // )
     }
 
@@ -339,6 +326,7 @@ impl<'r, 'l> Session<'r, 'l> {
         module_id: &ModuleId,
         function_name: &IdentStr,
         expected_return_type: &Type,
+        _module_storage: &impl ModuleStorage,
     ) -> VMResult<LoadedFunction> {
         self.move_vm
             .runtime
@@ -358,6 +346,7 @@ impl<'r, 'l> Session<'r, 'l> {
         module_id: &ModuleId,
         function_name: &IdentStr,
         ty_args: &[TypeTag],
+        _module_storage: &impl ModuleStorage,
     ) -> VMResult<LoadedFunction> {
         self.move_vm.runtime.loader().load_function(
             module_id,
@@ -399,11 +388,6 @@ impl<'r, 'l> Session<'r, 'l> {
             .loader()
             .type_to_type_tag(ty)
             .map_err(|e| e.finish(Location::Undefined))
-    }
-
-    /// Gets the abilities for this type, at it's particular instantiation
-    pub fn get_type_abilities(&self, ty: &Type) -> VMResult<AbilitySet> {
-        ty.abilities().map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Gets the underlying native extensions.

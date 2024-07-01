@@ -141,6 +141,19 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             }
             named_address_mapping.insert(name, addr);
         }
+
+        let mut storage = InMemoryStorage::new();
+        for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
+            .into_iter()
+            .map(|tmod| &tmod.named_module.module)
+        {
+            let mut module_bytes = vec![];
+            module
+                .serialize_for_version(Some(file_format_common::VERSION_MAX), &mut module_bytes)
+                .unwrap();
+            storage.publish_or_overwrite_module(module.self_id(), module_bytes);
+        }
+
         let mut adapter = Self {
             compiled_state: CompiledState::new(
                 named_address_mapping,
@@ -151,31 +164,9 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             default_syntax,
             comparison_mode,
             run_config,
-            storage: InMemoryStorage::new(),
+            storage,
         };
 
-        adapter
-            .perform_session_action(None, |session, gas_status| {
-                for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
-                    .into_iter()
-                    .map(|tmod| &tmod.named_module.module)
-                {
-                    let mut module_bytes = vec![];
-                    module
-                        .serialize_for_version(
-                            Some(file_format_common::VERSION_MAX),
-                            &mut module_bytes,
-                        )
-                        .unwrap();
-                    let id = module.self_id();
-                    let sender = *id.address();
-                    session
-                        .publish_module(module_bytes, sender, gas_status)
-                        .unwrap();
-                }
-                Ok(())
-            })
-            .unwrap();
         let mut addr_to_name_mapping = BTreeMap::new();
         for (name, addr) in move_stdlib_named_addresses() {
             let prev = addr_to_name_mapping.insert(addr, Symbol::from(name));
@@ -215,9 +206,11 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 !extra_args.skip_check_friend_linking,
             );
 
-            session.publish_module_bundle_with_compat_config(
+            session.verify_module_bundle_for_publication_with_compat_config(
                 vec![module_bytes],
                 sender,
+                // FIXME(George): pass resolver here
+                &(),
                 gas_status,
                 compat,
             )
@@ -269,6 +262,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 script_bytes,
                 type_args,
                 args,
+                &(),
                 gas_status,
                 &mut TraversalContext::new(&traversal_storage),
             )
@@ -320,6 +314,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     function,
                     type_args,
                     args,
+                    &(),
                     gas_status,
                     &mut TraversalContext::new(&traversal_storage),
                 )

@@ -435,6 +435,7 @@ fn validate_and_construct(
         &constructor.module_id,
         constructor.func_name,
         expected_type,
+        &(),
     )?;
     let mut args = vec![];
     let ty_builder = session.get_ty_builder();
@@ -460,6 +461,7 @@ fn validate_and_construct(
     let serialized_result = session.execute_loaded_function(
         function,
         args,
+        &(),
         gas_meter,
         &mut TraversalContext::new(&storage),
     )?;

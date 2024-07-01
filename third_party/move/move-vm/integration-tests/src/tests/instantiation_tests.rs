@@ -118,7 +118,7 @@ fn instantiation_err() {
     let traversal_storage = TraversalStorage::new();
 
     session
-        .publish_module(mod_bytes, addr, &mut UnmeteredGasMeter)
+        .verify_module_for_publication(mod_bytes, addr, &(), &mut UnmeteredGasMeter)
         .expect("Module must publish");
 
     let mut ty_arg = TypeTag::U128;
@@ -132,13 +132,14 @@ fn instantiation_err() {
         }));
     }
 
-    let res = session.load_function(&cm.self_id(), ident_str!("f"), &[ty_arg]);
+    let res = session.load_function(&cm.self_id(), ident_str!("f"), &[ty_arg], &());
     assert!(res.is_ok());
     let function = res.unwrap();
 
     let err = session.execute_entry_function(
         function,
         Vec::<Vec<u8>>::new(),
+        &(),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
     );

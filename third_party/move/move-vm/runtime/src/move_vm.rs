@@ -11,10 +11,7 @@ use crate::{
     runtime::VMRuntime,
     session::Session,
 };
-use move_binary_format::{errors::VMResult, CompiledModule};
-use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-};
+use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_types::resolver::MoveResolver;
 use std::sync::Arc;
 
@@ -112,29 +109,6 @@ impl MoveVM {
             module_store: ModuleStorageAdapter::new(module_storage),
             native_extensions,
         }
-    }
-
-    /// Load a module into VM's code cache
-    pub fn load_module(
-        &self,
-        module_id: &ModuleId,
-        remote: &impl MoveResolver,
-    ) -> VMResult<Arc<CompiledModule>> {
-        self.runtime
-            .loader()
-            .load_module(
-                module_id,
-                &mut TransactionDataCache::new(
-                    self.runtime
-                        .loader()
-                        .vm_config()
-                        .deserializer_config
-                        .clone(),
-                    remote,
-                ),
-                &ModuleStorageAdapter::new(self.runtime.module_storage()),
-            )
-            .map(|arc_module| arc_module.arc_module())
     }
 
     /// Allows the adapter to announce to the VM that the code loading cache should be considered

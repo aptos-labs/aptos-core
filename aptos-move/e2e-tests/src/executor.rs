@@ -886,7 +886,12 @@ impl FakeExecutor {
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             // load function name into cache to ensure cache is hot
-            let _ = session.load_function(module, &Self::name(function_name), &type_params.clone());
+            let _ = session.load_function(
+                module,
+                &Self::name(function_name),
+                &type_params.clone(),
+                &(),
+            );
 
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
@@ -928,6 +933,7 @@ impl FakeExecutor {
                     &fun_name,
                     ty,
                     arg,
+                    &(),
                     regular.as_mut().unwrap(),
                     &mut TraversalContext::new(&storage),
                 ),
@@ -936,6 +942,7 @@ impl FakeExecutor {
                     &fun_name,
                     ty,
                     arg,
+                    &(),
                     unmetered.as_mut().unwrap(),
                     &mut TraversalContext::new(&storage),
                 ),
@@ -1000,6 +1007,7 @@ impl FakeExecutor {
                 &fun_name,
                 type_params,
                 args,
+                &(),
                 &mut StandardGasMeter::new(CalibrationAlgebra {
                     base: StandardGasAlgebra::new(
                         //// TODO: fill in these with proper values
@@ -1064,6 +1072,7 @@ impl FakeExecutor {
                     &Self::name(function_name),
                     type_params,
                     args,
+                    &(),
                     // TODO(Gas): we probably want to switch to metered execution in the future
                     &mut UnmeteredGasMeter,
                     &mut TraversalContext::new(&storage),
@@ -1124,6 +1133,7 @@ impl FakeExecutor {
                 &Self::name(function_name),
                 type_params,
                 args,
+                &(),
                 // TODO(Gas): we probably want to switch to metered execution in the future
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&storage),

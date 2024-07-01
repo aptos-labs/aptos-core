@@ -140,6 +140,7 @@ pub(crate) fn run_script_prologue(
             prologue_function_name,
             vec![],
             serialize_values(&args),
+            &(),
             &mut gas_meter,
             traversal_context,
         )
@@ -183,6 +184,7 @@ pub(crate) fn run_multisig_prologue(
                 MoveValue::Address(payload.multisig_address),
                 MoveValue::vector_u8(provided_payload),
             ]),
+            &(),
             &mut UnmeteredGasMeter,
             traversal_context,
         )
@@ -224,6 +226,7 @@ fn run_epilogue(
             func_name,
             vec![],
             serialize_values(&args),
+            &(),
             &mut UnmeteredGasMeter,
             traversal_context,
         )
@@ -244,6 +247,7 @@ fn run_epilogue(
             func_name,
             vec![],
             serialize_values(&args),
+            &(),
             &mut UnmeteredGasMeter,
             traversal_context,
         )
@@ -272,6 +276,7 @@ fn emit_fee_statement(
             EMIT_FEE_STATEMENT,
             vec![],
             vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
+            &(),
             &mut UnmeteredGasMeter,
             traversal_context,
         )

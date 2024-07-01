@@ -209,6 +209,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 &actor.initializer,
                 vec![],
                 Vec::<Vec<u8>>::new(),
+                &(),
                 gas_status,
                 &mut TraversalContext::new(&traversal_storage),
             )
@@ -307,6 +308,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 handler_id,
                 vec![],
                 args,
+                &(),
                 gas_status,
                 &mut TraversalContext::new(&traversal_storage),
             )

@@ -280,6 +280,7 @@ impl SharedTestingConfig {
             IdentStr::new(function_name).unwrap(),
             vec![], // no ty args, at least for now
             serialize_values(test_info.arguments.iter()),
+            &(),
             &mut gas_meter,
             &mut TraversalContext::new(&storage),
         );

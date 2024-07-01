@@ -142,6 +142,7 @@ impl AptosVM {
                 UPSERT_INTO_OBSERVED_JWKS,
                 vec![],
                 serialize_values(&args),
+                resolver,
                 &mut gas_meter,
                 &mut TraversalContext::new(&module_storage),
             )

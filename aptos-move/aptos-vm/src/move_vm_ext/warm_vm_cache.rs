@@ -11,11 +11,7 @@ use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{on_chain_config::OnChainConfig, state_store::state_key::StateKey};
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
-use move_core_types::{
-    ident_str,
-    language_storage::{ModuleId, CORE_CODE_ADDRESS},
-    vm_status::StatusCode,
-};
+use move_core_types::{language_storage::CORE_CODE_ADDRESS, vm_status::StatusCode};
 use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -79,7 +75,7 @@ impl WarmVmCache {
         }
     }
 
-    fn warm_vm_up(vm: &MoveVM, resolver: &impl AptosMoveResolver) {
+    fn warm_vm_up(_vm: &MoveVM, _resolver: &impl AptosMoveResolver) {
         let _timer = TIMER.timer_with(&["vm_warm_up"]);
 
         // Loading `0x1::account` and its transitive dependency into the code cache.
@@ -89,10 +85,12 @@ impl WarmVmCache {
         //
         // Loading up `0x1::account` should be sufficient as this is the most common module
         // used for prologue, epilogue and transfer functionality.
-        let _ = vm.load_module(
-            &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            resolver,
-        );
+
+        // FIXME(George): We do not need to warm it up anymore, or this has to be done elsewhere!
+        // let _ = vm.load_module(
+        //     &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
+        //     resolver,
+        // );
     }
 }
 

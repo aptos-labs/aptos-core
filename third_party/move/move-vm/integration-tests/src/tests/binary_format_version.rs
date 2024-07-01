@@ -30,16 +30,18 @@ fn test_publish_module_with_custom_max_binary_format_version() {
         ));
         let mut sess = vm.new_session(&storage);
 
-        sess.publish_module(
+        sess.verify_module_for_publication(
             b_new.clone(),
             *m.self_id().address(),
+            &(),
             &mut UnmeteredGasMeter,
         )
         .unwrap();
 
-        sess.publish_module(
+        sess.verify_module_for_publication(
             b_old.clone(),
             *m.self_id().address(),
+            &(),
             &mut UnmeteredGasMeter,
         )
         .unwrap();
@@ -64,9 +66,10 @@ fn test_publish_module_with_custom_max_binary_format_version() {
         let mut sess = vm.new_session(&storage);
 
         assert_eq!(
-            sess.publish_module(
+            sess.verify_module_for_publication(
                 b_new.clone(),
                 *m.self_id().address(),
+                &(),
                 &mut UnmeteredGasMeter,
             )
             .unwrap_err()
@@ -74,9 +77,10 @@ fn test_publish_module_with_custom_max_binary_format_version() {
             StatusCode::UNKNOWN_VERSION
         );
 
-        sess.publish_module(
+        sess.verify_module_for_publication(
             b_old.clone(),
             *m.self_id().address(),
+            &(),
             &mut UnmeteredGasMeter,
         )
         .unwrap();
@@ -108,6 +112,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             b_new.clone(),
             vec![],
             args.clone(),
+            &(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
         )
@@ -117,6 +122,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             b_old.clone(),
             vec![],
             args,
+            &(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
         )
@@ -147,6 +153,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
                 b_new.clone(),
                 vec![],
                 args.clone(),
+                &(),
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage)
             )
@@ -159,6 +166,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
             b_old.clone(),
             vec![],
             args,
+            &(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
         )

@@ -390,6 +390,7 @@ fn exec_function(
             &Identifier::new(function_name).unwrap(),
             ty_args,
             args,
+            &(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&storage),
         )
@@ -772,8 +773,10 @@ fn publish_package(session: &mut SessionExt, pack: &ReleasePackage) {
         .into_iter()
         .map(|(c, _)| c.to_vec())
         .collect::<Vec<_>>();
+
+    // FIXME(George): pass view here?
     session
-        .publish_module_bundle(code, addr, &mut UnmeteredGasMeter)
+        .verify_module_bundle_for_publication(code, addr, &(), &mut UnmeteredGasMeter)
         .unwrap_or_else(|e| {
             panic!(
                 "Failure publishing package `{}`: {:?}",

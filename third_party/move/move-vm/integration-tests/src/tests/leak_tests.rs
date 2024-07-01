@@ -59,6 +59,7 @@ fn leak_with_abort() {
             script_bytes.as_slice(),
             vec![],
             Vec::<Vec<u8>>::new(),
+            &(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
         );

@@ -112,6 +112,7 @@ impl AptosVM {
                 FINISH_WITH_DKG_RESULT,
                 vec![],
                 serialize_values(&args),
+                resolver,
                 &mut gas_meter,
                 &mut TraversalContext::new(&module_storage),
             )

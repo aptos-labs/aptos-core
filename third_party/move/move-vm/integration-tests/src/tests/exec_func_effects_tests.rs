@@ -104,6 +104,7 @@ fn run(
             &fun_name,
             vec![],
             serialize_values(&vec![arg_val0]),
+            &(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
         )

@@ -743,6 +743,7 @@ impl AptosVM {
             script.code(),
             script.ty_args().to_vec(),
             args,
+            resolver,
             gas_meter,
             traversal_context,
         )?;
@@ -784,8 +785,12 @@ impl AptosVM {
             )?;
         }
 
-        let function =
-            session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
+        let function = session.load_function(
+            entry_fn.module(),
+            entry_fn.function(),
+            entry_fn.ty_args(),
+            resolver,
+        )?;
 
         // The `has_randomness_attribute()` should have been feature-gated in 1.11...
         if function.is_friend_or_private()
@@ -806,7 +811,7 @@ impl AptosVM {
             &function,
             struct_constructors_enabled,
         )?;
-        session.execute_entry_function(function, args, gas_meter, traversal_context)?;
+        session.execute_entry_function(function, args, resolver, gas_meter, traversal_context)?;
         Ok(())
     }
 
@@ -1059,6 +1064,7 @@ impl AptosVM {
                         MoveValue::Address(txn_payload.multisig_address),
                         MoveValue::vector_u8(provided_payload),
                     ]),
+                    &(),
                     gas_meter,
                     traversal_context,
                 )
@@ -1153,6 +1159,7 @@ impl AptosVM {
                             SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP,
                             vec![],
                             cleanup_args,
+                            &(),
                             &mut UnmeteredGasMeter,
                             traversal_context,
                         )
@@ -1284,6 +1291,7 @@ impl AptosVM {
                     FAILED_TRANSACTION_EXECUTION_CLEANUP,
                     vec![],
                     cleanup_args,
+                    &(),
                     &mut UnmeteredGasMeter,
                     traversal_context,
                 )
@@ -1310,7 +1318,8 @@ impl AptosVM {
                 continue;
             }
             *new_published_modules_loaded = true;
-            let init_function = session.load_function(&module.self_id(), init_func_name, &[]);
+            // FIXME(George): Here we pass tmp view!
+            let init_function = session.load_function(&module.self_id(), init_func_name, &[], &());
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
             // Note that for historic reasons, verification here is treated
@@ -1327,6 +1336,8 @@ impl AptosVM {
                         init_func_name,
                         vec![],
                         args,
+                        // FIXME(George): this must be tmp storage
+                        &(),
                         gas_meter,
                         traversal_context,
                     )?;
@@ -2071,6 +2082,7 @@ impl AptosVM {
                 BLOCK_PROLOGUE,
                 vec![],
                 args,
+                &(),
                 &mut gas_meter,
                 &mut TraversalContext::new(&storage),
             )
@@ -2150,6 +2162,7 @@ impl AptosVM {
                 BLOCK_PROLOGUE_EXT,
                 vec![],
                 serialize_values(&args),
+                resolver,
                 &mut gas_meter,
                 &mut TraversalContext::new(&storage),
             )
@@ -2251,7 +2264,7 @@ impl AptosVM {
     ) -> anyhow::Result<Vec<Vec<u8>>> {
         let mut session = vm.new_session(resolver, SessionId::Void, None);
 
-        let func = session.load_function(&module_id, &func_name, &type_args)?;
+        let func = session.load_function(&module_id, &func_name, &type_args, resolver)?;
         let metadata = vm.extract_module_metadata(resolver, &module_id);
         let arguments = verifier::view_function::validate_view_function(
             &mut session,
@@ -2270,6 +2283,7 @@ impl AptosVM {
                 func_name.as_ident_str(),
                 type_args,
                 arguments,
+                &(),
                 gas_meter,
                 &mut TraversalContext::new(&storage),
             )
@@ -2699,6 +2713,7 @@ fn create_account_if_does_not_exist(
             CREATE_ACCOUNT_IF_DOES_NOT_EXIST,
             vec![],
             serialize_values(&vec![MoveValue::Address(account)]),
+            &(),
             gas_meter,
             traversal_context,
         )

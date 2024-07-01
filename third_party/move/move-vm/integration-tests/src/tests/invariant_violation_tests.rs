@@ -84,6 +84,7 @@ fn merge_borrow_states_infinite_loop() {
             script_bytes.as_slice(),
             vec![],
             Vec::<Vec<u8>>::new(),
+            &(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
         )

@@ -174,6 +174,7 @@ fn main() -> Result<()> {
             script_blob,
             vec![],
             args,
+            &(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
         )?;
@@ -182,17 +183,20 @@ fn main() -> Result<()> {
         let mut module_blob = vec![];
         module.serialize(&mut module_blob)?;
 
-        sess.publish_module(
-            module_blob,
-            *module.self_id().address(),
-            &mut UnmeteredGasMeter,
-        )?;
+        // FIXME(George): We should not publish here, but use storage
+        // sess.publish_module(
+        //     module_blob,
+        //     *module.self_id().address(),
+        //     &mut UnmeteredGasMeter,
+        // )?;
+
         let args: Vec<Vec<u8>> = vec![];
         let res = sess.execute_function_bypass_visibility(
             &module.self_id(),
             ident_str!("run"),
             vec![],
             args,
+            &(),
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
         )?;
