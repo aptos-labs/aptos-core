@@ -29,7 +29,7 @@ use std::{
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
-        .num_threads(200)//32)
+        .num_threads(60)//32)
         .thread_name(|index| format!("kv_reader_{}", index))
         .build()
         .unwrap()

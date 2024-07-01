@@ -11,7 +11,7 @@ use once_cell::sync::{Lazy, OnceCell};
 use rayon::ThreadPool;
 use std::cmp::max;
 
-pub static MAX_THREAD_POOL_SIZE: usize = 200;// 32;
+pub static MAX_THREAD_POOL_SIZE: usize = 32;
 
 pub static THREAD_MANAGER: Lazy<Box<dyn ThreadManager>> = Lazy::new(|| {
     ThreadManagerBuilder::create_thread_manager(ThreadManagerBuilder::get_thread_config_strategy())
@@ -74,5 +74,6 @@ impl ThreadManagerBuilder {
 /// too few tasks which leads to under utilization of threads.
 static OPTIMAL_MAX_PARALLELISM: usize = MAX_THREAD_POOL_SIZE * 4;
 pub fn optimal_min_len(num_tasks: usize, min_threshold: usize) -> usize {
-    max(min_threshold, num_tasks / OPTIMAL_MAX_PARALLELISM)
+    16
+    //max(min_threshold, num_tasks / OPTIMAL_MAX_PARALLELISM)
 }
