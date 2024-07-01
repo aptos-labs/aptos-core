@@ -12,6 +12,7 @@ use aptos_types::{
 use aptos_validator_interface::{AptosValidatorInterface, DebuggerStateView};
 use std::{
     collections::HashMap,
+    ops::DerefMut,
     sync::{Arc, Mutex},
 };
 
@@ -20,7 +21,6 @@ pub struct DataStateView {
     code_data: Option<FakeDataStore>,
     data_read_state_keys: Option<Arc<Mutex<HashMap<StateKey, StateValue>>>>,
 }
-use std::ops::DerefMut;
 
 impl DataStateView {
     pub fn new(

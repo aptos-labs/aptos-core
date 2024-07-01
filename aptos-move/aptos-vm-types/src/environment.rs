@@ -89,16 +89,6 @@ impl Environment {
         ))
     }
 
-    pub fn with_features_for_testing(self, features: Features) -> Arc<Self> {
-        let ty_builder = aptos_default_ty_builder(&features);
-        Arc::new(Self::initialize(
-            features,
-            self.timed_features,
-            self.chain_id,
-            ty_builder,
-        ))
-    }
-
     pub fn try_enable_delayed_field_optimization(mut self) -> Self {
         if self.features.is_aggregator_v2_delayed_fields_enabled() {
             self.vm_config.delayed_field_optimization_enabled = true;
