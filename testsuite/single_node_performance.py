@@ -89,7 +89,7 @@ TESTS = [
     RunGroupConfig(expected_tps=21300, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=12800, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=36820, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=41479, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=9000, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=27873, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=18600, key=RunGroupKey("account-resource32-b"), included_in=Flow.CONTINUOUS),

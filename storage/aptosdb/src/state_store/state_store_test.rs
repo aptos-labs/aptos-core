@@ -58,7 +58,6 @@ fn put_value_set(
             None,
             &ledger_batch,
             &sharded_state_kv_batches,
-            &state_kv_metadata_batch,
             /*put_state_value_indices=*/ false,
             /*skip_usage=*/ false,
             /*last_checkpoint_index=*/ None,

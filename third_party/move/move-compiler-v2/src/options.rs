@@ -6,8 +6,14 @@ use crate::experiments::{DefaultValue, EXPERIMENTS};
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_command_line_common::env::read_env_var;
-use move_compiler::command_line as cli;
+use move_command_line_common::env::{bool_to_str, read_env_var};
+use move_compiler::{
+    command_line as cli,
+    shared::{
+        move_compiler_warn_of_deprecation_use_env_var,
+        warn_of_deprecation_use_in_aptos_libs_env_var,
+    },
+};
 use move_model::metadata::LanguageVersion;
 use once_cell::sync::Lazy;
 use std::{
@@ -25,29 +31,36 @@ pub struct Options {
         num_args = 0..
     )]
     pub dependencies: Vec<String>,
+
     /// Named address mapping.
     #[clap(
         short,
         num_args = 0..
     )]
     pub named_address_mapping: Vec<String>,
+
     /// Output directory.
     #[clap(short, long, default_value = "")]
     pub output_dir: String,
+
     /// The language version to use.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
+
     /// Do not complain about unknown attributes in Move code.
     #[clap(long, default_value = "false")]
     pub skip_attribute_checks: bool,
+
     /// Known attributes for this dialect of move; if empty, assumes third-party Move.
     /// Only used if skip_attribute_checks is false.
     #[clap(skip)]
     pub known_attributes: BTreeSet<String>,
+
     /// Whether we generate code for tests. This specifically guarantees stable output
     /// for baseline testing.
     #[clap(long)]
     pub testing: bool,
+
     /// Active experiments. Experiments alter default behavior of the compiler.
     /// See `Experiment` struct.
     #[clap(short)]
@@ -56,31 +69,52 @@ pub struct Options {
         num_args = 0..
     )]
     pub experiments: Vec<String>,
+
     /// A transient cache for memoization of experiment checks.
     #[clap(skip)]
     pub experiment_cache: RefCell<BTreeMap<String, bool>>,
+
     /// Sources to compile (positional arg, therefore last).
     /// Each source should be a path to either (1) a Move file or (2) a directory containing Move
     /// files, all to be compiled (e.g., not the root directory of a package---which contains
     /// Move.toml---but a specific subdirectorysuch as `sources`, `scripts`, and/or `tests`,
     /// depending on compilation mode).
     pub sources: Vec<String>,
+
     /// Dependencies to compile but not treat as a test/docgen/warning/prover target.
     /// Each source_dep should be a path to either (1) a Move file or (2) a directory containing
     /// Move files, all to be compiled (e.g., not the root directory of a package---which contains
     /// Move.toml---but a specific subdirectorysuch as `sources`).
     #[clap(skip)]
     pub sources_deps: Vec<String>,
+
+    #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG,
+           default_value=bool_to_str(move_compiler_warn_of_deprecation_use_env_var()))]
+    pub warn_deprecated: bool,
+
+    /// Show warnings about use of deprecated usage in the Aptos libraries,
+    /// which we should generally not bother users with.
+    /// Note that current value of this constant is "Wdeprecation-aptos"
+    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG,
+           default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
+    pub warn_of_deprecation_use_in_aptos_libs: bool,
+
     /// Show warnings about unused functions, fields, constants, etc.
     /// Note that the current value of this constant is "Wunused"
     #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
     pub warn_unused: bool,
+
     /// Whether to compile everything, including dependencies.
     #[clap(long)]
     pub whole_program: bool,
+
     /// Whether to compile #[test] and #[test_only] code
     #[clap(skip)]
     pub compile_test_code: bool,
+
+    /// Whether to compile #[verify_only] code
+    #[clap(skip)]
+    pub compile_verify_code: bool,
 }
 
 impl Default for Options {
@@ -166,6 +200,34 @@ impl Options {
     pub fn set_compile_test_code(self, value: bool) -> Self {
         Self {
             compile_test_code: value,
+            ..self
+        }
+    }
+
+    pub fn set_compile_verify_code(self, value: bool) -> Self {
+        Self {
+            compile_verify_code: value,
+            ..self
+        }
+    }
+
+    pub fn set_warn_deprecated(self, value: bool) -> Self {
+        Self {
+            warn_deprecated: value,
+            ..self
+        }
+    }
+
+    pub fn set_warn_of_deprecation_use_in_aptos_libs(self, value: bool) -> Self {
+        Self {
+            warn_of_deprecation_use_in_aptos_libs: value,
+            ..self
+        }
+    }
+
+    pub fn set_warn_unused(self, value: bool) -> Self {
+        Self {
+            warn_unused: value,
             ..self
         }
     }

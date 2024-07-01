@@ -171,7 +171,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
-        if self.env().language_version() < version_min {
+        if !self.env().language_version().is_at_least(version_min) {
             self.env().error(
                 loc,
                 &format!(

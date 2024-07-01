@@ -1,0 +1,5 @@
+warning: Unused assignment to `old_i`. Consider removing or prefixing with an underscore: `_old_i`
+  ┌─ tests/sources/regression/bug_828.move:4:21
+  │
+4 │         let old_i = i;
+  │                     ^

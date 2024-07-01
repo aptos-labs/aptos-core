@@ -34,15 +34,14 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     move_utils::MemberId,
-    on_chain_config::{AptosVersion, FeatureFlag, Features, OnChainConfig, ValidatorSet},
+    on_chain_config::{AptosVersion, OnChainConfig, ValidatorSet},
     state_store::{state_key::StateKey, state_value::StateValue, StateView, TStateView},
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, EntryFunction, ExecutionStatus, SignedTransaction, Transaction,
-        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
-        ViewFunctionOutput,
+        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::WriteSet,
@@ -50,9 +49,9 @@ use aptos_types::{
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
-    gas::{get_gas_parameters, make_prod_gas_meter},
-    move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionId},
-    verifier, AptosVM, VMValidator,
+    gas::make_prod_gas_meter,
+    move_vm_ext::{MoveVmExt, SessionId},
+    AptosVM, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -1094,72 +1093,6 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) {
         self.exec_module(&Self::module(module_name), function_name, type_params, args)
-    }
-
-    pub fn try_exec_entry_with_state_view(
-        &mut self,
-        senders: Vec<AccountAddress>,
-        entry_fn: &EntryFunction,
-        state_view: &impl AptosMoveResolver,
-        features: Features,
-    ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-        let (gas_params, storage_gas_params, gas_feature_version) =
-            get_gas_parameters(&features, state_view);
-
-        let are_struct_constructors_enabled = features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
-        let env = self
-            .env
-            .as_ref()
-            .clone()
-            .with_features_for_testing(features);
-
-        let vm = MoveVmExt::new(
-            LATEST_GAS_FEATURE_VERSION,
-            gas_params.as_ref(),
-            env,
-            state_view,
-        );
-
-        let mut session = vm.new_session(state_view, SessionId::void(), None);
-        let func =
-            session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
-        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-            &mut session,
-            senders,
-            entry_fn.args().to_vec(),
-            &func,
-            are_struct_constructors_enabled,
-        )?;
-
-        let mut gas_meter = make_prod_gas_meter(
-            gas_feature_version,
-            gas_params.unwrap().clone().vm,
-            storage_gas_params.unwrap(),
-            false,
-            10_000_000_000_000.into(),
-        );
-
-        let storage = TraversalStorage::new();
-        session
-            .execute_entry_function(
-                func,
-                args,
-                &mut gas_meter,
-                &mut TraversalContext::new(&storage),
-            )
-            .map_err(|e| e.into_vm_status())?;
-
-        let mut change_set = session
-            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
-                LATEST_GAS_FEATURE_VERSION,
-            ))
-            .expect("Failed to generate txn effects");
-        change_set.try_materialize_aggregator_v1_delta_set(state_view)?;
-        let (write_set, events) = change_set
-            .try_into_storage_change_set()
-            .expect("Failed to convert to ChangeSet")
-            .into_inner();
-        Ok((write_set, events))
     }
 
     pub fn try_exec(
