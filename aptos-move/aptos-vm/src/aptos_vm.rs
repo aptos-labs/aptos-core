@@ -506,6 +506,9 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
     ) -> Result<VMOutput, VMStatus> {
+        // Storage refund is zero since no slots are deleted in aborted transactions.
+        const ZERO_STORAGE_REFUND: u64 = 0;
+
         let is_account_init_for_sponsored_transaction =
             is_account_init_for_sponsored_transaction(txn_data, self.features(), resolver)?;
 
@@ -556,9 +559,8 @@ impl AptosVM {
                     );
                 };
 
-                let fee_statement = AptosVM::fee_statement_from_gas_meter(
-                    txn_data, gas_meter, /*storage_fee_refund = */ 0,
-                );
+                let fee_statement =
+                    AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
 
                 // Verify we charged sufficiently for creating an account slot
                 let gas_params = get_or_vm_startup_failure(&self.gas_params, log_context)?;
@@ -587,9 +589,8 @@ impl AptosVM {
                 }
                 (abort_hook_session_change_set, fee_statement)
             } else {
-                let fee_statement = AptosVM::fee_statement_from_gas_meter(
-                    txn_data, gas_meter, /*storage_fee_refund = */ 0,
-                );
+                let fee_statement =
+                    AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
                 (prologue_session_change_set, fee_statement)
             };
 

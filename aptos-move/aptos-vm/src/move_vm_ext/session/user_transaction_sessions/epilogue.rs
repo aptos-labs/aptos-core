@@ -115,7 +115,7 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
         let (change_set, empty_module_write_set) =
             session.finish_with_squashed_change_set(change_set_configs, true)?;
         let epilogue_session_change_set =
-            SystemSessionChangeSet::new(change_set, change_set_configs)?;
+            UserSessionChangeSet::new(change_set, module_write_set, change_set_configs)?;
 
         // Epilogue can never publish modules! When we move publishing outside MoveVM, we do not need to have
         // this check here, as modules will only be visible in user session.
@@ -127,8 +127,9 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
                     .into_vm_status()
             })?;
 
+        let (change_set, module_write_set) = epilogue_session_change_set.unpack();
         Ok(VMOutput::new(
-            epilogue_session_change_set.unpack(),
+            change_set,
             module_write_set,
             fee_statement,
             TransactionStatus::Keep(execution_status),
