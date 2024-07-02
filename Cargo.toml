@@ -37,11 +37,15 @@ members = [
     "aptos-move/package-builder",
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
+    "aptos-node",
     "aptos-utils",
     "config",
     "config/global-constants",
+    "consensus",
     "consensus/consensus-types",
     "consensus/safety-rules",
+    "crates/aptos",
+    "crates/aptos-admin-service",
     "crates/aptos-api-tester",
     "crates/aptos-bcs-utils",
     "crates/aptos-bitvec",
@@ -61,6 +65,7 @@ members = [
     "crates/aptos-github-client",
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
+    "crates/aptos-inspection-service",
     "crates/aptos-jwk-consensus",
     "crates/aptos-keygen",
     "crates/aptos-ledger",
@@ -267,7 +272,9 @@ rust-version = "1.78.0"
 [workspace.dependencies]
 # Internal crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
+aptos = { path = "crates/aptos" }
 aptos-accumulator = { path = "storage/accumulator" }
+aptos-admin-service = { path = "crates/aptos-admin-service" }
 aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
 aptos-api = { path = "api" }
 aptos-api-test-context = { path = "api/test-context" }
@@ -284,6 +291,7 @@ aptos-channels = { path = "crates/channel" }
 aptos-cli-common = { path = "crates/aptos-cli-common" }
 aptos-collections = { path = "crates/aptos-collections" }
 aptos-compression = { path = "crates/aptos-compression" }
+aptos-consensus = { path = "consensus" }
 aptos-consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
 aptos-consensus-types = { path = "consensus/consensus-types" }
 aptos-config = { path = "config" }
@@ -336,6 +344,7 @@ aptos-indexer-grpc-in-memory-cache-benchmark = { path = "ecosystem/indexer-grpc/
 aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
 aptos-infallible = { path = "crates/aptos-infallible" }
+aptos-inspection-service = { path = "crates/aptos-inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
 aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
 aptos-jwk-utils = { path = "crates/jwk-utils" }
