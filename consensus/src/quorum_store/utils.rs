@@ -439,7 +439,11 @@ impl ProofQueue {
                             .map_or(batch.num_txns(), |summaries| {
                                 summaries
                                     .iter()
-                                    .filter(|summary| filtered_txns.insert(**summary))
+                                    .filter(|summary| {
+                                        filtered_txns.insert(**summary)
+                                            && summary.expiration_timestamp_secs
+                                                > self.latest_block_timestamp
+                                    })
                                     .count() as u64
                             });
                         let bucket = proof.gas_bucket_start();
