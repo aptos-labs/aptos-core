@@ -406,7 +406,7 @@ impl ProofQueue {
                         self.batch_to_proof.get(&sort_key.batch_key)
                     {
                         // Calculate the number of unique transactions if this batch is included in the result
-                        let temp_unique_txns = if let Some(txn_summaries) =
+                        let unique_txns = if let Some(txn_summaries) =
                             self.batch_to_txn_summaries.get(&sort_key.batch_key)
                         {
                             cur_unique_txns
@@ -422,7 +422,7 @@ impl ProofQueue {
                             cur_unique_txns + batch.num_txns()
                         };
                         if cur_bytes + batch.num_bytes() > max_bytes
-                            || temp_unique_txns > max_unique_txns
+                            || unique_txns > max_unique_txns
                             || cur_all_txns + batch.num_txns() > max_txns
                         {
                             // Exceeded the limit for requested bytes or number of transactions.
