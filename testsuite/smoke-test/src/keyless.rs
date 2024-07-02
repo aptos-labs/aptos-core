@@ -61,6 +61,7 @@ async fn test_keyless_oidc_txn_verifies() {
 
 #[tokio::test]
 async fn test_keyless_rotate_vk() {
+    // TODO: try generating VK programatically here
     let (tw_sk, config, jwk, mut swarm, mut cli, root_idx) = setup_local_net().await;
     let mut info = swarm.aptos_public_info();
 
