@@ -34,9 +34,9 @@ This module provides the foundation for transferring of Tokens
     -  [Function `cancel_offer`](#@Specification_1_cancel_offer)
 
 
-<pre><code><b>use</b> <a href="../../aptos-framework/doc/account.md#0x1_account">0x1::account</a>;
+<pre><code><b>use</b> <a href="">0x1::account</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../aptos-framework/doc/event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="">0x1::event</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -69,19 +69,19 @@ This module provides the foundation for transferring of Tokens
 
 </dd>
 <dt>
-<code>offer_events: <a href="../../aptos-framework/doc/event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">token_transfers::TokenOfferEvent</a>&gt;</code>
+<code>offer_events: <a href="_EventHandle">event::EventHandle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">token_transfers::TokenOfferEvent</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>cancel_offer_events: <a href="../../aptos-framework/doc/event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">token_transfers::TokenCancelOfferEvent</a>&gt;</code>
+<code>cancel_offer_events: <a href="_EventHandle">event::EventHandle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">token_transfers::TokenCancelOfferEvent</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>claim_events: <a href="../../aptos-framework/doc/event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">token_transfers::TokenClaimEvent</a>&gt;</code>
+<code>claim_events: <a href="_EventHandle">event::EventHandle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">token_transfers::TokenClaimEvent</a>&gt;</code>
 </dt>
 <dd>
 
@@ -97,7 +97,7 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<pre><code>#[<a href="">event</a>]
 <b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenOfferId">TokenOfferId</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
@@ -131,7 +131,7 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<pre><code>#[<a href="">event</a>]
 <b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenOffer">TokenOffer</a> <b>has</b> drop, store
 </code></pre>
 
@@ -171,7 +171,7 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<pre><code>#[<a href="">event</a>]
 <b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a> <b>has</b> drop, store
 </code></pre>
 
@@ -211,7 +211,7 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<pre><code>#[<a href="">event</a>]
 <b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a> <b>has</b> drop, store
 </code></pre>
 
@@ -251,7 +251,7 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<pre><code>#[<a href="">event</a>]
 <b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenCancelOffer">TokenCancelOffer</a> <b>has</b> drop, store
 </code></pre>
 
@@ -291,7 +291,7 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<pre><code>#[<a href="">event</a>]
 <b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a> <b>has</b> drop, store
 </code></pre>
 
@@ -331,7 +331,7 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<pre><code>#[<a href="">event</a>]
 <b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenClaim">TokenClaim</a> <b>has</b> drop, store
 </code></pre>
 
@@ -386,7 +386,7 @@ Token offer doesn't exist
 
 
 
-<pre><code><b>fun</b> <a href="token_transfers.md#0x3_token_transfers_initialize_token_transfers">initialize_token_transfers</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>fun</b> <a href="token_transfers.md#0x3_token_transfers_initialize_token_transfers">initialize_token_transfers</a>(<a href="">account</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -395,14 +395,14 @@ Token offer doesn't exist
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="token_transfers.md#0x3_token_transfers_initialize_token_transfers">initialize_token_transfers</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>fun</b> <a href="token_transfers.md#0x3_token_transfers_initialize_token_transfers">initialize_token_transfers</a>(<a href="">account</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <b>move_to</b>(
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        <a href="">account</a>,
         <a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a> {
             pending_claims: <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenOfferId">TokenOfferId</a>, Token&gt;(),
-            offer_events: <a href="../../aptos-framework/doc/account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a>&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>),
-            cancel_offer_events: <a href="../../aptos-framework/doc/account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a>&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>),
-            claim_events: <a href="../../aptos-framework/doc/account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a>&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>),
+            offer_events: <a href="_new_event_handle">account::new_event_handle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a>&gt;(<a href="">account</a>),
+            cancel_offer_events: <a href="_new_event_handle">account::new_event_handle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a>&gt;(<a href="">account</a>),
+            claim_events: <a href="_new_event_handle">account::new_event_handle</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a>&gt;(<a href="">account</a>),
         }
     )
 }
@@ -510,7 +510,7 @@ Token offer doesn't exist
     };
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
+        <a href="_emit">event::emit</a>(
             <a href="token_transfers.md#0x3_token_transfers_TokenOffer">TokenOffer</a> {
                 to_address: receiver,
                 token_id,
@@ -518,7 +518,7 @@ Token offer doesn't exist
             }
         )
     };
-    <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a>&gt;(
+    <a href="_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a>&gt;(
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).offer_events,
         <a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a> {
             to_address: receiver,
@@ -595,7 +595,7 @@ Token offer doesn't exist
     <a href="token.md#0x3_token_deposit_token">token::deposit_token</a>(receiver, tokens);
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
+        <a href="_emit">event::emit</a>(
             <a href="token_transfers.md#0x3_token_transfers_TokenClaim">TokenClaim</a> {
                 to_address: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver),
                 token_id,
@@ -603,7 +603,7 @@ Token offer doesn't exist
             }
         )
     };
-    <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a>&gt;(
+    <a href="_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a>&gt;(
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender).claim_events,
         <a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a> {
             to_address: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver),
@@ -680,7 +680,7 @@ Token offer doesn't exist
     <a href="token.md#0x3_token_deposit_token">token::deposit_token</a>(sender, <a href="token.md#0x3_token">token</a>);
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
+        <a href="_emit">event::emit</a>(
             <a href="token_transfers.md#0x3_token_transfers_TokenCancelOffer">TokenCancelOffer</a> {
                 to_address: receiver,
                 token_id,
@@ -688,7 +688,7 @@ Token offer doesn't exist
             },
         )
     };
-    <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a>&gt;(
+    <a href="_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a>&gt;(
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).cancel_offer_events,
         <a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a> {
             to_address: receiver,
@@ -720,7 +720,7 @@ Token offer doesn't exist
 ### Function `initialize_token_transfers`
 
 
-<pre><code><b>fun</b> <a href="token_transfers.md#0x3_token_transfers_initialize_token_transfers">initialize_token_transfers</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>fun</b> <a href="token_transfers.md#0x3_token_transfers_initialize_token_transfers">initialize_token_transfers</a>(<a href="">account</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -737,13 +737,13 @@ Abort according to the code
 
 
 <pre><code><b>schema</b> <a href="token_transfers.md#0x3_token_transfers_InitializeTokenTransfersAbortsIf">InitializeTokenTransfersAbortsIf</a> {
-    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
-    <b>let</b> addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <a href="">account</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    <b>let</b> addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="">account</a>);
     <b>aborts_if</b> <b>exists</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(addr);
-    <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = <b>global</b>&lt;Account&gt;(addr);
+    <b>let</b> <a href="">account</a> = <b>global</b>&lt;Account&gt;(addr);
     <b>aborts_if</b> !<b>exists</b>&lt;Account&gt;(addr);
-    <b>aborts_if</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>.guid_creation_num + 3 &gt;= <a href="../../aptos-framework/doc/account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
-    <b>aborts_if</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>.guid_creation_num + 3 &gt; MAX_U64;
+    <b>aborts_if</b> <a href="">account</a>.guid_creation_num + 3 &gt;= <a href="_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
+    <b>aborts_if</b> <a href="">account</a>.guid_creation_num + 3 &gt; MAX_U64;
 }
 </code></pre>
 
@@ -795,7 +795,7 @@ Abort according to the code
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>let</b> sender_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
-<b>include</b> !<b>exists</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr) ==&gt; <a href="token_transfers.md#0x3_token_transfers_InitializeTokenTransfersAbortsIf">InitializeTokenTransfersAbortsIf</a>{<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> : sender};
+<b>include</b> !<b>exists</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr) ==&gt; <a href="token_transfers.md#0x3_token_transfers_InitializeTokenTransfersAbortsIf">InitializeTokenTransfersAbortsIf</a>{<a href="">account</a> : sender};
 <b>let</b> pending_claims = <b>global</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).pending_claims;
 <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(receiver, token_id);
 <b>let</b> tokens = <b>global</b>&lt;TokenStore&gt;(sender_addr).tokens;
@@ -853,7 +853,7 @@ Get the amount from sender token
 <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver), token_id);
 <b>aborts_if</b> !<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_claims, token_offer_id);
 <b>let</b> tokens = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pending_claims, token_offer_id);
-<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a>{<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: receiver };
+<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a>{<a href="">account</a>: receiver };
 <b>let</b> account_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver);
 <b>let</b> <a href="token.md#0x3_token">token</a> = tokens;
 <b>let</b> token_store = <b>global</b>&lt;TokenStore&gt;(account_addr);
@@ -881,7 +881,7 @@ Get the amount from sender token
 <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver), token_id);
 <b>aborts_if</b> !<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_claims, token_offer_id);
 <b>let</b> tokens = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pending_claims, token_offer_id);
-<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a>{<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: receiver };
+<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a>{<a href="">account</a>: receiver };
 <b>let</b> account_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver);
 <b>let</b> <a href="token.md#0x3_token">token</a> = tokens;
 <b>let</b> token_store = <b>global</b>&lt;TokenStore&gt;(account_addr);
@@ -910,7 +910,7 @@ Get the amount from sender token
 <b>let</b> pending_claims = <b>global</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).pending_claims;
 <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(receiver, token_id);
 <b>aborts_if</b> !<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_claims, token_offer_id);
-<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a>{<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: sender };
+<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a>{<a href="">account</a>: sender };
 <b>let</b> dst_token = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pending_claims, token_offer_id);
 <b>let</b> account_addr = sender_addr;
 <b>let</b> <a href="token.md#0x3_token">token</a> = dst_token;
@@ -939,7 +939,7 @@ Get the amount from sender token
 <b>let</b> pending_claims = <b>global</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).pending_claims;
 <b>let</b> token_offer_id = <a href="token_transfers.md#0x3_token_transfers_create_token_offer_id">create_token_offer_id</a>(receiver, token_id);
 <b>aborts_if</b> !<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_claims, token_offer_id);
-<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a>{<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: sender };
+<b>include</b> <a href="token.md#0x3_token_InitializeTokenStore">token::InitializeTokenStore</a>{<a href="">account</a>: sender };
 <b>let</b> dst_token = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(pending_claims, token_offer_id);
 <b>let</b> account_addr = sender_addr;
 <b>let</b> <a href="token.md#0x3_token">token</a> = dst_token;
