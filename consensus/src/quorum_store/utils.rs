@@ -251,17 +251,28 @@ impl ProofQueue {
     fn remaining_txns_without_duplicates(&self) -> u64 {
         let mut remaining_txns = self.txn_summary_num_occurrences.len() as u64;
 
-        // If a batch_key is not in batches_with_txn_summary, it means we've received the proof but haven't receive the
-        // transaction summary of the batch from batch coordinator. Add the number of txns in the batch to remaining_txns.
+        // Not all batches have transaction summaries included in txn_summary_num_occurrences / batch_to_txn_summaries.
+        // For these batches without transaction summaries, we add the number of txns in the batch to remaining_txns.
         remaining_txns += self
-            .batch_to_proof
-            .iter()
-            .filter_map(|(batch_key, proof)| {
-                if proof.is_some() && !self.batch_to_txn_summaries.contains_key(batch_key) {
-                    Some(proof.as_ref().unwrap().0.num_txns())
-                } else {
-                    None
-                }
+            .author_to_batches
+            .values()
+            .map(|batches| {
+                batches
+                    .keys()
+                    .map(|batch_sort_key| {
+                        if !self
+                            .batch_to_txn_summaries
+                            .contains_key(&batch_sort_key.batch_key)
+                        {
+                            if let Some(Some((proof, _))) =
+                                self.batch_to_proof.get(&batch_sort_key.batch_key)
+                            {
+                                return proof.num_txns();
+                            }
+                        }
+                        0
+                    })
+                    .sum::<u64>()
             })
             .sum::<u64>();
 
