@@ -36,7 +36,7 @@ impl Default for QuorumStoreBackPressureConfig {
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
             dynamic_min_txn_per_s: 160,
-            dynamic_max_txn_per_s: 4000,
+            dynamic_max_txn_per_s: 8000,
         }
     }
 }
