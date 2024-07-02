@@ -1,0 +1,9 @@
+// -- Model dump before bytecode pipeline
+module 0x42::package {
+    friend fun package(package: u8): u8 {
+        {
+          let package: u8 = Add<u8>(package, 1);
+          package
+        }
+    }
+} // end 0x42::package
