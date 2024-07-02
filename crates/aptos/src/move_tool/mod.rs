@@ -6,11 +6,11 @@ use crate::{
     common::{
         local_simulation,
         types::{
-            load_account_arg, ArgWithTypeJSON, CliConfig, CliError, CliTypedResult,
+            load_account_arg, ArgWithTypeJSON, ArgWithTypeVec, CliConfig, CliError, CliTypedResult,
             ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
             MoveManifestAccountWrapper, MovePackageDir, OverrideSizeCheckOption, ProfileOptions,
             PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments, TransactionOptions,
-            TransactionSummary,
+            TransactionSummary, TypeArgVec,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -316,6 +316,18 @@ pub struct CompilePackage {
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
+}
+
+impl CompilePackage {
+    pub fn new_for_indexer_testing(package_dir: PathBuf) -> Self {
+        Self {
+            save_metadata: true,
+            included_artifacts_args: IncludedArtifactsArgs {
+                included_artifacts: IncludedArtifacts::All,
+            },
+            move_options: MovePackageDir::new(package_dir),
+        }
+    }
 }
 
 #[async_trait]
@@ -658,6 +670,21 @@ pub struct PublishPackage {
     pub(crate) move_options: MovePackageDir,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
+}
+
+impl PublishPackage {
+    pub fn new_for_indexer_testing(package_dir: PathBuf) -> Self {
+        Self {
+            override_size_check_option: OverrideSizeCheckOption {
+                override_size_check: true,
+            },
+            included_artifacts_args: IncludedArtifactsArgs {
+                included_artifacts: IncludedArtifacts::All,
+            },
+            move_options: MovePackageDir::new(package_dir),
+            txn_options: TransactionOptions::default(),
+        }
+    }
 }
 
 struct PackagePublicationData {
@@ -1492,6 +1519,29 @@ pub struct RunScript {
     pub(crate) compile_proposal_args: CompileScriptFunction,
     #[clap(flatten)]
     pub(crate) script_function_args: ScriptFunctionArguments,
+}
+
+impl RunScript {
+    pub fn new_for_indexer_testing(path: PathBuf) -> Self {
+        Self {
+            txn_options: TransactionOptions::default(),
+            compile_proposal_args: CompileScriptFunction {
+                script_path: None,
+                compiled_script_path: Some(path),
+                bytecode_version: None,
+                framework_package_args: FrameworkPackageArgs {
+                    framework_git_rev: None,
+                    framework_local_dir: None,
+                    skip_fetch_latest_git_deps: false,
+                },
+            },
+            script_function_args: ScriptFunctionArguments {
+                json_file: None,
+                type_arg_vec: TypeArgVec { type_args: vec![] },
+                arg_vec: ArgWithTypeVec { args: vec![] },
+            },
+        }
+    }
 }
 
 #[async_trait]

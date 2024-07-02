@@ -36,6 +36,20 @@ pub struct FundWithFaucet {
     pub(crate) profile_options: ProfileOptions,
 }
 
+impl FundWithFaucet {
+    /// Create a new instance of this command with the provided amount.
+    /// This is useful for testing.
+    pub fn default_with_amount(amount: u64) -> Self {
+        Self {
+            account: None,
+            amount,
+            faucet_options: FaucetOptions::default(),
+            rest_options: RestOptions::default(),
+            profile_options: ProfileOptions::default(),
+        }
+    }
+}
+
 #[async_trait]
 impl CliCommand<String> for FundWithFaucet {
     fn command_name(&self) -> &'static str {
